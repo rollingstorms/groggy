@@ -30,7 +30,7 @@ class IROptimizer:
         """
         if passes is None:
             # Skip DCE by default - it's too aggressive before outputs are attached
-            passes = ['constant_fold', 'cse', 'fuse_neighbor', 'fuse_arithmetic']
+            passes = ['constant_fold', 'cse', 'fuse_neighbor']
         
         total_modified = False
         
@@ -363,13 +363,15 @@ class IROptimizer:
         modified = False
         
         # Pattern 1: neighbor_agg -> mul -> fused_neighbor_mul_agg
-        modified |= self._fuse_neighbor_mul_pattern()
+        if self._fuse_neighbor_mul_pattern():
+            modified = True
+            # Rebuild tracking immediately so next pass sees updated graph
+            self.ir.rebuild_var_tracking()
         
         # Pattern 2 & 3: arithmetic chains
-        modified |= self._fuse_arithmetic_chains()
-        
-        # Rebuild variable tracking after graph modifications
-        if modified:
+        if self._fuse_arithmetic_chains():
+            modified = True
+            # Rebuild tracking after arithmetic fusion too
             self.ir.rebuild_var_tracking()
         
         return modified
@@ -486,8 +488,9 @@ class IROptimizer:
             
             # CRUCIAL FIX: Ensure scalar operand is a node-map (broadcast if needed)
             # The fused kernel expects both operands to be node-maps
-            # Insert broadcast before the neighbor_agg node to ensure proper ordering
-            scalar_var = self._ensure_node_map(scalar_var, node.output, node)
+            # Use the VALUES input as reference (it's stable and won't change during fusion)
+            reference_var = node.inputs[0] if len(node.inputs) >= 1 else node.output
+            scalar_var = self._ensure_node_map(scalar_var, reference_var, node)
             
             # Update mul_node's inputs to use the broadcast variable
             # This is important so when we remove mul_node later, references are correct
@@ -543,7 +546,10 @@ class IROptimizer:
             inp2_node = self.ir.get_defining_node(inp2_var)
             
             # Pattern: mul + mul -> check if it's AXPY (a*x + b*y)
-            if inp1_node and inp2_node and inp1_node.op_type == 'mul' and inp2_node.op_type == 'mul':
+            # But don't match if either mul is already a fused operation
+            if (inp1_node and inp2_node and 
+                inp1_node.op_type == 'mul' and inp2_node.op_type == 'mul' and
+                not inp1_node.metadata.get('fused') and not inp2_node.metadata.get('fused')):
                 # Check if each mul is only used by this add
                 uses1 = self.ir.var_uses.get(inp1_var, [])
                 uses2 = self.ir.var_uses.get(inp2_var, [])
@@ -556,13 +562,33 @@ class IROptimizer:
                         self.variable_renames[inp1_var] = node.output
                         self.variable_renames[inp2_var] = node.output
                         
+                        # CRUCIAL FIX: Ensure all operands are node-maps (broadcast scalars if needed)
+                        # FusedAXPY expects: a, x, b, y all as node-maps
+                        # Find a node-map to use as reference for broadcasting
+                        stable_ref = None
+                        for candidate in [inp1_node.inputs[0], inp1_node.inputs[1], inp2_node.inputs[0], inp2_node.inputs[1]]:
+                            if not self._is_scalar_variable(candidate):
+                                stable_ref = candidate
+                                break
+                        if not stable_ref:
+                            # All inputs are scalars - shouldn't happen, use first as fallback
+                            stable_ref = inp1_node.inputs[0]
+                        
+                        a_var = self._ensure_node_map(inp1_node.inputs[0], stable_ref, node)
+                        x_var = self._ensure_node_map(inp1_node.inputs[1], stable_ref, node)
+                        b_var = self._ensure_node_map(inp2_node.inputs[0], stable_ref, node)
+                        y_var = self._ensure_node_map(inp2_node.inputs[1], stable_ref, node)
+                        
                         node.op_type = 'fused_axpy'
                         # AXPY params: a, x, b, y
-                        node.inputs = [
-                            inp1_node.inputs[0], inp1_node.inputs[1],
-                            inp2_node.inputs[0], inp2_node.inputs[1]
-                        ]
+                        node.inputs = [a_var, x_var, b_var, y_var]
                         node.metadata['fused'] = True
+                        node.metadata['fused_inputs'] = {
+                            'a': a_var,
+                            'x': x_var,
+                            'b': b_var,
+                            'y': y_var,
+                        }
                         
                         # Remove the mul nodes
                         for n in [inp1_node, inp2_node]:
@@ -575,16 +601,39 @@ class IROptimizer:
                         continue
             
             # Pattern: mul + scalar/vector -> FusedMADD (a*b + c)
-            if inp1_node and inp1_node.op_type == 'mul':
+            # But don't match if inp1_node is already a fused operation
+            if inp1_node and inp1_node.op_type == 'mul' and not inp1_node.metadata.get('fused'):
                 uses1 = self.ir.var_uses.get(inp1_var, [])
                 if len(uses1) == 1 and len(inp1_node.inputs) >= 2:
                     # Track rename: mul output is eliminated
                     self.variable_renames[inp1_var] = node.output
                     
+                    # CRUCIAL FIX: Ensure all operands are node-maps (broadcast scalars if needed)
+                    # FusedMADD expects: a (node-map), b (node-map), c (node-map)
+                    # Find a node-map to use as reference for broadcasting
+                    # Try the MUL's inputs first, then fall back to inp2_var
+                    stable_ref = None
+                    for candidate in [inp1_node.inputs[0], inp1_node.inputs[1], inp2_var]:
+                        if not self._is_scalar_variable(candidate):
+                            stable_ref = candidate
+                            break
+                    if not stable_ref:
+                        # All inputs are scalars - shouldn't happen, but use first input as fallback
+                        stable_ref = inp1_node.inputs[0]
+                    
+                    a_var = self._ensure_node_map(inp1_node.inputs[0], stable_ref, node)
+                    b_var = self._ensure_node_map(inp1_node.inputs[1], stable_ref, node)
+                    c_var = self._ensure_node_map(inp2_var, stable_ref, node)
+                    
                     # Fuse to MADD: a*b + c
                     node.op_type = 'fused_madd'
-                    node.inputs = [inp1_node.inputs[0], inp1_node.inputs[1], inp2_var]
+                    node.inputs = [a_var, b_var, c_var]
                     node.metadata['fused'] = True
+                    node.metadata['fused_inputs'] = {
+                        'a': a_var,
+                        'b': b_var,
+                        'c': c_var,
+                    }
                     
                     # Remove the mul node
                     if inp1_node in self.ir.nodes:

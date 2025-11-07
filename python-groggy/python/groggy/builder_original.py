@@ -1014,8 +1014,14 @@ class AlgorithmBuilder:
                     target = new_step.get("target")
                     remapped_source = new_step.get("source")  # Already remapped
                     if target and remapped_source:
-                        # Map the target name to the remapped source
+                        # BUGFIX: Add iteration suffix to alias target too
+                        # so that mul_3 becomes mul_3_iter0, mul_3_iter1, etc.
+                        target_with_iter = f"{target}_iter{iteration}"
+                        new_step["target"] = target_with_iter
+                        
+                        # Map both the original target and the iteration-specific target
                         var_mapping[target] = remapped_source
+                        var_mapping[target_with_iter] = remapped_source
                 
                 self.steps.append(new_step)
         

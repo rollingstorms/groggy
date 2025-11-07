@@ -37,13 +37,17 @@ def lpa(sG, max_iter=10):
     """Build LPA using the new decorator-based DSL."""
     # Initialize each node with unique label (use node sequence)
     labels = sG.nodes(unique=True)
+    labels = sG.var("labels", labels)  # Create logical loop variable
     b = sG.builder
     
     with sG.iterate(max_iter):
-        # Collect neighbor labels (including self)
-        neighbor_labels = b.graph_ops.collect_neighbor_values(labels, include_self=True)
-        # Take the mode (most common label)
-        labels = sG.var("labels", b.core.mode(neighbor_labels))
+        updated = b.core.neighbor_mode_update(
+            target=labels,
+            include_self=True,
+            tie_break="lowest",
+            ordered=True,
+        )
+        labels = sG.var("labels", updated)
     
     return labels
 

@@ -14,6 +14,7 @@ from groggy.builder.traits.graph import GraphOps
 from groggy.builder.traits.attr import AttrOps
 from groggy.builder.traits.iter import IterOps
 from groggy.builder.ir import IRGraph, IRNode
+from groggy.builder.execution import MessagePassContext
 
 # Import the original implementation temporarily during refactor
 # This will be fully replaced as we migrate functionality
@@ -78,6 +79,9 @@ class AlgorithmBuilder:
         self._input_ref = None
         self._graph_handle = None
         
+        # Execution context tracking
+        self._active_exec_context = None
+        
         # Register trait namespaces
         self.core = CoreOps(self)
         self.graph_ops = GraphOps(self)
@@ -101,6 +105,38 @@ class AlgorithmBuilder:
             # Allow access to builder from graph handle for convenience
             self._graph_handle.builder = self
         return self._graph_handle
+    
+    def message_pass(self, target: VarHandle, include_self: bool = True,
+                     ordered: bool = True, name: Optional[str] = None,
+                     **options) -> MessagePassContext:
+        """
+        Create a message-passing execution context for Gauss-Seidel style updates.
+        
+        Operations performed inside this context are captured and executed with
+        special semantics: in-place updates, ordered traversal, and efficient
+        neighbor aggregation.
+        
+        Args:
+            target: Variable being updated in this block
+            include_self: Whether to include self-loops in neighbor aggregation
+            ordered: Whether to process nodes in order (Gauss-Seidel) or parallel (Jacobi)
+            name: Optional name for this block (for debugging/profiling)
+            **options: Additional options (tie_break, direction, etc.)
+            
+        Returns:
+            MessagePassContext that can be used as a context manager
+            
+        Example:
+            >>> labels = G.nodes(unique=True)
+            >>> with builder.message_pass(target=labels, include_self=True, ordered=True) as mp:
+            ...     msgs = mp.pull(labels)
+            ...     update = builder.core.mode(msgs, tie_break="lowest")
+            ...     mp.apply(update)
+        """
+        return MessagePassContext(
+            self, target=target, include_self=include_self,
+            ordered=ordered, name=name, **options
+        )
     
     def _new_var(self, prefix: str = "var") -> VarHandle:
         """
@@ -493,9 +529,9 @@ class AlgorithmBuilder:
         self.variables = temp_builder.variables
         self._var_counter = temp_builder._var_counter
         
-        # Now unroll the IR graph if we're using IR
-        if self.use_ir and self.ir_graph is not None:
-            self._unroll_ir_loop(start_step, iterations, loop_vars)
+        # Now rebuild IR graph to reflect unrolled steps
+        if self.use_ir:
+            self._rebuild_ir_from_steps()
     
     def _unroll_ir_loop(self, start_step: int, iterations: int, loop_vars: Dict[str, VarHandle]):
         """
@@ -515,78 +551,8 @@ class AlgorithmBuilder:
         from groggy.builder.ir.graph import IRGraph
         from groggy.builder.ir.nodes import CoreIRNode, GraphIRNode, ControlIRNode
         
-        # Create new IR graph from scratch
-        new_ir = IRGraph(self.ir_graph.name)
-        
-        # Convert each step into an IR node
-        for step in self.steps:
-            # Skip steps that don't create outputs (like alias, attach_attr)
-            output = step.get("output")
-            if not output:
-                continue
-            
-            step_type = step.get("type", "")
-            
-            # Skip alias steps - they don't create new values in IR
-            if step_type == "alias":
-                continue
-            
-            # Determine domain and op_type
-            if "." in step_type:
-                domain_str, op_type = step_type.split(".", 1)
-            else:
-                # Legacy types - default to core
-                domain_str = "core"
-                op_type = step_type
-            
-            # Collect input variable names
-            inputs = []
-            for field in ["input", "source", "a", "b", "left", "right", "scalar", "reference", 
-                          "condition", "if_true", "if_false", "weights", "values"]:
-                value = step.get(field)
-                if value and isinstance(value, str):
-                    inputs.append(value)
-            
-            # Collect metadata - all non-standard fields
-            metadata = {}
-            skip_fields = {"type", "output", "input", "source", "a", "b", "left", "right", 
-                          "scalar", "reference", "condition", "if_true", "if_false", "weights", "values"}
-            for key, value in step.items():
-                if key not in skip_fields:
-                    metadata[key] = value
-            
-            # Create appropriate IR node type
-            node_id = f"node_{len(new_ir.nodes)}"
-            
-            if domain_str == "control":
-                node = ControlIRNode(
-                    node_id=node_id,
-                    op_type=op_type,
-                    inputs=inputs,
-                    output=output,
-                    **metadata
-                )
-            elif domain_str == "graph":
-                node = GraphIRNode(
-                    node_id=node_id,
-                    op_type=op_type,
-                    inputs=inputs,
-                    output=output,
-                    **metadata
-                )
-            else:  # core or unknown
-                node = CoreIRNode(
-                    node_id=node_id,
-                    op_type=op_type,
-                    inputs=inputs,
-                    output=output,
-                    **metadata
-                )
-            
-            new_ir.add_node(node)
-        
-        # Replace the IR graph
-        self.ir_graph = new_ir
+        # Rebuild the IR from updated steps
+        self._rebuild_ir_from_steps()
     
     def attach_as(self, attr_name: str, values: VarHandle):
         """
@@ -687,6 +653,9 @@ class AlgorithmBuilder:
         if optimize and self.use_ir and self.ir_graph is not None:
             from groggy.builder.ir.optimizer import optimize_ir
             
+            # Ensure IR reflects latest step list before optimization
+            self._rebuild_ir_from_steps()
+            
             # Run optimization passes (returns (ir_graph, variable_renames))
             self.ir_graph, variable_renames = optimize_ir(
                 self.ir_graph, passes=None, max_iterations=3, return_renames=True
@@ -695,15 +664,37 @@ class AlgorithmBuilder:
             # Regenerate steps from optimized IR
             ir_steps = self.ir_graph.to_steps()
             
+            # Ensure scalar operands are materialized as constants where required
+            ir_steps = self._materialize_scalar_operands(ir_steps)
+            
             # Extract alias steps from original steps
             alias_steps = [s for s in self.steps if s.get("type") == "alias"]
+            side_effect_steps = [
+                s for s in self.steps
+                if s.get("type") != "alias" and not s.get("output")
+            ]
             
             # Update alias steps to track through fusion transformations
+            expanded_renames = None
             if alias_steps and variable_renames:
-                alias_steps = self._apply_renames_to_aliases(alias_steps, variable_renames)
+                # Expand variable_renames to include iteration-specific mappings
+                # e.g., if mul_3 -> add_5, also add mul_3_iter0 -> add_5_iter0
+                expanded_renames = self._expand_renames_for_iterations(variable_renames, alias_steps)
+                alias_steps = self._apply_renames_to_aliases(alias_steps, expanded_renames)
+            if side_effect_steps and variable_renames:
+                if expanded_renames is None:
+                    expanded_renames = self._expand_renames_for_iterations(variable_renames, alias_steps)
+                side_effect_steps = [
+                    self._apply_renames_to_step_fields(step, expanded_renames)
+                    for step in side_effect_steps
+                ]
+            if expanded_renames:
+                for handle in self.variables.values():
+                    handle.name = self._resolve_rename(handle.name, expanded_renames)
             
             # Merge IR steps and alias steps in dependency order
             steps = self._merge_steps_topologically(ir_steps, alias_steps)
+            steps.extend(side_effect_steps)
         
         algo = BuiltAlgorithm(self.name, steps)
         
@@ -724,6 +715,144 @@ class AlgorithmBuilder:
             algo._validated = True
         
         return algo
+    
+    def _expand_renames_for_iterations(self, variable_renames, alias_steps):
+        """
+        Expand variable renames to include iteration-specific variants.
+        
+        When loops are unrolled, variables get iteration suffixes (e.g., mul_3_iter0).
+        But the optimizer only knows about base renames (e.g., mul_3 -> add_5).
+        This method creates iteration-specific mappings for all iteration variants
+        found in the alias steps.
+        
+        Args:
+            variable_renames: Base variable rename dict (e.g., {'mul_3': 'add_5'})
+            alias_steps: List of alias steps that may reference iteration variants
+            
+        Returns:
+            Expanded rename dict including iteration-specific mappings
+        """
+        import re
+        
+        expanded = dict(variable_renames)  # Start with base renames
+        
+        # Pattern to match iteration-specific variables: varname_iter123
+        iter_pattern = re.compile(r'^(.+)_iter(\d+)$')
+        
+        # Collect all iteration-specific variables from alias steps
+        iter_vars = set()
+        for step in alias_steps:
+            source = step.get('source')
+            if source:
+                match = iter_pattern.match(source)
+                if match:
+                    iter_vars.add(source)
+        
+        # For each iteration variable, check if we have a base rename
+        for iter_var in iter_vars:
+            match = iter_pattern.match(iter_var)
+            if match:
+                base_var = match.group(1)  # e.g., 'mul_3' from 'mul_3_iter0'
+                iter_num = match.group(2)  # e.g., '0' from 'mul_3_iter0'
+                
+                # If we have a base rename, create the iteration-specific rename
+                if base_var in variable_renames:
+                    renamed_base = variable_renames[base_var]  # e.g., 'add_5'
+                    renamed_iter = f"{renamed_base}_iter{iter_num}"  # e.g., 'add_5_iter0'
+                    expanded[iter_var] = renamed_iter
+        
+        return expanded
+    
+    def _materialize_scalar_operands(self, steps):
+        """
+        Ensure operations that expect variable operands don't receive raw literals.
+        
+        Some optimizer passes (e.g., constant folding) can inline literal values
+        into fields such as ``if_true``/``if_false`` on ``core.where`` steps.
+        Rust step implementations expect these operands to reference variables,
+        so we insert constant- or broadcast-producing steps and rewrite the
+        operands to point at generated variables.
+        """
+        materialized = []
+        constant_cache: Dict[float, str] = {}
+        broadcast_cache: Dict[tuple, str] = {}
+        
+        # Track which step defines each variable (before inserting new ones)
+        definition_map: Dict[str, Dict] = {}
+        for step in steps:
+            output = step.get("output")
+            if output is not None:
+                definition_map[output] = step
+
+        i = 0
+        while i < len(steps):
+            step = steps[i]
+            step_type = step.get("type")
+            
+            if step_type in ("core.where", "where"):
+                # Make sure condition references a map. If the condition was
+                # constant-folded to a scalar, broadcast it to match operand size.
+                cond_key = "condition" if "condition" in step else "mask"
+                cond_value = step.get(cond_key)
+                if isinstance(cond_value, str):
+                    defining_step = definition_map.get(cond_value)
+                    if defining_step and defining_step.get("type") in {"core.constant", "init_scalar", "core.init_scalar"}:
+                        # Determine a reference map (prefer if_true, otherwise if_false)
+                        ref_var = None
+                        for candidate in (step.get("if_true"), step.get("if_false")):
+                            if isinstance(candidate, str):
+                                ref_def = definition_map.get(candidate)
+                                if ref_def and ref_def.get("type") not in {"core.constant", "init_scalar", "core.init_scalar"}:
+                                    ref_var = candidate
+                                    break
+                        if ref_var is None:
+                            # Fallback to whatever the step produces; not ideal but keeps pipeline valid.
+                            if isinstance(step.get("output"), str):
+                                ref_var = step["output"]
+                        
+                        if ref_var is not None:
+                            cache_key = (cond_value, ref_var)
+                            broadcast_name = broadcast_cache.get(cache_key)
+                            if broadcast_name is None:
+                                broadcast_handle = self._new_var("broadcast_inline")
+                                broadcast_name = broadcast_handle.name
+                                broadcast_cache[cache_key] = broadcast_name
+                                broadcast_step = {
+                                    "type": "core.broadcast_scalar",
+                                    "output": broadcast_name,
+                                    "scalar": cond_value,
+                                    "reference": ref_var,
+                                }
+                                materialized.append((i, broadcast_step))
+                                definition_map[broadcast_name] = broadcast_step
+                            step[cond_key] = broadcast_name
+
+                for field in ("if_true", "if_false"):
+                    value = step.get(field)
+                    if isinstance(value, (int, float)):
+                        cache_key = float(value)
+                        const_name = constant_cache.get(cache_key)
+                        if const_name is None:
+                            const_handle = self._new_var("const_inline")
+                            const_name = const_handle.name
+                            constant_cache[cache_key] = const_name
+                            const_step = {
+                                "type": "core.constant",
+                                "output": const_name,
+                                "value": value,
+                            }
+                            materialized.append((i, const_step))
+                            definition_map[const_name] = const_step
+                        step[field] = const_name
+            i += 1
+        
+        # Insert constant steps before their use, adjusting for prior insertions.
+        offset = 0
+        for index, const_step in materialized:
+            steps.insert(index + offset, const_step)
+            offset += 1
+        
+        return steps
     
     def _apply_renames_to_aliases(self, steps, variable_renames):
         """
@@ -756,12 +885,104 @@ class AlgorithmBuilder:
                 # Update the 'source' field if it was renamed
                 source_var = step.get("source")
                 if source_var:
-                    final_var = follow_rename_chain(source_var)
+                    final_var = self._resolve_rename(source_var, variable_renames)
                     if final_var != source_var:
                         step = step.copy()
                         step["source"] = final_var
             updated_steps.append(step)
         return updated_steps
+
+    def _apply_renames_to_step_fields(self, step, variable_renames):
+        """
+        Apply variable renames to common step fields (input/source/mask/etc.).
+        """
+        updated = step.copy()
+        for key in ("input", "source", "mask", "condition", "reference", "scalar", "values"):
+            if key in updated and isinstance(updated[key], str):
+                updated[key] = self._resolve_rename(updated[key], variable_renames)
+
+        if "inputs" in updated and isinstance(updated["inputs"], dict):
+            updated["inputs"] = {
+                k: self._resolve_rename(v, variable_renames) if isinstance(v, str) else v
+                for k, v in updated["inputs"].items()
+            }
+
+        return updated
+
+    def _resolve_rename(self, name: str, variable_renames: Dict[str, str]) -> str:
+        """Follow rename chain to final variable name."""
+        current = name
+        visited = set()
+        while current in variable_renames and current not in visited:
+            visited.add(current)
+            current = variable_renames[current]
+        return current
+
+    def _rebuild_ir_from_steps(self):
+        """
+        Reconstruct the IR graph from the current step list.
+        """
+        if not self.use_ir:
+            return
+        
+        from groggy.builder.ir.graph import IRGraph
+        from groggy.builder.ir.nodes import CoreIRNode, GraphIRNode, ControlIRNode
+        
+        graph_name = self.ir_graph.name if self.ir_graph is not None else self.name
+        new_ir = IRGraph(graph_name)
+        
+        for step in self.steps:
+            output = step.get("output")
+            if not output:
+                continue
+            if step.get("type") == "alias":
+                continue
+            
+            step_type = step.get("type", "")
+            if "." in step_type:
+                domain_str, op_type = step_type.split(".", 1)
+            else:
+                domain_str = "core"
+                op_type = step_type
+            
+            inputs = []
+            for field in [
+                "input", "source", "a", "b", "left", "right", "scalar",
+                "reference", "condition", "if_true", "if_false", "weights", "values"
+            ]:
+                value = step.get(field)
+                if isinstance(value, str):
+                    inputs.append(value)
+            if op_type == "map_nodes":
+                for value in step.get("inputs", {}).values():
+                    if isinstance(value, str):
+                        inputs.append(value)
+            
+            metadata = {}
+            skip_fields = {
+                "type", "output", "input", "source", "a", "b", "left", "right",
+                "scalar", "reference", "condition", "if_true", "if_false",
+                "weights", "values", "inputs"
+            }
+            for key, value in step.items():
+                if key not in skip_fields:
+                    metadata[key] = value
+            if op_type == "map_nodes":
+                metadata["map_inputs"] = step.get("inputs", {})
+                metadata["fn"] = step.get("fn", "")
+                metadata["async_update"] = step.get("async_update", False)
+            
+            node_id = f"node_{len(new_ir.nodes)}"
+            if domain_str == "graph":
+                node = GraphIRNode(node_id=node_id, op_type=op_type, inputs=inputs, output=output, **metadata)
+            elif domain_str == "control":
+                node = ControlIRNode(node_id=node_id, op_type=op_type, inputs=inputs, output=output, **metadata)
+            else:
+                node = CoreIRNode(node_id=node_id, op_type=op_type, inputs=inputs, output=output, **metadata)
+            
+            new_ir.add_node(node)
+        
+        self.ir_graph = new_ir
     
     def _merge_steps_topologically(self, ir_steps, alias_steps):
         """

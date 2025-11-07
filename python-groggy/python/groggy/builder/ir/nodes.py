@@ -18,6 +18,7 @@ class IRDomain(Enum):
     GRAPH = "graph"         # Topology operations, neighbor aggregation
     ATTR = "attr"           # Attribute load/store
     CONTROL = "control"     # Loops, convergence checks
+    EXECUTION = "execution" # Execution blocks (message-pass, streaming)
     UNKNOWN = "unknown"
 
 
@@ -112,9 +113,12 @@ class CoreIRNode(IRNode):
             }
         
         step = {
-            "type": f"core.{self.op_type}",
-            "output": self.output
+            "type": f"core.{self.op_type}"
         }
+        
+        # Fused operations use "target" instead of "output"
+        if "fused" not in self.op_type:
+            step["output"] = self.output
         
         # Map inputs to legacy parameter names
         if self.op_type in ["add", "sub", "mul", "div", "pow"]:
@@ -134,10 +138,37 @@ class CoreIRNode(IRNode):
             step["a"] = self.inputs[0]
             step["b"] = self.inputs[1] if len(self.inputs) > 1 else self.metadata.get("b", 0.0)
             step["op"] = self.metadata.get("op", "eq")
+        elif self.op_type == "reduce_scalar":
+            # Reduce scalar operations expect a single source input
+            if self.inputs:
+                step["source"] = self.inputs[0]
+            step["op"] = self.metadata.get("op", "sum")
+        elif self.op_type == "normalize_sum":
+            if self.inputs:
+                step["input"] = self.inputs[0]
+        elif self.op_type == "collect_neighbor_values":
+            if self.inputs:
+                step["source"] = self.inputs[0]
+            step["include_self"] = self.metadata.get("include_self", True)
+        elif self.op_type == "mode_list":
+            if self.inputs:
+                step["source"] = self.inputs[0]
+            step["tie_break"] = self.metadata.get("tie_break", "lowest")
+        elif self.op_type == "map_nodes":
+            step["type"] = "map_nodes"
+            step["fn"] = self.metadata.get("fn", "")
+            step["inputs"] = self.metadata.get("map_inputs", {})
+            step["async_update"] = self.metadata.get("async_update", False)
         elif self.op_type == "fused_axpy":
             # Fused AXPY: result = a * x + b * y
             # Rust signature: FusedAXPY(a, x, b, y, target)
-            if len(self.inputs) >= 4:
+            fused_inputs = self.metadata.get("fused_inputs")
+            if fused_inputs:
+                step["a"] = fused_inputs.get("a")
+                step["x"] = fused_inputs.get("x")
+                step["b"] = fused_inputs.get("b")
+                step["y"] = fused_inputs.get("y")
+            elif len(self.inputs) >= 4:
                 step["a"] = self.inputs[0]
                 step["x"] = self.inputs[1]
                 step["b"] = self.inputs[2]
@@ -146,7 +177,12 @@ class CoreIRNode(IRNode):
         elif self.op_type == "fused_madd":
             # Fused MADD: result = a * b + c
             # Rust signature: FusedMADD(a, b, c, target)
-            if len(self.inputs) >= 3:
+            fused_inputs = self.metadata.get("fused_inputs")
+            if fused_inputs:
+                step["a"] = fused_inputs.get("a")
+                step["b"] = fused_inputs.get("b")
+                step["c"] = fused_inputs.get("c")
+            elif len(self.inputs) >= 3:
                 step["a"] = self.inputs[0]
                 step["b"] = self.inputs[1]
                 step["c"] = self.inputs[2]
@@ -159,6 +195,8 @@ class CoreIRNode(IRNode):
         
         # Add any additional metadata
         for key, value in self.metadata.items():
+            if key in {"fused_inputs", "map_inputs"}:
+                continue  # internal bookkeeping only
             if key not in step:
                 step[key] = value
         
@@ -201,9 +239,12 @@ class GraphIRNode(IRNode):
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format."""
         step = {
-            "type": f"graph.{self.op_type}",
-            "output": self.output
+            "type": f"graph.{self.op_type}"
         }
+        
+        # Fused operations use "target" instead of "output"
+        if "fused" not in self.op_type:
+            step["output"] = self.output
         
         # Map inputs to legacy parameter names
         if self.op_type == "degree":
@@ -353,5 +394,89 @@ class ControlIRNode(IRNode):
         return step
 
 
+@dataclass
+class ExecutionBlockNode(IRNode):
+    """
+    IR node for structured execution blocks (message-passing, streaming, etc.).
+    
+    Execution blocks encapsulate a sub-computation with specific semantics:
+    - Message-Pass: Gauss-Seidel style neighbor updates with in-place writes
+    - Streaming: Incremental/transactional updates (future)
+    
+    The block contains its own mini-DAG of operations that are executed
+    with special semantics (e.g., ordered traversal, in-place updates).
+    """
+    
+    def __init__(self, node_id: str, mode: str, target: str, **metadata):
+        """
+        Create an execution block node.
+        
+        Args:
+            node_id: Unique identifier for this block
+            mode: Execution mode ("message_pass", "streaming", etc.)
+            target: Variable being updated by the block
+            **metadata: Block configuration (include_self, ordered, tie_break, etc.)
+        """
+        super().__init__(
+            id=node_id,
+            domain=IRDomain.EXECUTION,
+            op_type=f"block_{mode}",
+            inputs=[],  # Inputs tracked in body nodes
+            output=target,
+            metadata={
+                "mode": mode,
+                "target": target,
+                "body_nodes": [],  # List of IRNode dicts representing block body
+                **metadata
+            }
+        )
+    
+    @property
+    def mode(self) -> str:
+        """Get the execution mode of this block."""
+        return self.metadata["mode"]
+    
+    @property
+    def target(self) -> str:
+        """Get the target variable being updated."""
+        return self.metadata["target"]
+    
+    @property
+    def body_nodes(self) -> List[Dict[str, Any]]:
+        """Get the body operations of this block."""
+        return self.metadata.get("body_nodes", [])
+    
+    def add_body_node(self, node: IRNode) -> None:
+        """Add an operation to the block body."""
+        if "body_nodes" not in self.metadata:
+            self.metadata["body_nodes"] = []
+        self.metadata["body_nodes"].append(node.to_dict())
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "domain": self.domain.value,
+            "op_type": self.op_type,
+            "mode": self.mode,
+            "target": self.target,
+            "metadata": self.metadata
+        }
+    
+    def to_step(self) -> Dict[str, Any]:
+        """Convert to legacy step format (for FFI serialization)."""
+        return {
+            "type": "core.execution_block",
+            "mode": self.mode,
+            "target": self.target,
+            "options": {
+                k: v for k, v in self.metadata.items()
+                if k not in ["mode", "target", "body_nodes"]
+            },
+            "body": {
+                "nodes": self.body_nodes
+            }
+        }
+
+
 # Convenience type for any IR node
-AnyIRNode = Union[CoreIRNode, GraphIRNode, AttrIRNode, ControlIRNode]
+AnyIRNode = Union[CoreIRNode, GraphIRNode, AttrIRNode, ControlIRNode, ExecutionBlockNode]

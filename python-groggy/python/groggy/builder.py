@@ -898,104 +898,32 @@ class AlgorithmBuilder:
         # Track variable renames across iterations
         var_mapping = {v.name: v.name for v in loop_vars.values()}
         
+        def remap_value(val):
+            """Recursively remap variable references using current iteration mapping."""
+            if isinstance(val, str):
+                return var_mapping.get(val, val)
+            if isinstance(val, list):
+                return [remap_value(item) for item in val]
+            if isinstance(val, dict):
+                return {key: remap_value(value) for key, value in val.items()}
+            return val
+        
         # Repeat body N times
         for iteration in range(iterations):
             for step in loop_body:
                 # Clone step
                 new_step = step.copy()
+                step_type = new_step.get("type")
                 
-                # Rename input variables for this iteration
-                if "input" in new_step:
-                    new_step["input"] = var_mapping.get(
-                        new_step["input"],
-                        new_step["input"]
-                    )
-                
-                if "left" in new_step:
-                    if isinstance(new_step["left"], str):
-                        new_step["left"] = var_mapping.get(
-                            new_step["left"],
-                            new_step["left"]
-                        )
-                
-                if "right" in new_step and isinstance(new_step["right"], str):
-                    new_step["right"] = var_mapping.get(
-                        new_step["right"],
-                        new_step["right"]
-                    )
-                
-                # Handle map_nodes inputs
-                if "inputs" in new_step and isinstance(new_step["inputs"], dict):
-                    new_inputs = {}
-                    for key, val in new_step["inputs"].items():
-                        # Check if the key (logical name) has a mapping, otherwise check the value
-                        if key in var_mapping:
-                            new_inputs[key] = var_mapping[key]
-                        else:
-                            new_inputs[key] = var_mapping.get(val, val)
-                    new_step["inputs"] = new_inputs
-                
-                # Handle alias source
-                if "source" in new_step and isinstance(new_step["source"], str):
-                    new_step["source"] = var_mapping.get(
-                        new_step["source"],
-                        new_step["source"]
-                    )
-                
-                # Handle core.where fields
-                if "condition" in new_step and isinstance(new_step["condition"], str):
-                    new_step["condition"] = var_mapping.get(
-                        new_step["condition"],
-                        new_step["condition"]
-                    )
-                if "if_true" in new_step and isinstance(new_step["if_true"], str):
-                    new_step["if_true"] = var_mapping.get(
-                        new_step["if_true"],
-                        new_step["if_true"]
-                    )
-                if "if_false" in new_step and isinstance(new_step["if_false"], str):
-                    new_step["if_false"] = var_mapping.get(
-                        new_step["if_false"],
-                        new_step["if_false"]
-                    )
-                
-                # Handle core.broadcast_scalar fields
-                if "scalar" in new_step and isinstance(new_step["scalar"], str):
-                    new_step["scalar"] = var_mapping.get(
-                        new_step["scalar"],
-                        new_step["scalar"]
-                    )
-                if "reference" in new_step and isinstance(new_step["reference"], str):
-                    new_step["reference"] = var_mapping.get(
-                        new_step["reference"],
-                        new_step["reference"]
-                    )
-                
-                # Handle other common fields (weights, target, etc.)
-                if "weights" in new_step and isinstance(new_step["weights"], str):
-                    new_step["weights"] = var_mapping.get(
-                        new_step["weights"],
-                        new_step["weights"]
-                    )
-                if "target" in new_step and new_step.get("type") != "alias" and isinstance(new_step["target"], str):
-                    new_step["target"] = var_mapping.get(
-                        new_step["target"],
-                        new_step["target"]
-                    )
-                
-                # Handle a, b fields (used by core.mul, core.add, etc.)
-                if "a" in new_step and isinstance(new_step["a"], str):
-                    new_step["a"] = var_mapping.get(
-                        new_step["a"],
-                        new_step["a"]
-                    )
-                if "b" in new_step and isinstance(new_step["b"], str):
-                    new_step["b"] = var_mapping.get(
-                        new_step["b"],
-                        new_step["b"]
-                    )
-                
-                # Note: alias target is NOT renamed - it's the logical name we're assigning to
+                # Remap all variable references except for fields we handle explicitly
+                for key, value in list(new_step.items()):
+                    if key == "type":
+                        continue
+                    if key == "output":
+                        continue  # handled below with iteration suffix
+                    if step_type == "alias" and key == "target":
+                        continue  # logical name should remain stable
+                    new_step[key] = remap_value(value)
                 
                 # Generate unique output name for this iteration
                 if "output" in new_step:
@@ -1005,10 +933,12 @@ class AlgorithmBuilder:
                     
                     # Update mapping
                     var_mapping[original_output] = new_output
+                    # Update paired target fields to use the new output name
+                    if step_type != "alias" and "target" in new_step and isinstance(new_step["target"], str):
+                        new_step["target"] = new_output
                 
-                # Handle alias target - update var_mapping immediately after processing
-                # Note: new_step["source"] has already been remapped on line 939-943,
-                # so it points to the correct iteration-specific variable
+                # Handle alias target - update mapping immediately after processing.
+                # new_step["source"] has already been remapped for this iteration.
                 if new_step.get("type") == "alias" and "target" in new_step:
                     target = new_step.get("target")
                     remapped_source = new_step.get("source")  # Already remapped
