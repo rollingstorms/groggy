@@ -57,9 +57,5 @@ fn bench_closeness(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    centrality,
-    bench_betweenness,
-    bench_closeness
-);
+criterion_group!(centrality, bench_betweenness, bench_closeness);
 criterion_main!(centrality);

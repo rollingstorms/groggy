@@ -19,6 +19,7 @@ mod filtering;
 mod flow;
 mod fused;
 mod init;
+mod loop_step;
 mod normalization;
 mod pathfinding;
 mod registry;
@@ -70,9 +71,7 @@ pub use sampling::{EntityType, ReservoirSampleStep, SampleEdgesStep, SampleNodes
 pub use structural::{
     EdgeWeightSumStep, KCoreMarkStep, NodeDegreeStep, TriangleCountStep, WeightedDegreeStep,
 };
-pub use transformations::{
-    MapNodesExprStep, MapNodesStep, NeighborModeUpdateStep, NodeMapFn,
-};
+pub use transformations::{MapNodesExprStep, MapNodesStep, NeighborModeUpdateStep, NodeMapFn};
 
 // Re-export fused operations
 pub use fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
@@ -81,7 +80,7 @@ pub use fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
 pub use direction::NeighborDirection;
 
 // Re-export execution block types
-pub use execution_block::{ExecutionBlockStep, ExecutionMode, BlockOptions, BlockBody, BodyNode};
+pub use execution_block::{BlockBody, BlockOptions, BodyNode, ExecutionBlockStep, ExecutionMode};
 
 // Re-export temporal steps
 pub use temporal::{

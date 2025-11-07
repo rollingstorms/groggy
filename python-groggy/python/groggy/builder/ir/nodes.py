@@ -7,6 +7,7 @@ and optimization.
 """
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
@@ -395,6 +396,68 @@ class ControlIRNode(IRNode):
 
 
 @dataclass
+class LoopIRNode(IRNode):
+    """
+    IR node for structured fixed-iteration loops.
+
+    Stores the serialized body so that the builder can preserve the original
+    operations without unrolling them across the IR or FFI boundary.
+    """
+
+    def __init__(
+        self,
+        node_id: str,
+        iterations: int,
+        body: List[Dict[str, Any]],
+        loop_vars: Optional[List[str]] = None,
+    ):
+        super().__init__(
+            id=node_id,
+            domain=IRDomain.CONTROL,
+            op_type="iter_loop",
+            inputs=[],
+            output=None,
+            metadata={
+                "iterations": iterations,
+                "body": body,
+                "loop_vars": loop_vars or [],
+            },
+        )
+
+    @property
+    def iterations(self) -> int:
+        return int(self.metadata.get("iterations", 1))
+
+    @property
+    def body(self) -> List[Dict[str, Any]]:
+        return self.metadata.get("body", [])
+
+    @property
+    def loop_vars(self) -> List[str]:
+        return self.metadata.get("loop_vars", [])
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "domain": self.domain.value,
+            "op_type": self.op_type,
+            "iterations": self.iterations,
+            "body": deepcopy(self.body),
+            "loop_vars": list(self.loop_vars),
+        }
+
+    def to_step(self) -> Dict[str, Any]:
+        step = {
+            "type": "iter.loop",
+            "iterations": self.iterations,
+            "body": deepcopy(self.body),
+        }
+        if self.loop_vars:
+            step["loop_vars"] = list(self.loop_vars)
+        return step
+
+
+@dataclass
 class ExecutionBlockNode(IRNode):
     """
     IR node for structured execution blocks (message-passing, streaming, etc.).
@@ -567,4 +630,11 @@ class ExecutionBlockNode(IRNode):
 
 
 # Convenience type for any IR node
-AnyIRNode = Union[CoreIRNode, GraphIRNode, AttrIRNode, ControlIRNode, ExecutionBlockNode]
+AnyIRNode = Union[
+    CoreIRNode,
+    GraphIRNode,
+    AttrIRNode,
+    ControlIRNode,
+    LoopIRNode,
+    ExecutionBlockNode,
+]

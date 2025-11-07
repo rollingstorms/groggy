@@ -132,7 +132,9 @@ impl Algorithm for StepPipelineAlgorithm {
         if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
             eprintln!(
                 "[exec_{}] Pipeline '{}' starting with {} steps",
-                execution_id, self.display_name, self.steps.len()
+                execution_id,
+                self.display_name,
+                self.steps.len()
             );
         }
 

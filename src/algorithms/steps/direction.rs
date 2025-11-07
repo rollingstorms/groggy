@@ -12,11 +12,11 @@ pub enum NeighborDirection {
     /// Incoming edges: for node N, iterate over nodes M where M→N exists.
     /// Used by: PageRank (aggregate from incoming), LPA (incoming labels).
     In,
-    
+
     /// Outgoing edges: for node N, iterate over nodes M where N→M exists.
     /// Used by: BFS/DFS (traverse outward), shortest paths.
     Out,
-    
+
     /// Undirected: for node N, iterate over all connected nodes (both directions).
     /// Used by: undirected graphs, community detection on symmetric networks.
     Undirected,
@@ -63,7 +63,9 @@ impl NeighborDirection {
     pub fn edge_mapping(&self) -> fn((usize, usize)) -> (usize, usize) {
         match self {
             NeighborDirection::In => |(source, target)| (target, source),
-            NeighborDirection::Out | NeighborDirection::Undirected => |(source, target)| (source, target),
+            NeighborDirection::Out | NeighborDirection::Undirected => {
+                |(source, target)| (source, target)
+            }
         }
     }
 }
@@ -74,16 +76,37 @@ mod tests {
 
     #[test]
     fn test_direction_parsing() {
-        assert_eq!(NeighborDirection::from_str("in"), Some(NeighborDirection::In));
-        assert_eq!(NeighborDirection::from_str("IN"), Some(NeighborDirection::In));
-        assert_eq!(NeighborDirection::from_str("incoming"), Some(NeighborDirection::In));
-        
-        assert_eq!(NeighborDirection::from_str("out"), Some(NeighborDirection::Out));
-        assert_eq!(NeighborDirection::from_str("outgoing"), Some(NeighborDirection::Out));
-        
-        assert_eq!(NeighborDirection::from_str("undirected"), Some(NeighborDirection::Undirected));
-        assert_eq!(NeighborDirection::from_str("both"), Some(NeighborDirection::Undirected));
-        
+        assert_eq!(
+            NeighborDirection::from_str("in"),
+            Some(NeighborDirection::In)
+        );
+        assert_eq!(
+            NeighborDirection::from_str("IN"),
+            Some(NeighborDirection::In)
+        );
+        assert_eq!(
+            NeighborDirection::from_str("incoming"),
+            Some(NeighborDirection::In)
+        );
+
+        assert_eq!(
+            NeighborDirection::from_str("out"),
+            Some(NeighborDirection::Out)
+        );
+        assert_eq!(
+            NeighborDirection::from_str("outgoing"),
+            Some(NeighborDirection::Out)
+        );
+
+        assert_eq!(
+            NeighborDirection::from_str("undirected"),
+            Some(NeighborDirection::Undirected)
+        );
+        assert_eq!(
+            NeighborDirection::from_str("both"),
+            Some(NeighborDirection::Undirected)
+        );
+
         assert_eq!(NeighborDirection::from_str("invalid"), None);
     }
 
@@ -102,13 +125,13 @@ mod tests {
     #[test]
     fn test_edge_mapping() {
         let edge = (1, 2); // source=1, target=2
-        
+
         // Incoming: swap to (target, source)
         assert_eq!(NeighborDirection::In.edge_mapping()(edge), (2, 1));
-        
+
         // Outgoing: keep as (source, target)
         assert_eq!(NeighborDirection::Out.edge_mapping()(edge), (1, 2));
-        
+
         // Undirected: keep as (source, target), will add reverse via flag
         assert_eq!(NeighborDirection::Undirected.edge_mapping()(edge), (1, 2));
     }
@@ -118,7 +141,7 @@ mod tests {
         let dir = NeighborDirection::In;
         let json = serde_json::to_string(&dir).unwrap();
         assert_eq!(json, r#""in""#);
-        
+
         let deserialized: NeighborDirection = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized, NeighborDirection::In);
     }

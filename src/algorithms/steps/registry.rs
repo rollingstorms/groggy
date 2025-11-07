@@ -17,12 +17,16 @@ use super::attributes::{
 };
 use super::community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
 use super::core::{global_step_registry, StepMetadata, StepRegistry};
+use super::execution_block::{
+    BlockBody, BlockOptions, BodyNode, ExecutionBlockStep, ExecutionMode,
+};
 use super::expression::Expr;
 use super::filtering::{
     FilterEdgesByAttrStep, FilterNodesByAttrStep, Predicate, SortNodesByAttrStep, SortOrder,
     TopKStep,
 };
 use super::flow::{FlowUpdateStep, ResidualCapacityStep};
+use super::fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
 use super::init::{InitEdgesStep, InitNodesStep, InitNodesWithIndexStep};
 use super::normalization::{
     ClipValuesStep, NormalizeMethod, NormalizeNodeValuesStep, NormalizeValuesStep, StandardizeStep,
@@ -36,8 +40,6 @@ use super::temporal::{
     TemporalPredicate, WindowAggregateStep,
 };
 use super::transformations::MapNodesExprStep;
-use super::fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
-use super::execution_block::{ExecutionBlockStep, ExecutionMode, BlockOptions, BlockBody, BodyNode};
 
 /// Register the core steps that ship with the engine.
 pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
@@ -95,7 +97,10 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get("value")
                 .cloned()
                 .unwrap_or(AlgorithmParamValue::None);
-            Ok(Box::new(super::init::InitScalarStep::new(target.to_string(), value)))
+            Ok(Box::new(super::init::InitScalarStep::new(
+                target.to_string(),
+                value,
+            )))
         },
     )?;
 
@@ -111,7 +116,9 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.graph_node_count requires 'target' param"))?;
-            Ok(Box::new(super::init::GraphNodeCountStep::new(target.to_string())))
+            Ok(Box::new(super::init::GraphNodeCountStep::new(
+                target.to_string(),
+            )))
         },
     )?;
 
@@ -127,7 +134,9 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.graph_edge_count requires 'target' param"))?;
-            Ok(Box::new(super::init::GraphEdgeCountStep::new(target.to_string())))
+            Ok(Box::new(super::init::GraphEdgeCountStep::new(
+                target.to_string(),
+            )))
         },
     )?;
 
@@ -294,19 +303,18 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("source")
                 .ok_or_else(|| anyhow!("core.recip requires 'source' param"))?
                 .to_string();
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.recip requires 'target' param"))?
                 .to_string();
-            
-            let epsilon = spec
-                .params
-                .get_float("epsilon")
-                .unwrap_or(1e-10);
-            
-            Ok(Box::new(super::arithmetic::RecipStep::new(source, target, epsilon)))
+
+            let epsilon = spec.params.get_float("epsilon").unwrap_or(1e-10);
+
+            Ok(Box::new(super::arithmetic::RecipStep::new(
+                source, target, epsilon,
+            )))
         },
     )?;
 
@@ -323,27 +331,29 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("left")
                 .ok_or_else(|| anyhow!("core.compare requires 'left' param"))?
                 .to_string();
-            
+
             let op_str = spec
                 .params
                 .get_text("op")
                 .ok_or_else(|| anyhow!("core.compare requires 'op' param"))?;
-            
+
             let op = super::arithmetic::CompareOp::from_str(op_str)?;
-            
+
             let right = spec
                 .params
                 .get_text("right")
                 .ok_or_else(|| anyhow!("core.compare requires 'right' param"))?
                 .to_string();
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.compare requires 'target' param"))?
                 .to_string();
-            
-            Ok(Box::new(super::arithmetic::CompareStep::new(left, op, right, target)))
+
+            Ok(Box::new(super::arithmetic::CompareStep::new(
+                left, op, right, target,
+            )))
         },
     )?;
 
@@ -360,26 +370,28 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("condition")
                 .ok_or_else(|| anyhow!("core.where requires 'condition' param"))?
                 .to_string();
-            
+
             let if_true = spec
                 .params
                 .get_text("if_true")
                 .ok_or_else(|| anyhow!("core.where requires 'if_true' param"))?
                 .to_string();
-            
+
             let if_false = spec
                 .params
                 .get_text("if_false")
                 .ok_or_else(|| anyhow!("core.where requires 'if_false' param"))?
                 .to_string();
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.where requires 'target' param"))?
                 .to_string();
-            
-            Ok(Box::new(super::arithmetic::WhereStep::new(condition, if_true, if_false, target)))
+
+            Ok(Box::new(super::arithmetic::WhereStep::new(
+                condition, if_true, if_false, target,
+            )))
         },
     )?;
 
@@ -396,21 +408,23 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("source")
                 .ok_or_else(|| anyhow!("core.reduce_scalar requires 'source' param"))?
                 .to_string();
-            
+
             let op_str = spec
                 .params
                 .get_text("op")
                 .ok_or_else(|| anyhow!("core.reduce_scalar requires 'op' param"))?;
-            
+
             let op = super::arithmetic::ReductionOp::from_str(op_str)?;
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.reduce_scalar requires 'target' param"))?
                 .to_string();
-            
-            Ok(Box::new(super::arithmetic::ReduceScalarStep::new(source, op, target)))
+
+            Ok(Box::new(super::arithmetic::ReduceScalarStep::new(
+                source, op, target,
+            )))
         },
     )?;
 
@@ -427,20 +441,22 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("scalar")
                 .ok_or_else(|| anyhow!("core.broadcast_scalar requires 'scalar' param"))?
                 .to_string();
-            
+
             let reference = spec
                 .params
                 .get_text("reference")
                 .ok_or_else(|| anyhow!("core.broadcast_scalar requires 'reference' param"))?
                 .to_string();
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.broadcast_scalar requires 'target' param"))?
                 .to_string();
-            
-            Ok(Box::new(super::arithmetic::BroadcastScalarStep::new(scalar, reference, target)))
+
+            Ok(Box::new(super::arithmetic::BroadcastScalarStep::new(
+                scalar, reference, target,
+            )))
         },
     )?;
 
@@ -457,18 +473,15 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("source")
                 .ok_or_else(|| anyhow!("core.collect_neighbor_values requires 'source' param"))?
                 .to_string();
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.collect_neighbor_values requires 'target' param"))?
                 .to_string();
-            
-            let include_self = spec
-                .params
-                .get_bool("include_self")
-                .unwrap_or(true);
-            
+
+            let include_self = spec.params.get_bool("include_self").unwrap_or(true);
+
             Ok(Box::new(super::arithmetic::CollectNeighborValuesStep::new(
                 source,
                 target,
@@ -490,13 +503,13 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("source")
                 .ok_or_else(|| anyhow!("core.mode_list requires 'source' param"))?
                 .to_string();
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.mode_list requires 'target' param"))?
                 .to_string();
-            
+
             let tie_break = spec
                 .params
                 .get_text("tie_break")
@@ -507,11 +520,9 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                     _ => super::arithmetic::ModeTieBreak::Lowest,
                 })
                 .unwrap_or(super::arithmetic::ModeTieBreak::Lowest);
-            
+
             Ok(Box::new(super::arithmetic::ModeListStep::new(
-                source,
-                target,
-                tie_break,
+                source, target, tie_break,
             )))
         },
     )?;
@@ -529,30 +540,23 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("source")
                 .ok_or_else(|| anyhow!("core.update_in_place requires 'source' param"))?
                 .to_string();
-            
+
             let target = spec
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.update_in_place requires 'target' param"))?
                 .to_string();
-            
-            let ordered = spec
-                .params
-                .get_bool("ordered")
-                .unwrap_or(false);
-            
+
+            let ordered = spec.params.get_bool("ordered").unwrap_or(false);
+
             let output = spec.params.get_text("output").map(|s| s.to_string());
-            
-            let mut step = super::transformations::UpdateInPlaceStep::new(
-                source,
-                target,
-                ordered,
-            );
-            
+
+            let mut step = super::transformations::UpdateInPlaceStep::new(source, target, ordered);
+
             if let Some(output_var) = output {
                 step = step.with_output(output_var);
             }
-            
+
             Ok(Box::new(step))
         },
     )?;
@@ -561,8 +565,8 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         "core.neighbor_mode_update",
         StepMetadata {
             id: "core.neighbor_mode_update".to_string(),
-            description:
-                "Update labels in-place using neighbor mode with deterministic ordering".to_string(),
+            description: "Update labels in-place using neighbor mode with deterministic ordering"
+                .to_string(),
             cost_hint: CostHint::Linear,
         },
         |spec| {
@@ -655,18 +659,15 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 Some("max") => NeighborAggType::Max,
                 Some(other) => return Err(anyhow!("unknown aggregation type '{other}'")),
             };
-            
-            let mut step = NeighborAggregationStep::new(
-                source.to_string(),
-                target.to_string(),
-                agg_type,
-            );
-            
+
+            let mut step =
+                NeighborAggregationStep::new(source.to_string(), target.to_string(), agg_type);
+
             // Add optional weights
             if let Some(weights) = spec.params.get_text("weights") {
                 step = step.with_weights(weights.to_string());
             }
-            
+
             Ok(Box::new(step))
         },
     )?;
@@ -1044,10 +1045,14 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
             // Accept both "min"/"max" and "min_value"/"max_value" for compatibility
-            let min = spec.params.get_float("min_value")
+            let min = spec
+                .params
+                .get_float("min_value")
                 .or_else(|| spec.params.get_float("min"))
                 .unwrap_or(f64::NEG_INFINITY);
-            let max = spec.params.get_float("max_value")
+            let max = spec
+                .params
+                .get_float("max_value")
                 .or_else(|| spec.params.get_float("max"))
                 .unwrap_or(f64::INFINITY);
             Ok(Box::new(ClipValuesStep::new(source, target, min, max)))
@@ -1085,9 +1090,8 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             // Check for async_update flag
             let async_update = spec.params.get_bool("async_update").unwrap_or(false);
 
-            let step = MapNodesExprStep::new(source, target, expr)
-                .with_async_update(async_update);
-            
+            let step = MapNodesExprStep::new(source, target, expr).with_async_update(async_update);
+
             Ok(Box::new(step))
         },
     )?;
@@ -1614,7 +1618,9 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
         |spec| {
             // Parse mode
-            let mode_str = spec.params.get_text("mode")
+            let mode_str = spec
+                .params
+                .get_text("mode")
                 .ok_or_else(|| anyhow!("core.execution_block requires 'mode' param"))?;
             let mode = match mode_str {
                 "message_pass" => ExecutionMode::MessagePass,
@@ -1623,27 +1629,56 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             };
 
             // Parse target
-            let target = spec.params.get_text("target")
+            let target = spec
+                .params
+                .get_text("target")
                 .ok_or_else(|| anyhow!("core.execution_block requires 'target' param"))?
                 .to_string();
 
             // Parse options
-            let options_value = spec.params.get("options")
+            let options_value = spec
+                .params
+                .get("options")
                 .ok_or_else(|| anyhow!("core.execution_block requires 'options' param"))?;
             let options: BlockOptions = serde_json::from_value(
                 serde_json::to_value(options_value)
-                    .map_err(|e| anyhow!("Failed to convert options: {}", e))?
-            ).map_err(|e| anyhow!("Failed to parse options: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to convert options: {}", e))?,
+            )
+            .map_err(|e| anyhow!("Failed to parse options: {}", e))?;
 
             // Parse body
-            let body_value = spec.params.get("body")
+            let body_value = spec
+                .params
+                .get("body")
                 .ok_or_else(|| anyhow!("core.execution_block requires 'body' param"))?;
-            let body: BlockBody = serde_json::from_value(
-                serde_json::to_value(body_value)
-                    .map_err(|e| anyhow!("Failed to convert body: {}", e))?
-            ).map_err(|e| anyhow!("Failed to parse body: {}", e))?;
+            let body_json = serde_json::to_value(body_value)
+                .map_err(|e| anyhow!("Failed to convert body: {}", e))?;
+            // Validate body structure eagerly for better error reporting
+            serde_json::from_value::<BlockBody>(body_json.clone())
+                .map_err(|e| anyhow!("Failed to parse body: {}", e))?;
 
-            Ok(Box::new(ExecutionBlockStep::new(mode, target, options, body)))
+            Ok(Box::new(ExecutionBlockStep::new(
+                mode, target, options, body_json,
+            )))
+        },
+    )?;
+
+    // Loop step
+    registry.register(
+        "iter.loop",
+        StepMetadata {
+            id: "iter.loop".to_string(),
+            description: "Execute loop body for N iterations (native loop, no FFI overhead)"
+                .to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            // Convert spec params to JSON for deserialize_loop_step
+            let json_spec = serde_json::to_value(&spec.params)
+                .map_err(|e| anyhow!("Failed to convert spec to JSON: {}", e))?;
+
+            // For now, use a simple implementation that doesn't try to pass registry
+            super::loop_step::deserialize_loop_step(&json_spec, global_step_registry())
         },
     )?;
 

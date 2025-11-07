@@ -39,7 +39,7 @@ impl CsrScratch {
         // Always clear and resize to ensure no stale data
         self.degree.clear();
         self.degree.resize(node_count, 0);
-        
+
         self.cursor.clear();
         self.cursor.resize(node_count, 0);
 

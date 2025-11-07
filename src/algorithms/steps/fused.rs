@@ -66,7 +66,7 @@ impl FusedNeighborMulAgg {
             .get_text("target")
             .ok_or_else(|| anyhow!("FusedNeighborMulAgg requires 'target' parameter"))?
             .to_string();
-        
+
         // Parse optional direction parameter
         let direction = spec
             .params
@@ -117,7 +117,7 @@ impl Step for FusedNeighborMulAgg {
         // Convert to f64 arrays for fast indexing
         let mut values_arr = vec![0.0; nodes.len()];
         let mut scalars_arr = vec![0.0; nodes.len()];
-        
+
         for (idx, &node) in nodes.iter().enumerate() {
             if let Some(v) = values_map.get(&node) {
                 values_arr[idx] = match v {
@@ -149,7 +149,10 @@ impl Step for FusedNeighborMulAgg {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (target, source)),
+                    |eid| {
+                        pool.get_edge_endpoints(eid)
+                            .map(|(source, target)| (target, source))
+                    },
                     CsrOptions {
                         add_reverse_edges: false,
                         sort_neighbors: false,
@@ -160,7 +163,10 @@ impl Step for FusedNeighborMulAgg {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (source, target)),
+                    |eid| {
+                        pool.get_edge_endpoints(eid)
+                            .map(|(source, target)| (source, target))
+                    },
                     CsrOptions {
                         add_reverse_edges: false,
                         sort_neighbors: false,
@@ -171,7 +177,10 @@ impl Step for FusedNeighborMulAgg {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (source, target)),
+                    |eid| {
+                        pool.get_edge_endpoints(eid)
+                            .map(|(source, target)| (source, target))
+                    },
                     CsrOptions {
                         add_reverse_edges: true,
                         sort_neighbors: false,
@@ -197,7 +206,9 @@ impl Step for FusedNeighborMulAgg {
         }
 
         // Store result
-        scope.variables_mut().set_node_map(self.target.clone(), result);
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), result);
 
         Ok(())
     }
@@ -291,7 +302,10 @@ impl Step for FusedAXPY {
         // Try to get each variable as node map or scalar
         let a_map = scope.variables().node_map(&self.a).ok();
         let a_scalar = if a_map.is_none() {
-            scope.variables().scalar(&self.a).ok()
+            scope
+                .variables()
+                .scalar(&self.a)
+                .ok()
                 .and_then(|v| match v {
                     crate::algorithms::AlgorithmParamValue::Float(f) => Some(*f),
                     crate::algorithms::AlgorithmParamValue::Int(i) => Some(*i as f64),
@@ -302,10 +316,13 @@ impl Step for FusedAXPY {
         };
 
         let x_map = scope.variables().node_map(&self.x)?;
-        
+
         let b_map = scope.variables().node_map(&self.b).ok();
         let b_scalar = if b_map.is_none() {
-            scope.variables().scalar(&self.b).ok()
+            scope
+                .variables()
+                .scalar(&self.b)
+                .ok()
                 .and_then(|v| match v {
                     crate::algorithms::AlgorithmParamValue::Float(f) => Some(*f),
                     crate::algorithms::AlgorithmParamValue::Int(i) => Some(*i as f64),
@@ -360,7 +377,9 @@ impl Step for FusedAXPY {
             result.insert(node, crate::algorithms::AlgorithmParamValue::Float(value));
         }
 
-        scope.variables_mut().set_node_map(self.target.clone(), result);
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), result);
 
         Ok(())
     }
@@ -466,7 +485,9 @@ impl Step for FusedMADD {
             result.insert(node, crate::algorithms::AlgorithmParamValue::Float(value));
         }
 
-        scope.variables_mut().set_node_map(self.target.clone(), result);
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), result);
 
         Ok(())
     }
@@ -475,8 +496,8 @@ impl Step for FusedMADD {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::algorithms::{AlgorithmParamValue, Context};
     use crate::algorithms::steps::{StepScope, StepVariables};
+    use crate::algorithms::{AlgorithmParamValue, Context};
     use crate::api::graph::Graph;
     use crate::subgraphs::Subgraph;
     use std::cell::RefCell;
@@ -494,28 +515,25 @@ mod tests {
         g.add_edge(n1, n2).unwrap();
 
         let nodes: HashSet<_> = [n0, n1, n2].into_iter().collect();
-        let subgraph = Subgraph::from_nodes(
-            Rc::new(RefCell::new(g)),
-            nodes,
-            "test".to_string()
-        ).unwrap();
-        
+        let subgraph =
+            Subgraph::from_nodes(Rc::new(RefCell::new(g)), nodes, "test".to_string()).unwrap();
+
         let mut ctx = Context::default();
         let mut vars = StepVariables::default();
-        
+
         // Set up test data
         let mut values_map = HashMap::new();
         values_map.insert(n0, AlgorithmParamValue::Float(1.0));
         values_map.insert(n1, AlgorithmParamValue::Float(2.0));
         values_map.insert(n2, AlgorithmParamValue::Float(3.0));
         vars.set_node_map("values", values_map);
-        
+
         let mut scalars_map = HashMap::new();
         scalars_map.insert(n0, AlgorithmParamValue::Float(0.5));
         scalars_map.insert(n1, AlgorithmParamValue::Float(1.0));
         scalars_map.insert(n2, AlgorithmParamValue::Float(1.5));
         vars.set_node_map("scalars", scalars_map);
-        
+
         let mut scope = StepScope::new(&subgraph, &mut vars);
 
         // Execute fused operation
@@ -557,35 +575,32 @@ mod tests {
         let n1 = g.add_node();
 
         let nodes: HashSet<_> = [n0, n1].into_iter().collect();
-        let subgraph = Subgraph::from_nodes(
-            Rc::new(RefCell::new(g)),
-            nodes,
-            "test".to_string()
-        ).unwrap();
-        
+        let subgraph =
+            Subgraph::from_nodes(Rc::new(RefCell::new(g)), nodes, "test".to_string()).unwrap();
+
         let mut ctx = Context::default();
         let mut vars = StepVariables::default();
-        
+
         let mut a_map = HashMap::new();
         a_map.insert(n0, AlgorithmParamValue::Float(2.0));
         a_map.insert(n1, AlgorithmParamValue::Float(3.0));
         vars.set_node_map("a", a_map);
-        
+
         let mut x_map = HashMap::new();
         x_map.insert(n0, AlgorithmParamValue::Float(1.0));
         x_map.insert(n1, AlgorithmParamValue::Float(2.0));
         vars.set_node_map("x", x_map);
-        
+
         let mut b_map = HashMap::new();
         b_map.insert(n0, AlgorithmParamValue::Float(0.5));
         b_map.insert(n1, AlgorithmParamValue::Float(1.0));
         vars.set_node_map("b", b_map);
-        
+
         let mut y_map = HashMap::new();
         y_map.insert(n0, AlgorithmParamValue::Float(4.0));
         y_map.insert(n1, AlgorithmParamValue::Float(6.0));
         vars.set_node_map("y", y_map);
-        
+
         let mut scope = StepScope::new(&subgraph, &mut vars);
 
         let step = FusedAXPY::new("a", "x", "b", "y", "result");
@@ -617,30 +632,27 @@ mod tests {
         let n1 = g.add_node();
 
         let nodes: HashSet<_> = [n0, n1].into_iter().collect();
-        let subgraph = Subgraph::from_nodes(
-            Rc::new(RefCell::new(g)),
-            nodes,
-            "test".to_string()
-        ).unwrap();
-        
+        let subgraph =
+            Subgraph::from_nodes(Rc::new(RefCell::new(g)), nodes, "test".to_string()).unwrap();
+
         let mut ctx = Context::default();
         let mut vars = StepVariables::default();
-        
+
         let mut a_map = HashMap::new();
         a_map.insert(n0, AlgorithmParamValue::Float(2.0));
         a_map.insert(n1, AlgorithmParamValue::Float(3.0));
         vars.set_node_map("a", a_map);
-        
+
         let mut b_map = HashMap::new();
         b_map.insert(n0, AlgorithmParamValue::Float(4.0));
         b_map.insert(n1, AlgorithmParamValue::Float(5.0));
         vars.set_node_map("b", b_map);
-        
+
         let mut c_map = HashMap::new();
         c_map.insert(n0, AlgorithmParamValue::Float(1.0));
         c_map.insert(n1, AlgorithmParamValue::Float(2.0));
         vars.set_node_map("c", c_map);
-        
+
         let mut scope = StepScope::new(&subgraph, &mut vars);
 
         let step = FusedMADD::new("a", "b", "c", "result");

@@ -669,9 +669,12 @@ class AlgorithmBuilder:
             
             # Extract alias steps from original steps
             alias_steps = [s for s in self.steps if s.get("type") == "alias"]
+            ir_managed_side_effects = {"iter.loop", "core.execution_block"}
             side_effect_steps = [
                 s for s in self.steps
-                if s.get("type") != "alias" and not s.get("output")
+                if s.get("type") != "alias"
+                and s.get("type") not in ir_managed_side_effects
+                and not s.get("output")
             ]
             
             # Update alias steps to track through fusion transformations
@@ -925,20 +928,59 @@ class AlgorithmBuilder:
         if not self.use_ir:
             return
         
+        import copy
         from groggy.builder.ir.graph import IRGraph
-        from groggy.builder.ir.nodes import CoreIRNode, GraphIRNode, ControlIRNode
+        from groggy.builder.ir.nodes import (
+            AttrIRNode,
+            CoreIRNode,
+            GraphIRNode,
+            ControlIRNode,
+            ExecutionBlockNode,
+            LoopIRNode,
+        )
         
         graph_name = self.ir_graph.name if self.ir_graph is not None else self.name
         new_ir = IRGraph(graph_name)
         
         for step in self.steps:
+            step_type = step.get("type", "")
+            if step_type == "alias":
+                continue
+            
+            if step_type == "iter.loop":
+                iterations = step.get("iterations") or step.get("count") or 1
+                body = copy.deepcopy(step.get("body", []))
+                loop_vars = step.get("loop_vars")
+                node = LoopIRNode(
+                    node_id=f"node_{len(new_ir.nodes)}",
+                    iterations=int(iterations),
+                    body=body,
+                    loop_vars=list(loop_vars) if loop_vars else None,
+                )
+                new_ir.add_node(node)
+                continue
+            
+            if step_type == "core.execution_block":
+                node_id = f"node_{len(new_ir.nodes)}"
+                target = step.get("target") or step.get("output")
+                mode = step.get("mode", "message_pass")
+                options = step.get("options", {})
+                node = ExecutionBlockNode(
+                    node_id=node_id,
+                    mode=mode,
+                    target=target,
+                    **options,
+                )
+                body_nodes = step.get("body", {}).get("nodes", [])
+                for body_node in body_nodes:
+                    node.metadata.setdefault("body_nodes", []).append(copy.deepcopy(body_node))
+                new_ir.add_node(node)
+                continue
+            
             output = step.get("output")
             if not output:
                 continue
-            if step.get("type") == "alias":
-                continue
             
-            step_type = step.get("type", "")
             if "." in step_type:
                 domain_str, op_type = step_type.split(".", 1)
             else:
@@ -977,6 +1019,8 @@ class AlgorithmBuilder:
                 node = GraphIRNode(node_id=node_id, op_type=op_type, inputs=inputs, output=output, **metadata)
             elif domain_str == "control":
                 node = ControlIRNode(node_id=node_id, op_type=op_type, inputs=inputs, output=output, **metadata)
+            elif domain_str == "attr":
+                node = AttrIRNode(node_id=node_id, op_type=op_type, inputs=inputs, output=output, **metadata)
             else:
                 node = CoreIRNode(node_id=node_id, op_type=op_type, inputs=inputs, output=output, **metadata)
             

@@ -883,160 +883,38 @@ class AlgorithmBuilder:
     
     def _finalize_loop(self, start_step: int, iterations: int, loop_vars: Dict[str, VarHandle]):
         """
-        Unroll loop by repeating steps.
+        Replace loop body with structured loop step executed natively.
         
         Args:
             start_step: Index where loop body starts
             iterations: Number of times to repeat
             loop_vars: Variables at loop start
         """
-        # Extract loop body
+        # Extract and remove body steps
         loop_body = self.steps[start_step:]
-        
-        # Remove loop body from main steps
         self.steps = self.steps[:start_step]
-        
-        # Track variable renames across iterations
-        var_mapping = {v.name: v.name for v in loop_vars.values()}
-        
-        # Repeat body N times
-        for iteration in range(iterations):
-            for step in loop_body:
-                # Clone step
-                new_step = step.copy()
-                
-                # Rename input variables for this iteration
-                if "input" in new_step:
-                    new_step["input"] = var_mapping.get(
-                        new_step["input"],
-                        new_step["input"]
-                    )
-                
-                if "left" in new_step:
-                    if isinstance(new_step["left"], str):
-                        new_step["left"] = var_mapping.get(
-                            new_step["left"],
-                            new_step["left"]
-                        )
-                
-                if "right" in new_step and isinstance(new_step["right"], str):
-                    new_step["right"] = var_mapping.get(
-                        new_step["right"],
-                        new_step["right"]
-                    )
-                
-                # Handle map_nodes inputs
-                if "inputs" in new_step and isinstance(new_step["inputs"], dict):
-                    new_inputs = {}
-                    for key, val in new_step["inputs"].items():
-                        # Check if the key (logical name) has a mapping, otherwise check the value
-                        if key in var_mapping:
-                            new_inputs[key] = var_mapping[key]
-                        else:
-                            new_inputs[key] = var_mapping.get(val, val)
-                    new_step["inputs"] = new_inputs
-                
-                # Handle alias source
-                if "source" in new_step and isinstance(new_step["source"], str):
-                    new_step["source"] = var_mapping.get(
-                        new_step["source"],
-                        new_step["source"]
-                    )
-                
-                # Handle core.where fields
-                if "condition" in new_step and isinstance(new_step["condition"], str):
-                    new_step["condition"] = var_mapping.get(
-                        new_step["condition"],
-                        new_step["condition"]
-                    )
-                if "if_true" in new_step and isinstance(new_step["if_true"], str):
-                    new_step["if_true"] = var_mapping.get(
-                        new_step["if_true"],
-                        new_step["if_true"]
-                    )
-                if "if_false" in new_step and isinstance(new_step["if_false"], str):
-                    new_step["if_false"] = var_mapping.get(
-                        new_step["if_false"],
-                        new_step["if_false"]
-                    )
-                
-                # Handle core.broadcast_scalar fields
-                if "scalar" in new_step and isinstance(new_step["scalar"], str):
-                    new_step["scalar"] = var_mapping.get(
-                        new_step["scalar"],
-                        new_step["scalar"]
-                    )
-                if "reference" in new_step and isinstance(new_step["reference"], str):
-                    new_step["reference"] = var_mapping.get(
-                        new_step["reference"],
-                        new_step["reference"]
-                    )
-                
-                # Handle other common fields (weights, target, etc.)
-                if "weights" in new_step and isinstance(new_step["weights"], str):
-                    new_step["weights"] = var_mapping.get(
-                        new_step["weights"],
-                        new_step["weights"]
-                    )
-                if "target" in new_step and new_step.get("type") != "alias" and isinstance(new_step["target"], str):
-                    new_step["target"] = var_mapping.get(
-                        new_step["target"],
-                        new_step["target"]
-                    )
-                
-                # Handle a, b fields (used by core.mul, core.add, etc.)
-                if "a" in new_step and isinstance(new_step["a"], str):
-                    new_step["a"] = var_mapping.get(
-                        new_step["a"],
-                        new_step["a"]
-                    )
-                if "b" in new_step and isinstance(new_step["b"], str):
-                    new_step["b"] = var_mapping.get(
-                        new_step["b"],
-                        new_step["b"]
-                    )
-                
-                # Note: alias target is NOT renamed - it's the logical name we're assigning to
-                
-                # Generate unique output name for this iteration
-                if "output" in new_step:
-                    original_output = new_step["output"]
-                    new_output = f"{original_output}_iter{iteration}"
-                    new_step["output"] = new_output
-                    
-                    # Update mapping
-                    var_mapping[original_output] = new_output
-                
-                # Handle alias target - update var_mapping immediately after processing
-                # Note: new_step["source"] has already been remapped on line 939-943,
-                # so it points to the correct iteration-specific variable
-                if new_step.get("type") == "alias" and "target" in new_step:
-                    target = new_step.get("target")
-                    remapped_source = new_step.get("source")  # Already remapped
-                    if target and remapped_source:
-                        # BUGFIX: Add iteration suffix to alias target too
-                        # so that mul_3 becomes mul_3_iter0, mul_3_iter1, etc.
-                        target_with_iter = f"{target}_iter{iteration}"
-                        new_step["target"] = target_with_iter
-                        
-                        # Map both the original target and the iteration-specific target
-                        var_mapping[target] = remapped_source
-                        var_mapping[target_with_iter] = remapped_source
-                
-                self.steps.append(new_step)
-        
-        # Add final aliases to restore original variable names for any variables
-        # that were reassigned during the loop (exist in builder.variables)
-        for original, final in var_mapping.items():
-            if original != final and original in self.variables:
-                self.steps.append({
-                    "type": "alias",
-                    "source": final,
-                    "target": original
-                })
-                
-                # Update variable handle to point to final name
-                self.variables[original].name = final
+
+        # Deep-copy body so future mutations don't affect stored body
+        body_copy = json.loads(json.dumps(loop_body))
+
+        alias_targets = {
+            step.get("target")
+            for step in body_copy
+            if isinstance(step, dict) and step.get("type") == "alias" and step.get("target")
+        }
+
+        loop_step = {
+            "type": "iter.loop",
+            "iterations": iterations,
+            "body": body_copy,
+        }
+
+        combined_loop_vars = set(loop_vars.keys()) if loop_vars else set()
+        combined_loop_vars.update(alias_targets)
+        if combined_loop_vars:
+            loop_step["loop_vars"] = sorted(combined_loop_vars)
+
+        self.steps.append(loop_step)
     
     def map_nodes(
         self, 
@@ -1202,6 +1080,16 @@ class BuiltAlgorithm(AlgorithmHandle):
     def id(self) -> str:
         """Get the algorithm identifier."""
         return self._id
+    
+    @property
+    def name(self) -> str:
+        """Human-readable algorithm name."""
+        return self._name
+    
+    @property
+    def steps(self) -> list:
+        """Expose legacy step list for inspection/testing."""
+        return self._steps
     
     def to_spec(self) -> Dict[str, Any]:
         """Convert to a pipeline spec entry usable by the Rust executor."""
@@ -1505,6 +1393,37 @@ class BuiltAlgorithm(AlgorithmHandle):
                 "id": "core.neighbor_mode_update",
                 "params": params
             }
+
+        if step_type == "iter.loop":
+            iterations = step.get("iterations", 1)
+            loop_vars = step.get("loop_vars")
+            body_specs = []
+
+            body_alias_map = alias_map.copy()
+            for body_step in step.get("body", []):
+                if body_step.get("type") == "alias":
+                    source = body_step.get("source")
+                    target = body_step.get("target")
+                    if source and target:
+                        resolved_source = self._resolve_with_alias(source, body_alias_map)
+                        body_alias_map[target] = resolved_source
+                    continue
+
+                encoded_body = self._encode_step(body_step, body_alias_map)
+                if encoded_body is not None:
+                    body_specs.append(encoded_body)
+
+            params: Dict[str, Any] = {
+                "iterations": iterations,
+                "body": body_specs,
+            }
+            if loop_vars:
+                params["loop_vars"] = loop_vars
+
+            return {
+                "id": "iter.loop",
+                "params": params,
+            }
         
         if step_type in ["normalize_sum", "core.normalize_sum"]:
             return {
@@ -1705,6 +1624,10 @@ class BuiltAlgorithm(AlgorithmHandle):
             #  - update_in_place / neighbor_mode_update intentionally redefine (in-place semantics)
             #  - alias steps generated by loop unrolling intentionally redefine to track iteration state
             in_place_steps = {"core.update_in_place", "core.neighbor_mode_update"}
+            if step_type == "iter.loop":
+                loop_vars = step.get("loop_vars") or []
+                for loop_var in loop_vars:
+                    defined_vars.add(loop_var)
             
             if "output" in step:
                 output_var = step["output"]

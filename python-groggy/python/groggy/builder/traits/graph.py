@@ -68,6 +68,12 @@ class GraphOps:
             self.builder.steps.append(step)
         
         return var
+
+    def node_degree(self, nodes: Optional[VarHandle] = None) -> VarHandle:
+        """
+        Backward-compatible alias for degree().
+        """
+        return self.degree(nodes)
     
     def neighbor_agg(
         self, 

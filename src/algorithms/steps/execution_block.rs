@@ -6,6 +6,7 @@
 //! - Streaming: Incremental/transactional updates (future)
 
 use anyhow::{anyhow, Result};
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -80,7 +81,8 @@ pub struct ExecutionBlockStep {
     mode: ExecutionMode,
     target: String,
     options: BlockOptions,
-    body: BlockBody,
+    body_value: serde_json::Value,
+    body_cache: OnceCell<BlockBody>,
 }
 
 impl ExecutionBlockStep {
@@ -88,26 +90,30 @@ impl ExecutionBlockStep {
         mode: ExecutionMode,
         target: String,
         options: BlockOptions,
-        body: BlockBody,
+        body_value: serde_json::Value,
     ) -> Self {
         Self {
             mode,
             target,
             options,
-            body,
+            body_value,
+            body_cache: OnceCell::new(),
         }
     }
 
+    fn body(&self) -> Result<&BlockBody> {
+        self.body_cache.get_or_try_init(|| {
+            serde_json::from_value(self.body_value.clone())
+                .map_err(|e| anyhow!("Failed to deserialize execution block body: {}", e))
+        })
+    }
+
     /// Execute message-pass mode (Gauss-Seidel style updates).
-    fn execute_message_pass(
-        &self,
-        ctx: &mut Context,
-        scope: &mut StepScope<'_>,
-    ) -> Result<()> {
+    fn execute_message_pass(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         // Get the target variable (what we're updating)
         // Remember the original storage type so we can preserve it
         let was_node_map = scope.variables().node_map(&self.target).is_ok();
-        
+
         let mut node_column = if scope.variables().contains(&self.target) {
             match scope.variables().node_column(&self.target) {
                 Ok(col) => col.clone(),
@@ -121,17 +127,25 @@ impl ExecutionBlockStep {
                 }
             }
         } else {
-            return Err(anyhow!("execution_block target '{}' not found", self.target));
+            return Err(anyhow!(
+                "execution_block target '{}' not found",
+                self.target
+            ));
         };
 
         let nodes = node_column.nodes().to_vec();
 
         // Determine neighbor direction - actually use it!
-        let direction = self.options.direction.as_deref()
+        let direction = self
+            .options
+            .direction
+            .as_deref()
             .and_then(|d| NeighborDirection::from_str(d))
             .unwrap_or(NeighborDirection::In);
 
         // Message-pass: iterate through nodes in order (Gauss-Seidel)
+        let body = self.body()?;
+
         // For each node, evaluate the block body and update in-place
         for &node_id in &nodes {
             // Get neighbors with the specified direction
@@ -140,21 +154,24 @@ impl ExecutionBlockStep {
                 let mut nbrs = match direction {
                     NeighborDirection::In => {
                         // Incoming edges: find nodes that point to this node
-                        subgraph.neighbors(node_id)
+                        subgraph
+                            .neighbors(node_id)
                             .map_err(|e| anyhow!("Failed to get neighbors: {}", e))?
                     }
                     NeighborDirection::Out => {
                         // Outgoing edges: find nodes this node points to
-                        subgraph.neighbors(node_id)
+                        subgraph
+                            .neighbors(node_id)
                             .map_err(|e| anyhow!("Failed to get neighbors: {}", e))?
                     }
                     NeighborDirection::Undirected => {
                         // All connected nodes
-                        subgraph.neighbors(node_id)
+                        subgraph
+                            .neighbors(node_id)
                             .map_err(|e| anyhow!("Failed to get neighbors: {}", e))?
                     }
                 };
-                
+
                 if self.options.include_self && !nbrs.contains(&node_id) {
                     nbrs.push(node_id);
                 }
@@ -162,18 +179,15 @@ impl ExecutionBlockStep {
             };
 
             // Evaluate block body for this node
-            let update_value = if self.body.nodes.is_empty() {
+            let update_value = if body.nodes.is_empty() {
                 // Empty body: just keep current value
-                node_column.get(node_id).cloned().unwrap_or(AlgorithmParamValue::None)
+                node_column
+                    .get(node_id)
+                    .cloned()
+                    .unwrap_or(AlgorithmParamValue::None)
             } else {
                 // Execute body operations
-                self.evaluate_body_for_node(
-                    node_id,
-                    &neighbors,
-                    &node_column,
-                    ctx,
-                    scope,
-                )?
+                self.evaluate_body_for_node(node_id, &neighbors, &node_column, body, ctx, scope)?
             };
 
             // Update in-place
@@ -192,14 +206,16 @@ impl ExecutionBlockStep {
             scope.variables_mut().set_node_map(&self.target, map);
         } else {
             // Keep as node column
-            scope.variables_mut().set_node_column(&self.target, node_column);
+            scope
+                .variables_mut()
+                .set_node_column(&self.target, node_column);
         }
 
         Ok(())
     }
 
     /// Evaluate the block body for a specific node.
-    /// 
+    ///
     /// This is a simplified implementation that handles common patterns.
     /// A full implementation would recursively evaluate the operation DAG.
     fn evaluate_body_for_node(
@@ -207,12 +223,13 @@ impl ExecutionBlockStep {
         node_id: NodeId,
         neighbors: &[NodeId],
         node_column: &super::core::NodeColumn,
+        body: &BlockBody,
         _ctx: &mut Context,
         _scope: &mut StepScope<'_>,
     ) -> Result<AlgorithmParamValue> {
         // For Phase 4 MVP, we'll implement the most common pattern:
         // collect_neighbor_values -> mode
-        
+
         // Collect neighbor values
         let mut neighbor_values = Vec::new();
         for &nbr in neighbors {
@@ -222,7 +239,7 @@ impl ExecutionBlockStep {
         }
 
         // If body specifies mode operation, compute mode
-        for body_node in &self.body.nodes {
+        for body_node in &body.nodes {
             if body_node.op_type == "mode_list" {
                 // Compute mode (most frequent value)
                 return compute_mode(&neighbor_values, self.options.tie_break.as_deref());
@@ -230,7 +247,9 @@ impl ExecutionBlockStep {
         }
 
         // Default: return first neighbor value or current value
-        neighbor_values.first().cloned()
+        neighbor_values
+            .first()
+            .cloned()
             .or_else(|| node_column.get(node_id).cloned())
             .ok_or_else(|| anyhow!("No value computed for node {}", node_id))
     }
@@ -271,10 +290,11 @@ fn compute_mode(
 
     // Count frequencies
     let mut freq_map: HashMap<String, (usize, AlgorithmParamValue)> = HashMap::new();
-    
+
     for val in values {
-        let key = format!("{:?}", val);  // Simple key representation
-        freq_map.entry(key.clone())
+        let key = format!("{:?}", val); // Simple key representation
+        freq_map
+            .entry(key.clone())
             .and_modify(|(count, _)| *count += 1)
             .or_insert((1, val.clone()));
     }
@@ -301,26 +321,22 @@ fn compute_mode(
         match tie_break {
             Some("lowest") => {
                 // Return lowest value (for numeric types)
-                candidates.sort_by(|a, b| {
-                    match (a, b) {
-                        (AlgorithmParamValue::Int(x), AlgorithmParamValue::Int(y)) => x.cmp(y),
-                        (AlgorithmParamValue::Float(x), AlgorithmParamValue::Float(y)) => {
-                            x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
-                        }
-                        _ => std::cmp::Ordering::Equal,
+                candidates.sort_by(|a, b| match (a, b) {
+                    (AlgorithmParamValue::Int(x), AlgorithmParamValue::Int(y)) => x.cmp(y),
+                    (AlgorithmParamValue::Float(x), AlgorithmParamValue::Float(y)) => {
+                        x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
                     }
+                    _ => std::cmp::Ordering::Equal,
                 });
                 Ok(candidates[0].clone())
             }
             Some("highest") => {
-                candidates.sort_by(|a, b| {
-                    match (a, b) {
-                        (AlgorithmParamValue::Int(x), AlgorithmParamValue::Int(y)) => y.cmp(x),
-                        (AlgorithmParamValue::Float(x), AlgorithmParamValue::Float(y)) => {
-                            y.partial_cmp(x).unwrap_or(std::cmp::Ordering::Equal)
-                        }
-                        _ => std::cmp::Ordering::Equal,
+                candidates.sort_by(|a, b| match (a, b) {
+                    (AlgorithmParamValue::Int(x), AlgorithmParamValue::Int(y)) => y.cmp(x),
+                    (AlgorithmParamValue::Float(x), AlgorithmParamValue::Float(y)) => {
+                        y.partial_cmp(x).unwrap_or(std::cmp::Ordering::Equal)
                     }
+                    _ => std::cmp::Ordering::Equal,
                 });
                 Ok(candidates[0].clone())
             }

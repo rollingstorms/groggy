@@ -76,11 +76,11 @@ impl Step for InitNodesWithIndexStep {
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let nodes = scope.subgraph().ordered_nodes();
         let mut map = HashMap::with_capacity(nodes.len());
-        
+
         for (idx, &node) in nodes.iter().enumerate() {
             map.insert(node, AlgorithmParamValue::Int(idx as i64));
         }
-        
+
         scope.variables_mut().set_node_map(self.target.clone(), map);
         Ok(())
     }
@@ -115,7 +115,9 @@ impl Step for InitScalarStep {
     }
 
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        scope.variables_mut().set_scalar(self.target.clone(), self.value.clone());
+        scope
+            .variables_mut()
+            .set_scalar(self.target.clone(), self.value.clone());
         Ok(())
     }
 }
@@ -186,10 +188,9 @@ impl Step for GraphNodeCountStep {
 
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let count = scope.subgraph().node_count();
-        scope.variables_mut().set_scalar(
-            self.target.clone(),
-            AlgorithmParamValue::Int(count as i64),
-        );
+        scope
+            .variables_mut()
+            .set_scalar(self.target.clone(), AlgorithmParamValue::Int(count as i64));
         Ok(())
     }
 }
@@ -222,10 +223,9 @@ impl Step for GraphEdgeCountStep {
 
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let count = scope.subgraph().edge_count();
-        scope.variables_mut().set_scalar(
-            self.target.clone(),
-            AlgorithmParamValue::Int(count as i64),
-        );
+        scope
+            .variables_mut()
+            .set_scalar(self.target.clone(), AlgorithmParamValue::Int(count as i64));
         Ok(())
     }
 }

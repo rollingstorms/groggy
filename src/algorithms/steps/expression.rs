@@ -409,11 +409,7 @@ fn eval_function(func: &str, args: &[Expr], ctx: &ExprContext) -> Result<Algorit
             // Collect neighbor values (excluding self; use core.collect_neighbor_values with include_self=True for that)
             let mut seen_neighbors = HashSet::new();
             for neighbor in neighbors {
-                if !ctx
-                    .input
-                    .subgraph
-                    .has_edge_between(ctx.node, neighbor)?
-                {
+                if !ctx.input.subgraph.has_edge_between(ctx.node, neighbor)? {
                     continue;
                 }
                 if !seen_neighbors.insert(neighbor) {
@@ -549,10 +545,7 @@ fn eval_function(func: &str, args: &[Expr], ctx: &ExprContext) -> Result<Algorit
                     let mut best_count = 0usize;
                     let mut first = true;
                     for (key, count) in counts.into_iter() {
-                        if first
-                            || count > best_count
-                            || (count == best_count && key < best_key)
-                        {
+                        if first || count > best_count || (count == best_count && key < best_key) {
                             best_key = key;
                             best_count = count;
                             first = false;
@@ -577,10 +570,7 @@ fn eval_function(func: &str, args: &[Expr], ctx: &ExprContext) -> Result<Algorit
                     let mut best_count = 0usize;
                     let mut first = true;
                     for (val, count) in counts.into_iter() {
-                        if first
-                            || count > best_count
-                            || (count == best_count && val < best_val)
-                        {
+                        if first || count > best_count || (count == best_count && val < best_val) {
                             best_val = val;
                             best_count = count;
                             first = false;

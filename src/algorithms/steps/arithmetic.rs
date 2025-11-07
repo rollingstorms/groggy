@@ -446,7 +446,9 @@ impl Step for RecipStep {
             }
             Operand::Scalar(value) => {
                 let result = apply_recip_scalar(value, self.epsilon, &self.source)?;
-                scope.variables_mut().set_scalar(self.target.clone(), result);
+                scope
+                    .variables_mut()
+                    .set_scalar(self.target.clone(), result);
                 Ok(())
             }
         }
@@ -485,14 +487,14 @@ fn apply_recip_scalar(
 ) -> Result<AlgorithmParamValue> {
     let num = NumericValue::from(value, context)?;
     let val = num.as_f64();
-    
+
     // Use max(abs(val), epsilon) to handle near-zero values
     // For zero or near-zero: use epsilon
     // For normal values: use the value itself
     let abs_val = val.abs();
     let safe_val = if abs_val < epsilon { epsilon } else { abs_val };
     let denominator = val.signum() * safe_val;
-    
+
     Ok(AlgorithmParamValue::Float(1.0 / denominator))
 }
 
@@ -667,13 +669,13 @@ where
                 left_name
             )
         })?;
-        
+
         let left_num = NumericValue::from(left_value, left_name)?;
         let right_num = NumericValue::from(right_value, right_name)?;
-        
+
         let cmp_result = op.apply(left_num.as_f64(), right_num.as_f64());
         let mask_value = if cmp_result { 1.0 } else { 0.0 };
-        
+
         result.insert(key, AlgorithmParamValue::Float(mask_value));
     }
 
@@ -712,10 +714,10 @@ where
     for (&key, value) in map.iter() {
         let num = NumericValue::from(value, map_name)?;
         let val = num.as_f64();
-        
+
         let cmp_result = op.apply(val, scalar_val);
         let mask_value = if cmp_result { 1.0 } else { 0.0 };
-        
+
         result.insert(key, AlgorithmParamValue::Float(mask_value));
     }
 
@@ -807,9 +809,7 @@ impl Step for WhereStep {
                     .set_edge_map(self.target.clone(), result);
                 Ok(())
             }
-            Operand::Scalar(_) => {
-                Err(anyhow!("core.where requires condition to be a map"))
-            }
+            Operand::Scalar(_) => Err(anyhow!("core.where requires condition to be a map")),
         }
     }
 }
@@ -838,11 +838,10 @@ fn where_node_map(
 
         let selected = if is_true {
             match &if_true {
-                Operand::NodeMap(map) => {
-                    map.get(&node)
-                        .ok_or_else(|| anyhow!("if_true map missing node {:?}", node))?
-                        .clone()
-                }
+                Operand::NodeMap(map) => map
+                    .get(&node)
+                    .ok_or_else(|| anyhow!("if_true map missing node {:?}", node))?
+                    .clone(),
                 Operand::Scalar(val) => (*val).clone(),
                 Operand::EdgeMap(_) => {
                     bail!("if_true must be node map when condition is node map")
@@ -850,11 +849,10 @@ fn where_node_map(
             }
         } else {
             match &if_false {
-                Operand::NodeMap(map) => {
-                    map.get(&node)
-                        .ok_or_else(|| anyhow!("if_false map missing node {:?}", node))?
-                        .clone()
-                }
+                Operand::NodeMap(map) => map
+                    .get(&node)
+                    .ok_or_else(|| anyhow!("if_false map missing node {:?}", node))?
+                    .clone(),
                 Operand::Scalar(val) => (*val).clone(),
                 Operand::EdgeMap(_) => {
                     bail!("if_false must be node map when condition is node map")
@@ -892,11 +890,10 @@ fn where_edge_map(
 
         let selected = if is_true {
             match &if_true {
-                Operand::EdgeMap(map) => {
-                    map.get(&edge)
-                        .ok_or_else(|| anyhow!("if_true map missing edge {:?}", edge))?
-                        .clone()
-                }
+                Operand::EdgeMap(map) => map
+                    .get(&edge)
+                    .ok_or_else(|| anyhow!("if_true map missing edge {:?}", edge))?
+                    .clone(),
                 Operand::Scalar(val) => (*val).clone(),
                 Operand::NodeMap(_) => {
                     bail!("if_true must be edge map when condition is edge map")
@@ -904,11 +901,10 @@ fn where_edge_map(
             }
         } else {
             match &if_false {
-                Operand::EdgeMap(map) => {
-                    map.get(&edge)
-                        .ok_or_else(|| anyhow!("if_false map missing edge {:?}", edge))?
-                        .clone()
-                }
+                Operand::EdgeMap(map) => map
+                    .get(&edge)
+                    .ok_or_else(|| anyhow!("if_false map missing edge {:?}", edge))?
+                    .clone(),
                 Operand::Scalar(val) => (*val).clone(),
                 Operand::NodeMap(_) => {
                     bail!("if_false must be edge map when condition is edge map")
@@ -960,7 +956,11 @@ impl ReductionOp {
             ReductionOp::Sum => Some(values.iter().sum()),
             ReductionOp::Mean => Some(values.iter().sum::<f64>() / values.len() as f64),
             ReductionOp::Min => values.iter().copied().fold(f64::INFINITY, f64::min).into(),
-            ReductionOp::Max => values.iter().copied().fold(f64::NEG_INFINITY, f64::max).into(),
+            ReductionOp::Max => values
+                .iter()
+                .copied()
+                .fold(f64::NEG_INFINITY, f64::max)
+                .into(),
         }
     }
 }
@@ -1109,9 +1109,9 @@ impl Step for BroadcastScalarStep {
                     .set_edge_map(self.target.clone(), result);
                 Ok(())
             }
-            Operand::Scalar(_) => {
-                Err(anyhow!("core.broadcast_scalar requires map reference, got scalar"))
-            }
+            Operand::Scalar(_) => Err(anyhow!(
+                "core.broadcast_scalar requires map reference, got scalar"
+            )),
         }
     }
 }
@@ -1146,21 +1146,19 @@ fn value_to_json(value: &AlgorithmParamValue) -> serde_json::Value {
     use serde_json::Value;
     match value {
         AlgorithmParamValue::Int(i) => Value::Number((*i).into()),
-        AlgorithmParamValue::Float(f) => {
-            serde_json::Number::from_f64(*f)
-                .map(Value::Number)
-                .unwrap_or(Value::Null)
-        }
+        AlgorithmParamValue::Float(f) => serde_json::Number::from_f64(*f)
+            .map(Value::Number)
+            .unwrap_or(Value::Null),
         AlgorithmParamValue::Bool(b) => Value::Bool(*b),
         AlgorithmParamValue::Text(s) => Value::String(s.clone()),
         AlgorithmParamValue::IntList(v) => {
             Value::Array(v.iter().map(|i| Value::Number((*i).into())).collect())
         }
-        AlgorithmParamValue::FloatList(v) => {
-            Value::Array(v.iter().filter_map(|f| {
-                serde_json::Number::from_f64(*f).map(Value::Number)
-            }).collect())
-        }
+        AlgorithmParamValue::FloatList(v) => Value::Array(
+            v.iter()
+                .filter_map(|f| serde_json::Number::from_f64(*f).map(Value::Number))
+                .collect(),
+        ),
         AlgorithmParamValue::BoolList(v) => {
             Value::Array(v.iter().map(|b| Value::Bool(*b)).collect())
         }
@@ -1249,11 +1247,10 @@ impl Step for ModeListStep {
                         .map(|i| serde_json::Value::Number((*i).into()))
                         .collect::<Vec<_>>()
                 }
-                AlgorithmParamValue::FloatList(v) => {
-                    &v.iter()
-                        .filter_map(|f| serde_json::Number::from_f64(*f).map(serde_json::Value::Number))
-                        .collect::<Vec<_>>()
-                }
+                AlgorithmParamValue::FloatList(v) => &v
+                    .iter()
+                    .filter_map(|f| serde_json::Number::from_f64(*f).map(serde_json::Value::Number))
+                    .collect::<Vec<_>>(),
                 _ => {
                     return Err(anyhow!(
                         "core.mode_list requires JSON array or list, got {:?}",
@@ -1281,7 +1278,11 @@ impl Step for ModeListStep {
             }
 
             // Find max frequency
-            let max_freq = freq_map.values().map(|(count, _)| *count).max().unwrap_or(0);
+            let max_freq = freq_map
+                .values()
+                .map(|(count, _)| *count)
+                .max()
+                .unwrap_or(0);
 
             // Find all values with max frequency
             let mut candidates: Vec<_> = freq_map
@@ -1297,7 +1298,7 @@ impl Step for ModeListStep {
                     // Find which candidate appears first in the original array
                     let mut first_candidate = candidates[0].clone();
                     let mut first_pos = usize::MAX;
-                    
+
                     for candidate in &candidates {
                         for (i, val) in array.iter().enumerate() {
                             if val == candidate && i < first_pos {
@@ -1337,10 +1338,7 @@ impl Step for ModeListStep {
     }
 }
 
-fn compare_json_values(
-    a: &serde_json::Value,
-    b: &serde_json::Value,
-) -> Result<std::cmp::Ordering> {
+fn compare_json_values(a: &serde_json::Value, b: &serde_json::Value) -> Result<std::cmp::Ordering> {
     use serde_json::Value;
     match (a, b) {
         (Value::Number(na), Value::Number(nb)) => {
@@ -1374,11 +1372,7 @@ fn json_to_algorithm_value(val: &serde_json::Value) -> AlgorithmParamValue {
 }
 
 impl CollectNeighborValuesStep {
-    pub fn new(
-        source: impl Into<String>,
-        target: impl Into<String>,
-        include_self: bool,
-    ) -> Self {
+    pub fn new(source: impl Into<String>, target: impl Into<String>, include_self: bool) -> Self {
         Self {
             source: source.into(),
             target: target.into(),
@@ -1484,7 +1478,10 @@ impl Step for CollectNeighborValuesStep {
                 }
             }
 
-            result.insert(node, AlgorithmParamValue::Json(serde_json::Value::Array(values)));
+            result.insert(
+                node,
+                AlgorithmParamValue::Json(serde_json::Value::Array(values)),
+            );
         }
 
         scope

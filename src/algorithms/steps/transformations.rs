@@ -6,13 +6,13 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
-use crate::types::NodeId;
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
+use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
+use super::arithmetic::ModeTieBreak;
 use super::core::{Step, StepInput, StepMetadata, StepScope};
 use super::expression::{Expr, ExprContext};
-use super::arithmetic::ModeTieBreak;
 
 /// Callback trait for node-wise mapping steps.
 pub trait NodeMapFn: Send + Sync {
@@ -269,11 +269,7 @@ impl Step for NeighborModeUpdateStep {
                 continue;
             }
 
-            let max_freq = counts
-                .values()
-                .map(|(count, _)| *count)
-                .max()
-                .unwrap_or(0);
+            let max_freq = counts.values().map(|(count, _)| *count).max().unwrap_or(0);
 
             let mut candidates: Vec<(String, AlgorithmParamValue)> = counts
                 .iter()
@@ -285,8 +281,9 @@ impl Step for NeighborModeUpdateStep {
                 ModeTieBreak::Keep => {
                     let mut chosen: Option<AlgorithmParamValue> = None;
                     for key in &order_keys {
-                        if let Some((_, value)) =
-                            candidates.iter().find(|(candidate_key, _)| candidate_key == key)
+                        if let Some((_, value)) = candidates
+                            .iter()
+                            .find(|(candidate_key, _)| candidate_key == key)
                         {
                             chosen = Some(value.clone());
                             break;
@@ -369,7 +366,7 @@ impl MapNodesExprStep {
             async_update: false,
         }
     }
-    
+
     pub fn with_async_update(mut self, async_update: bool) -> Self {
         self.async_update = async_update;
         self
@@ -442,10 +439,7 @@ impl Step for MapNodesExprStep {
             }
 
             // Mirror the updated source map into the target variable for downstream steps.
-            let updated_map = scope
-                .variables()
-                .node_map(&self.source)?
-                .clone();
+            let updated_map = scope.variables().node_map(&self.source)?.clone();
             scope
                 .variables_mut()
                 .set_node_map(self.target.clone(), updated_map);
@@ -453,7 +447,7 @@ impl Step for MapNodesExprStep {
             ctx.record_duration("map_nodes.total", start.elapsed());
         } else {
             // Standard synchronous mode: collect all results then write at end
-            
+
             // Try to get source map if it exists
             let source_map = scope.variables().node_map(&self.source).ok();
 
@@ -496,7 +490,7 @@ impl Step for MapNodesExprStep {
                 .variables_mut()
                 .set_node_map(self.target.clone(), result);
         }
-        
+
         Ok(())
     }
 }
@@ -538,7 +532,7 @@ impl UpdateInPlaceStep {
             output: None,
         }
     }
-    
+
     pub fn with_output(mut self, output: String) -> Self {
         self.output = Some(output);
         self
@@ -593,7 +587,9 @@ impl Step for UpdateInPlaceStep {
         if let Some(output_var) = &self.output {
             if output_var != &self.target {
                 let final_map = scope.variables().node_map(&self.target)?.clone();
-                scope.variables_mut().set_node_map(output_var.clone(), final_map);
+                scope
+                    .variables_mut()
+                    .set_node_map(output_var.clone(), final_map);
             }
         }
 

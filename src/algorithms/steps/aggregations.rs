@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
-use crate::types::NodeId;
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
+use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope};
@@ -620,7 +620,10 @@ impl Step for NeighborAggregationStep {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (target, source)),
+                    |eid| {
+                        pool.get_edge_endpoints(eid)
+                            .map(|(source, target)| (target, source))
+                    },
                     CsrOptions {
                         add_reverse_edges: false,
                         sort_neighbors: false,
@@ -631,7 +634,10 @@ impl Step for NeighborAggregationStep {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (source, target)),
+                    |eid| {
+                        pool.get_edge_endpoints(eid)
+                            .map(|(source, target)| (source, target))
+                    },
                     CsrOptions {
                         add_reverse_edges: false,
                         sort_neighbors: false,
@@ -642,7 +648,10 @@ impl Step for NeighborAggregationStep {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (source, target)),
+                    |eid| {
+                        pool.get_edge_endpoints(eid)
+                            .map(|(source, target)| (source, target))
+                    },
                     CsrOptions {
                         add_reverse_edges: true,
                         sort_neighbors: false,

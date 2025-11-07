@@ -153,10 +153,7 @@ impl Default for StepVariables {
     fn default() -> Self {
         let instance_id = STEP_VARIABLES_COUNTER.fetch_add(1, Ordering::SeqCst);
         if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
-            eprintln!(
-                "[StepVariables::{}] Created new instance",
-                instance_id
-            );
+            eprintln!("[StepVariables::{}] Created new instance", instance_id);
         }
         Self {
             values: HashMap::new(),
@@ -353,7 +350,11 @@ impl<'a> StepScope<'a> {
                     "[StepVariables::{}] Building neighbor_cache for {} nodes: {:?}",
                     self.variables.instance_id,
                     nodes.len(),
-                    if nodes.len() <= 10 { format!("{:?}", nodes) } else { format!("[{} nodes]", nodes.len()) }
+                    if nodes.len() <= 10 {
+                        format!("{:?}", nodes)
+                    } else {
+                        format!("[{} nodes]", nodes.len())
+                    }
                 );
             }
             let mut adjacency = Vec::with_capacity(nodes.len());

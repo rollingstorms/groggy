@@ -26,6 +26,7 @@ ahash = "0.8"         # Fast hash algorithm
 rustc-hash = "1.1"    # Fast FxHashMap for small keys
 bitvec = "1.0"        # Efficient bit vectors for indexing
 wide = "0.7"          # SIMD operations
+once_cell = "1.18"
 console = "0.15"      # Console utilities for display
 csv = "1.3"           # CSV reading/writing
 chrono = { version = "0.4", features = ["serde"] } # Date/time handling
