@@ -326,3 +326,87 @@ mod tests {
         assert!(!is_positive(&AlgorithmParamValue::Float(-0.001)).unwrap());
     }
 }
+
+/// Copy/alias a variable to a new name.
+///
+/// This step is used within loops to create logical variable assignments
+/// by copying the value of one variable to another. It's essential for
+/// loop variable mapping where iteration N reads from variable X but
+/// iteration N+1 needs to read from the updated value.
+///
+/// # Parameters
+/// - `source`: Source variable name
+/// - `target`: Target variable name (will be created or overwritten)
+///
+/// # Example
+/// Inside a loop body:
+/// ```
+/// ranks_new = compute_new_ranks(ranks)
+/// alias(source=ranks_new, target=ranks)  # Copy ranks_new to ranks for next iteration
+/// ```
+pub struct AliasStep {
+    source: String,
+    target: String,
+}
+
+impl AliasStep {
+    pub fn new(source: impl Into<String>, target: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+            target: target.into(),
+        }
+    }
+}
+
+impl Step for AliasStep {
+    fn id(&self) -> &'static str {
+        "alias"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: "Copy/alias variable to new name".to_string(),
+            cost_hint: CostHint::Constant,
+        }
+    }
+
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("alias cancelled"));
+        }
+
+        // Get the source value (try all possible types)
+        let value = {
+            let vars = scope.variables();
+            
+            // Try each type in order
+            if let Ok(map) = vars.node_map(&self.source) {
+                super::core::StepValue::NodeMap(map.clone())
+            } else if let Ok(col) = vars.node_column(&self.source) {
+                super::core::StepValue::NodeColumn(col.clone())
+            } else if let Ok(map) = vars.edge_map(&self.source) {
+                super::core::StepValue::EdgeMap(map.clone())
+            } else if let Ok(val) = vars.scalar(&self.source) {
+                super::core::StepValue::Scalar(val.clone())
+            } else {
+                return Err(anyhow!(
+                    "alias: source variable '{}' not found or has unsupported type",
+                    self.source
+                ));
+            }
+        };
+
+        // Write to target using the appropriate setter
+        let vars_mut = scope.variables_mut();
+        match value {
+            super::core::StepValue::NodeMap(map) => vars_mut.set_node_map(&self.target, map),
+            super::core::StepValue::NodeColumn(col) => vars_mut.set_node_column(&self.target, col),
+            super::core::StepValue::EdgeMap(map) => vars_mut.set_edge_map(&self.target, map),
+            super::core::StepValue::Scalar(val) => vars_mut.set_scalar(&self.target, val),
+            _ => return Err(anyhow!("alias: unsupported value type for '{}'", self.source)),
+        }
+
+        Ok(())
+    }
+}

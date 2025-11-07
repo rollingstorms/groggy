@@ -888,7 +888,7 @@ class AlgorithmBuilder:
         Args:
             start_step: Index where loop body starts
             iterations: Number of times to repeat
-            loop_vars: Variables at loop start
+            loop_vars: Variables at loop start (dict mapping Python var name -> VarHandle)
         """
         # Extract and remove body steps
         loop_body = self.steps[start_step:]
@@ -897,11 +897,100 @@ class AlgorithmBuilder:
         # Deep-copy body so future mutations don't affect stored body
         body_copy = json.loads(json.dumps(loop_body))
 
-        alias_targets = {
-            step.get("target")
-            for step in body_copy
-            if isinstance(step, dict) and step.get("type") == "alias" and step.get("target")
-        }
+        def collect_strings(value, sink):
+            """Recursively collect string references."""
+            if isinstance(value, str):
+                sink.add(value)
+            elif isinstance(value, list):
+                for item in value:
+                    collect_strings(item, sink)
+            elif isinstance(value, dict):
+                for sub_val in value.values():
+                    collect_strings(sub_val, sink)
+
+        # Track variables defined/used in the loop body
+        vars_defined = set()
+        vars_used = set()
+        for step in body_copy:
+            if not isinstance(step, dict):
+                continue
+            output = step.get("output")
+            if isinstance(output, str):
+                vars_defined.add(output)
+            step_type = step.get("type")
+            if step_type == "alias":
+                target = step.get("target")
+                if isinstance(target, str):
+                    vars_defined.add(target)
+            for key, value in step.items():
+                if key == "type" or key == "output":
+                    continue
+                if step_type == "alias" and key == "target":
+                    continue
+                collect_strings(value, vars_used)
+
+        # Initial physical names captured at loop entry (preserve order)
+        initial_candidates: list[str] = []
+        if loop_vars:
+            for _, handle in loop_vars.items():
+                if handle and handle.name not in initial_candidates:
+                    initial_candidates.append(handle.name)
+
+        alias_mappings: list[list[str]] = []
+        paired_initials = set()
+        logical_seen = set()
+
+        for step in body_copy:
+            if not isinstance(step, dict) or step.get("type") != "alias":
+                continue
+            logical_name = step.get("target")
+            if not isinstance(logical_name, str):
+                continue
+            if logical_name in logical_seen:
+                continue
+            # Skip if logical name already existed before the loop
+            if any(handle.name == logical_name for handle in (loop_vars or {}).values()):
+                logical_seen.add(logical_name)
+                continue
+            initial_name = None
+            for candidate in initial_candidates:
+                if candidate in paired_initials:
+                    continue
+                if candidate == logical_name:
+                    continue
+                if candidate not in vars_used:
+                    continue
+                if candidate in vars_defined:
+                    continue
+                initial_name = candidate
+                break
+            if initial_name:
+                alias_mappings.append([initial_name, logical_name])
+                paired_initials.add(initial_name)
+                logical_seen.add(logical_name)
+
+        if alias_mappings:
+            replacement_map = {initial: logical for initial, logical in alias_mappings}
+
+            def remap_values(value):
+                if isinstance(value, str):
+                    return replacement_map.get(value, value)
+                if isinstance(value, list):
+                    return [remap_values(item) for item in value]
+                if isinstance(value, dict):
+                    return {k: remap_values(v) for k, v in value.items()}
+                return value
+
+            for step in body_copy:
+                if not isinstance(step, dict):
+                    continue
+                step_type = step.get("type")
+                for key, value in list(step.items()):
+                    if key == "type" or key == "output":
+                        continue
+                    if step_type == "alias" and key == "target":
+                        continue
+                    step[key] = remap_values(value)
 
         loop_step = {
             "type": "iter.loop",
@@ -909,10 +998,8 @@ class AlgorithmBuilder:
             "body": body_copy,
         }
 
-        combined_loop_vars = set(loop_vars.keys()) if loop_vars else set()
-        combined_loop_vars.update(alias_targets)
-        if combined_loop_vars:
-            loop_step["loop_vars"] = sorted(combined_loop_vars)
+        if alias_mappings:
+            loop_step["loop_vars"] = alias_mappings
 
         self.steps.append(loop_step)
     
@@ -1627,7 +1714,11 @@ class BuiltAlgorithm(AlgorithmHandle):
             if step_type == "iter.loop":
                 loop_vars = step.get("loop_vars") or []
                 for loop_var in loop_vars:
-                    defined_vars.add(loop_var)
+                    # loop_var can be a string or a [initial, logical] pair
+                    if isinstance(loop_var, list):
+                        defined_vars.add(loop_var[1])  # Add the logical name
+                    else:
+                        defined_vars.add(loop_var)
             
             if "output" in step:
                 output_var = step["output"]

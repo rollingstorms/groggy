@@ -1673,12 +1673,81 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Linear,
         },
         |spec| {
-            // Convert spec params to JSON for deserialize_loop_step
-            let json_spec = serde_json::to_value(&spec.params)
-                .map_err(|e| anyhow!("Failed to convert spec to JSON: {}", e))?;
+            // Extract iterations
+            let iterations = spec.params.get_int("iterations")
+                .ok_or_else(|| anyhow!("iter.loop requires 'iterations' param"))? as usize;
+            
+            // Extract body exactly like ExecutionBlockStep does
+            let body_value = spec.params.get("body")
+                .ok_or_else(|| anyhow!("iter.loop requires 'body' param"))?;
+            let body_json = serde_json::to_value(body_value)
+                .map_err(|e| anyhow!("Failed to convert body: {}", e))?;
+            
+            // Optional: loop_vars specify initial aliasing ([initial, logical] pairs)
+            let loop_vars = if let Some(loop_var_value) = spec.params.get("loop_vars") {
+                let loop_vars_json = serde_json::to_value(loop_var_value)
+                    .map_err(|e| anyhow!("Failed to convert loop_vars: {}", e))?;
+                let arr = loop_vars_json
+                    .as_array()
+                    .ok_or_else(|| anyhow!("iter.loop 'loop_vars' must be an array"))?;
+                let mut pairs = Vec::with_capacity(arr.len());
+                for (idx, entry) in arr.iter().enumerate() {
+                    if let Some(pair_arr) = entry.as_array() {
+                        if pair_arr.len() == 2 {
+                            if let (Some(initial), Some(logical)) =
+                                (pair_arr[0].as_str(), pair_arr[1].as_str())
+                            {
+                                pairs.push((initial.to_string(), logical.to_string()));
+                                continue;
+                            }
+                        }
+                    } else if let Some(single) = entry.as_str() {
+                        pairs.push((single.to_string(), single.to_string()));
+                        continue;
+                    }
+                    return Err(anyhow!(
+                        "iter.loop loop_vars[{}] must be a [initial, logical] string pair",
+                        idx
+                    ));
+                }
+                Some(pairs)
+            } else {
+                None
+            };
+            
+            // Create loop step
+            let loop_step = if let Some(pairs) = loop_vars {
+                super::loop_step::LoopStep::with_loop_vars(
+                    iterations,
+                    body_json,
+                    pairs,
+                    global_step_registry(),
+                )
+            } else {
+                super::loop_step::LoopStep::new(iterations, body_json, global_step_registry())
+            };
+            
+            Ok(Box::new(loop_step))
+        },
+    )?;
 
-            // For now, use a simple implementation that doesn't try to pass registry
-            super::loop_step::deserialize_loop_step(&json_spec, global_step_registry())
+    registry.register(
+        "alias",
+        StepMetadata {
+            id: "alias".to_string(),
+            description: "Copy/alias variable to new name for loop variable mapping".to_string(),
+            cost_hint: CostHint::Constant,
+        },
+        |spec| {
+            let source = spec.params.get_text("source")
+                .ok_or_else(|| anyhow!("alias requires 'source' param"))?;
+            let target = spec.params.get_text("target")
+                .ok_or_else(|| anyhow!("alias requires 'target' param"))?;
+            
+            Ok(Box::new(super::flow::AliasStep::new(
+                source.to_string(),
+                target.to_string(),
+            )))
         },
     )?;
 

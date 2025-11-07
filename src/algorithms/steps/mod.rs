@@ -58,7 +58,7 @@ pub use attributes::{
     AttachEdgeAttrStep, AttachNodeAttrStep, EdgeWeightScaleStep, LoadEdgeAttrStep, LoadNodeAttrStep,
 };
 pub use community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
-pub use flow::{FlowUpdateStep, ResidualCapacityStep};
+pub use flow::{AliasStep, FlowUpdateStep, ResidualCapacityStep};
 pub use init::{
     GraphEdgeCountStep, GraphNodeCountStep, InitEdgesStep, InitNodesStep, InitNodesWithIndexStep,
     InitScalarStep,

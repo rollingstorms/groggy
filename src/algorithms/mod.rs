@@ -185,6 +185,45 @@ impl AlgorithmParams {
         self.insert(key, AlgorithmParamValue::Text(value.into()));
     }
 
+    /// Create AlgorithmParams from a JSON map, converting values to AlgorithmParamValue.
+    pub fn from_json_map(map: &serde_json::Map<String, serde_json::Value>) -> Result<Self> {
+        let mut params = Self::new();
+        for (key, value) in map.iter() {
+            let param_value = match value {
+                serde_json::Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        AlgorithmParamValue::Int(i)
+                    } else if let Some(f) = n.as_f64() {
+                        AlgorithmParamValue::Float(f)
+                    } else {
+                        return Err(anyhow!("Invalid number: {}", n));
+                    }
+                }
+                serde_json::Value::String(s) => AlgorithmParamValue::Text(s.clone()),
+                serde_json::Value::Bool(b) => AlgorithmParamValue::Bool(*b),
+                serde_json::Value::Array(arr) => {
+                    // Try to convert to IntList
+                    let ints: Result<Vec<i64>> = arr
+                        .iter()
+                        .map(|v| {
+                            v.as_i64()
+                                .ok_or_else(|| anyhow!("Array element is not an integer"))
+                        })
+                        .collect();
+                    if let Ok(int_list) = ints {
+                        AlgorithmParamValue::IntList(int_list)
+                    } else {
+                        // Fall back to JSON
+                        AlgorithmParamValue::Json(value.clone())
+                    }
+                }
+                _ => AlgorithmParamValue::Json(value.clone()),
+            };
+            params.insert(key.clone(), param_value);
+        }
+        Ok(params)
+    }
+
     /// Fetch a parameter by name.
     pub fn get(&self, key: &str) -> Option<&AlgorithmParamValue> {
         self.values.get(key)
