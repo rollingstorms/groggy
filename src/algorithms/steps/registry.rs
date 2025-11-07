@@ -37,6 +37,7 @@ use super::temporal::{
 };
 use super::transformations::MapNodesExprStep;
 use super::fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
+use super::execution_block::{ExecutionBlockStep, ExecutionMode, BlockOptions, BlockBody, BodyNode};
 
 /// Register the core steps that ship with the engine.
 pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
@@ -1601,6 +1602,49 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Linear,
         },
         |spec| Ok(Box::new(FusedMADD::from_spec(spec)?)),
+    )?;
+
+    // Execution block step
+    registry.register(
+        "core.execution_block",
+        StepMetadata {
+            id: "core.execution_block".to_string(),
+            description: "Execute structured execution block (message-pass, etc.)".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            // Parse mode
+            let mode_str = spec.params.get_text("mode")
+                .ok_or_else(|| anyhow!("core.execution_block requires 'mode' param"))?;
+            let mode = match mode_str {
+                "message_pass" => ExecutionMode::MessagePass,
+                "streaming" => ExecutionMode::Streaming,
+                _ => return Err(anyhow!("Invalid execution mode: {}", mode_str)),
+            };
+
+            // Parse target
+            let target = spec.params.get_text("target")
+                .ok_or_else(|| anyhow!("core.execution_block requires 'target' param"))?
+                .to_string();
+
+            // Parse options
+            let options_value = spec.params.get("options")
+                .ok_or_else(|| anyhow!("core.execution_block requires 'options' param"))?;
+            let options: BlockOptions = serde_json::from_value(
+                serde_json::to_value(options_value)
+                    .map_err(|e| anyhow!("Failed to convert options: {}", e))?
+            ).map_err(|e| anyhow!("Failed to parse options: {}", e))?;
+
+            // Parse body
+            let body_value = spec.params.get("body")
+                .ok_or_else(|| anyhow!("core.execution_block requires 'body' param"))?;
+            let body: BlockBody = serde_json::from_value(
+                serde_json::to_value(body_value)
+                    .map_err(|e| anyhow!("Failed to convert body: {}", e))?
+            ).map_err(|e| anyhow!("Failed to parse body: {}", e))?;
+
+            Ok(Box::new(ExecutionBlockStep::new(mode, target, options, body)))
+        },
     )?;
 
     Ok(())

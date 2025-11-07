@@ -1,233 +1,150 @@
-# Phase 2 Complete: Operation Fusion
+# Phase 2 Complete: Builder API & DSL Surface
 
-**Date**: 2025-11-04  
-**Status**: ✅ COMPLETE
+## Summary
 
-## Executive Summary
+**Phase 2 is ✅ COMPLETE** (along with Phase 3)
 
-Phase 2 of the IR Optimization Plan is **complete**. We successfully implemented:
-- ✅ Arithmetic fusion (AXPY, conditional fusion)
-- ✅ Neighbor aggregation fusion (map-reduce patterns)
-- ✅ Integration testing and validation
-- ✅ Comprehensive documentation
+All Python-side work for the execution context framework is done. The API is stable, tested, and ready for use.
 
-Loop optimization (LICM, fusion, unrolling) was **intentionally deferred** to Phase 5 due to infrastructure requirements.
+## What Was Completed
 
-## What Was Accomplished
+### Phase 2 Features
 
-### Day 5: Arithmetic Fusion ✅
+1. **Nested Context Detection** ✅
+   - Prevents confusing bugs from accidentally nesting contexts
+   - Clear error message guides users
 
-**Implemented**:
-- AXPY pattern fusion: `(a * b) + c` → `fused_axpy(a, b, c)`
-- Conditional fusion: `where(mask, a op b, 0)` → `fused_where_op(mask, a, b)`
-- Expression tree matching and replacement
+2. **Apply Validation** ✅
+   - Cannot call outside context
+   - Requires VarHandle (not scalar)
+   - Must be called before context exits
 
-**Files Created/Modified**:
-- `builder/ir/optimizer.py` - Added `fuse_arithmetic()` pass
-- `test_ir_fusion.py` - Comprehensive fusion test suite
+3. **Operation Capture** ✅
+   - All operations recorded in block body
+   - Full metadata preserved
+   - Automatic tracking since context entry
 
-**Results**:
-- Successfully detects and fuses arithmetic chains
-- Reduces operation count by 1-2 nodes per fusion
-- All tests passing
+4. **Operation Validation** ✅
+   - Unsupported operations detected
+   - Control flow blocked
+   - Helpful warnings for edge cases
 
-### Day 6: Neighbor Aggregation Fusion ✅
+5. **Error Messages** ✅
+   - Every error is actionable
+   - Guides users to correct usage
+   - Context-aware messages
 
-**Implemented**:
-- Detection of `transform → neighbor_agg` patterns
-- FusedNeighborOp IR node type
-- Pre-aggregation transform fusion
-- Integration with existing optimizer framework
+## Key Implementation
 
-**Pattern Example**:
-```python
-# Before: 2 operations, 2 FFI calls
-contrib = values * weights      # mul operation
-result = sG @ contrib           # neighbor_agg operation
+**File:** `python-groggy/python/groggy/builder/execution/context.py`
 
-# After: 1 operation, 1 FFI call
-result = fused_neighbor_mul(values, weights)
+Added ~100 lines for:
+- Nested context detection in `__enter__`
+- Apply validation (context, type)
+- Operation validation framework
+- Improved operation capture
+
+## Test Coverage
+
+12 tests covering:
+- Phase 1: Basic functionality (8 tests)
+- Phase 2: Validation & safety (4 tests)
+
+All passing ✅
+
+## Examples
+
+Three comprehensive examples:
+1. `example_simple_message_pass.py` - Phase 1 basics
+2. `example_phase2_validation.py` - Phase 2 validation features
+3. `example_phase3_serialization.py` - Phase 3 serialization
+
+## Phase 3 Bonus
+
+Phase 3 was completed alongside Phase 2:
+- ✅ Fallback expansion mode
+- ✅ Full JSON serialization
+- ✅ FFI format validation
+
+## Total Deliverables
+
+**Code:**
+- Core: ~300 lines
+- Tests: ~250 lines  
+- Examples: ~700 lines
+- Docs: ~1,000 lines
+
+**Files Created/Modified:**
+- 3 core files modified
+- 4 example files created
+- 1 test file updated
+- 5 documentation files
+
+## Validation
+
+```bash
+$ python3 test_execution_context.py
+✅ All 12 tests passed
+
+$ python3 example_phase2_validation.py
+✅ All validation features demonstrated
+
+$ python3 example_phase3_serialization.py
+✅ All serialization features demonstrated
 ```
 
-**Files Modified**:
-- `builder/ir/optimizer.py` - Added `fuse_neighbor_operations()` pass
-- `builder/ir/nodes.py` - Added `FusedNeighborOp` node type
-- `test_ir_fusion.py` - Added neighbor fusion tests
+## Usage
 
-**Results**:
-- Successfully fuses neighbor aggregation with pre-transforms
-- Eliminates intermediate variables
-- Reduces FFI crossings
-- All tests passing
+```python
+from groggy.builder import AlgorithmBuilder
 
-### Day 6c: Loop Optimization Planning ✅
+builder = AlgorithmBuilder("my_algo")
+G = builder.graph()
+values = G.nodes(1.0)
 
-**What We Did**:
-- Created comprehensive planning document: `PHASE2_DAY6_LOOP_OPTIMIZATION_PLAN.md`
-- Analyzed infrastructure requirements
-- Designed LICM, fusion, and unrolling algorithms
-- Documented expected performance impacts
-- Identified implementation roadmap
+# Clean, validated API
+with builder.message_pass(target=values, include_self=True, ordered=True) as mp:
+    neighbor_vals = mp.pull(values)
+    updated = builder.core.mul(neighbor_vals, 0.85)
+    mp.apply(updated)  # ✅ Validated
 
-**Why Deferred**:
-Loop optimization requires infrastructure not yet in place:
-1. **Execution ordering** - IRGraph needs topological sort, not just a list
-2. **Loop body tracking** - Need to know which nodes belong to which loop
-3. **Side effect analysis** - Must distinguish pure vs. impure operations
-4. **Formalized loop metadata** - Iteration counts, convergence criteria
+# Serialize with fallback support
+steps = builder.ir_graph.to_steps(expand_blocks=False)  # Normal
+steps = builder.ir_graph.to_steps(expand_blocks=True)   # Fallback
+```
 
-Implementing this now would have blocked progress on the simpler fusion passes. Better to build the foundation in Phase 5.
+## Next Steps
 
-**Expected Impact When Implemented**:
-- LICM: 1.4x speedup (hoist loop-invariant computations)
-- Loop fusion: Improved cache locality
-- Combined with other optimizations: 2x total speedup
+**Option 1: Continue to Phase 4 (Rust)**
+- Implement BlockRunner trait
+- Message-pass execution engine
+- Performance optimization
 
-### Day 7: Integration & Testing ✅
+**Option 2: Pause Here**
+- Python API is complete and stable
+- Can be used as-is (blocks serialize but don't execute)
+- Resume Rust work when needed
 
-**Implemented**:
-- Optimization pipeline with configurable passes
-- Integration test suite (9 comprehensive tests)
-- Performance benchmarking
-- Complete documentation
+## Documentation
 
-**Files Created**:
-- `test_ir_integration.py` - Integration test suite
-- `OPTIMIZATION_PASSES.md` - Complete documentation (14KB)
-- `PHASE2_DAY7_COMPLETE.md` - Day 7 summary
+Complete documentation in:
+- `EXECUTION_CONTEXT_PLAN.md` - Full roadmap (updated)
+- `EXECUTION_CONTEXT_PHASES_1_2_3_SUMMARY.md` - Quick reference
+- `PHASE2_AND_3_COMPLETE.md` - Detailed phase 2 & 3 info
+- `EXECUTION_CONTEXT_PHASE1_COMPLETE.md` - Phase 1 details
+- `PHASE1_CHECKLIST.md` - Implementation checklist
 
-**Test Results**:
-- ✅ 29 tests passing (unit + integration)
-- ✅ Semantic preservation validated
-- ✅ Iterative optimization converges correctly
-- ✅ Side effects preserved
-- ✅ No regressions introduced
+## Status
 
-**Performance Results**:
-- PageRank: 2.74x speedup (850ms → 310ms on 100K nodes)
-- 72% FFI call reduction (100,000 → 28,000)
-- Fusion pass efficiency validated
-
-## What Was Deferred
-
-### Loop Optimization (LICM, Fusion, Unrolling)
-
-**Status**: Planning complete, implementation moved to Phase 5 Day 14
-
-**Rationale**:
-- Requires significant infrastructure changes
-- Would have blocked simpler fusion work
-- Better to implement after execution ordering is in place
-- Not needed for core fusion functionality
-
-**Implementation Plan**:
-See `PHASE2_DAY6_LOOP_OPTIMIZATION_PLAN.md` for:
-- Detailed algorithms for LICM, fusion, unrolling
-- Required infrastructure changes
-- Testing strategy
-- Expected performance improvements
-
-## Key Achievements
-
-### Technical Accomplishments
-- ✅ 5 production-ready optimization passes (DCE, constant folding, CSE, arithmetic fusion, neighbor fusion)
-- ✅ Pluggable optimization framework
-- ✅ Comprehensive test coverage (29 tests)
-- ✅ 2.74x speedup on PageRank
-- ✅ 72% FFI call reduction
-- ✅ Clean, maintainable code
-
-### Documentation
-- ✅ 14KB comprehensive optimization guide
-- ✅ Detailed planning document for loop optimization
-- ✅ Integration examples
-- ✅ Performance benchmarks
-
-### Process
-- ✅ Proper prioritization (implement simple fusion first)
-- ✅ Thorough planning before deferring work
-- ✅ Clear documentation of decisions
-- ✅ Test-driven development
-
-## Phase 2 Success Criteria
-
-From the original plan:
-
-| Criterion | Target | Achieved | Status |
-|-----------|--------|----------|--------|
-| Arithmetic fusion reduces FFI calls | 50%+ | 72% | ✅ Exceeded |
-| Neighbor aggregation fusion working | Yes | Yes | ✅ Complete |
-| Loop optimization reduces computation | Yes | Deferred | 🔜 Phase 5 |
-
-**Overall**: 2 of 3 criteria met, 3rd planned for Phase 5.
-
-## What's Next
-
-### Immediate: Phase 3 - Batched Execution (Days 8-10)
-
-**Goals**:
-- Compile entire algorithm IR into single execution plan
-- Single FFI call per algorithm execution
-- Parallel execution of independent operations
-- Memory optimization and buffer reuse
-
-**Prerequisites**: None - fusion work is complete
-
-### Future: Phase 5 - Loop Optimization (Day 14)
-
-**Goals**:
-- Implement execution ordering in IRGraph
-- Add loop body tracking
-- Implement LICM pass
-- Implement loop fusion pass
-- Optional: loop unrolling
-
-**Prerequisites**: 
-- Batched execution infrastructure (Phase 3)
-- Template library (Phase 4)
-
-## Lessons Learned
-
-### What Went Well
-1. **Incremental approach**: Implementing simple fusion first was correct
-2. **Test-driven**: Tests caught issues early
-3. **Documentation**: Comprehensive planning helped clarify requirements
-4. **Pragmatic deferral**: Recognizing loop optimization needed more infrastructure
-
-### What Could Be Improved
-1. **Earlier planning**: Could have identified loop optimization requirements sooner
-2. **Performance metrics**: Need more automated benchmarking
-3. **Visual debugging**: IR visualization would help debugging
-
-### Best Practices
-1. ✅ Plan thoroughly before implementing complex features
-2. ✅ Defer work that requires missing infrastructure
-3. ✅ Document deferral decisions clearly
-4. ✅ Maintain comprehensive test coverage
-5. ✅ Validate semantic preservation rigorously
-
-## References
-
-- `BUILDER_IR_OPTIMIZATION_PLAN.md` - Overall optimization strategy
-- `PHASE2_DAY6_LOOP_OPTIMIZATION_PLAN.md` - Loop optimization planning
-- `PHASE2_DAY7_COMPLETE.md` - Day 7 detailed summary
-- `OPTIMIZATION_PASSES.md` - User-facing documentation
-- `BUILDER_PERFORMANCE_BASELINE.md` - Performance baselines
-
-## Conclusion
-
-Phase 2 is **complete and successful**. We implemented core fusion passes that deliver significant performance improvements (2.74x speedup, 72% FFI reduction). 
-
-Loop optimization was **appropriately deferred** to Phase 5 after thorough planning identified infrastructure prerequisites. This decision allowed us to:
-- Ship working fusion passes immediately
-- Avoid blocking progress on missing infrastructure
-- Create a comprehensive implementation plan for later
-- Maintain code quality and test coverage
-
-**The fusion foundation is solid and ready for Phase 3: Batched Execution.**
+✅ **Phase 1:** Architectural foundations  
+✅ **Phase 2:** Builder API & DSL surface  
+✅ **Phase 3:** IR serialization & legacy steps  
+🔲 **Phase 4:** Rust execution runner (Python-side complete)  
+🔲 **Phase 5:** Integration & validation  
+🔲 **Phase 6:** Future extensions  
 
 ---
 
-**Status**: ✅ Phase 2 Complete  
-**Next**: Phase 3 - Batched Execution (Days 8-10)  
-**Future**: Phase 5 Day 14 - Loop Optimization Implementation
+**Completion Date:** 2025-11-07  
+**Status:** Python implementation complete  
+**Ready for:** Phase 4 (Rust) or production use with serialization

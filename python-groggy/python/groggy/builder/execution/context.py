@@ -5,9 +5,9 @@ Provides context managers like message_pass() that capture operations
 and execute them with special semantics (in-place updates, ordering, etc.).
 """
 
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Set
 from groggy.builder.varhandle import VarHandle
-from groggy.builder.ir.nodes import ExecutionBlockNode, IRNode, AnyIRNode
+from groggy.builder.ir.nodes import ExecutionBlockNode, IRNode, AnyIRNode, IRDomain
 
 
 class MessagePassContext:
@@ -28,6 +28,16 @@ class MessagePassContext:
         - pull(source): Collect neighbor values (wraps collect_neighbor_values)
         - apply(values): Write values back to target variable in-place
     """
+    
+    # Operations not allowed inside message-pass blocks
+    # These require special handling or are fundamentally incompatible
+    UNSUPPORTED_OPS: Set[str] = {
+        "random_walk",      # Non-deterministic, incompatible with ordered semantics
+        "attr.load",        # Attribute loading should happen outside block
+        "attr.attach",      # Attribute writing should happen outside block
+        "loop",             # Control flow inside blocks not yet supported
+        "until_converged",  # Control flow inside blocks not yet supported
+    }
     
     def __init__(self, builder, target: VarHandle, include_self: bool = True,
                  ordered: bool = True, name: Optional[str] = None, **options):
@@ -74,9 +84,22 @@ class MessagePassContext:
     
     def __enter__(self):
         """Enter the context - start capturing operations."""
+        # Check for nested contexts (disallow for now)
+        prev = getattr(self.builder, '_active_exec_context', None)
+        if prev is not None:
+            raise RuntimeError(
+                f"Nested execution contexts are not supported. "
+                f"Already inside context '{prev.name}', cannot enter '{self.name}'. "
+                f"Close the outer context before opening a new one."
+            )
+        
         # Save previous context and install ourselves
-        self._prev_context = getattr(self.builder, '_active_exec_context', None)
+        self._prev_context = prev
         self.builder._active_exec_context = self
+        
+        # Mark the starting point in the IR graph for operation capture
+        self._ir_start_index = len(self.builder.ir_graph.nodes)
+        
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -127,28 +150,43 @@ class MessagePassContext:
         
         Args:
             values: Computed values to write to target
+            
+        Raises:
+            RuntimeError: If called outside context or with invalid values
         """
+        # Validate we're inside the context
+        if self.builder._active_exec_context != self:
+            raise RuntimeError(
+                f"Cannot call apply() outside execution context. "
+                f"apply() must be called while the context is active."
+            )
+        
+        # Validate values is a VarHandle (not a scalar)
+        if not isinstance(values, VarHandle):
+            raise TypeError(
+                f"apply() requires a VarHandle, got {type(values).__name__}. "
+                f"If you have a scalar value, wrap it with builder.constant() first."
+            )
+        
         self._applied = True
         
-        # Capture the computation chain leading to this value
-        # Walk backwards from the final value to find all operations
-        # that were performed inside this context
-        value_name = values.name if hasattr(values, 'name') else str(values)
+        # Capture operations performed since context entered
+        # Get all nodes added to IR since we entered the context
+        for node in self.builder.ir_graph.nodes[self._ir_start_index:]:
+            if node not in self._captured_nodes:
+                # Validate and capture
+                self._validate_operation(node)
+                self._captured_nodes.append(node)
+                self.block_node.add_body_node(node)
         
-        # Find the node that produces this value
+        # Also capture the computation chain leading to this value
+        value_name = values.name if hasattr(values, 'name') else str(values)
         final_node = self.builder.ir_graph.get_defining_node(value_name)
-        if final_node:
-            # For Phase 1: just capture the final node
-            # Phase 2 would do a full dependency walk to capture the sub-DAG
+        
+        if final_node and final_node not in self._captured_nodes:
+            self._validate_operation(final_node)
+            self._captured_nodes.append(final_node)
             self.block_node.add_body_node(final_node)
-            
-            # Also capture any direct dependencies
-            for dep in self.builder.ir_graph.get_dependencies(final_node):
-                # Only capture nodes created during this context
-                # (simple heuristic: check if they're recent)
-                if dep not in self._captured_nodes:
-                    self._captured_nodes.append(dep)
-                    self.block_node.add_body_node(dep)
     
     def capture_node(self, node: AnyIRNode) -> None:
         """
@@ -157,8 +195,49 @@ class MessagePassContext:
         Called by the builder when an operation is performed while this
         context is active.
         """
+        # Validate the operation is supported
+        self._validate_operation(node)
+        
         self._captured_nodes.append(node)
         self.block_node.add_body_node(node)
+    
+    def _validate_operation(self, node: AnyIRNode) -> None:
+        """
+        Validate that an operation is allowed inside this execution block.
+        
+        Args:
+            node: IR node to validate
+            
+        Raises:
+            RuntimeError: If the operation is not supported
+        """
+        # Check against unsupported operations
+        op_full_name = f"{node.domain.value}.{node.op_type}"
+        
+        if node.op_type in self.UNSUPPORTED_OPS or op_full_name in self.UNSUPPORTED_OPS:
+            raise RuntimeError(
+                f"Operation '{op_full_name}' is not supported inside message-pass blocks. "
+                f"Context: '{self.name}'. "
+                f"This operation requires special handling or is incompatible with "
+                f"ordered execution semantics."
+            )
+        
+        # Warn about potentially problematic operations
+        if node.domain == IRDomain.ATTR:
+            import warnings
+            warnings.warn(
+                f"Attribute operation '{op_full_name}' inside message-pass block '{self.name}'. "
+                f"This may not work as expected. Consider moving attribute access outside the block.",
+                UserWarning
+            )
+        
+        # Control flow operations are not yet supported
+        if node.domain == IRDomain.CONTROL:
+            raise RuntimeError(
+                f"Control flow operation '{op_full_name}' is not supported inside message-pass blocks. "
+                f"Context: '{self.name}'. "
+                f"Loops and conditionals must be outside the execution block."
+            )
     
     @property
     def options_dict(self) -> Dict[str, Any]:

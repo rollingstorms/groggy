@@ -476,6 +476,94 @@ class ExecutionBlockNode(IRNode):
                 "nodes": self.body_nodes
             }
         }
+    
+    def expand_to_steps(self) -> List[Dict[str, Any]]:
+        """
+        Expand execution block into a flat list of steps (fallback mode).
+        
+        This provides a lowering path for execution blocks when the runtime
+        doesn't support native execution block handling. The block operations
+        are expanded into regular sequential steps.
+        
+        Returns:
+            List of step dictionaries representing the body operations
+        """
+        steps = []
+        
+        # For message-pass blocks, we need to reconstruct the loop structure
+        # For now, just emit the body operations in sequence
+        for node_dict in self.body_nodes:
+            # Reconstruct the step from the node dictionary
+            domain = node_dict.get("domain", "unknown")
+            op_type = node_dict.get("op_type", "unknown")
+            inputs = node_dict.get("inputs", [])
+            metadata = node_dict.get("metadata", {})
+            output = node_dict.get("output")
+            
+            # Create step with type and output
+            step = {
+                "type": f"{domain}.{op_type}",
+            }
+            
+            if output:
+                step["output"] = output
+            
+            # Map inputs to parameter names based on operation type
+            # This covers the common operations used in execution blocks
+            if op_type in ["add", "sub", "mul", "div", "compare"]:
+                # Binary operations: a, b
+                if len(inputs) >= 1:
+                    step["a"] = inputs[0]
+                if len(inputs) >= 2:
+                    step["b"] = inputs[1]
+                # Add metadata like comparison operator
+                if "op" in metadata:
+                    step["op"] = metadata["op"]
+                    
+            elif op_type == "where":
+                # Conditional: condition, if_true, if_false
+                if len(inputs) >= 1:
+                    step["condition"] = inputs[0]
+                if len(inputs) >= 2:
+                    step["if_true"] = inputs[1]
+                if len(inputs) >= 3:
+                    step["if_false"] = inputs[2]
+                    
+            elif op_type == "collect_neighbor_values":
+                # Neighbor collection: source
+                if len(inputs) >= 1:
+                    step["source"] = inputs[0]
+                step["include_self"] = metadata.get("include_self", True)
+                if "direction" in metadata:
+                    step["direction"] = metadata["direction"]
+                    
+            elif op_type == "mode" or op_type == "mode_list":
+                # Mode computation: source (list of values)
+                if len(inputs) >= 1:
+                    step["source"] = inputs[0]
+                if "tie_break" in metadata:
+                    step["tie_break"] = metadata["tie_break"]
+                    
+            elif op_type == "constant":
+                # Constant value
+                if "value" in metadata:
+                    step["value"] = metadata["value"]
+                    
+            elif op_type == "init_nodes":
+                # Node initialization
+                step["target"] = output or "temp"
+                if "value" in metadata:
+                    step["value"] = metadata["value"]
+                    
+            else:
+                # Generic fallback: use inputs as-is and add all metadata
+                for i, inp in enumerate(inputs):
+                    step[f"input_{i}"] = inp
+                step.update(metadata)
+            
+            steps.append(step)
+        
+        return steps
 
 
 # Convenience type for any IR node

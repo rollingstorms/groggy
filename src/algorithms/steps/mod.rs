@@ -13,6 +13,7 @@ mod community;
 pub mod composition;
 mod core;
 pub mod direction;
+mod execution_block;
 mod expression;
 mod filtering;
 mod flow;
@@ -78,6 +79,9 @@ pub use fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
 
 // Re-export direction types
 pub use direction::NeighborDirection;
+
+// Re-export execution block types
+pub use execution_block::{ExecutionBlockStep, ExecutionMode, BlockOptions, BlockBody, BodyNode};
 
 // Re-export temporal steps
 pub use temporal::{

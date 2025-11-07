@@ -227,14 +227,29 @@ class IRGraph:
         
         return "\n".join(lines)
     
-    def to_steps(self) -> List[Dict]:
+    def to_steps(self, expand_blocks: bool = False) -> List[Dict]:
         """
         Convert IR graph back to legacy step list format.
+        
+        Args:
+            expand_blocks: If True, expand execution blocks into flat steps
+                          (fallback mode for runtimes without block support)
         
         Returns:
             List of step dictionaries for FFI serialization
         """
-        return [node.to_step() for node in self.topological_order()]
+        from .nodes import ExecutionBlockNode
+        
+        steps = []
+        for node in self.topological_order():
+            if expand_blocks and isinstance(node, ExecutionBlockNode):
+                # Expand block into flat steps
+                steps.extend(node.expand_to_steps())
+            else:
+                # Regular step conversion
+                steps.append(node.to_step())
+        
+        return steps
     
     def to_json(self) -> Dict:
         """
