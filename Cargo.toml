@@ -18,6 +18,13 @@ pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
 petgraph = "0.6"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 serde = { version = "1.0", features = ["derive"] }
+
+# Tier 2: JIT Compilation
+cranelift = "0.102"
+cranelift-jit = "0.102"
+cranelift-module = "0.102"
+cranelift-native = "0.102"
+cranelift-codegen = "0.102"
 serde_json = "1.0"
 rayon = "1.7"
 parking_lot = "0.12"  # High-performance locks

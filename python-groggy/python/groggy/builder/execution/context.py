@@ -114,9 +114,12 @@ class MessagePassContext:
                 "You must call mp.apply(values) at least once in the block."
             )
         
+        # Remove captured nodes from the main IR graph – they now live inside the block.
+        self.builder._remove_ir_nodes(self._captured_nodes)
+        
         # Finalize and add block to IR graph
         if self.builder.ir_graph is not None:
-            self.builder.ir_graph.add_node(self.block_node)
+            self.builder._add_ir_node(self.block_node)
         
         return False  # Don't suppress exceptions
     

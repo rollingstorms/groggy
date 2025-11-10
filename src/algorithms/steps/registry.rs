@@ -1651,8 +1651,14 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get("body")
                 .ok_or_else(|| anyhow!("core.execution_block requires 'body' param"))?;
-            let body_json = serde_json::to_value(body_value)
-                .map_err(|e| anyhow!("Failed to convert body: {}", e))?;
+
+            // Extract the JSON value directly - don't re-serialize AlgorithmParamValue
+            let body_json = match body_value {
+                AlgorithmParamValue::Json(value) => value.clone(),
+                other => serde_json::to_value(other)
+                    .map_err(|e| anyhow!("Failed to convert body: {}", e))?,
+            };
+
             // Validate body structure eagerly for better error reporting
             serde_json::from_value::<BlockBody>(body_json.clone())
                 .map_err(|e| anyhow!("Failed to parse body: {}", e))?;
@@ -1674,19 +1680,27 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
         |spec| {
             // Extract iterations
-            let iterations = spec.params.get_int("iterations")
-                .ok_or_else(|| anyhow!("iter.loop requires 'iterations' param"))? as usize;
-            
+            let iterations = spec
+                .params
+                .get_int("iterations")
+                .ok_or_else(|| anyhow!("iter.loop requires 'iterations' param"))?
+                as usize;
+
             // Extract body exactly like ExecutionBlockStep does
-            let body_value = spec.params.get("body")
+            let body_value = spec
+                .params
+                .get("body")
                 .ok_or_else(|| anyhow!("iter.loop requires 'body' param"))?;
             let body_json = serde_json::to_value(body_value)
                 .map_err(|e| anyhow!("Failed to convert body: {}", e))?;
-            
+
             // Optional: loop_vars specify initial aliasing ([initial, logical] pairs)
             let loop_vars = if let Some(loop_var_value) = spec.params.get("loop_vars") {
-                let loop_vars_json = serde_json::to_value(loop_var_value)
-                    .map_err(|e| anyhow!("Failed to convert loop_vars: {}", e))?;
+                let loop_vars_json = match loop_var_value {
+                    AlgorithmParamValue::Json(value) => value.clone(),
+                    other => serde_json::to_value(other)
+                        .map_err(|e| anyhow!("Failed to convert loop_vars: {}", e))?,
+                };
                 let arr = loop_vars_json
                     .as_array()
                     .ok_or_else(|| anyhow!("iter.loop 'loop_vars' must be an array"))?;
@@ -1714,7 +1728,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             } else {
                 None
             };
-            
+
             // Create loop step
             let loop_step = if let Some(pairs) = loop_vars {
                 super::loop_step::LoopStep::with_loop_vars(
@@ -1726,7 +1740,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             } else {
                 super::loop_step::LoopStep::new(iterations, body_json, global_step_registry())
             };
-            
+
             Ok(Box::new(loop_step))
         },
     )?;
@@ -1739,11 +1753,15 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Constant,
         },
         |spec| {
-            let source = spec.params.get_text("source")
+            let source = spec
+                .params
+                .get_text("source")
                 .ok_or_else(|| anyhow!("alias requires 'source' param"))?;
-            let target = spec.params.get_text("target")
+            let target = spec
+                .params
+                .get_text("target")
                 .ok_or_else(|| anyhow!("alias requires 'target' param"))?;
-            
+
             Ok(Box::new(super::flow::AliasStep::new(
                 source.to_string(),
                 target.to_string(),

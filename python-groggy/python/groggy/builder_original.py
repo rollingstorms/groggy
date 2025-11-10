@@ -1000,6 +1000,28 @@ class AlgorithmBuilder:
 
         if alias_mappings:
             loop_step["loop_vars"] = alias_mappings
+        
+        # Try to compile to batch plan for performance
+        try:
+            from groggy.builder.ir.batch import compile_loop_to_batch_plan
+            
+            # Convert loop_vars format: [[initial, logical]] -> [(initial, logical)]
+            loop_vars_tuples = None
+            if alias_mappings:
+                loop_vars_tuples = [(initial, logical) for initial, logical in alias_mappings]
+            
+            batch_plan = compile_loop_to_batch_plan(body_copy, loop_vars_tuples)
+            
+            # Check if compilation succeeded (has instructions)
+            if batch_plan and batch_plan.get('instructions'):
+                loop_step["batch_plan"] = batch_plan
+                # Mark as batch-optimized for diagnostics
+                loop_step["_batch_optimized"] = True
+        except Exception as e:
+            # Batch compilation failed - fall back to regular execution
+            # This is OK, the loop will just run slower via step-by-step
+            import warnings
+            warnings.warn(f"Batch compilation failed, using fallback: {e}", RuntimeWarning)
 
         self.steps.append(loop_step)
     
@@ -1294,9 +1316,11 @@ class BuiltAlgorithm(AlgorithmHandle):
             }
             return {"id": "core.normalize_node_values", "params": params}
 
-        if step_type in ["attach_attr", "core.attach_attr", "attr.save"]:
+        if step_type in ["attach_attr", "core.attach_attr", "attr.save", "attr.attach"]:
             # Resolve variable name through aliases
-            resolved_input = self._resolve_with_alias(step["input"], alias_map)
+            # Handle different field names: 'source' or 'input'
+            source = step.get("source", step.get("input"))
+            resolved_input = self._resolve_with_alias(source, alias_map)
             return {
                 "id": "core.attach_node_attr",
                 "params": {"source": resolved_input, "attr": step["attr_name"]},
@@ -1493,7 +1517,15 @@ class BuiltAlgorithm(AlgorithmHandle):
                     target = body_step.get("target")
                     if source and target:
                         resolved_source = self._resolve_with_alias(source, body_alias_map)
-                        body_alias_map[target] = resolved_source
+                        body_specs.append({
+                            "id": "alias",
+                            "params": {
+                                "source": resolved_source,
+                                "target": target
+                            }
+                        })
+                        # After executing the alias, future references should use the logical name.
+                        body_alias_map.pop(target, None)
                     continue
 
                 encoded_body = self._encode_step(body_step, body_alias_map)
@@ -1655,6 +1687,31 @@ class BuiltAlgorithm(AlgorithmHandle):
                     "c": self._resolve_operand(step["c"], alias_map),
                     "target": step["target"]
                 }
+            }
+        
+        if step_type == "core.execution_block":
+            body = step.get("body", {"nodes": []})
+            rewritten_nodes = []
+            for node in body.get("nodes", []):
+                node_copy = dict(node)
+                inputs = node_copy.get("inputs") or []
+                node_copy["inputs"] = [
+                    self._resolve_with_alias(inp, alias_map) if isinstance(inp, str) else inp
+                    for inp in inputs
+                ]
+                output = node_copy.get("output")
+                if isinstance(output, str):
+                    node_copy["output"] = self._resolve_with_alias(output, alias_map)
+                rewritten_nodes.append(node_copy)
+            
+            return {
+                "id": "core.execution_block",
+                "params": {
+                    "mode": step.get("mode", "message_pass"),
+                    "target": self._resolve_with_alias(step["target"], alias_map),
+                    "options": step.get("options", {}),
+                    "body": {"nodes": rewritten_nodes},
+                },
             }
 
         raise ValueError(f"Unsupported builder step type: {step_type}")

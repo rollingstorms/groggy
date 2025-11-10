@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 
 use crate::traits::SubgraphOperations;
-use crate::types::AttrName;
+use crate::types::{AttrName, EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope};
@@ -116,14 +116,17 @@ impl Step for AttachNodeAttrStep {
         }
 
         let map = scope.variables().node_map(&self.source)?;
-        let mut values = Vec::with_capacity(map.len());
+        let mut entries: Vec<(NodeId, &AlgorithmParamValue)> =
+            map.iter().map(|(node, value)| (*node, value)).collect();
+        entries.sort_unstable_by_key(|(node, _)| *node);
+        let mut values = Vec::with_capacity(entries.len());
 
-        for (node, value) in map.iter() {
+        for (node, value) in entries {
             if ctx.is_cancelled() {
                 return Err(anyhow!("attach_node_attr cancelled"));
             }
             if let Some(attr_value) = value.as_attr_value() {
-                values.push((*node, attr_value));
+                values.push((node, attr_value));
             } else {
                 return Err(anyhow!(
                     "variable '{}' contains unsupported attribute type",
@@ -221,12 +224,15 @@ impl Step for AttachEdgeAttrStep {
 
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let map = scope.variables().edge_map(&self.source)?;
+        let mut entries: Vec<(EdgeId, &AlgorithmParamValue)> =
+            map.iter().map(|(edge, value)| (*edge, value)).collect();
+        entries.sort_unstable_by_key(|(edge, _)| *edge);
         let mut attrs = HashMap::new();
-        let mut values = Vec::with_capacity(map.len());
+        let mut values = Vec::with_capacity(entries.len());
 
-        for (edge, value) in map.iter() {
+        for (edge, value) in entries {
             if let Some(attr_value) = value.as_attr_value() {
-                values.push((*edge, attr_value));
+                values.push((edge, attr_value));
             } else {
                 return Err(anyhow!(
                     "variable '{}' contains unsupported attribute type",

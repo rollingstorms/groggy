@@ -1,5 +1,6 @@
 use super::super::{AlgorithmParams, Context};
 use super::core::{Step, StepRegistry, StepScope, StepSpec};
+use crate::algorithms::execution::{BatchExecutor, BatchPlan};
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
 use serde_json::Value;
@@ -52,6 +53,17 @@ impl LoopStep {
         }
     }
 
+    /// Try to deserialize body as a BatchPlan (if it's been pre-compiled)
+    fn try_batch_plan(&self) -> Option<BatchPlan> {
+        // Check if body_json contains a batch plan
+        if let Some(plan_json) = self.body_json.get("batch_plan") {
+            // Try to deserialize as BatchPlan
+            serde_json::from_value(plan_json.clone()).ok()
+        } else {
+            None
+        }
+    }
+
     fn body_steps(&self) -> Result<&Vec<Box<dyn Step>>> {
         self.body_cache.get_or_try_init(|| {
             // The body JSON might be wrapped in AlgorithmParamValue format: {"type": "Json", "value": [...]}
@@ -75,22 +87,23 @@ impl LoopStep {
                 let step_id = step_value["id"]
                     .as_str()
                     .ok_or_else(|| anyhow!("iter.loop body[{}] missing 'id' field", idx))?;
-                
+
                 // Extract params as a JSON object
-                let params_obj = step_value.get("params")
+                let params_obj = step_value
+                    .get("params")
                     .and_then(|v| v.as_object())
                     .ok_or_else(|| anyhow!("iter.loop body[{}] has invalid 'params'", idx))?;
-                
+
                 // Convert params from raw JSON to AlgorithmParams
                 let params = AlgorithmParams::from_json_map(params_obj)?;
-                
+
                 let spec = StepSpec {
                     id: step_id.to_string(),
                     params,
                     inputs: Vec::new(),
                     outputs: Vec::new(),
                 };
-                
+
                 let step = self.registry.instantiate(&spec)?;
                 steps.push(step);
             }
@@ -115,7 +128,7 @@ impl Step for LoopStep {
                 // Use AliasStep logic to copy the variable
                 let value = {
                     let vars = scope.variables();
-                    
+
                     if let Ok(map) = vars.node_map(initial_var) {
                         super::core::StepValue::NodeMap(map.clone())
                     } else if let Ok(col) = vars.node_column(initial_var) {
@@ -135,15 +148,33 @@ impl Step for LoopStep {
                 let vars_mut = scope.variables_mut();
                 match value {
                     super::core::StepValue::NodeMap(map) => vars_mut.set_node_map(loop_var, map),
-                    super::core::StepValue::NodeColumn(col) => vars_mut.set_node_column(loop_var, col),
+                    super::core::StepValue::NodeColumn(col) => {
+                        vars_mut.set_node_column(loop_var, col)
+                    }
                     super::core::StepValue::EdgeMap(map) => vars_mut.set_edge_map(loop_var, map),
                     super::core::StepValue::Scalar(val) => vars_mut.set_scalar(loop_var, val),
-                    _ => return Err(anyhow!("Loop variable '{}' has unsupported type", initial_var)),
+                    _ => {
+                        return Err(anyhow!(
+                            "Loop variable '{}' has unsupported type",
+                            initial_var
+                        ))
+                    }
                 }
             }
         }
 
-        // Execute the loop body for the specified number of iterations
+        // Try batch execution first (if available)
+        if let Some(batch_plan) = self.try_batch_plan() {
+            // Execute via batch executor
+            let node_count = scope.subgraph().node_count();
+            let mut executor = BatchExecutor::new(node_count);
+            
+            return executor.execute(&batch_plan, self.iterations, scope).map_err(|e| {
+                anyhow!("Batch execution failed: {}", e)
+            });
+        }
+
+        // Fallback: Execute the loop body for the specified number of iterations
         for iteration in 0..self.iterations {
             // Execute each step in the body
             for (step_idx, step) in body_steps.iter().enumerate() {
@@ -203,7 +234,8 @@ pub fn deserialize_loop_step(
                 // Each element can be either a string (old format) or [initial, logical] pair
                 if let Some(pair) = v.as_array() {
                     if pair.len() == 2 {
-                        if let (Some(initial), Some(logical)) = (pair[0].as_str(), pair[1].as_str()) {
+                        if let (Some(initial), Some(logical)) = (pair[0].as_str(), pair[1].as_str())
+                        {
                             return Some((initial.to_string(), logical.to_string()));
                         }
                     }

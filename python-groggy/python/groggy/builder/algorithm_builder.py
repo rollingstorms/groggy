@@ -5,7 +5,7 @@ This module provides the main AlgorithmBuilder class that coordinates
 domain-specific trait classes (CoreOps, GraphOps, AttrOps, IterOps).
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
 from groggy.builder.varhandle import VarHandle, SubgraphHandle, GraphHandle
@@ -1045,27 +1045,30 @@ class AlgorithmBuilder:
         if not alias_steps:
             return ir_steps
         
-        # Build map: variable name -> step index that defines it
-        var_to_step_idx = {}
-        for i, step in enumerate(ir_steps):
-            output = step.get('output')
-            if output:
-                var_to_step_idx[output] = i
+        from collections import defaultdict
         
-        # Insert alias steps after their source variable is defined
-        merged = list(ir_steps)
-        inserted_count = 0
+        alias_by_source = defaultdict(list)
+        fallback_aliases = []
         
+        # Preserve original alias order when multiple map to same source
         for alias in alias_steps:
-            source = alias.get('source')
-            if source and source in var_to_step_idx:
-                # Insert immediately after the step that defines this variable
-                insert_pos = var_to_step_idx[source] + 1 + inserted_count
-                merged.insert(insert_pos, alias)
-                inserted_count += 1
+            source = alias.get("source")
+            if source:
+                alias_by_source[source].append(alias)
             else:
-                # Source not found in IR steps, append at end
-                merged.append(alias)
+                fallback_aliases.append(alias)
+        
+        merged = []
+        for step in ir_steps:
+            merged.append(step)
+            output = step.get("output")
+            if output and output in alias_by_source:
+                merged.extend(alias_by_source.pop(output))
+        
+        # Append any aliases whose sources were not part of the optimized IR
+        for leftover in alias_by_source.values():
+            merged.extend(leftover)
+        merged.extend(fallback_aliases)
         
         return merged
     
@@ -1082,11 +1085,36 @@ class AlgorithmBuilder:
         Args:
             node: IR node to add
         """
+        context = getattr(self, "_active_exec_context", None)
+        
         if self.use_ir and self.ir_graph is not None:
             self.ir_graph.add_node(node)
+            if context is not None:
+                context.capture_node(node)
         
-        # Always maintain legacy steps list for backward compatibility
-        self.steps.append(node.to_step())
+        # Only record legacy steps when not inside a structured execution block
+        if context is None:
+            self.steps.append(node.to_step())
+        
+        return node
+
+    def _remove_ir_nodes(self, nodes: List[IRNode]) -> None:
+        """
+        Remove a collection of IR nodes (used for execution block capture).
+        """
+        if not self.ir_graph or not nodes:
+            return
+        
+        remove_ids = {node.id for node in nodes}
+        if not remove_ids:
+            return
+        
+        self.ir_graph.nodes = [node for node in self.ir_graph.nodes if node.id not in remove_ids]
+        for node_id in remove_ids:
+            self.ir_graph.node_map.pop(node_id, None)
+        
+        # Rebuild tracking to drop stale references
+        self.ir_graph.rebuild_var_tracking()
     
     def get_ir_stats(self) -> Dict[str, Any]:
         """

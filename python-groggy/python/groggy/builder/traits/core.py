@@ -406,12 +406,26 @@ class CoreOps:
             >>> new_labels = builder.core.mode(neighbor_labels, tie_break="lowest")
         """
         var = self.builder._new_var("mode")
-        self.builder.steps.append({
-            "type": "core.mode_list",
-            "source": lists.name,
-            "tie_break": tie_break,
-            "output": var.name
-        })
+        
+        if self.builder.use_ir and self.builder.ir_graph is not None:
+            from groggy.builder.ir.nodes import CoreIRNode
+            node = CoreIRNode(
+                node_id=f"node_{len(self.builder.ir_graph.nodes)}",
+                op_type="mode_list",
+                inputs=[lists.name],
+                output=var.name,
+                tie_break=tie_break,
+                source=lists.name,
+            )
+            self.builder._add_ir_node(node)
+        else:
+            self.builder.steps.append({
+                "type": "core.mode_list",
+                "source": lists.name,
+                "tie_break": tie_break,
+                "output": var.name
+            })
+        
         return var
     
     def update_in_place(
@@ -745,5 +759,4 @@ class CoreOps:
             "output": var.name
         })
         return var
-
 

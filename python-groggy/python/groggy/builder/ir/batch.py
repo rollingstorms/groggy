@@ -320,3 +320,267 @@ def estimate_performance(plan: BatchExecutionPlan, ffi_overhead_ms: float = 0.25
         "theoretical_speedup": speedup,
         "max_live_variables": plan.max_live_variables,
     }
+
+
+# ============================================================================
+# New Batch Instruction Compiler (for Tier 1 batch executor)
+# ============================================================================
+
+class SlotAllocator:
+    """
+    Linear scan register allocator for loop bodies.
+    
+    Assigns slots (registers) to variables while minimizing slot count
+    by reusing slots for variables with non-overlapping lifetimes.
+    """
+    
+    def __init__(self):
+        self.slots: Dict[str, int] = {}  # variable name -> slot id
+        self.live_ranges: Dict[str, Tuple[int, int]] = {}  # var -> (first_use, last_use)
+        self.next_slot_id = 0
+    
+    def compute_lifetimes(self, operations: List[Dict[str, Any]]) -> None:
+        """
+        Compute variable lifetimes from a sequence of operations.
+        
+        Args:
+            operations: List of operation dicts with 'inputs', 'output' keys
+        """
+        for i, op in enumerate(operations):
+            # Track output definition
+            if 'output' in op and op['output']:
+                var = op['output']
+                if var not in self.live_ranges:
+                    self.live_ranges[var] = (i, i)
+                else:
+                    # Extend lifetime (redefinition)
+                    first, _ = self.live_ranges[var]
+                    self.live_ranges[var] = (min(first, i), i)
+            
+            # Track input uses
+            for input_var in op.get('inputs', []):
+                if input_var not in self.live_ranges:
+                    # First use (parameter or external)
+                    self.live_ranges[input_var] = (0, i)
+                else:
+                    # Extend lifetime to this use
+                    first, _ = self.live_ranges[input_var]
+                    self.live_ranges[input_var] = (first, i)
+    
+    def allocate(self) -> int:
+        """
+        Perform register allocation using linear scan algorithm.
+        
+        Returns:
+            Number of slots needed (slot_count)
+        """
+        if not self.live_ranges:
+            return 0
+        
+        # Sort variables by start time
+        vars_sorted = sorted(self.live_ranges.items(), key=lambda x: x[1][0])
+        
+        # Track free slots and active intervals
+        free_slots: List[int] = []
+        active: Dict[str, Tuple[int, int]] = {}  # var -> (slot, end_time)
+        
+        for var, (start, end) in vars_sorted:
+            # Expire old intervals and free their slots
+            expired = [v for v, (s, e) in active.items() if e < start]
+            for expired_var in expired:
+                slot, _ = active[expired_var]
+                free_slots.append(slot)
+                del active[expired_var]
+            
+            # Try to reuse a free slot
+            if free_slots:
+                slot = free_slots.pop(0)
+                self.slots[var] = slot
+                active[var] = (slot, end)
+            else:
+                # Allocate new slot
+                slot = self.next_slot_id
+                self.next_slot_id += 1
+                self.slots[var] = slot
+                active[var] = (slot, end)
+        
+        return self.next_slot_id
+    
+    def get_slot(self, var: str) -> int:
+        """Get the slot allocated to a variable."""
+        return self.slots.get(var, -1)
+
+
+class IRToBatchCompiler:
+    """
+    Compiles IR operations to BatchInstruction format for the Rust batch executor.
+    
+    This compiler:
+    1. Analyzes loop body operations
+    2. Allocates slots to variables
+    3. Lowers IR operations to BatchInstructions
+    4. Detects loop-carried variables (phi nodes)
+    """
+    
+    def __init__(self):
+        self.allocator = SlotAllocator()
+        self.instructions: List[Dict[str, Any]] = []
+        self.carried_vars: List[Tuple[int, int]] = []  # (from_slot, to_slot)
+    
+    def compile_loop_body(self, body_steps: List[Dict[str, Any]], 
+                          loop_vars: Optional[List[Tuple[str, str]]] = None) -> Dict[str, Any]:
+        """
+        Compile a loop body to BatchPlan format.
+        
+        Args:
+            body_steps: List of step dicts (from LoopIRNode.body)
+            loop_vars: Optional list of (initial_var, loop_var) pairs
+        
+        Returns:
+            BatchPlan dict ready for JSON serialization
+        """
+        # Step 1: Compute lifetimes
+        self.allocator.compute_lifetimes(body_steps)
+        
+        # Step 2: Allocate slots
+        slot_count = self.allocator.allocate()
+        
+        # Step 3: Lower operations to BatchInstructions
+        for step in body_steps:
+            instr = self._lower_step(step)
+            if instr:
+                self.instructions.append(instr)
+        
+        # Step 4: Handle loop-carried variables
+        if loop_vars:
+            for initial_var, loop_var in loop_vars:
+                from_slot = self.allocator.get_slot(loop_var)
+                to_slot = self.allocator.get_slot(initial_var)
+                if from_slot >= 0 and to_slot >= 0:
+                    self.carried_vars.append((from_slot, to_slot))
+        
+        return {
+            "instructions": self.instructions,
+            "slot_count": slot_count,
+            "carried_slots": self.carried_vars,
+            "name": "loop_body",
+        }
+    
+    def _lower_step(self, step: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Lower a single step to a BatchInstruction.
+        
+        Returns None if the step cannot be lowered (unsupported operation).
+        """
+        step_type = step.get('type', '')
+        
+        # Handle core arithmetic operations
+        if step_type == 'core.add':
+            return self._lower_binary_op(step, 'add')
+        elif step_type == 'core.sub':
+            return self._lower_binary_op(step, 'sub')
+        elif step_type == 'core.mul':
+            return self._lower_binary_op(step, 'mul')
+        elif step_type == 'core.div':
+            return self._lower_binary_op(step, 'div')
+        
+        # Handle scalar operations
+        elif step_type == 'core.constant':
+            return self._lower_constant(step)
+        
+        # Handle graph operations
+        elif step_type == 'graph.neighbor_sum':
+            return self._lower_neighbor_aggregate(step, 'sum')
+        elif step_type == 'graph.neighbor_mean':
+            return self._lower_neighbor_aggregate(step, 'mean')
+        
+        # Handle loads/stores
+        elif step_type == 'init_nodes_with_index':
+            return self._lower_load(step)
+        elif step_type == 'attach_attr':
+            return self._lower_store(step)
+        
+        # Unsupported: return None (will trigger fallback)
+        return None
+    
+    def _lower_binary_op(self, step: Dict[str, Any], op_name: str) -> Dict[str, Any]:
+        """Lower binary arithmetic operation."""
+        lhs = step.get('lhs') or step.get('source') or step.get('inputs', [None])[0]
+        rhs = step.get('rhs') or step.get('inputs', [None, None])[1]
+        dst = step.get('output') or step.get('target')
+        
+        return {
+            "type": op_name,
+            "dst": self.allocator.get_slot(dst),
+            "lhs": self.allocator.get_slot(lhs),
+            "rhs": self.allocator.get_slot(rhs),
+        }
+    
+    def _lower_constant(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        """Lower constant load to LoadScalar."""
+        dst = step.get('output') or step.get('target')
+        value = step.get('value', 0.0)
+        
+        return {
+            "type": "load_scalar",
+            "dst": self.allocator.get_slot(dst),
+            "value": float(value),
+        }
+    
+    def _lower_neighbor_aggregate(self, step: Dict[str, Any], operation: str) -> Dict[str, Any]:
+        """Lower neighbor aggregation to NeighborAggregate."""
+        src = step.get('source') or step.get('inputs', [None])[0]
+        dst = step.get('output') or step.get('target')
+        direction = step.get('direction', 'out')
+        
+        return {
+            "type": "neighbor_aggregate",
+            "dst": self.allocator.get_slot(dst),
+            "src": self.allocator.get_slot(src),
+            "operation": operation,
+            "direction": direction,
+        }
+    
+    def _lower_load(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        """Lower node property load."""
+        dst = step.get('output') or step.get('target')
+        var_name = step.get('var_name', dst)
+        
+        return {
+            "type": "load_node_prop",
+            "dst": self.allocator.get_slot(dst),
+            "var_name": var_name,
+        }
+    
+    def _lower_store(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        """Lower node property store."""
+        src = step.get('source') or step.get('inputs', [None])[0]
+        var_name = step.get('name', src)
+        
+        return {
+            "type": "store_node_prop",
+            "src": self.allocator.get_slot(src),
+            "var_name": var_name,
+        }
+
+
+def compile_loop_to_batch_plan(body_steps: List[Dict[str, Any]], 
+                                loop_vars: Optional[List[Tuple[str, str]]] = None) -> Dict[str, Any]:
+    """
+    Convenience function to compile a loop body to a batch plan.
+    
+    Args:
+        body_steps: List of step dicts from loop body
+        loop_vars: Optional loop-carried variables
+    
+    Returns:
+        BatchPlan dict ready for JSON serialization to Rust
+        
+    Example:
+        >>> body = [{"type": "core.mul", "lhs": "a", "rhs": "b", "output": "c"}]
+        >>> plan = compile_loop_to_batch_plan(body)
+        >>> import json
+        >>> json.dumps(plan)  # Send to Rust BatchExecutor
+    """
+    compiler = IRToBatchCompiler()
+    return compiler.compile_loop_body(body_steps, loop_vars)

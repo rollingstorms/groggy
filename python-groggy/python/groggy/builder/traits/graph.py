@@ -162,12 +162,24 @@ class GraphOps:
             >>> most_common = builder.core.mode(neighbor_labels)
         """
         var = self.builder._new_var("neighbor_values")
-        self.builder.steps.append({
-            "type": "core.collect_neighbor_values",  # Keep same step type
-            "source": values.name,
-            "include_self": include_self,
-            "output": var.name
-        })
+        
+        if self.builder.use_ir and self.builder.ir_graph is not None:
+            from groggy.builder.ir.nodes import CoreIRNode
+            node = CoreIRNode(
+                node_id=f"node_{len(self.builder.ir_graph.nodes)}",
+                op_type="collect_neighbor_values",
+                inputs=[values.name],
+                output=var.name,
+                include_self=include_self
+            )
+            self.builder._add_ir_node(node)
+        else:
+            self.builder.steps.append({
+                "type": "core.collect_neighbor_values",  # Keep same step type
+                "source": values.name,
+                "include_self": include_self,
+                "output": var.name
+            })
         return var
     
     def neighbor_mode_update(

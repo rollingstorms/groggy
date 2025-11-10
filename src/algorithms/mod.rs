@@ -19,6 +19,7 @@ use crate::types::{AttrValue, NodeId};
 pub mod builder;
 pub mod centrality;
 pub mod community;
+pub mod execution;
 pub mod pathfinding;
 pub mod pipeline;
 pub mod registry;

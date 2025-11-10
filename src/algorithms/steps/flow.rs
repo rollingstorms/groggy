@@ -379,7 +379,7 @@ impl Step for AliasStep {
         // Get the source value (try all possible types)
         let value = {
             let vars = scope.variables();
-            
+
             // Try each type in order
             if let Ok(map) = vars.node_map(&self.source) {
                 super::core::StepValue::NodeMap(map.clone())
@@ -404,7 +404,12 @@ impl Step for AliasStep {
             super::core::StepValue::NodeColumn(col) => vars_mut.set_node_column(&self.target, col),
             super::core::StepValue::EdgeMap(map) => vars_mut.set_edge_map(&self.target, map),
             super::core::StepValue::Scalar(val) => vars_mut.set_scalar(&self.target, val),
-            _ => return Err(anyhow!("alias: unsupported value type for '{}'", self.source)),
+            _ => {
+                return Err(anyhow!(
+                    "alias: unsupported value type for '{}'",
+                    self.source
+                ))
+            }
         }
 
         Ok(())

@@ -455,6 +455,48 @@ class LoopIRNode(IRNode):
         if self.loop_vars:
             step["loop_vars"] = list(self.loop_vars)
         return step
+    
+    def is_batch_compatible(self) -> bool:
+        """
+        Check if this loop body can be compiled to a batch plan.
+        
+        Returns True if all operations in the body are supported by
+        the batch executor, False otherwise.
+        
+        Unsupported operations:
+        - Nested loops
+        - Execution blocks (TODO: may support in future)
+        - Conditionals (if/where - TODO)
+        - Complex graph operations (custom neighbor functions)
+        """
+        supported_ops = {
+            # Core arithmetic
+            'core.add', 'core.sub', 'core.mul', 'core.div',
+            'core.constant',
+            # Graph operations
+            'graph.neighbor_sum', 'graph.neighbor_mean',
+            'graph.neighbor_min', 'graph.neighbor_max',
+            # Loads/stores
+            'init_nodes_with_index', 'attach_attr',
+            'alias',  # No-op in batch execution
+        }
+        
+        for step in self.body:
+            step_type = step.get('type', '')
+            
+            # Check for unsupported control flow
+            if step_type.startswith('iter.') or step_type.startswith('control.'):
+                return False  # Nested loops not supported
+            
+            if step_type == 'core.execution_block':
+                return False  # Execution blocks not supported yet
+            
+            # Check if operation is in supported set
+            if step_type not in supported_ops:
+                # Unknown operation - not batch compatible
+                return False
+        
+        return True
 
 
 @dataclass
