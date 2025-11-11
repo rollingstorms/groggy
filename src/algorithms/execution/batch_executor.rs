@@ -167,26 +167,26 @@ impl BatchExecutor {
 
     /// Load a node property from the graph into a slot
     fn load_node_prop(&mut self, dst: SlotId, var_name: &str, scope: &mut StepScope) -> Result<()> {
-        let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
+        // Use deterministic ordered node list
+        let nodes = scope.subgraph().ordered_nodes();
         let dst_vec = &mut self.slots[dst];
 
+        // Prefer NodeColumn for fast access
+        // NodeColumn already has O(1) lookup via internal HashMap
         if let Ok(column) = scope.variables().node_column(var_name) {
-            for (i, node) in nodes.iter().enumerate() {
-                let value = column.get(*node).ok_or_else(|| {
-                    anyhow!(
-                        "LoadNodeProp: node {} missing in column '{}'",
-                        node,
-                        var_name
-                    )
+            for (i, &node) in nodes.iter().enumerate() {
+                let value = column.get(node).ok_or_else(|| {
+                    anyhow!("LoadNodeProp: node {} missing in column '{}'", node, var_name)
                 })?;
                 dst_vec[i] = value_to_f64(value)?;
             }
             return Ok(());
         }
 
+        // Fallback to node map
         if let Ok(map) = scope.variables().node_map(var_name) {
-            for (i, node) in nodes.iter().enumerate() {
-                let value = map.get(node).ok_or_else(|| {
+            for (i, &node) in nodes.iter().enumerate() {
+                let value = map.get(&node).ok_or_else(|| {
                     anyhow!("LoadNodeProp: node {} missing in map '{}'", node, var_name)
                 })?;
                 dst_vec[i] = value_to_f64(value)?;
@@ -207,19 +207,48 @@ impl BatchExecutor {
         var_name: &str,
         scope: &mut StepScope,
     ) -> Result<()> {
-        // Get source slot
+        // Get source slot and use deterministic ordered node list (same as load)
         let src_vec = self.slots[src].clone();
+        let nodes = scope.subgraph().ordered_nodes();
         let debug_values = std::env::var("GROGGY_DEBUG_BATCH_VALUES").is_ok();
 
         // Try to update existing column
         let wrote_column = if let Ok(column) = scope.variables_mut().node_column_mut(var_name) {
-            for (i, value) in column.values_mut().iter_mut().enumerate() {
-                *value = AlgorithmParamValue::Float(src_vec[i]);
+            let col_nodes = column.nodes();
+            
+            // Check if column order matches subgraph ordered_nodes
+            let can_use_direct = col_nodes.len() == nodes.len() 
+                && col_nodes.iter().zip(nodes.iter()).all(|(a, b)| a == b);
+            
+            if can_use_direct {
+                // Fast path: direct index-to-index write (no HashMap needed!)
+                let values_mut = column.values_mut();
+                for (i, &value) in src_vec.iter().enumerate() {
+                    values_mut[i] = AlgorithmParamValue::Float(value);
+                }
+            } else {
+                // Fallback: build mapping (rare case where orderings differ)
+                let mut node_to_col_idx = HashMap::new();
+                for (col_idx, &node) in col_nodes.iter().enumerate() {
+                    node_to_col_idx.insert(node, col_idx);
+                }
+                
+                let values_mut = column.values_mut();
+                for (slot_idx, &node) in nodes.iter().enumerate() {
+                    if let Some(&col_idx) = node_to_col_idx.get(&node) {
+                        values_mut[col_idx] = AlgorithmParamValue::Float(src_vec[slot_idx]);
+                    } else {
+                        return Err(anyhow!(
+                            "StoreNodeProp: node {} missing in column '{}'",
+                            node,
+                            var_name
+                        ));
+                    }
+                }
             }
             true
         } else {
-            // Create new node map (simpler than creating NodeColumn)
-            let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
+            // Create new node map
             let mut map = HashMap::new();
             for (i, &node) in nodes.iter().enumerate() {
                 map.insert(node, AlgorithmParamValue::Float(src_vec[i]));
@@ -276,8 +305,8 @@ impl BatchExecutor {
         _direction: Direction,
         scope: &mut StepScope,
     ) -> Result<()> {
-        // Collect all data from scope first
-        let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
+        // Use deterministic ordered node list (same as load/store)
+        let nodes = scope.subgraph().ordered_nodes();
         let neighbor_cache = scope.neighbor_cache()?;
 
         // Build neighbor list
@@ -347,8 +376,8 @@ impl BatchExecutor {
         _direction: Direction,
         scope: &mut StepScope,
     ) -> Result<()> {
-        // Collect data from scope first
-        let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
+        // Use deterministic ordered node list (same as load/store)
+        let nodes = scope.subgraph().ordered_nodes();
         let neighbor_cache = scope.neighbor_cache()?;
         let neighbor_lists: Vec<Vec<NodeId>> = nodes
             .iter()
@@ -422,8 +451,8 @@ impl BatchExecutor {
         _direction: Direction,
         scope: &mut StepScope,
     ) -> Result<()> {
-        // Collect data from scope first
-        let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
+        // Use deterministic ordered node list (same as load/store)
+        let nodes = scope.subgraph().ordered_nodes();
         let neighbor_cache = scope.neighbor_cache()?;
         let neighbor_lists: Vec<Vec<NodeId>> = nodes
             .iter()
