@@ -936,9 +936,20 @@ class AlgorithmBuilder:
                 if handle and handle.name not in initial_candidates:
                     initial_candidates.append(handle.name)
 
+        pre_loop_alias_sources = {}
+        for step in self.steps[:start_step]:
+            if isinstance(step, dict) and step.get("type") == "alias":
+                source = step.get("source")
+                target = step.get("target")
+                if isinstance(source, str) and isinstance(target, str):
+                    pre_loop_alias_sources[target] = source
+
         alias_mappings: list[list[str]] = []
         paired_initials = set()
         logical_seen = set()
+
+        def _is_loop_candidate(name: str) -> bool:
+            return name.startswith(("nodes_", "labels_", "edges_", "values_"))
 
         for step in body_copy:
             if not isinstance(step, dict) or step.get("type") != "alias":
@@ -948,22 +959,22 @@ class AlgorithmBuilder:
                 continue
             if logical_name in logical_seen:
                 continue
-            # Skip if logical name already existed before the loop
-            if any(handle.name == logical_name for handle in (loop_vars or {}).values()):
-                logical_seen.add(logical_name)
-                continue
-            initial_name = None
-            for candidate in initial_candidates:
-                if candidate in paired_initials:
-                    continue
-                if candidate == logical_name:
-                    continue
-                if candidate not in vars_used:
-                    continue
-                if candidate in vars_defined:
-                    continue
-                initial_name = candidate
-                break
+            initial_name = pre_loop_alias_sources.get(logical_name)
+
+            if initial_name is None:
+                for candidate in initial_candidates:
+                    if not _is_loop_candidate(candidate):
+                        continue
+                    if candidate in paired_initials:
+                        continue
+                    if candidate == logical_name:
+                        continue
+                    if candidate not in vars_used:
+                        continue
+                    if candidate in vars_defined:
+                        continue
+                    initial_name = candidate
+                    break
             if initial_name:
                 alias_mappings.append([initial_name, logical_name])
                 paired_initials.add(initial_name)
@@ -1004,6 +1015,7 @@ class AlgorithmBuilder:
         # Try to compile to batch plan for performance
         try:
             from groggy.builder.ir.batch import compile_loop_to_batch_plan
+            import os
             
             # Convert loop_vars format: [[initial, logical]] -> [(initial, logical)]
             loop_vars_tuples = None
@@ -1012,16 +1024,30 @@ class AlgorithmBuilder:
             
             batch_plan = compile_loop_to_batch_plan(body_copy, loop_vars_tuples)
             
+            if os.environ.get('GROGGY_DEBUG_BATCH'):
+                print(f"[PYTHON] Batch compilation result: {batch_plan is not None}")
+                if batch_plan:
+                    print(f"[PYTHON] Instructions: {len(batch_plan.get('instructions', []))}")
+                    print(f"[PYTHON] Batch plan keys: {list(batch_plan.keys())}")
+            
             # Check if compilation succeeded (has instructions)
             if batch_plan and batch_plan.get('instructions'):
                 loop_step["batch_plan"] = batch_plan
                 # Mark as batch-optimized for diagnostics
                 loop_step["_batch_optimized"] = True
+                
+                if os.environ.get('GROGGY_DEBUG_BATCH'):
+                    print(f"[PYTHON] ✅ Batch plan added to loop_step!")
         except Exception as e:
             # Batch compilation failed - fall back to regular execution
             # This is OK, the loop will just run slower via step-by-step
             import warnings
             warnings.warn(f"Batch compilation failed, using fallback: {e}", RuntimeWarning)
+            
+            if os.environ.get('GROGGY_DEBUG_BATCH'):
+                import traceback
+                print(f"[PYTHON] ❌ Batch compilation failed:")
+                traceback.print_exc()
 
         self.steps.append(loop_step)
     
@@ -1532,12 +1558,31 @@ class BuiltAlgorithm(AlgorithmHandle):
                 if encoded_body is not None:
                     body_specs.append(encoded_body)
 
+            # After the loop, variables that were aliased inside should be treated as canonical
+            # Remove any backward aliases for loop variables so they're not resolved to old sources
+            if loop_vars:
+                for (_initial_var, loop_var) in loop_vars:
+                    # The loop variable is now the canonical name; don't resolve it backwards
+                    alias_map.pop(loop_var, None)
+
             params: Dict[str, Any] = {
                 "iterations": iterations,
                 "body": body_specs,
             }
             if loop_vars:
                 params["loop_vars"] = loop_vars
+            
+            # Forward batch_plan if compiled (Tier 1 batch execution)
+            import os
+            if "batch_plan" in step:
+                params["batch_plan"] = step["batch_plan"]
+                if os.environ.get('GROGGY_DEBUG_BATCH'):
+                    print(f"[PYTHON _encode_step] ✅ Added batch_plan to params")
+                    print(f"[PYTHON _encode_step] Params keys now: {list(params.keys())}")
+            else:
+                if os.environ.get('GROGGY_DEBUG_BATCH'):
+                    print(f"[PYTHON _encode_step] ⚠️  No batch_plan in step")
+                    print(f"[PYTHON _encode_step] Step keys: {list(step.keys())}")
 
             return {
                 "id": "iter.loop",

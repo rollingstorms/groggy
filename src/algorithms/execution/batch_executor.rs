@@ -6,9 +6,9 @@
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
+use crate::algorithms::steps::StepScope;
+use crate::algorithms::AlgorithmParamValue;
 use crate::types::NodeId;
-use crate::algorithms::{AlgorithmParamValue, Context};
-use crate::algorithms::steps::{StepScope, StepVariables};
 
 use super::batch_plan::{AggregateOp, BatchInstruction, BatchPlan, Direction, SlotId, TieBreak};
 
@@ -41,9 +41,28 @@ impl BatchExecutor {
     ///    a. Executes all instructions in sequence
     ///    b. Copies carried variables for next iteration
     /// 3. Returns control to caller
-    pub fn execute(&mut self, plan: &BatchPlan, iterations: usize, scope: &mut StepScope) -> Result<()> {
+    pub fn execute(
+        &mut self,
+        plan: &BatchPlan,
+        iterations: usize,
+        scope: &mut StepScope,
+    ) -> Result<()> {
         // Validate plan before execution
         plan.validate()?;
+
+        // DEBUG: Print plan details on first execution
+        if std::env::var("GROGGY_DEBUG_BATCH").is_ok() {
+            eprintln!(
+                "[BATCH_EXECUTOR] Plan: {} instructions, {} slots, {} carried",
+                plan.instructions.len(),
+                plan.slot_count,
+                plan.carried_slots.len()
+            );
+            eprintln!("[BATCH_EXECUTOR] Carried slots: {:?}", plan.carried_slots);
+            for (idx, instr) in plan.instructions.iter().enumerate() {
+                eprintln!("[BATCH_EXECUTOR]   Instruction {}: {:?}", idx, instr);
+            }
+        }
 
         // Allocate slots (registers)
         self.allocate_slots(plan.slot_count)?;
@@ -84,7 +103,11 @@ impl BatchExecutor {
     }
 
     /// Execute a single instruction
-    fn execute_instruction(&mut self, instr: &BatchInstruction, scope: &mut StepScope) -> Result<()> {
+    fn execute_instruction(
+        &mut self,
+        instr: &BatchInstruction,
+        scope: &mut StepScope,
+    ) -> Result<()> {
         match instr {
             BatchInstruction::LoadNodeProp { dst, var_name } => {
                 self.load_node_prop(*dst, var_name, scope)
@@ -93,12 +116,27 @@ impl BatchExecutor {
                 self.store_node_prop(*src, var_name, scope)
             }
             BatchInstruction::LoadScalar { dst, value } => self.load_scalar(*dst, *value),
-            BatchInstruction::Add { dst, lhs, rhs } => self.arithmetic_op(*dst, *lhs, *rhs, |a, b| a + b),
-            BatchInstruction::Sub { dst, lhs, rhs } => self.arithmetic_op(*dst, *lhs, *rhs, |a, b| a - b),
-            BatchInstruction::Mul { dst, lhs, rhs } => self.arithmetic_op(*dst, *lhs, *rhs, |a, b| a * b),
-            BatchInstruction::Div { dst, lhs, rhs } => self.arithmetic_op(*dst, *lhs, *rhs, |a, b| {
-                if b.abs() < 1e-9 { 0.0 } else { a / b }
-            }),
+            BatchInstruction::Add { dst, lhs, rhs } => {
+                self.arithmetic_op(*dst, *lhs, *rhs, |a, b| a + b)
+            }
+            BatchInstruction::Sub { dst, lhs, rhs } => {
+                self.arithmetic_op(*dst, *lhs, *rhs, |a, b| a - b)
+            }
+            BatchInstruction::Mul { dst, lhs, rhs } => {
+                self.arithmetic_op(*dst, *lhs, *rhs, |a, b| a * b)
+            }
+            BatchInstruction::Div { dst, lhs, rhs } => self.arithmetic_op(
+                *dst,
+                *lhs,
+                *rhs,
+                |a, b| {
+                    if b.abs() < 1e-9 {
+                        0.0
+                    } else {
+                        a / b
+                    }
+                },
+            ),
             BatchInstruction::NeighborAggregate {
                 dst,
                 src,
@@ -117,7 +155,9 @@ impl BatchExecutor {
                 multiplier,
                 operation,
                 direction,
-            } => self.fused_neighbor_mul_agg(*dst, *src, *multiplier, *operation, *direction, scope),
+            } => {
+                self.fused_neighbor_mul_agg(*dst, *src, *multiplier, *operation, *direction, scope)
+            }
             BatchInstruction::FusedMADD { dst, a, b, c } => self.fused_madd(*dst, *a, *b, *c),
             BatchInstruction::FusedAXPY { dst, alpha, x, y } => {
                 self.fused_axpy(*dst, *alpha, *x, *y)
@@ -127,32 +167,56 @@ impl BatchExecutor {
 
     /// Load a node property from the graph into a slot
     fn load_node_prop(&mut self, dst: SlotId, var_name: &str, scope: &mut StepScope) -> Result<()> {
-        // Get node column from scope
-        let column = scope.variables().node_column(var_name)?;
-        
-        // Extract values into destination slot
+        let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
         let dst_vec = &mut self.slots[dst];
-        for (i, (_node_id, value)) in column.iter().enumerate() {
-            dst_vec[i] = match value {
-                AlgorithmParamValue::Int(v) => *v as f64,
-                AlgorithmParamValue::Float(v) => *v,
-                _ => return Err(anyhow!("LoadNodeProp: variable '{}' contains non-numeric value", var_name)),
-            };
+
+        if let Ok(column) = scope.variables().node_column(var_name) {
+            for (i, node) in nodes.iter().enumerate() {
+                let value = column.get(*node).ok_or_else(|| {
+                    anyhow!(
+                        "LoadNodeProp: node {} missing in column '{}'",
+                        node,
+                        var_name
+                    )
+                })?;
+                dst_vec[i] = value_to_f64(value)?;
+            }
+            return Ok(());
         }
-        
-        Ok(())
+
+        if let Ok(map) = scope.variables().node_map(var_name) {
+            for (i, node) in nodes.iter().enumerate() {
+                let value = map.get(node).ok_or_else(|| {
+                    anyhow!("LoadNodeProp: node {} missing in map '{}'", node, var_name)
+                })?;
+                dst_vec[i] = value_to_f64(value)?;
+            }
+            return Ok(());
+        }
+
+        Err(anyhow!(
+            "LoadNodeProp: variable '{}' is not stored as a node column or node map",
+            var_name
+        ))
     }
 
     /// Store a slot value back to a node property in the graph
-    fn store_node_prop(&mut self, src: SlotId, var_name: &str, scope: &mut StepScope) -> Result<()> {
+    fn store_node_prop(
+        &mut self,
+        src: SlotId,
+        var_name: &str,
+        scope: &mut StepScope,
+    ) -> Result<()> {
         // Get source slot
-        let src_vec = &self.slots[src].clone();
-        
+        let src_vec = self.slots[src].clone();
+        let debug_values = std::env::var("GROGGY_DEBUG_BATCH_VALUES").is_ok();
+
         // Try to update existing column
-        if let Ok(column) = scope.variables_mut().node_column_mut(var_name) {
+        let wrote_column = if let Ok(column) = scope.variables_mut().node_column_mut(var_name) {
             for (i, value) in column.values_mut().iter_mut().enumerate() {
                 *value = AlgorithmParamValue::Float(src_vec[i]);
             }
+            true
         } else {
             // Create new node map (simpler than creating NodeColumn)
             let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
@@ -161,8 +225,21 @@ impl BatchExecutor {
                 map.insert(node, AlgorithmParamValue::Float(src_vec[i]));
             }
             scope.variables_mut().set_node_map(var_name, map);
+            false
+        };
+
+        if debug_values {
+            let sample_len = src_vec.len().min(5);
+            let sample: Vec<f64> = src_vec.iter().copied().take(sample_len).collect();
+            eprintln!(
+                "[BATCH_EXECUTOR] store '{}' sample ({} nodes, column={}) {:?}",
+                var_name,
+                src_vec.len(),
+                wrote_column,
+                sample
+            );
         }
-        
+
         Ok(())
     }
 
@@ -202,38 +279,37 @@ impl BatchExecutor {
         // Collect all data from scope first
         let nodes: Vec<NodeId> = scope.subgraph().nodes().iter().copied().collect();
         let neighbor_cache = scope.neighbor_cache()?;
-        
+
         // Build neighbor list
         let neighbor_lists: Vec<Vec<NodeId>> = nodes
             .iter()
             .map(|&node| neighbor_cache.neighbors(node).unwrap_or(&[]).to_vec())
             .collect();
-        
+
         // Now work with self's slots
         let src_vec = self.get_float_vec(src)?.clone();
         let dst_vec = self.get_float_vec_mut(dst)?;
-        
+
         // Build node index for fast lookup
         let mut node_index = HashMap::new();
         for (i, &node) in nodes.iter().enumerate() {
             node_index.insert(node, i);
         }
-        
+
         // Aggregate neighbors for each node
         for (i, neighbors) in neighbor_lists.iter().enumerate() {
-            
             if neighbors.is_empty() {
                 dst_vec[i] = 0.0;
                 continue;
             }
-            
+
             let mut agg_value = match operation {
                 AggregateOp::Sum => 0.0,
                 AggregateOp::Mean => 0.0,
                 AggregateOp::Min => f64::INFINITY,
                 AggregateOp::Max => f64::NEG_INFINITY,
             };
-            
+
             let mut count = 0;
             for &neighbor in neighbors.iter() {
                 if let Some(&neighbor_idx) = node_index.get(&neighbor) {
@@ -246,13 +322,19 @@ impl BatchExecutor {
                     count += 1;
                 }
             }
-            
+
             dst_vec[i] = match operation {
-                AggregateOp::Mean => if count > 0 { agg_value / count as f64 } else { 0.0 },
+                AggregateOp::Mean => {
+                    if count > 0 {
+                        agg_value / count as f64
+                    } else {
+                        0.0
+                    }
+                }
                 _ => agg_value,
             };
         }
-        
+
         Ok(())
     }
 
@@ -272,57 +354,61 @@ impl BatchExecutor {
             .iter()
             .map(|&node| neighbor_cache.neighbors(node).unwrap_or(&[]).to_vec())
             .collect();
-        
+
         // Work with slots
         let src_vec = self.get_float_vec(src)?.clone();
         let dst_vec = self.get_float_vec_mut(dst)?;
-        
+
         // Build node index
         let mut node_index = HashMap::new();
         for (i, &node) in nodes.iter().enumerate() {
             node_index.insert(node, i);
         }
-        
+
         // Compute mode for each node
         for (i, neighbors) in neighbor_lists.iter().enumerate() {
-            
             if neighbors.is_empty() {
                 dst_vec[i] = src_vec[i]; // Keep own value if no neighbors
                 continue;
             }
-            
+
             // Count frequency of each value
             let mut frequency: HashMap<i64, (f64, usize)> = HashMap::new();
             for &neighbor in neighbors {
                 if let Some(&neighbor_idx) = node_index.get(&neighbor) {
                     let value = src_vec[neighbor_idx];
                     let key = (value * 1000.0) as i64; // Discretize for counting
-                    frequency.entry(key)
+                    frequency
+                        .entry(key)
                         .and_modify(|(_, count)| *count += 1)
                         .or_insert((value, 1));
                 }
             }
-            
+
             // Find mode
             let mut mode_value = src_vec[i];
             let mut max_count = 0;
-            
+
             for (_key, (value, count)) in frequency.iter() {
                 let should_update = match tie_break {
-                    TieBreak::Lowest => *count > max_count || (*count == max_count && *value < mode_value),
-                    TieBreak::Highest => *count > max_count || (*count == max_count && *value > mode_value),
+                    TieBreak::Lowest => {
+                        *count > max_count || (*count == max_count && *value < mode_value)
+                    }
+                    TieBreak::Highest => {
+                        *count > max_count || (*count == max_count && *value > mode_value)
+                    }
                     TieBreak::First => *count > max_count,
                 };
-                
+
                 if should_update {
                     mode_value = *value;
                     max_count = *count;
                 }
             }
-            
+
             dst_vec[i] = mode_value;
         }
-        
+
         Ok(())
     }
 
@@ -343,33 +429,33 @@ impl BatchExecutor {
             .iter()
             .map(|&node| neighbor_cache.neighbors(node).unwrap_or(&[]).to_vec())
             .collect();
-        
+
         // Work with slots
         let src_vec = self.get_float_vec(src)?.clone();
         let mult_vec = self.get_float_vec(multiplier)?.clone();
         let dst_vec = self.get_float_vec_mut(dst)?;
-        
+
         // Build node index
         let mut node_index = HashMap::new();
         for (i, &node) in nodes.iter().enumerate() {
             node_index.insert(node, i);
         }
-        
+
         // For each node: aggregate(neighbors[src] * mult)
         for (i, neighbors) in neighbor_lists.iter().enumerate() {
             let mult = mult_vec[i];
-            
+
             if neighbors.is_empty() {
                 dst_vec[i] = 0.0;
                 continue;
             }
-            
+
             let mut agg = match operation {
                 AggregateOp::Sum | AggregateOp::Mean => 0.0,
                 AggregateOp::Min => f64::INFINITY,
                 AggregateOp::Max => f64::NEG_INFINITY,
             };
-            
+
             let mut count = 0;
             for &neighbor in neighbors.iter() {
                 if let Some(&neighbor_idx) = node_index.get(&neighbor) {
@@ -382,13 +468,19 @@ impl BatchExecutor {
                     count += 1;
                 }
             }
-            
+
             dst_vec[i] = match operation {
-                AggregateOp::Mean => if count > 0 { agg / count as f64 } else { 0.0 },
+                AggregateOp::Mean => {
+                    if count > 0 {
+                        agg / count as f64
+                    } else {
+                        0.0
+                    }
+                }
                 _ => agg,
             };
         }
-        
+
         Ok(())
     }
 
@@ -441,6 +533,17 @@ impl BatchExecutor {
     }
 }
 
+fn value_to_f64(value: &AlgorithmParamValue) -> Result<f64> {
+    match value {
+        AlgorithmParamValue::Float(v) => Ok(*v),
+        AlgorithmParamValue::Int(v) => Ok(*v as f64),
+        _ => Err(anyhow!(
+            "BatchExecutor expected numeric value, found {:?}",
+            value
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -454,14 +557,14 @@ mod tests {
 
     #[test]
     fn test_arithmetic_operations() {
-        use crate::Graph;
         use crate::algorithms::steps::core::{StepScope, StepVariables};
-        
+        use crate::Graph;
+
         let g = Graph::new();
         g.add_node();
         g.add_node();
         let sg = g.to_subgraph();
-        
+
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
 

@@ -20,22 +20,13 @@ pub type SlotId = usize;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BatchInstruction {
     /// Load a node property into a slot
-    LoadNodeProp {
-        dst: SlotId,
-        var_name: String,
-    },
+    LoadNodeProp { dst: SlotId, var_name: String },
 
     /// Store a slot value back to a node property
-    StoreNodeProp {
-        src: SlotId,
-        var_name: String,
-    },
+    StoreNodeProp { src: SlotId, var_name: String },
 
     /// Load a scalar value into a slot (broadcast to all nodes)
-    LoadScalar {
-        dst: SlotId,
-        value: f64,
-    },
+    LoadScalar { dst: SlotId, value: f64 },
 
     /// Element-wise addition: dst = lhs + rhs
     Add {
@@ -278,7 +269,10 @@ mod tests {
                     dst: 0,
                     var_name: "ranks".to_string(),
                 },
-                BatchInstruction::LoadScalar { dst: 1, value: 0.85 },
+                BatchInstruction::LoadScalar {
+                    dst: 1,
+                    value: 0.85,
+                },
                 BatchInstruction::Mul {
                     dst: 2,
                     lhs: 0,
@@ -289,7 +283,7 @@ mod tests {
                     var_name: "ranks".to_string(),
                 },
             ],
-            3, // 3 slots needed
+            3,            // 3 slots needed
             vec![(2, 0)], // carry slot 2 to slot 0
         );
 

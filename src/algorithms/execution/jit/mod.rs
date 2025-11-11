@@ -19,7 +19,7 @@ use anyhow::Result;
 pub type CompiledFunction = unsafe extern "C" fn(
     node_count: usize,
     iterations: usize,
-    scope_ptr: *mut u8,  // Opaque pointer for now
+    scope_ptr: *mut u8, // Opaque pointer for now
 ) -> i32;
 
 /// JIT compilation manager

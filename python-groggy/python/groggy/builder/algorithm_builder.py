@@ -951,11 +951,13 @@ class AlgorithmBuilder:
                 iterations = step.get("iterations") or step.get("count") or 1
                 body = copy.deepcopy(step.get("body", []))
                 loop_vars = step.get("loop_vars")
+                batch_plan = step.get("batch_plan")
                 node = LoopIRNode(
                     node_id=f"node_{len(new_ir.nodes)}",
                     iterations=int(iterations),
                     body=body,
                     loop_vars=list(loop_vars) if loop_vars else None,
+                    batch_plan=copy.deepcopy(batch_plan) if batch_plan else None,
                 )
                 new_ir.add_node(node)
                 continue

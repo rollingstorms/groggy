@@ -1,396 +1,405 @@
 """
-Benchmark builder-based PageRank and LPA vs native implementations.
-Tests on 50k and 200k node graphs.
-Validates that results match between builder and native implementations.
+Lightweight benchmark comparing native PageRank to builder implementations.
 
-Updated to use new decorator-based DSL syntax.
-
-TIER 1 COMPLETE (2025-11-10): Batch executor operational!
-- Loops automatically compile to BatchPlan
-- Single FFI call per loop (vs 70+ before)
-- Performance: ~5μs per node per iteration
-- 100% loop optimization rate
+Run with:
+    python benchmark_builder_vs_native.py --nodes 50000 200000 --variant loop async
 """
+from __future__ import annotations
+
+import argparse
+import random
 import time
+from collections import Counter
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Sequence, Tuple
+
 from groggy import Graph, print_profile
-from groggy.builder import algorithm
 from groggy.algorithms import centrality, community
-
-# Set to True to see detailed per-step profiling
-SHOW_PROFILING = False
+from groggy.builder import algorithm
 
 
-# Use the simpler loop-based PageRank (now batch-optimized!)
-USE_MESSAGE_PASS_PAGERANK = False
-
-# Enable to see batch optimization details
-SHOW_BATCH_INFO = True
-
-
-@algorithm("pagerank_message_pass")
-def pagerank_message_pass(sG, damping=0.85, max_iter=100):
-    """Build PageRank using the message_pass execution context."""
+@algorithm("pagerank_loop")
+def pagerank_loop(sG, damping: float = 0.85, max_iter: int = 100):
+    """Batch-optimized Jacobi PageRank."""
     builder = sG.builder
-    
-    ranks = sG.nodes(1.0)
-    ranks = builder.var("ranks", ranks)
-    
+
+    ranks = builder.var("ranks", sG.nodes(1.0))
     degrees = builder.graph_ops.degree()
     inv_degrees = builder.core.recip(degrees, epsilon=1e-9)
 
     node_count = sG.N
-    teleport_numer = builder.core.broadcast_scalar(
-        builder.core.constant(1 - damping),
-        ranks,
-    )
+    one_minus = builder.core.constant(1 - damping)
+    teleport_numer = builder.core.broadcast_scalar(one_minus, ranks)
     node_count_map = builder.core.broadcast_scalar(node_count, ranks)
     teleport = builder.core.div(teleport_numer, node_count_map)
-    
-    with builder.iter.loop(max_iter):
+
+    # Message-pass LPA also uses iterate() to bypass batch compilation until
+    # execution blocks participate in batch plans.
+    with builder.iterate(max_iter):
+        contrib = ranks * inv_degrees
+        neighbor_sum = sG @ contrib
+        ranks = builder.var("ranks", damping * neighbor_sum + teleport)
+
+    return ranks.normalize()
+
+
+@algorithm("pagerank_async")
+def pagerank_async(sG, damping: float = 0.85, max_iter: int = 100):
+    """Gauss-Seidel PageRank using the message_pass execution block."""
+    builder = sG.builder
+
+    ranks = builder.var("ranks", sG.nodes(1.0))
+    degrees = builder.graph_ops.degree()
+    inv_degrees = builder.core.recip(degrees, epsilon=1e-9)
+
+    node_count = sG.N
+    one_minus = builder.core.constant(1 - damping)
+    teleport_numer = builder.core.broadcast_scalar(one_minus, ranks)
+    node_count_map = builder.core.broadcast_scalar(node_count, ranks)
+    teleport = builder.core.div(teleport_numer, node_count_map)
+
+    # Message-pass blocks aren't batch-compatible yet, so use legacy iterate() to avoid
+    # broken batch plans while we keep the async semantics.
+    with builder.iterate(max_iter):
+        contrib = ranks * inv_degrees
         with builder.message_pass(
             target=ranks,
             include_self=False,
             ordered=True,
-            name="pagerank",
+            name="pagerank_async",
         ) as mp:
-            contrib = ranks * inv_degrees
-            neighbor_sum = sG @ contrib
-            update = damping * neighbor_sum + teleport
-            mp.apply(update)
-    
+            neighbor_sum = builder.graph_ops.neighbor_agg(contrib, "sum")
+            updated = damping * neighbor_sum + teleport
+            mp.apply(updated)
+
+        # Make loop-carried dependency explicit
+    ranks = builder.var("ranks", ranks)
+
     return ranks.normalize()
 
 
-@algorithm("pagerank")
-def pagerank_loop(sG, damping=0.85, max_iter=100):
-    """
-    PageRank using basic loop DSL.
-    
-    NOW BATCH-OPTIMIZED (Tier 1)! This loop automatically compiles to a BatchPlan
-    and executes in a single FFI call with ~5μs per node per iteration.
-    """
-    ranks = sG.nodes(unique=True)
-    
-    with sG.builder.iterate(max_iter):
-        neighbor_sum = sG @ ranks
-        ranks = sG.var("ranks", damping * neighbor_sum + (1 - damping))
-    
-    return ranks
-
-
-@algorithm("lpa")
-def lpa(sG, max_iter=10):
-    """Build Label Propagation using the message_pass execution context."""
+@algorithm("lpa_loop")
+def lpa_loop(sG, max_iter: int = 10):
+    """Label Propagation using message_pass for async updates."""
     builder = sG.builder
-    
-    labels = sG.nodes(unique=True)
-    labels = builder.var("labels", labels)
-    with sG.iterate(max_iter):
+
+    labels = builder.var("labels", sG.nodes(unique=True))
+
+    with builder.iterate(max_iter):
         with builder.message_pass(
             target=labels,
             include_self=True,
             ordered=True,
-            name="lpa",
+            name="lpa_async",
         ) as mp:
             neighbor_labels = mp.pull(labels)
-            update = builder.core.mode(neighbor_labels, tie_break="lowest")
-            mp.apply(update)
-    
+            updated = builder.core.mode(neighbor_labels, tie_break="lowest")
+            mp.apply(updated)
+
+        labels = builder.var("labels", labels)
+
     return labels
 
 
-def create_test_graph(num_nodes, avg_degree=10):
-    """Create a random graph for testing (creates one large connected component)."""
-    import random
-    random.seed(42)
-    
-    graph = Graph()  # Undirected by default
-    
-    # Create nodes explicitly
-    nodes = []
-    for i in range(num_nodes):
-        nodes.append(graph.add_node())
-    
-    # Generate edges efficiently
-    num_edges = num_nodes * avg_degree // 2
-    edges_data = []
-    seen = set()
-    
-    for _ in range(num_edges * 2):  # Try enough times
-        i = random.randint(0, num_nodes - 1)
-        j = random.randint(0, num_nodes - 1)
-        if i != j:
-            # Normalize for undirected graph
-            edge = (min(i, j), max(i, j))
-            if edge not in seen:
-                edges_data.append((nodes[i], nodes[j]))
-                seen.add(edge)
-                if len(edges_data) >= num_edges:
-                    break
-    
-    # Add all edges at once
-    graph.add_edges(edges_data)
-    
-    print(f"Created graph: {num_nodes} nodes, {len(edges_data)} edges")
-    print(f"  (Note: Dense random graphs create 1 giant component - LPA converges to few communities)")
+@dataclass
+class RunResult:
+    time: float
+    total: float
+    values: Dict[int, float]
+
+
+def create_random_graph(num_nodes: int, avg_degree: int, seed: int) -> Graph:
+    """Create an undirected random graph with roughly num_nodes*avg_degree/2 edges."""
+    random.seed(seed)
+    graph = Graph()
+
+    nodes = [graph.add_node() for _ in range(num_nodes)]
+    edges = set()
+    target_edges = num_nodes * avg_degree // 2
+
+    while len(edges) < target_edges:
+        i = random.randrange(num_nodes)
+        j = random.randrange(num_nodes)
+        if i == j:
+            continue
+        a, b = sorted((i, j))
+        if (a, b) in edges:
+            continue
+        edges.add((a, b))
+
+    graph.add_edges([(nodes[a], nodes[b]) for (a, b) in edges])
     return graph
 
 
-def benchmark_pagerank(graph, name):
-    """Benchmark PageRank builder vs native."""
-    print(f"\n{'='*60}")
-    print(f"PageRank Benchmark - {name}")
-    print(f"{'='*60}")
-    
-    sg = graph.view()
-    n = len(list(sg.nodes))
-    
-    # Check if batch optimization is enabled
-    if SHOW_BATCH_INFO:
-        from groggy.builder import AlgorithmBuilder
-        test_builder = AlgorithmBuilder("test")
-        test_G = test_builder.graph()
-        test_ranks = test_G.nodes(unique=True)
-        test_ranks = test_builder.var("ranks", test_ranks)
-        with test_builder.iterate(10):
-            neighbor_sum = test_G @ test_ranks
-            test_ranks = test_builder.var("ranks", 0.85 * neighbor_sum + 0.15)
-        
-        # Check for batch optimization
-        loop_steps = [s for s in test_builder.steps if s.get('type') == 'iter.loop']
-        if loop_steps:
-            loop_step = loop_steps[0]
-            if loop_step.get('_batch_optimized'):
-                print(f"\n✅ BATCH OPTIMIZATION ACTIVE!")
-                if 'batch_plan' in loop_step:
-                    plan = loop_step['batch_plan']
-                    print(f"  Instructions: {len(plan.get('instructions', []))}")
-                    print(f"  Slot count: {plan.get('slot_count')}")
-                    print(f"  Single FFI call per loop!")
-            else:
-                print(f"\n⚠️  Batch optimization not active (fallback mode)")
-        print()
-    
-    # Native version
-    print("\nNative PageRank:")
+def extract_values(result_graph, attr: str) -> Dict[int, float]:
+    return {node.id: getattr(node, attr) for node in result_graph.nodes}
+
+
+def run_native_pagerank(sg, damping: float, max_iter: int) -> Tuple[RunResult, Dict]:
     start = time.perf_counter()
-    result_native, profile_native = sg.apply(
-        centrality.pagerank(max_iter=100, damping=0.85, output_attr="pagerank_native"),
-        persist=True,  # Need to persist to access attributes
-        return_profile=True
+    result, profile = sg.apply(
+        centrality.pagerank(
+            max_iter=max_iter,
+            damping=damping,
+            output_attr="pagerank_native",
+        ),
+        persist=True,
+        return_profile=True,
     )
-    native_time = time.perf_counter() - start
-    
-    print(f"  Time: {native_time:.3f}s")
-    
-    if SHOW_PROFILING:
-        print_profile(profile_native, show_steps=True, show_details=False)
-    
-    # Get some sample values
-    native_nodes = list(result_native.nodes)
-    sample_nodes = [node.id for node in native_nodes[:5]]
-    print(f"  Sample values:")
-    for node_id in sample_nodes:
-        native_val = result_native.get_node_attribute(node_id, "pagerank_native")
-        print(f"    Node {node_id}: {native_val:.6f}")
-    
-    # Verify normalization
-    total_rank_native = sum(node.pagerank_native for node in native_nodes)
-    print(f"  Total rank: {total_rank_native:.6f}")
-    
-    # Builder version
-    print("\nBuilder PageRank:")
-    algo = pagerank_message_pass(damping=0.85, max_iter=100) if USE_MESSAGE_PASS_PAGERANK else pagerank_loop(damping=0.85, max_iter=100)
-    
-    start = time.perf_counter()
-    result_builder, profile_builder = sg.apply(algo, return_profile=True)
-    builder_time = time.perf_counter() - start
-    
-    print(f"  Time: {builder_time:.3f}s")
-    
-    if SHOW_PROFILING:
-        print_profile(profile_builder, show_steps=True, show_details=False)
-    
-    # Get some sample values
-    print(f"  Sample values:")
-    builder_nodes = list(result_builder.nodes)
-    builder_map = {node.id: node.pagerank for node in builder_nodes}
-    for node_id in sample_nodes:
-        builder_val = builder_map.get(node_id, 0.0)
-        print(f"    Node {node_id}: {builder_val:.6f}")
-    
-    # Verify normalization
-    total_rank = sum(builder_map.values())
-    print(f"  Total rank: {total_rank:.6f}")
-    
-    # Compare results
-    print(f"\n  Comparison:")
-    print(f"    Builder/Native time ratio: {builder_time/native_time:.2f}x")
-    
-    # Check if values are similar
-    diffs = []
-    for node in native_nodes:
-        node_id = node.id
-        builder_val = builder_map.get(node_id, 0.0)
-        native_val = node.pagerank_native
-        diffs.append(abs(builder_val - native_val))
-    
-    avg_diff = sum(diffs) / len(diffs)
-    max_diff = max(diffs)
-    print(f"    Avg difference: {avg_diff:.8f}")
-    print(f"    Max difference: {max_diff:.8f}")
-    
-    # Reasonable tolerance for convergence
-    # Avg should be very tight, max can be slightly looser due to edge cases
-    if avg_diff < 0.000001 and max_diff < 0.0001:
-        print(f"    ✅ Results match!")
-    elif max_diff < 0.001:
-        print(f"    ⚠️  Results differ slightly (max diff: {max_diff:.10f})")
-    else:
-        print(f"    ❌ Results differ significantly (max diff: {max_diff:.10f})")
-    
-    return builder_time, native_time, result_builder
+    elapsed = time.perf_counter() - start
+    values = extract_values(result, "pagerank_native")
+    return RunResult(elapsed, sum(values.values()), values), profile
 
 
-def benchmark_lpa(graph, name):
-    """Benchmark LPA builder vs native."""
-    print(f"\n{'='*60}")
-    print(f"LPA Benchmark - {name}")
-    print(f"{'='*60}")
-    
-    sg = graph.view()
-    
-    # Native version
-    print("\nNative LPA:")
+def run_builder_pagerank(
+    sg,
+    variant: str,
+    damping: float,
+    max_iter: int,
+) -> Tuple[RunResult, Dict]:
+    algo_factory = {
+        "loop": pagerank_loop,
+        "async": pagerank_async,
+    }[variant]
+    algo = algo_factory(damping=damping, max_iter=max_iter)
+
+    strip_execution_block_batch_plans(algo)
     start = time.perf_counter()
-    result_native, stats_native = sg.apply(
-        community.lpa(max_iter=10, output_attr="community_native"),
-        persist=True,  # Need to persist to access attributes
-        return_profile=True
+    result, profile = sg.apply(algo, return_profile=True)
+    elapsed = time.perf_counter() - start
+    attr_name = algo_factory.__name__
+    values = extract_values(result, attr_name)
+    return RunResult(elapsed, sum(values.values()), values), profile
+
+
+def run_native_lpa(sg, max_iter: int) -> Tuple[RunResult, Dict]:
+    start = time.perf_counter()
+    result, profile = sg.apply(
+        community.lpa(max_iter=max_iter, output_attr="lpa_native"),
+        persist=True,
+        return_profile=True,
     )
-    native_time = time.perf_counter() - start
-    
-    print(f"  Time: {native_time:.3f}s")
-    
-    # Count communities
-    communities_native = {}
-    for node in result_native.nodes:
-        comm = node.community_native
-        communities_native[comm] = communities_native.get(comm, 0) + 1
-    
-    print(f"  Communities found: {len(communities_native)}")
-    print(f"  Top 5 communities by size:")
-    top_comms_native = sorted(communities_native.items(), key=lambda x: x[1], reverse=True)[:5]
-    for comm_id, size in top_comms_native:
-        print(f"    Community {comm_id}: {size} nodes")
-    
-    # Builder version
-    print("\nBuilder LPA:")
-    algo = lpa(max_iter=10)
-    
+    elapsed = time.perf_counter() - start
+    values = extract_values(result, "lpa_native")
+    total = float(sum(values.values()))
+    return RunResult(elapsed, total, values), profile
+
+
+def run_builder_lpa(sg, max_iter: int) -> Tuple[RunResult, Dict]:
+    algo = lpa_loop(max_iter=max_iter)
+    strip_execution_block_batch_plans(algo)
     start = time.perf_counter()
-    result_builder, profile_builder = sg.apply(algo, return_profile=True)
-    builder_time = time.perf_counter() - start
-    
-    print(f"  Time: {builder_time:.3f}s")
-    
-    if SHOW_PROFILING:
-        print_profile(profile_builder, show_steps=True, show_details=False)
-    
-    # Count communities
-    communities = {}
-    for node in result_builder.nodes:
-        comm = node.lpa  # Updated attribute name
-        communities[comm] = communities.get(comm, 0) + 1
-    
-    print(f"  Communities found: {len(communities)}")
-    print(f"  Top 5 communities by size:")
-    top_comms = sorted(communities.items(), key=lambda x: x[1], reverse=True)[:5]
-    for comm_id, size in top_comms:
-        print(f"    Community {comm_id}: {size} nodes")
-    
-    # Compare results
-    print(f"\n  Comparison:")
-    print(f"    Builder/Native time ratio: {builder_time/native_time:.2f}x")
-    print(f"    Native communities: {len(communities_native)}")
-    print(f"    Builder communities: {len(communities)}")
-    
-    # Note: Builder LPA implementation is incomplete (missing collect_neighbor_values + mode ops)
-    # So we just compare performance, not correctness yet
-    print(f"    ⚠️  Builder LPA implementation incomplete - performance comparison only")
-    
-    return builder_time, native_time, result_builder
+    result, profile = sg.apply(algo, return_profile=True)
+    elapsed = time.perf_counter() - start
+    attr_name = lpa_loop.__name__
+    values = extract_values(result, attr_name)
+    total = float(sum(values.values()))
+    return RunResult(elapsed, total, values), profile
 
 
-def main():
-    print("Builder vs Native Algorithm Benchmark")
-    print("=" * 60)
-    print("\n🚀 TIER 1 BATCH EXECUTOR NOW ACTIVE!")
-    print("   - Loops compile to BatchPlan automatically")
-    print("   - Single FFI call per loop (vs 70+ before)")
-    print("   - Target: <10× slower than native")
-    print("=" * 60)
-    
-    # Test on 50k graph
-    print("\n\nBuilding 50k node graph...")
-    graph_50k = create_test_graph(50000, avg_degree=10)
-    
-    pr_builder_50k, pr_native_50k, pr_result_50k = benchmark_pagerank(graph_50k, "50k nodes")
-    lpa_builder_50k, lpa_native_50k, lpa_result_50k = benchmark_lpa(graph_50k, "50k nodes")
-    
-    # Test on 200k graph
-    print("\n\nBuilding 200k node graph...")
-    graph_200k = create_test_graph(200000, avg_degree=10)
-    
-    pr_builder_200k, pr_native_200k, pr_result_200k = benchmark_pagerank(graph_200k, "200k nodes")
-    lpa_builder_200k, lpa_native_200k, lpa_result_200k = benchmark_lpa(graph_200k, "200k nodes")
-    
-    # Summary
-    print(f"\n\n{'='*60}")
-    print("TIER 1 BATCH EXECUTION SUMMARY")
-    print(f"{'='*60}")
-    
-    print(f"\nPageRank Times (Builder vs Native):")
-    print(f"  50k nodes:  {pr_builder_50k:.3f}s vs {pr_native_50k:.3f}s ({pr_builder_50k/pr_native_50k:.2f}x)")
-    print(f"  200k nodes: {pr_builder_200k:.3f}s vs {pr_native_200k:.3f}s ({pr_builder_200k/pr_native_200k:.2f}x)")
-    print(f"  Builder scaling: {pr_builder_200k/pr_builder_50k:.2f}x")
-    print(f"  Native scaling:  {pr_native_200k/pr_native_50k:.2f}x")
-    
-    # Tier 1 Performance Analysis
-    print(f"\n📊 Tier 1 Performance Metrics:")
-    pr_50k_per_node = (pr_builder_50k * 1e6) / (50000 * 100)
-    pr_200k_per_node = (pr_builder_200k * 1e6) / (200000 * 100)
-    print(f"  Per-node-per-iteration cost:")
-    print(f"    50k:  {pr_50k_per_node:.2f}μs")
-    print(f"    200k: {pr_200k_per_node:.2f}μs")
-    
-    pr_50k_ratio = pr_builder_50k/pr_native_50k
-    pr_200k_ratio = pr_builder_200k/pr_native_200k
-    print(f"\n  Tier 1 Target (<10× native):")
-    if pr_50k_ratio < 10:
-        print(f"    50k:  ✅ {pr_50k_ratio:.2f}× (ACHIEVED)")
-    else:
-        print(f"    50k:  ❌ {pr_50k_ratio:.2f}× (target: <10×)")
-    
-    if pr_200k_ratio < 10:
-        print(f"    200k: ✅ {pr_200k_ratio:.2f}× (ACHIEVED)")
-    else:
-        print(f"    200k: ❌ {pr_200k_ratio:.2f}× (target: <10×)")
-    
-    print(f"\nLPA Times (Builder vs Native):")
-    print(f"  50k nodes:  {lpa_builder_50k:.3f}s vs {lpa_native_50k:.3f}s ({lpa_builder_50k/lpa_native_50k:.2f}x)")
-    print(f"  200k nodes: {lpa_builder_200k:.3f}s vs {lpa_native_200k:.3f}s ({lpa_builder_200k/lpa_native_200k:.2f}x)")
-    print(f"  Builder scaling: {lpa_builder_200k/lpa_builder_50k:.2f}x")
-    print(f"  Native scaling:  {lpa_native_200k/lpa_native_50k:.2f}x")
-    
+def summarize_diff(native: RunResult, builder: RunResult) -> Tuple[float, float]:
+    diffs = [
+        abs(builder.values.get(node_id, 0.0) - native_val)
+        for node_id, native_val in native.values.items()
+    ]
+    if not diffs:
+        return 0.0, 0.0
+    avg = sum(diffs) / len(diffs)
+    return avg, max(diffs)
+
+
+def sample_nodes(values: Dict[int, float], count: int = 5) -> List[Tuple[int, float]]:
+    node_ids = sorted(values.keys())[:count]
+    return [(node_id, values[node_id]) for node_id in node_ids]
+
+
+def summarize_lpa_match(native: RunResult, builder: RunResult) -> Tuple[int, int, float]:
+    total = len(native.values)
+    matches = sum(
+        1 for node_id, native_label in native.values.items()
+        if builder.values.get(node_id) == native_label
+    )
+    ratio = matches / total if total else 1.0
+    return matches, total, ratio
+
+
+def top_communities(values: Dict[int, float], limit: int = 5) -> List[Tuple[float, int]]:
+    counts = Counter(values.values())
+    return counts.most_common(limit)
+
+
+def benchmark_pagerank(
+    graph: Graph,
+    label: str,
+    variant: str,
+    damping: float,
+    max_iter: int,
+    show_profile: bool,
+):
     print(f"\n{'='*60}")
-    if pr_50k_ratio < 10 and pr_200k_ratio < 10:
-        print("🎉 TIER 1 SUCCESS! All benchmarks meet <10× target!")
-    else:
-        print("✅ All benchmarks complete!")
-        print(f"⚠️  Some benchmarks exceed 10× target (may need further optimization)")
+    print(f"PageRank Benchmark ({label}) - variant: {variant}")
     print(f"{'='*60}")
-    print("\n📚 See TIER1_COMPLETE_FINAL.md for full details")
+
+    sg = graph.view()
+
+    native, native_profile = run_native_pagerank(sg, damping, max_iter)
+    builder, builder_profile = run_builder_pagerank(sg, variant, damping, max_iter)
+
+    avg_diff, max_diff = summarize_diff(native, builder)
+
+    print(f"Native time : {native.time:.3f}s  (total={native.total:.6f})")
+    print(f"Builder time: {builder.time:.3f}s  (total={builder.total:.6f})")
+    print(f"Speed ratio : {builder.time / native.time:.2f}x")
+    print(f"Avg diff    : {avg_diff:.8f}")
+    print(f"Max diff    : {max_diff:.8f}")
+
+    native_samples = sample_nodes(native.values)
+    builder_samples = sample_nodes(builder.values)
+    print("\nSample node ranks (first 5 IDs):")
+    for (nid, native_val), (_, builder_val) in zip(native_samples, builder_samples):
+        print(f"  Node {nid:>5}: native={native_val:.6f}  builder={builder_val:.6f}")
+
+    if show_profile:
+        print("\nNative profile:")
+        print_profile(native_profile, show_steps=True, show_details=False)
+        print("\nBuilder profile:")
+        print_profile(builder_profile, show_steps=True, show_details=False)
+
+
+def benchmark_lpa(
+    graph: Graph,
+    label: str,
+    max_iter: int,
+    show_profile: bool,
+):
+    print(f"\n{'='*60}")
+    print(f"LPA Benchmark ({label})")
+    print(f"{'='*60}")
+
+    sg = graph.view()
+
+    native, native_profile = run_native_lpa(sg, max_iter=max_iter)
+    builder, builder_profile = run_builder_lpa(sg, max_iter=max_iter)
+
+    matches, total_nodes, ratio = summarize_lpa_match(native, builder)
+
+    print(f"Native time : {native.time:.3f}s")
+    print(f"Builder time: {builder.time:.3f}s")
+    print(f"Speed ratio : {builder.time / native.time:.2f}x")
+    print(f"Match ratio : {ratio:.2%} ({matches}/{total_nodes})")
+
+    native_comm = top_communities(native.values)
+    builder_comm = top_communities(builder.values)
+
+    print("\nNative top communities:")
+    for comm, size in native_comm:
+        print(f"  Label {comm}: {size} nodes")
+
+    print("\nBuilder top communities:")
+    for comm, size in builder_comm:
+        print(f"  Label {comm}: {size} nodes")
+
+    if show_profile:
+        print("\nNative profile:")
+        print_profile(native_profile, show_steps=True, show_details=False)
+        print("\nBuilder profile:")
+        print_profile(builder_profile, show_steps=True, show_details=False)
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--nodes",
+        type=int,
+        nargs="+",
+        default=[50000],
+        help="One or more node counts to benchmark (default: 50000)",
+    )
+    parser.add_argument(
+        "--avg-degree",
+        type=int,
+        default=10,
+        help="Average degree to target when generating graphs",
+    )
+    parser.add_argument(
+        "--variant",
+        choices=["loop", "async"],
+        default="loop",
+        help="Builder variant to benchmark",
+    )
+    parser.add_argument(
+        "--damping",
+        type=float,
+        default=0.85,
+        help="PageRank damping factor",
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=100,
+        help="Maximum PageRank iterations",
+    )
+    parser.add_argument(
+        "--lpa-iterations",
+        type=int,
+        default=10,
+        help="Maximum LPA iterations",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Seed for random graph generation",
+    )
+    parser.add_argument(
+        "--algo",
+        choices=["pagerank", "lpa"],
+        nargs="+",
+        default=["pagerank"],
+        help="Benchmark selection (can list multiple)",
+    )
+    parser.add_argument(
+        "--show-profile",
+        action="store_true",
+        help="Print detailed profiler output for both runs",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None):
+    args = parse_args(argv)
+    selected = set(args.algo)
+
+    for node_count in args.nodes:
+        graph = create_random_graph(node_count, args.avg_degree, args.seed)
+        label = f"{node_count} nodes"
+        if "pagerank" in selected:
+            benchmark_pagerank(
+                graph=graph,
+                label=label,
+                variant=args.variant,
+                damping=args.damping,
+                max_iter=args.iterations,
+                show_profile=args.show_profile,
+            )
+        if "lpa" in selected:
+            benchmark_lpa(
+                graph=graph,
+                label=label,
+                max_iter=args.lpa_iterations,
+                show_profile=args.show_profile,
+            )
+
+
+def strip_execution_block_batch_plans(algorithm_obj) -> None:
+    """Remove batch plans from loops that contain execution blocks."""
+    for step in getattr(algorithm_obj, "steps", []):
+        if step.get("type") != "iter.loop":
+            continue
+        body = step.get("body", [])
+        if any(item.get("type") == "core.execution_block" for item in body):
+            step.pop("batch_plan", None)
+            step.pop("_batch_optimized", None)
 
 
 if __name__ == "__main__":

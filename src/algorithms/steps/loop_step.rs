@@ -55,12 +55,34 @@ impl LoopStep {
 
     /// Try to deserialize body as a BatchPlan (if it's been pre-compiled)
     fn try_batch_plan(&self) -> Option<BatchPlan> {
-        // Check if body_json contains a batch plan
-        if let Some(plan_json) = self.body_json.get("batch_plan") {
-            // Try to deserialize as BatchPlan
-            serde_json::from_value(plan_json.clone()).ok()
+        // The batch_plan is at the top level of body_json
+        let bp_wrapped = self.body_json.get("batch_plan")?;
+
+        // It might be wrapped in AlgorithmParamValue format: {"type": "Json", "value": {...}}
+        let bp_val = if let Some(inner) = bp_wrapped.get("value") {
+            inner // Unwrap
         } else {
-            None
+            bp_wrapped // Already unwrapped
+        };
+
+        match serde_json::from_value::<BatchPlan>(bp_val.clone()) {
+            Ok(plan) => {
+                if std::env::var("GROGGY_DEBUG_BATCH").is_ok() {
+                    eprintln!("[LOOP_STEP] ✅ Successfully deserialized BatchPlan!");
+                    eprintln!(
+                        "[LOOP_STEP]    {} instructions, {} slots",
+                        plan.instructions.len(),
+                        plan.slot_count
+                    );
+                }
+                Some(plan)
+            }
+            Err(e) => {
+                if std::env::var("GROGGY_DEBUG_BATCH").is_ok() {
+                    eprintln!("[LOOP_STEP] ⚠️  BatchPlan deserialization failed: {}", e);
+                }
+                None
+            }
         }
     }
 
@@ -168,10 +190,10 @@ impl Step for LoopStep {
             // Execute via batch executor
             let node_count = scope.subgraph().node_count();
             let mut executor = BatchExecutor::new(node_count);
-            
-            return executor.execute(&batch_plan, self.iterations, scope).map_err(|e| {
-                anyhow!("Batch execution failed: {}", e)
-            });
+
+            return executor
+                .execute(&batch_plan, self.iterations, scope)
+                .map_err(|e| anyhow!("Batch execution failed: {}", e));
         }
 
         // Fallback: Execute the loop body for the specified number of iterations

@@ -1691,8 +1691,23 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get("body")
                 .ok_or_else(|| anyhow!("iter.loop requires 'body' param"))?;
-            let body_json = serde_json::to_value(body_value)
+            let mut body_json = serde_json::to_value(body_value)
                 .map_err(|e| anyhow!("Failed to convert body: {}", e))?;
+
+            // Check if batch_plan is provided (for Tier 1 batch execution)
+            if let Some(batch_plan_value) = spec.params.get("batch_plan") {
+                let batch_plan_json = serde_json::to_value(batch_plan_value)
+                    .map_err(|e| anyhow!("Failed to convert batch_plan: {}", e))?;
+
+                // Add batch_plan to body_json so LoopStep can find it
+                if let Some(obj) = body_json.as_object_mut() {
+                    obj.insert("batch_plan".to_string(), batch_plan_json);
+
+                    if std::env::var("GROGGY_DEBUG_BATCH").is_ok() {
+                        eprintln!("[REGISTRY] Added batch_plan to iter.loop body_json");
+                    }
+                }
+            }
 
             // Optional: loop_vars specify initial aliasing ([initial, logical] pairs)
             let loop_vars = if let Some(loop_var_value) = spec.params.get("loop_vars") {

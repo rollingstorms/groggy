@@ -21,10 +21,10 @@
 //! - Target: Single FFI call to enter batch executor
 //! - Expected speedup: 10-100× (PageRank: 113-196× → <10× slower than native)
 
-pub mod batch_plan;
 pub mod batch_executor;
-pub mod jit;  // Tier 2: JIT compilation
+pub mod batch_plan;
+pub mod jit; // Tier 2: JIT compilation
 
-pub use batch_plan::{BatchInstruction, BatchPlan, SlotId};
 pub use batch_executor::BatchExecutor;
+pub use batch_plan::{BatchInstruction, BatchPlan, SlotId};
 pub use jit::JitManager;

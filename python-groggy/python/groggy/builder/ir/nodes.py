@@ -410,18 +410,23 @@ class LoopIRNode(IRNode):
         iterations: int,
         body: List[Dict[str, Any]],
         loop_vars: Optional[List[str]] = None,
+        batch_plan: Optional[Dict[str, Any]] = None,
     ):
+        metadata = {
+            "iterations": iterations,
+            "body": body,
+            "loop_vars": loop_vars or [],
+        }
+        if batch_plan is not None:
+            metadata["batch_plan"] = batch_plan
+            
         super().__init__(
             id=node_id,
             domain=IRDomain.CONTROL,
             op_type="iter_loop",
             inputs=[],
             output=None,
-            metadata={
-                "iterations": iterations,
-                "body": body,
-                "loop_vars": loop_vars or [],
-            },
+            metadata=metadata,
         )
 
     @property
@@ -435,6 +440,10 @@ class LoopIRNode(IRNode):
     @property
     def loop_vars(self) -> List[str]:
         return self.metadata.get("loop_vars", [])
+    
+    @property
+    def batch_plan(self) -> Optional[Dict[str, Any]]:
+        return self.metadata.get("batch_plan")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -454,6 +463,8 @@ class LoopIRNode(IRNode):
         }
         if self.loop_vars:
             step["loop_vars"] = list(self.loop_vars)
+        if self.batch_plan is not None:
+            step["batch_plan"] = deepcopy(self.batch_plan)
         return step
     
     def is_batch_compatible(self) -> bool:

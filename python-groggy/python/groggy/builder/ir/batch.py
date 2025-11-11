@@ -200,33 +200,32 @@ class BatchPlanGenerator:
         # Sort variables by start time
         vars_by_start = sorted(self.live_ranges.items(), key=lambda x: x[1][0])
         
-        # Active variables (currently live)
-        active: List[Tuple[str, int]] = []  # (var_name, end_time)
+        # Active variables (currently live) and free slots
+        active: List[Tuple[str, int, int]] = []  # (var_name, end_time, slot_id)
+        free_slots: List[int] = []
         
         for var_name, (start, end) in vars_by_start:
-            # Remove expired variables from active list
-            active = [(v, e) for v, e in active if e >= start]
-            
-            # Try to reuse a slot from an expired variable
-            if active:
-                # Find the slot with the earliest end time
-                min_end = min(e for _, e in active)
-                for v, e in active:
-                    if e == min_end and e < start:
-                        # Reuse this slot
-                        self.variable_slots[var_name] = self.variable_slots[v]
-                        active.append((var_name, end))
-                        break
+            # Remove expired variables and free their slots
+            new_active = []
+            for (v, e, slot) in active:
+                if e > start:
+                    new_active.append((v, e, slot))
                 else:
-                    # No reusable slot, allocate new one
-                    self.variable_slots[var_name] = self.next_slot
-                    self.next_slot += 1
-                    active.append((var_name, end))
+                    free_slots.append(slot)
+            active = new_active
+            
+            if var_name in self.variable_slots:
+                continue
+            
+            # Assign slot (reuse first available, else allocate new)
+            if free_slots:
+                slot = free_slots.pop()
             else:
-                # First variable, allocate slot 0
-                self.variable_slots[var_name] = self.next_slot
+                slot = self.next_slot
                 self.next_slot += 1
-                active.append((var_name, end))
+            
+            self.variable_slots[var_name] = slot
+            active.append((var_name, end, slot))
     
     def _pack_operations(self) -> List[Dict[str, Any]]:
         """
@@ -344,7 +343,7 @@ class SlotAllocator:
         Compute variable lifetimes from a sequence of operations.
         
         Args:
-            operations: List of operation dicts with 'inputs', 'output' keys
+            operations: List of operation dicts with various input/output keys
         """
         for i, op in enumerate(operations):
             # Track output definition
@@ -357,8 +356,29 @@ class SlotAllocator:
                     first, _ = self.live_ranges[var]
                     self.live_ranges[var] = (min(first, i), i)
             
+            # Track target as output (for alias steps)
+            if 'target' in op and op['target'] and op.get('type') != 'attach_attr':
+                var = op['target']
+                if var not in self.live_ranges:
+                    self.live_ranges[var] = (i, i)
+                else:
+                    first, _ = self.live_ranges[var]
+                    self.live_ranges[var] = (min(first, i), i)
+            
+            # Extract all input variables from the operation
+            input_vars = []
+            
+            # Standard inputs key
+            if 'inputs' in op:
+                input_vars.extend(op['inputs'])
+            
+            # Binary operation keys (a, b, lhs, rhs, source, etc.)
+            for key in ['a', 'b', 'lhs', 'rhs', 'source']:
+                if key in op and isinstance(op[key], str):
+                    input_vars.append(op[key])
+            
             # Track input uses
-            for input_var in op.get('inputs', []):
+            for input_var in input_vars:
                 if input_var not in self.live_ranges:
                     # First use (parameter or external)
                     self.live_ranges[input_var] = (0, i)
@@ -445,11 +465,62 @@ class IRToBatchCompiler:
         # Step 2: Allocate slots
         slot_count = self.allocator.allocate()
         
-        # Step 3: Lower operations to BatchInstructions
+        # Step 2.5: Identify external inputs (variables used before they're defined)
+        # These need LoadNodeProp instructions at the start
+        defined_vars = set()
+        external_vars = set()
+        
         for step in body_steps:
-            instr = self._lower_step(step)
-            if instr:
-                self.instructions.append(instr)
+            # Check uses BEFORE updating definitions
+            for key in ['a', 'b', 'lhs', 'rhs', 'source']:
+                if key in step and isinstance(step[key], str):
+                    var = step[key]
+                    if var not in defined_vars:
+                        external_vars.add(var)
+            if 'inputs' in step:
+                for var in step['inputs']:
+                    if var not in defined_vars:
+                        external_vars.add(var)
+            
+            # Now update definitions
+            if step.get('output'):
+                defined_vars.add(step.get('output'))
+            if step.get('target') and step.get('type') != 'attach_attr':
+                defined_vars.add(step.get('target'))
+        
+        # Emit LoadNodeProp for external variables
+        for var in sorted(external_vars):  # Sort for deterministic order
+            slot = self.allocator.get_slot(var)
+            if slot >= 0:
+                self.instructions.append({
+                    "type": "load_node_prop",
+                    "dst": slot,
+                    "var_name": var,
+                })
+        
+        # Step 3: Lower operations to BatchInstructions
+        # Also track alias steps for loop-carried variables
+        alias_mappings = {}  # target -> source
+        for step in body_steps:
+            if step.get('type') == 'alias':
+                source = step.get('source')
+                target = step.get('target')
+                if source and target:
+                    alias_mappings[target] = source
+            else:
+                instr = self._lower_step(step)
+                if instr:
+                    self.instructions.append(instr)
+        
+        # Step 3.5: Emit StoreNodeProp for loop-carried variables (alias targets)
+        for target, source in alias_mappings.items():
+            src_slot = self.allocator.get_slot(source)
+            if src_slot >= 0:
+                self.instructions.append({
+                    "type": "store_node_prop",
+                    "src": src_slot,
+                    "var_name": target,
+                })
         
         # Step 4: Handle loop-carried variables
         if loop_vars:
@@ -493,6 +564,14 @@ class IRToBatchCompiler:
             return self._lower_neighbor_aggregate(step, 'sum')
         elif step_type == 'graph.neighbor_mean':
             return self._lower_neighbor_aggregate(step, 'mean')
+        elif step_type == 'graph.neighbor_agg':
+            # Generic neighbor aggregation
+            agg_type = step.get('agg', 'sum')
+            return self._lower_neighbor_aggregate(step, agg_type)
+        
+        # Handle alias (copy operation)
+        elif step_type == 'alias':
+            return self._lower_alias(step)
         
         # Handle loads/stores
         elif step_type == 'init_nodes_with_index':
@@ -505,8 +584,9 @@ class IRToBatchCompiler:
     
     def _lower_binary_op(self, step: Dict[str, Any], op_name: str) -> Dict[str, Any]:
         """Lower binary arithmetic operation."""
-        lhs = step.get('lhs') or step.get('source') or step.get('inputs', [None])[0]
-        rhs = step.get('rhs') or step.get('inputs', [None, None])[1]
+        # Try different key names for inputs (steps use 'a'/'b', not 'lhs'/'rhs')
+        lhs = step.get('lhs') or step.get('a') or step.get('source') or step.get('inputs', [None])[0]
+        rhs = step.get('rhs') or step.get('b') or step.get('inputs', [None, None])[1]
         dst = step.get('output') or step.get('target')
         
         return {
@@ -531,7 +611,7 @@ class IRToBatchCompiler:
         """Lower neighbor aggregation to NeighborAggregate."""
         src = step.get('source') or step.get('inputs', [None])[0]
         dst = step.get('output') or step.get('target')
-        direction = step.get('direction', 'out')
+        direction = step.get('direction', 'in')
         
         return {
             "type": "neighbor_aggregate",
@@ -562,6 +642,15 @@ class IRToBatchCompiler:
             "src": self.allocator.get_slot(src),
             "var_name": var_name,
         }
+    
+    def _lower_alias(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        """Lower alias (copy) operation. This is a no-op at the instruction level,
+        as the register allocator already handles variable renaming."""
+        # Alias means target = source. In the register model, this is already
+        # handled by slot allocation, but we need to track the copy for loop-carried vars.
+        # For now, emit as a comment/metadata or skip it.
+        # The slot allocator already knows target and source share a slot or are connected.
+        return None  # Skip alias in instruction stream
 
 
 def compile_loop_to_batch_plan(body_steps: List[Dict[str, Any]], 
