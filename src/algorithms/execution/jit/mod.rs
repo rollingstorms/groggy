@@ -11,15 +11,21 @@
 pub mod compiler;
 pub mod context;
 
-use crate::algorithms::execution::batch_plan::BatchPlan;
+use crate::algorithms::execution::batch_plan::{BatchInstruction, BatchPlan};
 use anyhow::Result;
 
 /// Compiled native function signature
-/// For now, just takes basic parameters (we'll add StepScope later)
+/// 
+/// Parameters:
+/// - node_count: Number of nodes to process
+/// - iterations: Number of loop iterations
+/// - slot_ptrs: Pointer to array of slot pointers (f64 arrays)
+/// 
+/// Returns: 0 on success, non-zero on error
 pub type CompiledFunction = unsafe extern "C" fn(
     node_count: usize,
     iterations: usize,
-    scope_ptr: *mut u8, // Opaque pointer for now
+    slot_ptrs: *const *mut f64,
 ) -> i32;
 
 /// JIT compilation manager
@@ -40,10 +46,35 @@ impl JitManager {
         compiler::compile_batch_plan(&mut self.context, plan)
     }
 
+    /// Check if JIT compilation is supported on this platform
+    pub fn is_platform_supported() -> bool {
+        // ARM64 support requires Cranelift 0.107+
+        cfg!(not(target_arch = "aarch64"))
+    }
+
     /// Check if a plan is JIT-compatible
     pub fn is_compatible(plan: &BatchPlan) -> bool {
-        // For now, all batch plans are JIT-compatible
-        // Later: check for unsupported instructions
+        // Platform check
+        if !Self::is_platform_supported() {
+            return false;
+        }
+
+        // Check for supported instructions
+        // Currently: arithmetic and scalar ops only
+        // TODO: Add StepScope-dependent operations (Load/StoreNodeProp, NeighborAggregate)
+        for instr in &plan.instructions {
+            match instr {
+                BatchInstruction::LoadScalar { .. }
+                | BatchInstruction::Add { .. }
+                | BatchInstruction::Sub { .. }
+                | BatchInstruction::Mul { .. }
+                | BatchInstruction::Div { .. }
+                | BatchInstruction::FusedMADD { .. }
+                | BatchInstruction::FusedAXPY { .. } => {}
+                _ => return false, // Unsupported instruction
+            }
+        }
+
         !plan.instructions.is_empty()
     }
 }

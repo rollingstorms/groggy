@@ -102,6 +102,23 @@ impl BatchExecutor {
         Ok(())
     }
 
+    /// Allocate slots for JIT execution (public for LoopStep)
+    /// This is separate from execute() to allow JIT to access slot pointers
+    pub fn allocate_slots_for_jit(&mut self, count: usize) -> Result<()> {
+        self.allocate_slots(count)
+    }
+
+    /// Get mutable pointers to slot data for JIT execution
+    /// 
+    /// # Safety
+    /// The returned pointers are valid only as long as:
+    /// 1. The BatchExecutor is not moved
+    /// 2. No other methods that reallocate slots are called
+    /// 3. The slot count matches what was allocated
+    pub fn get_slot_pointers(&mut self) -> Vec<*mut f64> {
+        self.slots.iter_mut().map(|v| v.as_mut_ptr()).collect()
+    }
+
     /// Execute a single instruction
     fn execute_instruction(
         &mut self,
