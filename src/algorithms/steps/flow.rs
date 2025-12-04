@@ -341,7 +341,7 @@ mod tests {
 ///
 /// # Example
 /// Inside a loop body:
-/// ```
+/// ```text
 /// ranks_new = compute_new_ranks(ranks)
 /// alias(source=ranks_new, target=ranks)  # Copy ranks_new to ranks for next iteration
 /// ```

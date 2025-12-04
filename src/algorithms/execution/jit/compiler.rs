@@ -378,7 +378,7 @@ fn compile_instruction(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_arch = "x86_64"))]
 mod tests {
     use super::*;
     use crate::algorithms::execution::batch_plan::{BatchInstruction, BatchPlan};

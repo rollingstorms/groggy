@@ -4,6 +4,11 @@ use anyhow::Result;
 use cranelift::prelude::*;
 use cranelift_jit::JITModule;
 
+#[cfg(not(target_arch = "aarch64"))]
+use cranelift_jit::JITBuilder;
+#[cfg(not(target_arch = "aarch64"))]
+use cranelift_module::Module;
+
 /// JIT execution context
 pub struct JitContext {
     /// Cranelift module for code generation

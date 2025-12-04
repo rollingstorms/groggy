@@ -635,9 +635,7 @@ impl Step for NeighborAggregationStep {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| {
-                        pool.get_edge_endpoints(eid)
-                    },
+                    |eid| pool.get_edge_endpoints(eid),
                     CsrOptions {
                         add_reverse_edges: false,
                         sort_neighbors: false,
@@ -648,9 +646,7 @@ impl Step for NeighborAggregationStep {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| node_to_idx.get(&nid).copied(),
-                    |eid| {
-                        pool.get_edge_endpoints(eid)
-                    },
+                    |eid| pool.get_edge_endpoints(eid),
                     CsrOptions {
                         add_reverse_edges: true,
                         sort_neighbors: false,

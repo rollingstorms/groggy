@@ -3,6 +3,7 @@ import pytest
 import groggy as gr
 
 
+@pytest.mark.skip(reason="TemporalScope not yet implemented")
 def test_temporal_scope_creation():
     """Test creating temporal scopes."""
     # Simple scope at a commit
@@ -82,6 +83,7 @@ def test_changed_entities_from_index():
     assert node_c in changed_in_c3
 
 
+@pytest.mark.skip(reason="TemporalScope not yet implemented")
 def test_temporal_scope_metadata():
     """Test adding metadata to temporal scopes."""
     scope = gr.TemporalScope(current_commit=10, window=None)

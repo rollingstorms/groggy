@@ -7,6 +7,11 @@ use once_cell::sync::OnceCell;
 use serde_json::Value;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[cfg(not(target_arch = "aarch64"))]
+use crate::algorithms::execution::JitManager;
+#[cfg(not(target_arch = "aarch64"))]
+use std::sync::Mutex;
+
 /// Execution statistics for hot-path detection
 #[derive(Debug, Default)]
 struct LoopExecutionStats {
@@ -96,37 +101,25 @@ impl LoopStep {
 
     /// Check if this loop should attempt JIT compilation
     #[allow(dead_code)]
-    fn should_attempt_jit(&self, _batch_plan: &BatchPlan) -> bool {
-        // Platform check
-        #[cfg(target_arch = "aarch64")]
-        {
-            false // ARM64 not supported in Cranelift 0.102
-        }
-        #[cfg(not(target_arch = "aarch64"))]
-        {
-            false
+    #[cfg(not(target_arch = "aarch64"))]
+    fn should_attempt_jit(&self, batch_plan: &BatchPlan) -> bool {
+        // Check if already attempted
+        if self.stats.jit_attempted.load(Ordering::Relaxed) > 0 {
+            return false;
         }
 
-        #[cfg(not(target_arch = "aarch64"))]
-        {
-            // Check if already attempted
-            if self.stats.jit_attempted.load(Ordering::Relaxed) > 0 {
-                return false;
-            }
-
-            // Check execution count threshold
-            if self.stats.execution_count.load(Ordering::Relaxed) < Self::HOT_THRESHOLD {
-                return false;
-            }
-
-            // Check minimum iterations
-            if self.iterations < Self::MIN_ITERATIONS_FOR_JIT {
-                return false;
-            }
-
-            // Check if plan is JIT-compatible
-            JitManager::is_compatible(batch_plan)
+        // Check execution count threshold
+        if self.stats.execution_count.load(Ordering::Relaxed) < Self::HOT_THRESHOLD {
+            return false;
         }
+
+        // Check minimum iterations
+        if self.iterations < Self::MIN_ITERATIONS_FOR_JIT {
+            return false;
+        }
+
+        // Check if plan is JIT-compatible
+        JitManager::is_compatible(batch_plan)
     }
 
     /// Try to compile the batch plan to native code (Tier 2)

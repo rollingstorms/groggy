@@ -293,13 +293,16 @@ impl GirvanNewman {
 
         impl PartialOrd for State {
             fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                other.dist.partial_cmp(&self.dist)
+                Some(self.cmp(other))
             }
         }
 
         impl Ord for State {
             fn cmp(&self, other: &Self) -> Ordering {
-                other.dist.partial_cmp(&self.dist).unwrap_or(Ordering::Equal)
+                other
+                    .dist
+                    .partial_cmp(&self.dist)
+                    .unwrap_or(Ordering::Equal)
             }
         }
 
