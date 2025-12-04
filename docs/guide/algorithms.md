@@ -1,612 +1,391 @@
 # Graph Algorithms
 
-Groggy provides efficient graph algorithms implemented in Rust. These algorithms work on both full graphs and subgraphs, with results typically written back to the graph or returned as new objects.
+Groggy ships 11 native algorithms implemented in Rust, exposed through the Python API. Everything runs on subgraphs (views of your graph), writes results back as attributes, and works with the Batch Executor for the heavy iterative cases.
+
+- Centrality: PageRank, Betweenness, Closeness
+- Community: Label Propagation (LPA), Louvain, Leiden, Connected Components
+- Pathfinding/Traversal: BFS, DFS, Dijkstra, A*
+
+## How to Run
+
+Use the algorithm handles from `groggy.algorithms.*` and apply them to a graph view or subgraph:
+
+```python
+from groggy.algorithms import centrality, community, pathfinding
+
+sg = graph.view()  # or any Subgraph
+result = sg.apply(centrality.pagerank(damping=0.9, max_iter=50))
+
+# Results are written as node attributes on the returned Subgraph
+scores = result.nodes["pagerank"]
+```
+
+Patterns:
+- One-off run: `subgraph.apply(algo_handle)`
+- Pipelines: `graph.pipeline([algo1, algo2])(subgraph)`
+- Builder DSL: use `builder.iterate()` for custom loops; native algorithms already use the Batch Executor when applicable.
+
+## Performance Snapshot
+
+| Algorithm | Notes | Batch Executor effect |
+|-----------|-------|-----------------------|
+| PageRank | Iterative centrality | ~100x faster (1000 nodes, 100 iters) |
+| LPA | Iterative community | ~40x faster (10000 nodes) |
+| Louvain / Leiden | Iterative refinement | Benefit from batched steps |
+| BFS / DFS | Single-pass traversal | Linear in V+E |
+| Dijkstra | Weighted shortest paths | O((V+E) log V) |
+| A* | Goal-directed shortest paths | Faster than Dijkstra with a good heuristic |
+
+Known drift: PageRank can show ~5–6% numerical drift after 100+ iterations; practical usage (10–20 iterations) is stable.
+
+## When to Use What
+
+- PageRank: importance ranking on directed or undirected graphs; personalize with a node attribute when needed.
+- Betweenness: highlight bridge nodes that sit on many shortest paths.
+- Closeness: favor nodes that are on average near all others (per connected component).
+- LPA: fast, parameter-light community detection; good for exploratory clustering.
+- Louvain: modularity-optimizing communities; balanced speed and quality.
+- Leiden: higher-quality, well-connected communities; better for production clustering.
+- Connected Components: quickly partition or label disconnected regions (undirected, weak, or strong).
+- BFS / DFS: traversals and unweighted distances; BFS for shortest paths, DFS for deep exploration/cycle detection.
+- Dijkstra: weighted single-source shortest paths; use when you have edge weights.
+- A*: weighted paths with a heuristic and explicit goals; use when you know sources and goals.
 
 ---
 
-## Algorithm Categories
+## Centrality
 
-Groggy's algorithms fall into several categories:
+### PageRank {#pagerank}
 
-- **Traversal**: BFS, DFS
-- **Components**: Connected components
-- **Paths**: Shortest paths
-- **Centrality**: Degree, betweenness, closeness
-- **Community**: Community detection, clustering
-- **Spectral**: Eigenvalue-based methods
+Importance based on incoming links with damping.
 
-### Running Algorithms
-
-You have three convenient ways to execute an algorithm:
-
+**Usage**
 ```python
-result = sg.apply(algo)                     # Subgraph.apply()
-result = gr.pipeline([algo1, algo2])(sg)    # Pipeline object
-result = gr.apply(sg, [algo1, algo2, ...])  # Convenience helper
+from groggy.algorithms import centrality
+
+sg = graph.view()
+result = sg.apply(
+    centrality.pagerank(
+        damping=0.85,
+        max_iter=100,
+        tolerance=1e-6,
+        output_attr="pagerank",
+        # personalization_attr="traffic"  # optional
+    )
+)
+scores = result.nodes["pagerank"]
 ```
 
-For bespoke combinations you can also build a custom pipeline using the
-[Builder DSL](builder.md) and then call `sg.apply(custom_algo)`.
+**Parameters**
+- `damping` (float, default 0.85): random jump probability.
+- `max_iter` (int, default 100): iteration cap.
+- `tolerance` (float, default 1e-6): convergence threshold.
+- `personalization_attr` (str | None): node attribute for personalized PageRank.
+- `output_attr` (str, default "pagerank"): node attribute to store scores.
+
+**Returns**: Subgraph with `output_attr` on nodes.
+
+**Use cases**: ranking pages or users, surfacing authorities, ordering recommendations.
+
+**Notes**: Batch Executor accelerates iterations; small drift may appear beyond 100 iterations.
+
+### Betweenness {#betweenness}
+
+Shortest-path load centrality.
+
+**Usage**
+```python
+from groggy.algorithms import centrality
+
+result = graph.view().apply(
+    centrality.betweenness(
+        normalized=True,
+        # weight_attr="weight",  # optional
+        output_attr="betweenness",
+    )
+)
+scores = result.nodes["betweenness"]
+```
+
+**Parameters**
+- `normalized` (bool, default True): normalize scores by graph size.
+- `weight_attr` (str | None): edge weight attribute for weighted paths.
+- `output_attr` (str, default "betweenness"): node attribute for scores.
+
+**Returns**: Subgraph with `output_attr` on nodes.
+
+**Use cases**: bridge detection, choke point analysis, routing resilience.
+
+### Closeness {#closeness}
+
+Average distance centrality.
+
+**Usage**
+```python
+from groggy.algorithms import centrality
+
+result = graph.view().apply(
+    centrality.closeness(
+        # weight_attr="latency",  # optional
+        output_attr="closeness",
+    )
+)
+scores = result.nodes["closeness"]
+```
+
+**Parameters**
+- `weight_attr` (str | None): edge weight attribute.
+- `output_attr` (str, default "closeness"): node attribute for scores.
+
+**Returns**: Subgraph with `output_attr` on nodes.
+
+**Use cases**: finding hubs with short average reach, selecting facility locations.
 
 ---
 
-## Graph Traversal
+## Communities
 
-### Breadth-First Search (BFS)
+### Label Propagation (LPA) {#label-propagation-lpa}
 
-Explore graph level by level:
+Fast, parameter-free-ish community labels via neighbor majority voting.
 
+**Usage**
 ```python
-import groggy as gr
+from groggy.algorithms import community
 
-g = gr.generators.karate_club()
-
-# BFS from a starting node
-result = g.bfs(start=0)  # Returns Subgraph
-
-print(f"BFS reached {result.node_count()} nodes")
+result = graph.view().apply(
+    community.lpa(
+        max_iter=100,
+        # seed=42,  # optional
+        output_attr="community",
+    )
+)
+labels = result.nodes["community"]
 ```
 
-**Use cases:**
-- Finding shortest unweighted paths
-- Level-order exploration
-- Testing connectivity
+**Parameters**
+- `max_iter` (int, default 100): iteration cap.
+- `seed` (int | None): random seed.
+- `output_attr` (str, default "community"): node label attribute.
 
-### Depth-First Search (DFS)
+**Returns**: Subgraph with community labels.
 
-Explore deeply before backtracking:
+**Use cases**: quick segmentation, exploratory clustering, warm-starting Louvain/Leiden.
 
+### Louvain {#louvain}
+
+Modularity-maximizing communities with iterative refinement.
+
+**Usage**
 ```python
-# DFS from starting node
-result = g.dfs(start=0)  # Returns Subgraph
+from groggy.algorithms import community
 
-print(f"DFS reached {result.node_count()} nodes")
+result = graph.view().apply(
+    community.louvain(
+        resolution=1.0,
+        max_iter=100,
+        output_attr="community",
+    )
+)
+labels = result.nodes["community"]
 ```
 
-**Use cases:**
-- Detecting cycles
-- Topological sorting
-- Path finding
+**Parameters**
+- `resolution` (float, default 1.0): controls community granularity.
+- `max_iter` (int, default 100): iteration cap.
+- `output_attr` (str, default "community"): node label attribute.
+
+**Returns**: Subgraph with community labels.
+
+**Use cases**: balanced quality/speed modularity clustering; baseline for Leiden.
+
+### Leiden {#leiden}
+
+Leiden refinement for well-connected, higher-quality communities.
+
+**Usage**
+```python
+from groggy.algorithms import community
+
+result = graph.view().apply(
+    community.leiden(
+        resolution=1.0,
+        max_iter=20,
+        max_phases=10,
+        # seed=123,  # optional
+        output_attr="community",
+    )
+)
+labels = result.nodes["community"]
+```
+
+**Parameters**
+- `resolution` (float, default 1.0): modularity granularity.
+- `max_iter` (int, default 20): node-move iterations per phase.
+- `max_phases` (int, default 10): refinement phases.
+- `seed` (int | None): random seed.
+- `output_attr` (str, default "community"): node label attribute.
+
+**Returns**: Subgraph with community labels.
+
+**Use cases**: production-grade community detection, better-connected clusters than Louvain.
+
+### Connected Components {#connected-components}
+
+Partition nodes by reachability.
+
+**Usage**
+```python
+from groggy.algorithms import community
+
+result = graph.view().apply(
+    community.connected_components(
+        mode="undirected",  # "undirected" | "weak" | "strong"
+        output_attr="component",
+    )
+)
+components = result.nodes["component"]
+```
+
+**Parameters**
+- `mode` (str, default "undirected"): undirected, weak (ignore direction), or strong.
+- `output_attr` (str, default "component"): node component ID attribute.
+
+**Returns**: Subgraph with component IDs; also useful as a mask for further analysis.
+
+**Use cases**: graph cleaning, fragmentation analysis, per-component metrics.
 
 ---
 
-## Connected Components
+## Pathfinding and Traversal
 
-Find groups of connected nodes:
+### BFS (unweighted shortest paths) {#bfs-unweighted-shortest-paths}
 
-### In-Place Labeling
+Layered traversal for hop distances.
 
-Write component IDs to nodes:
-
+**Usage**
 ```python
-g = gr.generators.karate_club()
+from groggy.algorithms import pathfinding
 
-# Label nodes with component ID
-g.connected_components(inplace=True, label="component")
+# Mark sources
+graph.nodes["is_source"] = graph.nodes.ids() == 0
 
-# Check assignments
-components = g.nodes["component"]
-num_components = components.nunique()
-
-print(f"Found {num_components} component(s)")
-
-# Get nodes in component 0
-comp_0 = g.nodes[g.nodes["component"] == 0]
-print(f"Component 0: {comp_0.node_count()} nodes")
+result = graph.view().apply(
+    pathfinding.bfs(
+        start_attr="is_source",
+        output_attr="distance",
+    )
+)
+distances = result.nodes["distance"]
 ```
 
-### As SubgraphArray
+**Parameters**
+- `start_attr` (str): node attribute flagging sources (truthy values).
+- `output_attr` (str, default "distance"): hop distance attribute.
 
-Get components as separate subgraphs:
+**Returns**: Subgraph with hop distances; unreachable nodes may remain unset/null.
 
+**Use cases**: unweighted shortest paths, reachability, level-order exploration.
+
+### DFS (depth-first traversal) {#dfs-depth-first-traversal}
+
+Depth-first discovery order.
+
+**Usage**
 ```python
-# Returns SubgraphArray
-components = g.connected_components()
+from groggy.algorithms import pathfinding
 
-print(f"{len(components)} component(s)")
-
-# Access individual components
-largest = components[0]  # Subgraph
-print(f"Largest: {largest.node_count()} nodes")
-
-# Analyze each
-for i, comp in enumerate(components):
-    density = comp.density()
-    print(f"Component {i}: {comp.node_count()} nodes, density={density:.3f}")
+graph.nodes["is_root"] = graph.nodes.ids() == 0
+result = graph.view().apply(
+    pathfinding.dfs(
+        start_attr="is_root",
+        output_attr="discovery_time",
+    )
+)
+order = result.nodes["discovery_time"]
 ```
 
-**Use cases:**
-- Finding disconnected parts
-- Analyzing component structure
-- Filtering by component size
+**Parameters**
+- `start_attr` (str): node attribute flagging roots.
+- `output_attr` (str, default "discovery_time"): discovery order attribute.
+
+**Returns**: Subgraph with discovery times.
+
+**Use cases**: cycle detection, topological-like traversals, exhaustive exploration.
+
+### Dijkstra (weighted shortest paths) {#dijkstra-weighted-shortest-paths}
+
+Single-source weighted shortest paths.
+
+**Usage**
+```python
+from groggy.algorithms import pathfinding
+
+graph.nodes["is_source"] = graph.nodes.ids() == 0
+result = graph.view().apply(
+    pathfinding.dijkstra(
+        start_attr="is_source",
+        weight_attr="weight",  # optional for weighted graphs
+        output_attr="distance",
+    )
+)
+distances = result.nodes["distance"]
+```
+
+**Parameters**
+- `start_attr` (str): node attribute flagging sources.
+- `weight_attr` (str | None): edge weight attribute; omit for unweighted cost 1.
+- `output_attr` (str, default "distance"): distance attribute.
+
+**Returns**: Subgraph with distances.
+
+**Use cases**: routing with weights (latency, cost), baseline for A*.
+
+### A* (goal-directed shortest paths) {#a-goal-directed-shortest-paths}
+
+Heuristic-guided shortest paths to explicit goals.
+
+**Usage**
+```python
+from groggy.algorithms import pathfinding
+
+graph.nodes["is_start"] = graph.nodes.ids() == 0
+graph.nodes["is_goal"] = graph.nodes.ids() == 9
+
+result = graph.view().apply(
+    pathfinding.astar(
+        start_attr="is_start",
+        goal_attr="is_goal",
+        heuristic_attr="h_score",  # optional, per-node heuristic
+        weight_attr="weight",      # optional
+        output_attr="distance",
+    )
+)
+distances = result.nodes["distance"]
+```
+
+**Parameters**
+- `start_attr` (str): node attribute flagging sources.
+- `goal_attr` (str): node attribute flagging targets.
+- `heuristic_attr` (str | None): node heuristic estimates to goal.
+- `weight_attr` (str | None): edge weights.
+- `output_attr` (str, default "distance"): distance attribute.
+
+**Returns**: Subgraph with distances (and traversal state encoded in attributes).
+
+**Use cases**: navigation with known goals, faster-than-Dijkstra routing when a heuristic is available.
 
 ---
 
-## Shortest Paths
-
-### Single-Source Shortest Paths
-
-Find shortest paths from one node to all others:
-
-```python
-g = gr.generators.karate_club()
-
-# Shortest paths from node 0
-paths = g.shortest_path(source=0)  # Returns Subgraph or distances
-
-# With edge weights
-g_weighted = gr.Graph()
-n0, n1, n2 = g_weighted.add_node(), g_weighted.add_node(), g_weighted.add_node()
-g_weighted.add_edge(n0, n1, weight=5.0)
-g_weighted.add_edge(n0, n2, weight=2.0)
-g_weighted.add_edge(n1, n2, weight=1.0)
-
-# Weighted shortest paths
-paths = g_weighted.shortest_path(source=0, weight="weight")
-```
-
-**Algorithms used:**
-- Unweighted: BFS (O(V + E))
-- Weighted: Dijkstra (O((V + E) log V))
-
-**Use cases:**
-- Finding optimal routes
-- Distance calculations
-- Network analysis
-
----
-
-## Degree and Centrality
-
-### Degree
-
-Count connections per node:
-
-```python
-g = gr.generators.karate_club()
-
-# All degrees
-degrees = g.degree()  # NumArray
-print(f"Mean degree: {degrees.mean():.2f}")
-print(f"Max degree: {degrees.max()}")
-
-# In-degree (directed graphs)
-in_degrees = g.in_degree()
-
-# Out-degree (directed graphs)
-out_degrees = g.out_degree()
-```
-
-### Degree as Node Attribute
-
-```python
-# Store degrees as attribute
-g.nodes.set_attrs({
-    int(nid): {"degree": int(deg)}
-    for nid, deg in zip(g.nodes.ids(), g.degree())
-})
-
-# Query by degree
-high_degree = g.nodes[g.nodes["degree"] > 5]
-print(f"High-degree nodes: {high_degree.node_count()}")
-```
-
-**Use cases:**
-- Finding hubs
-- Network analysis
-- Filtering by connectivity
-
-### Other Centrality Measures
-
-```python
-# Betweenness centrality (if available)
-# betweenness = g.betweenness_centrality()
-
-# Closeness centrality
-# closeness = g.closeness_centrality()
-
-# Eigenvector centrality
-# eigenvector = g.eigenvector_centrality()
-
-# PageRank
-# pagerank = g.pagerank(damping=0.85)
-```
-
----
-
-## Neighborhood Analysis
-
-### K-Hop Neighborhoods
-
-Get nodes within k hops:
-
-```python
-g = gr.generators.karate_club()
-
-# 2-hop neighborhood around node 0
-neighborhood = g.neighborhood(node=0, depth=2)
-
-# For multiple nodes
-seeds = g.nodes[:5]
-neighborhoods = seeds.neighborhood(depth=2)  # SubgraphArray
-
-for i, nbh in enumerate(neighborhoods):
-    print(f"Node {i} reaches {nbh.node_count()} nodes in 2 hops")
-```
-
-**Use cases:**
-- Local structure analysis
-- Feature extraction
-- Subgraph sampling
-
-### Neighborhood Statistics
-
-```python
-# Get neighborhood statistics (if available)
-stats = g.neighborhood_statistics(depth=2)
-
-# Might include:
-# - Average neighborhood size
-# - Clustering coefficients
-# - Local densities
-```
-
----
-
-## Clustering and Communities
-
-### Clustering Coefficient
-
-Measure how clustered neighborhoods are:
-
-```python
-# Global clustering coefficient
-# clustering = g.clustering_coefficient()
-# print(f"Clustering: {clustering:.3f}")
-
-# Per-node clustering
-# node_clustering = g.node_clustering_coefficient()
-```
-
-**Interpretation:**
-- 0.0 = No triangles (tree-like)
-- 1.0 = Complete graph (everyone connected)
-
-### Community Detection
-
-Find natural groupings:
-
-```python
-# Louvain community detection (if available)
-# communities = g.detect_communities(method="louvain")
-
-# Label propagation
-# communities = g.detect_communities(method="label_propagation")
-
-# Results as node attribute
-# g.nodes.set_attrs({
-#     int(nid): {"community": int(comm)}
-#     for nid, comm in zip(g.nodes.ids(), communities)
-# })
-```
-
-**Use cases:**
-- Social network analysis
-- Modularity optimization
-- Graph partitioning
-
----
-
-## Spectral Methods
-
-### Spectral Embeddings
-
-Embed graphs in vector space:
-
-```python
-# Spectral embedding (if available)
-# embeddings = g.spectral_embedding(dimensions=8)
-
-# Returns matrix where each row is a node embedding
-# print(embeddings.shape())  # (num_nodes, 8)
-```
-
-**Use cases:**
-- Graph visualization
-- Node classification
-- Dimensionality reduction
-
-### Laplacian Eigenmaps
-
-```python
-# Get Laplacian
-L = g.laplacian_matrix()
-
-# Compute eigenvectors (external library needed)
-# import scipy.sparse.linalg as spla
-# eigenvalues, eigenvectors = spla.eigsh(L, k=10, which='SM')
-```
-
----
-
-## Common Patterns
-
-### Pattern 1: Filter by Algorithm Result
-
-```python
-# Run algorithm
-g.connected_components(inplace=True, label="component")
-
-# Filter by result
-largest_comp_id = 0  # Assuming 0 is largest
-largest = g.nodes[g.nodes["component"] == largest_comp_id]
-
-# Work with filtered graph
-print(f"Largest component: {largest.node_count()} nodes")
-largest_graph = largest.to_graph()
-```
-
-### Pattern 2: Iterative Refinement
-
-```python
-# Start with full graph
-current = g
-
-# Iteratively filter
-for i in range(3):
-    # Run algorithm
-    components = current.connected_components()
-
-    # Keep largest
-    current = components[0].to_graph()
-
-    print(f"Iteration {i}: {current.node_count()} nodes")
-```
-
-### Pattern 3: Multi-Metric Analysis
-
-```python
-# Compute multiple metrics
-degrees = g.degree()
-# betweenness = g.betweenness_centrality()
-# clustering = g.node_clustering_coefficient()
-
-# Store all
-g.nodes.set_attrs({
-    int(nid): {
-        "degree": int(deg),
-        # "betweenness": float(bet),
-        # "clustering": float(clust)
-    }
-    for nid, deg in zip(g.nodes.ids(), degrees)
-})
-
-# Query by combination
-# important = g.nodes[
-#     (g.nodes["degree"] > 5) &
-#     (g.nodes["betweenness"] > 0.1)
-# ]
-```
-
-### Pattern 4: Component Comparison
-
-```python
-components = g.connected_components()
-
-# Analyze each
-stats = []
-for i, comp in enumerate(components):
-    stats.append({
-        'id': i,
-        'nodes': comp.node_count(),
-        'edges': comp.edge_count(),
-        'density': comp.density(),
-        'is_connected': comp.is_connected()
-    })
-
-# Convert to DataFrame
-import pandas as pd
-df = pd.DataFrame(stats)
-print(df.sort_values('nodes', ascending=False))
-```
-
-### Pattern 5: Shortest Path Analysis
-
-```python
-# Find all paths from central node
-central_node = 0
-paths = g.shortest_path(source=central_node)
-
-# Analyze reachability
-reachable = paths.node_count()
-total = g.node_count()
-print(f"Reachability: {reachable}/{total} ({reachable/total*100:.1f}%)")
-
-# Check if graph is connected
-if reachable == total:
-    print("Graph is connected")
-else:
-    print("Graph is disconnected")
-```
-
-### Pattern 6: Degree Distribution
-
-```python
-degrees = g.degree()
-
-# Get distribution
-from collections import Counter
-degree_dist = Counter(degrees.to_list())
-
-print("Degree distribution:")
-for degree, count in sorted(degree_dist.items()):
-    print(f"  Degree {degree}: {count} node(s)")
-
-# Plot if needed
-import matplotlib.pyplot as plt
-plt.bar(degree_dist.keys(), degree_dist.values())
-plt.xlabel("Degree")
-plt.ylabel("Frequency")
-plt.title("Degree Distribution")
-```
-
-### Pattern 7: Subgraph Algorithms
-
-```python
-# Filter to subgraph
-young = g.nodes[g.nodes["age"] < 30]
-
-# Run algorithms on subgraph
-young_components = young.connected_components()
-print(f"Young network has {len(young_components)} component(s)")
-
-# Compare to full graph
-full_components = g.connected_components()
-print(f"Full network has {len(full_components)} component(s)")
-```
-
----
-
-## Performance Considerations
-
-### Algorithm Complexity
-
-| Algorithm | Complexity | Notes |
-|-----------|------------|-------|
-| BFS/DFS | O(V + E) | Linear in graph size |
-| Connected Components | O(V + E) | Union-find based |
-| Shortest Path (unweighted) | O(V + E) | BFS |
-| Shortest Path (weighted) | O((V + E) log V) | Dijkstra's |
-| Degree | O(V + E) | Count edges per node |
-
-### Large Graphs
-
-For very large graphs:
-
-```python
-# Work with samples
-sample = g.nodes.sample(1000)
-sample_graph = sample.to_graph()
-components = sample_graph.connected_components()
-
-# Or work with subgraphs
-core = g.nodes[g.nodes["degree"] > 5]  # High-degree subgraph
-core_components = core.connected_components()
-```
-
-### Parallelization
-
-Rust implementation uses parallelization when beneficial:
-
-```python
-# Algorithms automatically parallelize when appropriate
-# No special configuration needed
-components = g.connected_components()
-```
-
----
-
-## Algorithm Selection
-
-### When to Use Each
-
-**BFS:**
-- ✅ Shortest unweighted paths
-- ✅ Level-order traversal
-- ✅ Checking connectivity
-
-**DFS:**
-- ✅ Cycle detection
-- ✅ Topological sorting
-- ✅ Deep exploration
-
-**Connected Components:**
-- ✅ Finding separate networks
-- ✅ Analyzing fragmentation
-- ✅ Filtering disconnected parts
-
-**Shortest Paths:**
-- ✅ Navigation/routing
-- ✅ Distance calculations
-- ✅ Network efficiency
-
-**Degree:**
-- ✅ Finding hubs
-- ✅ Network topology
-- ✅ Quick connectivity measure
-
-**Centrality:**
-- ✅ Identifying important nodes
-- ✅ Ranking nodes
-- ✅ Influence analysis
-
----
-
-## Future Algorithms
-
-Algorithms potentially coming to Groggy:
-
-- **Betweenness centrality**: Bridge detection
-- **PageRank**: Importance ranking
-- **Community detection**: Modularity optimization
-- **Minimum spanning tree**: Network design
-- **Max flow**: Capacity analysis
-- **Triangle counting**: Clustering analysis
-- **K-core decomposition**: Core structure
-
-Check the API reference for the latest available algorithms.
-
----
-
-## Quick Reference
-
-### Running Algorithms
-
-```python
-# Traversal
-bfs_result = g.bfs(start=0)
-dfs_result = g.dfs(start=0)
-
-# Components
-g.connected_components(inplace=True, label="component")
-components = g.connected_components()  # SubgraphArray
-
-# Paths
-paths = g.shortest_path(source=0)
-paths = g.shortest_path(source=0, weight="weight")
-
-# Degree
-degrees = g.degree()
-in_deg = g.in_degree()
-out_deg = g.out_degree()
-
-# Neighborhoods
-nbh = g.neighborhood(node=0, depth=2)
-nbhs = g.nodes[:5].neighborhood(depth=2)
-```
-
-### Common Options
-
-```python
-# In-place modification
-g.connected_components(inplace=True, label="component")
-
-# Return value
-components = g.connected_components()  # SubgraphArray
-
-# With weights
-paths = g.shortest_path(source=0, weight="weight")
-
-# Depth parameter
-nbh = g.neighborhood(node=0, depth=2)
-```
-
----
+## Quick Selection Guide
+
+- Need rankings: PageRank for link-based importance; Betweenness for bridges; Closeness for global proximity.
+- Need communities: LPA for speed; Louvain for modularity with good speed; Leiden for highest quality/connectedness.
+- Need reachability: Connected Components for partitioning; BFS/DFS for traversal; Dijkstra/A* for weighted routes.
+- Iterative workloads: prefer native algorithms or Builder DSL with `builder.iterate()` to leverage the Batch Executor.
 
 ## See Also
 
-- **[Graph Core Guide](graph-core.md)**: Running algorithms on graphs
-- **[Subgraphs Guide](subgraphs.md)**: Algorithms on subgraphs
-- **[SubgraphArrays Guide](subgraph-arrays.md)**: Working with component results
-- **[Matrices Guide](matrices.md)**: Matrix-based algorithms
-- **[Performance Guide](performance.md)**: Optimizing algorithm performance
+- `docs/guide/builder.md` for custom pipelines and the Batch Executor.
+- `docs/guide/graph-core.md` for graph operations prior to running algorithms.
+- `docs/guide/performance.md` for performance tuning tips.

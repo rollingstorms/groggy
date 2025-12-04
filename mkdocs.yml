@@ -86,15 +86,48 @@ nav:
       - Tables: guide/tables.md
       - Arrays: guide/arrays.md
       - Matrices: guide/matrices.md
+      - Builder DSL: guide/builder.md
       - Algorithms: guide/algorithms.md
       - Neural Networks: guide/neural.md
       - Integration: guide/integration.md
       - Performance: guide/performance.md
+  - Algorithms:
+      - Overview: guide/algorithms.md
+      - Centrality:
+          - PageRank: guide/algorithms.md
+          - Betweenness: guide/algorithms.md
+          - Closeness: guide/algorithms.md
+      - Community Detection:
+          - Label Propagation: guide/algorithms.md
+          - Louvain: guide/algorithms.md
+          - Leiden: guide/algorithms.md
+          - Connected Components: guide/algorithms.md
+      - Pathfinding:
+          - BFS: guide/algorithms.md
+          - DFS: guide/algorithms.md
+          - Dijkstra: guide/algorithms.md
+          - A*: guide/algorithms.md
+  - Builder DSL:
+      - Getting Started: builder/index.md
+      - Batch Executor: guide/builder.md
+      - Tutorials:
+          - Hello World: builder/tutorials/01_hello_world.md
+          - PageRank: builder/tutorials/02_pagerank.md
+          - LPA: builder/tutorials/03_lpa.md
+          - Custom Metrics: builder/tutorials/04_custom_metrics.md
+      - API Reference:
+          - Core Ops: builder/api/core.md
+          - Graph Ops: builder/api/graph.md
+          - Attr Ops: builder/api/attr.md
+          - Iteration: builder/api/iter.md
+          - VarHandle: builder/api/varhandle.md
   - API Reference:
       - Graph Objects:
           - Graph: api/graph.md
           - Subgraph: api/subgraph.md
           - SubgraphArray: api/subgrapharray.md
+      - Algorithms: api/algorithms.md
+      - Builder: api/builder.md
       - Accessors:
           - NodesAccessor: api/nodesaccessor.md
           - EdgesAccessor: api/edgesaccessor.md

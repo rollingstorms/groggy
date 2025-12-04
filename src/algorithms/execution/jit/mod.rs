@@ -15,18 +15,15 @@ use crate::algorithms::execution::batch_plan::{BatchInstruction, BatchPlan};
 use anyhow::Result;
 
 /// Compiled native function signature
-/// 
+///
 /// Parameters:
 /// - node_count: Number of nodes to process
 /// - iterations: Number of loop iterations
 /// - slot_ptrs: Pointer to array of slot pointers (f64 arrays)
-/// 
+///
 /// Returns: 0 on success, non-zero on error
-pub type CompiledFunction = unsafe extern "C" fn(
-    node_count: usize,
-    iterations: usize,
-    slot_ptrs: *const *mut f64,
-) -> i32;
+pub type CompiledFunction =
+    unsafe extern "C" fn(node_count: usize, iterations: usize, slot_ptrs: *const *mut f64) -> i32;
 
 /// JIT compilation manager
 pub struct JitManager {

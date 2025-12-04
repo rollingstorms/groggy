@@ -19,10 +19,10 @@ print("\n=== Test 1: Map + Scalar (both directions) ===")
 builder = AlgorithmBuilder("map_scalar_test")
 # Just use init_nodes for this test
 degrees = builder.init_nodes(default=2.0)  # Simulate degree values
-scaled_up = builder.core.mul(degrees, 10.0)   # map * scalar
+scaled_up = builder.core.mul(degrees, 10.0)  # map * scalar
 scaled_down = builder.core.div(scaled_up, 2.0)  # map / scalar
-shifted = builder.core.add(scaled_down, 1.0)   # map + scalar
-final = builder.core.sub(shifted, 0.5)         # map - scalar
+shifted = builder.core.add(scaled_down, 1.0)  # map + scalar
+final = builder.core.sub(shifted, 0.5)  # map - scalar
 builder.attach_as("result", final)
 
 g.apply(builder.build())
@@ -44,7 +44,7 @@ values = builder.init_nodes(default=3.0)
 # Scalar on left side
 result1 = builder.core.add(10.0, values)  # scalar + map
 result2 = builder.core.sub(20.0, values)  # scalar - map
-result3 = builder.core.mul(2.0, values)   # scalar * map
+result3 = builder.core.mul(2.0, values)  # scalar * map
 builder.attach_as("add_result", result1)
 builder.attach_as("sub_result", result2)
 builder.attach_as("mul_result", result3)
@@ -55,12 +55,12 @@ for node in [n1, n2, n3, n4]:
     add_val = g.get_node_attr(node, "add_result")
     sub_val = g.get_node_attr(node, "sub_result")
     mul_val = g.get_node_attr(node, "mul_result")
-    
+
     print(f"  Node {node}:")
     print(f"    10.0 + 3.0 = {add_val} (expected 13.0)")
     print(f"    20.0 - 3.0 = {sub_val} (expected 17.0)")
     print(f"    2.0 * 3.0 = {mul_val} (expected 6.0)")
-    
+
     assert abs(add_val - 13.0) < 1e-9
     assert abs(sub_val - 17.0) < 1e-9
     assert abs(mul_val - 6.0) < 1e-9
@@ -88,12 +88,14 @@ for node in [n1, n2, n3, n4]:
     diff_val = g.get_node_attr(node, "diff")
     prod_val = g.get_node_attr(node, "prod")
     quot_val = g.get_node_attr(node, "quot")
-    
-    print(f"  Node {node}: sum={sum_val}, diff={diff_val}, prod={prod_val}, quot={quot_val}")
+
+    print(
+        f"  Node {node}: sum={sum_val}, diff={diff_val}, prod={prod_val}, quot={quot_val}"
+    )
     assert abs(sum_val - 8.0) < 1e-9
     assert abs(diff_val - 2.0) < 1e-9
     assert abs(prod_val - 15.0) < 1e-9
-    assert abs(quot_val - (5.0/3.0)) < 1e-6  # Float precision
+    assert abs(quot_val - (5.0 / 3.0)) < 1e-6  # Float precision
 
 print("✓ Map + Map operations work!")
 
@@ -102,8 +104,8 @@ print("\n=== Test 4: Verify efficiency (no extra node maps) ===")
 builder = AlgorithmBuilder("efficiency_test")
 nodes = builder.init_nodes(default=1.0)
 r1 = builder.core.mul(nodes, 0.85)  # Should create ONE scalar var
-r2 = builder.core.add(r1, 0.15)      # Should create ONE scalar var
-r3 = builder.core.div(r2, 2.0)       # Should create ONE scalar var
+r2 = builder.core.add(r1, 0.15)  # Should create ONE scalar var
+r3 = builder.core.div(r2, 2.0)  # Should create ONE scalar var
 builder.attach_as("result", r3)
 
 # Count step types
@@ -183,6 +185,6 @@ print(f"\nNew approach creates {init_scalar_steps} O(1) scalar variables")
 print(f"Old approach would create {init_scalar_steps} O(n) node maps")
 print("✓ Significant efficiency improvement!")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("All comprehensive tests passed! ✓")
 print("Scalar auto-detection working correctly!")

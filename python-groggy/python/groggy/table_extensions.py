@@ -6,9 +6,11 @@ to existing graph classes.
 """
 
 from typing import Optional
-from ._groggy import BaseTable, NodesTable, EdgesTable, GraphTable
+
+from ._groggy import BaseTable, EdgesTable, GraphTable, NodesTable
 
 # GraphTable now comes from Rust FFI via __init__.py
+
 
 def add_table_methods():
     """Add table() methods to Graph and related classes."""
@@ -16,6 +18,7 @@ def add_table_methods():
     # NOTE: Graph classes already have table() methods implemented in Rust FFI
     # This extension is no longer needed as of the Rust migration
     pass  # No additional table methods needed
+
 
 # Add edges table access
 class EdgesTableAccessor:
@@ -27,6 +30,7 @@ class EdgesTableAccessor:
     def table(self):
         """Return a GraphTable view of edges."""
         return GraphTable(self.graph_or_subgraph, "edges")
+
 
 def add_edges_table_accessor():
     """Add edges.table() accessor to Graph classes."""
@@ -60,8 +64,10 @@ def add_table_conversion_methods():
         """
         # Check if the node_id_column exists
         if not self.has_column(node_id_column):
-            raise ValueError(f"Column '{node_id_column}' not found in table. "
-                           f"Available columns: {self.column_names()}")
+            raise ValueError(
+                f"Column '{node_id_column}' not found in table. "
+                f"Available columns: {self.column_names()}"
+            )
 
         # Convert to pandas and back with column renaming
         try:
@@ -83,7 +89,7 @@ def add_table_conversion_methods():
         self,
         source_id_column: str = "source",
         target_id_column: str = "target",
-        edge_id_column: Optional[str] = None
+        edge_id_column: Optional[str] = None,
     ) -> EdgesTable:
         """
         Convert BaseTable to EdgesTable.
@@ -111,8 +117,10 @@ def add_table_conversion_methods():
 
         missing_columns = [col for col in required_columns if not self.has_column(col)]
         if missing_columns:
-            raise ValueError(f"Missing required columns: {missing_columns}. "
-                           f"Available columns: {self.column_names()}")
+            raise ValueError(
+                f"Missing required columns: {missing_columns}. "
+                f"Available columns: {self.column_names()}"
+            )
 
         # Convert to pandas and back with column renaming
         try:
@@ -127,22 +135,26 @@ def add_table_conversion_methods():
 
             # Ensure edge_id column exists for EdgesTable
             if "edge_id" not in data_dict:
-                data_dict["edge_id"] = list(range(1, len(data_dict.get("source", [])) + 1))
+                data_dict["edge_id"] = list(
+                    range(1, len(data_dict.get("source", [])) + 1)
+                )
 
             return EdgesTable.from_dict(data_dict)
         except Exception as e:
             print(f"Warning: Could not convert BaseTable to EdgesTable: {e}")
             print("This functionality requires FFI implementation")
             # Return a basic EdgesTable for now
-            return EdgesTable.from_dict({
-                "edge_id": [1, 2],
-                "source": [1, 2],
-                "target": [2, 3],
-                "placeholder": ["edge1", "edge2"]
-            })
+            return EdgesTable.from_dict(
+                {
+                    "edge_id": [1, 2],
+                    "source": [1, 2],
+                    "target": [2, 3],
+                    "placeholder": ["edge1", "edge2"],
+                }
+            )
 
     # Attach methods to BaseTable class
-    if hasattr(BaseTable, 'to_nodes_table'):
+    if hasattr(BaseTable, "to_nodes_table"):
         # Methods already exist, don't override
         pass
     else:

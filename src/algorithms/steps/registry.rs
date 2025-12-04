@@ -18,7 +18,7 @@ use super::attributes::{
 use super::community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
 use super::core::{global_step_registry, StepMetadata, StepRegistry};
 use super::execution_block::{
-    BlockBody, BlockOptions, BodyNode, ExecutionBlockStep, ExecutionMode,
+    BlockBody, BlockOptions, ExecutionBlockStep, ExecutionMode,
 };
 use super::expression::Expr;
 use super::filtering::{

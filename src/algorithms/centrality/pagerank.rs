@@ -192,7 +192,7 @@ impl Algorithm for PageRank {
         ctx.record_stat("pr.count.input_edges", edges.len() as f64);
 
         // === PHASE 4: Build or Get CSR ===
-        let is_directed = subgraph.graph().borrow().is_directed();
+        let _is_directed = subgraph.graph().borrow().is_directed();
         let add_reverse = false; // PageRank uses incoming edges naturally
 
         let csr = match subgraph.csr_cache_get(add_reverse) {

@@ -13,9 +13,10 @@ Test Coverage:
 Success Criteria: Algorithms work correctly on test graphs, proper error handling
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
@@ -59,7 +60,7 @@ class TestGraphTraversal:
         """Test breadth-first search"""
         graph, node_ids = self.get_test_graph()
 
-        if not hasattr(graph, 'bfs'):
+        if not hasattr(graph, "bfs"):
             pytest.skip("BFS not implemented")
 
         # BFS from root
@@ -70,7 +71,7 @@ class TestGraphTraversal:
         """Test depth-first search"""
         graph, node_ids = self.get_test_graph()
 
-        if not hasattr(graph, 'dfs'):
+        if not hasattr(graph, "dfs"):
             pytest.skip("DFS not implemented")
 
         # DFS from root
@@ -114,8 +115,10 @@ class TestGraphComponents:
         # connected_components should work (verified in comprehensive tests)
         components = graph.connected_components()
         assert components is not None, "connected_components() should return result"
-        assert type(components).__name__ in ['ComponentsArray', 'SubgraphArray'], \
-            "Should return ComponentsArray or SubgraphArray"
+        assert type(components).__name__ in [
+            "ComponentsArray",
+            "SubgraphArray",
+        ], "Should return ComponentsArray or SubgraphArray"
 
         # Should have 2 components
         assert len(components) == 2, f"Should have 2 components, got {len(components)}"
@@ -124,7 +127,7 @@ class TestGraphComponents:
         """Test graph connectivity check"""
         graph = self.get_test_graph()
 
-        if not hasattr(graph, 'is_connected'):
+        if not hasattr(graph, "is_connected"):
             pytest.skip("is_connected not implemented")
 
         # Multi-component graph should not be connected
@@ -138,7 +141,7 @@ class TestGraphComponents:
         n2 = single_graph.add_node(label="B")
         single_graph.add_edge(n1, n2)
 
-        if hasattr(single_graph, 'is_connected'):
+        if hasattr(single_graph, "is_connected"):
             is_conn_single = single_graph.is_connected()
             assert is_conn_single, "Single component graph should be connected"
 
@@ -172,7 +175,7 @@ class TestPathfinding:
         # shortest_path should work (verified in comprehensive tests)
         path = graph.shortest_path(node_ids[0], node_ids[4])
         assert path is not None, "shortest_path() should return result"
-        assert type(path).__name__ == 'Subgraph', "Should return Subgraph"
+        assert type(path).__name__ == "Subgraph", "Should return Subgraph"
 
     def test_neighborhood(self):
         """Test neighborhood extraction"""
@@ -181,8 +184,9 @@ class TestPathfinding:
         # neighborhood should return NeighborhoodArray (specialized SubgraphArray with metadata)
         neighborhood = graph.neighborhood(node_ids[2])
         assert neighborhood is not None, "neighborhood() should return result"
-        assert type(neighborhood).__name__ == 'NeighborhoodArray', \
-            "Should return NeighborhoodArray"
+        assert (
+            type(neighborhood).__name__ == "NeighborhoodArray"
+        ), "Should return NeighborhoodArray"
 
     def test_neighbors(self):
         """Test getting node neighbors"""
@@ -201,11 +205,12 @@ class TestPathfinding:
         graph, node_ids = self.get_test_graph()
 
         # neighborhood_statistics should work (verified in comprehensive tests)
-        if hasattr(graph, 'neighborhood_statistics'):
+        if hasattr(graph, "neighborhood_statistics"):
             stats = graph.neighborhood_statistics()
             assert stats is not None, "neighborhood_statistics() should return result"
-            assert type(stats).__name__ == 'NeighborhoodStats', \
-                "Should return NeighborhoodStats"
+            assert (
+                type(stats).__name__ == "NeighborhoodStats"
+            ), "Should return NeighborhoodStats"
 
 
 @pytest.mark.algorithms
@@ -236,7 +241,7 @@ class TestGraphMetrics:
         """Test node counting"""
         graph = self.get_test_graph()
 
-        if hasattr(graph, 'node_count'):
+        if hasattr(graph, "node_count"):
             count = graph.node_count()
             assert count == 4, f"Should have 4 nodes, got {count}"
 
@@ -244,7 +249,7 @@ class TestGraphMetrics:
         """Test edge counting"""
         graph = self.get_test_graph()
 
-        if hasattr(graph, 'edge_count'):
+        if hasattr(graph, "edge_count"):
             count = graph.edge_count()
             # Complete graph with 4 nodes has 6 edges
             assert count == 6, f"Should have 6 edges, got {count}"
@@ -253,11 +258,13 @@ class TestGraphMetrics:
         """Test graph density calculation"""
         graph = self.get_test_graph()
 
-        if hasattr(graph, 'density'):
+        if hasattr(graph, "density"):
             dens = graph.density()
             assert dens is not None, "density() should return a value"
             # Complete graph has density 1.0
-            assert 0.9 <= dens <= 1.1, f"Complete graph density should be ~1.0, got {dens}"
+            assert (
+                0.9 <= dens <= 1.1
+            ), f"Complete graph density should be ~1.0, got {dens}"
 
     def test_is_empty(self):
         """Test empty graph check"""
@@ -266,13 +273,13 @@ class TestGraphMetrics:
 
         graph = gr.Graph()
 
-        if hasattr(graph, 'is_empty'):
+        if hasattr(graph, "is_empty"):
             assert graph.is_empty(), "New graph should be empty"
 
         # Add a node
         graph.add_node(label="Test")
 
-        if hasattr(graph, 'is_empty'):
+        if hasattr(graph, "is_empty"):
             assert not graph.is_empty(), "Graph with nodes should not be empty"
 
 
@@ -305,7 +312,7 @@ class TestAlgorithmIntegration:
 
         merged = sampled.merge()
         assert merged is not None, "Should be able to merge sampled components"
-        assert hasattr(merged, 'nodes'), "Merged result should be a graph"
+        assert hasattr(merged, "nodes"), "Merged result should be a graph"
 
     def test_path_analysis_workflow(self):
         """Test pathfinding workflow"""
@@ -324,10 +331,10 @@ class TestAlgorithmIntegration:
         assert path is not None, "Should find shortest path"
 
         # Path should be a Subgraph
-        assert type(path).__name__ == 'Subgraph', "Path should be a Subgraph"
+        assert type(path).__name__ == "Subgraph", "Path should be a Subgraph"
 
         # Should be able to get adjacency matrix from path
-        if hasattr(path, 'adjacency_matrix'):
+        if hasattr(path, "adjacency_matrix"):
             adj = path.adjacency_matrix()
             assert adj is not None, "Should get adjacency matrix from path subgraph"
 
@@ -349,7 +356,7 @@ class TestAlgorithmIntegration:
         assert neighborhood is not None, "Should get neighborhood"
 
         # Should be able to get statistics
-        if hasattr(graph, 'neighborhood_statistics'):
+        if hasattr(graph, "neighborhood_statistics"):
             stats = graph.neighborhood_statistics()
             assert stats is not None, "Should get neighborhood statistics"
 

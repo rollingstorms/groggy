@@ -15,9 +15,10 @@ Test Coverage:
 Success Criteria: Gradients computed correctly for basic operations
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
@@ -40,7 +41,7 @@ class TestGradientTracking:
         m = gr.matrix([[1.0, 2.0], [3.0, 4.0]])
 
         # Initial state should be False
-        assert hasattr(m, 'requires_grad'), "Matrix should have requires_grad property"
+        assert hasattr(m, "requires_grad"), "Matrix should have requires_grad property"
         assert m.requires_grad == False, "Initial requires_grad should be False"
 
     def test_requires_grad_setter(self):
@@ -53,7 +54,9 @@ class TestGradientTracking:
         # requires_grad_ returns a new matrix with tracking enabled
         m_tracked = m.requires_grad_(True)
         assert m_tracked is not None, "requires_grad_ should return matrix"
-        assert m_tracked.requires_grad == True, "Returned matrix should have requires_grad=True"
+        assert (
+            m_tracked.requires_grad == True
+        ), "Returned matrix should have requires_grad=True"
 
     def test_grad_property_exists(self):
         """Test grad property for accessing gradients"""
@@ -62,7 +65,7 @@ class TestGradientTracking:
 
         m = gr.matrix([[1.0, 2.0], [3.0, 4.0]]).requires_grad_(True)
 
-        assert hasattr(m, 'grad'), "Matrix should have grad property"
+        assert hasattr(m, "grad"), "Matrix should have grad property"
         # Initially grad should be None or zero
         # We can't check the value without doing backward first
 
@@ -74,7 +77,7 @@ class TestGradientTracking:
         m = gr.matrix([[1.0, 2.0], [3.0, 4.0]]).requires_grad_(True)
 
         # Should have zero_grad method
-        assert hasattr(m, 'zero_grad'), "Matrix should have zero_grad method"
+        assert hasattr(m, "zero_grad"), "Matrix should have zero_grad method"
 
         # Should not fail (even though no computation graph yet)
         try:
@@ -85,7 +88,9 @@ class TestGradientTracking:
 
 
 @pytest.mark.neural
-@pytest.mark.skip(reason="Autograd requires computation graph initialization - API under development")
+@pytest.mark.skip(
+    reason="Autograd requires computation graph initialization - API under development"
+)
 class TestBasicAutodiff:
     """Test basic automatic differentiation"""
 
@@ -139,7 +144,9 @@ class TestBasicAutodiff:
 
 
 @pytest.mark.neural
-@pytest.mark.skip(reason="Autograd requires computation graph initialization - API under development")
+@pytest.mark.skip(
+    reason="Autograd requires computation graph initialization - API under development"
+)
 class TestActivationGradients:
     """Test gradients of activation functions"""
 
@@ -278,10 +285,10 @@ class TestNeuralIntegration:
         m = gr.matrix([[1.0, 2.0], [-1.0, -2.0]])
 
         # These should all work in forward pass
-        assert hasattr(m, 'relu'), "Should have relu"
-        assert hasattr(m, 'sigmoid'), "Should have sigmoid"
-        assert hasattr(m, 'tanh'), "Should have tanh"
-        assert hasattr(m, 'elu'), "Should have elu"
+        assert hasattr(m, "relu"), "Should have relu"
+        assert hasattr(m, "sigmoid"), "Should have sigmoid"
+        assert hasattr(m, "tanh"), "Should have tanh"
+        assert hasattr(m, "elu"), "Should have elu"
 
         # Test forward pass works
         relu_result = m.relu()
@@ -301,11 +308,11 @@ class TestNeuralIntegration:
         m = gr.matrix([[1.0, 2.0]])
 
         # API should exist
-        assert hasattr(m, 'requires_grad'), "Should have requires_grad property"
-        assert hasattr(m, 'requires_grad_'), "Should have requires_grad_ method"
-        assert hasattr(m, 'grad'), "Should have grad property"
-        assert hasattr(m, 'backward'), "Should have backward method"
-        assert hasattr(m, 'zero_grad'), "Should have zero_grad method"
+        assert hasattr(m, "requires_grad"), "Should have requires_grad property"
+        assert hasattr(m, "requires_grad_"), "Should have requires_grad_ method"
+        assert hasattr(m, "grad"), "Should have grad property"
+        assert hasattr(m, "backward"), "Should have backward method"
+        assert hasattr(m, "zero_grad"), "Should have zero_grad method"
 
     def test_backward_fails_gracefully(self):
         """Test that backward fails gracefully without computation graph"""
@@ -321,8 +328,9 @@ class TestNeuralIntegration:
             pytest.skip("backward unexpectedly succeeded")
         except Exception as e:
             error_msg = str(e).lower()
-            assert "computation graph" in error_msg or "gradient" in error_msg, \
-                f"Error should mention computation graph, got: {e}"
+            assert (
+                "computation graph" in error_msg or "gradient" in error_msg
+            ), f"Error should mention computation graph, got: {e}"
 
 
 @pytest.mark.neural

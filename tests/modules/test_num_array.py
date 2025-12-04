@@ -18,9 +18,10 @@ Failing Methods: reshape() and to_type() (missing parameters)
 Success Criteria: 90%+ pass rate, numeric operations validated
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
@@ -66,7 +67,7 @@ class TestNumArrayCore(NumArrayTest):
         """Test creating NumArray from graph node IDs"""
         node_ids = simple_graph.node_ids
         assert node_ids is not None
-        assert hasattr(node_ids, 'to_list'), "NumArray should have to_list() method"
+        assert hasattr(node_ids, "to_list"), "NumArray should have to_list() method"
 
         ids_list = node_ids.to_list()
         assert isinstance(ids_list, list), "to_list() should return a list"
@@ -82,24 +83,26 @@ class TestNumArrayCore(NumArrayTest):
 
         # Test all numeric methods that should work
         numeric_operations = {
-            'sum': (int, float),
-            'mean': (int, float),
-            'min': (int, float),
-            'max': (int, float),
-            'std': (int, float),
-            'var': (int, float),
-            'count': (int,)
+            "sum": (int, float),
+            "mean": (int, float),
+            "min": (int, float),
+            "max": (int, float),
+            "std": (int, float),
+            "var": (int, float),
+            "count": (int,),
         }
 
         for op_name, expected_types in numeric_operations.items():
             if hasattr(node_ids, op_name):
                 result = getattr(node_ids, op_name)()
-                assert isinstance(result, expected_types), f"{op_name}() should return {expected_types}, got {type(result)}"
+                assert isinstance(
+                    result, expected_types
+                ), f"{op_name}() should return {expected_types}, got {type(result)}"
 
                 # Basic sanity checks
-                if op_name == 'count':
+                if op_name == "count":
                     assert result >= 0, f"count() should be non-negative, got {result}"
-                elif op_name in ['sum', 'mean', 'min', 'max']:
+                elif op_name in ["sum", "mean", "min", "max"]:
                     # These should be reasonable numbers (not NaN)
                     assert result == result, f"{op_name}() returned NaN"
 
@@ -112,19 +115,29 @@ class TestNumArrayCore(NumArrayTest):
 
         # Test nunique (count of unique values)
         unique_count = node_ids.nunique()
-        assert isinstance(unique_count, int), f"nunique() should return int, got {type(unique_count)}"
-        assert unique_count >= 0, f"nunique() should be non-negative, got {unique_count}"
+        assert isinstance(
+            unique_count, int
+        ), f"nunique() should return int, got {type(unique_count)}"
+        assert (
+            unique_count >= 0
+        ), f"nunique() should be non-negative, got {unique_count}"
 
         # Test unique (array of unique values)
         unique_array = node_ids.unique()
         assert unique_array is not None
-        assert hasattr(unique_array, 'to_list'), "unique() should return array-like object"
+        assert hasattr(
+            unique_array, "to_list"
+        ), "unique() should return array-like object"
 
         unique_list = unique_array.to_list()
-        assert len(unique_list) >= 0, "Unique values list should have non-negative length"
+        assert (
+            len(unique_list) >= 0
+        ), "Unique values list should have non-negative length"
 
         # Unique count should match unique array length
-        assert len(unique_list) == unique_count, f"unique() length {len(unique_list)} should match nunique() {unique_count}"
+        assert (
+            len(unique_list) == unique_count
+        ), f"unique() length {len(unique_list)} should match nunique() {unique_count}"
 
     def test_numarray_first_last_access(self, simple_graph):
         """Test first and last element access"""
@@ -135,15 +148,21 @@ class TestNumArrayCore(NumArrayTest):
 
         # Test first element
         first_id = node_ids.first()
-        assert isinstance(first_id, int), f"first() should return int, got {type(first_id)}"
+        assert isinstance(
+            first_id, int
+        ), f"first() should return int, got {type(first_id)}"
 
         # Test last element
         last_id = node_ids.last()
-        assert isinstance(last_id, int), f"last() should return int, got {type(last_id)}"
+        assert isinstance(
+            last_id, int
+        ), f"last() should return int, got {type(last_id)}"
 
         # If array has only one element, first and last should be the same
         if node_ids.count() == 1:
-            assert first_id == last_id, "For single-element array, first() and last() should be equal"
+            assert (
+                first_id == last_id
+            ), "For single-element array, first() and last() should be equal"
 
     def test_numarray_dtype_property(self, simple_graph):
         """Test dtype property"""
@@ -162,20 +181,28 @@ class TestNumArrayCore(NumArrayTest):
             pytest.skip("Cannot test type conversion on empty array")
 
         # Test conversion to different types
-        conversion_types = ['int32', 'int64', 'float32', 'float64']
+        conversion_types = ["int32", "int64", "float32", "float64"]
 
         for target_type in conversion_types:
             try:
                 converted = node_ids.to_type(target_type)
-                assert converted is not None, f"to_type('{target_type}') should not return None"
+                assert (
+                    converted is not None
+                ), f"to_type('{target_type}') should not return None"
 
                 # Verify it has the expected array interface
-                assert hasattr(converted, 'to_list'), f"Converted to {target_type} should have to_list() method"
-                assert hasattr(converted, 'dtype'), f"Converted to {target_type} should have dtype property"
+                assert hasattr(
+                    converted, "to_list"
+                ), f"Converted to {target_type} should have to_list() method"
+                assert hasattr(
+                    converted, "dtype"
+                ), f"Converted to {target_type} should have dtype property"
 
                 # Check the dtype reflects the conversion (though implementation may vary)
                 converted_dtype = converted.dtype
-                assert isinstance(converted_dtype, str), f"Converted dtype should be string"
+                assert isinstance(
+                    converted_dtype, str
+                ), f"Converted dtype should be string"
 
             except Exception as e:
                 # Type conversion may fail for valid reasons, document the failure
@@ -206,19 +233,20 @@ class TestNumArrayCore(NumArrayTest):
             reshape_configs.append((3, array_length // 3))
 
         # Always test 1xN and Nx1 reshapes
-        reshape_configs.extend([
-            (1, array_length),
-            (array_length, 1)
-        ])
+        reshape_configs.extend([(1, array_length), (array_length, 1)])
 
         for rows, cols in reshape_configs:
             try:
                 reshaped = node_ids.reshape(rows, cols)
-                assert reshaped is not None, f"reshape({rows}, {cols}) should not return None"
+                assert (
+                    reshaped is not None
+                ), f"reshape({rows}, {cols}) should not return None"
 
                 # Verify the reshaped array has expected properties
                 # (Exact verification depends on implementation)
-                assert hasattr(reshaped, 'to_list') or hasattr(reshaped, '__iter__'), "Reshaped array should be iterable"
+                assert hasattr(reshaped, "to_list") or hasattr(
+                    reshaped, "__iter__"
+                ), "Reshaped array should be iterable"
 
             except Exception as e:
                 # Some reshapes may fail for implementation reasons
@@ -234,14 +262,14 @@ class TestNumArrayCore(NumArrayTest):
         assert node_ids is not None
 
         # Basic operations should work regardless of graph type
-        assert hasattr(node_ids, 'is_empty')
-        assert hasattr(node_ids, 'count')
-        assert hasattr(node_ids, 'to_list')
+        assert hasattr(node_ids, "is_empty")
+        assert hasattr(node_ids, "count")
+        assert hasattr(node_ids, "to_list")
 
         if not node_ids.is_empty():
             # Statistical operations should work
-            assert hasattr(node_ids, 'sum')
-            assert hasattr(node_ids, 'mean')
+            assert hasattr(node_ids, "sum")
+            assert hasattr(node_ids, "mean")
 
             # These should not raise exceptions
             assert node_ids.sum() == node_ids.sum()  # Should not be NaN
@@ -268,7 +296,7 @@ class TestNumArrayCore(NumArrayTest):
         assert node_ids.count() == node_count
 
         # Test performance of statistical operations
-        operations_to_test = ['sum', 'mean', 'min', 'max', 'std', 'nunique']
+        operations_to_test = ["sum", "mean", "min", "max", "std", "nunique"]
 
         for op_name in operations_to_test:
             if hasattr(node_ids, op_name):
@@ -276,7 +304,9 @@ class TestNumArrayCore(NumArrayTest):
                 result = getattr(node_ids, op_name)()
                 elapsed = time.time() - start_time
 
-                assert elapsed < 1.0, f"{op_name}() took {elapsed:.3f}s, should be < 1.0s for {node_count} elements"
+                assert (
+                    elapsed < 1.0
+                ), f"{op_name}() took {elapsed:.3f}s, should be < 1.0s for {node_count} elements"
                 assert result == result, f"{op_name}() returned NaN"
 
 
@@ -299,14 +329,14 @@ class TestNumArrayIntegration:
         # Test degree array
         degrees = attributed_graph.degree()
         assert degrees is not None
-        assert hasattr(degrees, 'sum'), "Degrees should be a NumArray with sum() method"
+        assert hasattr(degrees, "sum"), "Degrees should be a NumArray with sum() method"
 
         # All should be NumArray-like objects with similar interfaces
         arrays_to_test = [node_ids, edge_ids, degrees]
         for array in arrays_to_test:
-            assert hasattr(array, 'is_empty')
-            assert hasattr(array, 'to_list')
-            assert hasattr(array, 'count')
+            assert hasattr(array, "is_empty")
+            assert hasattr(array, "to_list")
+            assert hasattr(array, "count")
 
     def test_numarray_attribute_access(self, attributed_graph):
         """Test accessing numeric attributes as NumArray"""
@@ -317,13 +347,13 @@ class TestNumArrayIntegration:
             try:
                 # Try to access attribute as array
                 attr_array = attributed_graph[attr_name]
-                if hasattr(attr_array, 'sum'):  # Check if it has numeric operations
+                if hasattr(attr_array, "sum"):  # Check if it has numeric operations
                     numeric_attrs.append(attr_name)
 
                     # Test that numeric operations work
-                    assert hasattr(attr_array, 'mean')
-                    assert hasattr(attr_array, 'min')
-                    assert hasattr(attr_array, 'max')
+                    assert hasattr(attr_array, "mean")
+                    assert hasattr(attr_array, "min")
+                    assert hasattr(attr_array, "max")
 
                     if not attr_array.is_empty():
                         # These should not raise exceptions
@@ -338,7 +368,9 @@ class TestNumArrayIntegration:
 
         # We should find at least some numeric attributes in test graphs
         if len(numeric_attrs) == 0:
-            pytest.skip("No numeric attributes found in test graph for NumArray testing")
+            pytest.skip(
+                "No numeric attributes found in test graph for NumArray testing"
+            )
 
 
 if __name__ == "__main__":

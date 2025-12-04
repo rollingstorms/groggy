@@ -253,6 +253,7 @@ fn is_positive(val: &AlgorithmParamValue) -> Result<bool> {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
 

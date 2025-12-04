@@ -652,4 +652,4 @@ def threshold(sG, attr_name, threshold=0.5):
 
 - [VarHandle API](varhandle.md) - Operator overloading
 - [GraphOps API](graph.md) - Topology operations
-- [Migration Guide](../../../BUILDER_SYNTAX_COMPARISON.md)
+- Migration notes available in repository docs

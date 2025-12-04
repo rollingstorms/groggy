@@ -21,31 +21,12 @@ Future phases will add:
 - JIT compilation
 """
 
-from .nodes import (
-    IRNode,
-    IRDomain,
-    CoreIRNode,
-    GraphIRNode,
-    AttrIRNode,
-    ControlIRNode,
-    AnyIRNode,
-)
-
+from .analysis import (DataflowAnalysis, DataflowAnalyzer, DependencyChain,
+                       LivenessInfo, LoopInfo, analyze_dataflow)
 from .graph import IRGraph
-
-from .analysis import (
-    LivenessInfo,
-    LoopInfo,
-    DependencyChain,
-    DataflowAnalysis,
-    DataflowAnalyzer,
-    analyze_dataflow,
-)
-
-from .optimizer import (
-    IROptimizer,
-    optimize_ir,
-)
+from .nodes import (AnyIRNode, AttrIRNode, ControlIRNode, CoreIRNode,
+                    GraphIRNode, IRDomain, IRNode)
+from .optimizer import IROptimizer, optimize_ir
 
 __all__ = [
     "IRNode",

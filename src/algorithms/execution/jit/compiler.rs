@@ -1,8 +1,10 @@
 //! BatchPlan → native code compiler
 
+#![allow(unused_mut, dead_code)]
+
 use super::context::JitContext;
 use super::CompiledFunction;
-use crate::algorithms::execution::batch_plan::{AggregateOp, BatchInstruction, BatchPlan};
+use crate::algorithms::execution::batch_plan::{BatchInstruction, BatchPlan};
 use anyhow::{anyhow, Result};
 use cranelift::prelude::*;
 use cranelift_module::{Linkage, Module};
@@ -30,12 +32,18 @@ impl<'a> CompilerContext<'a> {
         let lhs_ptr = self.slot_ptrs[lhs];
         let node_offset = self.builder.ins().imul_imm(node_idx, 8); // f64 = 8 bytes
         let lhs_elem_addr = self.builder.ins().iadd(lhs_ptr, node_offset);
-        let lhs_val = self.builder.ins().load(types::F64, MemFlags::new(), lhs_elem_addr, 0);
+        let lhs_val = self
+            .builder
+            .ins()
+            .load(types::F64, MemFlags::new(), lhs_elem_addr, 0);
 
         // Load rhs[node_idx]
         let rhs_ptr = self.slot_ptrs[rhs];
         let rhs_elem_addr = self.builder.ins().iadd(rhs_ptr, node_offset);
-        let rhs_val = self.builder.ins().load(types::F64, MemFlags::new(), rhs_elem_addr, 0);
+        let rhs_val = self
+            .builder
+            .ins()
+            .load(types::F64, MemFlags::new(), rhs_elem_addr, 0);
 
         // Perform operation
         let result = op(&mut self.builder, lhs_val, rhs_val);
@@ -43,7 +51,9 @@ impl<'a> CompilerContext<'a> {
         // Store to dst[node_idx]
         let dst_ptr = self.slot_ptrs[dst];
         let dst_elem_addr = self.builder.ins().iadd(dst_ptr, node_offset);
-        self.builder.ins().store(MemFlags::new(), result, dst_elem_addr, 0);
+        self.builder
+            .ins()
+            .store(MemFlags::new(), result, dst_elem_addr, 0);
     }
 
     /// Compile scalar broadcast: dst[i] = value
@@ -52,7 +62,9 @@ impl<'a> CompilerContext<'a> {
         let dst_ptr = self.slot_ptrs[dst];
         let node_offset = self.builder.ins().imul_imm(node_idx, 8);
         let dst_elem_addr = self.builder.ins().iadd(dst_ptr, node_offset);
-        self.builder.ins().store(MemFlags::new(), val, dst_elem_addr, 0);
+        self.builder
+            .ins()
+            .store(MemFlags::new(), val, dst_elem_addr, 0);
     }
 
     /// Compile fused multiply-add: dst[i] = a[i] * b[i] + c[i]
@@ -62,17 +74,26 @@ impl<'a> CompilerContext<'a> {
         // Load a[node_idx]
         let a_ptr = self.slot_ptrs[a];
         let a_elem_addr = self.builder.ins().iadd(a_ptr, node_offset);
-        let a_val = self.builder.ins().load(types::F64, MemFlags::new(), a_elem_addr, 0);
+        let a_val = self
+            .builder
+            .ins()
+            .load(types::F64, MemFlags::new(), a_elem_addr, 0);
 
         // Load b[node_idx]
         let b_ptr = self.slot_ptrs[b];
         let b_elem_addr = self.builder.ins().iadd(b_ptr, node_offset);
-        let b_val = self.builder.ins().load(types::F64, MemFlags::new(), b_elem_addr, 0);
+        let b_val = self
+            .builder
+            .ins()
+            .load(types::F64, MemFlags::new(), b_elem_addr, 0);
 
         // Load c[node_idx]
         let c_ptr = self.slot_ptrs[c];
         let c_elem_addr = self.builder.ins().iadd(c_ptr, node_offset);
-        let c_val = self.builder.ins().load(types::F64, MemFlags::new(), c_elem_addr, 0);
+        let c_val = self
+            .builder
+            .ins()
+            .load(types::F64, MemFlags::new(), c_elem_addr, 0);
 
         // Compute a * b + c (use fma if available, otherwise separate ops)
         let result = self.builder.ins().fma(a_val, b_val, c_val);
@@ -80,7 +101,9 @@ impl<'a> CompilerContext<'a> {
         // Store to dst[node_idx]
         let dst_ptr = self.slot_ptrs[dst];
         let dst_elem_addr = self.builder.ins().iadd(dst_ptr, node_offset);
-        self.builder.ins().store(MemFlags::new(), result, dst_elem_addr, 0);
+        self.builder
+            .ins()
+            .store(MemFlags::new(), result, dst_elem_addr, 0);
     }
 
     /// Copy one slot to another: to[i] = from[i]
@@ -89,11 +112,16 @@ impl<'a> CompilerContext<'a> {
 
         let from_ptr = self.slot_ptrs[from];
         let from_elem_addr = self.builder.ins().iadd(from_ptr, node_offset);
-        let val = self.builder.ins().load(types::F64, MemFlags::new(), from_elem_addr, 0);
+        let val = self
+            .builder
+            .ins()
+            .load(types::F64, MemFlags::new(), from_elem_addr, 0);
 
         let to_ptr = self.slot_ptrs[to];
         let to_elem_addr = self.builder.ins().iadd(to_ptr, node_offset);
-        self.builder.ins().store(MemFlags::new(), val, to_elem_addr, 0);
+        self.builder
+            .ins()
+            .store(MemFlags::new(), val, to_elem_addr, 0);
     }
 }
 
@@ -139,7 +167,9 @@ pub fn compile_batch_plan(jit: &mut JitContext, plan: &BatchPlan) -> Result<Comp
     for slot_idx in 0..plan.slot_count {
         let offset = (slot_idx * std::mem::size_of::<usize>()) as i64;
         let slot_ptr_addr = builder.ins().iadd_imm(slot_ptrs_base, offset);
-        let slot_ptr = builder.ins().load(pointer_type, MemFlags::new(), slot_ptr_addr, 0);
+        let slot_ptr = builder
+            .ins()
+            .load(pointer_type, MemFlags::new(), slot_ptr_addr, 0);
         slot_ptrs.push(slot_ptr);
     }
 
@@ -158,8 +188,12 @@ pub fn compile_batch_plan(jit: &mut JitContext, plan: &BatchPlan) -> Result<Comp
     // Iteration loop header
     builder.switch_to_block(iter_block);
     let iter_var = builder.block_params(iter_block)[0];
-    let cond = builder.ins().icmp(IntCC::UnsignedLessThan, iter_var, iterations);
-    builder.ins().brif(cond, iter_body_block, &[], iter_done_block, &[]);
+    let cond = builder
+        .ins()
+        .icmp(IntCC::UnsignedLessThan, iter_var, iterations);
+    builder
+        .ins()
+        .brif(cond, iter_body_block, &[], iter_done_block, &[]);
 
     // Iteration body
     builder.switch_to_block(iter_body_block);
@@ -175,8 +209,12 @@ pub fn compile_batch_plan(jit: &mut JitContext, plan: &BatchPlan) -> Result<Comp
     // Node loop header
     builder.switch_to_block(node_block);
     let node_var = builder.block_params(node_block)[0];
-    let node_cond = builder.ins().icmp(IntCC::UnsignedLessThan, node_var, node_count);
-    builder.ins().brif(node_cond, node_body_block, &[], node_done_block, &[]);
+    let node_cond = builder
+        .ins()
+        .icmp(IntCC::UnsignedLessThan, node_var, node_count);
+    builder
+        .ins()
+        .brif(node_cond, node_body_block, &[], node_done_block, &[]);
 
     // Node body - execute all instructions for this node
     builder.switch_to_block(node_body_block);
@@ -204,12 +242,17 @@ pub fn compile_batch_plan(jit: &mut JitContext, plan: &BatchPlan) -> Result<Comp
     // Copy carried slots (only if not last iteration)
     if !plan.carried_slots.is_empty() {
         let is_last_iter = ctx.builder.ins().iadd_imm(iter_var, 1);
-        let is_last = ctx.builder.ins().icmp(IntCC::Equal, is_last_iter, iterations);
+        let is_last = ctx
+            .builder
+            .ins()
+            .icmp(IntCC::Equal, is_last_iter, iterations);
 
         let copy_block = ctx.builder.create_block();
         let skip_copy_block = ctx.builder.create_block();
 
-        ctx.builder.ins().brif(is_last, skip_copy_block, &[], copy_block, &[]);
+        ctx.builder
+            .ins()
+            .brif(is_last, skip_copy_block, &[], copy_block, &[]);
 
         // Copy block - copy all carried slots
         ctx.builder.switch_to_block(copy_block);
@@ -220,13 +263,23 @@ pub fn compile_batch_plan(jit: &mut JitContext, plan: &BatchPlan) -> Result<Comp
             let copy_node_body_block = ctx.builder.create_block();
             let copy_node_done_block = ctx.builder.create_block();
 
-            ctx.builder.append_block_param(copy_node_block, pointer_type);
+            ctx.builder
+                .append_block_param(copy_node_block, pointer_type);
             ctx.builder.ins().jump(copy_node_block, &[zero]);
 
             ctx.builder.switch_to_block(copy_node_block);
             let copy_node_var = ctx.builder.block_params(copy_node_block)[0];
-            let copy_cond = ctx.builder.ins().icmp(IntCC::UnsignedLessThan, copy_node_var, node_count);
-            ctx.builder.ins().brif(copy_cond, copy_node_body_block, &[], copy_node_done_block, &[]);
+            let copy_cond =
+                ctx.builder
+                    .ins()
+                    .icmp(IntCC::UnsignedLessThan, copy_node_var, node_count);
+            ctx.builder.ins().brif(
+                copy_cond,
+                copy_node_body_block,
+                &[],
+                copy_node_done_block,
+                &[],
+            );
 
             ctx.builder.switch_to_block(copy_node_body_block);
             ctx.compile_copy_slot(*from_slot, *to_slot, copy_node_var);
@@ -269,6 +322,7 @@ pub fn compile_batch_plan(jit: &mut JitContext, plan: &BatchPlan) -> Result<Comp
     // Get function pointer
     let code_ptr = jit.module.get_finalized_function(func_id);
 
+    #[allow(clippy::missing_transmute_annotations)]
     Ok(unsafe { std::mem::transmute(code_ptr) })
 }
 
@@ -426,10 +480,7 @@ mod tests {
                     dst: 0,
                     value: 20.0,
                 },
-                BatchInstruction::LoadScalar {
-                    dst: 1,
-                    value: 5.0,
-                },
+                BatchInstruction::LoadScalar { dst: 1, value: 5.0 },
                 BatchInstruction::Sub {
                     dst: 2,
                     lhs: 0,
@@ -475,18 +526,9 @@ mod tests {
         let mut jit = JitContext::new().unwrap();
         let plan = BatchPlan::new(
             vec![
-                BatchInstruction::LoadScalar {
-                    dst: 0,
-                    value: 2.0,
-                },
-                BatchInstruction::LoadScalar {
-                    dst: 1,
-                    value: 3.0,
-                },
-                BatchInstruction::LoadScalar {
-                    dst: 2,
-                    value: 5.0,
-                },
+                BatchInstruction::LoadScalar { dst: 0, value: 2.0 },
+                BatchInstruction::LoadScalar { dst: 1, value: 3.0 },
+                BatchInstruction::LoadScalar { dst: 2, value: 5.0 },
                 BatchInstruction::FusedMADD {
                     dst: 3,
                     a: 0,
@@ -517,14 +559,8 @@ mod tests {
         // Plan: increment by 1.0 each iteration
         let plan = BatchPlan::new(
             vec![
-                BatchInstruction::LoadScalar {
-                    dst: 0,
-                    value: 0.0,
-                },
-                BatchInstruction::LoadScalar {
-                    dst: 1,
-                    value: 1.0,
-                },
+                BatchInstruction::LoadScalar { dst: 0, value: 0.0 },
+                BatchInstruction::LoadScalar { dst: 1, value: 1.0 },
                 BatchInstruction::Add {
                     dst: 0,
                     lhs: 0,

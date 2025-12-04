@@ -1,202 +1,87 @@
-# Tutorial 1: Hello World - Your First Algorithm
+# Tutorial 1: Hello World — Your First Builder Algorithm
 
-Welcome to the Groggy Builder DSL! This tutorial will walk you through creating your first custom graph algorithm.
+Build a simple, normalized degree score using the current builder API. No decorators—just create a builder, add steps, build, and apply.
 
-## What You'll Learn
+## What You’ll Build
 
-- How to use the `@algorithm` decorator
-- Initialize node values
-- Perform basic arithmetic operations
-- Attach results back to the graph
+`popularity = degree / max_degree` → a 0–1 score where 1.0 is the highest degree in the graph.
 
-## Prerequisites
-
-- Groggy installed (`pip install groggy`)
-- Basic Python knowledge
-- Understanding of graph concepts (nodes, edges)
-
-## The Scenario
-
-Let's create a simple algorithm that computes a "popularity score" for each node based on its degree (number of connections). The formula will be:
-
-```
-popularity = degree / max_degree
-```
-
-This normalizes degrees to a 0-1 range, where 1.0 means the node has the most connections.
-
-## Step 1: Import and Decorator
+## Step 1: Create the Builder
 
 ```python
-from groggy.builder import algorithm
+import groggy as gr
 
-@algorithm("node_popularity")
-def compute_popularity(sG):
-    """Compute normalized popularity scores based on degree."""
-    pass  # We'll fill this in
+b = gr.builder("node_popularity")
 ```
 
-The `@algorithm` decorator transforms your function into a reusable algorithm that can be applied to any graph or subgraph.
+`b` records steps and later produces an algorithm handle you can apply to any subgraph.
 
-**Key points:**
-- `sG` represents the **subgraph** your algorithm operates on (could be the full graph or a subset)
-- The decorator name (`"node_popularity"`) is what the result attribute will be called
-- Return a `VarHandle` to automatically save results
-
-**Why `sG` not `G`?** All operations work on subgraphs, not full graphs. Using `sG` reminds us we're always working with a (potentially filtered) subset.
-
-## Step 2: Get Degrees
+## Step 2: Compute Degrees
 
 ```python
-@algorithm("node_popularity")
-def compute_popularity(sG):
-    """Compute normalized popularity scores based on degree."""
-    # Get the degree of each node
-    degrees = sG.nodes().degrees()
-    
-    return degrees
+nodes = b.init_nodes(default=0.0)
+degrees = b.node_degrees(nodes)
 ```
 
-**What's happening:**
-- `sG.nodes()` initializes a variable representing all nodes in the subgraph (with default value 0.0)
-- `.degrees()` is a fluent method that computes the degree for each node
-- We return `degrees` to save it as the "node_popularity" attribute
+- `init_nodes` seeds a node vector.
+- `node_degrees` writes degrees into a new variable.
 
-## Step 3: Normalize
-
-Now let's normalize by the maximum degree:
+## Step 3: Normalize and Attach
 
 ```python
-@algorithm("node_popularity")
-def compute_popularity(sG):
-    """Compute normalized popularity scores based on degree."""
-    # Get degrees
-    degrees = sG.nodes().degrees()
-    
-    # Find max degree
-    max_degree = degrees.reduce("max")
-    
-    # Normalize to [0, 1]
-    popularity = degrees / (max_degree + 1e-9)  # Add small epsilon to avoid division by zero
-    
-    return popularity
+normalized = b.normalize(degrees, method="max")  # divide by max degree
+b.attach_as("node_popularity", normalized)
+
+popularity_algo = b.build()
 ```
 
-**New concepts:**
-- `.reduce("max")` aggregates all degree values to find the maximum
-- Operator overloading: `degrees / (max_degree + 1e-9)` uses Python's division operator
-- The `1e-9` prevents division by zero if all nodes have degree 0
+`attach_as` stores the result as a node attribute; `build()` returns the algorithm handle.
 
-## Step 4: Apply to a Graph
-
-Now let's use our algorithm on a real graph:
+## Step 4: Run It
 
 ```python
-import groggy as gg
+G = gr.generators.karate_club()
+result = G.view().apply(popularity_algo)
 
-# Create a simple graph
-G = gg.Graph()
-G.add_edges_from([
-    (1, 2), (1, 3), (1, 4),  # Node 1 has degree 3
-    (2, 3), (2, 5),           # Node 2 has degree 3
-    (3, 4),                   # Node 3 has degree 3
-    (4, 5),                   # Node 4 has degree 3
-])
-
-# Create our algorithm
-pop_algo = compute_popularity()
-
-# Apply to all nodes
-result = G.all().apply(pop_algo)
-
-# Access results
-popularity_scores = result.nodes()["node_popularity"]
-print(popularity_scores)
-# {1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 0.667}
+scores = result.nodes["node_popularity"]
+print(scores[:5])
 ```
 
-**Key points:**
-- `G.all()` creates a subgraph containing all nodes and edges
-- `.apply(algo)` executes the algorithm on the subgraph
-- Results are accessed via `result.nodes()["attribute_name"]`
+- `view()` creates a subgraph for execution.
+- `.apply()` runs the Rust-backed plan; the returned subgraph carries the new attribute.
 
 ## Complete Example
 
-Here's the complete code:
-
 ```python
-from groggy.builder import algorithm
-import groggy as gg
+import groggy as gr
 
-@algorithm("node_popularity")
-def compute_popularity(sG):
-    """Compute normalized popularity scores based on degree."""
-    degrees = G.nodes().degrees()
-    max_degree = degrees.reduce("max")
-    popularity = degrees / (max_degree + 1e-9)
-    return popularity
+b = gr.builder("node_popularity")
+nodes = b.init_nodes(default=0.0)
+degrees = b.node_degrees(nodes)
+normalized = b.normalize(degrees, method="max")
+b.attach_as("node_popularity", normalized)
+popularity_algo = b.build()
 
-# Create a graph
-G = gg.Graph()
-G.add_edges_from([
-    (1, 2), (1, 3), (1, 4),
-    (2, 3), (2, 5),
-    (3, 4),
-    (4, 5),
-])
+G = gr.generators.karate_club()
+result = G.view().apply(popularity_algo)
 
-# Apply algorithm
-algo = compute_popularity()
-result = G.all().apply(algo)
-
-# Get results
-scores = result.nodes()["node_popularity"]
-for node, score in sorted(scores.items()):
-    print(f"Node {node}: {score:.3f}")
+for nid, score in zip(result.nodes.ids(), result.nodes["node_popularity"]):
+    print(f"{nid}: {score:.3f}")
 ```
 
-Output:
-```
-Node 1: 1.000
-Node 2: 1.000
-Node 3: 1.000
-Node 4: 1.000
-Node 5: 0.667
-```
+## Try This Next
 
-## Exercises
-
-Try modifying the algorithm to:
-
-1. **Bonus for outdegree**: Give extra weight to nodes with high outdegree
-   ```python
-   popularity = (0.6 * in_degrees + 0.4 * out_degrees) / max_degree
-   ```
-
-2. **Log scaling**: Use logarithmic scaling instead of linear
-   ```python
-   popularity = G.builder.core.log(degrees + 1) / G.builder.core.log(max_degree + 1)
-   ```
-
-3. **Percentile rank**: Compute what percentile each node is in
-   - Hint: You'll need to sort and compute ranks
+1) Weight in/out-degree differently: compute in/out separately (if directed) and combine with `core.add/mul`.  
+2) Log scale: `log_deg = b.core.log(b.core.add(degrees, 1.0))`; then normalize.  
+3) Threshold mask: attach a boolean `is_popular = normalized > 0.5` with `b.core.gt`.
 
 ## Key Takeaways
 
-✅ Use `@algorithm` to define reusable graph algorithms  
-✅ `G.nodes()` initializes node values  
-✅ `.degrees()` computes node degrees  
-✅ `.reduce("max")` aggregates values  
-✅ Operator overloading (`/`, `+`, etc.) makes math natural  
-✅ Return a `VarHandle` to save results automatically  
+- Use `gr.builder(name)` to define a pipeline.
+- `init_nodes` → `node_degrees` → `normalize` → `attach_as` covers many scoring tasks.
+- `build()` returns a handle you can run with `subgraph.apply(...)`.
 
-## Next Steps
-
-- [Tutorial 2: PageRank](02_pagerank.md) - Learn about iterative algorithms
-- [API Reference: Core Operations](../api/core.md) - See all available operations
-- [API Reference: VarHandle](../api/varhandle.md) - Learn about operator overloading
-
-## Common Mistakes
+Next: [Tutorial 2: PageRank](02_pagerank.md) to learn loops and the Batch Executor.
 
 ❌ **Forgetting the decorator**
 ```python

@@ -225,6 +225,7 @@ impl Step for NeighborModeUpdateStep {
             scope.node_ids().copied().collect()
         };
 
+        #[allow(unused_mut)]
         let mut target_map = scope.variables_mut().node_map_mut(&self.target)?;
 
         let mut counts: HashMap<String, (usize, AlgorithmParamValue)> = HashMap::new();
@@ -468,7 +469,7 @@ impl Step for MapNodesExprStep {
                 }
 
                 // Create expression context
-                let expr_ctx = if let Some(ref map) = source_map {
+                let expr_ctx = if let Some(map) = source_map {
                     if let Some(value) = map.get(&node) {
                         ExprContext::with_value(node, &step_input, value)
                     } else {

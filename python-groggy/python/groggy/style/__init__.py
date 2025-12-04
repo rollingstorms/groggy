@@ -6,18 +6,7 @@ customization capabilities, and seamless integration with both basic rendering
 and advanced Jupyter widgets.
 """
 
-from .style_system import (
-    GroggyStyleSystem,
-    ThemeType, 
-    NodeStyle,
-    EdgeStyle,
-    CanvasStyle
-)
+from .style_system import (CanvasStyle, EdgeStyle, GroggyStyleSystem,
+                           NodeStyle, ThemeType)
 
-__all__ = [
-    'GroggyStyleSystem',
-    'ThemeType',
-    'NodeStyle', 
-    'EdgeStyle',
-    'CanvasStyle'
-]
+__all__ = ["GroggyStyleSystem", "ThemeType", "NodeStyle", "EdgeStyle", "CanvasStyle"]

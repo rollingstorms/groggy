@@ -14,11 +14,12 @@ Test Coverage:
 Success Criteria: Complex workflows execute successfully end-to-end
 """
 
-import pytest
+import os
 import sys
 import tempfile
-import os
 from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
@@ -54,8 +55,8 @@ class TestGraphWorkflows:
         assert table is not None, "Should convert to table"
 
         # Validate table structure
-        assert hasattr(table, 'nodes'), "Table should have nodes"
-        assert hasattr(table, 'edges'), "Table should have edges"
+        assert hasattr(table, "nodes"), "Table should have nodes"
+        assert hasattr(table, "edges"), "Table should have edges"
 
     def test_filter_transform_query_workflow(self):
         """Test: filter nodes -> transform -> query"""
@@ -70,7 +71,7 @@ class TestGraphWorkflows:
                 label=f"Node{i}",
                 value=i,
                 category="even" if i % 2 == 0 else "odd",
-                score=i * 0.5
+                score=i * 0.5,
             )
 
         # Filter nodes
@@ -97,10 +98,7 @@ class TestGraphWorkflows:
         for comp_id in range(3):
             comp_nodes = []
             for i in range(4):
-                node = graph.add_node(
-                    label=f"C{comp_id}N{i}",
-                    component=comp_id
-                )
+                node = graph.add_node(label=f"C{comp_id}N{i}", component=comp_id)
                 comp_nodes.append(node)
 
             # Connect within component
@@ -118,7 +116,7 @@ class TestGraphWorkflows:
         # Merge sampled components
         merged = sampled.merge()
         assert merged is not None, "Should merge components"
-        assert hasattr(merged, 'nodes'), "Merged result should be graph"
+        assert hasattr(merged, "nodes"), "Merged result should be graph"
 
 
 @pytest.mark.integration
@@ -134,11 +132,7 @@ class TestArrayTableIntegration:
 
         # Create nodes with attributes
         for i in range(15):
-            graph.add_node(
-                label=f"Node{i}",
-                value=i,
-                score=i * 2.5
-            )
+            graph.add_node(label=f"Node{i}", value=i, score=i * 2.5)
 
         # Get node array
         node_arr = graph.nodes.array()
@@ -149,7 +143,7 @@ class TestArrayTableIntegration:
         assert node_table is not None, "Should get node table"
 
         # Table operations
-        if hasattr(node_table, 'head'):
+        if hasattr(node_table, "head"):
             head = node_table.head()
             assert head is not None, "Should get table head"
 
@@ -164,10 +158,7 @@ class TestArrayTableIntegration:
         for cluster in range(3):
             cluster_nodes = []
             for i in range(5):
-                node = graph.add_node(
-                    label=f"C{cluster}N{i}",
-                    cluster=cluster
-                )
+                node = graph.add_node(label=f"C{cluster}N{i}", cluster=cluster)
                 cluster_nodes.append(node)
 
             for i in range(len(cluster_nodes) - 1):
@@ -213,7 +204,7 @@ class TestMatrixGraphIntegration:
         assert flattened is not None, "Should flatten matrix"
 
         # Get Laplacian
-        if hasattr(graph, 'laplacian_matrix'):
+        if hasattr(graph, "laplacian_matrix"):
             laplacian = graph.laplacian_matrix()
             assert laplacian is not None, "Should get Laplacian matrix"
 
@@ -231,7 +222,7 @@ class TestMatrixGraphIntegration:
         # Chain matrix operations
         result = graph.to_matrix().dense().abs().flatten()
         assert result is not None, "Matrix chain should succeed"
-        assert type(result).__name__ == 'NumArray', "Final result should be NumArray"
+        assert type(result).__name__ == "NumArray", "Final result should be NumArray"
 
 
 @pytest.mark.integration
@@ -261,14 +252,16 @@ class TestIOIntegration:
                 # Load - returns GraphTable
                 loaded_table = gr.GraphTable.load_bundle(bundle_path)
                 assert loaded_table is not None, "Should load GraphTable"
-                
+
                 # Convert back to graph
                 loaded_graph = loaded_table.to_graph()
                 assert loaded_graph is not None, "Should convert to Graph"
-                assert hasattr(loaded_graph, 'nodes'), "Loaded graph should have nodes"
-                
+                assert hasattr(loaded_graph, "nodes"), "Loaded graph should have nodes"
+
                 # Verify node count matches
-                assert len(loaded_graph.nodes) == len(graph.nodes), "Node count should match"
+                assert len(loaded_graph.nodes) == len(
+                    graph.nodes
+                ), "Node count should match"
             except Exception as e:
                 # May require parameters or not be fully implemented
                 if "missing" in str(e).lower() or "parameter" in str(e).lower():
@@ -291,7 +284,7 @@ class TestIOIntegration:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Try CSV export
-            if hasattr(node_table, 'to_csv'):
+            if hasattr(node_table, "to_csv"):
                 csv_path = os.path.join(tmpdir, "nodes.csv")
                 try:
                     node_table.to_csv(csv_path)
@@ -300,7 +293,7 @@ class TestIOIntegration:
                     pytest.skip("CSV export not fully implemented")
 
             # Try Parquet export
-            if hasattr(node_table, 'to_parquet'):
+            if hasattr(node_table, "to_parquet"):
                 parquet_path = os.path.join(tmpdir, "nodes.parquet")
                 try:
                     node_table.to_parquet(parquet_path)
@@ -326,14 +319,13 @@ class TestComplexWorkflows:
         users = []
         for i in range(20):
             user = graph.add_node(
-                label=f"User{i}",
-                age=20 + i,
-                city=["NYC", "SF", "LA"][i % 3]
+                label=f"User{i}", age=20 + i, city=["NYC", "SF", "LA"][i % 3]
             )
             users.append(user)
 
         # Create friendships
         import random
+
         random.seed(42)
         for i in range(30):
             u1, u2 = random.sample(users, 2)
@@ -363,9 +355,15 @@ class TestComplexWorkflows:
 
         # Add entities
         entities = {
-            "person": [graph.add_node(label=f"Person{i}", type="person") for i in range(5)],
-            "place": [graph.add_node(label=f"Place{i}", type="place") for i in range(3)],
-            "thing": [graph.add_node(label=f"Thing{i}", type="thing") for i in range(4)]
+            "person": [
+                graph.add_node(label=f"Person{i}", type="person") for i in range(5)
+            ],
+            "place": [
+                graph.add_node(label=f"Place{i}", type="place") for i in range(3)
+            ],
+            "thing": [
+                graph.add_node(label=f"Thing{i}", type="thing") for i in range(4)
+            ],
         }
 
         # Add relationships
@@ -382,7 +380,7 @@ class TestComplexWorkflows:
         assert len(people) == 5, "Should have 5 people"
 
         # Traverse from person
-        if hasattr(graph, 'neighborhood'):
+        if hasattr(graph, "neighborhood"):
             neighborhood = graph.neighborhood(entities["person"][0])
             assert neighborhood is not None, "Should get neighborhood"
 

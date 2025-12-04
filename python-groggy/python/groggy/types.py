@@ -1,20 +1,21 @@
-from typing import Union, List, Dict, Optional, Tuple
 from enum import Enum
+from typing import Dict, List, Optional, Tuple, Union
 
 # Type aliases matching Rust
 NodeId = int
-EdgeId = int  
+EdgeId = int
 AttrName = str
 StateId = int
 BranchName = str
 
+
 class AttrValue:
     """Python representation of Rust AttrValue enum"""
-    
+
     def __init__(self, value: Union[int, float, str, bool, List[float], bytes]):
         self._value = value
         self._type = self._determine_type(value)
-    
+
     def _determine_type(self, value):
         if isinstance(value, int):
             return "int"
@@ -30,22 +31,23 @@ class AttrValue:
             return "bytes"
         else:
             raise ValueError(f"Unsupported attribute value type: {type(value)}")
-    
+
     @property
     def value(self):
         return self._value
-    
-    @property 
+
+    @property
     def type_name(self) -> str:
         return self._type
-    
+
     def __repr__(self) -> str:
         return f"AttrValue({self._value!r})"
-    
+
     def __eq__(self, other) -> bool:
         if isinstance(other, AttrValue):
             return self._value == other._value
         return False
+
 
 # Query filter types
 class AttributeFilter:
@@ -54,10 +56,12 @@ class AttributeFilter:
         self.value = value
         self.kwargs = kwargs
 
+
 class NodeFilter:
     def __init__(self, filter_type: str, **kwargs):
         self.filter_type = filter_type
         self.kwargs = kwargs
+
 
 class EdgeFilter:
     def __init__(self, filter_type: str, **kwargs):

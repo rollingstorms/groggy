@@ -5,23 +5,25 @@ This module provides high-level access to all registered algorithms,
 grouped by category (centrality, community, pathfinding, etc.).
 """
 
-from groggy import _groggy
-from groggy.algorithms.base import algorithm, RustAlgorithmHandle, AlgorithmHandle
-from groggy.algorithms import centrality, community, pathfinding
-from typing import Dict, List, Optional
 import json
+from typing import Dict, List, Optional
+
+from groggy import _groggy
+from groggy.algorithms import centrality, community, pathfinding
+from groggy.algorithms.base import (AlgorithmHandle, RustAlgorithmHandle,
+                                    algorithm)
 
 
 def list(category: Optional[str] = None) -> List[str]:
     """
     List all registered algorithms, optionally filtered by category.
-    
+
     Args:
         category: Optional category filter (e.g., "centrality", "community")
-        
+
     Returns:
         List of algorithm IDs
-        
+
     Example:
         >>> from groggy import algorithms
         >>> all_algos = algorithms.list()
@@ -38,10 +40,10 @@ def list(category: Optional[str] = None) -> List[str]:
 def categories() -> Dict[str, List[str]]:
     """
     Get all algorithms grouped by category.
-    
+
     Returns:
         Dictionary mapping category names to algorithm ID lists
-        
+
     Example:
         >>> from groggy import algorithms
         >>> cats = algorithms.categories()
@@ -53,13 +55,13 @@ def categories() -> Dict[str, List[str]]:
 def info(algorithm_id: str) -> Dict[str, any]:
     """
     Get detailed information about a specific algorithm.
-    
+
     Args:
         algorithm_id: The algorithm identifier (e.g., "centrality.pagerank")
-        
+
     Returns:
         Dictionary with algorithm metadata including parameters, version, etc.
-        
+
     Example:
         >>> from groggy import algorithms
         >>> pagerank_info = algorithms.info("centrality.pagerank")
@@ -67,7 +69,7 @@ def info(algorithm_id: str) -> Dict[str, any]:
         >>> print(pagerank_info["parameters"])
     """
     metadata = _groggy.pipeline.get_algorithm_metadata(algorithm_id)
-    
+
     # Convert AttrValues to Python values
     result = {}
     for key, value in metadata.items():
@@ -80,20 +82,20 @@ def info(algorithm_id: str) -> Dict[str, any]:
                 result["parameters"] = value.value
         else:
             result[key] = value.value
-    
+
     return result
 
 
 def search(query: str) -> List[str]:
     """
     Search for algorithms by name or description.
-    
+
     Args:
         query: Search query string
-        
+
     Returns:
         List of matching algorithm IDs
-        
+
     Example:
         >>> from groggy import algorithms
         >>> results = algorithms.search("shortest path")
@@ -101,17 +103,19 @@ def search(query: str) -> List[str]:
     """
     query_lower = query.lower()
     matching = []
-    
+
     for algo_dict in _groggy.pipeline.list_algorithms():
         algo_id = algo_dict["id"].value
         name = algo_dict.get("name", algo_dict["id"]).value
         desc = algo_dict.get("description", "").value
-        
-        if (query_lower in algo_id.lower() or 
-            query_lower in name.lower() or 
-            query_lower in desc.lower()):
+
+        if (
+            query_lower in algo_id.lower()
+            or query_lower in name.lower()
+            or query_lower in desc.lower()
+        ):
             matching.append(algo_id)
-    
+
     return matching
 
 

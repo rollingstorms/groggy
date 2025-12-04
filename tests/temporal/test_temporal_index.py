@@ -1,5 +1,6 @@
-import groggy as gr
 import pytest
+
+import groggy as gr
 
 
 def test_temporal_index_basic():

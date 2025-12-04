@@ -1,9 +1,9 @@
 use super::super::{AlgorithmParams, Context};
 use super::core::{Step, StepRegistry, StepScope, StepSpec};
-use crate::algorithms::execution::{BatchExecutor, BatchPlan, JitManager};
+use crate::algorithms::execution::{BatchExecutor, BatchPlan};
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
+
 use serde_json::Value;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -14,6 +14,7 @@ struct LoopExecutionStats {
     execution_count: AtomicU64,
     /// Total iterations executed across all runs
     total_iterations: AtomicU64,
+    #[allow(dead_code)]
     /// Whether JIT compilation has been attempted
     jit_attempted: AtomicU64,
 }
@@ -53,9 +54,11 @@ pub struct LoopStep {
 
 impl LoopStep {
     /// Hot path threshold - after this many executions, try JIT compilation
+    #[allow(dead_code)]
     const HOT_THRESHOLD: u64 = 100;
 
     /// Minimum iterations to justify JIT compilation overhead
+    #[allow(dead_code)]
     const MIN_ITERATIONS_FOR_JIT: usize = 10;
 
     /// Create a new loop step
@@ -92,11 +95,16 @@ impl LoopStep {
     }
 
     /// Check if this loop should attempt JIT compilation
-    fn should_attempt_jit(&self, batch_plan: &BatchPlan) -> bool {
+    #[allow(dead_code)]
+    fn should_attempt_jit(&self, _batch_plan: &BatchPlan) -> bool {
         // Platform check
         #[cfg(target_arch = "aarch64")]
         {
-            return false; // ARM64 not supported in Cranelift 0.102
+            false // ARM64 not supported in Cranelift 0.102
+        }
+        #[cfg(not(target_arch = "aarch64"))]
+        {
+            false
         }
 
         #[cfg(not(target_arch = "aarch64"))]
@@ -123,7 +131,10 @@ impl LoopStep {
 
     /// Try to compile the batch plan to native code (Tier 2)
     #[cfg(not(target_arch = "aarch64"))]
-    fn try_jit_compile(&self, batch_plan: &BatchPlan) -> Option<crate::algorithms::execution::jit::CompiledFunction> {
+    fn try_jit_compile(
+        &self,
+        batch_plan: &BatchPlan,
+    ) -> Option<crate::algorithms::execution::jit::CompiledFunction> {
         // Mark as attempted (even if it fails, don't retry)
         self.stats.jit_attempted.store(1, Ordering::Relaxed);
 
@@ -170,28 +181,26 @@ impl LoopStep {
             None => {
                 // Create new JIT manager
                 match JitManager::new() {
-                    Ok(mut jit) => {
-                        match jit.compile(batch_plan) {
-                            Ok(func) => {
-                                let elapsed = start.elapsed();
-                                if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                                    eprintln!(
+                    Ok(mut jit) => match jit.compile(batch_plan) {
+                        Ok(func) => {
+                            let elapsed = start.elapsed();
+                            if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
+                                eprintln!(
                                         "[LOOP_STEP] ✅ JIT compilation successful ({:.2}ms, {} instructions)",
                                         elapsed.as_secs_f64() * 1000.0,
                                         batch_plan.instructions.len()
                                     );
-                                }
-                                *jit_cache = Some(jit);
-                                Some(func)
                             }
-                            Err(e) => {
-                                if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                                    eprintln!("[LOOP_STEP] ❌ JIT compilation failed: {}", e);
-                                }
-                                None
-                            }
+                            *jit_cache = Some(jit);
+                            Some(func)
                         }
-                    }
+                        Err(e) => {
+                            if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
+                                eprintln!("[LOOP_STEP] ❌ JIT compilation failed: {}", e);
+                            }
+                            None
+                        }
+                    },
                     Err(e) => {
                         if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
                             eprintln!("[LOOP_STEP] ❌ JIT manager creation failed: {}", e);
@@ -204,6 +213,7 @@ impl LoopStep {
     }
 
     #[cfg(target_arch = "aarch64")]
+    #[allow(dead_code)]
     fn try_jit_compile(&self, _batch_plan: &BatchPlan) -> Option<()> {
         None // ARM64 not supported
     }
@@ -341,7 +351,7 @@ impl Step for LoopStep {
         }
 
         // Update statistics
-        let exec_count = self.stats.execution_count.fetch_add(1, Ordering::Relaxed) + 1;
+        let _exec_count = self.stats.execution_count.fetch_add(1, Ordering::Relaxed) + 1;
         self.stats
             .total_iterations
             .fetch_add(self.iterations as u64, Ordering::Relaxed);
@@ -356,7 +366,7 @@ impl Step for LoopStep {
                 if let Some(jit_func) = self.try_jit_compile(&batch_plan) {
                     // Execute via JIT compiled code
                     let mut executor = BatchExecutor::new(node_count);
-                    
+
                     // Allocate slots for JIT execution
                     if let Err(e) = executor.allocate_slots_for_jit(batch_plan.slot_count) {
                         // Fallback to batch executor on allocation failure
@@ -366,12 +376,11 @@ impl Step for LoopStep {
                     } else {
                         // Get slot pointers
                         let slot_ptrs = executor.get_slot_pointers();
-                        
+
                         // Execute compiled code
-                        let ret = unsafe {
-                            jit_func(node_count, self.iterations, slot_ptrs.as_ptr())
-                        };
-                        
+                        let ret =
+                            unsafe { jit_func(node_count, self.iterations, slot_ptrs.as_ptr()) };
+
                         if ret == 0 {
                             // JIT execution successful - we still need to handle Load/StoreNodeProp
                             // For now, fall through to batch executor for complete execution
@@ -388,7 +397,7 @@ impl Step for LoopStep {
 
             // Tier 1: Batch executor (interpreted execution)
             let mut executor = BatchExecutor::new(node_count);
-            
+
             return executor
                 .execute(&batch_plan, self.iterations, scope)
                 .map_err(|e| anyhow!("Batch execution failed: {}", e));
@@ -431,6 +440,7 @@ impl Step for LoopStep {
 ///   "loop_vars": ["ranks", "contrib"]  // optional
 /// }
 /// ```
+#[allow(dead_code)]
 pub fn deserialize_loop_step(
     spec: &Value,
     registry: &'static StepRegistry,

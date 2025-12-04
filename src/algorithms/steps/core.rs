@@ -52,6 +52,7 @@ pub struct StepSpec {
 
 /// Runtime value representation for variables inside a step pipeline.
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum StepValue {
     /// Mapping from node id → value.
     NodeMap(HashMap<NodeId, AlgorithmParamValue>),
@@ -64,6 +65,7 @@ pub enum StepValue {
     /// Immutable temporal snapshot cached for reuse.
     Snapshot(TemporalSnapshot),
     /// Shared temporal index handle for cross-step reuse.
+    #[allow(clippy::large_enum_variant)]
     TemporalIndex(Arc<TemporalIndex>),
 }
 

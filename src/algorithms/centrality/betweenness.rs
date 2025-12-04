@@ -129,9 +129,9 @@ impl BetweennessCentrality {
         csr: &Csr,
         weight_map: Option<&HashMap<(NodeId, NodeId), f64>>,
         // Pre-allocated arrays (reused between sources)
-        sigma: &mut Vec<f64>,
-        distance: &mut Vec<f64>,
-        predecessors: &mut Vec<Vec<NodeId>>,
+        sigma: &mut [f64],
+        distance: &mut [f64],
+        predecessors: &mut [Vec<NodeId>],
     ) -> Result<Vec<NodeId>> {
         let n = nodes.len();
         let source_idx = indexer

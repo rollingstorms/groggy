@@ -86,6 +86,7 @@ struct LabelState {
     labels: Vec<AttrValue>,
 }
 
+#[allow(dead_code)]
 impl LabelState {
     fn new(nodes: Vec<NodeId>, labels: Vec<AttrValue>) -> Self {
         Self { nodes, labels }
@@ -227,8 +228,8 @@ impl LabelPropagation {
     fn run_iterations(
         &self,
         ctx: &mut Context,
-        subgraph: &Subgraph,
-        indexer: &NodeIndexer,
+        _subgraph: &Subgraph,
+        _indexer: &NodeIndexer,
         csr: &Csr,
         mut state: LabelState,
     ) -> Result<LabelState> {

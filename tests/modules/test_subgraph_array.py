@@ -18,9 +18,10 @@ SubgraphArray (13 methods, ~80% expected pass rate):
 Success Criteria: 90%+ pass rate, proper error handling for invalid inputs
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
@@ -31,12 +32,10 @@ except ImportError:
     gr = None
 
 from tests.conftest import assert_graph_valid, assert_method_callable
-from tests.modules.test_subgraph_base import (
-    SubgraphTestBase,
-    SubgraphArrayBehaviorMixin,
-    SubgraphAttributeTestMixin,
-    SubgraphOperationsTestMixin,
-)
+from tests.modules.test_subgraph_base import (SubgraphArrayBehaviorMixin,
+                                              SubgraphAttributeTestMixin,
+                                              SubgraphOperationsTestMixin,
+                                              SubgraphTestBase)
 
 
 class SubgraphArrayTest(
@@ -70,11 +69,15 @@ class TestSubgraphArray(SubgraphArrayTest):
         # Create via nodes.group_by
         subgraphs = graph.nodes.group_by("cluster")
         assert subgraphs is not None, "nodes.group_by() should return SubgraphArray"
-        assert type(subgraphs).__name__ == 'SubgraphArray', "Should return SubgraphArray type"
+        assert (
+            type(subgraphs).__name__ == "SubgraphArray"
+        ), "Should return SubgraphArray type"
 
         # Create via edges.group_by
         subgraphs_edges = graph.edges.group_by("edge_type")
-        assert subgraphs_edges is not None, "edges.group_by() should return SubgraphArray"
+        assert (
+            subgraphs_edges is not None
+        ), "edges.group_by() should return SubgraphArray"
 
     def test_subgraph_array_length_and_iteration(self):
         """Test SubgraphArray length and iteration"""
@@ -82,19 +85,25 @@ class TestSubgraphArray(SubgraphArrayTest):
 
         # Test length
         length = len(subgraph_array)
-        assert length > 0, "SubgraphArray should have positive length for clustered graph"
+        assert (
+            length > 0
+        ), "SubgraphArray should have positive length for clustered graph"
         assert length == 3, "Should have 3 subgraphs (one per cluster)"
 
         # Test iteration (via iter() method)
-        if hasattr(subgraph_array, 'iter'):
+        if hasattr(subgraph_array, "iter"):
             iterator = subgraph_array.iter()
             items = list(iterator)
-            assert len(items) == length, "Iterator should yield same number of items as length"
+            assert (
+                len(items) == length
+            ), "Iterator should yield same number of items as length"
 
         # Test iteration (via __iter__)
-        elif hasattr(subgraph_array, '__iter__'):
+        elif hasattr(subgraph_array, "__iter__"):
             items = list(subgraph_array)
-            assert len(items) == length, "Iterator should yield same number of items as length"
+            assert (
+                len(items) == length
+            ), "Iterator should yield same number of items as length"
 
     def test_subgraph_array_collection_methods(self):
         """Test SubgraphArray collection methods"""
@@ -105,7 +114,9 @@ class TestSubgraphArray(SubgraphArrayTest):
 
         # Additional specific tests
         subgraph_list = subgraph_array.to_list()
-        assert len(subgraph_list) == len(subgraph_array), "to_list() should preserve length"
+        assert len(subgraph_list) == len(
+            subgraph_array
+        ), "to_list() should preserve length"
 
         collected = subgraph_array.collect()
         assert len(collected) == len(subgraph_array), "collect() should preserve length"
@@ -120,11 +131,15 @@ class TestSubgraphArray(SubgraphArrayTest):
         # Additional specific tests
         nodes_table = subgraph_array.nodes_table()
         assert nodes_table is not None, "nodes_table() should return TableArray"
-        assert type(nodes_table).__name__ == 'TableArray', "Should return TableArray type"
+        assert (
+            type(nodes_table).__name__ == "TableArray"
+        ), "Should return TableArray type"
 
         edges_table = subgraph_array.edges_table()
         assert edges_table is not None, "edges_table() should return TableArray"
-        assert type(edges_table).__name__ == 'TableArray', "Should return TableArray type"
+        assert (
+            type(edges_table).__name__ == "TableArray"
+        ), "Should return TableArray type"
 
         table = subgraph_array.table()
         assert table is not None, "table() should return TableArray"
@@ -139,11 +154,15 @@ class TestSubgraphArray(SubgraphArrayTest):
             pytest.skip("SubgraphArray is empty")
 
         summary = subgraph_array.summary()
-        node_counts = summary.column('node_count').to_list()
-        edge_counts = summary.column('edge_count').to_list()
+        node_counts = summary.column("node_count").to_list()
+        edge_counts = summary.column("edge_count").to_list()
 
         assert node_counts == [4, 4, 4], "Each cluster should contain four nodes"
-        assert edge_counts == [3, 3, 3], "Each cluster should contain three intra-cluster edges"
+        assert edge_counts == [
+            3,
+            3,
+            3,
+        ], "Each cluster should contain three intra-cluster edges"
 
     def test_subgraph_array_extract_node_attribute(self):
         """Extracting node attributes should return ArrayArray keyed by subgraph index."""
@@ -151,12 +170,12 @@ class TestSubgraphArray(SubgraphArrayTest):
         if len(subgraph_array) == 0:
             pytest.skip("SubgraphArray is empty")
 
-        attributes = subgraph_array.extract_node_attribute('value')
+        attributes = subgraph_array.extract_node_attribute("value")
         assert len(attributes) == len(subgraph_array)
 
         keys = attributes.keys()
         if keys is not None:
-            assert keys == [f'subgraph_{i}' for i in range(len(subgraph_array))]
+            assert keys == [f"subgraph_{i}" for i in range(len(subgraph_array))]
 
         value_lists = []
         for idx in range(len(subgraph_array)):
@@ -181,7 +200,7 @@ class TestSubgraphArray(SubgraphArrayTest):
     def test_subgraph_array_group_by_edges_distribution(self):
         """Grouping edges by type should split intra- and inter-cluster edges."""
         graph = self.get_test_graph()
-        edge_groups = graph.edges.group_by('edge_type')
+        edge_groups = graph.edges.group_by("edge_type")
         assert edge_groups is not None
         assert len(edge_groups) >= 2
         edge_types = set()
@@ -190,14 +209,14 @@ class TestSubgraphArray(SubgraphArrayTest):
                 continue
             edges_table = subgraph.edges_table()
             try:
-                edge_type_col = edges_table.column('edge_type')
+                edge_type_col = edges_table.column("edge_type")
             except AttributeError:
                 continue
             if edge_type_col is None:
                 continue
             edge_types.update(edge_type_col.to_list())
-        assert 'intra_cluster' in edge_types
-        assert 'inter_cluster' in edge_types
+        assert "intra_cluster" in edge_types
+        assert "inter_cluster" in edge_types
 
     def test_subgraph_array_sampling_operations(self):
         """Test SubgraphArray sampling"""
@@ -213,7 +232,9 @@ class TestSubgraphArray(SubgraphArrayTest):
         sampled = subgraph_array.sample(sample_size)
         # Note: sample() may return more than requested if implementation differs
         assert sampled is not None, "sample() should return a SubgraphArray"
-        assert type(sampled).__name__ == 'SubgraphArray', "sample() should return SubgraphArray"
+        assert (
+            type(sampled).__name__ == "SubgraphArray"
+        ), "sample() should return SubgraphArray"
 
     def test_subgraph_array_merge_operation(self):
         """Test SubgraphArray merge"""
@@ -225,8 +246,8 @@ class TestSubgraphArray(SubgraphArrayTest):
         # Additional specific tests
         merged_graph = subgraph_array.merge()
         assert merged_graph is not None, "merge() should return a Graph"
-        assert hasattr(merged_graph, 'nodes'), "Merged result should have nodes"
-        assert hasattr(merged_graph, 'edges'), "Merged result should have edges"
+        assert hasattr(merged_graph, "nodes"), "Merged result should have nodes"
+        assert hasattr(merged_graph, "edges"), "Merged result should have edges"
 
         # Merged graph should have nodes from all subgraphs
         assert len(merged_graph.nodes) > 0, "Merged graph should have nodes"
@@ -240,7 +261,7 @@ class TestSubgraphArray(SubgraphArrayTest):
         )
         assert isinstance(meta_nodes, list)
         assert len(meta_nodes) == len(subgraph_array)
-        assert all(hasattr(node, 'id') for node in meta_nodes)
+        assert all(hasattr(node, "id") for node in meta_nodes)
 
     def test_subgraph_array_is_empty_check(self):
         """Test SubgraphArray is_empty"""
@@ -296,8 +317,10 @@ class TestComponentsArray(SubgraphArrayTest):
 
         components = graph.connected_components()
         assert components is not None, "connected_components() should return result"
-        assert type(components).__name__ in ['ComponentsArray', 'SubgraphArray'], \
-            "Should return ComponentsArray or SubgraphArray"
+        assert type(components).__name__ in [
+            "ComponentsArray",
+            "SubgraphArray",
+        ], "Should return ComponentsArray or SubgraphArray"
 
     def test_components_array_neighborhood(self):
         """Test ComponentsArray neighborhood expansion"""
@@ -307,11 +330,14 @@ class TestComponentsArray(SubgraphArrayTest):
             pytest.skip("No components to test neighborhood")
 
         # Test neighborhood - should work
-        if hasattr(components, 'neighborhood'):
+        if hasattr(components, "neighborhood"):
             neighborhood = components.neighborhood()
-            assert neighborhood is not None, "neighborhood() should return SubgraphArray"
-            assert type(neighborhood).__name__ == 'SubgraphArray', \
-                "neighborhood() should return SubgraphArray"
+            assert (
+                neighborhood is not None
+            ), "neighborhood() should return SubgraphArray"
+            assert (
+                type(neighborhood).__name__ == "SubgraphArray"
+            ), "neighborhood() should return SubgraphArray"
 
             # Note: depth parameter may not be supported as keyword argument
             # Try with positional argument if available
@@ -332,7 +358,9 @@ class TestComponentsArray(SubgraphArrayTest):
         sample_size = min(2, len(components))
         sampled = components.sample(sample_size)
         assert sampled is not None, "sample() should return SubgraphArray"
-        assert type(sampled).__name__ == 'SubgraphArray', "sample() should return SubgraphArray"
+        assert (
+            type(sampled).__name__ == "SubgraphArray"
+        ), "sample() should return SubgraphArray"
 
     def test_components_array_collapse(self):
         """Ensure batch collapse works for connected components."""
@@ -347,7 +375,7 @@ class TestComponentsArray(SubgraphArrayTest):
         )
 
         assert len(meta_nodes) == len(components)
-        assert all(hasattr(node, 'id') for node in meta_nodes)
+        assert all(hasattr(node, "id") for node in meta_nodes)
 
 
 @pytest.mark.subgraph_array
@@ -368,13 +396,13 @@ class TestSubgraphArrayIntegration:
                 node_id = graph.add_node(
                     label=f"C{cluster_id}N{i}",
                     cluster=cluster_id,
-                    value=cluster_id * 10 + i
+                    value=cluster_id * 10 + i,
                 )
 
         # Chain: group_by -> sample -> merge
         result = graph.nodes.group_by("cluster").sample(2).merge()
         assert result is not None, "Chained operations should succeed"
-        assert hasattr(result, 'nodes'), "Final result should be a Graph"
+        assert hasattr(result, "nodes"), "Final result should be a Graph"
 
     def test_subgraph_to_table_conversion(self):
         """Test converting SubgraphArray to table representations"""
@@ -408,12 +436,12 @@ class TestSubgraphArrayIntegration:
         # Chain: connected_components -> sample
         # Note: neighborhood() not available on SubgraphArray, only on ComponentsArray
         components = graph.connected_components()
-        if len(components) > 0 and hasattr(components, 'sample'):
+        if len(components) > 0 and hasattr(components, "sample"):
             sampled = components.sample(min(2, len(components)))
             assert sampled is not None, "Sampled components should succeed"
 
             # If sampled result still has neighborhood, test that too
-            if hasattr(sampled, 'neighborhood'):
+            if hasattr(sampled, "neighborhood"):
                 result = sampled.neighborhood()
                 assert result is not None, "Chained component operations should succeed"
 

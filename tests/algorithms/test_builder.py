@@ -1,7 +1,8 @@
 """Tests for the Builder DSL and custom step execution."""
 
 import pytest
-from groggy import Graph, builder, AlgorithmBuilder, VarHandle, apply
+
+from groggy import AlgorithmBuilder, Graph, VarHandle, apply, builder
 
 
 def test_builder_creation():
@@ -23,7 +24,7 @@ def test_init_nodes_step():
     """Test init_nodes step."""
     b = builder("test")
     nodes = b.init_nodes(default=1.0)
-    
+
     assert isinstance(nodes, VarHandle)
     assert len(b.steps) == 1
     assert b.steps[0]["type"] == "init_nodes"
@@ -35,7 +36,7 @@ def test_node_degrees_step():
     b = builder("test")
     nodes = b.init_nodes()
     degrees = b.node_degrees(nodes)
-    
+
     assert isinstance(degrees, VarHandle)
     assert len(b.steps) == 2
     assert b.steps[1]["type"] == "node_degree"
@@ -46,7 +47,7 @@ def test_normalize_step():
     b = builder("test")
     values = b.init_nodes()
     normalized = b.normalize(values, method="sum")
-    
+
     assert isinstance(normalized, VarHandle)
     assert len(b.steps) == 2
     assert b.steps[1]["type"] == "normalize"
@@ -58,7 +59,7 @@ def test_attach_as_step():
     b = builder("test")
     values = b.init_nodes()
     b.attach_as("my_attr", values)
-    
+
     assert len(b.steps) == 2
     assert b.steps[1]["type"] == "attach_attr"
     assert b.steps[1]["attr_name"] == "my_attr"
@@ -67,13 +68,13 @@ def test_attach_as_step():
 def test_multi_step_composition():
     """Test composing multiple steps."""
     b = builder("degree_centrality")
-    
+
     # Build a simple degree centrality algorithm
     nodes = b.init_nodes(default=0.0)
     degrees = b.node_degrees(nodes)
     normalized = b.normalize(degrees)
     b.attach_as("degree_centrality", normalized)
-    
+
     assert len(b.steps) == 4
     assert b.steps[0]["type"] == "init_nodes"
     assert b.steps[1]["type"] == "node_degree"
@@ -86,10 +87,10 @@ def test_build_returns_algorithm():
     b = builder("test")
     nodes = b.init_nodes()
     b.attach_as("value", nodes)
-    
+
     algo = b.build()
     assert algo is not None
-    assert hasattr(algo, 'id')
+    assert hasattr(algo, "id")
     assert "custom.test" in algo.id
 
 
@@ -99,7 +100,7 @@ def test_built_algorithm_properties():
     nodes = b.init_nodes()
     b.attach_as("value", nodes)
     algo = b.build()
-    
+
     assert algo.id == "custom.my_algo"
     assert "my_algo" in str(algo)
     assert "2 steps" in str(algo)
@@ -141,7 +142,7 @@ def test_variable_tracking():
     v1 = b.init_nodes()
     v2 = b.init_nodes()
     v3 = b.node_degrees(v1)
-    
+
     # Should have 3 variables
     assert len(b.variables) == 3
     assert v1.name in b.variables
@@ -152,13 +153,13 @@ def test_variable_tracking():
 def test_builder_fluent_interface():
     """Test that builder methods can be chained conceptually."""
     b = builder("test")
-    
+
     # While not strictly fluent, should be able to use results
     v1 = b.init_nodes()
     v2 = b.node_degrees(v1)
     v3 = b.normalize(v2)
     b.attach_as("result", v3)
-    
+
     # Should have a complete sequence
     assert len(b.steps) == 4
 
@@ -169,7 +170,7 @@ def test_different_normalization_methods():
         b = builder(f"norm_{method}")
         values = b.init_nodes()
         normalized = b.normalize(values, method=method)
-        
+
         assert b.steps[-1]["method"] == method
 
 
@@ -178,10 +179,10 @@ def test_multiple_attachments():
     b = builder("multi_attr")
     v1 = b.init_nodes()
     v2 = b.node_degrees(v1)
-    
+
     b.attach_as("attr1", v1)
     b.attach_as("attr2", v2)
-    
+
     attach_steps = [s for s in b.steps if s["type"] == "attach_attr"]
     assert len(attach_steps) == 2
     assert attach_steps[0]["attr_name"] == "attr1"
@@ -192,11 +193,11 @@ def test_builder_independence():
     """Test that builders are independent."""
     b1 = builder("algo1")
     b2 = builder("algo2")
-    
+
     b1.init_nodes()
     b2.init_nodes()
     b2.init_nodes()
-    
+
     # Each builder should have its own steps
     assert len(b1.steps) == 1
     assert len(b2.steps) == 2
@@ -206,33 +207,34 @@ def test_builder_independence():
 # Documentation/Example Tests
 # ==============================================================================
 
+
 def test_builder_example_degree_centrality():
     """
     Example: Build a simple degree centrality algorithm.
-    
+
     This demonstrates the intended usage pattern.
     """
     b = builder("degree_centrality")
-    
+
     # Initialize node values
     nodes = b.init_nodes(default=0.0)
-    
+
     # Compute degrees
     degrees = b.node_degrees(nodes)
-    
+
     # Normalize to [0, 1]
     normalized = b.normalize(degrees, method="max")
-    
+
     # Attach as attribute
     b.attach_as("degree_score", normalized)
-    
+
     # Build the algorithm
     algo = b.build()
-    
+
     # Verify structure
     assert len(b.steps) == 4
     assert algo.id == "custom.degree_centrality"
-    
+
     print("\n✓ Built custom degree centrality algorithm")
     print(f"  Steps: {len(b.steps)}")
     print(f"  ID: {algo.id}")
@@ -241,19 +243,19 @@ def test_builder_example_degree_centrality():
 def test_builder_example_with_documentation():
     """Example mirroring documentation narrative for custom builders."""
     b = builder("my_centrality")
-    
+
     # Step 1: Initialize
     nodes = b.init_nodes(default=0.0)
-    
+
     # Step 2: Compute something interesting
     degrees = b.node_degrees(nodes)
-    
+
     # Step 3: Normalize
     scores = b.normalize(degrees)
-    
+
     # Step 4: Output
     b.attach_as("centrality_score", scores)
-    
+
     # Build
     algo = b.build()
     assert algo is not None

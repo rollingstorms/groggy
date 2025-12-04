@@ -210,7 +210,7 @@ where
         result.insert(key, computed);
     }
 
-    for key in right.keys().copied() {
+    for &key in right.keys() {
         if !left.contains_key(&key) {
             bail!(
                 "variable '{}' contains entry for id {:?} missing in '{}'",
@@ -510,6 +510,7 @@ pub enum CompareOp {
 }
 
 impl CompareOp {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
         match s {
             "eq" => Ok(CompareOp::Eq),
@@ -679,7 +680,7 @@ where
         result.insert(key, AlgorithmParamValue::Float(mask_value));
     }
 
-    for key in right.keys().copied() {
+    for &key in right.keys() {
         if !left.contains_key(&key) {
             bail!(
                 "variable '{}' contains entry for id {:?} missing in '{}'",
@@ -819,8 +820,8 @@ fn where_node_map(
     if_true: Operand<'_>,
     if_false: Operand<'_>,
     cond_name: &str,
-    true_name: &str,
-    false_name: &str,
+    _true_name: &str,
+    _false_name: &str,
 ) -> Result<HashMap<NodeId, AlgorithmParamValue>> {
     if condition.is_empty() {
         return Ok(HashMap::new());
@@ -871,8 +872,8 @@ fn where_edge_map(
     if_true: Operand<'_>,
     if_false: Operand<'_>,
     cond_name: &str,
-    true_name: &str,
-    false_name: &str,
+    _true_name: &str,
+    _false_name: &str,
 ) -> Result<HashMap<EdgeId, AlgorithmParamValue>> {
     if condition.is_empty() {
         return Ok(HashMap::new());
@@ -928,6 +929,7 @@ pub enum ReductionOp {
 }
 
 impl ReductionOp {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
         match s {
             "sum" => Ok(ReductionOp::Sum),

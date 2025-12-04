@@ -5,14 +5,12 @@ These tests verify that the documented examples work correctly.
 """
 
 import pytest
-from groggy.examples import (
-    example_single_algorithm,
-    example_multi_algorithm_pipeline,
-    example_algorithm_discovery,
-    example_parameter_customization,
-    example_error_handling,
-    example_algorithm_reuse,
-)
+
+from groggy.examples import (example_algorithm_discovery,
+                             example_algorithm_reuse, example_error_handling,
+                             example_multi_algorithm_pipeline,
+                             example_parameter_customization,
+                             example_single_algorithm)
 
 
 def test_example_single_algorithm():

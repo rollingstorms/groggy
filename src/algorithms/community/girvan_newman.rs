@@ -145,10 +145,10 @@ impl GirvanNewman {
         active_edges: &HashSet<(usize, usize)>,
         weight_map: Option<&HashMap<(NodeId, NodeId), f64>>,
         // Pre-allocated buffers (reused across iterations)
-        distance: &mut Vec<f64>,
-        sigma: &mut Vec<f64>,
-        predecessors: &mut Vec<Vec<usize>>,
-        delta: &mut Vec<f64>,
+        distance: &mut [f64],
+        sigma: &mut [f64],
+        predecessors: &mut [Vec<usize>],
+        delta: &mut [f64],
         queue: &mut VecDeque<usize>,
         stack: &mut Vec<usize>,
     ) -> HashMap<(usize, usize), f64> {
@@ -194,10 +194,10 @@ impl GirvanNewman {
         csr: &Csr,
         nodes: &[NodeId],
         active_edges: &HashSet<(usize, usize)>,
-        distance: &mut Vec<f64>,
-        sigma: &mut Vec<f64>,
-        predecessors: &mut Vec<Vec<usize>>,
-        delta: &mut Vec<f64>,
+        distance: &mut [f64],
+        sigma: &mut [f64],
+        predecessors: &mut [Vec<usize>],
+        delta: &mut [f64],
         queue: &mut VecDeque<usize>,
         stack: &mut Vec<usize>,
         edge_betweenness: &mut HashMap<(usize, usize), f64>,
@@ -266,10 +266,10 @@ impl GirvanNewman {
         nodes: &[NodeId],
         active_edges: &HashSet<(usize, usize)>,
         weight_map: &HashMap<(NodeId, NodeId), f64>,
-        distance: &mut Vec<f64>,
-        sigma: &mut Vec<f64>,
-        predecessors: &mut Vec<Vec<usize>>,
-        delta: &mut Vec<f64>,
+        distance: &mut [f64],
+        sigma: &mut [f64],
+        predecessors: &mut [Vec<usize>],
+        delta: &mut [f64],
         stack: &mut Vec<usize>,
         edge_betweenness: &mut HashMap<(usize, usize), f64>,
     ) {
@@ -299,7 +299,7 @@ impl GirvanNewman {
 
         impl Ord for State {
             fn cmp(&self, other: &Self) -> Ordering {
-                self.partial_cmp(other).unwrap_or(Ordering::Equal)
+                other.dist.partial_cmp(&self.dist).unwrap_or(Ordering::Equal)
             }
         }
 
@@ -385,11 +385,18 @@ impl GirvanNewman {
         let mut parent: Vec<usize> = (0..n).collect();
         let mut rank: Vec<usize> = vec![0; n];
 
-        fn find(parent: &mut [usize], node: usize) -> usize {
-            if parent[node] != node {
-                parent[node] = find(parent, parent[node]);
+        fn find(parent: &mut [usize], mut node: usize) -> usize {
+            let mut root = node;
+            while parent[root] != root {
+                root = parent[root];
             }
-            parent[node]
+            // Path compression
+            while parent[node] != root {
+                let next = parent[node];
+                parent[node] = root;
+                node = next;
+            }
+            root
         }
 
         fn union(parent: &mut [usize], rank: &mut [usize], u: usize, v: usize) {
@@ -565,7 +572,7 @@ impl GirvanNewman {
             }
 
             ctx.record_stat(
-                &format!("girvan_newman.iteration_{}.modularity", iteration),
+                format!("girvan_newman.iteration_{}.modularity", iteration),
                 modularity,
             );
 
@@ -597,7 +604,7 @@ impl GirvanNewman {
                 &mut stack,
             );
             ctx.record_call(
-                &format!("girvan_newman.iteration_{}.compute_betweenness", iteration),
+                format!("girvan_newman.iteration_{}.compute_betweenness", iteration),
                 betweenness_start.elapsed(),
             );
 
@@ -632,7 +639,7 @@ impl GirvanNewman {
             }
 
             ctx.record_call(
-                &format!("girvan_newman.iteration_{}.total", iteration),
+                format!("girvan_newman.iteration_{}.total", iteration),
                 iter_start.elapsed(),
             );
         }

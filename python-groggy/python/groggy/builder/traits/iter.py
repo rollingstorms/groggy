@@ -13,26 +13,26 @@ if TYPE_CHECKING:
 
 class IterOps:
     """Control flow and iteration constructs."""
-    
-    def __init__(self, builder: 'AlgorithmBuilder'):
+
+    def __init__(self, builder: "AlgorithmBuilder"):
         """
         Initialize iteration operations.
-        
+
         Args:
             builder: Parent algorithm builder
         """
         self.builder = builder
-    
+
     def loop(self, count: int):
         """
         Fixed iteration loop.
-        
+
         Args:
             count: Number of iterations
-            
+
         Returns:
             Context manager for loop body
-            
+
         Example:
             >>> with builder.iter.loop(100):
             ...     neighbor_sum = G @ ranks
@@ -40,21 +40,18 @@ class IterOps:
         """
         # Delegate to builder.iterate for now (backward compatibility)
         return self.builder.iterate(count)
-    
+
     def until_converged(
-        self, 
-        watched: 'VarHandle',
-        tol: float = 1e-6,
-        max_iter: int = 1000
+        self, watched: "VarHandle", tol: float = 1e-6, max_iter: int = 1000
     ):
         """
         Loop until convergence (future feature).
-        
+
         Args:
             watched: Variable to watch for convergence
             tol: Convergence tolerance
             max_iter: Maximum iterations
-            
+
         Example:
             >>> with builder.iter.until_converged(ranks, tol=1e-6):
             ...     ranks = update_ranks(ranks)
@@ -62,19 +59,20 @@ class IterOps:
         # Placeholder for future IR-based convergence detection
         # For now, fall back to fixed iteration
         import warnings
+
         warnings.warn(
             "until_converged() not yet implemented, falling back to fixed iteration",
-            FutureWarning
+            FutureWarning,
         )
         return self.builder.iterate(max_iter)
-    
+
     def strategy(self, mode: str = "sync"):
         """
         Set update strategy (future feature).
-        
+
         Args:
             mode: 'sync' (batch updates) or 'async' (immediate updates)
-            
+
         Note: Currently only 'sync' is implemented for most operations.
               Use graph.neighbor_mode_update() for async LPA-style updates.
         """

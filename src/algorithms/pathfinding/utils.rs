@@ -267,7 +267,7 @@ pub fn collect_edge_weights(
 /// Number of reachable nodes (including source)
 pub fn bfs_layers_csr(
     csr: &Csr,
-    nodes: &[NodeId],
+    _nodes: &[NodeId],
     source_idx: usize,
     distances: &mut Vec<usize>,
     queue: &mut VecDeque<usize>,
@@ -341,6 +341,7 @@ impl PartialOrd for DijkstraState {
 ///
 /// # Returns
 /// Number of reachable nodes (including source)
+#[allow(private_interfaces)]
 pub fn dijkstra_csr(
     csr: &Csr,
     nodes: &[NodeId],
@@ -629,7 +630,7 @@ mod tests {
         let result = bfs_layers(&subgraph, source);
 
         // Verify we got results
-        assert!(result.len() > 0);
+        assert!(!result.is_empty());
         assert_eq!(result.get(&source), Some(&0));
     }
 }

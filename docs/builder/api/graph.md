@@ -660,4 +660,4 @@ def structural_similarity(sG):
 - [VarHandle API](varhandle.md) - Matrix notation (sG @ values)
 - [CoreOps API](core.md) - Value operations
 - [IterOps API](iter.md) - Control flow for iterative algorithms
-- [PageRank Tutorial](../tutorials/pagerank.md) - Neighbor aggregation in practice
+- [PageRank Tutorial](../tutorials/02_pagerank.md) - Neighbor aggregation in practice

@@ -140,7 +140,7 @@ impl ExecutionBlockStep {
             .options
             .direction
             .as_deref()
-            .and_then(|d| NeighborDirection::from_str(d))
+            .and_then(NeighborDirection::from_str)
             .unwrap_or(NeighborDirection::In);
 
         // Message-pass: iterate through nodes in order (Gauss-Seidel)
@@ -442,7 +442,7 @@ impl ExecutionBlockStep {
                     )?
                 };
 
-                let if_false_value = if let Some(val) = local_values.get(if_false_name) {
+                let _if_false_value = if let Some(val) = local_values.get(if_false_name) {
                     val.clone()
                 } else {
                     self.resolve_node_value(
@@ -564,10 +564,10 @@ fn apply_arithmetic(
             Ok(AlgorithmParamValue::Float(result))
         }
         // Promote int to float if mixed
-        (AlgorithmParamValue::Int(l), AlgorithmParamValue::Float(r)) => {
+        (AlgorithmParamValue::Int(l), AlgorithmParamValue::Float(_r)) => {
             apply_arithmetic(op, &AlgorithmParamValue::Float(*l as f64), right)
         }
-        (AlgorithmParamValue::Float(l), AlgorithmParamValue::Int(r)) => {
+        (AlgorithmParamValue::Float(_l), AlgorithmParamValue::Int(r)) => {
             apply_arithmetic(op, left, &AlgorithmParamValue::Float(*r as f64))
         }
         _ => Err(anyhow!(

@@ -19,6 +19,48 @@ At groggy, we believe structure is computation.
 pip install groggy
 ```
 
+## Features
+
+### High-Performance Algorithms
+11 Rust-native algorithms, exposed via Python:
+- Centrality: PageRank, Betweenness, Closeness
+- Community: LPA, Louvain, Leiden, Connected Components
+- Pathfinding: BFS, DFS, Dijkstra, A*
+
+```python
+from groggy.algorithms.centrality import pagerank
+
+result = graph.view().apply(pagerank(damping=0.85))
+scores = result.nodes["pagerank"]
+```
+
+### Builder DSL — Custom Algorithms with Batch Executor
+Compose algorithms in Python; iterative loops get 10-100x speedup via the Batch Executor.
+
+```python
+import groggy as gr
+
+b = gr.builder("my_algorithm")
+values = b.init_nodes(default=1.0)
+
+with b.iterate(20):  # batched when compatible
+    neighbor_sum = b.map_nodes(
+        "sum(values[neighbors(node)])",
+        inputs={"values": values},
+    )
+    values = b.core.add(b.core.mul(neighbor_sum, 0.85), 0.15)
+
+b.attach_as("result", values)
+algo = b.build()
+result = graph.view().apply(algo)
+```
+
+### Documentation
+- Algorithms Guide: https://rollingstorms.github.io/groggy/guide/algorithms/
+- Builder DSL: https://rollingstorms.github.io/groggy/guide/builder/
+- Tutorials: https://rollingstorms.github.io/groggy/builder/tutorials/
+- API Reference: https://rollingstorms.github.io/groggy/api/
+
 ### Example Python Usage
 
 ```python

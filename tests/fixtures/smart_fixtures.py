@@ -13,8 +13,8 @@ Key Features:
 
 import inspect
 import random
-from typing import Any, Dict, List, Tuple, Type, Optional, Union
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 try:
     import groggy as gr
@@ -26,6 +26,7 @@ except ImportError:
 @dataclass
 class TestCase:
     """Represents a single test case with arguments and expected behavior"""
+
     args: Tuple[Any, ...]
     kwargs: Dict[str, Any]
     description: str
@@ -41,7 +42,7 @@ class FixtureFactory:
     appropriate test values for nodes, edges, attributes, and other types.
     """
 
-    def __init__(self, graph: Optional['gr.Graph'] = None):
+    def __init__(self, graph: Optional["gr.Graph"] = None):
         """Initialize with an optional graph for context"""
         self.graph = graph or (gr.Graph() if gr else None)
         self.node_ids = []
@@ -63,20 +64,32 @@ class FixtureFactory:
             self.graph.add_node(label="Alice", age=29, active=True),
             self.graph.add_node(label="Bob", age=35, active=False),
             self.graph.add_node(label="Carol", age=31, department="Engineering"),
-            self.graph.add_node()  # Node with no attributes
+            self.graph.add_node(),  # Node with no attributes
         ]
 
         # Create test edges
         if len(self.node_ids) >= 2:
             self.edge_ids = [
-                self.graph.add_edge(self.node_ids[0], self.node_ids[1], weight=1.0, relationship="friend"),
-                self.graph.add_edge(self.node_ids[1], self.node_ids[2], weight=0.5, relationship="colleague"),
+                self.graph.add_edge(
+                    self.node_ids[0],
+                    self.node_ids[1],
+                    weight=1.0,
+                    relationship="friend",
+                ),
+                self.graph.add_edge(
+                    self.node_ids[1],
+                    self.node_ids[2],
+                    weight=0.5,
+                    relationship="colleague",
+                ),
             ]
 
         # Create a branch for testing
         self.state_ids.append(self.graph.commit("Initial test state", "FixtureFactory"))
 
-    def get_fixture_for_param(self, param_name: str, param_type: Type, method_name: str = "") -> Any:
+    def get_fixture_for_param(
+        self, param_name: str, param_type: Type, method_name: str = ""
+    ) -> Any:
         """
         Return a valid test value for a parameter based on its name and type.
 
@@ -90,49 +103,59 @@ class FixtureFactory:
         """
 
         # Node ID parameters
-        if param_name in ['node_id', 'node', 'source', 'target', 'start_node', 'end_node']:
+        if param_name in [
+            "node_id",
+            "node",
+            "source",
+            "target",
+            "start_node",
+            "end_node",
+        ]:
             return self.node_ids[0] if self.node_ids else 1
 
         # Edge ID parameters
-        if param_name in ['edge_id', 'edge']:
+        if param_name in ["edge_id", "edge"]:
             return self.edge_ids[0] if self.edge_ids else 1
 
         # Multiple node/edge parameters
-        if param_name in ['node_ids', 'nodes']:
+        if param_name in ["node_ids", "nodes"]:
             return self.node_ids[:2] if len(self.node_ids) >= 2 else [1, 2]
-        if param_name in ['edge_ids', 'edges']:
+        if param_name in ["edge_ids", "edges"]:
             return self.edge_ids[:1] if self.edge_ids else [1]
 
         # Attribute parameters - use simple values that don't cause FFI issues
-        if param_name in ['attrs', 'attributes', 'attrs_dict']:
+        if param_name in ["attrs", "attributes", "attrs_dict"]:
             return {"test_attr": "simple_string", "count": 42}
-        if param_name in ['attr_name', 'attribute_name']:
+        if param_name in ["attr_name", "attribute_name"]:
             return "test_attr"
-        if param_name in ['attr_value', 'value']:
+        if param_name in ["attr_value", "value"]:
             return "test_value"
 
         # Branch and state parameters
-        if param_name in ['branch_name', 'branch']:
+        if param_name in ["branch_name", "branch"]:
             return "test_branch"
-        if param_name in ['state_id', 'commit_id']:
+        if param_name in ["state_id", "commit_id"]:
             return self.state_ids[0] if self.state_ids else 1
 
         # Commit requires both message and author
-        if param_name == 'message' and method_name == 'commit':
+        if param_name == "message" and method_name == "commit":
             return "Test commit message"
-        if param_name == 'author' and method_name == 'commit':
+        if param_name == "author" and method_name == "commit":
             return "Test Author"
 
         # Query and filter parameters
-        if param_name in ['query', 'node_query', 'edge_query']:
+        if param_name in ["query", "node_query", "edge_query"]:
             return "age > 0"  # Use actual attributes, not computed values like degree
-        if param_name in ['node_filter', 'edge_filter']:
-            if 'node' in param_name:
+        if param_name in ["node_filter", "edge_filter"]:
+            if "node" in param_name:
                 # Create a proper NodeFilter object
                 try:
                     import groggy as gr
+
                     if gr:
-                        return gr.NodeFilter.attribute_filter('age', gr.AttributeFilter.greater_than(0))
+                        return gr.NodeFilter.attribute_filter(
+                            "age", gr.AttributeFilter.greater_than(0)
+                        )
                 except:
                     pass
                 return "age > 0"  # Fallback to string
@@ -140,48 +163,51 @@ class FixtureFactory:
                 # Create a proper EdgeFilter object
                 try:
                     import groggy as gr
+
                     if gr:
-                        return gr.EdgeFilter.attribute_filter('strength', gr.AttributeFilter.greater_than(0.5))
+                        return gr.EdgeFilter.attribute_filter(
+                            "strength", gr.AttributeFilter.greater_than(0.5)
+                        )
                 except:
                     pass
                 return "strength > 0.5"  # Fallback to string
-        if param_name in ['filter_string', 'filter_query']:
+        if param_name in ["filter_string", "filter_query"]:
             return "age > 0"
-        if param_name in ['depth', 'max_depth']:
+        if param_name in ["depth", "max_depth"]:
             return 2
-        if param_name in ['limit', 'max_results']:
+        if param_name in ["limit", "max_results"]:
             return 10
 
         # File and data parameters
-        if param_name in ['path', 'file_path', 'filename']:
+        if param_name in ["path", "file_path", "filename"]:
             return "/tmp/test_graph.json"
-        if param_name in ['data', 'graph_data']:
+        if param_name in ["data", "graph_data"]:
             return {"nodes": [], "edges": []}
 
         # Collection parameters for bulk operations
-        if param_name in ['edges_data', 'edges_list']:
+        if param_name in ["edges_data", "edges_list"]:
             if self.node_ids and len(self.node_ids) >= 2:
                 return [(self.node_ids[0], self.node_ids[1])]
             return [(1, 2)]
-        if param_name in ['nodes_data', 'nodes_list']:
+        if param_name in ["nodes_data", "nodes_list"]:
             return [{"label": "test_node"}]
 
         # Boolean parameters
-        if param_name in ['inplace', 'in_place']:
+        if param_name in ["inplace", "in_place"]:
             return False  # Safer default for testing
-        if param_name in ['directed', 'is_directed']:
+        if param_name in ["directed", "is_directed"]:
             return True
 
         # Generic string parameters
-        if param_name in ['label', 'name', 'key']:
+        if param_name in ["label", "name", "key"]:
             return "test_label"
-        if param_name in ['message', 'description']:
+        if param_name in ["message", "description"]:
             return "test message"
 
         # Numeric parameters
-        if param_name in ['weight', 'value', 'threshold']:
+        if param_name in ["weight", "value", "threshold"]:
             return 1.0
-        if param_name in ['count', 'num', 'size']:
+        if param_name in ["count", "num", "size"]:
             return 5
 
         # Type-based defaults when parameter name doesn't give us a hint
@@ -202,7 +228,9 @@ class FixtureFactory:
         # Fallback
         return None
 
-    def generate_test_cases(self, obj: Any, method_name: str, num_cases: int = 3) -> List[TestCase]:
+    def generate_test_cases(
+        self, obj: Any, method_name: str, num_cases: int = 3
+    ) -> List[TestCase]:
         """
         Generate multiple test cases for a method.
 
@@ -220,42 +248,54 @@ class FixtureFactory:
             sig = inspect.signature(method)
         except (ValueError, TypeError):
             # Method doesn't have inspectable signature
-            return [TestCase(args=(), kwargs={}, description=f"Basic call to {method_name}")]
+            return [
+                TestCase(args=(), kwargs={}, description=f"Basic call to {method_name}")
+            ]
 
         test_cases = []
 
         # Generate basic valid case
         args, kwargs = self._generate_args_kwargs(sig, method_name)
-        test_cases.append(TestCase(
-            args=args,
-            kwargs=kwargs,
-            description=f"Basic valid call to {method_name}",
-            should_succeed=True
-        ))
+        test_cases.append(
+            TestCase(
+                args=args,
+                kwargs=kwargs,
+                description=f"Basic valid call to {method_name}",
+                should_succeed=True,
+            )
+        )
 
         # Generate edge case variations if we have more cases to generate
         for i in range(1, num_cases):
             args, kwargs = self._generate_args_kwargs(sig, method_name, variation=i)
-            test_cases.append(TestCase(
-                args=args,
-                kwargs=kwargs,
-                description=f"Variation {i} call to {method_name}",
-                should_succeed=True
-            ))
+            test_cases.append(
+                TestCase(
+                    args=args,
+                    kwargs=kwargs,
+                    description=f"Variation {i} call to {method_name}",
+                    should_succeed=True,
+                )
+            )
 
         return test_cases
 
-    def _generate_args_kwargs(self, sig: inspect.Signature, method_name: str, variation: int = 0) -> Tuple[Tuple, Dict]:
+    def _generate_args_kwargs(
+        self, sig: inspect.Signature, method_name: str, variation: int = 0
+    ) -> Tuple[Tuple, Dict]:
         """Generate args and kwargs for a method signature"""
         args = []
         kwargs = {}
 
         for param_name, param in sig.parameters.items():
-            if param_name == 'self':
+            if param_name == "self":
                 continue
 
             # Get the parameter type
-            param_type = param.annotation if param.annotation != inspect.Parameter.empty else None
+            param_type = (
+                param.annotation
+                if param.annotation != inspect.Parameter.empty
+                else None
+            )
 
             # Generate value
             value = self.get_fixture_for_param(param_name, param_type, method_name)
@@ -267,7 +307,10 @@ class FixtureFactory:
             # Decide whether to use as positional or keyword argument
             if param.default == inspect.Parameter.empty:
                 # Required parameter
-                if param.kind in [inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD]:
+                if param.kind in [
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                ]:
                     args.append(value)
                 else:
                     kwargs[param_name] = value
@@ -316,12 +359,12 @@ class GraphFixtures:
     """
 
     @staticmethod
-    def empty_graph() -> 'gr.Graph':
+    def empty_graph() -> "gr.Graph":
         """Create an empty graph"""
         return gr.Graph() if gr else None
 
     @staticmethod
-    def single_node_graph() -> 'gr.Graph':
+    def single_node_graph() -> "gr.Graph":
         """Create a graph with a single node"""
         if not gr:
             return None
@@ -330,7 +373,7 @@ class GraphFixtures:
         return g
 
     @staticmethod
-    def simple_path_graph(length: int = 3) -> 'gr.Graph':
+    def simple_path_graph(length: int = 3) -> "gr.Graph":
         """Create a simple path graph: 1-2-3-...-n"""
         if not gr:
             return None
@@ -341,7 +384,7 @@ class GraphFixtures:
         return g
 
     @staticmethod
-    def simple_cycle_graph(length: int = 4) -> 'gr.Graph':
+    def simple_cycle_graph(length: int = 4) -> "gr.Graph":
         """Create a simple cycle graph"""
         if not gr:
             return None
@@ -352,19 +395,21 @@ class GraphFixtures:
         return g
 
     @staticmethod
-    def star_graph(center_degree: int = 5) -> 'gr.Graph':
+    def star_graph(center_degree: int = 5) -> "gr.Graph":
         """Create a star graph with center connected to all other nodes"""
         if not gr:
             return None
         g = gr.Graph()
         center = g.add_node(label="Center", type="hub")
-        leaves = [g.add_node(label=f"Leaf{i}", type="leaf") for i in range(center_degree)]
+        leaves = [
+            g.add_node(label=f"Leaf{i}", type="leaf") for i in range(center_degree)
+        ]
         for leaf in leaves:
             g.add_edge(center, leaf, relationship="spoke")
         return g
 
     @staticmethod
-    def complete_graph(n: int = 4) -> 'gr.Graph':
+    def complete_graph(n: int = 4) -> "gr.Graph":
         """Create a complete graph where every node connects to every other node"""
         if not gr:
             return None
@@ -376,7 +421,7 @@ class GraphFixtures:
         return g
 
     @staticmethod
-    def multi_component_graph() -> 'gr.Graph':
+    def multi_component_graph() -> "gr.Graph":
         """Create a graph with multiple disconnected components"""
         if not gr:
             return None
@@ -401,31 +446,16 @@ class GraphFixtures:
         return g
 
     @staticmethod
-    def attributed_graph() -> 'gr.Graph':
+    def attributed_graph() -> "gr.Graph":
         """Create a graph with diverse attribute types for testing attribute operations"""
         if not gr:
             return None
         g = gr.Graph()
 
         # Nodes with simpler attribute types to avoid FFI issues
-        n1 = g.add_node(
-            label="Alice",
-            age=29,
-            salary=75000.50,
-            active=True
-        )
-        n2 = g.add_node(
-            label="Bob",
-            age=35,
-            salary=85000.75,
-            active=False
-        )
-        n3 = g.add_node(
-            label="Carol",
-            age=31,
-            salary=65000.25,
-            active=True
-        )
+        n1 = g.add_node(label="Alice", age=29, salary=75000.50, active=True)
+        n2 = g.add_node(label="Bob", age=35, salary=85000.75, active=False)
+        n3 = g.add_node(label="Carol", age=31, salary=65000.25, active=True)
 
         # Edges with simple attributes
         g.add_edge(n1, n2, relationship="colleague", strength=0.8, years_known=3)
@@ -435,7 +465,7 @@ class GraphFixtures:
         return g
 
     @staticmethod
-    def large_graph(num_nodes: int = 100, edge_probability: float = 0.1) -> 'gr.Graph':
+    def large_graph(num_nodes: int = 100, edge_probability: float = 0.1) -> "gr.Graph":
         """Create a larger random graph for performance testing"""
         if not gr:
             return None
@@ -447,7 +477,7 @@ class GraphFixtures:
             node = g.add_node(
                 label=f"Node{i}",
                 value=random.randint(1, 100),
-                category=random.choice(["A", "B", "C"])
+                category=random.choice(["A", "B", "C"]),
             )
             nodes.append(node)
 

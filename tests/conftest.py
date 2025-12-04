@@ -5,17 +5,18 @@ Provides shared fixtures, configuration, and test utilities across all modules.
 Part of the Milestone-based testing strategy.
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add groggy to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
 
 try:
     import groggy as gr
-    from tests.fixtures.smart_fixtures import FixtureFactory, GraphFixtures
     from tests.fixtures.graph_samples import load_test_graph
+    from tests.fixtures.smart_fixtures import FixtureFactory, GraphFixtures
 except ImportError as e:
     print(f"Warning: Could not import groggy or fixtures: {e}")
     gr = None
@@ -85,9 +86,9 @@ def graph_with_factory():
     return graph, factory
 
 
-@pytest.fixture(params=[
-    "empty", "path", "cycle", "star", "complete", "karate", "social"
-])
+@pytest.fixture(
+    params=["empty", "path", "cycle", "star", "complete", "karate", "social"]
+)
 def parametric_graph(request):
     """Parametric fixture that yields different graph types"""
     if gr is None:
@@ -203,10 +204,7 @@ def parametric_num_array(request):
     if gr is None:
         pytest.skip("groggy not available")
 
-    size_map = {
-        "small": 5,
-        "medium": 50
-    }
+    size_map = {"small": 5, "medium": 50}
 
     size = size_map[request.param]
     graph = gr.Graph()
@@ -222,10 +220,7 @@ def parametric_nodes_array(request):
     if gr is None:
         pytest.skip("groggy not available")
 
-    size_map = {
-        "small": 3,
-        "medium": 20
-    }
+    size_map = {"small": 3, "medium": 20}
 
     size = size_map[request.param]
     graph = gr.Graph()
@@ -241,10 +236,7 @@ def parametric_edges_array(request):
     if gr is None:
         pytest.skip("groggy not available")
 
-    node_counts = {
-        "small": 4,
-        "medium": 10
-    }
+    node_counts = {"small": 4, "medium": 10}
 
     node_count = node_counts[request.param]
     graph = gr.Graph()
@@ -283,7 +275,7 @@ def diverse_graph():
             value=i * 2,
             category="A" if i % 2 == 0 else "B",
             active=i % 3 == 0,
-            priority="high" if i < 3 else "low"
+            priority="high" if i < 3 else "low",
         )
         node_ids.append(node_id)
 
@@ -295,7 +287,7 @@ def diverse_graph():
             node_ids[i + 1],
             strength=i * 0.1,
             relationship="friend" if i % 2 == 0 else "colleague",
-            years_known=i + 1
+            years_known=i + 1,
         )
         edge_ids.append(edge_id)
 
@@ -335,21 +327,19 @@ def large_accessor_graph():
             label=f"Node{i}",
             value=i,
             category=f"Cat{i % 5}",  # 5 categories
-            priority="high" if i % 10 == 0 else "low"
+            priority="high" if i % 10 == 0 else "low",
         )
         node_ids.append(node_id)
 
     # Add edges (create a connected graph)
     for i in range(node_count - 1):
         graph.add_edge(
-            node_ids[i],
-            node_ids[i + 1],
-            weight=i * 0.01,
-            relationship="connection"
+            node_ids[i], node_ids[i + 1], weight=i * 0.01, relationship="connection"
         )
 
     # Add some random additional edges
     import random
+
     random.seed(42)  # For reproducible tests
     for _ in range(50):
         i, j = random.sample(range(node_count), 2)
@@ -381,7 +371,7 @@ def table_test_graph():
             active=i % 2 == 0,
             score=i * 0.1,
             name=f"Name_{i}",
-            priority="high" if i < 3 else ("medium" if i < 7 else "low")
+            priority="high" if i < 3 else ("medium" if i < 7 else "low"),
         )
         node_ids.append(node_id)
 
@@ -392,18 +382,30 @@ def table_test_graph():
             node_ids[i],
             node_ids[i + 1],
             weight=i * 0.1,
-            relationship="friend" if i % 3 == 0 else ("colleague" if i % 3 == 1 else "family"),
+            relationship=(
+                "friend" if i % 3 == 0 else ("colleague" if i % 3 == 1 else "family")
+            ),
             years_known=i + 1,
             strength=i * 0.05,
-            type="strong" if i % 2 == 0 else "weak"
+            type="strong" if i % 2 == 0 else "weak",
         )
         edge_ids.append(edge_id)
 
     # Add some additional complex edges
     if len(node_ids) >= 5:
-        graph.add_edge(node_ids[0], node_ids[4], relationship="mentor", weight=0.9, years_known=10)
-        graph.add_edge(node_ids[2], node_ids[7], relationship="friend", weight=0.7, years_known=5)
-        graph.add_edge(node_ids[1], node_ids[8], relationship="colleague", weight=0.6, years_known=3)
+        graph.add_edge(
+            node_ids[0], node_ids[4], relationship="mentor", weight=0.9, years_known=10
+        )
+        graph.add_edge(
+            node_ids[2], node_ids[7], relationship="friend", weight=0.7, years_known=5
+        )
+        graph.add_edge(
+            node_ids[1],
+            node_ids[8],
+            relationship="colleague",
+            weight=0.6,
+            years_known=3,
+        )
 
     return graph
 
@@ -444,7 +446,7 @@ def large_table_graph():
             category=f"Cat{i % 8}",  # 8 categories for good grouping
             active=i % 4 == 0,
             score=i * 0.01,
-            priority="high" if i % 20 == 0 else ("medium" if i % 10 == 0 else "low")
+            priority="high" if i % 20 == 0 else ("medium" if i % 10 == 0 else "low"),
         )
         node_ids.append(node_id)
 
@@ -457,12 +459,13 @@ def large_table_graph():
             node_ids[i + 1],
             weight=i * 0.005,
             relationship="connection",
-            strength=i * 0.002
+            strength=i * 0.002,
         )
         edge_count += 1
 
     # Add some random additional edges for complexity
     import random
+
     random.seed(42)  # For reproducible tests
     for _ in range(100):
         i, j = random.sample(range(node_count), 2)
@@ -471,7 +474,7 @@ def large_table_graph():
                 node_ids[i],
                 node_ids[j],
                 relationship=random.choice(["friend", "colleague", "family"]),
-                weight=random.uniform(0.1, 1.0)
+                weight=random.uniform(0.1, 1.0),
             )
             edge_count += 1
         except:
@@ -484,15 +487,9 @@ def large_table_graph():
 # Test configuration
 def pytest_configure(config):
     """Configure pytest with custom markers and settings"""
-    config.addinivalue_line(
-        "markers", "graph_core: tests for core Graph functionality"
-    )
-    config.addinivalue_line(
-        "markers", "array_ops: tests for array operations"
-    )
-    config.addinivalue_line(
-        "markers", "num_array: tests for NumArray functionality"
-    )
+    config.addinivalue_line("markers", "graph_core: tests for core Graph functionality")
+    config.addinivalue_line("markers", "array_ops: tests for array operations")
+    config.addinivalue_line("markers", "num_array: tests for NumArray functionality")
     config.addinivalue_line(
         "markers", "nodes_array: tests for NodesArray functionality"
     )
@@ -502,33 +499,21 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "array_base: tests for shared array functionality"
     )
-    config.addinivalue_line(
-        "markers", "base_array: tests for BaseArray functionality"
-    )
-    config.addinivalue_line(
-        "markers", "graph_arrays: tests for graph-specific arrays"
-    )
-    config.addinivalue_line(
-        "markers", "table_ops: tests for table operations"
-    )
+    config.addinivalue_line("markers", "base_array: tests for BaseArray functionality")
+    config.addinivalue_line("markers", "graph_arrays: tests for graph-specific arrays")
+    config.addinivalue_line("markers", "table_ops: tests for table operations")
     config.addinivalue_line(
         "markers", "subgraph_array: tests for SubgraphArray functionality"
     )
     config.addinivalue_line(
         "markers", "components: tests for ComponentsArray functionality"
     )
-    config.addinivalue_line(
-        "markers", "graph_view: tests for GraphView functionality"
-    )
+    config.addinivalue_line("markers", "graph_view: tests for GraphView functionality")
     config.addinivalue_line(
         "markers", "graph_matrix: tests for GraphMatrix functionality"
     )
-    config.addinivalue_line(
-        "markers", "matrix_operations: tests for matrix operations"
-    )
-    config.addinivalue_line(
-        "markers", "algorithms: tests for graph algorithms"
-    )
+    config.addinivalue_line("markers", "matrix_operations: tests for matrix operations")
+    config.addinivalue_line("markers", "algorithms: tests for graph algorithms")
     config.addinivalue_line(
         "markers", "neural: tests for neural network and autograd operations"
     )
@@ -547,30 +532,18 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "nodes_edges_tables: tests for table integration"
     )
-    config.addinivalue_line(
-        "markers", "accessor_ops: tests for accessor operations"
-    )
+    config.addinivalue_line("markers", "accessor_ops: tests for accessor operations")
     config.addinivalue_line(
         "markers", "nodes_accessor: tests for NodesAccessor functionality"
     )
     config.addinivalue_line(
         "markers", "edges_accessor: tests for EdgesAccessor functionality"
     )
-    config.addinivalue_line(
-        "markers", "accessors: tests for accessor integration"
-    )
-    config.addinivalue_line(
-        "markers", "subgraph_ops: tests for subgraph operations"
-    )
-    config.addinivalue_line(
-        "markers", "matrix_ops: tests for matrix operations"
-    )
-    config.addinivalue_line(
-        "markers", "integration: integration tests across modules"
-    )
-    config.addinivalue_line(
-        "markers", "performance: performance and stress tests"
-    )
+    config.addinivalue_line("markers", "accessors: tests for accessor integration")
+    config.addinivalue_line("markers", "subgraph_ops: tests for subgraph operations")
+    config.addinivalue_line("markers", "matrix_ops: tests for matrix operations")
+    config.addinivalue_line("markers", "integration: integration tests across modules")
+    config.addinivalue_line("markers", "performance: performance and stress tests")
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
@@ -596,8 +569,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
 
         # Mark slow tests
-        if hasattr(item, 'obj') and hasattr(item.obj, '__name__'):
-            if 'performance' in item.obj.__name__ or 'stress' in item.obj.__name__:
+        if hasattr(item, "obj") and hasattr(item.obj, "__name__"):
+            if "performance" in item.obj.__name__ or "stress" in item.obj.__name__:
                 item.add_marker(pytest.mark.slow)
 
 
@@ -608,8 +581,8 @@ def assert_graph_valid(graph):
         return True
 
     # Basic consistency checks
-    assert hasattr(graph, 'nodes')
-    assert hasattr(graph, 'edges')
+    assert hasattr(graph, "nodes")
+    assert hasattr(graph, "edges")
     assert len(graph.nodes) >= 0
     assert len(graph.edges) >= 0
 

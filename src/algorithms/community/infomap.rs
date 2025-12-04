@@ -69,9 +69,12 @@ impl NodeIndexer {
 ///
 /// Uses the map equation to minimize the description length of random walks on the graph.
 /// Excellent for detecting flow-based communities and naturally handles directed graphs.
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Infomap {
+    #[allow(dead_code)]
     teleportation: f64,
+    #[allow(dead_code)]
     num_trials: usize,
     max_iter: usize,
     seed: Option<u64>,
@@ -278,11 +281,11 @@ impl Algorithm for Infomap {
             }
 
             ctx.record_call(
-                &format!("infomap.iteration_{}", iteration),
+                format!("infomap.iteration_{}", iteration),
                 iter_start.elapsed(),
             );
             ctx.record_stat(
-                &format!("infomap.iteration_{}.changed", iteration),
+                format!("infomap.iteration_{}.changed", iteration),
                 if changed { 1.0 } else { 0.0 },
             );
 

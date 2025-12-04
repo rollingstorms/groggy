@@ -2,8 +2,7 @@
 
 use anyhow::Result;
 use cranelift::prelude::*;
-use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::Module;
+use cranelift_jit::JITModule;
 
 /// JIT execution context
 pub struct JitContext {

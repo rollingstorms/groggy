@@ -4,14 +4,15 @@
 # Generated WITHOUT experimental features (build with --features experimental-delegation to include)
 
 from __future__ import annotations  # Enable forward references
-from typing import Any, List, Dict, Optional, Tuple, Union, Iterator
+
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 # Module-level functions
 
 def array(*args, **kwargs) -> Any:
     """
     Create a BaseArray from a Python list or array-like object
-    
+
     Examples:
       gr.array([1, 2, 3, 4])
       gr.array(['a', 'b', 'c'])
@@ -40,7 +41,7 @@ def int_array(*args, **kwargs) -> Any:
 def matrix(*args, **kwargs) -> Any:
     """
     Create a GraphMatrix from arrays or nested lists
-    
+
     Examples:
       gr.matrix([[1, 2], [3, 4]])  # From nested lists
       gr.matrix([arr1, arr2])      # From GraphArrays
@@ -51,12 +52,12 @@ def matrix(*args, **kwargs) -> Any:
 def merge(*args, **kwargs) -> Any:
     """
     Create a GraphTable from dictionary or arrays with column names
-    
+
     Examples:
       gr.table({'name': ['Alice', 'Bob'], 'age': [25, 30]})
       gr.table([arr1, arr2], columns=['col1', 'col2'])
     Merge multiple graphs into a single new graph
-    
+
     Examples:
       gr.merge([g1, g2, g3])  # Merge multiple graphs
       gr.merge([g1, g2])      # Merge two graphs
@@ -66,7 +67,7 @@ def merge(*args, **kwargs) -> Any:
 def num_array(*args, **kwargs) -> Any:
     """
     Create a NumArray for numerical operations from a Python list
-    
+
     Examples:
       gr.num_array([1, 2, 3, 4])
       gr.num_array([1.0, 2.5, 3.7])
@@ -94,7 +95,7 @@ def parse_node_query(*args, **kwargs) -> Any:
 def table(*args, **kwargs) -> Any:
     """
     Create a BaseTable from a Python list of dictionaries or other data
-    
+
     Examples:
       gr.table([{"name": "Alice", "age": 25}, {"name": "Bob", "age": 30}])
       gr.table({"node_id": [1, 2, 3], "name": ["A", "B", "C"]})
@@ -113,6 +114,7 @@ class AggregationFunction:
     """
     Python wrapper for AggregationFunction
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -203,27 +205,19 @@ class AggregationFunction:
         """
         ...
 
-
 class AggregationResult:
     """
     Result of an aggregation operation
     """
-    @property
-    def attribute(self) -> Any:
-        ...
 
     @property
-    def count(self) -> Any:
-        ...
-
+    def attribute(self) -> Any: ...
     @property
-    def operation(self) -> Any:
-        ...
-
+    def count(self) -> Any: ...
     @property
-    def value(self) -> Any:
-        ...
-
+    def operation(self) -> Any: ...
+    @property
+    def value(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -254,11 +248,11 @@ class AggregationResult:
         """
         ...
 
-
 class ArrayArray:
     """
     Python wrapper for ArrayArray
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -304,14 +298,14 @@ class ArrayArray:
     def agg(self, *args, **kwargs) -> Any:
         """
         Apply multiple aggregations at once
-        
+
         Args:
             spec: Dictionary mapping aggregation names to functions
                   e.g., {"mean": "mean", "std": "std"}
-        
+
         Returns:
             BaseTable with columns for each aggregation
-        
+
         Example:
         ```python
         result = arr_arr.agg({"mean": "mean", "std": "std", "count": "count"})
@@ -347,10 +341,10 @@ class ArrayArray:
     def mean(self, *args, **kwargs) -> Any:
         """
         Calculate mean of each array
-        
+
         Returns a BaseTable with group keys and means if keys are present,
         otherwise returns a Python list of means.
-        
+
         Example:
         ```python
         arr_arr = ArrayArray([
@@ -383,10 +377,10 @@ class ArrayArray:
     def to_type(self, *args, **kwargs) -> Any:
         """
         Convert ArrayArray to numeric NumArray for operations
-        
+
         Converts all arrays to f64 and returns as NumArray.
         Non-numeric values are filtered out during conversion.
-        
+
         Example:
         ```python
         arr_arr = ArrayArray([
@@ -398,19 +392,15 @@ class ArrayArray:
         """
         ...
 
-
 class AttrValue:
     """
     Python wrapper for AttrValue
     """
-    @property
-    def type_name(self) -> Any:
-        ...
 
     @property
-    def value(self) -> Any:
-        ...
-
+    def type_name(self) -> Any: ...
+    @property
+    def value(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -440,12 +430,12 @@ class AttrValue:
         Return str(self).
         """
         ...
-
 
 class AttributeFilter:
     """
     Python wrapper for AttributeFilter
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -476,29 +466,18 @@ class AttributeFilter:
         """
         ...
 
-    def equals(self, *args, **kwargs) -> Any:
-        ...
-
-    def greater_than(self, *args, **kwargs) -> Any:
-        ...
-
-    def greater_than_or_equal(self, *args, **kwargs) -> Any:
-        ...
-
-    def less_than(self, *args, **kwargs) -> Any:
-        ...
-
-    def less_than_or_equal(self, *args, **kwargs) -> Any:
-        ...
-
-    def not_equals(self, *args, **kwargs) -> Any:
-        ...
-
+    def equals(self, *args, **kwargs) -> Any: ...
+    def greater_than(self, *args, **kwargs) -> Any: ...
+    def greater_than_or_equal(self, *args, **kwargs) -> Any: ...
+    def less_than(self, *args, **kwargs) -> Any: ...
+    def less_than_or_equal(self, *args, **kwargs) -> Any: ...
+    def not_equals(self, *args, **kwargs) -> Any: ...
 
 class BaseArray:
     """
     New BaseArray-powered array with chaining support
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -538,13 +517,13 @@ class BaseArray:
     def append(self, *args, **kwargs) -> Any:
         """
         Append a single element (standard Python method)
-        
+
         # Arguments
         * `element` - Value to append to the array
-        
+
         # Returns
         New array with the element appended
-        
+
         # Examples
         ```python
         new_array = array.append(42)
@@ -555,10 +534,10 @@ class BaseArray:
     def append_element(self, *args, **kwargs) -> Any:
         """
         Append a single element to the array
-        
+
         # Arguments
         * `element` - Value to append to the array
-        
+
         # Examples
         ```python
         new_array = array.append_element(42)
@@ -569,13 +548,13 @@ class BaseArray:
     def apply(self, *args, **kwargs) -> Any:
         """
         Apply a Python function to each element in the array (pandas-style apply)
-        
+
         # Arguments
         * `func` - Python function to apply to each element
-        
+
         # Returns
         New BaseArray with transformed values
-        
+
         # Examples
         ```python
         # Square each number
@@ -583,9 +562,9 @@ class BaseArray:
             if isinstance(x, (int, float)):
                 return x * x
             return x
-        
+
         squared = array.apply(square)
-        
+
         # Using lambda
         doubled = array.apply(lambda x: x * 2 if isinstance(x, (int, float)) else x)
         ```
@@ -608,11 +587,11 @@ class BaseArray:
     def corr(self, *args, **kwargs) -> Any:
         """
         Compute correlation coefficient with another array
-        
+
         # Arguments
         * `other` - The other array to compute correlation with
         * `method` - Correlation method: "pearson" (default), "spearman", or "kendall"
-        
+
         # Returns
         Correlation coefficient as a Python float
         """
@@ -627,11 +606,11 @@ class BaseArray:
     def cov(self, *args, **kwargs) -> Any:
         """
         Compute covariance with another array
-        
+
         # Arguments
         * `other` - The other array to compute covariance with
         * `ddof` - Delta degrees of freedom (default: 1)
-        
+
         # Returns
         Covariance as a Python float
         """
@@ -640,7 +619,7 @@ class BaseArray:
     def cummax(self, *args, **kwargs) -> Any:
         """
         Cumulative maximum operation
-        
+
         # Returns
         New BaseArray with cumulative maximum values
         """
@@ -649,7 +628,7 @@ class BaseArray:
     def cummin(self, *args, **kwargs) -> Any:
         """
         Cumulative minimum operation
-        
+
         # Returns
         New BaseArray with cumulative minimum values
         """
@@ -658,19 +637,17 @@ class BaseArray:
     def cumsum(self, *args, **kwargs) -> Any:
         """
         Cumulative sum operation
-        
+
         # Returns
         New BaseArray with cumulative sum values
         """
         ...
 
-    def describe(self, *args, **kwargs) -> Any:
-        ...
-
+    def describe(self, *args, **kwargs) -> Any: ...
     def drop_duplicates_elements(self, *args, **kwargs) -> Any:
         """
         Drop duplicate elements
-        
+
         # Examples
         ```python
         new_array = array.drop_duplicates_elements()
@@ -681,10 +658,10 @@ class BaseArray:
     def drop_elements(self, *args, **kwargs) -> Any:
         """
         Drop elements by indices
-        
+
         # Arguments
         * `indices` - List of indices to drop from the array
-        
+
         # Examples
         ```python
         new_array = array.drop_elements([0, 2, 4])  # Drop elements at indices 0, 2, and 4
@@ -709,10 +686,10 @@ class BaseArray:
     def expanding(self, *args, **kwargs) -> Any:
         """
         Expanding window operation (cumulative from start)
-        
+
         # Arguments
         * `operation` - Function to apply to expanding window (e.g., "mean", "sum", "min", "max", "std")
-        
+
         # Returns
         New BaseArray with expanding operation results
         """
@@ -721,13 +698,13 @@ class BaseArray:
     def extend(self, *args, **kwargs) -> Any:
         """
         Extend array with multiple elements (standard Python method)
-        
+
         # Arguments
         * `elements` - List of values to append to the array
-        
+
         # Returns
         New array with all elements appended
-        
+
         # Examples
         ```python
         new_array = array.extend([42, "hello", 3.14])
@@ -738,10 +715,10 @@ class BaseArray:
     def extend_elements(self, *args, **kwargs) -> Any:
         """
         Extend array with multiple elements
-        
+
         # Arguments
         * `elements` - List of values to append to the array
-        
+
         # Examples
         ```python
         new_array = array.extend_elements([42, "hello", 3.14])
@@ -760,13 +737,13 @@ class BaseArray:
     def filter(self, *args, **kwargs) -> Any:
         """
         Filter elements using a Python function
-        
+
         # Arguments
         * `predicate` - Python function that returns True/False for each element
-        
+
         # Returns
         New array with elements where predicate returns True
-        
+
         # Examples
         ```python
         filtered = array.filter(lambda x: x > 5)
@@ -777,13 +754,13 @@ class BaseArray:
     def get(self, *args, **kwargs) -> Any:
         """
         Get element at specific index
-        
+
         # Arguments
         * `index` - Index to retrieve (0-based)
-        
+
         # Returns
         The element at the specified index
-        
+
         # Examples
         ```python
         element = array.get(0)  # Get first element
@@ -794,19 +771,19 @@ class BaseArray:
     def get_percentile(self, *args, **kwargs) -> Any:
         """
         Compute specific percentile for the array (direct method for consistency)
-        
+
         # Arguments
         * `percentile` - Percentile to compute (0.0 to 100.0)
         * `interpolation` - Method for interpolation
-        
+
         # Returns
         The computed percentile as PyObject
-        
+
         # Examples
         ```python
         # Get median (50th percentile)
         median = array.get_percentile(50.0)
-        
+
         # Get 95th percentile with nearest interpolation
         p95 = array.get_percentile(95.0, "nearest")
         ```
@@ -820,9 +797,7 @@ class BaseArray:
         """
         ...
 
-    def head(self, *args, **kwargs) -> Any:
-        ...
-
+    def head(self, *args, **kwargs) -> Any: ...
     def infer_numeric_type(self, *args, **kwargs) -> Any:
         """
         Infer the optimal numeric type for this BaseArray
@@ -834,14 +809,14 @@ class BaseArray:
     def insert(self, *args, **kwargs) -> Any:
         """
         Insert element at specific index
-        
+
         # Arguments
         * `index` - Index to insert at
         * `element` - Value to insert
-        
+
         # Returns
         New array with element inserted
-        
+
         # Examples
         ```python
         new_array = array.insert(2, "new_value")
@@ -878,10 +853,10 @@ class BaseArray:
     def len(self, *args, **kwargs) -> Any:
         """
         Get the length of the array (standard Python method)
-        
+
         # Returns
         The number of elements in the array
-        
+
         # Examples
         ```python
         size = array.len()
@@ -892,13 +867,13 @@ class BaseArray:
     def map(self, *args, **kwargs) -> Any:
         """
         Map elements using a Python function
-        
+
         # Arguments
         * `func` - Python function to apply to each element
-        
+
         # Returns
         New array with transformed elements
-        
+
         # Examples
         ```python
         mapped = array.map(lambda x: x * 2)
@@ -959,10 +934,10 @@ class BaseArray:
     def pct_change(self, *args, **kwargs) -> Any:
         """
         Percentage change operation
-        
+
         # Arguments
         * `periods` - Number of periods to use for comparison (default: 1)
-        
+
         # Returns
         New BaseArray with percentage change values
         """
@@ -971,16 +946,16 @@ class BaseArray:
     def percentile(self, *args, **kwargs) -> Any:
         """
         Compute percentile for the array (equivalent to quantile * 100)
-        
+
         # Arguments
         * `percentile` - Percentile to compute (0.0 to 100.0)
         * `interpolation` - Method for interpolation
-        
+
         # Examples
         ```python
         # Get median (50th percentile)
         median = array.percentile(50.0, "linear")
-        
+
         # Get quartiles
         q1 = array.percentile(25.0)
         q3 = array.percentile(75.0)
@@ -991,11 +966,11 @@ class BaseArray:
     def percentiles(self, *args, **kwargs) -> Any:
         """
         Compute multiple percentiles for the array
-        
+
         # Arguments
         * `percentiles` - List of percentiles to compute (each 0.0 to 100.0)
         * `interpolation` - Method for interpolation
-        
+
         # Returns
         BaseArray containing the computed percentiles
         """
@@ -1004,19 +979,19 @@ class BaseArray:
     def quantile(self, *args, **kwargs) -> Any:
         """
         Compute quantile for the array (pandas-style quantile)
-        
+
         # Arguments
         * `q` - Quantile to compute (0.0 to 1.0)
         * `interpolation` - Method for interpolation ("linear", "lower", "higher", "midpoint", "nearest")
-        
+
         # Returns
         AttrValue containing the computed quantile
-        
+
         # Examples
         ```python
         # Get median (50th percentile)
         median = array.quantile(0.5, "linear")
-        
+
         # Get 95th percentile with nearest interpolation
         p95 = array.quantile(0.95, "nearest")
         ```
@@ -1026,11 +1001,11 @@ class BaseArray:
     def quantiles(self, *args, **kwargs) -> Any:
         """
         Compute multiple quantiles for the array
-        
+
         # Arguments
         * `quantiles` - List of quantiles to compute (each 0.0 to 1.0)
         * `interpolation` - Method for interpolation
-        
+
         # Returns
         BaseArray containing the computed quantiles
         """
@@ -1039,13 +1014,13 @@ class BaseArray:
     def remove(self, *args, **kwargs) -> Any:
         """
         Remove element at specific index
-        
+
         # Arguments
         * `index` - Index to remove
-        
+
         # Returns
         New array with element removed
-        
+
         # Examples
         ```python
         new_array = array.remove(0)  # Remove first element
@@ -1056,10 +1031,10 @@ class BaseArray:
     def reverse(self, *args, **kwargs) -> Any:
         """
         Reverse the order of elements
-        
+
         # Returns
         New array with elements in reverse order
-        
+
         # Examples
         ```python
         reversed_array = array.reverse()
@@ -1070,11 +1045,11 @@ class BaseArray:
     def rolling(self, *args, **kwargs) -> Any:
         """
         Rolling window operation with specified window size
-        
+
         # Arguments
         * `window` - Window size for rolling operations
         * `operation` - Function to apply to each window (e.g., "mean", "sum", "min", "max", "std")
-        
+
         # Returns
         New BaseArray with rolling operation results
         """
@@ -1083,11 +1058,11 @@ class BaseArray:
     def shift(self, *args, **kwargs) -> Any:
         """
         Shift operation - shift values by specified periods
-        
+
         # Arguments
         * `periods` - Number of periods to shift (positive = shift right, negative = shift left)
         * `fill_value` - Value to use for filling gaps (default: Null)
-        
+
         # Returns
         New BaseArray with shifted values
         """
@@ -1096,13 +1071,13 @@ class BaseArray:
     def sort(self, *args, **kwargs) -> Any:
         """
         Sort the array elements
-        
+
         # Arguments
         * `ascending` - Whether to sort in ascending order (default: true)
-        
+
         # Returns
         New array with sorted elements
-        
+
         # Examples
         ```python
         sorted_asc = array.sort()
@@ -1123,9 +1098,7 @@ class BaseArray:
         """
         ...
 
-    def tail(self, *args, **kwargs) -> Any:
-        ...
-
+    def tail(self, *args, **kwargs) -> Any: ...
     def to_list(self, *args, **kwargs) -> Any:
         """
         Convert the array to a plain Python list
@@ -1143,7 +1116,7 @@ class BaseArray:
     def to_table(self, *args, **kwargs) -> Any:
         """
         Convert array to table format for streaming visualization
-        
+
         Creates a BaseTable with 'index' and 'value' columns from the array data.
         This enables the array to use the rich streaming table infrastructure.
         """
@@ -1152,10 +1125,10 @@ class BaseArray:
     def to_table_with_name(self, *args, **kwargs) -> Any:
         """
         Convert array to single-column table with specified column name
-        
+
         # Arguments
         * `column_name` - Name for the column when converting to table
-        
+
         # Examples
         ```python
         table = array.to_table_with_name("scores")
@@ -1166,10 +1139,10 @@ class BaseArray:
     def to_table_with_prefix(self, *args, **kwargs) -> Any:
         """
         Convert array to single-column table with prefix added to default column name
-        
+
         # Arguments
         * `prefix` - Prefix to add to the default 'values' column name
-        
+
         # Examples
         ```python
         table = array.to_table_with_prefix("old_")  # Creates column "old_values"
@@ -1180,10 +1153,10 @@ class BaseArray:
     def to_table_with_suffix(self, *args, **kwargs) -> Any:
         """
         Convert array to single-column table with suffix added to default column name
-        
+
         # Arguments
         * `suffix` - Suffix to add to the default 'values' column name
-        
+
         # Examples
         ```python
         table = array.to_table_with_suffix("_v1")  # Creates column "values_v1"
@@ -1197,29 +1170,27 @@ class BaseArray:
         """
         ...
 
-    def unique(self, *args, **kwargs) -> Any:
-        ...
-
+    def unique(self, *args, **kwargs) -> Any: ...
     def value_counts(self, *args, **kwargs) -> Any:
         """
         Count the frequency of unique values (pandas-style value_counts)
-        
+
         # Arguments
         * `sort` - Whether to sort results by count (default: true)
         * `ascending` - Sort order when sort=true (default: false, most frequent first)
         * `dropna` - Whether to exclude null values (default: true)
-        
+
         # Returns
         Table with 'value' and 'count' columns showing frequency of each unique value
-        
+
         # Examples
         ```python
         # Basic usage
         counts = array.value_counts()
-        
+
         # Custom sorting
         counts = array.value_counts(sort=True, ascending=True)
-        
+
         # Include null values
         counts = array.value_counts(dropna=False)
         ```
@@ -1232,11 +1203,11 @@ class BaseArray:
         """
         ...
 
-
 class BaseTable:
     """
     Python wrapper for BaseTable
     """
+
     @property
     def column_names(self) -> Any:
         """
@@ -1329,10 +1300,10 @@ class BaseTable:
     def add_prefix(self, *args, **kwargs) -> Any:
         """
         Add prefix to all column names
-        
+
         # Arguments
         * `prefix` - String prefix to add to all column names
-        
+
         # Examples
         ```python
         prefixed = table.add_prefix("old_")
@@ -1343,10 +1314,10 @@ class BaseTable:
     def add_suffix(self, *args, **kwargs) -> Any:
         """
         Add suffix to all column names
-        
+
         # Arguments
         * `suffix` - String suffix to add to all column names
-        
+
         # Examples
         ```python
         suffixed = table.add_suffix("_v1")
@@ -1357,13 +1328,13 @@ class BaseTable:
     def agg(self, *args, **kwargs) -> Any:
         """
         Alias for aggregate method (more concise)
-        
+
         # Arguments
         * `agg_specs` - Dictionary mapping column names to aggregation functions
-        
+
         # Returns
         PyBaseTable: A single table with aggregated results
-        
+
         # Example
         ```python
         # Aggregate the entire table
@@ -1375,10 +1346,10 @@ class BaseTable:
     def aggregate(self, *args, **kwargs) -> Any:
         """
         Aggregate entire table without grouping
-        
+
         # Arguments
         * `agg_specs` - Dictionary mapping column names to aggregation functions
-        
+
         # Examples
         ```python
         # Calculate summary statistics
@@ -1390,13 +1361,13 @@ class BaseTable:
     def append(self, *args, **kwargs) -> Any:
         """
         Append a new row to the table (pandas-style append)
-        
+
         # Arguments
         * `row_data` - Dictionary mapping column names to values
-        
+
         # Returns
         New table with the row appended
-        
+
         # Examples
         ```python
         # Add a new row
@@ -1408,10 +1379,10 @@ class BaseTable:
     def append_row(self, *args, **kwargs) -> Any:
         """
         Append a single row to the table
-        
+
         # Arguments
         * `row` - Dictionary mapping column names to values
-        
+
         # Examples
         ```python
         new_table = table.append_row({"name": "David", "age": 40, "score": 95})
@@ -1422,20 +1393,20 @@ class BaseTable:
     def apply(self, *args, **kwargs) -> Any:
         """
         Apply a Python function along an axis of the table (pandas-style apply)
-        
+
         # Arguments
         * `func` - Python function to apply
         * `axis` - 0 for columns, 1 for rows
         * `result_name` - Name for the result column (only used when axis=1)
-        
+
         # Returns
         Transformed table based on the axis
-        
+
         # Examples
         ```python
         # Apply to columns (axis=0)
         column_sums = table.apply(lambda col: sum(col), axis=0)
-        
+
         # Apply to rows (axis=1)
         row_sums = table.apply(lambda row: sum(row.values()), axis=1, result_name="total")
         ```
@@ -1445,21 +1416,21 @@ class BaseTable:
     def apply_to_columns(self, *args, **kwargs) -> Any:
         """
         Apply a Python function to each column in the table (pandas-style apply with axis=0)
-        
+
         # Arguments
         * `func` - Python function to apply to each column
-        
+
         # Returns
         New single-row table with one column per original column containing the function results
-        
+
         # Examples
         ```python
         # Get column sums
         def sum_column(col):
             return sum(x for x in col if isinstance(x, (int, float)))
-        
+
         result = table.apply(sum_column, axis=0)
-        
+
         # Using lambda for column means
         means = table.apply(lambda col: sum(col) / len(col), axis=0)
         ```
@@ -1469,22 +1440,22 @@ class BaseTable:
     def apply_to_rows(self, *args, **kwargs) -> Any:
         """
         Apply a Python function to each row in the table (pandas-style apply with axis=1)
-        
+
         # Arguments
         * `func` - Python function to apply to each row
         * `result_name` - Name for the result column
-        
+
         # Returns
         New single-column table with one row per original row containing the function results
-        
+
         # Examples
         ```python
         # Compute row sums
         def sum_row(row):
             return sum(v for v in row.values() if isinstance(v, (int, float)))
-        
+
         result = table.apply(sum_row, axis=1, result_name="row_sum")
-        
+
         # Using lambda for row means
         means = table.apply(lambda row: sum(row.values()) / len(row), axis=1, result_name="row_mean")
         ```
@@ -1494,17 +1465,17 @@ class BaseTable:
     def assign(self, *args, **kwargs) -> Any:
         """
         Assign updates to multiple columns at once
-        
+
         Args:
             updates: Dictionary mapping column names to values. Values can be:
-                     - Lists: ['value1', 'value2', ...]  
+                     - Lists: ['value1', 'value2', ...]
                      - Dictionaries with integer keys: {0: 'value1', 1: 'value2', ...}
-            
+
         Examples:
             # Using lists (updates entire columns)
             updates = {"bonus": [1000, 1500], "status": ["active", "inactive"]}
             table.assign(updates)
-            
+
             # Using dictionaries with integer keys (sparse updates)
             updates = {"bonus": {0: 1000, 3: 1500}, "status": {1: "active", 2: "inactive"}}
             table.assign(updates)
@@ -1514,11 +1485,11 @@ class BaseTable:
     def check_outliers(self, *args, **kwargs) -> Any:
         """
         Detect outliers in numeric columns using IQR method
-        
+
         # Arguments
         * `column` - Column name to analyze for outliers
         * `factor` - IQR multiplication factor (default: 1.5)
-        
+
         # Returns
         BaseArray with boolean values indicating outliers
         """
@@ -1541,10 +1512,10 @@ class BaseTable:
     def corr(self, *args, **kwargs) -> Any:
         """
         Compute correlation matrix for numeric columns
-        
+
         # Arguments
         * `method` - Correlation method: "pearson" (default), "spearman", or "kendall"
-        
+
         # Returns
         BaseTable containing the correlation matrix
         """
@@ -1553,12 +1524,12 @@ class BaseTable:
     def corr_columns(self, *args, **kwargs) -> Any:
         """
         Compute correlation between two specific columns
-        
+
         # Arguments
         * `col1` - First column name
         * `col2` - Second column name
         * `method` - Correlation method: "pearson" (default), "spearman", or "kendall"
-        
+
         # Returns
         Correlation coefficient as a Python float
         """
@@ -1567,10 +1538,10 @@ class BaseTable:
     def cov(self, *args, **kwargs) -> Any:
         """
         Compute covariance matrix for numeric columns
-        
+
         # Arguments
         * `ddof` - Delta degrees of freedom (default: 1)
-        
+
         # Returns
         BaseTable containing the covariance matrix
         """
@@ -1579,12 +1550,12 @@ class BaseTable:
     def cov_columns(self, *args, **kwargs) -> Any:
         """
         Compute covariance between two specific columns
-        
+
         # Arguments
         * `col1` - First column name
         * `col2` - Second column name
         * `ddof` - Delta degrees of freedom (default: 1)
-        
+
         # Returns
         Covariance as a Python float
         """
@@ -1593,10 +1564,10 @@ class BaseTable:
     def cummax(self, *args, **kwargs) -> Any:
         """
         Cumulative maximum operation on a specific column
-        
+
         # Arguments
         * `column` - Column name to apply cumulative maximum to
-        
+
         # Returns
         BaseArray with cumulative maximum values
         """
@@ -1605,10 +1576,10 @@ class BaseTable:
     def cummin(self, *args, **kwargs) -> Any:
         """
         Cumulative minimum operation on a specific column
-        
+
         # Arguments
         * `column` - Column name to apply cumulative minimum to
-        
+
         # Returns
         BaseArray with cumulative minimum values
         """
@@ -1617,10 +1588,10 @@ class BaseTable:
     def cumsum(self, *args, **kwargs) -> Any:
         """
         Cumulative sum operation on a specific column
-        
+
         # Arguments
         * `column` - Column name to apply cumulative sum to
-        
+
         # Returns
         BaseArray with cumulative sum values
         """
@@ -1629,15 +1600,15 @@ class BaseTable:
     def describe(self, *args, **kwargs) -> Any:
         """
         Generate descriptive statistics for numeric columns
-        
+
         Returns a table with summary statistics including count, mean, std, min,
         percentiles (25%, 50%, 75%), and max for all numeric columns.
         Similar to pandas DataFrame.describe()
-        
+
         # Returns
         PyBaseTable: A table where each row represents a statistic and each column
         represents a numeric column from the original table
-        
+
         # Examples
         ```python
         # Generate descriptive statistics
@@ -1659,10 +1630,10 @@ class BaseTable:
     def drop_columns(self, *args, **kwargs) -> Any:
         """
         Drop columns from the table
-        
+
         Args:
             columns: List of column names to drop
-        
+
         Returns:
             PyBaseTable: A new table without the specified columns
         """
@@ -1671,15 +1642,15 @@ class BaseTable:
     def drop_duplicates(self, *args, **kwargs) -> Any:
         """
         Drop duplicate rows based on specified columns (or all columns if none specified)
-        
+
         # Arguments
         * `subset` - Optional list of column names to check for duplicates
-        
+
         # Examples
         ```python
         # Drop duplicates based on all columns
         new_table = table.drop_duplicates()
-        
+
         # Drop duplicates based only on 'name' and 'age' columns
         new_table = table.drop_duplicates(["name", "age"])
         ```
@@ -1689,10 +1660,10 @@ class BaseTable:
     def drop_rows(self, *args, **kwargs) -> Any:
         """
         Drop rows by indices
-        
+
         # Arguments
         * `indices` - List of row indices to drop
-        
+
         # Examples
         ```python
         new_table = table.drop_rows([0, 2, 4])  # Drop rows at indices 0, 2, and 4
@@ -1718,11 +1689,11 @@ class BaseTable:
     def expanding(self, *args, **kwargs) -> Any:
         """
         Expanding window operation on a specific column
-        
+
         # Arguments
         * `column` - Column name to apply expanding operation to
         * `operation` - Function to apply to expanding window (e.g., "mean", "sum", "min", "max", "std")
-        
+
         # Returns
         BaseArray with expanding operation results
         """
@@ -1731,10 +1702,10 @@ class BaseTable:
     def expanding_all(self, *args, **kwargs) -> Any:
         """
         Apply expanding window operations to all numeric columns
-        
+
         # Arguments
         * `operation` - Function to apply to expanding window
-        
+
         # Returns
         New table with expanding operations applied to all numeric columns
         """
@@ -1743,13 +1714,13 @@ class BaseTable:
     def extend(self, *args, **kwargs) -> Any:
         """
         Extend the table with multiple rows (pandas-style extend/concat)
-        
+
         # Arguments
         * `rows_data` - List of dictionaries, each representing a row
-        
+
         # Returns
         New table with all rows appended
-        
+
         # Examples
         ```python
         # Add multiple rows
@@ -1765,10 +1736,10 @@ class BaseTable:
     def extend_rows(self, *args, **kwargs) -> Any:
         """
         Extend table with multiple rows
-        
+
         # Arguments
         * `rows` - List of dictionaries, each mapping column names to values
-        
+
         # Examples
         ```python
         new_table = table.extend_rows([
@@ -1796,10 +1767,10 @@ class BaseTable:
     def filter(self, *args, **kwargs) -> Any:
         """
         Filter rows using a query expression or Python function
-        
+
         Args:
             predicate: Either a string query expression (e.g. "age > 25") or a Python function
-        
+
         Returns:
             PyBaseTable: A new table with filtered rows
         """
@@ -1814,10 +1785,10 @@ class BaseTable:
     def from_dict(self, *args, **kwargs) -> Any:
         """
         Create BaseTable from a Python dictionary
-        
+
         # Arguments
         * `data` - Dictionary mapping column names to lists of values
-        
+
         # Examples
         ```python
         data = {
@@ -1857,20 +1828,20 @@ class BaseTable:
     def get_percentile(self, *args, **kwargs) -> Any:
         """
         Compute specific percentile for a column (direct method for consistency)
-        
+
         # Arguments
         * `column` - Column name to analyze
         * `percentile` - Percentile to compute (0.0 to 100.0)
         * `interpolation` - Method for interpolation
-        
+
         # Returns
         The computed percentile as PyObject
-        
+
         # Examples
         ```python
         # Get median (50th percentile)
         median = table.get_percentile("age", 50.0)
-        
+
         # Get 95th percentile with nearest interpolation
         p95 = table.get_percentile("score", 95.0, "nearest")
         ```
@@ -1880,10 +1851,10 @@ class BaseTable:
     def group_by(self, *args, **kwargs) -> Any:
         """
         Group by columns and return grouped tables
-        
+
         Args:
             columns: List of column names to group by
-        
+
         Returns:
             PyTableArray: Array-like container holding the grouped tables
         """
@@ -1892,17 +1863,17 @@ class BaseTable:
     def group_by_agg(self, *args, **kwargs) -> Any:
         """
         Group by columns and apply aggregations
-        
+
         # Arguments
         * `group_cols` - List of column names to group by
         * `agg_specs` - Dictionary mapping column names to aggregation functions
           Supported functions: "count", "sum", "avg", "mean", "min", "max"
-        
+
         # Examples
         ```python
         # Group by 'category' and aggregate 'value' column
         result = table.group_by_agg(['category'], {'value': 'sum', 'price': 'avg'})
-        
+
         # Multiple grouping columns
         result = table.group_by_agg(['region', 'category'], {'sales': 'sum', 'items': 'count'})
         ```
@@ -1913,18 +1884,18 @@ class BaseTable:
         """
         Group table by one or more columns, returning a TableArray for fluent operations
         This enables powerful operations like table.groupby(['category']).sum()
-        
+
         # Arguments
         * `by` - Column name(s) to group by. Can be string or list of strings.
-        
+
         # Returns
         A TableArray where each table represents one group
-        
+
         # Examples
         ```python
         # Group by single column and sum
         result = table.groupby('category').sum()
-        
+
         # Group by multiple columns with custom aggregation
         result = table.groupby(['category', 'region']).agg({
             'sales': 'sum',
@@ -1961,10 +1932,10 @@ class BaseTable:
     def intersect(self, *args, **kwargs) -> Any:
         """
         Intersect with another table (returns common rows)
-        
+
         # Arguments
         * `other` - The table to intersect with
-        
+
         # Examples
         ```python
         # Find common rows between tables
@@ -1982,14 +1953,14 @@ class BaseTable:
     def isin(self, *args, **kwargs) -> Any:
         """
         Check if values in a column are in a provided set (pandas-style isin)
-        
+
         # Arguments
         * `column_name` - Name of the column to check
         * `values` - List of values to check membership against
-        
+
         # Returns
         Boolean array indicating which rows match the values
-        
+
         # Examples
         ```python
         mask = table.isin("department", ["Engineering", "Marketing"])
@@ -2015,7 +1986,7 @@ class BaseTable:
     def join(self, *args, **kwargs) -> Any:
         """
         Unified join method with pandas-style interface
-        
+
         # Arguments
         * `other` - The table to join with
         * `on` - Column name(s) to join on. Can be:
@@ -2024,15 +1995,15 @@ class BaseTable:
           - Dict: {"left": "col1", "right": "col2"} for different column names
           - Dict: {"left": ["col1", "col2"], "right": ["col3", "col4"]} for multiple different columns
         * `how` - Join type: "inner", "left", "right", "outer"
-        
+
         # Examples
         ```python
         # Simple inner join on same column name
         result = table1.join(table2, on="id", how="inner")
-        
-        # Left join on different column names  
+
+        # Left join on different column names
         result = table1.join(table2, on={"left": "user_id", "right": "id"}, how="left")
-        
+
         # Multi-column join
         result = table1.join(table2, on=["key1", "key2"], how="outer")
         ```
@@ -2042,13 +2013,13 @@ class BaseTable:
     def median(self, *args, **kwargs) -> Any:
         """
         Calculate median for a specific column
-        
+
         # Arguments
         * `column` - Column name to analyze
-        
+
         # Returns
         Median value as f64
-        
+
         # Examples
         ```python
         # Get median of age column
@@ -2060,21 +2031,21 @@ class BaseTable:
     def melt(self, *args, **kwargs) -> Any:
         """
         Melt operation for data unpivoting (pandas-style melt)
-        
+
         # Arguments
         * `id_vars` - Column(s) to use as identifier variables
         * `value_vars` - Column(s) to unpivot (if None, uses all columns except id_vars)
         * `var_name` - Name for the variable column (default: "variable")
         * `value_name` - Name for the value column (default: "value")
-        
+
         # Returns
         Unpivoted table in long format
-        
+
         # Examples
         ```python
         # Basic melt
         melted = table.melt(["id"], ["col1", "col2"])
-        
+
         # Custom column names
         melted = table.melt(["id"], ["col1", "col2"], "metric", "score")
         ```
@@ -2084,14 +2055,14 @@ class BaseTable:
     def nlargest(self, *args, **kwargs) -> Any:
         """
         Get the N largest values in a column (pandas-style nlargest)
-        
+
         # Arguments
         * `n` - Number of largest values to return
         * `column_name` - Name of the column to sort by
-        
+
         # Returns
         New table with the N rows having the largest values in the specified column
-        
+
         # Examples
         ```python
         top_5_salaries = table.nlargest(5, "salary")
@@ -2110,14 +2081,14 @@ class BaseTable:
     def nsmallest(self, *args, **kwargs) -> Any:
         """
         Get the N smallest values in a column (pandas-style nsmallest)
-        
+
         # Arguments
         * `n` - Number of smallest values to return
         * `column_name` - Name of the column to sort by
-        
+
         # Returns
         New table with the N rows having the smallest values in the specified column
-        
+
         # Examples
         ```python
         bottom_5_salaries = table.nsmallest(5, "salary")
@@ -2141,11 +2112,11 @@ class BaseTable:
     def pct_change(self, *args, **kwargs) -> Any:
         """
         Percentage change operation on a specific column
-        
+
         # Arguments
         * `column` - Column name to compute percentage change for
         * `periods` - Number of periods to use for comparison (default: 1)
-        
+
         # Returns
         BaseArray with percentage change values
         """
@@ -2154,12 +2125,12 @@ class BaseTable:
     def percentile(self, *args, **kwargs) -> Any:
         """
         Compute percentile for a specific column
-        
+
         # Arguments
         * `column` - Column name to analyze
         * `percentile` - Percentile to compute (0.0 to 100.0)
         * `interpolation` - Method for interpolation
-        
+
         # Examples
         ```python
         # Get median (50th percentile)
@@ -2177,21 +2148,21 @@ class BaseTable:
     def pivot_table(self, *args, **kwargs) -> Any:
         """
         Create a pivot table for data reshaping (pandas-style pivot_table)
-        
+
         # Arguments
         * `index` - Column(s) to use as index for the pivot table
         * `columns` - Column to spread into new columns
         * `values` - Column to aggregate
         * `aggfunc` - Aggregation function ("mean", "sum", "count", etc.)
-        
+
         # Returns
         Reshaped table with index as rows and unique values from columns as columns
-        
+
         # Examples
         ```python
         # Create pivot table showing average salary by department and level
         pivot = table.pivot_table(["dept"], "level", "salary", "mean")
-        
+
         # Multi-index pivot
         pivot = table.pivot_table(["dept", "team"], "level", "salary", "sum")
         ```
@@ -2201,7 +2172,7 @@ class BaseTable:
     def profile(self, *args, **kwargs) -> Any:
         """
         Comprehensive data profiling and quality assessment
-        
+
         # Returns
         BaseTable containing detailed statistics and quality metrics for each column
         """
@@ -2210,33 +2181,33 @@ class BaseTable:
     def quantile(self, *args, **kwargs) -> Any:
         """
         Drop rows at specified indices (pandas-style drop)
-        
+
         # Arguments
         * `indices` - List of row indices to remove
-        
+
         # Returns
         New table with specified rows removed
-        
+
         # Examples
         ```python
         # Remove rows at indices 0, 2, and 5
         new_table = table.drop_rows([0, 2, 5])
         ```
         Compute quantile for a specific column (pandas-style quantile)
-        
+
         # Arguments
         * `column` - Column name to analyze
         * `q` - Quantile to compute (0.0 to 1.0)
         * `interpolation` - Method for interpolation ("linear", "lower", "higher", "midpoint", "nearest")
-        
+
         # Returns
         AttrValue containing the computed quantile
-        
+
         # Examples
         ```python
         # Get median (50th percentile) of sales column
         median = table.quantile("sales", 0.5, "linear")
-        
+
         # Get 95th percentile with nearest interpolation
         p95 = table.quantile("price", 0.95, "nearest")
         ```
@@ -2246,12 +2217,12 @@ class BaseTable:
     def quantiles(self, *args, **kwargs) -> Any:
         """
         Compute multiple quantiles for a specific column
-        
+
         # Arguments
         * `column` - Column name to analyze
         * `quantiles` - List of quantiles to compute (each 0.0 to 1.0)
         * `interpolation` - Method for interpolation
-        
+
         # Returns
         BaseArray containing the computed quantiles
         """
@@ -2260,13 +2231,13 @@ class BaseTable:
     def query(self, *args, **kwargs) -> Any:
         """
         Pandas-style query method for string-based filtering
-        
+
         # Arguments
         * `expr` - String expression to evaluate (uses enhanced filter syntax)
-        
+
         # Returns
         New table with rows matching the query expression
-        
+
         # Examples
         ```python
         result = table.query("age > 25 AND department == Engineering")
@@ -2280,10 +2251,10 @@ class BaseTable:
     def rename(self, *args, **kwargs) -> Any:
         """
         Rename columns using a dictionary mapping
-        
+
         # Arguments
         * `columns` - Dictionary mapping old column names to new column names
-        
+
         # Examples
         ```python
         renamed = table.rename({"old_name": "new_name", "score": "final_score"})
@@ -2294,10 +2265,10 @@ class BaseTable:
     def reorder_columns(self, *args, **kwargs) -> Any:
         """
         Reorder columns according to specified order
-        
+
         # Arguments
         * `new_order` - List of column names in the desired order
-        
+
         # Examples
         ```python
         reordered = table.reorder_columns(["name", "age", "score"])
@@ -2314,12 +2285,12 @@ class BaseTable:
     def rolling(self, *args, **kwargs) -> Any:
         """
         Rolling window operation on a specific column
-        
+
         # Arguments
         * `column` - Column name to apply rolling operation to
         * `window` - Window size for rolling operations
         * `operation` - Function to apply to each window (e.g., "mean", "sum", "min", "max", "std")
-        
+
         # Returns
         BaseArray with rolling operation results
         """
@@ -2328,11 +2299,11 @@ class BaseTable:
     def rolling_all(self, *args, **kwargs) -> Any:
         """
         Apply rolling window operations to all numeric columns
-        
+
         # Arguments
         * `window` - Window size for rolling operations
         * `operation` - Function to apply to each window
-        
+
         # Returns
         New table with rolling operations applied to all numeric columns
         """
@@ -2341,7 +2312,7 @@ class BaseTable:
     def sample(self, *args, **kwargs) -> Any:
         """
         Comprehensive random sampling method
-        
+
         # Parameters
         - `n`: Number of rows to sample (mutually exclusive with `fraction`)
         - `fraction`: Fraction of rows to sample (0.0 to 1.0, mutually exclusive with `n`)
@@ -2349,23 +2320,23 @@ class BaseTable:
         - `subset`: Optional subset of columns to consider for sampling
         - `class_weights`: Optional mapping of column values to weights for stratified sampling
         - `replace`: Whether to sample with replacement (default: false)
-        
+
         # Examples
         ```python
         # Sample 10 rows
         sample = table.sample(n=10)
-        
+
         # Sample 20% of rows
         sample = table.sample(fraction=0.2)
-        
+
         # Weighted sampling with replacement
         weights = [1.0, 2.0, 1.0, 3.0]  # Higher weight for certain rows
         sample = table.sample(n=5, weights=weights, replace=True)
-        
+
         # Stratified sampling by 'category' column
         class_weights = {"category": [("A", 2.0), ("B", 1.0), ("C", 3.0)]}
         sample = table.sample(n=10, class_weights=class_weights)
-        
+
         # Focus on complete rows in subset of columns
         sample = table.sample(n=20, subset=["age", "income"])
         ```
@@ -2375,10 +2346,10 @@ class BaseTable:
     def select(self, *args, **kwargs) -> Any:
         """
         Select specific columns to create a new table
-        
+
         Args:
             columns: List of column names to select
-        
+
         Returns:
             PyBaseTable: A new table with only the selected columns
         """
@@ -2387,11 +2358,11 @@ class BaseTable:
     def set_column(self, *args, **kwargs) -> Any:
         """
         Set an entire column with new values
-        
+
         Args:
             column_name: Name of the column to set
             values: List of new values for the column
-            
+
         Example:
             table.set_column("score", [95, 87, 92, 88])
         """
@@ -2400,12 +2371,12 @@ class BaseTable:
     def set_value(self, *args, **kwargs) -> Any:
         """
         Set a single value at a specific row and column
-        
+
         Args:
             row: Row index (0-based)
             column_name: Name of the column
             value: New value to set
-            
+
         Example:
             table.set_value(0, "name", "Alice Updated")
         """
@@ -2414,12 +2385,12 @@ class BaseTable:
     def set_values_by_mask(self, *args, **kwargs) -> Any:
         """
         Set values for multiple rows in a column using a boolean mask
-        
+
         Args:
             mask: List of booleans indicating which rows to update
             column_name: Name of the column to update
             value: Value to set for all masked rows
-            
+
         Example:
             table.set_values_by_mask([True, False, True], "flag", "updated")
         """
@@ -2428,14 +2399,14 @@ class BaseTable:
     def set_values_by_range(self, *args, **kwargs) -> Any:
         """
         Set values for a range of rows in a column
-        
+
         Args:
             start: Starting row index (inclusive)
             end: Ending row index (exclusive)
             step: Step size (default 1 for consecutive rows)
             column_name: Name of the column to update
             value: Value to set for all rows in the range
-            
+
         Example:
             table.set_values_by_range(10, 20, 1, "score", 0.0)  # rows 10-19
             table.set_values_by_range(0, 10, 2, "flag", True)   # rows 0,2,4,6,8
@@ -2445,12 +2416,12 @@ class BaseTable:
     def shift(self, *args, **kwargs) -> Any:
         """
         Shift operation on a specific column
-        
+
         # Arguments
         * `column` - Column name to shift
         * `periods` - Number of periods to shift (positive = shift right, negative = shift left)
         * `fill_value` - Value to use for filling gaps (default: Null)
-        
+
         # Returns
         BaseArray with shifted values
         """
@@ -2459,11 +2430,11 @@ class BaseTable:
     def slice(self, *args, **kwargs) -> Any:
         """
         Get a slice of rows [start, end)
-        
+
         Args:
             start: Starting row index (inclusive)
             end: Ending row index (exclusive)
-        
+
         Returns:
             PyBaseTable: A new table with the specified row slice
         """
@@ -2472,11 +2443,11 @@ class BaseTable:
     def sort_by(self, *args, **kwargs) -> Any:
         """
         Sort table by column
-        
+
         Args:
             column: Name of the column to sort by
             ascending: If True, sort in ascending order; if False, descending
-        
+
         Returns:
             PyBaseTable: A new sorted table
         """
@@ -2486,20 +2457,20 @@ class BaseTable:
         """
         Sort table by multiple columns with mixed ascending/descending order
         Pandas-style multi-column sorting with priority order
-        
+
         Args:
             columns: List of column names to sort by (in priority order)
             ascending: List of booleans for sort direction per column.
                       If single bool, applies to all columns.
                       If list, must match length of columns.
-        
+
         Returns:
             PyBaseTable: A new sorted table
-        
+
         Examples:
             # Sort by department ascending, then salary descending
             sorted_table = table.sort_values(['department', 'salary'], [True, False])
-        
+
             # Sort by all columns ascending
             sorted_table = table.sort_values(['col1', 'col2'], True)
         """
@@ -2508,13 +2479,13 @@ class BaseTable:
     def std(self, *args, **kwargs) -> Any:
         """
         Calculate standard deviation for a specific column
-        
+
         # Arguments
         * `column` - Column name to analyze
-        
+
         # Returns
         Standard deviation as f64
-        
+
         # Examples
         ```python
         # Get standard deviation of scores column
@@ -2538,15 +2509,15 @@ class BaseTable:
     def to_edges_table(self, *args, **kwargs) -> Any:
         """
         Convert BaseTable to EdgesTable.
-        
+
         Args:
             source_id_column: Name of column containing source node IDs
             target_id_column: Name of column containing target node IDs
             edge_id_column: Optional name of column containing edge IDs
-        
+
         Returns:
             EdgesTable: New EdgesTable with same data
-        
+
         Example:
             >>> base_table = gr.table({
             ...     "source": [1, 2],
@@ -2566,13 +2537,13 @@ class BaseTable:
     def to_nodes_table(self, *args, **kwargs) -> Any:
         """
         Convert BaseTable to NodesTable.
-        
+
         Args:
             node_id_column: Name of column containing node IDs
-        
+
         Returns:
             NodesTable: New NodesTable with same data
-        
+
         Example:
             >>> base_table = gr.table({"node_id": [1, 2], "name": ["A", "B"]})
             >>> nodes_table = base_table.to_nodes_table("node_id")
@@ -2594,10 +2565,10 @@ class BaseTable:
     def to_type(self, *args, **kwargs) -> Any:
         """
         Convert table columns to specified type
-        
+
         Returns a copy of the table with all numeric columns converted to the specified type.
         Non-numeric columns are left unchanged.
-        
+
         Example:
         ```python
         # Convert all numeric columns to float64
@@ -2609,10 +2580,10 @@ class BaseTable:
     def union(self, *args, **kwargs) -> Any:
         """
         Union with another table (removes duplicates)
-        
+
         # Arguments
         * `other` - The table to union with
-        
+
         # Examples
         ```python
         # Combine two tables with same schema
@@ -2624,10 +2595,10 @@ class BaseTable:
     def validate_schema(self, *args, **kwargs) -> Any:
         """
         Validate table schema against expected schema
-        
+
         # Arguments
         * `expected_columns` - Dictionary mapping column names to expected data types
-        
+
         # Returns
         BaseTable with validation results
         """
@@ -2636,24 +2607,24 @@ class BaseTable:
     def value_counts(self, *args, **kwargs) -> Any:
         """
         Count the frequency of unique values in a column (pandas-style value_counts)
-        
+
         # Arguments
         * `column` - Column name to analyze
         * `sort` - Whether to sort results by count (default: true)
         * `ascending` - Sort order when sort=true (default: false, most frequent first)
         * `dropna` - Whether to exclude null values (default: true)
-        
+
         # Returns
         Table with 'value' and 'count' columns showing frequency of each unique value
-        
+
         # Examples
         ```python
         # Basic usage
         counts = table.value_counts("category")
-        
+
         # Custom sorting
         counts = table.value_counts("category", sort=True, ascending=True)
-        
+
         # Include null values
         counts = table.value_counts("category", dropna=False)
         ```
@@ -2663,13 +2634,13 @@ class BaseTable:
     def var(self, *args, **kwargs) -> Any:
         """
         Calculate variance for a specific column
-        
+
         # Arguments
         * `column` - Column name to analyze
-        
+
         # Returns
         Variance as f64
-        
+
         # Examples
         ```python
         # Get variance of prices column
@@ -2678,23 +2649,17 @@ class BaseTable:
         """
         ...
 
-
 class BranchInfo:
     """
     Python wrapper for branch information
     """
-    @property
-    def head(self) -> Any:
-        ...
 
     @property
-    def is_current(self) -> Any:
-        ...
-
+    def head(self) -> Any: ...
     @property
-    def name(self) -> Any:
-        ...
-
+    def is_current(self) -> Any: ...
+    @property
+    def name(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2724,32 +2689,22 @@ class BranchInfo:
         Return str(self).
         """
         ...
-
 
 class Commit:
     """
     Python wrapper for commit information
     """
-    @property
-    def author(self) -> Any:
-        ...
 
     @property
-    def id(self) -> Any:
-        ...
-
+    def author(self) -> Any: ...
     @property
-    def message(self) -> Any:
-        ...
-
+    def id(self) -> Any: ...
     @property
-    def parents(self) -> Any:
-        ...
-
+    def message(self) -> Any: ...
     @property
-    def timestamp(self) -> Any:
-        ...
-
+    def parents(self) -> Any: ...
+    @property
+    def timestamp(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2779,36 +2734,24 @@ class Commit:
         Return str(self).
         """
         ...
-
 
 class ComponentSubgraph:
     """
     Python wrapper for ComponentSubgraph - Pure delegation to existing traits
     """
-    @property
-    def component_id(self) -> Any:
-        ...
 
     @property
-    def component_size(self) -> Any:
-        ...
-
+    def component_id(self) -> Any: ...
     @property
-    def edge_count(self) -> Any:
-        ...
-
+    def component_size(self) -> Any: ...
     @property
-    def is_largest_component(self) -> Any:
-        ...
-
+    def edge_count(self) -> Any: ...
     @property
-    def node_count(self) -> Any:
-        ...
-
+    def is_largest_component(self) -> Any: ...
     @property
-    def total_components(self) -> Any:
-        ...
-
+    def node_count(self) -> Any: ...
+    @property
+    def total_components(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2839,23 +2782,16 @@ class ComponentSubgraph:
         """
         ...
 
-    def contains_edge(self, *args, **kwargs) -> Any:
-        ...
-
-    def contains_node(self, *args, **kwargs) -> Any:
-        ...
-
-    def edge_ids(self, *args, **kwargs) -> Any:
-        ...
-
-    def node_ids(self, *args, **kwargs) -> Any:
-        ...
-
+    def contains_edge(self, *args, **kwargs) -> Any: ...
+    def contains_node(self, *args, **kwargs) -> Any: ...
+    def edge_ids(self, *args, **kwargs) -> Any: ...
+    def node_ids(self, *args, **kwargs) -> Any: ...
 
 class ComponentsArray:
     """
     Lazy array of connected components - avoids creating hundreds of PySubgraphs immediately
     """
+
     @property
     def viz(self) -> Any:
         """
@@ -2959,11 +2895,11 @@ class ComponentsArray:
         """
         ...
 
-
 class ComposerPreview:
     """
     Python wrapper for ComposerPreview
     """
+
     @property
     def edge_strategy(self) -> Any:
         """
@@ -3029,11 +2965,11 @@ class ComposerPreview:
         """
         ...
 
-
 class DisplayConfig:
     """
     Python wrapper for DisplayConfig
     """
+
     @property
     def max_cols(self) -> Any:
         """
@@ -3084,19 +3020,19 @@ class DisplayConfig:
         """
         ...
 
-
 class Edge:
     """
     Python wrapper for a regular graph edge
-    
+
     Regular edges are the basic connections between nodes in graphs. They provide access
     to edge attributes, topology information (source/target), and graph operations.
     """
+
     @property
     def entity_type(self) -> Any:
         """
         Get the entity type for this edge
-        
+
         # Returns
         The string "edge"
         """
@@ -3106,7 +3042,7 @@ class Edge:
     def id(self) -> Any:
         """
         Get the edge ID
-        
+
         # Returns
         The unique EdgeId for this edge
         """
@@ -3116,7 +3052,7 @@ class Edge:
     def is_active(self) -> Any:
         """
         Check if this edge is currently active
-        
+
         # Returns
         True if the edge is active in the graph
         """
@@ -3126,10 +3062,10 @@ class Edge:
     def source(self) -> Any:
         """
         Get the edge's source node ID
-        
+
         # Returns
         The NodeId of the source node
-        
+
         # Raises
         * `RuntimeError` - If there's an error getting the source
         """
@@ -3139,10 +3075,10 @@ class Edge:
     def target(self) -> Any:
         """
         Get the edge's target node ID
-        
+
         # Returns
         The NodeId of the target node
-        
+
         # Raises
         * `RuntimeError` - If there's an error getting the target
         """
@@ -3193,10 +3129,10 @@ class Edge:
     def keys(self, *args, **kwargs) -> Any:
         """
         Get all attribute keys for this edge
-        
+
         # Returns
         List of attribute names
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
@@ -3205,7 +3141,7 @@ class Edge:
     def summary(self, *args, **kwargs) -> Any:
         """
         Get a summary of this edge
-        
+
         # Returns
         A human-readable summary string
         """
@@ -3214,23 +3150,23 @@ class Edge:
     def values(self, *args, **kwargs) -> Any:
         """
         Get all attribute values for this edge
-        
+
         # Arguments
         * `py` - Python interpreter instance
-        
+
         # Returns
         List of attribute values
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
         ...
 
-
 class EdgeFilter:
     """
     Python wrapper for EdgeFilter
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -3261,30 +3197,14 @@ class EdgeFilter:
         """
         ...
 
-    def and_filters(self, *args, **kwargs) -> Any:
-        ...
-
-    def attribute_equals(self, *args, **kwargs) -> Any:
-        ...
-
-    def attribute_filter(self, *args, **kwargs) -> Any:
-        ...
-
-    def connects_any(self, *args, **kwargs) -> Any:
-        ...
-
-    def connects_nodes(self, *args, **kwargs) -> Any:
-        ...
-
-    def has_attribute(self, *args, **kwargs) -> Any:
-        ...
-
-    def not_filter(self, *args, **kwargs) -> Any:
-        ...
-
-    def or_filters(self, *args, **kwargs) -> Any:
-        ...
-
+    def and_filters(self, *args, **kwargs) -> Any: ...
+    def attribute_equals(self, *args, **kwargs) -> Any: ...
+    def attribute_filter(self, *args, **kwargs) -> Any: ...
+    def connects_any(self, *args, **kwargs) -> Any: ...
+    def connects_nodes(self, *args, **kwargs) -> Any: ...
+    def has_attribute(self, *args, **kwargs) -> Any: ...
+    def not_filter(self, *args, **kwargs) -> Any: ...
+    def or_filters(self, *args, **kwargs) -> Any: ...
     def source_attribute_equals(self, *args, **kwargs) -> Any:
         """
         Filter edges where the source node has a specific attribute value
@@ -3311,11 +3231,11 @@ class EdgeFilter:
         """
         ...
 
-
 class EdgeStrategy:
     """
     Python wrapper for EdgeStrategy
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -3366,15 +3286,15 @@ class EdgeStrategy:
 
     def keep_external(self, *args, **kwargs) -> Any:
         """
-        Create keep_external strategy  
+        Create keep_external strategy
         """
         ...
 
-
 class EdgesAccessor:
     """
-    Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
+    Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView
     """
+
     @property
     def attributes(self) -> Any:
         """
@@ -3386,12 +3306,12 @@ class EdgesAccessor:
     def base(self) -> Any:
         """
         Get filtered accessor for base edges (non-meta edges)
-        
+
         Returns a new EdgesAccessor that only shows edges where entity_type != 'meta'
-        
+
         Example:
             base_edges = g.edges.base
-            base_count = len(base_edges)  
+            base_count = len(base_edges)
             base_table = base_edges.table()
         """
         ...
@@ -3400,9 +3320,9 @@ class EdgesAccessor:
     def meta(self) -> Any:
         """
         Get filtered accessor for meta-edges
-        
+
         Returns a new EdgesAccessor that only shows edges where entity_type == 'meta'
-        
+
         Example:
             meta_edges = g.edges.meta
             meta_count = len(meta_edges)
@@ -3421,7 +3341,7 @@ class EdgesAccessor:
     @property
     def targets(self) -> NumArray:
         """
-        Get target node IDs for all edges  
+        Get target node IDs for all edges
         Returns a NumArray parallel to edge_ids where each element is the target of the corresponding edge
         """
         ...
@@ -3516,13 +3436,13 @@ class EdgesAccessor:
     def group_by(self, *args, **kwargs) -> Any:
         """
         Group edges by attribute value, returning SubgraphArray
-        
+
         Args:
             attr_name: Name of the edge attribute to group by
-        
+
         Returns:
             SubgraphArray: Array of subgraphs, one for each unique attribute value
-        
+
         Example:
             type_groups = g.edges.group_by('interaction_type')
             # Returns subgraphs for each interaction type
@@ -3553,7 +3473,7 @@ class EdgesAccessor:
     def table(self, *args, **kwargs) -> Any:
         """
         Get an EdgesTable representation of accessible edges
-        Implements: g.edges.table()  
+        Implements: g.edges.table()
         """
         ...
 
@@ -3565,12 +3485,12 @@ class EdgesAccessor:
         """
         ...
 
-
 class EdgesArray:
     """
     EdgesArray: Collection of EdgesAccessor objects with delegation to BaseArray
     Provides basic array operations and graph-specific transformations
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -3646,16 +3566,16 @@ class EdgesArray:
     def interactive(self, *args, **kwargs) -> Any:
         """
         Launch interactive visualization for this EdgesArray
-        
+
         Converts the EdgesArray to a table view and launches visualization
-        
+
         # Arguments
         * `port` - Optional port number (0 for auto-assign)
         * `layout` - Layout algorithm: \"force-directed\", \"circular\", \"grid\", \"hierarchical\"
         * `theme` - Visual theme: \"light\", \"dark\", \"publication\", \"minimal\"
         * `width` - Canvas width in pixels
         * `height` - Canvas height in pixels
-        
+
         # Returns
         VizAccessor for launching interactive visualization
         """
@@ -3715,11 +3635,11 @@ class EdgesArray:
         """
         ...
 
-
 class EdgesArrayIterator:
     """
     Iterator for EdgesArray that enables method chaining
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -3786,11 +3706,11 @@ class EdgesArrayIterator:
         """
         ...
 
-
 class EdgesTable:
     """
     Python wrapper for EdgesTable
     """
+
     @property
     def viz(self) -> Any:
         """
@@ -3867,10 +3787,10 @@ class EdgesTable:
     def drop_columns(self, *args, **kwargs) -> Any:
         """
         Drop columns from the table (cannot drop edge_id, source, or target)
-        
+
         Args:
             columns: List of column names to drop
-        
+
         Returns:
             PyEdgesTable: A new table without the specified columns
         """
@@ -3885,10 +3805,10 @@ class EdgesTable:
     def filter(self, *args, **kwargs) -> Any:
         """
         Filter rows using a query expression or Python function
-        
+
         Args:
             predicate: Either a string query expression (e.g. "weight > 0.5") or a Python function
-        
+
         Returns:
             PyEdgesTable: A new table with filtered rows
         """
@@ -3939,10 +3859,10 @@ class EdgesTable:
     def group_by(self, *args, **kwargs) -> Any:
         """
         Group by columns and return grouped tables
-        
+
         Args:
             columns: List of column names to group by
-        
+
         Returns:
             PyEdgesTableArray: Array-like container holding the grouped edge tables
         """
@@ -3957,11 +3877,11 @@ class EdgesTable:
     def interactive(self, *args, **kwargs) -> Any:
         """
         Launch interactive streaming table view in browser
-        
+
         Returns the URL where the interactive table can be viewed.
         The table will be available for real-time exploration with virtual scrolling,
         filtering, and other interactive features.
-        
+
         Returns:
             str: URL of the interactive table interface
         """
@@ -3970,10 +3890,10 @@ class EdgesTable:
     def interactive_embed(self, *args, **kwargs) -> Any:
         """
         Generate embedded iframe HTML for Jupyter notebooks
-        
+
         Creates an interactive streaming edges table that can be embedded directly
         in a Jupyter notebook cell, eliminating the need for a separate browser tab.
-        
+
         Returns:
             str: HTML iframe code for embedding in Jupyter
         """
@@ -3982,14 +3902,14 @@ class EdgesTable:
     def interactive_viz(self, *args, **kwargs) -> Any:
         """
         Launch interactive visualization for this EdgesTable (new visualization system)
-        
+
         # Arguments
         * `port` - Optional port number (0 for auto-assign)
         * `layout` - Layout algorithm: \"force-directed\", \"circular\", \"grid\", \"hierarchical\"
         * `theme` - Visual theme: \"light\", \"dark\", \"publication\", \"minimal\"
         * `width` - Canvas width in pixels
         * `height` - Canvas height in pixels
-        
+
         # Returns
         VizAccessor for launching interactive visualization
         """
@@ -4028,10 +3948,10 @@ class EdgesTable:
     def select(self, *args, **kwargs) -> Any:
         """
         Select specific columns to create a new table
-        
+
         Args:
             columns: List of column names to select
-        
+
         Returns:
             PyEdgesTable: A new table with only the selected columns
         """
@@ -4046,11 +3966,11 @@ class EdgesTable:
     def slice(self, *args, **kwargs) -> Any:
         """
         Get a slice of rows [start, end)
-        
+
         Args:
             start: Starting row index (inclusive)
             end: Ending row index (exclusive)
-        
+
         Returns:
             PyEdgesTable: A new table with the specified row slice
         """
@@ -4059,11 +3979,11 @@ class EdgesTable:
     def sort_by(self, *args, **kwargs) -> Any:
         """
         Sort table by column
-        
+
         Args:
             column: Name of the column to sort by
             ascending: If True, sort in ascending order; if False, descending
-        
+
         Returns:
             PyEdgesTable: A new sorted table
         """
@@ -4073,13 +3993,13 @@ class EdgesTable:
         """
         Sort table by multiple columns with mixed ascending/descending order
         Pandas-style multi-column sorting with priority order
-        
+
         Args:
             columns: List of column names to sort by (in priority order)
             ascending: List of booleans for sort direction per column.
                       If single bool, applies to all columns.
                       If list, must match length of columns.
-        
+
         Returns:
             PyEdgesTable: A new sorted table
         """
@@ -4099,7 +4019,7 @@ class EdgesTable:
 
     def targets(self, *args, **kwargs) -> Any:
         """
-        Get target node IDs  
+        Get target node IDs
         """
         ...
 
@@ -4133,15 +4053,15 @@ class EdgesTable:
         """
         ...
 
-
 class Graph:
     """
     Python wrapper for the main Graph
     """
+
     @property
     def edge_ids(self) -> NumArray:
         """
-        Get all active edge IDs as IntArray  
+        Get all active edge IDs as IntArray
         """
         ...
 
@@ -4237,19 +4157,15 @@ class Graph:
     def add_graph(self, *args, **kwargs) -> Any:
         """
         Add another graph to this graph (merge nodes and edges)
-        
+
         All nodes and edges from the other graph will be added to this graph.
         Node and edge IDs may be remapped to avoid conflicts.
         Attributes are preserved during the merge.
         """
         ...
 
-    def add_node(self, *args, **kwargs) -> Any:
-        ...
-
-    def add_nodes(self, *args, **kwargs) -> Any:
-        ...
-
+    def add_node(self, *args, **kwargs) -> Any: ...
+    def add_nodes(self, *args, **kwargs) -> Any: ...
     def adjacency_list(self, *args, **kwargs) -> Any:
         """
         Get adjacency list (not yet implemented).
@@ -4336,7 +4252,7 @@ class Graph:
 
     def contains_edge(self, *args, **kwargs) -> Any:
         """
-        Check if edge exists - DELEGATED (same as has_edge)  
+        Check if edge exists - DELEGATED (same as has_edge)
         """
         ...
 
@@ -4366,7 +4282,7 @@ class Graph:
 
     def dfs(self, *args, **kwargs) -> Any:
         """
-        DFS traversal - delegates to PyGraphAnalysis helper  
+        DFS traversal - delegates to PyGraphAnalysis helper
         """
         ...
 
@@ -4382,9 +4298,7 @@ class Graph:
         """
         ...
 
-    def edge_endpoints(self, *args, **kwargs) -> Any:
-        ...
-
+    def edge_endpoints(self, *args, **kwargs) -> Any: ...
     def edges_table(self, *args, **kwargs) -> Any:
         """
         Get edges table - delegates via Python.
@@ -4400,7 +4314,7 @@ class Graph:
     def filter_edges(self, *args, **kwargs) -> Subgraph:
         """
         Filter edges using EdgeFilter object or string query
-        
+
         OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
         """
         ...
@@ -4408,7 +4322,7 @@ class Graph:
     def filter_nodes(self, *args, **kwargs) -> Subgraph:
         """
         Filter nodes using NodeFilter object or string query
-        
+
         OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
         """
         ...
@@ -4470,7 +4384,7 @@ class Graph:
 
     def has_edge(self, *args, **kwargs) -> Any:
         """
-        Check if an edge exists in the graph - DELEGATED  
+        Check if an edge exists in the graph - DELEGATED
         """
         ...
 
@@ -4764,11 +4678,11 @@ class Graph:
         """
         ...
 
-
 class GraphMatrix:
     """
     Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
     """
+
     @property
     def columns(self) -> Any:
         """
@@ -4988,10 +4902,10 @@ class GraphMatrix:
     def from_data(self, *args, **kwargs) -> Any:
         """
         Create matrix from nested Python lists (API consistency)
-        
+
         This is a classmethod wrapper around the `groggy.matrix()` function
         for API consistency with other matrix libraries.
-        
+
         Examples:
           groggy.GraphMatrix.from_data([[1, 2], [3, 4]])  # 2×2 matrix
           groggy.GraphMatrix.from_data([[1, 2, 3]])       # 1×3 matrix
@@ -5117,7 +5031,7 @@ class GraphMatrix:
 
     def mean(self, *args, **kwargs) -> Any:
         """
-        Global mean of all elements in the matrix  
+        Global mean of all elements in the matrix
         """
         ...
 
@@ -5361,11 +5275,11 @@ class GraphMatrix:
     def to_normalized_laplacian(self, *args, **kwargs) -> Any:
         """
         Get normalized Laplacian matrix with enhanced parameterization
-        
+
         Args:
             eps: Exponent for degree matrix (default 0.5 for standard normalization)
             k: Power to raise the result to (default 1)
-        
+
         Formula: (D^eps @ A @ D^eps)^k
         """
         ...
@@ -5386,10 +5300,10 @@ class GraphMatrix:
     def to_table_for_streaming(self, *args, **kwargs) -> Any:
         """
         Convert matrix to table format for streaming visualization
-        
+
         Creates a BaseTable with columns representing matrix data:
         - 'row': row index
-        - 'column': column index  
+        - 'column': column index
         - 'value': the matrix value at that position
         """
         ...
@@ -5424,15 +5338,15 @@ class GraphMatrix:
         """
         ...
 
-
 class GraphTable:
     """
     Python wrapper for GraphTable
     """
+
     @property
     def edges(self) -> Any:
         """
-        Get EdgesTable component  
+        Get EdgesTable component
         """
         ...
 
@@ -5507,13 +5421,13 @@ class GraphTable:
     def get_bundle_info(self, *args, **kwargs) -> Any:
         """
         Get bundle metadata information without loading the full bundle
-        
+
         # Arguments
         * `bundle_path` - Directory path containing the bundle
-        
+
         # Returns
         * `dict` - Bundle metadata information
-        
+
         # Examples
         ```python
         # Inspect bundle metadata
@@ -5540,18 +5454,18 @@ class GraphTable:
     def load_bundle(self, *args, **kwargs) -> Any:
         """
         Load GraphTable from a bundle directory (supports both v1.0 and v2.0 formats)
-        
+
         # Arguments
         * `bundle_path` - Directory path containing the bundle
-        
+
         # Returns
         * `PyGraphTable` - Loaded graph table with validation policy restored
-        
+
         # Examples
         ```python
         # Load from v2.0 bundle (with integrity verification)
         graph_table = GraphTable.load_bundle("./graph_data_bundle")
-        
+
         # Also supports legacy v1.0 bundles
         graph_table = GraphTable.load_bundle("./old_bundle")
         ```
@@ -5579,15 +5493,15 @@ class GraphTable:
     def save_bundle(self, *args, **kwargs) -> Any:
         """
         Save GraphTable as a v2.0 bundle with comprehensive metadata and checksums
-        
+
         # Arguments
         * `bundle_path` - Directory path to save the bundle
-        
+
         # Examples
         ```python
         # Save with comprehensive metadata and validation
         graph_table.save_bundle("./graph_data_bundle")
-        
+
         # Bundle will contain:
         # - metadata.json: Comprehensive metadata with checksums
         # - MANIFEST.json: File integrity manifest
@@ -5606,7 +5520,7 @@ class GraphTable:
 
     def stats(self, *args, **kwargs) -> Any:
         """
-        Get graph statistics  
+        Get graph statistics
         """
         ...
 
@@ -5649,13 +5563,13 @@ class GraphTable:
     def verify_bundle(self, *args, **kwargs) -> Any:
         """
         Verify bundle integrity without loading the full data
-        
+
         # Arguments
         * `bundle_path` - Directory path containing the bundle
-        
+
         # Returns
         * `dict` - Verification results with checksums and validation status
-        
+
         # Examples
         ```python
         # Verify bundle integrity
@@ -5668,23 +5582,17 @@ class GraphTable:
         """
         ...
 
-
 class GroupedAggregationResult:
     """
     Result of a grouped aggregation operation
     """
-    @property
-    def attribute(self) -> Any:
-        ...
 
     @property
-    def groups(self) -> Any:
-        ...
-
+    def attribute(self) -> Any: ...
     @property
-    def operation(self) -> Any:
-        ...
-
+    def groups(self) -> Any: ...
+    @property
+    def operation(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5714,16 +5622,14 @@ class GroupedAggregationResult:
         Return str(self).
         """
         ...
-
 
 class HistoricalView:
     """
     Python wrapper for historical view
     """
-    @property
-    def state_id(self) -> Any:
-        ...
 
+    @property
+    def state_id(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5754,11 +5660,11 @@ class HistoricalView:
         """
         ...
 
-
 class HistoryStatistics:
     """
     History statistics for the graph
     """
+
     @property
     def current_state_edges(self) -> Any:
         """
@@ -5824,12 +5730,12 @@ class HistoryStatistics:
         """
         ...
 
-
 class MatrixArray:
     """
     MatrixArray: Collection of GraphMatrix objects with delegation to NumArray
     Provides basic array operations plus statistical operations on matrix collections
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5956,11 +5862,11 @@ class MatrixArray:
         """
         ...
 
-
 class MatrixArrayIterator:
     """
     Iterator for MatrixArray that enables method chaining
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6027,26 +5933,26 @@ class MatrixArrayIterator:
         """
         ...
 
-
 class MetaEdge:
     """
     Python wrapper for a meta-edge (aggregated edge)
-    
+
     Meta-edges are special edges that represent aggregated or summarized relationships
     between nodes. They have all the capabilities of regular edges plus meta-specific
     operations like getting aggregation counts.
     """
+
     @property
     def aggregated_from(self) -> Any:
         """
         Get the IDs of original edges that were aggregated into this meta-edge
-        
+
         This is a future enhancement - currently original edge IDs are not stored
         during the collapse process.
-        
+
         # Returns
         Optional list of original EdgeIds, or None if not available
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing aggregated edges
         """
@@ -6056,10 +5962,10 @@ class MetaEdge:
     def edge_count(self) -> Any:
         """
         Get the count of original edges this meta-edge aggregates
-        
+
         During subgraph collapse, multiple original edges may be aggregated
         into a single meta-edge. This returns how many were combined.
-        
+
         # Returns
         Optional count of original edges, or None if not available
         """
@@ -6069,7 +5975,7 @@ class MetaEdge:
     def entity_type(self) -> Any:
         """
         Get the entity type for this meta-edge
-        
+
         # Returns
         The string "meta_edge"
         """
@@ -6079,7 +5985,7 @@ class MetaEdge:
     def id(self) -> Any:
         """
         Get the meta-edge ID
-        
+
         # Returns
         The unique EdgeId for this meta-edge
         """
@@ -6089,7 +5995,7 @@ class MetaEdge:
     def is_active(self) -> Any:
         """
         Check if this meta-edge is currently active
-        
+
         # Returns
         True if the meta-edge is active in the graph
         """
@@ -6099,9 +6005,9 @@ class MetaEdge:
     def is_meta_edge(self) -> Any:
         """
         Check if this is a meta-edge
-        
+
         Meta-edges are identified by having entity_type="meta"
-        
+
         # Returns
         True if this is a meta-edge, False otherwise
         """
@@ -6111,10 +6017,10 @@ class MetaEdge:
     def source(self) -> Any:
         """
         Get the meta-edge's source node ID
-        
+
         # Returns
         The NodeId of the source node
-        
+
         # Raises
         * `RuntimeError` - If there's an error getting the source
         """
@@ -6124,10 +6030,10 @@ class MetaEdge:
     def target(self) -> Any:
         """
         Get the meta-edge's target node ID
-        
+
         # Returns
         The NodeId of the target node
-        
+
         # Raises
         * `RuntimeError` - If there's an error getting the target
         """
@@ -6178,13 +6084,13 @@ class MetaEdge:
     def expand(self, *args, **kwargs) -> Any:
         """
         Expand meta-edge back to original edges
-        
+
         This is a future enhancement that would recreate the original edges
         that were aggregated into this meta-edge.
-        
+
         # Returns
         Optional list of recreated EdgeIds, or None if not possible
-        
+
         # Raises
         * `RuntimeError` - If there's an error expanding the meta-edge
         """
@@ -6193,10 +6099,10 @@ class MetaEdge:
     def keys(self, *args, **kwargs) -> Any:
         """
         Get all attribute keys for this meta-edge
-        
+
         # Returns
         List of attribute names
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
@@ -6205,16 +6111,16 @@ class MetaEdge:
     def meta_properties(self, *args, **kwargs) -> Any:
         """
         Get meta-edge specific properties as a dictionary
-        
+
         Returns a dictionary containing meta-edge specific attributes like
         edge_count, aggregation information, etc.
-        
+
         # Arguments
         * `py` - Python interpreter instance
-        
+
         # Returns
         Dictionary of property names to values for this meta-edge
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing meta properties
         """
@@ -6223,7 +6129,7 @@ class MetaEdge:
     def summary(self, *args, **kwargs) -> Any:
         """
         Get a summary of this meta-edge
-        
+
         # Returns
         A human-readable summary string including meta-edge specific information
         """
@@ -6232,35 +6138,35 @@ class MetaEdge:
     def values(self, *args, **kwargs) -> Any:
         """
         Get all attribute values for this meta-edge
-        
+
         # Arguments
         * `py` - Python interpreter instance
-        
+
         # Returns
         List of attribute values
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
         ...
 
-
 class MetaNode:
     """
     Python wrapper for a meta-node (collapsed subgraph)
-    
+
     Meta-nodes are special nodes that represent collapsed subgraphs. They have all
     the capabilities of regular nodes plus meta-specific operations like expanding
     back to the original subgraph.
     """
+
     @property
     def degree(self) -> Any:
         """
         Get the meta-node's degree (number of connected edges)
-        
+
         # Returns
         The number of edges connected to this meta-node
-        
+
         # Raises
         * `RuntimeError` - If there's an error calculating degree
         """
@@ -6270,7 +6176,7 @@ class MetaNode:
     def entity_type(self) -> Any:
         """
         Get the entity type for this meta-node
-        
+
         # Returns
         The string "meta_node"
         """
@@ -6280,7 +6186,7 @@ class MetaNode:
     def has_subgraph(self) -> Any:
         """
         Check if this meta-node contains a subgraph
-        
+
         # Returns
         True if this meta-node has an associated subgraph
         """
@@ -6290,7 +6196,7 @@ class MetaNode:
     def id(self) -> Any:
         """
         Get the meta-node ID
-        
+
         # Returns
         The unique NodeId for this meta-node
         """
@@ -6300,7 +6206,7 @@ class MetaNode:
     def is_active(self) -> Any:
         """
         Check if this meta-node is currently active
-        
+
         # Returns
         True if the meta-node is active in the graph
         """
@@ -6310,13 +6216,13 @@ class MetaNode:
     def meta_edges(self) -> Any:
         """
         Get all meta-edges connected to this meta-node
-        
+
         Meta-edges are edges with entity_type="meta" that were created during
         the subgraph collapse process.
-        
+
         # Returns
         List of EdgeIds representing meta-edges connected to this meta-node
-        
+
         # Raises
         * `RuntimeError` - If there's an error getting meta-edges
         """
@@ -6326,10 +6232,10 @@ class MetaNode:
     def neighbors(self) -> Any:
         """
         Get the meta-node's neighbors
-        
+
         # Returns
         List of NodeIds representing neighboring nodes (could be regular nodes or other meta-nodes)
-        
+
         # Raises
         * `RuntimeError` - If there's an error getting neighbors
         """
@@ -6339,12 +6245,12 @@ class MetaNode:
     def subgraph(self) -> Any:
         """
         Get the contained subgraph
-        
+
         This returns the original subgraph that was collapsed to create this meta-node.
-        
+
         # Returns
         Optional PySubgraph representing the contained subgraph
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing the subgraph
         """
@@ -6354,7 +6260,7 @@ class MetaNode:
     def subgraph_id(self) -> Any:
         """
         Get the ID of the contained subgraph
-        
+
         # Returns
         Optional subgraph ID if this meta-node contains a subgraph
         """
@@ -6405,12 +6311,12 @@ class MetaNode:
     def expand(self, *args, **kwargs) -> Any:
         """
         Expand the meta-node back to its original subgraph
-        
+
         This is an alias for the subgraph property with a more intuitive name.
-        
+
         # Returns
         Optional PySubgraph representing the expanded subgraph
-        
+
         # Raises
         * `RuntimeError` - If there's an error expanding the meta-node
         """
@@ -6419,10 +6325,10 @@ class MetaNode:
     def keys(self, *args, **kwargs) -> Any:
         """
         Get all attribute keys for this meta-node
-        
+
         # Returns
         List of attribute names
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
@@ -6431,13 +6337,13 @@ class MetaNode:
     def re_aggregate(self, *args, **kwargs) -> Any:
         """
         Re-aggregate meta-node attributes with new aggregation functions
-        
+
         This allows updating the meta-node's aggregated attributes by re-running
         the aggregation process with different functions.
-        
+
         # Arguments
         * `agg_functions` - Dictionary mapping attribute names to aggregation functions
-        
+
         # Raises
         * `RuntimeError` - If there's an error during re-aggregation
         """
@@ -6446,7 +6352,7 @@ class MetaNode:
     def summary(self, *args, **kwargs) -> Any:
         """
         Get a summary of this meta-node
-        
+
         # Returns
         A human-readable summary string including meta-node specific information
         """
@@ -6455,23 +6361,23 @@ class MetaNode:
     def values(self, *args, **kwargs) -> Any:
         """
         Get all attribute values for this meta-node
-        
+
         # Arguments
         * `py` - Python interpreter instance
-        
+
         # Returns
         List of attribute values
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
         ...
 
-
 class MetaNodeArray:
     """
     Python wrapper for MetaNodeArray - specialized array for MetaNode collections
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6514,14 +6420,14 @@ class MetaNodeArray:
         """
         ...
 
-
 class MetaNodePlan:
     """
     Simplified Python wrapper for immediate execution
-    
+
     Since we can't store Rc<RefCell<Graph>> in a PyClass, we'll execute immediately.
     This still provides the clean API but without the plan/execute separation.
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6560,31 +6466,23 @@ class MetaNodePlan:
 
     def preview(self, *args, **kwargs) -> Any:
         """
-        Preview what was configured  
+        Preview what was configured
         """
         ...
-
 
 class NeighborhoodResult:
     """
     Python wrapper for NeighborhoodResult
     """
-    @property
-    def execution_time_ms(self) -> Any:
-        ...
 
     @property
-    def largest_neighborhood_size(self) -> Any:
-        ...
-
+    def execution_time_ms(self) -> Any: ...
     @property
-    def neighborhoods(self) -> Any:
-        ...
-
+    def largest_neighborhood_size(self) -> Any: ...
     @property
-    def total_neighborhoods(self) -> Any:
-        ...
-
+    def neighborhoods(self) -> Any: ...
+    @property
+    def total_neighborhoods(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6633,27 +6531,19 @@ class NeighborhoodResult:
         """
         ...
 
-
 class NeighborhoodStats:
     """
     Python wrapper for NeighborhoodStats
     """
-    @property
-    def operation_counts(self) -> Any:
-        ...
 
     @property
-    def total_neighborhoods(self) -> Any:
-        ...
-
+    def operation_counts(self) -> Any: ...
     @property
-    def total_nodes_sampled(self) -> Any:
-        ...
-
+    def total_neighborhoods(self) -> Any: ...
     @property
-    def total_time_ms(self) -> Any:
-        ...
-
+    def total_nodes_sampled(self) -> Any: ...
+    @property
+    def total_time_ms(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6696,19 +6586,15 @@ class NeighborhoodStats:
         """
         ...
 
-
 class NeighborhoodSubgraph:
     """
     Python wrapper for NeighborhoodSubgraph
     """
-    @property
-    def central_nodes(self) -> Any:
-        ...
 
     @property
-    def hops(self) -> Any:
-        ...
-
+    def central_nodes(self) -> Any: ...
+    @property
+    def hops(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6752,22 +6638,22 @@ class NeighborhoodSubgraph:
         """
         ...
 
-
 class Node:
     """
     Python wrapper for a regular graph node
-    
+
     Regular nodes are the basic building blocks of graphs. They provide access
     to node attributes, topology information (neighbors, degree), and graph operations.
     """
+
     @property
     def degree(self) -> Any:
         """
         Get the node's degree (number of connected edges)
-        
+
         # Returns
         The number of edges connected to this node
-        
+
         # Raises
         * `RuntimeError` - If there's an error calculating degree
         """
@@ -6777,7 +6663,7 @@ class Node:
     def entity_type(self) -> Any:
         """
         Get the entity type for this node
-        
+
         # Returns
         The string "node"
         """
@@ -6787,7 +6673,7 @@ class Node:
     def id(self) -> Any:
         """
         Get the node ID
-        
+
         # Returns
         The unique NodeId for this node
         """
@@ -6797,7 +6683,7 @@ class Node:
     def is_active(self) -> Any:
         """
         Check if this node is currently active
-        
+
         # Returns
         True if the node is active in the graph
         """
@@ -6807,10 +6693,10 @@ class Node:
     def neighbors(self) -> Any:
         """
         Get the node's neighbors
-        
+
         # Returns
         List of NodeIds representing neighboring nodes
-        
+
         # Raises
         * `RuntimeError` - If there's an error getting neighbors
         """
@@ -6861,10 +6747,10 @@ class Node:
     def keys(self, *args, **kwargs) -> Any:
         """
         Get all attribute keys for this node
-        
+
         # Returns
         List of attribute names
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
@@ -6873,7 +6759,7 @@ class Node:
     def summary(self, *args, **kwargs) -> Any:
         """
         Get a summary of this node
-        
+
         # Returns
         A human-readable summary string
         """
@@ -6882,23 +6768,23 @@ class Node:
     def values(self, *args, **kwargs) -> Any:
         """
         Get all attribute values for this node
-        
+
         # Arguments
         * `py` - Python interpreter instance
-        
+
         # Returns
         List of attribute values
-        
+
         # Raises
         * `RuntimeError` - If there's an error accessing attributes
         """
         ...
 
-
 class NodeFilter:
     """
     Python wrapper for NodeFilter
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6929,29 +6815,18 @@ class NodeFilter:
         """
         ...
 
-    def and_filters(self, *args, **kwargs) -> Any:
-        ...
-
-    def attribute_equals(self, *args, **kwargs) -> Any:
-        ...
-
-    def attribute_filter(self, *args, **kwargs) -> Any:
-        ...
-
-    def has_attribute(self, *args, **kwargs) -> Any:
-        ...
-
-    def not_filter(self, *args, **kwargs) -> Any:
-        ...
-
-    def or_filters(self, *args, **kwargs) -> Any:
-        ...
-
+    def and_filters(self, *args, **kwargs) -> Any: ...
+    def attribute_equals(self, *args, **kwargs) -> Any: ...
+    def attribute_filter(self, *args, **kwargs) -> Any: ...
+    def has_attribute(self, *args, **kwargs) -> Any: ...
+    def not_filter(self, *args, **kwargs) -> Any: ...
+    def or_filters(self, *args, **kwargs) -> Any: ...
 
 class NodesAccessor:
     """
     Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
     """
+
     @property
     def attributes(self) -> Any:
         """
@@ -6963,10 +6838,10 @@ class NodesAccessor:
     def base(self) -> Any:
         """
         Get filtered accessor for base (non-meta) nodes only
-        
+
         Returns:
             PyNodesAccessor: Accessor that only shows base nodes (entity_type != 'meta')
-        
+
         Example:
             base_nodes = g.nodes.base
             base_count = len(base_nodes)
@@ -6978,10 +6853,10 @@ class NodesAccessor:
     def meta(self) -> Any:
         """
         Get filtered accessor for meta-nodes only
-        
+
         Returns:
             PyNodesAccessor: Accessor that only shows meta-nodes (entity_type == 'meta')
-        
+
         Example:
             meta_nodes = g.nodes.meta
             meta_count = len(meta_nodes)
@@ -6993,10 +6868,10 @@ class NodesAccessor:
     def subgraphs(self) -> Any:
         """
         Access all subgraph-nodes (meta-nodes) in the graph
-        
+
         Returns:
             PyNumArray: Array of node IDs that contain subgraphs
-        
+
         Example:
             subgraph_nodes = g.nodes.subgraphs
             for meta_node in subgraph_nodes:
@@ -7067,7 +6942,7 @@ class NodesAccessor:
 
     def all(self, *args, **kwargs) -> Subgraph:
         """
-        Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
+        Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations
         Returns a subgraph containing all nodes and all induced edges
         """
         ...
@@ -7094,13 +6969,13 @@ class NodesAccessor:
     def get_meta_node(self, *args, **kwargs) -> Any:
         """
         Get a MetaNode object if the specified node is a meta-node
-        
+
         Args:
             node_id: The node ID to check
-        
+
         Returns:
             PyMetaNode if the node is a meta-node, None otherwise
-        
+
         Example:
             meta_node = g.nodes.get_meta_node(3)
             if meta_node:
@@ -7111,13 +6986,13 @@ class NodesAccessor:
     def group_by(self, *args, **kwargs) -> Any:
         """
         Group nodes by attribute value, returning SubgraphArray
-        
+
         Args:
             attr_name: Name of the node attribute to group by
-        
+
         Returns:
             SubgraphArray: Array of subgraphs, one for each unique attribute value
-        
+
         Example:
             dept_groups = g.nodes.group_by('department')
             # Returns subgraphs for each department value
@@ -7147,17 +7022,17 @@ class NodesAccessor:
 
     def table(self, *args, **kwargs) -> Any:
         """
-        Get a NodesTable representation of accessible nodes  
+        Get a NodesTable representation of accessible nodes
         Implements: g.nodes.table()
         """
         ...
-
 
 class NodesArray:
     """
     NodesArray: Collection of NodesAccessor objects with delegation to BaseArray
     Provides basic array operations and graph-specific transformations
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7227,16 +7102,16 @@ class NodesArray:
     def interactive(self, *args, **kwargs) -> Any:
         """
         Launch interactive visualization for this NodesArray
-        
+
         Converts the NodesArray to a table view and launches visualization
-        
+
         # Arguments
         * `port` - Optional port number (0 for auto-assign)
         * `layout` - Layout algorithm: \"force-directed\", \"circular\", \"grid\", \"hierarchical\"
         * `theme` - Visual theme: \"light\", \"dark\", \"publication\", \"minimal\"
         * `width` - Canvas width in pixels
         * `height` - Canvas height in pixels
-        
+
         # Returns
         VizAccessor for launching interactive visualization
         """
@@ -7256,7 +7131,7 @@ class NodesArray:
 
     def last(self, *args, **kwargs) -> Any:
         """
-        Get the last NodesAccessor  
+        Get the last NodesAccessor
         """
         ...
 
@@ -7290,11 +7165,11 @@ class NodesArray:
         """
         ...
 
-
 class NodesArrayIterator:
     """
     Iterator for NodesArray that enables method chaining
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7349,11 +7224,11 @@ class NodesArrayIterator:
         """
         ...
 
-
 class NodesTable:
     """
     Python wrapper for NodesTable
     """
+
     @property
     def viz(self) -> Any:
         """
@@ -7418,10 +7293,10 @@ class NodesTable:
     def drop_columns(self, *args, **kwargs) -> Any:
         """
         Drop columns from the table (cannot drop node_id)
-        
+
         Args:
             columns: List of column names to drop
-        
+
         Returns:
             PyNodesTable: A new table without the specified columns
         """
@@ -7430,10 +7305,10 @@ class NodesTable:
     def filter(self, *args, **kwargs) -> Any:
         """
         Filter rows using a query expression or Python function
-        
+
         Args:
             predicate: Either a string query expression (e.g. "age > 25") or a Python function
-        
+
         Returns:
             PyNodesTable: A new table with filtered rows
         """
@@ -7472,10 +7347,10 @@ class NodesTable:
     def group_by(self, *args, **kwargs) -> Any:
         """
         Group by columns and return grouped tables
-        
+
         Args:
             columns: List of column names to group by
-        
+
         Returns:
             PyNodesTableArray: Array-like container holding the grouped node tables
         """
@@ -7490,11 +7365,11 @@ class NodesTable:
     def interactive(self, *args, **kwargs) -> Any:
         """
         Launch interactive streaming table view in browser
-        
+
         Returns the URL where the interactive table can be viewed.
         The table will be available for real-time exploration with virtual scrolling,
         filtering, and other interactive features.
-        
+
         Returns:
             str: URL of the interactive table interface
         """
@@ -7503,10 +7378,10 @@ class NodesTable:
     def interactive_embed(self, *args, **kwargs) -> Any:
         """
         Generate embedded iframe HTML for Jupyter notebooks
-        
+
         Creates an interactive streaming nodes table that can be embedded directly
         in a Jupyter notebook cell, eliminating the need for a separate browser tab.
-        
+
         Returns:
             str: HTML iframe code for embedding in Jupyter
         """
@@ -7515,14 +7390,14 @@ class NodesTable:
     def interactive_viz(self, *args, **kwargs) -> Any:
         """
         Launch interactive visualization for this NodesTable
-        
+
         # Arguments
         * `port` - Optional port number (0 for auto-assign)
         * `layout` - Layout algorithm: \"force-directed\", \"circular\", \"grid\", \"hierarchical\"
         * `theme` - Visual theme: \"light\", \"dark\", \"publication\", \"minimal\"
         * `width` - Canvas width in pixels
         * `height` - Canvas height in pixels
-        
+
         # Returns
         VizAccessor for launching interactive visualization
         """
@@ -7573,10 +7448,10 @@ class NodesTable:
     def select(self, *args, **kwargs) -> Any:
         """
         Select specific columns to create a new table
-        
+
         Args:
             columns: List of column names to select
-        
+
         Returns:
             PyNodesTable: A new table with only the selected columns
         """
@@ -7591,11 +7466,11 @@ class NodesTable:
     def slice(self, *args, **kwargs) -> Any:
         """
         Get a slice of rows [start, end)
-        
+
         Args:
             start: Starting row index (inclusive)
             end: Ending row index (exclusive)
-        
+
         Returns:
             PyNodesTable: A new table with the specified row slice
         """
@@ -7604,11 +7479,11 @@ class NodesTable:
     def sort_by(self, *args, **kwargs) -> Any:
         """
         Sort table by column
-        
+
         Args:
             column: Name of the column to sort by
             ascending: If True, sort in ascending order; if False, descending
-        
+
         Returns:
             PyNodesTable: A new sorted table
         """
@@ -7618,13 +7493,13 @@ class NodesTable:
         """
         Sort table by multiple columns with mixed ascending/descending order
         Pandas-style multi-column sorting with priority order
-        
+
         Args:
             columns: List of column names to sort by (in priority order)
             ascending: List of booleans for sort direction per column.
                       If single bool, applies to all columns.
                       If list, must match length of columns.
-        
+
         Returns:
             PyNodesTable: A new sorted table
         """
@@ -7669,24 +7544,24 @@ class NodesTable:
     def with_attributes(self, *args, **kwargs) -> Any:
         """
         Add node attributes - flexible input format
-        
+
         Args:
-            attr_name: Name of the attribute column to add  
+            attr_name: Name of the attribute column to add
             attributes: Can be:
                 - Dictionary mapping node_id to value: {0: "Alice", 1: "Bob"}
                 - List of {"id": node_id, "value": value} dicts: [{"id": 0, "value": "Alice"}]
                 - HashMap<NodeId, PyAttrValue> (advanced usage)
-        
+
         Returns:
             PyNodesTable: A new table with the attributes added
         """
         ...
 
-
 class NumArray:
     """
     Unified statistical array supporting all numeric types internally
     """
+
     @property
     def dtype(self) -> Any:
         """
@@ -7762,7 +7637,7 @@ class NumArray:
 
     def last(self, *args, **kwargs) -> Any:
         """
-        Get last element  
+        Get last element
         """
         ...
 
@@ -7832,11 +7707,11 @@ class NumArray:
         """
         ...
 
-
 class PyAttributeCollection:
     """
     Python wrapper for high-performance attribute collections
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7885,11 +7760,11 @@ class PyAttributeCollection:
         """
         ...
 
-
 class PyComponentsArrayIterator:
     """
     Iterator for ComponentsArray
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7931,12 +7806,12 @@ class PyComponentsArrayIterator:
         Return str(self).
         """
         ...
-
 
 class PyNumArrayIterator:
     """
     Iterator for PyNumArray
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7978,24 +7853,18 @@ class PyNumArrayIterator:
         Return str(self).
         """
         ...
-
 
 class PyResultHandle:
     """
     Native result handle that keeps data in Rust
     """
-    @property
-    def edges(self) -> Any:
-        ...
 
     @property
-    def nodes(self) -> Any:
-        ...
-
+    def edges(self) -> Any: ...
     @property
-    def result_type(self) -> Any:
-        ...
-
+    def nodes(self) -> Any: ...
+    @property
+    def result_type(self) -> Any: ...
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -8026,11 +7895,11 @@ class PyResultHandle:
         """
         ...
 
-
 class PySubgraphArrayIterator:
     """
     Python iterator for PySubgraphArray
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -8073,11 +7942,11 @@ class PySubgraphArrayIterator:
         """
         ...
 
-
 class PyTableArrayCoreIterator:
     """
     Python iterator for core TableArray
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -8126,11 +7995,11 @@ class PyTableArrayCoreIterator:
         """
         ...
 
-
 class PyTableArrayIterator:
     """
     Python iterator for PyTableArray
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -8173,11 +8042,11 @@ class PyTableArrayIterator:
         """
         ...
 
-
 class StatsArray:
     """
     Unified statistical array supporting all numeric types internally
     """
+
     @property
     def dtype(self) -> Any:
         """
@@ -8253,7 +8122,7 @@ class StatsArray:
 
     def last(self, *args, **kwargs) -> Any:
         """
-        Get last element  
+        Get last element
         """
         ...
 
@@ -8323,14 +8192,14 @@ class StatsArray:
         """
         ...
 
-
 class Subgraph:
     """
     Python wrapper for core Subgraph - Pure delegation to existing trait methods
-    
+
     This completely replaces the complex dual-mode PySubgraph with simple delegation
     to the existing SubgraphOperations trait methods. Same API, much simpler implementation.
     """
+
     @property
     def edge_ids(self) -> NumArray:
         """
@@ -8450,10 +8319,10 @@ class Subgraph:
     def collapse(self, *args, **kwargs) -> Any:
         """
         Modern MetaGraph Composer API - Clean interface for meta-node creation
-        
+
         This is the new, intuitive way to create meta-nodes with flexible configuration.
         Returns a MetaNodePlan that can be previewed, modified, and executed.
-        
+
         # Arguments
         * `node_aggs` - Node aggregation specifications (dict or list format)
         * `edge_aggs` - Edge aggregation specifications (dict format)
@@ -8463,7 +8332,7 @@ class Subgraph:
         * `include_edge_count` - Include edge_count attribute in meta-edges
         * `mark_entity_type` - Mark meta-nodes/edges with entity_type
         * `entity_type` - Entity type for marking
-        
+
         # Examples
         ```python
         # Dict format for node aggregations
@@ -8474,7 +8343,7 @@ class Subgraph:
             node_strategy="extract"
         )
         meta_node = plan.add_to_graph()
-        
+
         # With preset
         plan = subgraph.collapse(preset="social_network")
         meta_node = plan.add_to_graph()
@@ -8490,7 +8359,7 @@ class Subgraph:
 
     def contains_edge(self, *args, **kwargs) -> Any:
         """
-        Check if subgraph contains a specific edge (alias for has_edge)  
+        Check if subgraph contains a specific edge (alias for has_edge)
         """
         ...
 
@@ -8503,12 +8372,12 @@ class Subgraph:
     def degree(self, *args, **kwargs) -> Any:
         """
         Get degree of nodes in subgraph as GraphArray
-        
+
         Usage:
         - degree(node_id, full_graph=False) -> int: degree of single node (local or full graph)
         - degree(node_ids, full_graph=False) -> GraphArray: degrees for list of nodes
         - degree(full_graph=False) -> GraphArray: degrees for all nodes in subgraph
-        
+
         Parameters:
         - nodes: Optional node ID, list of node IDs, or None for all nodes
         - full_graph: If False (default), compute degrees within subgraph only.
@@ -8560,7 +8429,7 @@ class Subgraph:
 
     def filter_nodes(self, *args, **kwargs) -> Subgraph:
         """
-        Filter nodes and return new subgraph  
+        Filter nodes and return new subgraph
         """
         ...
 
@@ -8579,14 +8448,14 @@ class Subgraph:
     def group_by(self, *args, **kwargs) -> Any:
         """
         Group subgraph by attribute value
-        
+
         Args:
             attr_name: Name of the attribute to group by
             element_type: Either 'nodes' or 'edges' to specify what to group
-        
+
         Returns:
             SubgraphArray: Array of subgraphs, one for each unique attribute value
-        
+
         Example:
             dept_groups = subgraph.group_by('department', 'nodes')
             type_groups = subgraph.group_by('interaction_type', 'edges')
@@ -8620,18 +8489,18 @@ class Subgraph:
     def has_path(self, *args, **kwargs) -> Any:
         """
         Check if there is a path between two nodes within this subgraph
-        
+
         This is more efficient than `shortest_path_subgraph` when you only need
         to know if a path exists, not the actual path.
-        
+
         # Arguments
         * `node1_id` - The starting node ID
         * `node2_id` - The destination node ID
-        
+
         # Returns
         * `True` if a path exists between the nodes within this subgraph
         * `False` if no path exists or either node is not in this subgraph
-        
+
         # Example
         ```python
         # Check if there's a path between node 1 and node 5 in the subgraph
@@ -8652,9 +8521,7 @@ class Subgraph:
         """
         ...
 
-    def intersect_with(self, *args, **kwargs) -> Any:
-        ...
-
+    def intersect_with(self, *args, **kwargs) -> Any: ...
     def is_connected(self, *args, **kwargs) -> Any:
         """
         Check if this subgraph is connected
@@ -8706,14 +8573,14 @@ class Subgraph:
     def parent_meta_node(self, *args, **kwargs) -> Any:
         """
         Enhanced collapse supporting three syntax forms for flexible aggregation
-        
+
         # Supported Syntax Forms:
-        
+
         ## Form 1: Simple (backward compatible)
         ```python
         subgraph.add_to_graph({"age": "mean", "salary": "sum"})
         ```
-        
+
         ## Form 2: Tuple (custom attribute names)
         ```python
         subgraph.add_to_graph({
@@ -8722,7 +8589,7 @@ class Subgraph:
             "person_count": ("count", None)
         })
         ```
-        
+
         ## Form 3: Dict-of-dicts (advanced with defaults)
         ```python
         subgraph.add_to_graph({
@@ -8743,7 +8610,7 @@ class Subgraph:
 
     def set_edge_attrs(self, *args, **kwargs) -> Any:
         """
-        Set multiple edge attributes (bulk operation) - delegates to accessor  
+        Set multiple edge attributes (bulk operation) - delegates to accessor
         """
         ...
 
@@ -8765,9 +8632,7 @@ class Subgraph:
         """
         ...
 
-    def subtract_from(self, *args, **kwargs) -> Any:
-        ...
-
+    def subtract_from(self, *args, **kwargs) -> Any: ...
     def summary(self, *args, **kwargs) -> Any:
         """
         Get text summary of subgraph
@@ -8783,7 +8648,7 @@ class Subgraph:
 
     def to_edges(self, *args, **kwargs) -> Any:
         """
-        Get edges from this subgraph as an EdgesAccessor  
+        Get edges from this subgraph as an EdgesAccessor
         Enables chaining like: subgraph.to_edges().to_nodes().connected_components()
         """
         ...
@@ -8804,22 +8669,22 @@ class Subgraph:
     def to_networkx(self, *args, **kwargs) -> Any:
         """
         Convert to NetworkX graph (if available)
-        
+
         Returns a NetworkX Graph or DiGraph (depending on the parent graph type)
         containing only the nodes and edges from this subgraph, with all attributes preserved.
-        
+
         # Returns
         * `PyObject` - A NetworkX graph object containing only this subgraph
-        
+
         # Raises
         * `ImportError` - If NetworkX is not installed
         * `RuntimeError` - If conversion fails
-        
+
         # Examples
         ```python
         import groggy
         import networkx as nx
-        
+
         g = groggy.Graph()
         # ... add nodes and edges ...
         subgraph = g.filter_nodes("age > 25")
@@ -8841,15 +8706,15 @@ class Subgraph:
         """
         ...
 
-
 class SubgraphArray:
     """
     Specialized array for PySubgraph objects
-    
+
     Note: Uses Arc<Vec<PySubgraph>> for zero-copy sharing. PySubgraph is marked
     as `unsendable` so this won't be used across threads. Arc is used here for
     efficient cloning/sharing within a single thread.
     """
+
     @property
     def viz(self) -> Any:
         """
@@ -8920,10 +8785,10 @@ class SubgraphArray:
     def edges_table(self, *args, **kwargs) -> Any:
         """
         Get edges tables from all subgraphs as TableArray
-        
+
         Returns a TableArray where each table contains the edges from one subgraph
         with all their attributes
-        
+
         Example:
             components = g.connected_components()
             edge_tables = components.edges_table()
@@ -8940,14 +8805,14 @@ class SubgraphArray:
     def group_by(self, *args, **kwargs) -> Any:
         """
         Apply group_by to all subgraphs and flatten results
-        
+
         Args:
             attr_name: Name of the attribute to group by
             element_type: Either 'nodes' or 'edges' to specify what to group
-        
+
         Returns:
             SubgraphArray: Flattened array of all grouped subgraphs
-        
+
         Example:
             nested_groups = subgraph_array.group_by('department', 'nodes')
             # Returns all department groups from all input subgraphs
@@ -8963,18 +8828,18 @@ class SubgraphArray:
     def map(self, *args, **kwargs) -> Any:
         """
         Map a function over all subgraphs and return a BaseArray
-        
+
         Args:
             func: Python callable that takes a Subgraph and returns a numeric value
-        
+
         Returns:
             BaseArray containing the results
-        
+
         Example:
         ```python
         # Get node count for each subgraph
         node_counts = subgraph_array.map(lambda sg: sg.node_count())
-        
+
         # Get average degree
         avg_degrees = subgraph_array.map(lambda sg: sum(sg.degrees()) / sg.node_count())
         ```
@@ -8984,14 +8849,14 @@ class SubgraphArray:
     def merge(self, *args, **kwargs) -> Any:
         """
         Merge all subgraphs into a single Graph
-        
+
         Combines all nodes and edges from all subgraphs into one unified graph.
         Node and edge IDs are preserved from the original graph.
         Duplicate nodes/edges are handled by taking the first occurrence.
-        
+
         Returns:
             PyGraph containing all merged subgraphs
-        
+
         Example:
         ```python
         # Group by department, then merge back
@@ -9004,10 +8869,10 @@ class SubgraphArray:
     def nodes_table(self, *args, **kwargs) -> Any:
         """
         Get nodes tables from all subgraphs as TableArray
-        
+
         Returns a TableArray where each table contains the nodes from one subgraph
         with all their attributes
-        
+
         Example:
             components = g.connected_components()
             node_tables = components.nodes_table()
@@ -9024,13 +8889,13 @@ class SubgraphArray:
     def summary(self, *args, **kwargs) -> Any:
         """
         Get summary statistics for all subgraphs as a BaseTable
-        
+
         Returns a table with one row per subgraph containing:
         - subgraph_id: Index of the subgraph
         - node_count: Number of nodes in the subgraph
         - edge_count: Number of edges in the subgraph
         - density: Edge density of the subgraph
-        
+
         Example:
             components = g.connected_components()
             summary = components.summary()
@@ -9050,11 +8915,11 @@ class SubgraphArray:
         """
         ...
 
-
 class TableArray:
     """
     Python wrapper for core TableArray
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -9295,11 +9160,11 @@ class TableArray:
         """
         ...
 
-
 class TableArrayIterator:
     """
     Chainable iterator for PyTableArray that supports method forwarding
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -9372,11 +9237,11 @@ class TableArrayIterator:
         """
         ...
 
-
 class TableFormatter:
     """
     Python wrapper for table formatting functions
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -9419,11 +9284,11 @@ class TableFormatter:
         """
         ...
 
-
 class VizAccessor:
     """
     VizAccessor provides visualization methods for groggy objects
     """
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -9478,4 +9343,3 @@ class VizAccessor:
         Update visualization parameters - sends control message to existing server
         """
         ...
-

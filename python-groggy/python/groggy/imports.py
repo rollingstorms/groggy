@@ -6,24 +6,32 @@ including CSV, pandas DataFrames, numpy arrays, and more.
 """
 
 import os
-from typing import Optional, Dict, Any, Union, List
-from ._groggy import BaseTable, NodesTable, EdgesTable, GraphTable, Graph
-from ._groggy import array, num_array, matrix, table
+from typing import Any, Dict, List, Optional, Union
+
+from ._groggy import (BaseTable, EdgesTable, Graph, GraphTable, NodesTable,
+                      array, matrix, num_array, table)
 
 # Import pandas for NaN checking - optional import
 try:
     import pandas as pd
+
     _PANDAS_AVAILABLE = True
 except ImportError:
     _PANDAS_AVAILABLE = False
+
     def _isna_fallback(x):
         """Fallback NaN checking without pandas"""
-        return x is None or str(x).lower() in ['nan', 'none', '']
+        return x is None or str(x).lower() in ["nan", "none", ""]
 
 
-def _handle_unknown_result_types(nodes_dict: Dict[str, List], edges_dict: Dict[str, List],
-                                node_mapping: Dict[str, int], node_id_column: str,
-                                source_id_column: str, target_id_column: str):
+def _handle_unknown_result_types(
+    nodes_dict: Dict[str, List],
+    edges_dict: Dict[str, List],
+    node_mapping: Dict[str, int],
+    node_id_column: str,
+    source_id_column: str,
+    target_id_column: str,
+):
     """
     Handle methods with unknown return types (NaN) from comprehensive_library_testing.py.
 
@@ -36,9 +44,11 @@ def _handle_unknown_result_types(nodes_dict: Dict[str, List], edges_dict: Dict[s
 
     if target_id_column in edges_dict:
         for x in edges_dict[target_id_column]:
-            if x is not None and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x)):
+            if x is not None and not (
+                pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x)
+            ):
                 str_x = str(x).lower()
-                if str_x not in ['nan', 'none', '']:
+                if str_x not in ["nan", "none", ""]:
                     target_values.add(str(x))
             else:
                 # Count NaN/unknown values
@@ -52,8 +62,12 @@ def _handle_unknown_result_types(nodes_dict: Dict[str, List], edges_dict: Dict[s
     missing_targets = target_values - set(node_mapping.keys())
 
     if len(missing_targets) > 0:
-        print(f"🔧 Auto-expanding nodes to include {len(missing_targets)} result types (including {unknown_count} unknown)")
-        print(f"   Added: {sorted(list(missing_targets))[:5]}{'...' if len(missing_targets) > 5 else ''}")
+        print(
+            f"🔧 Auto-expanding nodes to include {len(missing_targets)} result types (including {unknown_count} unknown)"
+        )
+        print(
+            f"   Added: {sorted(list(missing_targets))[:5]}{'...' if len(missing_targets) > 5 else ''}"
+        )
 
         # Create expanded node mapping
         expanded_mapping = node_mapping.copy()
@@ -80,7 +94,9 @@ def _handle_unknown_result_types(nodes_dict: Dict[str, List], edges_dict: Dict[s
                 if existing_values:
                     # Check first non-null value
                     for val in existing_values:
-                        if val is not None and not (pd.isna(val) if _PANDAS_AVAILABLE else _isna_fallback(val)):
+                        if val is not None and not (
+                            pd.isna(val) if _PANDAS_AVAILABLE else _isna_fallback(val)
+                        ):
                             # Check if it's numeric
                             try:
                                 float(val)
@@ -95,16 +111,26 @@ def _handle_unknown_result_types(nodes_dict: Dict[str, List], edges_dict: Dict[s
                     expanded_nodes_dict[col].extend([0 for _ in missing_targets])
                 else:
                     # For text columns, add descriptive values
-                    expanded_nodes_dict[col].extend([
-                        "Unknown return type" if target == "unknown_return_type" else f"Type: {target}"
-                        for target in missing_targets
-                    ])
+                    expanded_nodes_dict[col].extend(
+                        [
+                            (
+                                "Unknown return type"
+                                if target == "unknown_return_type"
+                                else f"Type: {target}"
+                            )
+                            for target in missing_targets
+                        ]
+                    )
 
         # Update edges to use "unknown_return_type" for NaN values
         if target_id_column in edges_dict:
             updated_targets = []
             for x in edges_dict[target_id_column]:
-                if x is None or (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x)) or str(x).lower() in ['nan', 'none', '']:
+                if (
+                    x is None
+                    or (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x))
+                    or str(x).lower() in ["nan", "none", ""]
+                ):
                     updated_targets.append("unknown_return_type")
                 else:
                     updated_targets.append(x)
@@ -115,13 +141,20 @@ def _handle_unknown_result_types(nodes_dict: Dict[str, List], edges_dict: Dict[s
     return nodes_dict, node_mapping
 
 
-def _suggest_column_mapping(mapped_dict: Dict[str, List], source_column: str, target_column: str,
-                           node_mapping: Dict[str, int], filtered_count: int):
+def _suggest_column_mapping(
+    mapped_dict: Dict[str, List],
+    source_column: str,
+    target_column: str,
+    node_mapping: Dict[str, int],
+    filtered_count: int,
+):
     """
     Provide concise suggestions when many edges are being filtered due to unmapped values.
     """
     # Find the best alternative column
-    available_columns = [col for col in mapped_dict.keys() if col not in ['_node_mapping']]
+    available_columns = [
+        col for col in mapped_dict.keys() if col not in ["_node_mapping"]
+    ]
     best_suggestion = None
 
     for col in available_columns:
@@ -133,13 +166,18 @@ def _suggest_column_mapping(mapped_dict: Dict[str, List], source_column: str, ta
                 break
 
     if best_suggestion:
-        print(f"💡 Did you mean: source_id_column='{best_suggestion}'? ('{source_column}' values don't exist as nodes)")
+        print(
+            f"💡 Did you mean: source_id_column='{best_suggestion}'? ('{source_column}' values don't exist as nodes)"
+        )
 
 
-def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
-                          node_id_column: str = "node_id",
-                          source_id_column: str = "source",
-                          target_id_column: str = "target") -> Dict[str, List]:
+def _apply_node_id_mapping(
+    data_dict: Dict[str, List],
+    table_type: str,
+    node_id_column: str = "node_id",
+    source_id_column: str = "source",
+    target_id_column: str = "target",
+) -> Dict[str, List]:
     """
     Apply node ID mapping to convert string identifiers to integers.
 
@@ -167,7 +205,9 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
             node_mapping = {str(node): i for i, node in enumerate(unique_nodes)}
 
             # Add new mapped column alongside original
-            mapped_dict["node_id"] = [node_mapping[str(node)] for node in mapped_dict[node_id_column]]
+            mapped_dict["node_id"] = [
+                node_mapping[str(node)] for node in mapped_dict[node_id_column]
+            ]
 
             # Keep original column - don't delete it!
             # The original column (like 'object_name') stays for reference
@@ -184,13 +224,19 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
             all_node_ids = set()
             if source_id_column in mapped_dict:
                 all_node_ids.update(
-                    str(x) for x in mapped_dict[source_id_column]
-                    if x is not None and str(x).lower() not in ['nan', 'none', ''] and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x))
+                    str(x)
+                    for x in mapped_dict[source_id_column]
+                    if x is not None
+                    and str(x).lower() not in ["nan", "none", ""]
+                    and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x))
                 )
             if target_id_column in mapped_dict:
                 all_node_ids.update(
-                    str(x) for x in mapped_dict[target_id_column]
-                    if x is not None and str(x).lower() not in ['nan', 'none', ''] and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x))
+                    str(x)
+                    for x in mapped_dict[target_id_column]
+                    if x is not None
+                    and str(x).lower() not in ["nan", "none", ""]
+                    and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x))
                 )
 
             node_mapping = {str(node): i for i, node in enumerate(sorted(all_node_ids))}
@@ -198,7 +244,13 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
         # Apply mapping to source column - add new column alongside original
         if source_id_column in mapped_dict:
             mapped_dict["source"] = [
-                node_mapping.get(str(x), None) if x is not None and str(x).lower() not in ['nan', 'none', ''] and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x)) else None
+                (
+                    node_mapping.get(str(x), None)
+                    if x is not None
+                    and str(x).lower() not in ["nan", "none", ""]
+                    and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x))
+                    else None
+                )
                 for x in mapped_dict[source_id_column]
             ]
             # Keep original source column (like 'object_name') for reference
@@ -206,7 +258,13 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
         # Apply mapping to target column - add new column alongside original
         if target_id_column in mapped_dict:
             mapped_dict["target"] = [
-                node_mapping.get(str(x), None) if x is not None and str(x).lower() not in ['nan', 'none', ''] and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x)) else None
+                (
+                    node_mapping.get(str(x), None)
+                    if x is not None
+                    and str(x).lower() not in ["nan", "none", ""]
+                    and not (pd.isna(x) if _PANDAS_AVAILABLE else _isna_fallback(x))
+                    else None
+                )
                 for x in mapped_dict[target_id_column]
             ]
             # Keep original target column (like 'result_type') for reference
@@ -218,7 +276,8 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
         target_list = mapped_dict.get("target", [])
 
         valid_indices = [
-            i for i, (src, tgt) in enumerate(zip(source_list, target_list))
+            i
+            for i, (src, tgt) in enumerate(zip(source_list, target_list))
             if src is not None and tgt is not None
         ]
 
@@ -228,8 +287,13 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
 
             # Provide intelligent suggestions if most/all edges are being filtered
             if filtered_count > len(source_list) * 0.5:  # More than 50% filtered
-                _suggest_column_mapping(mapped_dict, source_id_column, target_id_column,
-                                       node_mapping, filtered_count)
+                _suggest_column_mapping(
+                    mapped_dict,
+                    source_id_column,
+                    target_id_column,
+                    node_mapping,
+                    filtered_count,
+                )
 
             # Keep only valid entries for ALL columns
             filtered_dict = {}
@@ -253,10 +317,13 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
     return mapped_dict
 
 
-def _create_table_with_mapping(data_dict: Dict[str, List], table_type: str,
-                               node_id_column: str = "node_id",
-                               source_id_column: str = "source",
-                               target_id_column: str = "target") -> Union[BaseTable, NodesTable, EdgesTable]:
+def _create_table_with_mapping(
+    data_dict: Dict[str, List],
+    table_type: str,
+    node_id_column: str = "node_id",
+    source_id_column: str = "source",
+    target_id_column: str = "target",
+) -> Union[BaseTable, NodesTable, EdgesTable]:
     """
     Create a Groggy table with automatic node ID mapping applied.
 
@@ -277,8 +344,9 @@ def _create_table_with_mapping(data_dict: Dict[str, List], table_type: str,
     """
     # Apply mapping if needed
     if table_type in ["nodes", "edges"]:
-        mapped_dict = _apply_node_id_mapping(data_dict, table_type,
-                                           node_id_column, source_id_column, target_id_column)
+        mapped_dict = _apply_node_id_mapping(
+            data_dict, table_type, node_id_column, source_id_column, target_id_column
+        )
     else:
         mapped_dict = data_dict.copy()
 
@@ -306,7 +374,7 @@ def from_csv(
     source_id_column: str = "source",
     target_id_column: str = "target",
     # CSV parsing options
-    **kwargs
+    **kwargs,
 ) -> Union[BaseTable, GraphTable]:
     """
     Load data from CSV file(s) into Groggy tables or graphs.
@@ -348,7 +416,9 @@ def from_csv(
     if nodes_filepath is None and edges_filepath is None:
         # Single file mode - load as BaseTable
         if filepath is None:
-            raise ValueError("Must provide either 'filepath' for single file or 'nodes_filepath'/'edges_filepath' for graph creation")
+            raise ValueError(
+                "Must provide either 'filepath' for single file or 'nodes_filepath'/'edges_filepath' for graph creation"
+            )
 
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"CSV file not found: {filepath}")
@@ -364,8 +434,12 @@ def from_csv(
 
             # Load as BaseTable first, then convert with column mapping
             edges_base = BaseTable.from_csv(edges_filepath)
-            return from_pandas(edges_base.to_pandas(), table_type="edges",
-                             source_id_column=source_id_column, target_id_column=target_id_column)
+            return from_pandas(
+                edges_base.to_pandas(),
+                table_type="edges",
+                source_id_column=source_id_column,
+                target_id_column=target_id_column,
+            )
 
         # Both nodes and edges files specified - create GraphTable
 
@@ -390,40 +464,60 @@ def from_csv(
         edges_dict = {col: edges_df[col].tolist() for col in edges_df.columns}
 
         # Create nodes table with mapping - this generates the node mapping
-        nodes_mapped_dict = _apply_node_id_mapping(nodes_dict, "nodes",
-                                                  node_id_column, source_id_column, target_id_column)
+        nodes_mapped_dict = _apply_node_id_mapping(
+            nodes_dict, "nodes", node_id_column, source_id_column, target_id_column
+        )
         node_mapping = nodes_mapped_dict.pop("_node_mapping", {})
 
         # Handle methods with unknown return types by creating synthetic target nodes
         expanded_nodes_dict, expanded_node_mapping = _handle_unknown_result_types(
-            nodes_dict, edges_dict, node_mapping, node_id_column, source_id_column, target_id_column
+            nodes_dict,
+            edges_dict,
+            node_mapping,
+            node_id_column,
+            source_id_column,
+            target_id_column,
         )
 
         # Apply the expanded mapping to edges
         edges_dict["_node_mapping"] = expanded_node_mapping
-        edges_mapped_dict = _apply_node_id_mapping(edges_dict, "edges",
-                                                  node_id_column, source_id_column, target_id_column)
+        edges_mapped_dict = _apply_node_id_mapping(
+            edges_dict, "edges", node_id_column, source_id_column, target_id_column
+        )
 
         # Manually apply the expanded_node_mapping to the expanded nodes
         # DO NOT call _apply_node_id_mapping again as it would re-create the mapping!
         expanded_nodes_mapped_dict = expanded_nodes_dict.copy()
         if node_id_column in expanded_nodes_mapped_dict:
             expanded_nodes_mapped_dict["node_id"] = [
-                expanded_node_mapping[str(node)] 
+                expanded_node_mapping[str(node)]
                 for node in expanded_nodes_mapped_dict[node_id_column]
             ]
-        
-        nodes_table = NodesTable.from_dict({k: v for k, v in expanded_nodes_mapped_dict.items() if k != "_node_mapping"})
-        edges_table = EdgesTable.from_dict({k: v for k, v in edges_mapped_dict.items() if k != "_node_mapping"})
+
+        nodes_table = NodesTable.from_dict(
+            {
+                k: v
+                for k, v in expanded_nodes_mapped_dict.items()
+                if k != "_node_mapping"
+            }
+        )
+        edges_table = EdgesTable.from_dict(
+            {k: v for k, v in edges_mapped_dict.items() if k != "_node_mapping"}
+        )
 
         # Create GraphTable from NodesTable and EdgesTable
         try:
             from ._groggy import GraphTable
+
             graph_table = GraphTable(nodes_table, edges_table)
             print(f"✅ Created GraphTable from {nodes_file} and {edges_file}")
-            print(f"📊 Mapped {len(node_mapping)} unique {node_id_column} values to integer node IDs")
+            print(
+                f"📊 Mapped {len(node_mapping)} unique {node_id_column} values to integer node IDs"
+            )
             print(f"🔗 Edge columns: {source_id_column} -> {target_id_column}")
-            print(f"📈 Nodes: {len(nodes_dict[list(nodes_dict.keys())[0]])}, Edges: {len(edges_dict[list(edges_dict.keys())[0]])}")
+            print(
+                f"📈 Nodes: {len(nodes_dict[list(nodes_dict.keys())[0]])}, Edges: {len(edges_dict[list(edges_dict.keys())[0]])}"
+            )
 
             return graph_table
         except Exception as e:
@@ -438,10 +532,14 @@ def from_csv(
 
         # Load as BaseTable first, then convert with column mapping
         nodes_base = BaseTable.from_csv(nodes_filepath)
-        return from_pandas(nodes_base.to_pandas(), table_type="nodes", node_id_column=node_id_column)
+        return from_pandas(
+            nodes_base.to_pandas(), table_type="nodes", node_id_column=node_id_column
+        )
 
     else:
-        raise ValueError("Must provide either 'filepath' for single file or 'nodes_filepath'/'edges_filepath' for graph creation")
+        raise ValueError(
+            "Must provide either 'filepath' for single file or 'nodes_filepath'/'edges_filepath' for graph creation"
+        )
 
 
 def from_pandas(
@@ -450,7 +548,7 @@ def from_pandas(
     *,
     node_id_column: str = "node_id",
     source_id_column: str = "source",
-    target_id_column: str = "target"
+    target_id_column: str = "target",
 ) -> Union[BaseTable, NodesTable, EdgesTable]:
     """
     Create Groggy table from pandas DataFrame with automatic node ID mapping.
@@ -479,15 +577,19 @@ def from_pandas(
     try:
         import pandas as pd
     except ImportError:
-        raise ImportError("pandas is required for from_pandas(). Install with: pip install pandas")
+        raise ImportError(
+            "pandas is required for from_pandas(). Install with: pip install pandas"
+        )
 
     if not isinstance(df, pd.DataFrame):
         raise TypeError("Input must be a pandas DataFrame")
 
     # Validate column requirements based on table type
     if table_type == "nodes" and node_id_column not in df.columns:
-        raise ValueError(f"Column '{node_id_column}' not found in DataFrame. "
-                        f"Available columns: {list(df.columns)}")
+        raise ValueError(
+            f"Column '{node_id_column}' not found in DataFrame. "
+            f"Available columns: {list(df.columns)}"
+        )
 
     if table_type == "edges":
         missing_columns = []
@@ -497,21 +599,23 @@ def from_pandas(
             missing_columns.append(target_id_column)
 
         if missing_columns:
-            raise ValueError(f"Missing required edge columns: {missing_columns}. "
-                           f"Available columns: {list(df.columns)}")
+            raise ValueError(
+                f"Missing required edge columns: {missing_columns}. "
+                f"Available columns: {list(df.columns)}"
+            )
 
     # Convert DataFrame to dict format - preserve all original columns
     data_dict = {col: df[col].tolist() for col in df.columns}
 
     # Use the new unified mapping system (preserves original columns)
-    return _create_table_with_mapping(data_dict, table_type,
-                                    node_id_column, source_id_column, target_id_column)
+    return _create_table_with_mapping(
+        data_dict, table_type, node_id_column, source_id_column, target_id_column
+    )
 
 
 def from_numpy(
-    arr,
-    array_type: str = "auto"
-) -> Union['BaseArray', 'NumArray', 'GraphMatrix']:
+    arr, array_type: str = "auto"
+) -> Union["BaseArray", "NumArray", "GraphMatrix"]:
     """
     Create Groggy array or matrix from numpy array.
 
@@ -530,7 +634,9 @@ def from_numpy(
     try:
         import numpy as np
     except ImportError:
-        raise ImportError("numpy is required for from_numpy(). Install with: pip install numpy")
+        raise ImportError(
+            "numpy is required for from_numpy(). Install with: pip install numpy"
+        )
 
     if not isinstance(arr, np.ndarray):
         raise TypeError("Input must be a numpy array")
@@ -541,7 +647,9 @@ def from_numpy(
 
         if array_type == "auto":
             # Auto-detect based on dtype
-            if np.issubdtype(arr.dtype, np.integer) or np.issubdtype(arr.dtype, np.floating):
+            if np.issubdtype(arr.dtype, np.integer) or np.issubdtype(
+                arr.dtype, np.floating
+            ):
                 return num_array(data)
             else:
                 return array(data)
@@ -570,7 +678,7 @@ def from_json(
     *,
     node_id_column: str = "node_id",
     source_id_column: str = "source",
-    target_id_column: str = "target"
+    target_id_column: str = "target",
 ) -> Union[BaseTable, NodesTable, EdgesTable]:
     """
     Load table from JSON file.
@@ -596,8 +704,10 @@ def from_json(
 
     # Validate column requirements based on table type
     if table_type == "nodes" and not base_table.has_column(node_id_column):
-        raise ValueError(f"Column '{node_id_column}' not found in JSON file. "
-                        f"Available columns: {base_table.column_names}")
+        raise ValueError(
+            f"Column '{node_id_column}' not found in JSON file. "
+            f"Available columns: {base_table.column_names}"
+        )
 
     if table_type == "edges":
         missing_columns = []
@@ -607,8 +717,10 @@ def from_json(
             missing_columns.append(target_id_column)
 
         if missing_columns:
-            raise ValueError(f"Missing required edge columns: {missing_columns}. "
-                           f"Available columns: {base_table.column_names}")
+            raise ValueError(
+                f"Missing required edge columns: {missing_columns}. "
+                f"Available columns: {base_table.column_names}"
+            )
 
     # Return appropriate table type
     if table_type == "base":
@@ -627,7 +739,7 @@ def from_parquet(
     *,
     node_id_column: str = "node_id",
     source_id_column: str = "source",
-    target_id_column: str = "target"
+    target_id_column: str = "target",
 ) -> Union[BaseTable, NodesTable, EdgesTable]:
     """
     Load table from Parquet file.
@@ -654,8 +766,10 @@ def from_parquet(
 
     # Validate column requirements based on table type
     if table_type == "nodes" and not base_table.has_column(node_id_column):
-        raise ValueError(f"Column '{node_id_column}' not found in Parquet file. "
-                        f"Available columns: {base_table.column_names}")
+        raise ValueError(
+            f"Column '{node_id_column}' not found in Parquet file. "
+            f"Available columns: {base_table.column_names}"
+        )
 
     if table_type == "edges":
         missing_columns = []
@@ -665,8 +779,10 @@ def from_parquet(
             missing_columns.append(target_id_column)
 
         if missing_columns:
-            raise ValueError(f"Missing required edge columns: {missing_columns}. "
-                           f"Available columns: {base_table.column_names}")
+            raise ValueError(
+                f"Missing required edge columns: {missing_columns}. "
+                f"Available columns: {base_table.column_names}"
+            )
 
     # Return appropriate table type
     if table_type == "base":
@@ -686,7 +802,7 @@ def from_dict(
     *,
     node_id_column: str = "node_id",
     source_id_column: str = "source",
-    target_id_column: str = "target"
+    target_id_column: str = "target",
 ) -> Union[BaseTable, NodesTable, EdgesTable]:
     """
     Create table from dictionary of columns with automatic node ID mapping.
@@ -708,8 +824,10 @@ def from_dict(
     """
     # Validate column requirements based on table type
     if table_type == "nodes" and node_id_column not in data:
-        raise ValueError(f"Column '{node_id_column}' not found in data. "
-                        f"Available columns: {list(data.keys())}")
+        raise ValueError(
+            f"Column '{node_id_column}' not found in data. "
+            f"Available columns: {list(data.keys())}"
+        )
 
     if table_type == "edges":
         missing_columns = []
@@ -719,9 +837,12 @@ def from_dict(
             missing_columns.append(target_id_column)
 
         if missing_columns:
-            raise ValueError(f"Missing required edge columns: {missing_columns}. "
-                           f"Available columns: {list(data.keys())}")
+            raise ValueError(
+                f"Missing required edge columns: {missing_columns}. "
+                f"Available columns: {list(data.keys())}"
+            )
 
     # Use the new unified mapping system
-    return _create_table_with_mapping(data, table_type,
-                                    node_id_column, source_id_column, target_id_column)
+    return _create_table_with_mapping(
+        data, table_type, node_id_column, source_id_column, target_id_column
+    )

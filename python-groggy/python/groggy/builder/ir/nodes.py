@@ -9,17 +9,18 @@ and optimization.
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
 from enum import Enum
+from typing import Any, Dict, List, Optional, Union
 
 
 class IRDomain(Enum):
     """Domain classification for IR nodes."""
-    CORE = "core"           # Arithmetic, reductions, conditionals
-    GRAPH = "graph"         # Topology operations, neighbor aggregation
-    ATTR = "attr"           # Attribute load/store
-    CONTROL = "control"     # Loops, convergence checks
-    EXECUTION = "execution" # Execution blocks (message-pass, streaming)
+
+    CORE = "core"  # Arithmetic, reductions, conditionals
+    GRAPH = "graph"  # Topology operations, neighbor aggregation
+    ATTR = "attr"  # Attribute load/store
+    CONTROL = "control"  # Loops, convergence checks
+    EXECUTION = "execution"  # Execution blocks (message-pass, streaming)
     UNKNOWN = "unknown"
 
 
@@ -27,42 +28,42 @@ class IRDomain(Enum):
 class IRNode(ABC):
     """
     Base class for all IR nodes.
-    
+
     Each node represents a single operation in the algorithm with:
     - Domain classification (core, graph, attr, control)
     - Operation type within that domain
     - Input and output variable names
     - Metadata for optimization and code generation
     """
-    
+
     # Unique identifier for this node
     id: str
-    
+
     # Domain this operation belongs to
     domain: IRDomain
-    
+
     # Operation type within the domain (e.g., "add", "neighbor_agg")
     op_type: str
-    
+
     # Input variable names
     inputs: List[str] = field(default_factory=list)
-    
+
     # Output variable name
     output: Optional[str] = None
-    
+
     # Additional metadata (parameters, options, etc.)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     @abstractmethod
     def to_dict(self) -> Dict[str, Any]:
         """Serialize node to dictionary for JSON/FFI serialization."""
         pass
-    
+
     @abstractmethod
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format for backward compatibility."""
         pass
-    
+
     def __repr__(self) -> str:
         """Pretty representation for debugging."""
         inputs_str = ", ".join(self.inputs) if self.inputs else ""
@@ -74,7 +75,7 @@ class IRNode(ABC):
 class CoreIRNode(IRNode):
     """
     IR node for core arithmetic/scalar operations.
-    
+
     Covers:
     - Binary arithmetic: add, sub, mul, div, pow
     - Unary operations: neg, recip, sqrt, abs
@@ -82,18 +83,19 @@ class CoreIRNode(IRNode):
     - Conditionals: compare, where
     - Broadcasting and scalar operations
     """
-    
-    def __init__(self, node_id: str, op_type: str, inputs: List[str], 
-                 output: str, **metadata):
+
+    def __init__(
+        self, node_id: str, op_type: str, inputs: List[str], output: str, **metadata
+    ):
         super().__init__(
             id=node_id,
             domain=IRDomain.CORE,
             op_type=op_type,
             inputs=inputs,
             output=output,
-            metadata=metadata
+            metadata=metadata,
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -101,26 +103,21 @@ class CoreIRNode(IRNode):
             "op_type": self.op_type,
             "inputs": self.inputs,
             "output": self.output,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
-    
+
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format."""
         # Handle special case: init_nodes_unique -> init_nodes_with_index
         if self.op_type == "init_nodes_unique":
-            return {
-                "type": "init_nodes_with_index",
-                "output": self.output
-            }
-        
-        step = {
-            "type": f"core.{self.op_type}"
-        }
-        
+            return {"type": "init_nodes_with_index", "output": self.output}
+
+        step = {"type": f"core.{self.op_type}"}
+
         # Fused operations use "target" instead of "output"
         if "fused" not in self.op_type:
             step["output"] = self.output
-        
+
         # Map inputs to legacy parameter names
         if self.op_type in ["add", "sub", "mul", "div", "pow"]:
             if len(self.inputs) >= 1:
@@ -133,11 +130,21 @@ class CoreIRNode(IRNode):
             step["input"] = self.inputs[0]
         elif self.op_type == "where":
             step["mask"] = self.inputs[0]
-            step["if_true"] = self.inputs[1] if len(self.inputs) > 1 else self.metadata.get("if_true", 0.0)
-            step["if_false"] = self.inputs[2] if len(self.inputs) > 2 else self.metadata.get("if_false", 0.0)
+            step["if_true"] = (
+                self.inputs[1]
+                if len(self.inputs) > 1
+                else self.metadata.get("if_true", 0.0)
+            )
+            step["if_false"] = (
+                self.inputs[2]
+                if len(self.inputs) > 2
+                else self.metadata.get("if_false", 0.0)
+            )
         elif self.op_type == "compare":
             step["a"] = self.inputs[0]
-            step["b"] = self.inputs[1] if len(self.inputs) > 1 else self.metadata.get("b", 0.0)
+            step["b"] = (
+                self.inputs[1] if len(self.inputs) > 1 else self.metadata.get("b", 0.0)
+            )
             step["op"] = self.metadata.get("op", "eq")
         elif self.op_type == "reduce_scalar":
             # Reduce scalar operations expect a single source input
@@ -155,6 +162,10 @@ class CoreIRNode(IRNode):
             if self.inputs:
                 step["source"] = self.inputs[0]
             step["tie_break"] = self.metadata.get("tie_break", "lowest")
+        elif self.op_type == "histogram":
+            if self.inputs:
+                step["source"] = self.inputs[0]
+            step["bins"] = self.metadata.get("bins", 10)
         elif self.op_type == "map_nodes":
             step["type"] = "map_nodes"
             step["fn"] = self.metadata.get("fn", "")
@@ -193,14 +204,14 @@ class CoreIRNode(IRNode):
             if len(self.inputs) >= 2:
                 step["scalar"] = self.inputs[0]
                 step["reference"] = self.inputs[1]
-        
+
         # Add any additional metadata
         for key, value in self.metadata.items():
             if key in {"fused_inputs", "map_inputs"}:
                 continue  # internal bookkeeping only
             if key not in step:
                 step[key] = value
-        
+
         return step
 
 
@@ -208,25 +219,26 @@ class CoreIRNode(IRNode):
 class GraphIRNode(IRNode):
     """
     IR node for graph topology operations.
-    
+
     Covers:
     - Structural queries: degree, neighbors, subgraph
     - Aggregation: neighbor_agg (sum, mean, min, max)
     - Traversal: BFS, DFS, shortest paths
     - Normalization: normalize adjacency matrix
     """
-    
-    def __init__(self, node_id: str, op_type: str, inputs: List[str],
-                 output: str, **metadata):
+
+    def __init__(
+        self, node_id: str, op_type: str, inputs: List[str], output: str, **metadata
+    ):
         super().__init__(
             id=node_id,
             domain=IRDomain.GRAPH,
             op_type=op_type,
             inputs=inputs,
             output=output,
-            metadata=metadata
+            metadata=metadata,
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -234,19 +246,17 @@ class GraphIRNode(IRNode):
             "op_type": self.op_type,
             "inputs": self.inputs,
             "output": self.output,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
-    
+
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format."""
-        step = {
-            "type": f"graph.{self.op_type}"
-        }
-        
+        step = {"type": f"graph.{self.op_type}"}
+
         # Fused operations use "target" instead of "output"
         if "fused" not in self.op_type:
             step["output"] = self.output
-        
+
         # Map inputs to legacy parameter names
         if self.op_type == "degree":
             # No inputs typically
@@ -269,12 +279,12 @@ class GraphIRNode(IRNode):
             step["direction"] = self.metadata.get("direction", "in")
         elif self.op_type == "subgraph":
             step["mask"] = self.inputs[0]
-        
+
         # Add any additional metadata
         for key, value in self.metadata.items():
             if key not in step:
                 step[key] = value
-        
+
         return step
 
 
@@ -282,24 +292,30 @@ class GraphIRNode(IRNode):
 class AttrIRNode(IRNode):
     """
     IR node for attribute operations.
-    
+
     Covers:
     - Loading: load attribute by name
     - Storing: attach computed values as attributes
     - Aggregation: groupby, join operations
     """
-    
-    def __init__(self, node_id: str, op_type: str, inputs: List[str],
-                 output: Optional[str], **metadata):
+
+    def __init__(
+        self,
+        node_id: str,
+        op_type: str,
+        inputs: List[str],
+        output: Optional[str],
+        **metadata,
+    ):
         super().__init__(
             id=node_id,
             domain=IRDomain.ATTR,
             op_type=op_type,
             inputs=inputs,
             output=output,
-            metadata=metadata
+            metadata=metadata,
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -307,18 +323,18 @@ class AttrIRNode(IRNode):
             "op_type": self.op_type,
             "inputs": self.inputs,
             "output": self.output,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
-    
+
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format."""
         step = {
             "type": f"attr.{self.op_type}",
         }
-        
+
         if self.output:
             step["output"] = self.output
-        
+
         # Map specific operations
         if self.op_type == "load":
             step["name"] = self.metadata.get("name", "")
@@ -327,12 +343,12 @@ class AttrIRNode(IRNode):
             step["name"] = self.metadata.get("name", "")
             if len(self.inputs) >= 1:
                 step["source"] = self.inputs[0]
-        
+
         # Add any additional metadata
         for key, value in self.metadata.items():
             if key not in step:
                 step[key] = value
-        
+
         return step
 
 
@@ -340,25 +356,31 @@ class AttrIRNode(IRNode):
 class ControlIRNode(IRNode):
     """
     IR node for control flow operations.
-    
+
     Covers:
     - Loops: fixed iteration, convergence-based
     - Conditionals: if/else branches
     - Barriers: synchronization points
     - Scope: variable lifetime management
     """
-    
-    def __init__(self, node_id: str, op_type: str, inputs: List[str],
-                 output: Optional[str], **metadata):
+
+    def __init__(
+        self,
+        node_id: str,
+        op_type: str,
+        inputs: List[str],
+        output: Optional[str],
+        **metadata,
+    ):
         super().__init__(
             id=node_id,
             domain=IRDomain.CONTROL,
             op_type=op_type,
             inputs=inputs,
             output=output,
-            metadata=metadata
+            metadata=metadata,
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -366,18 +388,18 @@ class ControlIRNode(IRNode):
             "op_type": self.op_type,
             "inputs": self.inputs,
             "output": self.output,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
-    
+
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format."""
         step = {
             "type": f"control.{self.op_type}",
         }
-        
+
         if self.output:
             step["output"] = self.output
-        
+
         # Map specific operations
         if self.op_type == "loop":
             step["count"] = self.metadata.get("count", 1)
@@ -386,12 +408,12 @@ class ControlIRNode(IRNode):
             step["tol"] = self.metadata.get("tol", 1e-6)
             step["max_iter"] = self.metadata.get("max_iter", 100)
             step["body"] = self.metadata.get("body", [])
-        
+
         # Add any additional metadata
         for key, value in self.metadata.items():
             if key not in step:
                 step[key] = value
-        
+
         return step
 
 
@@ -419,7 +441,7 @@ class LoopIRNode(IRNode):
         }
         if batch_plan is not None:
             metadata["batch_plan"] = batch_plan
-            
+
         super().__init__(
             id=node_id,
             domain=IRDomain.CONTROL,
@@ -440,7 +462,7 @@ class LoopIRNode(IRNode):
     @property
     def loop_vars(self) -> List[str]:
         return self.metadata.get("loop_vars", [])
-    
+
     @property
     def batch_plan(self) -> Optional[Dict[str, Any]]:
         return self.metadata.get("batch_plan")
@@ -466,14 +488,14 @@ class LoopIRNode(IRNode):
         if self.batch_plan is not None:
             step["batch_plan"] = deepcopy(self.batch_plan)
         return step
-    
+
     def is_batch_compatible(self) -> bool:
         """
         Check if this loop body can be compiled to a batch plan.
-        
+
         Returns True if all operations in the body are supported by
         the batch executor, False otherwise.
-        
+
         Unsupported operations:
         - Nested loops
         - Execution blocks (TODO: may support in future)
@@ -482,31 +504,37 @@ class LoopIRNode(IRNode):
         """
         supported_ops = {
             # Core arithmetic
-            'core.add', 'core.sub', 'core.mul', 'core.div',
-            'core.constant',
+            "core.add",
+            "core.sub",
+            "core.mul",
+            "core.div",
+            "core.constant",
             # Graph operations
-            'graph.neighbor_sum', 'graph.neighbor_mean',
-            'graph.neighbor_min', 'graph.neighbor_max',
+            "graph.neighbor_sum",
+            "graph.neighbor_mean",
+            "graph.neighbor_min",
+            "graph.neighbor_max",
             # Loads/stores
-            'init_nodes_with_index', 'attach_attr',
-            'alias',  # No-op in batch execution
+            "init_nodes_with_index",
+            "attach_attr",
+            "alias",  # No-op in batch execution
         }
-        
+
         for step in self.body:
-            step_type = step.get('type', '')
-            
+            step_type = step.get("type", "")
+
             # Check for unsupported control flow
-            if step_type.startswith('iter.') or step_type.startswith('control.'):
+            if step_type.startswith("iter.") or step_type.startswith("control."):
                 return False  # Nested loops not supported
-            
-            if step_type == 'core.execution_block':
+
+            if step_type == "core.execution_block":
                 return False  # Execution blocks not supported yet
-            
+
             # Check if operation is in supported set
             if step_type not in supported_ops:
                 # Unknown operation - not batch compatible
                 return False
-        
+
         return True
 
 
@@ -514,19 +542,19 @@ class LoopIRNode(IRNode):
 class ExecutionBlockNode(IRNode):
     """
     IR node for structured execution blocks (message-passing, streaming, etc.).
-    
+
     Execution blocks encapsulate a sub-computation with specific semantics:
     - Message-Pass: Gauss-Seidel style neighbor updates with in-place writes
     - Streaming: Incremental/transactional updates (future)
-    
+
     The block contains its own mini-DAG of operations that are executed
     with special semantics (e.g., ordered traversal, in-place updates).
     """
-    
+
     def __init__(self, node_id: str, mode: str, target: str, **metadata):
         """
         Create an execution block node.
-        
+
         Args:
             node_id: Unique identifier for this block
             mode: Execution mode ("message_pass", "streaming", etc.)
@@ -543,31 +571,31 @@ class ExecutionBlockNode(IRNode):
                 "mode": mode,
                 "target": target,
                 "body_nodes": [],  # List of IRNode dicts representing block body
-                **metadata
-            }
+                **metadata,
+            },
         )
-    
+
     @property
     def mode(self) -> str:
         """Get the execution mode of this block."""
         return self.metadata["mode"]
-    
+
     @property
     def target(self) -> str:
         """Get the target variable being updated."""
         return self.metadata["target"]
-    
+
     @property
     def body_nodes(self) -> List[Dict[str, Any]]:
         """Get the body operations of this block."""
         return self.metadata.get("body_nodes", [])
-    
+
     def add_body_node(self, node: IRNode) -> None:
         """Add an operation to the block body."""
         if "body_nodes" not in self.metadata:
             self.metadata["body_nodes"] = []
         self.metadata["body_nodes"].append(node.to_dict())
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -575,9 +603,9 @@ class ExecutionBlockNode(IRNode):
             "op_type": self.op_type,
             "mode": self.mode,
             "target": self.target,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
-    
+
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format (for FFI serialization)."""
         return {
@@ -585,27 +613,26 @@ class ExecutionBlockNode(IRNode):
             "mode": self.mode,
             "target": self.target,
             "options": {
-                k: v for k, v in self.metadata.items()
+                k: v
+                for k, v in self.metadata.items()
                 if k not in ["mode", "target", "body_nodes"]
             },
-            "body": {
-                "nodes": self.body_nodes
-            }
+            "body": {"nodes": self.body_nodes},
         }
-    
+
     def expand_to_steps(self) -> List[Dict[str, Any]]:
         """
         Expand execution block into a flat list of steps (fallback mode).
-        
+
         This provides a lowering path for execution blocks when the runtime
         doesn't support native execution block handling. The block operations
         are expanded into regular sequential steps.
-        
+
         Returns:
             List of step dictionaries representing the body operations
         """
         steps = []
-        
+
         # For message-pass blocks, we need to reconstruct the loop structure
         # For now, just emit the body operations in sequence
         for node_dict in self.body_nodes:
@@ -615,15 +642,15 @@ class ExecutionBlockNode(IRNode):
             inputs = node_dict.get("inputs", [])
             metadata = node_dict.get("metadata", {})
             output = node_dict.get("output")
-            
+
             # Create step with type and output
             step = {
                 "type": f"{domain}.{op_type}",
             }
-            
+
             if output:
                 step["output"] = output
-            
+
             # Map inputs to parameter names based on operation type
             # This covers the common operations used in execution blocks
             if op_type in ["add", "sub", "mul", "div", "compare"]:
@@ -635,7 +662,7 @@ class ExecutionBlockNode(IRNode):
                 # Add metadata like comparison operator
                 if "op" in metadata:
                     step["op"] = metadata["op"]
-                    
+
             elif op_type == "where":
                 # Conditional: condition, if_true, if_false
                 if len(inputs) >= 1:
@@ -644,7 +671,7 @@ class ExecutionBlockNode(IRNode):
                     step["if_true"] = inputs[1]
                 if len(inputs) >= 3:
                     step["if_false"] = inputs[2]
-                    
+
             elif op_type == "collect_neighbor_values":
                 # Neighbor collection: source
                 if len(inputs) >= 1:
@@ -652,33 +679,33 @@ class ExecutionBlockNode(IRNode):
                 step["include_self"] = metadata.get("include_self", True)
                 if "direction" in metadata:
                     step["direction"] = metadata["direction"]
-                    
+
             elif op_type == "mode" or op_type == "mode_list":
                 # Mode computation: source (list of values)
                 if len(inputs) >= 1:
                     step["source"] = inputs[0]
                 if "tie_break" in metadata:
                     step["tie_break"] = metadata["tie_break"]
-                    
+
             elif op_type == "constant":
                 # Constant value
                 if "value" in metadata:
                     step["value"] = metadata["value"]
-                    
+
             elif op_type == "init_nodes":
                 # Node initialization
                 step["target"] = output or "temp"
                 if "value" in metadata:
                     step["value"] = metadata["value"]
-                    
+
             else:
                 # Generic fallback: use inputs as-is and add all metadata
                 for i, inp in enumerate(inputs):
                     step[f"input_{i}"] = inp
                 step.update(metadata)
-            
+
             steps.append(step)
-        
+
         return steps
 
 

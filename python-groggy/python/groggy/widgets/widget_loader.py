@@ -7,17 +7,18 @@ This module handles JavaScript loading exactly like Plotly and other production 
 3. Automatic registration with Jupyter
 """
 
-import os
 import json
+import os
 from pathlib import Path
+
 from IPython.display import HTML, Javascript, display
 
 
 def get_widget_js_path():
     """Get path to bundled widget JavaScript file."""
     current_dir = Path(__file__).parent
-    static_dir = current_dir.parent / 'static'
-    js_path = static_dir / 'groggy-widget.js'
+    static_dir = current_dir.parent / "static"
+    js_path = static_dir / "groggy-widget.js"
     return js_path
 
 
@@ -25,7 +26,7 @@ def get_widget_js_content():
     """Get widget JavaScript content for inline loading."""
     js_path = get_widget_js_path()
     if js_path.exists():
-        with open(js_path, 'r') as f:
+        with open(js_path, "r") as f:
             return f.read()
     else:
         raise FileNotFoundError(f"Widget JavaScript not found at {js_path}")
@@ -35,7 +36,7 @@ def get_widget_js_url():
     """Get URL for widget JavaScript (CDN when available, local fallback)."""
     # Future CDN URL (when we set it up)
     cdn_url = None  # "https://cdn.groggy.dev/widgets/groggy-widget-0.1.0.js"
-    
+
     if cdn_url:
         return cdn_url
     else:
@@ -69,12 +70,14 @@ def load_widget_js():
         
         // Continue with widget registration if we didn't return early
         """
-        
+
         # Get the widget JavaScript content
         widget_js_content = get_widget_js_content()
-        
+
         # Create direct widget manager registration that bypasses RequireJS
-        js_code = js_code_with_guard + f"""
+        js_code = (
+            js_code_with_guard
+            + """
         // Groggy Widget Registration - Direct Widget Manager approach  
         (function() {{
             console.log('🎨 Setting up Groggy widget registration...');
@@ -463,12 +466,13 @@ def load_widget_js():
         }})();
         })(); // Close the IIFE wrapper from early-exit guard
         """
-        
+        )
+
         # Display the JavaScript
         display(Javascript(js_code))
-        
+
         return True
-        
+
     except Exception as e:
         print(f"Warning: Failed to load widget JavaScript: {e}")
         return False
@@ -486,18 +490,20 @@ def ensure_widget_loaded():
 # Auto-load when module is imported (like Plotly does)
 _widget_loaded = False
 
+
 def auto_load_widget():
     """Automatically load widget when in Jupyter environment."""
     global _widget_loaded
-    
+
     if _widget_loaded:
         return True
-        
+
     try:
         # Check if we're in a Jupyter environment
         from IPython import get_ipython
+
         ipython = get_ipython()
-        
+
         if ipython is not None:
             # We're in IPython/Jupyter
             _widget_loaded = ensure_widget_loaded()
@@ -505,7 +511,7 @@ def auto_load_widget():
     except ImportError:
         # Not in Jupyter environment
         pass
-    
+
     return False
 
 

@@ -16,7 +16,9 @@ print("Graph created with 3 nodes")
 print("\n=== Test 1: Scalar Multiplication ===")
 builder = AlgorithmBuilder("test_scalar_mul")
 nodes = builder.init_nodes(default=5.0)
-result = builder.core.mul(nodes, 2.0)  # Should create scalar variable instead of node map
+result = builder.core.mul(
+    nodes, 2.0
+)  # Should create scalar variable instead of node map
 builder.attach_as("scaled", result)
 
 algo = builder.build()
@@ -86,7 +88,14 @@ for i, step in enumerate(builder.steps):
         print(f"    -> scalar value: {step.get('value')}")
 
 # Should have: init_nodes, init_scalar (0.85), mul, init_scalar (0.15), add, attach_attr
-expected_types = ["init_nodes", "init_scalar", "core.mul", "init_scalar", "core.add", "attach_attr"]
+expected_types = [
+    "init_nodes",
+    "init_scalar",
+    "core.mul",
+    "init_scalar",
+    "core.add",
+    "attach_attr",
+]
 actual_types = [step.get("type") for step in builder.steps]
 print(f"\nExpected types: {expected_types}")
 print(f"Actual types: {actual_types}")
@@ -94,6 +103,6 @@ assert actual_types == expected_types, f"Step sequence mismatch"
 
 print("✓ Builder uses scalar variables efficiently!")
 
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print("All tests passed! ✓")
 print("Scalar operations are now handled efficiently.")

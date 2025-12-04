@@ -573,6 +573,7 @@ impl NeighborAggregationStep {
         self
     }
 
+    #[allow(dead_code)]
     pub fn with_direction(mut self, direction: NeighborDirection) -> Self {
         self.direction = direction;
         self
@@ -636,7 +637,6 @@ impl Step for NeighborAggregationStep {
                     |nid| node_to_idx.get(&nid).copied(),
                     |eid| {
                         pool.get_edge_endpoints(eid)
-                            .map(|(source, target)| (source, target))
                     },
                     CsrOptions {
                         add_reverse_edges: false,
@@ -650,7 +650,6 @@ impl Step for NeighborAggregationStep {
                     |nid| node_to_idx.get(&nid).copied(),
                     |eid| {
                         pool.get_edge_endpoints(eid)
-                            .map(|(source, target)| (source, target))
                     },
                     CsrOptions {
                         add_reverse_edges: true,
@@ -683,7 +682,7 @@ impl Step for NeighborAggregationStep {
             // Aggregate neighbor values
             let agg_value = match self.agg_type {
                 NeighborAggType::Sum => {
-                    let sum: f64 = if let Some(ref weights) = weights_map {
+                    let sum: f64 = if let Some(weights) = weights_map {
                         // Weighted sum: sum(values[neighbor] * weights[neighbor])
                         neighbor_indices
                             .iter()
@@ -955,7 +954,7 @@ mod tests {
 
         // Each bin should have ~10 elements
         for count in bin_counts {
-            assert!(count >= 9 && count <= 11);
+            assert!((9..=11).contains(&count));
         }
     }
 

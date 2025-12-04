@@ -72,6 +72,7 @@ impl NodeIndexer {
 pub struct Louvain {
     max_iter: usize,
     max_phases: usize,
+    #[allow(dead_code)]
     resolution: f64,
     output_attr: AttrName,
 }
@@ -277,7 +278,7 @@ impl Algorithm for Louvain {
         let mut total_iterations = 0;
 
         if self.max_phases > 0 {
-            let phase = 0;
+            let _phase = 0;
             let phase_start = Instant::now();
             let mut improved = false;
 

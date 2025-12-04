@@ -5,7 +5,7 @@ Smart fixture generation and reusable test data for comprehensive testing.
 Part of the Modular Testing Strategy - Milestone approach.
 """
 
-from .smart_fixtures import FixtureFactory, GraphFixtures
 from .graph_samples import *
+from .smart_fixtures import FixtureFactory, GraphFixtures
 
-__all__ = ['FixtureFactory', 'GraphFixtures']
+__all__ = ["FixtureFactory", "GraphFixtures"]

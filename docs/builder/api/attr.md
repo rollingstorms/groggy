@@ -303,7 +303,7 @@ inv_n = sG.nodes(1.0 / sG.N)
 
 These are NOT loading from attributes - they create new values.
 
-**See:** [GraphHandle documentation](graphhandle.md) for `sG.nodes()` details.
+**See:** Graph/node accessors in the main guide for `sG.nodes()` details.
 
 ## Common Patterns
 
@@ -595,4 +595,4 @@ def weighted_degree(sG, weight_attr="weight"):
 
 - [CoreOps API](core.md) - Operations on attribute values
 - [GraphOps API](graph.md) - Using attributes in neighbor aggregation
-- [Custom Metrics Tutorial](../tutorials/custom_metrics.md) - Building algorithms with attributes
+- [Custom Metrics Tutorial](../tutorials/04_custom_metrics.md) - Building algorithms with attributes

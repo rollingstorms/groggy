@@ -10,24 +10,24 @@ The Groggy Algorithm Builder is a powerful Domain-Specific Language (DSL) for co
 ## Quick Start
 
 ```python
-from groggy.builder import algorithm
+import groggy as gr
 
-@algorithm("pagerank")
-def pagerank(sG, damping=0.85, max_iter=100):
-    """PageRank centrality algorithm."""
-    ranks = sG.nodes(1.0 / sG.N)
-    deg = ranks.degrees()
-    
-    with sG.builder.iter.loop(max_iter):
-        neighbor_sum = sG @ (ranks / (deg + 1e-9))
-        ranks = sG.builder.var("ranks",
-            damping * neighbor_sum + (1 - damping) / sG.N
-        )
-    
-    return ranks.normalize()
+b = gr.builder("pagerank_builder")
+ranks = b.init_nodes(default=1.0)
+degrees = b.node_degrees(ranks)
+inv_deg = b.core.recip(degrees, epsilon=1e-9)
 
-# Use it
-pr_algo = pagerank(damping=0.9)
+with b.iterate(20):
+    contrib = b.core.mul(ranks, inv_deg)
+    neighbor_sum = b.map_nodes(
+        "sum(contrib[neighbors(node)])",
+        inputs={"contrib": contrib},
+    )
+    ranks = b.core.add(b.core.mul(neighbor_sum, 0.85), 0.15)
+    ranks = b.normalize(ranks, method="sum")
+
+b.attach_as("pagerank", ranks)
+pr_algo = b.build()
 result = graph.view().apply(pr_algo)
 ```
 
@@ -80,18 +80,18 @@ Algorithm Definition (Python)
 
 ## Documentation Structure
 
-- **[API Reference](api/)** - Detailed trait and class documentation
+- **API Reference** - Detailed trait and class documentation
   - [VarHandle](api/varhandle.md) - Variable handles and operators
   - [CoreOps](api/core.md) - Arithmetic and value operations
   - [GraphOps](api/graph.md) - Topology and neighbor operations
   - [AttrOps](api/attr.md) - Attribute loading and saving
   - [IterOps](api/iter.md) - Control flow and iteration
 
-- **[Tutorials](tutorials/)** - Step-by-step guides
-  - [Hello World](tutorials/hello_world.md) - Your first algorithm
-  - [PageRank](tutorials/pagerank.md) - Iterative algorithm
-  - [Label Propagation](tutorials/lpa.md) - Asynchronous updates
-  - [Custom Metrics](tutorials/custom_metrics.md) - Building custom centrality
+- **[Tutorials](tutorials/README.md)** - Step-by-step guides
+  - [Hello World](tutorials/01_hello_world.md) - Your first algorithm
+  - [PageRank](tutorials/02_pagerank.md) - Iterative algorithm
+  - [Label Propagation](tutorials/03_lpa.md) - Asynchronous updates
+  - [Custom Metrics](tutorials/04_custom_metrics.md) - Building custom centrality
 
 ## Design Principles
 
@@ -173,7 +173,7 @@ def my_algo(sG):
     return nodes + 1.0
 ```
 
-See [Migration Guide](../appendices/migration.md) for details.
+See the tutorials and guides for migration patterns.
 
 ## Advanced Features
 
@@ -305,7 +305,7 @@ def debug_pagerank(sG):
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
+See the repository contributing guidelines for details.
 
 When adding new operations:
 1. Add to appropriate trait (core/graph/attr/iter)
@@ -318,5 +318,4 @@ When adding new operations:
 - [VarHandle API](api/varhandle.md) - Operator overloading and fluent methods
 - [CoreOps API](api/core.md) - Arithmetic and value operations
 - [GraphOps API](api/graph.md) - Topology operations
-- [Syntax Comparison](../../BUILDER_SYNTAX_COMPARISON.md) - Old vs new syntax
-- [FFI Optimization Strategy](../../FFI_OPTIMIZATION_STRATEGY.md) - Performance details
+- Additional historical docs available in the repository for deeper context

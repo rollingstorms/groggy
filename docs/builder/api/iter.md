@@ -689,5 +689,5 @@ def iterative_refinement(sG, max_iter=100):
 
 - [CoreOps API](core.md) - Operations within loop bodies
 - [GraphOps API](graph.md) - Neighbor operations in iterations
-- [PageRank Tutorial](../tutorials/pagerank.md) - Iterative algorithm example
-- [LPA Tutorial](../tutorials/lpa.md) - Asynchronous iteration example
+- [PageRank Tutorial](../tutorials/02_pagerank.md) - Iterative algorithm example
+- [LPA Tutorial](../tutorials/03_lpa.md) - Asynchronous iteration example

@@ -59,6 +59,7 @@ impl ComponentMode {
     }
 
     #[allow(dead_code)]
+    #[allow(clippy::wrong_self_convention)]
     fn to_str(&self) -> &str {
         match self {
             Self::Undirected => "undirected",

@@ -23,6 +23,7 @@ pub enum SeedStrategy {
 }
 
 impl SeedStrategy {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "singleton" => Ok(SeedStrategy::Singleton),
@@ -324,7 +325,7 @@ impl Step for LabelPropagateStep {
             let current = current_labels
                 .get(node)
                 .cloned()
-                .unwrap_or_else(|| AlgorithmParamValue::Int(node as i64));
+                .unwrap_or(AlgorithmParamValue::Int(node as i64));
 
             let neighbors = cache
                 .neighbors(node)
@@ -344,7 +345,7 @@ impl Step for LabelPropagateStep {
                 let neighbor_label = current_labels
                     .get(neighbor)
                     .cloned()
-                    .unwrap_or_else(|| AlgorithmParamValue::Int(neighbor as i64));
+                    .unwrap_or(AlgorithmParamValue::Int(neighbor as i64));
                 let repr = format!("{:?}", neighbor_label);
                 let entry = counts.entry(repr).or_insert((neighbor_label, 0));
                 entry.1 += 1;

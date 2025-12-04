@@ -906,7 +906,7 @@ mod tests {
 
         let result = scope.variables().node_map("sampled").unwrap();
         // Should sample roughly half (with small graph, might not be exact)
-        assert!(result.len() > 0);
+        assert!(!result.is_empty());
         assert!(result.len() <= sg.node_count());
     }
 

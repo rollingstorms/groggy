@@ -16,19 +16,21 @@ Testing Patterns Established:
 Success Criteria: 90%+ pass rate, I/O preserves data, table patterns documented
 """
 
-import pytest
+import os
 import sys
 import tempfile
-import os
-from pathlib import Path
 from abc import ABC, abstractmethod
+from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
 
 try:
-    import groggy as gr
     import pandas as pd
+
+    import groggy as gr
 except ImportError:
     gr = None
     pd = None
@@ -73,7 +75,7 @@ class TableTestBase(ABC):
                 category="A" if i % 2 == 0 else "B",
                 active=i % 3 == 0,
                 score=i * 0.5,
-                name=f"Name_{i}"
+                name=f"Name_{i}",
             )
             node_ids.append(node_id)
 
@@ -86,7 +88,7 @@ class TableTestBase(ABC):
                 weight=i * 0.1,
                 relationship="friend" if i % 2 == 0 else "colleague",
                 years_known=i + 1,
-                strength=i * 0.2
+                strength=i * 0.2,
             )
             edge_ids.append(edge_id)
 
@@ -102,7 +104,7 @@ class TableTestBase(ABC):
         table = self.get_table_instance()
 
         # All tables should have basic table methods
-        basic_methods = ['head', 'tail', 'ncols', 'nrows', 'shape']
+        basic_methods = ["head", "tail", "ncols", "nrows", "shape"]
         for method_name in basic_methods:
             assert_method_callable(table, method_name)
 
@@ -127,8 +129,12 @@ class TableTestBase(ABC):
         # For GraphTable, shape might combine nodes+edges while nrows/ncols might count them separately
         # So we'll just verify they're reasonable
         assert len(shape) == 2, f"shape() should return (rows, cols), got {shape}"
-        assert shape[0] >= 0 and shape[1] >= 0, f"shape() should have non-negative values, got {shape}"
-        assert nrows >= 0 and ncols >= 0, f"nrows/ncols should be non-negative, got nrows={nrows}, ncols={ncols}"
+        assert (
+            shape[0] >= 0 and shape[1] >= 0
+        ), f"shape() should have non-negative values, got {shape}"
+        assert (
+            nrows >= 0 and ncols >= 0
+        ), f"nrows/ncols should be non-negative, got nrows={nrows}, ncols={ncols}"
 
     def test_table_head_tail_operations(self):
         """Test head and tail operations"""
@@ -168,9 +174,11 @@ class TableTestBase(ABC):
         table = self.get_table_instance()
 
         # Test to_pandas conversion
-        if hasattr(table, 'to_pandas'):
+        if hasattr(table, "to_pandas"):
             df = table.to_pandas()
-            assert isinstance(df, pd.DataFrame), f"to_pandas() should return DataFrame, got {type(df)}"
+            assert isinstance(
+                df, pd.DataFrame
+            ), f"to_pandas() should return DataFrame, got {type(df)}"
 
             # DataFrame should have reasonable shape
             assert df.shape[0] >= 0, "DataFrame should have non-negative rows"
@@ -178,22 +186,24 @@ class TableTestBase(ABC):
 
             # DataFrame shape should match table shape
             table_shape = table.shape()
-            assert df.shape == table_shape, f"DataFrame shape {df.shape} should match table shape {table_shape}"
+            assert (
+                df.shape == table_shape
+            ), f"DataFrame shape {df.shape} should match table shape {table_shape}"
 
     def test_table_column_operations(self):
         """Test column-related operations"""
         table = self.get_table_instance()
 
         # Test select operation if available
-        if hasattr(table, 'select'):
+        if hasattr(table, "select"):
             try:
                 # Try selecting first few columns based on table type
-                if hasattr(table, 'node_ids'):
+                if hasattr(table, "node_ids"):
                     # For tables with node_ids, try selecting common node columns
-                    selected = table.select(['node_id'] if table.ncols() > 0 else [])
-                elif hasattr(table, 'edge_ids'):
+                    selected = table.select(["node_id"] if table.ncols() > 0 else [])
+                elif hasattr(table, "edge_ids"):
                     # For tables with edge_ids, try selecting common edge columns
-                    selected = table.select(['edge_id'] if table.ncols() > 0 else [])
+                    selected = table.select(["edge_id"] if table.ncols() > 0 else [])
                 else:
                     # Generic table - select first column if any
                     if table.ncols() > 0:
@@ -203,18 +213,22 @@ class TableTestBase(ABC):
                         selected = table.select([])
 
                 assert selected is not None, "select() should return a table"
-                assert type(selected) == type(table), "select() should return same table type"
+                assert type(selected) == type(
+                    table
+                ), "select() should return same table type"
 
             except Exception as e:
                 pytest.skip(f"select() operation failed: {e}")
 
         # Test drop_columns operation if available
-        if hasattr(table, 'drop_columns'):
+        if hasattr(table, "drop_columns"):
             try:
                 # Try dropping empty list (should return same table)
                 dropped = table.drop_columns([])
                 assert dropped is not None, "drop_columns([]) should return a table"
-                assert type(dropped) == type(table), "drop_columns() should return same table type"
+                assert type(dropped) == type(
+                    table
+                ), "drop_columns() should return same table type"
             except Exception as e:
                 pytest.skip(f"drop_columns() operation failed: {e}")
 
@@ -223,19 +237,27 @@ class TableTestBase(ABC):
         table = self.get_table_instance()
 
         # Test sort_by if available
-        if hasattr(table, 'sort_by'):
+        if hasattr(table, "sort_by"):
             try:
                 # For tables with known structure, try sorting by common columns
-                if hasattr(table, 'node_ids'):
+                if hasattr(table, "node_ids"):
                     # Try sorting by node_id if it exists
-                    sorted_table = table.sort_by('node_id')
-                    assert sorted_table is not None, "sort_by('node_id') should return a table"
-                    assert type(sorted_table) == type(table), "sort_by() should return same table type"
-                elif hasattr(table, 'edge_ids'):
+                    sorted_table = table.sort_by("node_id")
+                    assert (
+                        sorted_table is not None
+                    ), "sort_by('node_id') should return a table"
+                    assert type(sorted_table) == type(
+                        table
+                    ), "sort_by() should return same table type"
+                elif hasattr(table, "edge_ids"):
                     # Try sorting by edge_id if it exists
-                    sorted_table = table.sort_by('edge_id')
-                    assert sorted_table is not None, "sort_by('edge_id') should return a table"
-                    assert type(sorted_table) == type(table), "sort_by() should return same table type"
+                    sorted_table = table.sort_by("edge_id")
+                    assert (
+                        sorted_table is not None
+                    ), "sort_by('edge_id') should return a table"
+                    assert type(sorted_table) == type(
+                        table
+                    ), "sort_by() should return same table type"
                 else:
                     # Generic sorting test - skip without knowing column names
                     pytest.skip("Need column names to test sort_by operation")
@@ -244,15 +266,19 @@ class TableTestBase(ABC):
                 pytest.skip(f"sort_by() operation failed: {e}")
 
         # Test sort_values if available
-        if hasattr(table, 'sort_values'):
+        if hasattr(table, "sort_values"):
             try:
                 # Similar approach for sort_values
-                if hasattr(table, 'node_ids'):
-                    sorted_table = table.sort_values(['node_id'])
-                    assert sorted_table is not None, "sort_values(['node_id']) should return a table"
-                elif hasattr(table, 'edge_ids'):
-                    sorted_table = table.sort_values(['edge_id'])
-                    assert sorted_table is not None, "sort_values(['edge_id']) should return a table"
+                if hasattr(table, "node_ids"):
+                    sorted_table = table.sort_values(["node_id"])
+                    assert (
+                        sorted_table is not None
+                    ), "sort_values(['node_id']) should return a table"
+                elif hasattr(table, "edge_ids"):
+                    sorted_table = table.sort_values(["edge_id"])
+                    assert (
+                        sorted_table is not None
+                    ), "sort_values(['edge_id']) should return a table"
                 else:
                     pytest.skip("Need column names to test sort_values operation")
 
@@ -264,17 +290,21 @@ class TableTestBase(ABC):
         table = self.get_table_instance()
 
         # Test group_by if available
-        if hasattr(table, 'group_by'):
+        if hasattr(table, "group_by"):
             try:
                 # Try grouping by a categorical column if table has known structure
-                if hasattr(table, 'node_ids'):
+                if hasattr(table, "node_ids"):
                     # For node tables, try grouping by category or similar
-                    grouped = table.group_by('category')
-                    assert grouped is not None, "group_by('category') should return a result"
-                elif hasattr(table, 'edge_ids'):
+                    grouped = table.group_by("category")
+                    assert (
+                        grouped is not None
+                    ), "group_by('category') should return a result"
+                elif hasattr(table, "edge_ids"):
                     # For edge tables, try grouping by relationship or similar
-                    grouped = table.group_by('relationship')
-                    assert grouped is not None, "group_by('relationship') should return a result"
+                    grouped = table.group_by("relationship")
+                    assert (
+                        grouped is not None
+                    ), "group_by('relationship') should return a result"
                 else:
                     pytest.skip("Need column names to test group_by operation")
 
@@ -287,27 +317,33 @@ class TableTestBase(ABC):
         table = self.get_table_instance()
 
         # Test slice if available
-        if hasattr(table, 'slice'):
+        if hasattr(table, "slice"):
             try:
                 # Test slicing first 3 rows
                 sliced = table.slice(0, 3)
                 assert sliced is not None, "slice(0, 3) should return a table"
-                assert type(sliced) == type(table), "slice() should return same table type"
+                assert type(sliced) == type(
+                    table
+                ), "slice() should return same table type"
 
                 # Sliced table should have <= 3 rows
                 sliced_shape = sliced.shape()
-                assert sliced_shape[0] <= 3, f"Sliced table should have <= 3 rows, got {sliced_shape[0]}"
+                assert (
+                    sliced_shape[0] <= 3
+                ), f"Sliced table should have <= 3 rows, got {sliced_shape[0]}"
 
             except Exception as e:
                 # Expected to fail for missing parameters in comprehensive test
-                assert "missing" in str(e) or "required" in str(e), f"slice() should fail due to missing parameters: {e}"
+                assert "missing" in str(e) or "required" in str(
+                    e
+                ), f"slice() should fail due to missing parameters: {e}"
 
     def test_table_iteration_operations(self):
         """Test iteration operations"""
         table = self.get_table_instance()
 
         # Test iter if available
-        if hasattr(table, 'iter'):
+        if hasattr(table, "iter"):
             iterator = table.iter()
             assert iterator is not None, "iter() should return an iterator"
 
@@ -319,15 +355,19 @@ class TableTestBase(ABC):
             except Exception as e:
                 pytest.skip(f"Table iteration failed: {e}")
             else:
-                assert isinstance(first_item, dict), "Row iteration should yield dictionaries"
-                if hasattr(table, 'ncols'):
-                    assert len(first_item) == table.ncols(), "Row dict should match column count"
+                assert isinstance(
+                    first_item, dict
+                ), "Row iteration should yield dictionaries"
+                if hasattr(table, "ncols"):
+                    assert (
+                        len(first_item) == table.ncols()
+                    ), "Row dict should match column count"
 
     def test_table_apply_operations(self):
         """Test apply operations along both axes"""
         table = self.get_table_instance()
 
-        if not hasattr(table, 'apply'):
+        if not hasattr(table, "apply"):
             pytest.skip("apply() not available for this table type")
 
         shape = resolve_shape(table)
@@ -346,7 +386,10 @@ class TableTestBase(ABC):
         assert column_result is not None, "apply(axis=0) should return a table"
         column_shape = resolve_shape(column_result)
         assert column_shape is not None, "apply(axis=0) result should expose shape"
-        assert column_shape == (1, ncols), "axis=0 apply should produce single-row table"
+        assert column_shape == (
+            1,
+            ncols,
+        ), "axis=0 apply should produce single-row table"
 
         def row_numeric_sum(row):
             numeric = [v for v in row.values() if isinstance(v, (int, float))]
@@ -356,26 +399,33 @@ class TableTestBase(ABC):
         assert row_result is not None, "apply(axis=1) should return a table"
         row_shape = resolve_shape(row_result)
         assert row_shape is not None, "apply(axis=1) result should expose shape"
-        assert row_shape == (nrows, 1), "axis=1 apply should produce single-column table"
+        assert row_shape == (
+            nrows,
+            1,
+        ), "axis=1 apply should produce single-column table"
 
     def test_table_stats_operations(self):
         """Test statistics operations"""
         table = self.get_table_instance()
 
         # Test stats if available
-        if hasattr(table, 'stats'):
+        if hasattr(table, "stats"):
             try:
                 stats = table.stats()
-                assert isinstance(stats, dict), f"stats() should return dict, got {type(stats)}"
+                assert isinstance(
+                    stats, dict
+                ), f"stats() should return dict, got {type(stats)}"
                 assert len(stats) >= 0, "Stats should contain some information"
             except Exception as e:
                 pytest.skip(f"stats() operation failed: {e}")
 
         # Test rich_display if available
-        if hasattr(table, 'rich_display'):
+        if hasattr(table, "rich_display"):
             try:
                 display = table.rich_display()
-                assert isinstance(display, str), f"rich_display() should return string, got {type(display)}"
+                assert isinstance(
+                    display, str
+                ), f"rich_display() should return string, got {type(display)}"
                 assert len(display) > 0, "Rich display should have content"
             except Exception as e:
                 pytest.skip(f"rich_display() operation failed: {e}")
@@ -392,31 +442,37 @@ class TableIOTestMixin:
             csv_path = os.path.join(tmpdir, "test_table.csv")
 
             # Test to_csv
-            if hasattr(table, 'to_csv'):
+            if hasattr(table, "to_csv"):
                 try:
                     table.to_csv(csv_path)
-                    assert os.path.exists(csv_path), f"CSV file should be created at {csv_path}"
+                    assert os.path.exists(
+                        csv_path
+                    ), f"CSV file should be created at {csv_path}"
 
                     # Verify file has content
-                    with open(csv_path, 'r') as f:
+                    with open(csv_path, "r") as f:
                         content = f.read()
                         assert len(content) > 0, "CSV file should have content"
 
                 except Exception as e:
                     # Expected to fail for missing parameters in comprehensive test
-                    assert "missing" in str(e) or "required" in str(e), f"to_csv() should fail due to missing parameter: {e}"
+                    assert "missing" in str(e) or "required" in str(
+                        e
+                    ), f"to_csv() should fail due to missing parameter: {e}"
 
             # Test from_csv if available
-            if hasattr(table, 'from_csv'):
+            if hasattr(table, "from_csv"):
                 try:
                     # First create a simple CSV to read
                     simple_csv = os.path.join(tmpdir, "simple.csv")
-                    with open(simple_csv, 'w') as f:
+                    with open(simple_csv, "w") as f:
                         f.write("id,name,value\n1,test,100\n2,test2,200\n")
 
                     loaded_table = table.from_csv(simple_csv)
                     assert loaded_table is not None, "from_csv() should return a table"
-                    assert type(loaded_table) == type(table), "from_csv() should return same table type"
+                    assert type(loaded_table) == type(
+                        table
+                    ), "from_csv() should return same table type"
 
                 except Exception as e:
                     # Expected to fail due to missing required ID fields or parameters
@@ -434,31 +490,37 @@ class TableIOTestMixin:
             json_path = os.path.join(tmpdir, "test_table.json")
 
             # Test to_json
-            if hasattr(table, 'to_json'):
+            if hasattr(table, "to_json"):
                 try:
                     table.to_json(json_path)
-                    assert os.path.exists(json_path), f"JSON file should be created at {json_path}"
+                    assert os.path.exists(
+                        json_path
+                    ), f"JSON file should be created at {json_path}"
 
                     # Verify file has content
-                    with open(json_path, 'r') as f:
+                    with open(json_path, "r") as f:
                         content = f.read()
                         assert len(content) > 0, "JSON file should have content"
 
                 except Exception as e:
                     # Expected to fail for missing parameters in comprehensive test
-                    assert "missing" in str(e) or "required" in str(e), f"to_json() should fail due to missing parameter: {e}"
+                    assert "missing" in str(e) or "required" in str(
+                        e
+                    ), f"to_json() should fail due to missing parameter: {e}"
 
             # Test from_json if available
-            if hasattr(table, 'from_json'):
+            if hasattr(table, "from_json"):
                 try:
                     # First create a simple JSON to read
                     simple_json = os.path.join(tmpdir, "simple.json")
-                    with open(simple_json, 'w') as f:
+                    with open(simple_json, "w") as f:
                         f.write('[{"id": 1, "name": "test", "value": 100}]')
 
                     loaded_table = table.from_json(simple_json)
                     assert loaded_table is not None, "from_json() should return a table"
-                    assert type(loaded_table) == type(table), "from_json() should return same table type"
+                    assert type(loaded_table) == type(
+                        table
+                    ), "from_json() should return same table type"
 
                 except Exception as e:
                     # Expected to fail due to missing required keys or parameters
@@ -476,10 +538,12 @@ class TableIOTestMixin:
             parquet_path = os.path.join(tmpdir, "test_table.parquet")
 
             # Test to_parquet
-            if hasattr(table, 'to_parquet'):
+            if hasattr(table, "to_parquet"):
                 try:
                     table.to_parquet(parquet_path)
-                    assert os.path.exists(parquet_path), f"Parquet file should be created at {parquet_path}"
+                    assert os.path.exists(
+                        parquet_path
+                    ), f"Parquet file should be created at {parquet_path}"
 
                     # Verify file has content
                     file_size = os.path.getsize(parquet_path)
@@ -487,22 +551,33 @@ class TableIOTestMixin:
 
                 except Exception as e:
                     # Expected to fail for missing parameters in comprehensive test
-                    assert "missing" in str(e) or "required" in str(e), f"to_parquet() should fail due to missing parameter: {e}"
+                    assert "missing" in str(e) or "required" in str(
+                        e
+                    ), f"to_parquet() should fail due to missing parameter: {e}"
 
             # Test from_parquet if available
-            if hasattr(table, 'from_parquet'):
+            if hasattr(table, "from_parquet"):
                 try:
                     # We would need to create a valid parquet file first
                     # For now, just test that the method exists and fails appropriately
                     loaded_table = table.from_parquet(parquet_path)
                     # If it succeeds, verify it returns correct type
                     if loaded_table is not None:
-                        assert type(loaded_table) == type(table), "from_parquet() should return same table type"
+                        assert type(loaded_table) == type(
+                            table
+                        ), "from_parquet() should return same table type"
 
                 except Exception as e:
                     # Expected to fail for missing parameters or file not found
-                    expected_errors = ["missing", "required", "not found", "No such file"]
-                    assert any(err in str(e) for err in expected_errors), f"from_parquet() should fail appropriately: {e}"
+                    expected_errors = [
+                        "missing",
+                        "required",
+                        "not found",
+                        "No such file",
+                    ]
+                    assert any(
+                        err in str(e) for err in expected_errors
+                    ), f"from_parquet() should fail appropriately: {e}"
 
 
 class TableFilteringTestMixin:
@@ -513,38 +588,44 @@ class TableFilteringTestMixin:
         table = self.get_table_instance()
 
         # Test filter if available
-        if hasattr(table, 'filter'):
+        if hasattr(table, "filter"):
             try:
                 # This should fail according to comprehensive tests (missing predicate)
                 filtered = table.filter()
                 pytest.skip("filter() unexpectedly succeeded without predicate")
             except Exception as e:
                 # Expected failure - comprehensive test shows missing parameter
-                assert "missing" in str(e) or "required" in str(e), f"filter() should fail due to missing parameter: {e}"
+                assert "missing" in str(e) or "required" in str(
+                    e
+                ), f"filter() should fail due to missing parameter: {e}"
 
         # Test filter_by_attr if available
-        if hasattr(table, 'filter_by_attr'):
+        if hasattr(table, "filter_by_attr"):
             try:
                 # This should fail according to comprehensive tests (missing value)
                 filtered = table.filter_by_attr()
                 pytest.skip("filter_by_attr() unexpectedly succeeded without value")
             except Exception as e:
                 # Expected failure - comprehensive test shows missing parameter
-                assert "missing" in str(e) or "required" in str(e), f"filter_by_attr() should fail due to missing parameter: {e}"
+                assert "missing" in str(e) or "required" in str(
+                    e
+                ), f"filter_by_attr() should fail due to missing parameter: {e}"
 
     def test_unique_operations(self):
         """Test unique value operations"""
         table = self.get_table_instance()
 
         # Test unique_attr_values if available
-        if hasattr(table, 'unique_attr_values'):
+        if hasattr(table, "unique_attr_values"):
             try:
                 # This should fail according to comprehensive tests (column not found)
-                unique_vals = table.unique_attr_values('test')
+                unique_vals = table.unique_attr_values("test")
                 pytest.skip("unique_attr_values('test') unexpectedly succeeded")
             except Exception as e:
                 # Expected failure - comprehensive test shows "Column 'test' not found"
-                assert "not found" in str(e) or "Column" in str(e), f"unique_attr_values() should fail for missing column: {e}"
+                assert "not found" in str(e) or "Column" in str(
+                    e
+                ), f"unique_attr_values() should fail for missing column: {e}"
 
 
 @pytest.mark.table_base
@@ -591,16 +672,16 @@ class TestTableBase:
         """Verify that table testing patterns are properly established"""
         # Test that we have the right mixins and base classes
         assert issubclass(TableTestBase, ABC)
-        assert hasattr(TableTestBase, 'test_table_basic_properties')
-        assert hasattr(TableTestBase, 'test_table_head_tail_operations')
+        assert hasattr(TableTestBase, "test_table_basic_properties")
+        assert hasattr(TableTestBase, "test_table_head_tail_operations")
 
         # Test mixins
-        assert hasattr(TableIOTestMixin, 'test_csv_io_operations')
-        assert hasattr(TableIOTestMixin, 'test_json_io_operations')
-        assert hasattr(TableIOTestMixin, 'test_parquet_io_operations')
+        assert hasattr(TableIOTestMixin, "test_csv_io_operations")
+        assert hasattr(TableIOTestMixin, "test_json_io_operations")
+        assert hasattr(TableIOTestMixin, "test_parquet_io_operations")
 
-        assert hasattr(TableFilteringTestMixin, 'test_filter_operations')
-        assert hasattr(TableFilteringTestMixin, 'test_unique_operations')
+        assert hasattr(TableFilteringTestMixin, "test_filter_operations")
+        assert hasattr(TableFilteringTestMixin, "test_unique_operations")
 
 
 if __name__ == "__main__":

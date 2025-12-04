@@ -1,223 +1,134 @@
-# Tutorial 2: PageRank - Iterative Algorithms
+# Tutorial 2: PageRank — Iterative Algorithms with `builder.iterate()`
 
-In this tutorial, you'll learn how to implement iterative graph algorithms using the Groggy Builder DSL. We'll implement the famous PageRank algorithm as an example.
+Express PageRank with the current builder API and let the Batch Executor handle the loop. We’ll build a compact iteration that reuses neighbor aggregation each round.
 
-## What You'll Learn
+## What You’ll Learn
 
-- Using loops with `G.builder.iter.loop()`
-- Variable reassignment with `G.builder.var()`
-- Neighbor aggregation with the `@` operator
-- Handling edge cases (sink nodes)
-- Normalizing results
+- Structuring loops with `builder.iterate()`
+- Neighbor aggregation via `map_nodes(...)`
+- Reassigning variables across iterations
+- Normalizing ranks each pass
 
 ## Prerequisites
 
-- Complete [Tutorial 1: Hello World](01_hello_world.md)
-- Understanding of iterative algorithms
-- Basic knowledge of PageRank (optional but helpful)
+- [Tutorial 1: Hello World](01_hello_world.md)
+- Familiarity with PageRank basics (damping, iterations)
 
-## What is PageRank?
-
-PageRank is an algorithm used by Google to rank web pages. The idea is simple:
-- Important pages are linked to by other important pages
-- A page's importance is the sum of the importance of pages linking to it
-- We iterate this calculation until scores converge
-
-**Mathematical formula:**
-```
-PR(u) = (1 - d)/N + d * Σ(PR(v) / outdegree(v))
-```
-
-Where:
-- `PR(u)` is the PageRank of node u
-- `d` is the damping factor (usually 0.85)
-- `N` is the total number of nodes
-- The sum is over all nodes v that link to u
-
-## Step 1: Basic Structure
-
-Let's start with the skeleton:
+## Step 1: Builder Setup
 
 ```python
-from groggy.builder import algorithm
+import groggy as gr
 
-@algorithm("pagerank")
-def pagerank(sG, damping=0.85, max_iter=100):
-    """Compute PageRank scores for all nodes."""
-    # We'll fill this in
-    pass
+b = gr.builder("pagerank_builder")
+damping = 0.85
+max_iter = 20
 ```
 
-**Key points:**
-- We accept parameters (`damping`, `max_iter`) to make the algorithm configurable
-- The decorator name is "pagerank", so results will be saved as the "pagerank" attribute
+`builder.iterate()` marks the loop so the Batch Executor can batch iterations when the body is compatible.
 
-## Step 2: Initialize Ranks
-
-All nodes start with equal rank:
+## Step 2: Initialize and Precompute
 
 ```python
-@algorithm("pagerank")
-def pagerank(sG, damping=0.85, max_iter=100):
-    """Compute PageRank scores for all nodes."""
-    # Initialize all nodes with rank 1/N
-    ranks = G.nodes(1.0 / G.N)
-    
-    return ranks
+ranks = b.init_nodes(default=1.0)          # start with uniform scores
+degrees = b.node_degrees(ranks)            # degrees per node
+inv_deg = b.core.recip(degrees, epsilon=1e-9)  # safe 1/deg
 ```
 
-**What's happening:**
-- `G.N` is a property that returns the node count
-- `G.nodes(1.0 / G.N)` initializes each node with value 1/N
-- Division and other operators work naturally!
+Degrees don’t change during PageRank, so we compute them once.
 
-## Step 3: Add Iteration
-
-Now let's add the main loop:
+## Step 3: Iterative Update
 
 ```python
-@algorithm("pagerank")
-def pagerank(sG, damping=0.85, max_iter=100):
-    """Compute PageRank scores for all nodes."""
-    # Initialize
-    ranks = G.nodes(1.0 / G.N)
-    
-    # Iterate
-    with G.builder.iter.loop(max_iter):
-        # Compute new ranks (we'll fill this in)
-        new_ranks = ranks  # Placeholder
-        
-        # Reassign for next iteration
-        ranks = G.builder.var("ranks", new_ranks)
-    
-    return ranks
+with b.iterate(max_iter):
+    contrib = b.core.mul(ranks, inv_deg)  # rank / degree
+
+    neighbor_sum = b.map_nodes(
+        "sum(contrib[neighbors(node)])",
+        inputs={"contrib": contrib},
+    )
+
+    # Damped neighbor influence + small teleport; normalize each pass
+    ranks = b.core.add(b.core.mul(neighbor_sum, damping), 1 - damping)
+    ranks = b.normalize(ranks, method="sum")
 ```
 
-**Important concepts:**
+- `map_nodes` aggregates neighbor contributions each iteration.
+- Reassigning `ranks` inside the loop carries the value forward.
+- Normalizing each round keeps the vector stable.
 
-### The Loop Context
-```python
-with G.builder.iter.loop(max_iter):
-    # Code here runs max_iter times
-```
-
-This creates a fixed-iteration loop. Everything inside runs `max_iter` times.
-
-### Variable Reassignment
-```python
-ranks = G.builder.var("ranks", new_ranks)
-```
-
-This is crucial for loops! It tells the builder: "The variable `ranks` in the next iteration should use the value of `new_ranks` from this iteration."
-
-**Why is this needed?** The builder constructs a computation graph, not direct Python execution. We need to explicitly mark which values carry forward between iterations.
-
-## Step 4: Compute Contributions
-
-Each node contributes its rank divided by its degree to its neighbors:
+## Step 4: Attach and Build
 
 ```python
-@algorithm("pagerank")
-def pagerank(sG, damping=0.85, max_iter=100):
-    """Compute PageRank scores for all nodes."""
-    # Initialize
-    ranks = G.nodes(1.0 / G.N)
-    
-    # Precompute degrees (they don't change)
-    degrees = ranks.degrees()
-    inv_degrees = 1.0 / (degrees + 1e-9)  # Avoid division by zero
-    
-    # Iterate
-    with G.builder.iter.loop(max_iter):
-        # Each node contributes rank/degree to neighbors
-        contrib = ranks * inv_degrees
-        
-        # Aggregate contributions from neighbors
-        neighbor_sum = G @ contrib
-        
-        # Compute new ranks (simplified for now)
-        new_ranks = damping * neighbor_sum + (1 - damping) / G.N
-        
-        # Reassign
-        ranks = G.builder.var("ranks", new_ranks)
-    
-    return ranks.normalize()  # Normalize to sum to 1.0
+b.attach_as("pagerank", ranks)
+pagerank_algo = b.build()
 ```
 
-**New concepts:**
-
-### Neighbor Aggregation: `G @ contrib`
-The `@` operator (matrix multiplication) aggregates neighbor values:
-```python
-neighbor_sum = G @ contrib
-```
-
-For each node u, this computes: `sum(contrib[v] for all neighbors v of u)`
-
-### Normalize
-```python
-return ranks.normalize()
-```
-
-This divides each value by the sum, so all ranks sum to 1.0.
-
-## Step 5: Handle Sink Nodes
-
-Sink nodes (nodes with no outgoing edges) need special handling. They can't contribute to their neighbors, so their rank should be redistributed uniformly:
+## Step 5: Run It
 
 ```python
-@algorithm("pagerank")
-def pagerank(sG, damping=0.85, max_iter=100):
-    """Compute PageRank scores for all nodes."""
-    # Initialize
-    ranks = G.nodes(1.0 / G.N)
-    
-    # Precompute degrees and identify sinks
-    degrees = ranks.degrees()
-    inv_degrees = 1.0 / (degrees + 1e-9)
-    is_sink = (degrees == 0.0)  # Binary mask: 1.0 if sink, 0.0 otherwise
-    
-    # Iterate
-    with G.builder.iter.loop(max_iter):
-        # Sinks contribute 0, non-sinks contribute rank/degree
-        contrib = is_sink.where(0.0, ranks * inv_degrees)
-        
-        # Aggregate from neighbors
-        neighbor_sum = G @ contrib
-        
-        # Collect mass from sink nodes
-        sink_mass = is_sink.where(ranks, 0.0).reduce("sum")
-        
-        # Compute new ranks with all three terms
-        new_ranks = (
-            damping * neighbor_sum +           # Damped neighbor contribution
-            (1 - damping) / G.N +              # Teleportation term
-            damping * sink_mass / G.N          # Sink redistribution
-        )
-        
-        # Reassign
-        ranks = G.builder.var("ranks", new_ranks)
-    
-    return ranks.normalize()
+G = gr.generators.karate_club()
+result = G.view().apply(pagerank_algo)
+
+scores = result.nodes["pagerank"]
+print(scores[:5])
 ```
 
-**Key additions:**
+The returned subgraph contains the `pagerank` attribute on nodes.
 
-### Comparison Operators
+## Optional: Sink Handling
+
+To redistribute sink mass, zero out contributions where degree is 0 and add a uniform sink term. A simple approach is to mask sinks in the neighbor_sum expression (e.g., `is_sink ? 0 : rank/deg`) and normalize each iteration. For exact parity with a reference implementation, compute sink mass on the Python side and feed a scalar into the builder.
+
+## Tested Reference Implementation (matches builder tests)
+
 ```python
-is_sink = (degrees == 0.0)
+def build_pagerank_builder(builder, max_iter=100, damping=0.85):
+    """
+    Mirrors the native Rust PageRank (see tests/test_builder_pagerank.py).
+    - Precomputes out-degrees and sink mask once
+    - Applies damping, teleport, and sink redistribution each iteration
+    """
+    node_count = builder.graph_node_count()
+    inv_n = builder.core.recip(node_count, epsilon=1e-9)
+    ranks = builder.init_nodes(default=1.0)
+    ranks = builder.var("ranks", builder.core.broadcast_scalar(inv_n, ranks))
+
+    degrees = builder.node_degrees(ranks)
+    inv_degrees = builder.core.recip(degrees, epsilon=1e-9)
+    sink_mask = builder.core.compare(degrees, "eq", 0.0)
+    inv_n_map = builder.core.broadcast_scalar(inv_n, degrees)
+    teleport = builder.core.mul(inv_n_map, 1.0 - damping)
+
+    with builder.iterate(max_iter):
+        contrib = builder.core.mul(ranks, inv_degrees)
+        contrib = builder.core.where(sink_mask, 0.0, contrib)
+        neighbor_sum = builder.core.neighbor_agg(contrib, agg="sum")
+        damped = builder.core.mul(neighbor_sum, damping)
+
+        sink_ranks = builder.core.where(sink_mask, ranks, 0.0)
+        sink_mass = builder.core.reduce_scalar(sink_ranks, op="sum")
+        sink_share = builder.core.mul(inv_n_map, sink_mass)
+        sink_share = builder.core.mul(sink_share, damping)
+
+        next_ranks = builder.core.add(damped, teleport)
+        next_ranks = builder.core.add(next_ranks, sink_share)
+        ranks = builder.var("ranks", next_ranks)
+
+    builder.attach_as("pagerank", ranks)
+    return builder
 ```
 
-Comparison operators (`==`, `<`, `>`, etc.) create binary masks.
+## Performance Note
 
-### Conditional Selection: `.where()`
-```python
-contrib = is_sink.where(0.0, ranks * inv_degrees)
-```
+This tutorial uses `builder.iterate()`, which enables the **Batch Executor** when the loop body is compatible. Iterative runs (PageRank/LPA) typically see 10–100x speedups compared to step-by-step execution.
 
-This means: "If is_sink is true (1.0), use 0.0, else use ranks * inv_degrees"
+## Recap
 
-Syntax: `mask.where(if_true, if_false)`
+- `builder.iterate()` enables batched execution for iterative algorithms.
+- Use `map_nodes("sum(...[neighbors(node)])", inputs=...)` for neighbor aggregation.
+- Normalize inside the loop to keep ranks bounded.
+
+Next: [Tutorial 3: Label Propagation](03_lpa.md) for async updates with `map_nodes(async_update=True)`.
 
 ### Reduction
 ```python

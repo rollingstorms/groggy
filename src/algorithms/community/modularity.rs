@@ -95,7 +95,7 @@ pub fn modularity_delta(
     adjacency: &HashMap<NodeId, Vec<NodeId>>,
     data: &ModularityData,
     community_degrees: &HashMap<usize, f64>,
-    community_internal: &HashMap<usize, f64>,
+    _community_internal: &HashMap<usize, f64>,
 ) -> f64 {
     if old_comm == new_comm {
         return 0.0;

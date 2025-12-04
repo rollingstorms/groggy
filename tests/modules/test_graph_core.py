@@ -22,9 +22,10 @@ Testing Patterns Established:
 Success Criteria: 95%+ pass rate, all CRUD operations stable
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
@@ -50,18 +51,27 @@ class TestGraphCoreCreation:
     def test_graph_has_required_methods(self, empty_graph):
         """Verify graph has all required core methods and properties"""
         required_methods = [
-            'add_node', 'add_nodes', 'add_edge', 'add_edges',
-            'contains_node', 'contains_edge',
-            'commit', 'branches', 'create_branch', 'checkout_branch'
+            "add_node",
+            "add_nodes",
+            "add_edge",
+            "add_edges",
+            "contains_node",
+            "contains_edge",
+            "commit",
+            "branches",
+            "create_branch",
+            "checkout_branch",
         ]
 
         for method_name in required_methods:
             assert_method_callable(empty_graph, method_name)
 
         # Test properties separately
-        required_properties = ['nodes', 'edges']
+        required_properties = ["nodes", "edges"]
         for prop_name in required_properties:
-            assert hasattr(empty_graph, prop_name), f"Graph missing property {prop_name}"
+            assert hasattr(
+                empty_graph, prop_name
+            ), f"Graph missing property {prop_name}"
             prop_value = getattr(empty_graph, prop_name)
             assert prop_value is not None, f"Property {prop_name} is None"
 
@@ -87,7 +97,9 @@ class TestNodeOperations:
     def test_add_multiple_nodes_basic(self, empty_graph):
         """Test adding multiple nodes at once"""
         try:
-            node_ids = empty_graph.add_nodes([{}, {"label": "Node1"}, {"label": "Node2", "value": 5}])
+            node_ids = empty_graph.add_nodes(
+                [{}, {"label": "Node1"}, {"label": "Node2", "value": 5}]
+            )
             assert len(node_ids) == 3
             assert len(empty_graph.nodes) == 3
             for node_id in node_ids:
@@ -102,7 +114,7 @@ class TestNodeOperations:
             string_attr="text",
             int_attr=42,
             float_attr=3.14,
-            bool_attr=True
+            bool_attr=True,
             # Skip complex types that might cause FFI issues for now
         )
         assert empty_graph.contains_node(node_id)
@@ -111,6 +123,7 @@ class TestNodeOperations:
     def test_add_many_nodes_performance(self, empty_graph, count):
         """Test adding many nodes for performance validation"""
         import time
+
         start_time = time.time()
 
         node_ids = []
@@ -243,11 +256,11 @@ class TestGraphQueries:
                 # Filter nodes by age using string syntax
                 young_nodes = attributed_graph.nodes.filter("age < 30")
                 assert young_nodes is not None
-                assert hasattr(young_nodes, '__len__')
+                assert hasattr(young_nodes, "__len__")
 
                 older_nodes = attributed_graph.nodes.filter("age >= 30")
                 assert older_nodes is not None
-                assert hasattr(older_nodes, '__len__')
+                assert hasattr(older_nodes, "__len__")
             else:
                 pytest.skip("No 'age' attribute available for string query testing")
         except Exception as e:
@@ -264,12 +277,12 @@ class TestGraphQueries:
                 age_filter = gr.AttributeFilter.less_than(30)
 
                 # Create NodeFilter
-                young_filter = gr.NodeFilter.attribute_filter('age', age_filter)
+                young_filter = gr.NodeFilter.attribute_filter("age", age_filter)
 
                 # Apply filter
                 young_nodes = attributed_graph.nodes.filter(young_filter)
                 assert young_nodes is not None
-                assert hasattr(young_nodes, '__len__')
+                assert hasattr(young_nodes, "__len__")
             else:
                 pytest.skip("No 'age' attribute available for NodeFilter testing")
         except Exception as e:
@@ -283,8 +296,10 @@ class TestGraphQueries:
             attr_names = attributed_graph.nodes.attribute_names()
             if "age" in attr_names and "active" in attr_names:
                 # Create multiple filters
-                age_filter = gr.NodeFilter.attribute_filter('age', gr.AttributeFilter.greater_than(25))
-                active_filter = gr.NodeFilter.attribute_equals('active', True)
+                age_filter = gr.NodeFilter.attribute_filter(
+                    "age", gr.AttributeFilter.greater_than(25)
+                )
+                active_filter = gr.NodeFilter.attribute_equals("active", True)
 
                 # Combine with AND
                 combined_filter = gr.NodeFilter.and_filters([age_filter, active_filter])
@@ -292,9 +307,11 @@ class TestGraphQueries:
                 # Apply combined filter
                 filtered_nodes = attributed_graph.nodes.filter(combined_filter)
                 assert filtered_nodes is not None
-                assert hasattr(filtered_nodes, '__len__')
+                assert hasattr(filtered_nodes, "__len__")
             else:
-                pytest.skip("Required attributes not available for complex filter testing")
+                pytest.skip(
+                    "Required attributes not available for complex filter testing"
+                )
         except Exception as e:
             pytest.skip(f"Complex node filtering currently failing: {e}")
 
@@ -307,22 +324,28 @@ class TestGraphQueries:
                 if "strength" in edge_attrs:
                     filtered_edges = attributed_graph.edges.filter("strength > 0.5")
                     assert filtered_edges is not None
-                    assert hasattr(filtered_edges, '__len__')
+                    assert hasattr(filtered_edges, "__len__")
                 elif "years_known" in edge_attrs:
                     filtered_edges = attributed_graph.edges.filter("years_known > 1")
                     assert filtered_edges is not None
-                    assert hasattr(filtered_edges, '__len__')
+                    assert hasattr(filtered_edges, "__len__")
                 elif "relationship" in edge_attrs:
-                    filtered_edges = attributed_graph.edges.filter("relationship == 'friend'")
+                    filtered_edges = attributed_graph.edges.filter(
+                        "relationship == 'friend'"
+                    )
                     assert filtered_edges is not None
-                    assert hasattr(filtered_edges, '__len__')
+                    assert hasattr(filtered_edges, "__len__")
                 else:
                     # Try with the first available attribute if it's numeric
                     first_attr = edge_attrs[0]
                     if first_attr in ["strength", "years_known"]:
-                        filtered_edges = attributed_graph.edges.filter(f"{first_attr} > 0")
+                        filtered_edges = attributed_graph.edges.filter(
+                            f"{first_attr} > 0"
+                        )
                     else:
-                        filtered_edges = attributed_graph.edges.filter(f"{first_attr} != ''")
+                        filtered_edges = attributed_graph.edges.filter(
+                            f"{first_attr} != ''"
+                        )
                     assert filtered_edges is not None
             else:
                 pytest.skip("No edges or edge attributes available for testing")
@@ -337,14 +360,18 @@ class TestGraphQueries:
             edge_attrs = attributed_graph.edges.attribute_names()
             if len(attributed_graph.edges) > 0 and "strength" in edge_attrs:
                 # Create EdgeFilter for strength
-                strength_filter = gr.EdgeFilter.attribute_filter('strength', gr.AttributeFilter.greater_than(0.5))
+                strength_filter = gr.EdgeFilter.attribute_filter(
+                    "strength", gr.AttributeFilter.greater_than(0.5)
+                )
 
                 # Apply filter
                 filtered_edges = attributed_graph.edges.filter(strength_filter)
                 assert filtered_edges is not None
-                assert hasattr(filtered_edges, '__len__')
+                assert hasattr(filtered_edges, "__len__")
             else:
-                pytest.skip("No edges with 'strength' attribute available for EdgeFilter testing")
+                pytest.skip(
+                    "No edges with 'strength' attribute available for EdgeFilter testing"
+                )
         except Exception as e:
             pytest.skip(f"EdgeFilter-based filtering currently failing: {e}")
 
@@ -353,14 +380,16 @@ class TestGraphQueries:
         attr_names = attributed_graph.nodes.attribute_names()
         try:
             # Test accessing attributes through graph[attr_name] syntax
-            
+
             if attr_names:
                 # Try accessing the first available attribute
                 first_attr = attr_names[0]
                 attr_values = attributed_graph[first_attr]
                 assert attr_values is not None
                 # Should return some kind of array or accessor
-                assert hasattr(attr_values, '__len__') or hasattr(attr_values, '__iter__')
+                assert hasattr(attr_values, "__len__") or hasattr(
+                    attr_values, "__iter__"
+                )
             else:
                 pytest.skip("No node attributes available for testing")
         except Exception as e:
@@ -372,7 +401,7 @@ class TestGraphQueries:
             # Test that degree() returns a NumArray
             degrees = attributed_graph.degree()
             assert degrees is not None
-            assert hasattr(degrees, '__len__')
+            assert hasattr(degrees, "__len__")
             # Degrees should have same length as number of nodes
             assert len(degrees) == len(attributed_graph.nodes)
         except Exception as e:
@@ -566,7 +595,7 @@ class TestGraphCorePerformance:
         # Add 1000 nodes
         node_ids = []
         for i in range(1000):
-            node_id = g.add_node(index=i, value=i*2)
+            node_id = g.add_node(index=i, value=i * 2)
             node_ids.append(node_id)
 
         node_creation_time = time.time() - start_time

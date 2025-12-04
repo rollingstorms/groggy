@@ -134,7 +134,7 @@ impl Step for WeightedDegreeStep {
             let weight = scope
                 .subgraph()
                 .get_edge_attribute(edge, &self.weight_attr)?
-                .and_then(|attr| AlgorithmParamValue::from_attr_value(attr))
+                .and_then(AlgorithmParamValue::from_attr_value)
                 .unwrap_or(AlgorithmParamValue::Float(1.0));
 
             let weight_f64 = match weight {
@@ -357,7 +357,7 @@ impl Step for EdgeWeightSumStep {
             let weight = scope
                 .subgraph()
                 .get_edge_attribute(edge, &self.weight_attr)?
-                .and_then(|attr| AlgorithmParamValue::from_attr_value(attr))
+                .and_then(AlgorithmParamValue::from_attr_value)
                 .unwrap_or(AlgorithmParamValue::Float(1.0));
 
             let weight_f64 = match weight {

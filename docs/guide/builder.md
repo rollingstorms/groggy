@@ -1,31 +1,41 @@
-# Builder DSL for Custom Algorithms
+# Builder DSL and Batch Executor
 
-The Builder DSL lets you compose Groggy’s Rust step primitives directly from Python and execute
-that pipeline without writing any Rust. This is ideal when you need a bespoke algorithm that
-combines existing primitives like initialisation, node degree, normalisation, and attribute
-attachment.
+Groggy's Builder DSL lets you compose Rust-backed steps from Python, ship custom algorithms without writing Rust, and unlock the Batch Executor for fast iterative workloads.
 
----
+- Compose pipelines with step primitives (load, map, normalize, attach).
+- Use `builder.iterate()` to express structured loops; the Batch Executor compacts these loops for 10–100x speedups when compatible.
+- Algorithms run on subgraphs and write results back as node attributes.
 
-## When to Use the Builder
+## When to Reach for the Builder
 
-Use the Builder DSL when:
+- You need a bespoke algorithm that combines existing primitives.
+- You want fast, Rust-side execution while staying in Python.
+- You are iterating on a pipeline before moving logic into the native layer.
+If a single native algorithm fits, prefer `groggy.algorithms` directly; the builder is for composition and iteration-heavy flows.
 
-- You want to prototype a custom analysis without leaving Python
-- You need a lightweight transformation that can run entirely in Rust
-- You want to ship a repeatable pipeline to teammates who may not write Rust
+## How Execution Works
 
-If you just need a single built-in algorithm, keep using `groggy.algorithms` and `apply()` – the
-builder is meant for higher-order composition.
+1) You record steps in Python using the builder API.  
+2) `build()` serializes the plan and sends it through the FFI to Rust.  
+3) Rust validates the plan, releases the GIL for long runs, executes steps, and returns a subgraph with new attributes.  
+4) If the plan contains `builder.iterate()` loops that are batchable, the Batch Executor runs; otherwise it falls back to step-by-step execution automatically.
 
----
+## Batch Executor at a Glance {#batch-executor-at-a-glance}
 
-## Quick Example
+- What it does: collapses structured loops into batched kernels for iterative algorithms.
+- When it kicks in: loop bodies expressed via `builder.iterate()` that use supported steps (attr load/store, neighbor maps, arithmetic, normalize, etc.).
+- Fallback: unsupported ops or validation failures drop to the regular step interpreter; behavior stays correct.
+- Performance (illustrative):
+  - PageRank: ~100x faster (1000 nodes, 100 iterations)
+  - LPA: ~40x faster (10000 nodes)
+  - Any `builder.iterate()` loop benefits when compatible
+- Drift note: PageRank can show ~5–6% drift after 100+ iterations; typical 10–20 iterations are stable.
+
+## Quick Start (non-iterative)
 
 ```python
 import groggy as gr
 
-# Build a simple "degree_score" algorithm
 b = gr.builder("degree_score")
 
 nodes = b.init_nodes(default=0.0)
@@ -34,78 +44,74 @@ normalized = b.normalize(degrees, method="max")
 b.attach_as("degree_score", normalized)
 
 algo = b.build()
-
-# Run against any subgraph
-G = gr.generators.path_graph(6)
-result = G.view().apply(algo)
-
-for node in result.nodes[:3]:
-    print(node.id, node.degree_score)
+result = gr.generators.karate_club().view().apply(algo)
+print(result.nodes["degree_score"][:5])
 ```
 
-Behind the scenes, `builder.step_pipeline` executes the generated pipeline inside Rust. The
-resulting subgraph is returned immediately so you can continue chaining (`sg.apply(algo).table()`).
+Behind the scenes, the plan runs in Rust via `builder.step_pipeline`, returning a subgraph so you can keep chaining.
 
----
+## Iterative Algorithms with `builder.iterate()`
 
-## Step Primitives
+`builder.iterate(count)` marks a loop; the Batch Executor uses this structure to batch iterations when the body is compatible.
 
-The builder currently exposes the following primitives (with more on the way):
-
-| Step ID                   | Builder Call         | Purpose                                  |
-|--------------------------|----------------------|------------------------------------------|
-| `core.init_nodes`        | `init_nodes()`       | Initialise a node map with a constant    |
-| `core.node_degree`       | `node_degrees()`     | Compute node degrees                     |
-| `core.normalize_node_values` | `normalize()`  | Normalise node map (`sum`, `max`, `minmax`)|
-| `core.attach_node_attr`  | `attach_as()`        | Persist a node map as an attribute       |
-
-Each builder method records an internal step specification. When you call `build()`, the spec is
-serialised to JSON and handed to the Rust interpreter for validation and execution.
-
----
-
-## Validation & Errors
-
-- Missing parameters raise `ValueError` when `build()` is called
-- Unknown step types raise a descriptive error during execution
-- Normalisation with zero magnitude triggers a friendly `RuntimeError`
-
-Use the `steps` list on the builder for debugging:
+### PageRank-style Loop
 
 ```python
-for step in b.steps:
-    print(step)
+import groggy as gr
+
+b = gr.builder("pagerank_builder")
+ranks = b.init_nodes(default=1.0)
+
+with b.iterate(20):
+    neighbor_sum = b.map_nodes(
+        "sum(ranks[neighbors(node)])",
+        inputs={"ranks": ranks},
+    )
+    ranks = b.core.add(
+        b.core.mul(neighbor_sum, 0.85),  # damping
+        0.15,                            # teleport
+    )
+
+b.attach_as("pagerank", ranks)
+pagerank_algo = b.build()
+result = graph.view().apply(pagerank_algo)
+scores = result.nodes["pagerank"]
 ```
 
----
-
-## Best Practices
-
-- Prefer descriptive algorithm names – they become part of the registry ID (`custom.NAME`)
-- Keep pipelines short; reuse existing algorithms where possible
-- Chain `sg.apply(algo)` with `.table()`/`.viz` to stay in fluent mode
-
----
-
-## Related Documentation
-
-- [Algorithm Guide](algorithms.md)
-- [Architecture Deep Dive](../concepts/architecture.md)
-- [`apply()` Convenience Function](../quickstart.md#running-algorithms)
-
-
-## Example: Label Propagation Wrapper
+### Label Propagation (async updates)
 
 ```python
-b = gr.builder("lpa_wrapper")
-base = b.init_nodes(default=0)
-communities = b.normalize(base, method="sum")
-b.attach_as("community_score", communities)
+b = gr.builder("lpa_builder")
+labels = b.init_nodes(unique=True)
 
-lpa_wrapper = b.build()
-result = sg.apply(lpa_wrapper)
-print(result.nodes.table()[["community_score"]].head())
+with b.iterate(10):
+    labels = b.map_nodes(
+        "mode(labels[neighbors(node)])",
+        inputs={"labels": labels},
+        async_update=True,  # nodes can see earlier updates in the same iteration
+    )
+
+b.attach_as("community", labels)
+lpa_algo = b.build()
+communities = graph.view().apply(lpa_algo).nodes["community"]
 ```
 
-Use this pattern when you want to add pre/post-processing around an existing algorithm (call the
-handle separately) or when prototyping a custom scoring function before dropping into Rust.
+## Patterns You’ll Use Often
+
+- Pre/post-process around a native algorithm: run a native handle, then normalize or relabel with a small builder pipeline.
+- Attribute pipelines: load attrs, transform with `core.add/mul/sub/div`, attach back with `attach_as`.
+- Iterative refinement: express update rules in `builder.iterate()` to unlock batching (PageRank, LPA, custom relaxations).
+- Masked workflows: load attributes, build boolean masks, and attach them for downstream filtering.
+
+## Compatibility and Pitfalls
+
+- Batch Executor only activates for loops created via `builder.iterate()` and supported steps; incompatible steps run correctly but without batching.
+- Keep loop bodies deterministic and attribute-centric (no Python-side state mutation inside the loop).
+- Default values matter: set `default` when loading attrs to avoid missing-data surprises.
+- Prefer scalar literals in `core.*` ops; they’re converted to constants inside the plan.
+- Async updates (`async_update=True`) are for algorithms that require in-place iteration semantics (e.g., LPA).
+
+## See Also
+
+- `docs/guide/algorithms.md` for native algorithms you can combine.
+- `docs/guide/performance.md` for tuning and benchmarking tips.

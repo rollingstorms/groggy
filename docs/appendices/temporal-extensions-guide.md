@@ -471,6 +471,6 @@ Areas for potential extension:
 
 ## See Also
 
-- [API Reference](api-reference.md) - Complete API documentation
-- [Performance Guide](performance-guide.md) - Optimization techniques
-- [Tutorial Notebooks](../notebooks/) - Interactive examples
+- API reference (see main documentation navigation)
+- Performance guide (see main documentation navigation)
+- Tutorial notebooks (external)

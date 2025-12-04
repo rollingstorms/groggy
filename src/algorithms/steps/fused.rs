@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
-use crate::types::NodeId;
+
 
 use super::super::{Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope, StepSpec};
@@ -71,7 +71,7 @@ impl FusedNeighborMulAgg {
         let direction = spec
             .params
             .get_text("direction")
-            .and_then(|s| NeighborDirection::from_str(s))
+            .and_then(NeighborDirection::from_str)
             .unwrap_or_default();
 
         Ok(Self {
@@ -165,7 +165,6 @@ impl Step for FusedNeighborMulAgg {
                     |nid| node_to_idx.get(&nid).copied(),
                     |eid| {
                         pool.get_edge_endpoints(eid)
-                            .map(|(source, target)| (source, target))
                     },
                     CsrOptions {
                         add_reverse_edges: false,
@@ -179,7 +178,6 @@ impl Step for FusedNeighborMulAgg {
                     |nid| node_to_idx.get(&nid).copied(),
                     |eid| {
                         pool.get_edge_endpoints(eid)
-                            .map(|(source, target)| (source, target))
                     },
                     CsrOptions {
                         add_reverse_edges: true,
@@ -348,7 +346,7 @@ impl Step for FusedAXPY {
                 _ => return Err(anyhow!("y must be numeric for all nodes")),
             };
 
-            let a_val = if let Some(ref map) = a_map {
+            let a_val = if let Some(map) = a_map {
                 match map.get(&node) {
                     Some(crate::algorithms::AlgorithmParamValue::Float(f)) => *f,
                     Some(crate::algorithms::AlgorithmParamValue::Int(i)) => *i as f64,
@@ -360,7 +358,7 @@ impl Step for FusedAXPY {
                 return Err(anyhow!("a must be either a node map or scalar"));
             };
 
-            let b_val = if let Some(ref map) = b_map {
+            let b_val = if let Some(map) = b_map {
                 match map.get(&node) {
                     Some(crate::algorithms::AlgorithmParamValue::Float(f)) => *f,
                     Some(crate::algorithms::AlgorithmParamValue::Int(i)) => *i as f64,

@@ -510,5 +510,5 @@ def custom_centrality(sG, alpha=0.5):
 
 - [CoreOps API](core.md) - Arithmetic operations
 - [GraphOps API](graph.md) - Topology operations
-- [Operator Overloading Guide](../../guide/operators.md)
-- [Algorithm Examples](../tutorials/)
+- Operator overloading is covered in the main builder guide and examples.
+- [Algorithm Examples](../tutorials/README.md)

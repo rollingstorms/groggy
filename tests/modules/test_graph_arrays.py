@@ -20,9 +20,10 @@ EdgesArray (80.0% pass rate, 12/15 methods):
 Success Criteria: 90%+ pass rate, graph array patterns documented
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add path for groggy
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "python"))
@@ -73,7 +74,9 @@ class EdgesArrayTest(ArrayTestBase, GraphArrayTestMixin):
             graph = gr.Graph()
             # Add nodes first
             nodes = []
-            node_count = max(size if size is not None else 3, 2)  # Need at least 2 nodes for edges
+            node_count = max(
+                size if size is not None else 3, 2
+            )  # Need at least 2 nodes for edges
             for i in range(node_count):
                 node_id = graph.add_node(label=f"Node{i}", value=i)
                 nodes.append(node_id)
@@ -98,7 +101,9 @@ class TestNodesArray(NodesArrayTest):
         """Test creating NodesArray from graph"""
         nodes_array = simple_graph.nodes.array()
         assert nodes_array is not None
-        assert hasattr(nodes_array, 'to_list'), "NodesArray should have to_list() method"
+        assert hasattr(
+            nodes_array, "to_list"
+        ), "NodesArray should have to_list() method"
 
     def test_nodes_array_collection_operations(self, simple_graph):
         """Test collection-style operations"""
@@ -110,17 +115,23 @@ class TestNodesArray(NodesArrayTest):
         # Test first() - should return NodesAccessor
         first_node = nodes_array.first()
         assert first_node is not None
-        assert hasattr(first_node, 'attribute_names'), "first() should return NodesAccessor"
+        assert hasattr(
+            first_node, "attribute_names"
+        ), "first() should return NodesAccessor"
 
         # Test last() - should return NodesAccessor
         last_node = nodes_array.last()
         assert last_node is not None
-        assert hasattr(last_node, 'attribute_names'), "last() should return NodesAccessor"
+        assert hasattr(
+            last_node, "attribute_names"
+        ), "last() should return NodesAccessor"
 
         # Test union() - should return NodesAccessor
         union_result = nodes_array.union()
         assert union_result is not None
-        assert hasattr(union_result, 'attribute_names'), "union() should return NodesAccessor"
+        assert hasattr(
+            union_result, "attribute_names"
+        ), "union() should return NodesAccessor"
 
     def test_nodes_array_count_operations(self, simple_graph):
         """Test node counting operations"""
@@ -128,8 +139,12 @@ class TestNodesArray(NodesArrayTest):
 
         # Test total_node_count()
         total_count = nodes_array.total_node_count()
-        assert isinstance(total_count, int), f"total_node_count() should return int, got {type(total_count)}"
-        assert total_count >= 0, f"total_node_count() should be non-negative, got {total_count}"
+        assert isinstance(
+            total_count, int
+        ), f"total_node_count() should return int, got {type(total_count)}"
+        assert (
+            total_count >= 0
+        ), f"total_node_count() should be non-negative, got {total_count}"
 
         # Should match the length of the parent graph's nodes
         expected_count = len(simple_graph.nodes)
@@ -155,10 +170,12 @@ class TestNodesArray(NodesArrayTest):
 
         table = nodes_array.table()
         assert table is not None
-        assert hasattr(table, 'to_list') or hasattr(table, '__iter__'), "table() should return iterable"
+        assert hasattr(table, "to_list") or hasattr(
+            table, "__iter__"
+        ), "table() should return iterable"
 
         # Should be some kind of TableArray
-        assert hasattr(table, 'is_empty'), "Table should have is_empty() method"
+        assert hasattr(table, "is_empty"), "Table should have is_empty() method"
 
     def test_nodes_array_iteration(self, simple_graph):
         """Test iteration over NodesArray"""
@@ -175,7 +192,9 @@ class TestNodesArray(NodesArrayTest):
         # Items should be NodesAccessor-like objects
         if items:
             first_item = items[0]
-            assert hasattr(first_item, 'attribute_names'), "Array items should be NodesAccessor-like"
+            assert hasattr(
+                first_item, "attribute_names"
+            ), "Array items should be NodesAccessor-like"
 
         # Test iter() method
         iterator = nodes_array.iter()
@@ -186,12 +205,16 @@ class TestNodesArray(NodesArrayTest):
         nodes_array = simple_graph.nodes.array()
 
         node_list = nodes_array.to_list()
-        assert isinstance(node_list, list), f"to_list() should return list, got {type(node_list)}"
+        assert isinstance(
+            node_list, list
+        ), f"to_list() should return list, got {type(node_list)}"
 
         # List should contain NodesAccessor-like objects
         if node_list:
             first_item = node_list[0]
-            assert hasattr(first_item, 'attribute_names'), "List items should be NodesAccessor-like"
+            assert hasattr(
+                first_item, "attribute_names"
+            ), "List items should be NodesAccessor-like"
 
     def test_nodes_array_filtering_operations(self, simple_graph):
         """Test filtering operations (with parameter provisioning)"""
@@ -204,7 +227,9 @@ class TestNodesArray(NodesArrayTest):
         try:
             filtered = nodes_array.filter_by_size(1)  # Min size of 1
             assert filtered is not None
-            assert hasattr(filtered, 'is_empty'), "Filtered result should have is_empty() method"
+            assert hasattr(
+                filtered, "is_empty"
+            ), "Filtered result should have is_empty() method"
         except Exception as e:
             pytest.skip(f"filter_by_size() failed: {e}")
 
@@ -213,26 +238,36 @@ class TestNodesArray(NodesArrayTest):
         if node_list:
             sample_accessor = node_list[0]
 
-            if hasattr(nodes_array, 'contains'):
+            if hasattr(nodes_array, "contains"):
                 try:
                     contains_result = nodes_array.contains(sample_accessor)
                 except Exception as exc:
                     pytest.skip(f"contains() failed: {exc}")
 
-                assert isinstance(contains_result, bool), "contains() should return bool"
-                assert contains_result is True, "contains() should be True for existing accessor"
+                assert isinstance(
+                    contains_result, bool
+                ), "contains() should return bool"
+                assert (
+                    contains_result is True
+                ), "contains() should be True for existing accessor"
 
-            if hasattr(nodes_array, 'filter'):
+            if hasattr(nodes_array, "filter"):
                 # Use len() instead of node_count() since NodesAccessor doesn't have node_count()
                 threshold = len(sample_accessor)
 
                 try:
-                    filtered = nodes_array.filter(lambda accessor: len(accessor) >= threshold)
+                    filtered = nodes_array.filter(
+                        lambda accessor: len(accessor) >= threshold
+                    )
                 except Exception as exc:
                     pytest.skip(f"filter() failed: {exc}")
 
-                assert hasattr(filtered, 'is_empty'), "filter() should return NodesArray"
-                assert not filtered.is_empty(), "Filtered array should not be empty for threshold predicate"
+                assert hasattr(
+                    filtered, "is_empty"
+                ), "filter() should return NodesArray"
+                assert (
+                    not filtered.is_empty()
+                ), "Filtered array should not be empty for threshold predicate"
                 # Note: contains() may not work due to accessor object identity issues
                 # assert filtered.contains(sample_accessor), "Filtered NodesArray should include matching accessor"
 
@@ -255,15 +290,21 @@ class TestNodesArray(NodesArrayTest):
         nodes_array = graph.nodes.array()
         creation_time = time.time() - start_time
 
-        assert creation_time < 1.0, f"NodesArray creation took {creation_time:.3f}s, should be < 1.0s"
+        assert (
+            creation_time < 1.0
+        ), f"NodesArray creation took {creation_time:.3f}s, should be < 1.0s"
 
         # Test performance of operations
         start_time = time.time()
         total_count = nodes_array.total_node_count()
         count_time = time.time() - start_time
 
-        assert count_time < 0.1, f"total_node_count() took {count_time:.3f}s, should be < 0.1s"
-        assert total_count == node_count, f"Expected {node_count} nodes, got {total_count}"
+        assert (
+            count_time < 0.1
+        ), f"total_node_count() took {count_time:.3f}s, should be < 0.1s"
+        assert (
+            total_count == node_count
+        ), f"Expected {node_count} nodes, got {total_count}"
 
 
 @pytest.mark.edges_array
@@ -274,7 +315,9 @@ class TestEdgesArray(EdgesArrayTest):
         """Test creating EdgesArray from graph"""
         edges_array = simple_graph.edges.array()
         assert edges_array is not None
-        assert hasattr(edges_array, 'to_list'), "EdgesArray should have to_list() method"
+        assert hasattr(
+            edges_array, "to_list"
+        ), "EdgesArray should have to_list() method"
 
     def test_edges_array_collection_operations(self, simple_graph):
         """Test collection-style operations"""
@@ -286,43 +329,59 @@ class TestEdgesArray(EdgesArrayTest):
         # Test first() - should return EdgesAccessor
         first_edge = edges_array.first()
         assert first_edge is not None
-        assert hasattr(first_edge, 'attribute_names'), "first() should return EdgesAccessor"
+        assert hasattr(
+            first_edge, "attribute_names"
+        ), "first() should return EdgesAccessor"
 
         # Test last() - should return EdgesAccessor
         last_edge = edges_array.last()
         assert last_edge is not None
-        assert hasattr(last_edge, 'attribute_names'), "last() should return EdgesAccessor"
+        assert hasattr(
+            last_edge, "attribute_names"
+        ), "last() should return EdgesAccessor"
 
         # Test union() - should return EdgesAccessor
         union_result = edges_array.union()
         assert union_result is not None
-        assert hasattr(union_result, 'attribute_names'), "union() should return EdgesAccessor"
+        assert hasattr(
+            union_result, "attribute_names"
+        ), "union() should return EdgesAccessor"
 
         edge_list = edges_array.to_list()
 
         if edge_list:
             sample_accessor = edge_list[0]
 
-            if hasattr(edges_array, 'contains'):
+            if hasattr(edges_array, "contains"):
                 try:
                     contains_result = edges_array.contains(sample_accessor)
                 except Exception as exc:
                     pytest.skip(f"contains() failed: {exc}")
 
-                assert isinstance(contains_result, bool), "contains() should return bool"
-                assert contains_result is True, "contains() should be True for existing accessor"
+                assert isinstance(
+                    contains_result, bool
+                ), "contains() should return bool"
+                assert (
+                    contains_result is True
+                ), "contains() should be True for existing accessor"
 
-            if hasattr(edges_array, 'filter'):
+            if hasattr(edges_array, "filter"):
                 # Use len() instead of edge_count() since EdgesAccessor doesn't have edge_count()
                 threshold = len(sample_accessor)
 
                 try:
-                    filtered = edges_array.filter(lambda accessor: len(accessor) >= threshold)
+                    filtered = edges_array.filter(
+                        lambda accessor: len(accessor) >= threshold
+                    )
                 except Exception as exc:
                     pytest.skip(f"filter() failed: {exc}")
 
-                assert hasattr(filtered, 'is_empty'), "filter() should return EdgesArray"
-                assert not filtered.is_empty(), "Filtered array should not be empty for threshold predicate"
+                assert hasattr(
+                    filtered, "is_empty"
+                ), "filter() should return EdgesArray"
+                assert (
+                    not filtered.is_empty()
+                ), "Filtered array should not be empty for threshold predicate"
                 # Note: contains() may not work due to accessor object identity issues
                 # assert filtered.contains(sample_accessor), "Filtered EdgesArray should include matching accessor"
 
@@ -332,8 +391,12 @@ class TestEdgesArray(EdgesArrayTest):
 
         # Test total_edge_count()
         total_count = edges_array.total_edge_count()
-        assert isinstance(total_count, int), f"total_edge_count() should return int, got {type(total_count)}"
-        assert total_count >= 0, f"total_edge_count() should be non-negative, got {total_count}"
+        assert isinstance(
+            total_count, int
+        ), f"total_edge_count() should return int, got {type(total_count)}"
+        assert (
+            total_count >= 0
+        ), f"total_edge_count() should be non-negative, got {total_count}"
 
     def test_edges_array_edge_specific_operations(self, simple_graph):
         """Test edge-specific operations"""
@@ -345,17 +408,27 @@ class TestEdgesArray(EdgesArrayTest):
         # Test nodes() - should return NodesArray of nodes connected by these edges
         nodes_result = edges_array.nodes()
         assert nodes_result is not None
-        assert hasattr(nodes_result, 'total_node_count'), "nodes() should return NodesArray"
+        assert hasattr(
+            nodes_result, "total_node_count"
+        ), "nodes() should return NodesArray"
 
         # Test filter_by_size - this works according to comprehensive tests
-        filtered_by_size = edges_array.filter_by_size(0)  # Min size 0 should include all
+        filtered_by_size = edges_array.filter_by_size(
+            0
+        )  # Min size 0 should include all
         assert filtered_by_size is not None
-        assert hasattr(filtered_by_size, 'is_empty'), "filter_by_size() should return EdgesArray"
+        assert hasattr(
+            filtered_by_size, "is_empty"
+        ), "filter_by_size() should return EdgesArray"
 
         # Test filter_by_weight - this works according to comprehensive tests
-        filtered_by_weight = edges_array.filter_by_weight(0)  # Min weight 0 should include edges with weight >= 0
+        filtered_by_weight = edges_array.filter_by_weight(
+            0
+        )  # Min weight 0 should include edges with weight >= 0
         assert filtered_by_weight is not None
-        assert hasattr(filtered_by_weight, 'is_empty'), "filter_by_weight() should return EdgesArray"
+        assert hasattr(
+            filtered_by_weight, "is_empty"
+        ), "filter_by_weight() should return EdgesArray"
 
     def test_edges_array_stats_operations(self, simple_graph):
         """Test statistical operations"""
@@ -373,10 +446,12 @@ class TestEdgesArray(EdgesArrayTest):
 
         table = edges_array.table()
         assert table is not None
-        assert hasattr(table, 'to_list') or hasattr(table, '__iter__'), "table() should return iterable"
+        assert hasattr(table, "to_list") or hasattr(
+            table, "__iter__"
+        ), "table() should return iterable"
 
         # Should be some kind of TableArray
-        assert hasattr(table, 'is_empty'), "Table should have is_empty() method"
+        assert hasattr(table, "is_empty"), "Table should have is_empty() method"
 
     def test_edges_array_iteration(self, simple_graph):
         """Test iteration over EdgesArray"""
@@ -393,7 +468,9 @@ class TestEdgesArray(EdgesArrayTest):
         # Items should be EdgesAccessor-like objects
         if items:
             first_item = items[0]
-            assert hasattr(first_item, 'attribute_names'), "Array items should be EdgesAccessor-like"
+            assert hasattr(
+                first_item, "attribute_names"
+            ), "Array items should be EdgesAccessor-like"
 
         # Test iter() method
         iterator = edges_array.iter()
@@ -404,12 +481,16 @@ class TestEdgesArray(EdgesArrayTest):
         edges_array = simple_graph.edges.array()
 
         edge_list = edges_array.to_list()
-        assert isinstance(edge_list, list), f"to_list() should return list, got {type(edge_list)}"
+        assert isinstance(
+            edge_list, list
+        ), f"to_list() should return list, got {type(edge_list)}"
 
         # List should contain EdgesAccessor-like objects
         if edge_list:
             first_item = edge_list[0]
-            assert hasattr(first_item, 'attribute_names'), "List items should be EdgesAccessor-like"
+            assert hasattr(
+                first_item, "attribute_names"
+            ), "List items should be EdgesAccessor-like"
 
     def test_edges_array_weight_operations(self, attributed_graph):
         """Test weight-based operations on edges with weights"""
@@ -425,12 +506,16 @@ class TestEdgesArray(EdgesArrayTest):
             try:
                 filtered = edges_array.filter_by_weight(threshold)
                 assert filtered is not None
-                assert hasattr(filtered, 'total_edge_count'), "filter_by_weight() should return EdgesArray"
+                assert hasattr(
+                    filtered, "total_edge_count"
+                ), "filter_by_weight() should return EdgesArray"
 
                 # Count should be reasonable (>= 0, <= total)
                 filtered_count = filtered.total_edge_count()
                 total_count = edges_array.total_edge_count()
-                assert 0 <= filtered_count <= total_count, f"Filtered count {filtered_count} should be between 0 and {total_count}"
+                assert (
+                    0 <= filtered_count <= total_count
+                ), f"Filtered count {filtered_count} should be between 0 and {total_count}"
 
             except Exception as e:
                 pytest.skip(f"filter_by_weight({threshold}) failed: {e}")
@@ -456,7 +541,9 @@ class TestEdgesArray(EdgesArrayTest):
         # Add edges (create a dense subgraph)
         edge_count = 0
         for i in range(min(50, node_count)):  # Connect first 50 nodes densely
-            for j in range(i + 1, min(i + 10, node_count)):  # Each node connects to next 9 nodes
+            for j in range(
+                i + 1, min(i + 10, node_count)
+            ):  # Each node connects to next 9 nodes
                 graph.add_edge(nodes[i], nodes[j], weight=i + j)
                 edge_count += 1
 
@@ -464,22 +551,30 @@ class TestEdgesArray(EdgesArrayTest):
         edges_array = graph.edges.array()
         creation_time = time.time() - start_time
 
-        assert creation_time < 1.0, f"EdgesArray creation took {creation_time:.3f}s, should be < 1.0s"
+        assert (
+            creation_time < 1.0
+        ), f"EdgesArray creation took {creation_time:.3f}s, should be < 1.0s"
 
         # Test performance of operations
         start_time = time.time()
         total_count = edges_array.total_edge_count()
         count_time = time.time() - start_time
 
-        assert count_time < 0.1, f"total_edge_count() took {count_time:.3f}s, should be < 0.1s"
-        assert total_count == edge_count, f"Expected {edge_count} edges, got {total_count}"
+        assert (
+            count_time < 0.1
+        ), f"total_edge_count() took {count_time:.3f}s, should be < 0.1s"
+        assert (
+            total_count == edge_count
+        ), f"Expected {edge_count} edges, got {total_count}"
 
         # Test performance of filtering
         start_time = time.time()
         filtered = edges_array.filter_by_weight(0.5)
         filter_time = time.time() - start_time
 
-        assert filter_time < 0.5, f"filter_by_weight() took {filter_time:.3f}s, should be < 0.5s"
+        assert (
+            filter_time < 0.5
+        ), f"filter_by_weight() took {filter_time:.3f}s, should be < 0.5s"
 
 
 @pytest.mark.graph_arrays
@@ -518,14 +613,18 @@ class TestGraphArraysIntegration:
         # Get nodes connected by these edges
         connected_nodes = edges_array.nodes()
         assert connected_nodes is not None
-        assert hasattr(connected_nodes, 'total_node_count'), "edges.nodes() should return NodesArray"
+        assert hasattr(
+            connected_nodes, "total_node_count"
+        ), "edges.nodes() should return NodesArray"
 
         # Should have at least some nodes if there are edges
         connected_count = connected_nodes.total_node_count()
         assert connected_count >= 0, "Connected nodes count should be non-negative"
 
         if not edges_array.is_empty():
-            assert connected_count >= 1, "Non-empty edges should connect at least one node"
+            assert (
+                connected_count >= 1
+            ), "Non-empty edges should connect at least one node"
 
     def test_array_composition_patterns(self, attributed_graph):
         """Test composition patterns across array types"""
