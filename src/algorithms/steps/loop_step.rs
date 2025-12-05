@@ -48,10 +48,8 @@ pub struct LoopStep {
     loop_vars: Option<Vec<(String, String)>>,
 
     registry: &'static StepRegistry,
-
     /// Execution statistics for hot-path detection
     stats: LoopExecutionStats,
-
     // Cached JIT compiled function (Tier 2) - disabled temporarily
     // Mutex for interior mutability (compilation happens on first hot execution)
     // #[cfg(not(target_arch = "aarch64"))]

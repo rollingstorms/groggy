@@ -22,9 +22,10 @@ from groggy.builder.traits.iter import IterOps
 from groggy.builder.varhandle import GraphHandle, SubgraphHandle, VarHandle
 
 # Load the original builder module for LoopContext and BuiltAlgorithm
+builder_original_path = Path(__file__).parent.parent / "builder_original.py"
 spec = importlib.util.spec_from_file_location(
     "builder_original",
-    "/Users/michaelroth/Documents/Code/groggy/python-groggy/python/groggy/builder_original.py",
+    str(builder_original_path),
 )
 builder_original = importlib.util.module_from_spec(spec)
 sys.modules["builder_original"] = builder_original
