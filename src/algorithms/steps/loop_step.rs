@@ -7,10 +7,11 @@ use once_cell::sync::OnceCell;
 use serde_json::Value;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg(not(target_arch = "aarch64"))]
-use crate::algorithms::execution::JitManager;
-#[cfg(not(target_arch = "aarch64"))]
-use std::sync::Mutex;
+// JIT disabled temporarily due to Cranelift ARM64 compatibility issues
+// #[cfg(not(target_arch = "aarch64"))]
+// use crate::algorithms::execution::JitManager;
+// #[cfg(not(target_arch = "aarch64"))]
+// use std::sync::Mutex;
 
 /// Execution statistics for hot-path detection
 #[derive(Debug, Default)]
@@ -51,10 +52,10 @@ pub struct LoopStep {
     /// Execution statistics for hot-path detection
     stats: LoopExecutionStats,
 
-    /// Cached JIT compiled function (Tier 2)
-    /// Mutex for interior mutability (compilation happens on first hot execution)
-    #[cfg(not(target_arch = "aarch64"))]
-    jit_cache: Mutex<Option<JitManager>>,
+    // Cached JIT compiled function (Tier 2) - disabled temporarily
+    // Mutex for interior mutability (compilation happens on first hot execution)
+    // #[cfg(not(target_arch = "aarch64"))]
+    // jit_cache: Mutex<Option<JitManager>>,
 }
 
 impl LoopStep {
@@ -75,8 +76,8 @@ impl LoopStep {
             loop_vars: None,
             registry,
             stats: LoopExecutionStats::default(),
-            #[cfg(not(target_arch = "aarch64"))]
-            jit_cache: Mutex::new(None),
+            // #[cfg(not(target_arch = "aarch64"))]
+            // jit_cache: Mutex::new(None),
         }
     }
 
@@ -94,122 +95,33 @@ impl LoopStep {
             loop_vars: Some(loop_vars),
             registry,
             stats: LoopExecutionStats::default(),
-            #[cfg(not(target_arch = "aarch64"))]
-            jit_cache: Mutex::new(None),
+            // #[cfg(not(target_arch = "aarch64"))]
+            // jit_cache: Mutex::new(None),
         }
     }
 
-    /// Check if this loop should attempt JIT compilation
-    #[allow(dead_code)]
-    #[cfg(not(target_arch = "aarch64"))]
-    fn should_attempt_jit(&self, batch_plan: &BatchPlan) -> bool {
-        // Check if already attempted
-        if self.stats.jit_attempted.load(Ordering::Relaxed) > 0 {
-            return false;
-        }
+    // JIT compilation disabled temporarily
+    // /// Check if this loop should attempt JIT compilation
+    // #[allow(dead_code)]
+    // #[cfg(not(target_arch = "aarch64"))]
+    // fn should_attempt_jit(&self, batch_plan: &BatchPlan) -> bool {
+    //     false // JIT disabled
+    // }
 
-        // Check execution count threshold
-        if self.stats.execution_count.load(Ordering::Relaxed) < Self::HOT_THRESHOLD {
-            return false;
-        }
+    // /// Try to compile the batch plan to native code (Tier 2)
+    // #[cfg(not(target_arch = "aarch64"))]
+    // fn try_jit_compile(
+    //     &self,
+    //     batch_plan: &BatchPlan,
+    // ) -> Option<crate::algorithms::execution::jit::CompiledFunction> {
+    //     None // JIT disabled
+    // }
 
-        // Check minimum iterations
-        if self.iterations < Self::MIN_ITERATIONS_FOR_JIT {
-            return false;
-        }
-
-        // Check if plan is JIT-compatible
-        JitManager::is_compatible(batch_plan)
-    }
-
-    /// Try to compile the batch plan to native code (Tier 2)
-    #[cfg(not(target_arch = "aarch64"))]
-    fn try_jit_compile(
-        &self,
-        batch_plan: &BatchPlan,
-    ) -> Option<crate::algorithms::execution::jit::CompiledFunction> {
-        // Mark as attempted (even if it fails, don't retry)
-        self.stats.jit_attempted.store(1, Ordering::Relaxed);
-
-        // Check if we should compile
-        if !self.should_attempt_jit(batch_plan) {
-            return None;
-        }
-
-        if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-            eprintln!(
-                "[LOOP_STEP] 🔥 Hot path detected! Attempting JIT compilation (executions={}, iterations={})",
-                self.stats.execution_count.load(Ordering::Relaxed),
-                self.iterations
-            );
-        }
-
-        // Try to compile
-        let start = std::time::Instant::now();
-        let mut jit_cache = self.jit_cache.lock();
-
-        match jit_cache.as_mut() {
-            Some(jit) => {
-                // Already have a JIT manager, compile the plan
-                match jit.compile(batch_plan) {
-                    Ok(func) => {
-                        let elapsed = start.elapsed();
-                        if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                            eprintln!(
-                                "[LOOP_STEP] ✅ JIT compilation successful ({:.2}ms, {} instructions)",
-                                elapsed.as_secs_f64() * 1000.0,
-                                batch_plan.instructions.len()
-                            );
-                        }
-                        Some(func)
-                    }
-                    Err(e) => {
-                        if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                            eprintln!("[LOOP_STEP] ❌ JIT compilation failed: {}", e);
-                        }
-                        None
-                    }
-                }
-            }
-            None => {
-                // Create new JIT manager
-                match JitManager::new() {
-                    Ok(mut jit) => match jit.compile(batch_plan) {
-                        Ok(func) => {
-                            let elapsed = start.elapsed();
-                            if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                                eprintln!(
-                                        "[LOOP_STEP] ✅ JIT compilation successful ({:.2}ms, {} instructions)",
-                                        elapsed.as_secs_f64() * 1000.0,
-                                        batch_plan.instructions.len()
-                                    );
-                            }
-                            *jit_cache = Some(jit);
-                            Some(func)
-                        }
-                        Err(e) => {
-                            if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                                eprintln!("[LOOP_STEP] ❌ JIT compilation failed: {}", e);
-                            }
-                            None
-                        }
-                    },
-                    Err(e) => {
-                        if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                            eprintln!("[LOOP_STEP] ❌ JIT manager creation failed: {}", e);
-                        }
-                        None
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    #[allow(dead_code)]
-    fn try_jit_compile(&self, _batch_plan: &BatchPlan) -> Option<()> {
-        None // ARM64 not supported
-    }
+    // #[cfg(target_arch = "aarch64")]
+    // #[allow(dead_code)]
+    // fn try_jit_compile(&self, _batch_plan: &BatchPlan) -> Option<()> {
+    //     None // ARM64 not supported
+    // }
 
     /// Try to deserialize body as a BatchPlan (if it's been pre-compiled)
     fn try_batch_plan(&self) -> Option<BatchPlan> {
@@ -353,40 +265,13 @@ impl Step for LoopStep {
         if let Some(batch_plan) = self.try_batch_plan() {
             let node_count = scope.subgraph().node_count();
 
-            // Tier 2: JIT compilation (hot paths, x86_64 only)
-            #[cfg(not(target_arch = "aarch64"))]
-            {
-                if let Some(jit_func) = self.try_jit_compile(&batch_plan) {
-                    // Execute via JIT compiled code
-                    let mut executor = BatchExecutor::new(node_count);
-
-                    // Allocate slots for JIT execution
-                    if let Err(e) = executor.allocate_slots_for_jit(batch_plan.slot_count) {
-                        // Fallback to batch executor on allocation failure
-                        if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                            eprintln!("[LOOP_STEP] ⚠️  JIT slot allocation failed: {}, falling back to batch executor", e);
-                        }
-                    } else {
-                        // Get slot pointers
-                        let slot_ptrs = executor.get_slot_pointers();
-
-                        // Execute compiled code
-                        let ret =
-                            unsafe { jit_func(node_count, self.iterations, slot_ptrs.as_ptr()) };
-
-                        if ret == 0 {
-                            // JIT execution successful - we still need to handle Load/StoreNodeProp
-                            // For now, fall through to batch executor for complete execution
-                            if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                                eprintln!("[LOOP_STEP] ⚠️  JIT execution returned success but needs full integration");
-                                eprintln!("[LOOP_STEP]    Falling back to batch executor for complete execution");
-                            }
-                        } else if std::env::var("GROGGY_DEBUG_JIT").is_ok() {
-                            eprintln!("[LOOP_STEP] ⚠️  JIT execution failed (ret={}), falling back to batch executor", ret);
-                        }
-                    }
-                }
-            }
+            // Tier 2: JIT compilation disabled temporarily
+            // #[cfg(not(target_arch = "aarch64"))]
+            // {
+            //     if let Some(jit_func) = self.try_jit_compile(&batch_plan) {
+            //         ...JIT execution code...
+            //     }
+            // }
 
             // Tier 1: Batch executor (interpreted execution)
             let mut executor = BatchExecutor::new(node_count);

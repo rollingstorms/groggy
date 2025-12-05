@@ -210,9 +210,22 @@ builder.graph.load_edge_attr("weight")
 
 ---
 
+## ⚠️ Known Issues
+
+### JIT Compilation (Blocked for v0.5.2)
+The experimental JIT compilation feature from the Tier 2 roadmap has been temporarily disabled due to thread-safety issues with Cranelift's `JITModule`. The `LoopStep` implementation requires `Send + Sync` traits, but Cranelift's function resolver callbacks are not thread-safe.
+
+**Status:** This issue blocks the JIT functionality but does not affect any other features in this release. All native algorithms and the batch executor work correctly.
+
+**Workaround:** Algorithms will use the interpreted batch executor path, which still provides 10-100x performance improvements over the naive FFI approach.
+
+**Resolution Plan:** We're tracking upstream Cranelift development and will re-enable JIT in v0.6.0 once thread-safe symbol resolution is available or we implement an alternative architecture.
+
+---
+
 ## 🚀 What's Next
 
-### Tier 2: JIT Compilation (v0.6.0)
+### Tier 2: JIT Compilation (v0.6.0 - In Progress)
 - Native code generation from batch execution plans
 - Direct LLVM IR emission for maximum performance
 - Target: Single-digit nanosecond per-iteration overhead

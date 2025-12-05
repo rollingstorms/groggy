@@ -23,8 +23,9 @@
 
 pub mod batch_executor;
 pub mod batch_plan;
-pub mod jit; // Tier 2: JIT compilation
+// JIT compilation disabled temporarily due to Cranelift ARM64 compatibility issues
+// pub mod jit; // Tier 2: JIT compilation
 
 pub use batch_executor::BatchExecutor;
 pub use batch_plan::{BatchInstruction, BatchPlan, SlotId};
-pub use jit::JitManager;
+// pub use jit::JitManager;
