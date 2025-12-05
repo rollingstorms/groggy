@@ -150,42 +150,8 @@ impl BetweennessCentrality {
         }
         sigma[source_idx] = 1.0;
 
-        if weight_map.is_none() {
-            // Unweighted BFS using CSR
-            distance[source_idx] = 0.0;
-            let mut stack = Vec::with_capacity(n);
-            let mut queue = VecDeque::with_capacity(n);
-            queue.push_back(source);
-
-            while let Some(v) = queue.pop_front() {
-                stack.push(v);
-                let v_idx = indexer.get(v).unwrap();
-                let v_dist = distance[v_idx];
-
-                // Use CSR neighbors (slice - no allocation!)
-                for &w_idx in csr.neighbors(v_idx) {
-                    if w_idx >= n {
-                        continue;
-                    }
-                    let w = nodes[w_idx];
-                    let w_dist = distance[w_idx];
-
-                    if w_dist < 0.0 {
-                        distance[w_idx] = v_dist + 1.0;
-                        queue.push_back(w);
-                    }
-
-                    if (distance[w_idx] - (v_dist + 1.0)).abs() < EPS {
-                        sigma[w_idx] += sigma[v_idx];
-                        predecessors[w_idx].push(v);
-                    }
-                }
-            }
-
-            Ok(stack)
-        } else {
+        if let Some(weights) = weight_map {
             // Weighted Dijkstra variant
-            let weights = weight_map.unwrap();
             distance[source_idx] = 0.0;
 
             #[derive(Copy, Clone, Debug)]
@@ -256,6 +222,39 @@ impl BetweennessCentrality {
             }
 
             Ok(order)
+        } else {
+            // Unweighted BFS using CSR
+            distance[source_idx] = 0.0;
+            let mut stack = Vec::with_capacity(n);
+            let mut queue = VecDeque::with_capacity(n);
+            queue.push_back(source);
+
+            while let Some(v) = queue.pop_front() {
+                stack.push(v);
+                let v_idx = indexer.get(v).unwrap();
+                let v_dist = distance[v_idx];
+
+                // Use CSR neighbors (slice - no allocation!)
+                for &w_idx in csr.neighbors(v_idx) {
+                    if w_idx >= n {
+                        continue;
+                    }
+                    let w = nodes[w_idx];
+                    let w_dist = distance[w_idx];
+
+                    if w_dist < 0.0 {
+                        distance[w_idx] = v_dist + 1.0;
+                        queue.push_back(w);
+                    }
+
+                    if (distance[w_idx] - (v_dist + 1.0)).abs() < EPS {
+                        sigma[w_idx] += sigma[v_idx];
+                        predecessors[w_idx].push(v);
+                    }
+                }
+            }
+
+            Ok(stack)
         }
     }
 

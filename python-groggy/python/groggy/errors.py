@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from .types import EdgeId, NodeId
 
@@ -50,7 +50,7 @@ class NotImplementedError(GroggyError):
 class ValidationError(GroggyError):
     """Raised when pipeline validation fails"""
 
-    def __init__(self, errors: list[str], warnings: list[str] = None):
+    def __init__(self, errors: List[str], warnings: List[str] = None):
         self.errors = errors
         self.warnings = warnings or []
 
