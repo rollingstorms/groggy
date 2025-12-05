@@ -22,7 +22,7 @@ interpreter registered as `builder.step_pipeline`.
 """
 
 import json
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
@@ -1806,7 +1806,7 @@ class BuiltAlgorithm(AlgorithmHandle):
 
         raise ValueError(f"Unsupported builder step type: {step_type}")
 
-    def _validate(self) -> tuple[list[str], list[str]]:
+    def _validate(self) -> Tuple[List[str], List[str]]:
         """
         Validate the pipeline.
 
