@@ -9,6 +9,7 @@ import importlib.util
 # Import the original implementation temporarily during refactor
 # This will be fully replaced as we migrate functionality
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from groggy import _groggy
