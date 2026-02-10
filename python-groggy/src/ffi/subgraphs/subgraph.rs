@@ -4,7 +4,8 @@
 //! This replaces the 800+ line complex version with pure delegation to existing trait methods.
 
 use crate::ffi::api::pipeline::{
-    py_build_pipeline, py_drop_pipeline, py_run_pipeline, PyPipelineHandle,
+    py_build_pipeline, py_drop_pipeline, py_run_pipeline, py_build_sample_pipeline,
+    py_drop_sample_pipeline, py_run_sample_pipeline, PyPipelineHandle, PySamplePipelineHandle,
 };
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
@@ -16,6 +17,7 @@ use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use pyo3::{Py, PyCell, PyObject};
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -1042,22 +1044,31 @@ impl PySubgraph {
         Ok(result.inner().clone())
     }
 
-    /// Sample k nodes from this subgraph randomly
-    pub fn sample(&self, k: usize) -> PyResult<PySubgraph> {
-        let node_ids: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
+    /// Sample using either a sampler pipeline or a simple k value.
+    #[pyo3(signature = (sampler_or_k))]
+    pub fn sample(&self, py: Python, sampler_or_k: &PyAny) -> PyResult<PyObject> {
+        if let Ok(k) = sampler_or_k.extract::<usize>() {
+            let node_ids: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
 
-        if k >= node_ids.len() {
-            // Return the same subgraph if k is larger than available nodes
-            return Ok(self.clone());
+            if k >= node_ids.len() {
+                return Ok(PySubgraph::from_core_subgraph(self.inner.clone())?.into_py(py));
+            }
+
+            let _sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
+            return Ok(PySubgraph::from_core_subgraph(self.inner.clone())?.into_py(py));
         }
 
-        // Simple sampling: take first k nodes (for now - would use proper random sampling in production)
-        let _sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
+        if sampler_or_k.hasattr("to_spec")? {
+            let spec_any = sampler_or_k.call_method0("to_spec")?;
+            let handle = py_build_sample_pipeline(py, spec_any)?;
+            let result = py_run_sample_pipeline(py, &handle, self)?;
+            py_drop_sample_pipeline(&handle);
+            return Ok(result.into_py(py));
+        }
 
-        // For now, just return a clone of the original subgraph as a placeholder
-        // In a full implementation, we would properly create an induced subgraph
-        // with the sampled nodes using the core graph algorithms
-        Ok(self.clone())
+        Err(PyTypeError::new_err(
+            "sample() expects an int or a sampler with to_spec()",
+        ))
     }
 
     // === String representations ===
@@ -1615,64 +1626,37 @@ impl PySubgraph {
     /// Convert this subgraph to its adjacency matrix representation
     /// Enables chaining like: subgraph.to_matrix().eigen().stats()
     pub fn to_matrix(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
-        // For now, create a placeholder matrix
-        // In full implementation, would convert subgraph to adjacency matrix
-        let graph_ref = self.inner.graph();
-        let graph_borrowed = graph_ref.borrow();
-
-        // Get node IDs and create a mapping
-        let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
-        let n = node_ids.len();
-
-        // Create adjacency matrix data (simplified - would be optimized in real implementation)
-        let mut matrix_data = vec![vec![0.0f32; n]; n];
-
-        // Fill adjacency matrix
-        for (i, &node_i) in node_ids.iter().enumerate() {
-            for (j, &node_j) in node_ids.iter().enumerate() {
-                if i != j {
-                    // Check if there's an edge between these nodes
-                    if let Ok(has_edge) = graph_borrowed.has_edge_between(node_i, node_j) {
-                        if has_edge {
-                            matrix_data[i][j] = 1.0; // Unweighted for now
-                        }
-                    }
-                }
-            }
-        }
-
-        // Convert matrix data to NumArrays for each column
-        Python::with_gil(|py| {
-            let mut py_arrays: Vec<PyObject> = Vec::with_capacity(n);
-
-            // Create a column for each node (column-major format)
-            for col_idx in 0..n {
-                let column_values: Vec<f64> = (0..n)
-                    .map(|row_idx| matrix_data[row_idx][col_idx] as f64)
-                    .collect();
-
-                // Create NumArray since adjacency matrices are always numerical
-                let num_array = PyNumArray::new(column_values);
-                py_arrays.push(Py::new(py, num_array)?.to_object(py));
-            }
-
-            // Create GraphMatrix using the new constructor that accepts PyObject arrays
-            let matrix = crate::ffi::storage::matrix::PyGraphMatrix::new(py, py_arrays)?;
-
-            // Set column names based on node IDs
-            let column_names: Vec<String> = node_ids
-                .iter()
-                .map(|&node_id| format!("node_{}", node_id))
-                .collect();
-
-            let mut inner_matrix = matrix.inner;
-            inner_matrix.set_column_names(column_names);
-
-            Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(inner_matrix))
-        })
+        self.adjacency_matrix()
     }
 
     // === ADJACENCY METHODS (moved from Graph to Subgraph) ===
+
+    /// Convert this subgraph to its adjacency matrix representation
+    /// Returns a GraphMatrix with rows/columns scoped to this subgraph
+    fn adjacency_matrix(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
+        let graph_ref = self.inner.graph();
+        let adjacency_matrix = {
+            let mut graph_borrowed = graph_ref.borrow_mut();
+            graph_borrowed
+                .subgraph_adjacency_matrix(&node_ids)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?
+        };
+
+        let temp_graph = PyGraph {
+            inner: graph_ref.clone(),
+            cached_view: RefCell::new(None),
+        };
+        let graph_matrix = temp_graph.adjacency_matrix_to_graph_matrix(adjacency_matrix)?;
+        Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(
+            graph_matrix,
+        ))
+    }
+
+    /// Get adjacency matrix (alias for adjacency_matrix)
+    fn adj(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        self.adjacency_matrix()
+    }
 
     /// Get adjacency list representation
     /// Returns: Dict mapping node_id -> list of connected node_ids

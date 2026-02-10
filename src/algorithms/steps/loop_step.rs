@@ -227,6 +227,8 @@ impl Step for LoopStep {
                         super::core::StepValue::EdgeMap(map.clone())
                     } else if let Ok(val) = vars.scalar(initial_var) {
                         super::core::StepValue::Scalar(val.clone())
+                    } else if let Ok(array) = vars.subgraph_array(initial_var) {
+                        super::core::StepValue::SubgraphArray(array.clone())
                     } else {
                         return Err(anyhow!(
                             "Loop variable initialization: '{}' not found",
@@ -243,6 +245,9 @@ impl Step for LoopStep {
                     }
                     super::core::StepValue::EdgeMap(map) => vars_mut.set_edge_map(loop_var, map),
                     super::core::StepValue::Scalar(val) => vars_mut.set_scalar(loop_var, val),
+                    super::core::StepValue::SubgraphArray(array) => {
+                        vars_mut.set_subgraph_array(loop_var, array)
+                    }
                     _ => {
                         return Err(anyhow!(
                             "Loop variable '{}' has unsupported type",

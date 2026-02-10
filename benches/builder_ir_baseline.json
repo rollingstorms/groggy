@@ -1,12 +1,37 @@
 {
-  "ffi_overhead_ms": 0.25042708999999996,
+  "ffi_overhead_ms": 0.6458041700000006,
   "operation_times": {
-    "init_nodes": 8.551792000000003,
-    "scalar_mul": 0.5472499999999991,
-    "degrees": 1.35445900000003
+    "init_nodes": 23.75087499999995,
+    "scalar_mul": 1.1535409999999802,
+    "degrees": 4.6578750000000335
   },
-  "build_time_ms": 0.04008300000002407,
-  "exec_time_ms": 0.9901250000000084,
-  "loop_overhead_ms": 0.1839590000000113,
-  "pagerank_builder_ms": 5.292458
+  "build_time_ms": 1.1235419999999774,
+  "exec_time_ms": 1.6190830000000211,
+  "fusion_opportunities": {
+    "total_ops": 27,
+    "fusion_chains": 0,
+    "ops_saved": 0,
+    "theoretical_speedup": 1.0
+  },
+  "loop_overhead_ms": 40.69154199999991,
+  "pagerank_builder_ms": 9.001582999999979,
+  "pagerank_native_ms": 3.9532920000000527,
+  "overhead_ratio": 2.276984093256926,
+  "batch_vs_fallback": {
+    "batch_ms": 72.7084586666666,
+    "fallback_ms": 55.57722266666672,
+    "speedup": 0.7643845528545946,
+    "iterations": 50,
+    "repeats": 3
+  },
+  "lpa_builder_ms": 14.068541999999962,
+  "lpa_native_ms": 1.133541666666682,
+  "lpa_overhead_ratio": 12.411137952582044,
+  "lpa_batch_vs_fallback": {
+    "batch_ms": 12.748805666666696,
+    "fallback_ms": 12.261389000000067,
+    "speedup": 0.9617676604843826,
+    "iterations": 10,
+    "repeats": 3
+  }
 }

@@ -60,7 +60,7 @@ Operations are organized into semantic domains:
 | **CoreOps** | Value operations | `x + y`, `x.reduce("sum")` |
 | **GraphOps** | Topology operations | `sG @ values`, `sG.builder.graph_ops.degree()` |
 | **AttrOps** | Attribute I/O | `sG.builder.attr.load("weight")` |
-| **IterOps** | Control flow | `sG.builder.iter.loop(100)` |
+| **IterOps** | Control flow | `sG.iterate(100)` |
 
 ## Architecture
 
@@ -248,7 +248,7 @@ def degree_centrality(sG, normalized=True):
 @algorithm
 def lpa(sG, max_iter=10):
     labels = sG.nodes(unique=True)
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         labels = sG.builder.graph_ops.neighbor_mode_update(
             labels, include_self=True, ordered=True
         )

@@ -193,6 +193,7 @@ def test_builder_map_nodes_encoding():
     builder = AlgorithmBuilder("test_encode_map")
     ranks = builder.init_nodes(1.0)
     sums = builder.map_nodes("sum(ranks[neighbors(node)])", inputs={"ranks": ranks})
+    builder.attach_as("sums", sums)
 
     algo = builder.build()
     map_step = builder.steps[1]
@@ -433,6 +434,7 @@ def test_builder_load_attr_encoding():
 
     builder = AlgorithmBuilder("test_encode_load")
     weights = builder.load_attr("weight", default=1.0)
+    builder.attach_as("weights", weights)
 
     algo = builder.build()
     load_step = builder.steps[0]
@@ -451,6 +453,7 @@ def test_builder_load_edge_attr_encoding():
 
     builder = AlgorithmBuilder("test_encode_load_edge")
     edge_weights = builder.load_edge_attr("weight", default=1.0)
+    builder.attach_as("edge_weights", edge_weights)
 
     algo = builder.build()
     load_step = builder.steps[0]
@@ -567,6 +570,7 @@ def test_builder_validation_warnings():
 def test_builder_validation_map_nodes_undefined_input():
     """Test that validation catches undefined variables in map_nodes inputs."""
     import pytest
+    import warnings
 
     from groggy.builder import AlgorithmBuilder
     from groggy.errors import ValidationError
@@ -584,8 +588,14 @@ def test_builder_validation_map_nodes_undefined_input():
     )
 
     # Should raise ValidationError
-    with pytest.raises(ValidationError) as exc_info:
-        algo = builder.build(validate=True)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Pipeline validation: Pipeline doesn't attach any output attributes",
+            category=UserWarning,
+        )
+        with pytest.raises(ValidationError) as exc_info:
+            algo = builder.build(validate=True)
 
     assert "undefined_ranks" in str(exc_info.value)
 

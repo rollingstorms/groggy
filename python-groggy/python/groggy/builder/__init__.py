@@ -35,20 +35,27 @@ Example (original syntax, backward compatible):
     >>> result = subgraph.apply(algo)
 """
 
-from groggy.builder.algorithm_builder import (AlgorithmBuilder, BuiltAlgorithm,
-                                              LoopContext, builder)
+from groggy.builder.algorithm_builder import (
+    AlgorithmBuilder,
+    BuiltAlgorithm,
+    BuiltSampler,
+    LoopContext,
+    builder,
+)
 from groggy.builder.decorators import algorithm, compiled, traced
 from groggy.builder.traits.attr import AttrOps
 from groggy.builder.traits.core import CoreOps
 from groggy.builder.traits.graph import GraphOps
 from groggy.builder.traits.iter import IterOps
-from groggy.builder.varhandle import GraphHandle, SubgraphHandle, VarHandle
+from groggy.builder.varhandle import (GraphHandle, SubgraphArrayHandle,
+                                      SubgraphHandle, VarHandle)
 
 # Export main classes
 __all__ = [
     "AlgorithmBuilder",
     "VarHandle",
     "SubgraphHandle",
+    "SubgraphArrayHandle",
     "GraphHandle",
     "LoopContext",
     "CoreOps",
@@ -56,6 +63,7 @@ __all__ = [
     "AttrOps",
     "IterOps",
     "BuiltAlgorithm",
+    "BuiltSampler",
     "builder",
     "algorithm",
     "compiled",

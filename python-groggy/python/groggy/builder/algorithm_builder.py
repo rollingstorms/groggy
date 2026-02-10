@@ -20,7 +20,8 @@ from groggy.builder.traits.attr import AttrOps
 from groggy.builder.traits.core import CoreOps
 from groggy.builder.traits.graph import GraphOps
 from groggy.builder.traits.iter import IterOps
-from groggy.builder.varhandle import GraphHandle, SubgraphHandle, VarHandle
+from groggy.builder.varhandle import (GraphHandle, SubgraphHandle, SubgraphArrayHandle,
+                                      VarHandle)
 
 # Load the original builder module for LoopContext and BuiltAlgorithm
 builder_original_path = Path(__file__).parent.parent / "builder_original.py"
@@ -35,6 +36,7 @@ spec.loader.exec_module(builder_original)
 # Import remaining classes from original
 LoopContext = builder_original.LoopContext
 BuiltAlgorithm = builder_original.BuiltAlgorithm
+BuiltSampler = builder_original.BuiltSampler
 
 
 class AlgorithmBuilder:
@@ -48,7 +50,7 @@ class AlgorithmBuilder:
         >>> builder = AlgorithmBuilder("pagerank")
         >>> G = builder.graph()
         >>> ranks = G.nodes(1.0 / G.N)
-        >>> with builder.iter.loop(10):
+        >>> with builder.iterate(10):
         ...     neighbor_sum = G @ (ranks / (ranks.degrees() + 1e-9))
         ...     ranks = builder.var("ranks", 0.85 * neighbor_sum + 0.15 / G.N)
 
@@ -635,6 +637,130 @@ class AlgorithmBuilder:
 
         return handle
 
+    def iterate_nodes(self) -> VarHandle:
+        """
+        Create one seed subgraph per node.
+        """
+        handle = SubgraphArrayHandle(self._new_var("iter_nodes").name, self)
+        self.steps.append({"type": "sample.iterate_nodes", "output": handle.name})
+        return handle
+
+    def iterate_edges(self) -> VarHandle:
+        """
+        Create one seed subgraph per edge.
+        """
+        handle = SubgraphArrayHandle(self._new_var("iter_edges").name, self)
+        self.steps.append({"type": "sample.iterate_edges", "output": handle.name})
+        return handle
+
+    def neighbors(self, seeds: VarHandle, hops: int = 1) -> SubgraphArrayHandle:
+        """
+        Expand each seed subgraph to its k-hop neighborhood.
+        """
+        handle = SubgraphArrayHandle(self._new_var("neighbors").name, self)
+        self.steps.append(
+            {
+                "type": "sample.neighbors",
+                "input": seeds.name,
+                "hops": hops,
+                "output": handle.name,
+            }
+        )
+        return handle
+
+    def sample_nodes(
+        self,
+        *,
+        count: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> VarHandle:
+        """
+        Sample nodes from the input subgraph.
+        """
+        if count is None and fraction is None:
+            raise ValueError("sample_nodes requires count or fraction")
+        handle = self._new_var("sample_nodes")
+        step = {"type": "sample_nodes", "output": handle.name}
+        if count is not None:
+            step["count"] = count
+        if fraction is not None:
+            step["fraction"] = fraction
+        if seed is not None:
+            step["seed"] = seed
+        self.steps.append(step)
+        return handle
+
+    def sample_edges(
+        self,
+        *,
+        count: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> VarHandle:
+        """
+        Sample edges from the input subgraph.
+        """
+        if count is None and fraction is None:
+            raise ValueError("sample_edges requires count or fraction")
+        handle = self._new_var("sample_edges")
+        step = {"type": "sample_edges", "output": handle.name}
+        if count is not None:
+            step["count"] = count
+        if fraction is not None:
+            step["fraction"] = fraction
+        if seed is not None:
+            step["seed"] = seed
+        self.steps.append(step)
+        return handle
+
+    def emit_subgraphs(
+        self,
+        values: VarHandle,
+        *,
+        mode: str = "per_item",
+        induced: bool = True,
+    ) -> SubgraphArrayHandle:
+        """
+        Emit subgraphs from a selection or subgraph array.
+        """
+        output_name = "__sample_output__"
+        handle = SubgraphArrayHandle(output_name, self)
+        self.variables[output_name] = handle
+        self.steps.append(
+            {
+                "type": "sample.emit_subgraphs",
+                "input": values.name,
+                "output": output_name,
+                "mode": mode,
+                "induced": induced,
+            }
+        )
+        return handle
+
+    def each(self, subgraphs: SubgraphArrayHandle, fn) -> SubgraphArrayHandle:
+        """
+        Map a sub-pipeline over each subgraph in a SubgraphArray.
+        """
+        temp_builder = AlgorithmBuilder(f"{self.name}_each", use_ir=self.use_ir)
+        result = fn(temp_builder)
+
+        if "__sample_output__" not in temp_builder.variables:
+            if isinstance(result, VarHandle):
+                temp_builder.emit_subgraphs(result, mode="unified")
+
+        body_steps = temp_builder.steps
+        handle = SubgraphArrayHandle(self._new_var("each").name, self)
+        self.steps.append(
+            {
+                "type": "sample.for_each",
+                "input": subgraphs.name,
+                "output": handle.name,
+                "body": body_steps,
+            }
+        )
+        return handle
+
     def build(self, validate: bool = True, optimize: bool = True) -> AlgorithmHandle:
         """
         Build the algorithm from accumulated steps.
@@ -730,6 +856,78 @@ class AlgorithmBuilder:
             algo._validated = True
 
         return algo
+
+    def build_sampler(self, validate: bool = True, optimize: bool = True) -> BuiltSampler:
+        """
+        Build a sampler pipeline from accumulated steps.
+        """
+        steps = self.steps
+
+        if optimize and self.use_ir and self.ir_graph is not None:
+            from groggy.builder.ir.optimizer import optimize_ir
+
+            self._rebuild_ir_from_steps()
+
+            self.ir_graph, variable_renames = optimize_ir(
+                self.ir_graph, passes=None, max_iterations=3, return_renames=True
+            )
+
+            ir_steps = self.ir_graph.to_steps()
+            ir_steps = self._materialize_scalar_operands(ir_steps)
+
+            alias_steps = [s for s in self.steps if s.get("type") == "alias"]
+            ir_managed_side_effects = {"iter.loop", "core.execution_block"}
+            side_effect_steps = [
+                s
+                for s in self.steps
+                if s.get("type") != "alias"
+                and s.get("type") not in ir_managed_side_effects
+                and not s.get("output")
+            ]
+
+            expanded_renames = None
+            if alias_steps and variable_renames:
+                expanded_renames = self._expand_renames_for_iterations(
+                    variable_renames, alias_steps
+                )
+                alias_steps = self._apply_renames_to_aliases(
+                    alias_steps, expanded_renames
+                )
+            if side_effect_steps and variable_renames:
+                if expanded_renames is None:
+                    expanded_renames = self._expand_renames_for_iterations(
+                        variable_renames, alias_steps
+                    )
+                side_effect_steps = [
+                    self._apply_renames_to_step_fields(step, expanded_renames)
+                    for step in side_effect_steps
+                ]
+            if expanded_renames:
+                for handle in self.variables.values():
+                    handle.name = self._resolve_rename(handle.name, expanded_renames)
+
+            steps = self._merge_steps_topologically(ir_steps, alias_steps)
+            steps.extend(side_effect_steps)
+
+        sampler = BuiltSampler(self.name, steps)
+
+        if validate:
+            errors, warnings = sampler._validate()
+
+            if warnings:
+                import warnings as warn_module
+
+                for warning in warnings:
+                    warn_module.warn(f"Pipeline validation: {warning}", UserWarning)
+
+            if errors:
+                from groggy.errors import ValidationError
+
+                raise ValidationError(errors, warnings)
+
+            sampler._validated = True
+
+        return sampler
 
     def _expand_renames_for_iterations(self, variable_renames, alias_steps):
         """

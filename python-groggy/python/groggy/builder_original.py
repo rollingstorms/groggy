@@ -1709,6 +1709,80 @@ class BuiltAlgorithm(AlgorithmHandle):
                 params["default"] = default
             return {"id": "core.load_edge_attr", "params": params}
 
+        if step_type in ["sample_nodes", "core.sample_nodes"]:
+            params: Dict[str, Any] = {"target": step["output"]}
+            if "fraction" in step:
+                params["fraction"] = step["fraction"]
+            if "count" in step:
+                params["count"] = step["count"]
+            if "seed" in step:
+                params["seed"] = step["seed"]
+            return {"id": "core.sample_nodes", "params": params}
+
+        if step_type in ["sample_edges", "core.sample_edges"]:
+            params: Dict[str, Any] = {"target": step["output"]}
+            if "fraction" in step:
+                params["fraction"] = step["fraction"]
+            if "count" in step:
+                params["count"] = step["count"]
+            if "seed" in step:
+                params["seed"] = step["seed"]
+            return {"id": "core.sample_edges", "params": params}
+
+        if step_type in ["sample.iterate_nodes", "iterate_nodes"]:
+            return {
+                "id": "sample.iterate_nodes",
+                "params": {"target": step["output"]},
+            }
+
+        if step_type in ["sample.iterate_edges", "iterate_edges"]:
+            return {
+                "id": "sample.iterate_edges",
+                "params": {"target": step["output"]},
+            }
+
+        if step_type in ["sample.neighbors", "neighbors"]:
+            params = {
+                "source": self._resolve_operand(step["input"], alias_map),
+                "target": step["output"],
+                "hops": step.get("hops", 1),
+            }
+            return {"id": "sample.neighbors", "params": params}
+
+        if step_type in ["sample.emit_subgraphs", "emit_subgraphs"]:
+            params = {
+                "source": self._resolve_operand(step["input"], alias_map),
+                "target": step["output"],
+                "mode": step.get("mode", "per_item"),
+                "induced": step.get("induced", True),
+            }
+            return {"id": "sample.emit_subgraphs", "params": params}
+
+        if step_type in ["sample.for_each", "for_each"]:
+            body_steps = step.get("body", [])
+            body_alias_map = dict(alias_map)
+            body_specs: list[Dict[str, Any]] = []
+
+            for body_step in body_steps:
+                if body_step.get("type") == "alias":
+                    source = body_step.get("source")
+                    target = body_step.get("target")
+                    if source and target:
+                        resolved_source = self._resolve_with_alias(source, body_alias_map)
+                        body_alias_map[target] = resolved_source
+                    continue
+
+                encoded_body = self._encode_step(body_step, body_alias_map)
+                if encoded_body is not None:
+                    body_specs.append(encoded_body)
+
+            params = {
+                "source": self._resolve_operand(step["input"], alias_map),
+                "target": step["output"],
+                "body": body_specs,
+            }
+            return {"id": "sample.for_each", "params": params}
+
         if step_type == "core.histogram":
             # Handle both 'source' and 'input' field names (IR may change them)
             source_val = step.get(
@@ -1917,6 +1991,46 @@ class BuiltAlgorithm(AlgorithmHandle):
             warnings.append("Pipeline doesn't attach any output attributes")
 
         return errors, warnings
+
+
+class BuiltSampler(BuiltAlgorithm):
+    """Sampler pipeline built from composed steps."""
+
+    def __init__(self, name: str, steps: list):
+        super().__init__(name, steps)
+        self._id = f"custom.sample.{name}"
+
+    def to_spec(self) -> Dict[str, Any]:
+        alias_map: Dict[str, str] = {}
+        encoded_steps: list[Dict[str, Any]] = []
+
+        for step in self._steps:
+            if step.get("type") == "alias":
+                source = step.get("source")
+                target = step.get("target")
+                if source and target:
+                    resolved_source = self._resolve_with_alias(source, alias_map)
+                    alias_map[target] = resolved_source
+                continue
+
+            encoded = self._encode_step(step, alias_map)
+            if encoded is not None:
+                encoded_steps.append(encoded)
+
+        pipeline_definition = {
+            "name": self._name,
+            "steps": encoded_steps,
+        }
+
+        pipeline_json = json.dumps(pipeline_definition)
+
+        return {
+            "id": "builder.sample_pipeline",
+            "params": {
+                "name": _groggy.AttrValue(self._name),
+                "steps": _groggy.AttrValue(pipeline_json),
+            },
+        }
 
     def __repr__(self) -> str:
         return f"BuiltAlgorithm('{self._name}', {len(self._steps)} steps)"

@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 
 use crate::types::AttrName;
 
-use super::super::{AlgorithmParamValue, CostHint};
+use super::super::{AlgorithmParamValue, AlgorithmParams, CostHint};
 use super::aggregations::{
     EntropyStep, HistogramStep, MedianStep, ModeStep, NeighborAggType, NeighborAggregationStep,
     QuantileStep, ReduceNodeValuesStep, Reduction, StdDevStep,
@@ -38,6 +38,92 @@ use super::temporal::{
     TemporalPredicate, WindowAggregateStep,
 };
 use super::transformations::MapNodesExprStep;
+
+fn json_to_param(value: serde_json::Value) -> Result<AlgorithmParamValue> {
+    Ok(match value {
+        serde_json::Value::Null => AlgorithmParamValue::None,
+        serde_json::Value::Bool(b) => AlgorithmParamValue::Bool(b),
+        serde_json::Value::Number(num) => {
+            if let Some(i) = num.as_i64() {
+                AlgorithmParamValue::Int(i)
+            } else if let Some(f) = num.as_f64() {
+                AlgorithmParamValue::Float(f)
+            } else {
+                return Err(anyhow!("unsupported number format"));
+            }
+        }
+        serde_json::Value::String(s) => AlgorithmParamValue::Text(s),
+        serde_json::Value::Array(items) => {
+            AlgorithmParamValue::Json(serde_json::Value::Array(items))
+        }
+        serde_json::Value::Object(map) => {
+            AlgorithmParamValue::Json(serde_json::Value::Object(map))
+        }
+    })
+}
+
+fn parse_body_steps(value: &AlgorithmParamValue) -> Result<Vec<super::core::StepSpec>> {
+    let json_value = match value {
+        AlgorithmParamValue::Json(value) => value.clone(),
+        AlgorithmParamValue::Text(text) => serde_json::from_str::<serde_json::Value>(text)?,
+        other => {
+            return Err(anyhow!(
+                "sample.for_each expected JSON for 'body', found {:?}",
+                other
+            ))
+        }
+    };
+
+    let array = json_value
+        .as_array()
+        .ok_or_else(|| anyhow!("sample.for_each body must be a JSON array"))?;
+
+    let mut specs = Vec::with_capacity(array.len());
+    for item in array {
+        let obj = item
+            .as_object()
+            .ok_or_else(|| anyhow!("sample.for_each body entries must be objects"))?;
+        let id = obj
+            .get("id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("sample.for_each body step missing id"))?
+            .to_string();
+        let params_obj = obj.get("params").and_then(|v| v.as_object());
+        let mut params = AlgorithmParams::new();
+        if let Some(map) = params_obj {
+            for (key, value) in map {
+                params.insert(key.to_string(), json_to_param(value.clone())?);
+            }
+        }
+        let inputs = obj
+            .get("inputs")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_else(Vec::new);
+        let outputs = obj
+            .get("outputs")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_else(Vec::new);
+
+        specs.push(super::core::StepSpec {
+            id,
+            params,
+            inputs,
+            outputs,
+        });
+    }
+
+    Ok(specs)
+}
 
 /// Register the core steps that ship with the engine.
 pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
@@ -1259,6 +1345,103 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             };
 
             Ok(Box::new(SampleEdgesStep::new(sample_spec, seed, target)))
+        },
+    )?;
+
+    registry.register(
+        "sample.iterate_nodes",
+        StepMetadata {
+            id: "sample.iterate_nodes".to_string(),
+            description: "Create one subgraph per node".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let target = spec.params.expect_text("target")?.to_string();
+            Ok(Box::new(super::sampling::IterateNodesStep::new(target)))
+        },
+    )?;
+
+    registry.register(
+        "sample.iterate_edges",
+        StepMetadata {
+            id: "sample.iterate_edges".to_string(),
+            description: "Create one subgraph per edge".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let target = spec.params.expect_text("target")?.to_string();
+            Ok(Box::new(super::sampling::IterateEdgesStep::new(target)))
+        },
+    )?;
+
+    registry.register(
+        "sample.neighbors",
+        StepMetadata {
+            id: "sample.neighbors".to_string(),
+            description: "Expand each seed subgraph to k-hop neighborhoods".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec.params.expect_text("source")?.to_string();
+            let target = spec.params.expect_text("target")?.to_string();
+            let hops = spec
+                .params
+                .get_int("hops")
+                .map(|v| v as usize)
+                .unwrap_or(1);
+            Ok(Box::new(super::sampling::NeighborsStep::new(
+                source, hops, target,
+            )))
+        },
+    )?;
+
+    registry.register(
+        "sample.emit_subgraphs",
+        StepMetadata {
+            id: "sample.emit_subgraphs".to_string(),
+            description: "Emit subgraphs from a selection".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec.params.expect_text("source")?.to_string();
+            let target = spec.params.expect_text("target")?.to_string();
+            let mode = match spec.params.get_text("mode") {
+                Some("unified") => super::sampling::EmitMode::Unified,
+                Some("per_item") | Some("per-item") | None => {
+                    super::sampling::EmitMode::PerSeed
+                }
+                Some(other) => return Err(anyhow!("unknown emit mode: {}", other)),
+            };
+            let induced = spec.params.get_bool("induced").unwrap_or(true);
+            Ok(Box::new(super::sampling::EmitSubgraphsStep::new(
+                source, target, mode, induced,
+            )))
+        },
+    )?;
+
+    registry.register(
+        "sample.for_each",
+        StepMetadata {
+            id: "sample.for_each".to_string(),
+            description: "Map a sub-pipeline over subgraphs".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec.params.expect_text("source")?.to_string();
+            let target = spec.params.expect_text("target")?.to_string();
+            let body_param = spec
+                .params
+                .get("body")
+                .ok_or_else(|| anyhow!("sample.for_each requires 'body' param"))?;
+            let body_specs = parse_body_steps(body_param)?;
+            let registry = global_step_registry();
+            let mut body_steps = Vec::with_capacity(body_specs.len());
+            for step_spec in body_specs {
+                body_steps.push(registry.instantiate(&step_spec)?);
+            }
+            Ok(Box::new(super::sampling::ForEachSubgraphStep::new(
+                source, target, body_steps,
+            )))
         },
     )?;
 

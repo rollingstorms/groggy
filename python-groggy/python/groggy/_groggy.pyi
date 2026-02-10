@@ -8659,6 +8659,18 @@ class Subgraph:
         """
         ...
 
+    def adjacency_matrix(self, *args, **kwargs) -> Any:
+        """
+        Convert this subgraph to its adjacency matrix representation
+        """
+        ...
+
+    def adj(self, *args, **kwargs) -> Any:
+        """
+        Get adjacency matrix (alias for adjacency_matrix)
+        """
+        ...
+
     def to_matrix(self, *args, **kwargs) -> Any:
         """
         Convert this subgraph to its adjacency matrix representation

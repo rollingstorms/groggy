@@ -28,7 +28,7 @@ def build_pagerank_builder(builder, max_iter=100, damping=0.85):
         # Contribution from neighbors: damping * sum(rank / out_degree) over incoming edges
         contrib = builder.core.mul(ranks, inv_degrees)
         contrib = builder.core.where(sink_mask, 0.0, contrib)
-        neighbor_sum = builder.core.neighbor_agg(contrib, agg="sum")
+        neighbor_sum = builder.graph_ops.neighbor_agg(contrib, agg="sum")
         damped = builder.core.mul(neighbor_sum, damping)
 
         # Sink redistribution: damping * sink_mass / n

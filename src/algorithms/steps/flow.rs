@@ -390,6 +390,8 @@ impl Step for AliasStep {
                 super::core::StepValue::EdgeMap(map.clone())
             } else if let Ok(val) = vars.scalar(&self.source) {
                 super::core::StepValue::Scalar(val.clone())
+            } else if let Ok(array) = vars.subgraph_array(&self.source) {
+                super::core::StepValue::SubgraphArray(array.clone())
             } else {
                 return Err(anyhow!(
                     "alias: source variable '{}' not found or has unsupported type",
@@ -405,6 +407,9 @@ impl Step for AliasStep {
             super::core::StepValue::NodeColumn(col) => vars_mut.set_node_column(&self.target, col),
             super::core::StepValue::EdgeMap(map) => vars_mut.set_edge_map(&self.target, map),
             super::core::StepValue::Scalar(val) => vars_mut.set_scalar(&self.target, val),
+            super::core::StepValue::SubgraphArray(array) => {
+                vars_mut.set_subgraph_array(&self.target, array)
+            }
             _ => {
                 return Err(anyhow!(
                     "alias: unsupported value type for '{}'",

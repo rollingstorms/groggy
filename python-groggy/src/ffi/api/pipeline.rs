@@ -13,17 +13,33 @@ pub struct PyPipelineHandle {
     handle_id: usize,
 }
 
+#[pyclass]
+pub struct PySamplePipelineHandle {
+    handle_id: usize,
+}
+
 struct PipelineEntry {
     pipeline: Arc<groggy::algorithms::Pipeline>,
     build_time_seconds: f64,
 }
 
+struct SamplePipelineEntry {
+    pipeline: Arc<groggy::algorithms::builder::StepSamplePipeline>,
+    build_time_seconds: f64,
+}
+
 // Global pipeline registry using OnceLock for thread-safe initialization
 static PIPELINE_REGISTRY: OnceLock<Mutex<HashMap<usize, PipelineEntry>>> = OnceLock::new();
+static SAMPLE_PIPELINE_REGISTRY: OnceLock<Mutex<HashMap<usize, SamplePipelineEntry>>> =
+    OnceLock::new();
 static NEXT_ID: OnceLock<Mutex<usize>> = OnceLock::new();
 
 fn registry() -> &'static Mutex<HashMap<usize, PipelineEntry>> {
     PIPELINE_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn sample_registry() -> &'static Mutex<HashMap<usize, SamplePipelineEntry>> {
+    SAMPLE_PIPELINE_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn next_id() -> usize {
@@ -142,6 +158,105 @@ pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle>
         },
     );
     Ok(PyPipelineHandle { handle_id: id })
+}
+
+#[pyfunction]
+#[pyo3(name = "build_sample_pipeline")]
+pub fn py_build_sample_pipeline(py: Python, spec: &PyAny) -> PyResult<PySamplePipelineHandle> {
+    groggy::algorithms::ensure_algorithms_registered();
+
+    let id: String = spec.get_item("id")?.extract()?;
+    let params_any = spec
+        .get_item("params")
+        .unwrap_or_else(|_| PyNone::get(py).into());
+    let params_dict: HashMap<String, PyAttrValue> = if params_any.is_none() {
+        HashMap::new()
+    } else {
+        params_any.extract()?
+    };
+
+    let mut params = groggy::algorithms::AlgorithmParams::new();
+    for (key, value) in &params_dict {
+        let param_value = match &value.inner {
+            groggy::types::AttrValue::Int(i) => groggy::algorithms::AlgorithmParamValue::Int(*i),
+            groggy::types::AttrValue::SmallInt(i) => {
+                groggy::algorithms::AlgorithmParamValue::Int(*i as i64)
+            }
+            groggy::types::AttrValue::Float(f) => {
+                groggy::algorithms::AlgorithmParamValue::Float(*f as f64)
+            }
+            groggy::types::AttrValue::Bool(b) => groggy::algorithms::AlgorithmParamValue::Bool(*b),
+            groggy::types::AttrValue::Text(s) => {
+                groggy::algorithms::AlgorithmParamValue::Text(s.clone())
+            }
+            groggy::types::AttrValue::CompactText(s) => {
+                groggy::algorithms::AlgorithmParamValue::Text(s.as_str().to_string())
+            }
+            groggy::types::AttrValue::CompressedText(data) => {
+                if let Ok(text) = data.decompress_text() {
+                    groggy::algorithms::AlgorithmParamValue::Text(text)
+                } else {
+                    continue;
+                }
+            }
+            groggy::types::AttrValue::IntVec(v) => {
+                groggy::algorithms::AlgorithmParamValue::IntList(v.clone())
+            }
+            groggy::types::AttrValue::FloatVec(v) => {
+                groggy::algorithms::AlgorithmParamValue::FloatList(
+                    v.iter().map(|&f| f as f64).collect(),
+                )
+            }
+            groggy::types::AttrValue::CompressedFloatVec(data) => {
+                if let Ok(floats) = data.decompress_float_vec() {
+                    groggy::algorithms::AlgorithmParamValue::FloatList(
+                        floats.iter().map(|&f| f as f64).collect(),
+                    )
+                } else {
+                    continue;
+                }
+            }
+            groggy::types::AttrValue::BoolVec(v) => {
+                groggy::algorithms::AlgorithmParamValue::BoolList(v.clone())
+            }
+            groggy::types::AttrValue::TextVec(v) => {
+                groggy::algorithms::AlgorithmParamValue::TextList(v.clone())
+            }
+            groggy::types::AttrValue::Json(json_str) => {
+                match serde_json::from_str::<serde_json::Value>(json_str) {
+                    Ok(value) => groggy::algorithms::AlgorithmParamValue::Json(value),
+                    Err(_) => continue,
+                }
+            }
+            groggy::types::AttrValue::Bytes(_)
+            | groggy::types::AttrValue::Null
+            | groggy::types::AttrValue::SubgraphRef(_)
+            | groggy::types::AttrValue::NodeArray(_)
+            | groggy::types::AttrValue::EdgeArray(_) => {
+                continue;
+            }
+        };
+        params.insert(key, param_value);
+    }
+
+    let spec = groggy::algorithms::AlgorithmSpec { id, params };
+    let build_start = Instant::now();
+    let pipeline =
+        groggy::algorithms::builder::StepSamplePipeline::try_from_spec(&spec).map_err(|e| {
+            PyRuntimeError::new_err(format!("failed to build sample pipeline: {e}"))
+        })?;
+    let build_time_seconds = build_start.elapsed().as_secs_f64();
+
+    let handle_id = next_id();
+    sample_registry().lock().unwrap().insert(
+        handle_id,
+        SamplePipelineEntry {
+            pipeline: Arc::new(pipeline),
+            build_time_seconds,
+        },
+    );
+
+    Ok(PySamplePipelineHandle { handle_id })
 }
 
 #[pyfunction]
@@ -267,6 +382,34 @@ pub fn py_run_pipeline(
 }
 
 #[pyfunction]
+#[pyo3(name = "run_sample_pipeline", signature = (handle, subgraph))]
+pub fn py_run_sample_pipeline(
+    py: Python,
+    handle: &PySamplePipelineHandle,
+    subgraph: &crate::ffi::subgraphs::subgraph::PySubgraph,
+) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+    let pipeline = {
+        let registry_guard = sample_registry().lock().unwrap();
+        let entry = registry_guard
+            .get(&handle.handle_id)
+            .ok_or_else(|| PyRuntimeError::new_err("invalid sample pipeline handle"))?;
+        Arc::clone(&entry.pipeline)
+    };
+
+    let mut ctx = groggy::algorithms::Context::new();
+    let subgraphs = pipeline
+        .run(&mut ctx, subgraph.inner.clone())
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let py_subgraphs = subgraphs
+        .into_iter()
+        .map(crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph)
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+        py_subgraphs,
+    ))
+}
+
+#[pyfunction]
 #[pyo3(name = "get_pipeline_context_info")]
 pub fn py_get_pipeline_context_info() -> PyResult<HashMap<String, PyAttrValue>> {
     // Return information about pipeline execution capabilities
@@ -300,6 +443,12 @@ pub fn py_get_pipeline_context_info() -> PyResult<HashMap<String, PyAttrValue>> 
 #[pyo3(name = "drop_pipeline")]
 pub fn py_drop_pipeline(handle: &PyPipelineHandle) {
     registry().lock().unwrap().remove(&handle.handle_id);
+}
+
+#[pyfunction]
+#[pyo3(name = "drop_sample_pipeline")]
+pub fn py_drop_sample_pipeline(handle: &PySamplePipelineHandle) {
+    sample_registry().lock().unwrap().remove(&handle.handle_id);
 }
 
 #[pyfunction]
@@ -572,9 +721,13 @@ pub fn py_list_algorithms() -> PyResult<Vec<HashMap<String, PyAttrValue>>> {
 #[pymodule]
 pub fn pipeline(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPipelineHandle>()?;
+    m.add_class::<PySamplePipelineHandle>()?;
     m.add_function(wrap_pyfunction!(py_build_pipeline, m)?)?;
     m.add_function(wrap_pyfunction!(py_run_pipeline, m)?)?;
     m.add_function(wrap_pyfunction!(py_drop_pipeline, m)?)?;
+    m.add_function(wrap_pyfunction!(py_build_sample_pipeline, m)?)?;
+    m.add_function(wrap_pyfunction!(py_run_sample_pipeline, m)?)?;
+    m.add_function(wrap_pyfunction!(py_drop_sample_pipeline, m)?)?;
     m.add_function(wrap_pyfunction!(py_list_algorithms, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_algorithm_metadata, m)?)?;
     m.add_function(wrap_pyfunction!(py_validate_algorithm_params, m)?)?;

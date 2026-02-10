@@ -15,8 +15,11 @@ import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add local groggy package to path (in-tree Python package)
+repo_root = Path(__file__).parent.parent
+python_pkg = repo_root / "python-groggy" / "python"
+sys.path.insert(0, str(python_pkg))
+sys.path.insert(0, str(repo_root))
 
 import groggy as gr
 from groggy.builder import AlgorithmBuilder, algorithm
@@ -227,23 +230,26 @@ class BuilderProfiler:
         # Build the spec to analyze IR
         spec = pagerank_pattern()
         
-        # Get the builder's IR from the spec (we need to access internal state)
-        # For now, just count steps
-        if hasattr(spec, 'steps'):
-            total_ops = len(spec['steps'])
+        # Use encoded spec to inspect steps
+        encoded = spec.to_spec()
+        steps = encoded.get("steps", [])
+        if not steps and hasattr(spec, "_steps"):
+            steps = getattr(spec, "_steps", [])
+        if steps:
+            total_ops = len(steps)
             print(f"Total operations: {total_ops}")
             
             # Manually identify fusable patterns by analyzing step types
             fusable_patterns = [
-                ('mul', 'where'),  # ranks * inv_deg then where
-                ('mul', 'add'),    # 0.85 * x + 0.15 * y
+                ('core.mul', 'core.where'),  # ranks * inv_deg then where
+                ('core.mul', 'core.add'),    # 0.85 * x + 0.15 * y
             ]
             
             # Count potential fusion opportunities
             fusion_count = 0
-            for i in range(len(spec['steps']) - 1):
-                step1 = spec['steps'][i]['type']
-                step2 = spec['steps'][i+1]['type']
+            for i in range(len(steps) - 1):
+                step1 = steps[i].get('id') or steps[i].get('type')
+                step2 = steps[i + 1].get('id') or steps[i + 1].get('type')
                 if any(step1 == p[0] and step2 == p[1] for p in fusable_patterns):
                     fusion_count += 1
             
@@ -260,6 +266,8 @@ class BuilderProfiler:
                 'theoretical_speedup': theoretical_speedup
             }
         
+        else:
+            print("No steps available for fusion analysis.")
         return None
         
     def profile_loop_overhead(self):
@@ -340,13 +348,10 @@ class BuilderProfiler:
         try:
             @timer
             def native_pagerank():
+                from groggy.algorithms.centrality import pagerank
+
                 sG = self.graph.to_subgraph()
-                # Check if there's a native pagerank method
-                if hasattr(sG, 'pagerank'):
-                    sG.pagerank(damping=0.85, max_iter=10, tol=1e-6)
-                else:
-                    # Use graph-level if available
-                    self.graph.pagerank(damping=0.85, max_iter=10, tol=1e-6)
+                sG.apply(pagerank(damping=0.85, max_iter=10, tolerance=1e-6))
             
             _, native_time = native_pagerank()
             print(f"Native PageRank (10 iter):  {native_time:.4f} ms")
@@ -362,6 +367,134 @@ class BuilderProfiler:
             print(f"Builder PageRank time: {builder_time:.4f} ms (no native comparison)")
             self.results['pagerank_builder_ms'] = builder_time
             return builder_time, None
+
+    def compare_batch_vs_fallback(self, iterations: int = 50, repeats: int = 3):
+        """Compare batch executor vs fallback for a simple iterative loop."""
+        print("\n=== Batch Executor vs Fallback ===")
+
+        @algorithm("batch_compare")
+        def batch_compare(sG, iters=iterations):
+            ranks = sG.nodes(1.0)
+            with sG.iterate(iters):
+                neighbor_sum = sG.builder.graph_ops.neighbor_agg(ranks, agg="sum")
+                damped = neighbor_sum * 0.85
+                ranks = sG.var("ranks", damped + 0.15)
+            return ranks
+
+        def run_with_env(disable: bool) -> float:
+            if disable:
+                os.environ["GROGGY_DISABLE_BATCH"] = "1"
+            else:
+                os.environ.pop("GROGGY_DISABLE_BATCH", None)
+
+            sG = self.graph.to_subgraph()
+            spec = batch_compare(iters=iterations)
+            total = 0.0
+            for _ in range(repeats):
+                start = time.perf_counter()
+                sG.apply(spec)
+                total += time.perf_counter() - start
+            return total / repeats
+
+        batch_time = run_with_env(disable=False)
+        fallback_time = run_with_env(disable=True)
+        speedup = fallback_time / batch_time if batch_time > 0 else float("inf")
+
+        print(f"Batch avg:    {batch_time*1000:.3f} ms")
+        print(f"Fallback avg: {fallback_time*1000:.3f} ms")
+        print(f"Speedup:      {speedup:.2f}x")
+
+        self.results["batch_vs_fallback"] = {
+            "batch_ms": batch_time * 1000,
+            "fallback_ms": fallback_time * 1000,
+            "speedup": speedup,
+            "iterations": iterations,
+            "repeats": repeats,
+        }
+        return batch_time, fallback_time, speedup
+
+    def compare_lpa(self, iterations: int = 10, repeats: int = 3):
+        """Compare builder LPA vs native and batch vs fallback."""
+        print("\n=== LPA: Builder vs Native ===")
+
+        @algorithm("lpa_builder")
+        def lpa_builder(sG, iters=iterations):
+            labels = sG.nodes(unique=True)
+            with sG.iterate(iters):
+                neighbor_labels = sG.builder.graph_ops.collect_neighbor_values(labels, include_self=True)
+                most_common = sG.builder.core.mode(neighbor_labels, tie_break="lowest")
+                labels = sG.builder.core.update_in_place(
+                    most_common, target=labels, ordered=True
+                )
+            return labels
+
+        def run_builder() -> float:
+            sG = self.graph.to_subgraph()
+            spec = lpa_builder(iters=iterations)
+            total = 0.0
+            for _ in range(repeats):
+                start = time.perf_counter()
+                sG.apply(spec)
+                total += time.perf_counter() - start
+            return total / repeats
+
+        builder_time = run_builder()
+        print(f"Builder LPA ({iterations} iter): {builder_time*1000:.3f} ms")
+
+        native_time = None
+        try:
+            from groggy.algorithms.community import lpa
+
+            def run_native() -> float:
+                sG = self.graph.to_subgraph()
+                total = 0.0
+                for _ in range(repeats):
+                    start = time.perf_counter()
+                    sG.apply(lpa(max_iter=iterations))
+                    total += time.perf_counter() - start
+                return total / repeats
+
+            native_time = run_native()
+            print(f"Native LPA ({iterations} iter):  {native_time*1000:.3f} ms")
+            if native_time > 0:
+                print(f"Overhead: {(builder_time / native_time):.2f}x")
+        except Exception as e:
+            print(f"Native LPA not available: {e}")
+
+        print("\n=== LPA: Batch vs Fallback ===")
+        def run_with_env(disable: bool) -> float:
+            if disable:
+                os.environ["GROGGY_DISABLE_BATCH"] = "1"
+            else:
+                os.environ.pop("GROGGY_DISABLE_BATCH", None)
+            sG = self.graph.to_subgraph()
+            spec = lpa_builder(iters=iterations)
+            total = 0.0
+            for _ in range(repeats):
+                start = time.perf_counter()
+                sG.apply(spec)
+                total += time.perf_counter() - start
+            return total / repeats
+
+        batch_time = run_with_env(disable=False)
+        fallback_time = run_with_env(disable=True)
+        speedup = fallback_time / batch_time if batch_time > 0 else float("inf")
+        print(f"Batch avg:    {batch_time*1000:.3f} ms")
+        print(f"Fallback avg: {fallback_time*1000:.3f} ms")
+        print(f"Speedup:      {speedup:.2f}x")
+
+        self.results["lpa_builder_ms"] = builder_time * 1000
+        if native_time is not None:
+            self.results["lpa_native_ms"] = native_time * 1000
+            self.results["lpa_overhead_ratio"] = builder_time / native_time
+        self.results["lpa_batch_vs_fallback"] = {
+            "batch_ms": batch_time * 1000,
+            "fallback_ms": fallback_time * 1000,
+            "speedup": speedup,
+            "iterations": iterations,
+            "repeats": repeats,
+        }
+        return builder_time, native_time, speedup
         
     def generate_report(self):
         """Generate comprehensive performance report."""
@@ -383,6 +516,19 @@ class BuilderProfiler:
             print(f"   - Builder: {self.results['pagerank_builder_ms']:.4f} ms")
             print(f"   - Native:  {self.results['pagerank_native_ms']:.4f} ms")
             print(f"   - Overhead: {self.results['overhead_ratio']:.2f}x")
+
+        if 'batch_vs_fallback' in self.results:
+            bf = self.results['batch_vs_fallback']
+            print(f"\n🚀 Batch vs Fallback:")
+            print(f"   - Batch:    {bf['batch_ms']:.4f} ms")
+            print(f"   - Fallback: {bf['fallback_ms']:.4f} ms")
+            print(f"   - Speedup:  {bf['speedup']:.2f}x")
+
+        if 'lpa_builder_ms' in self.results:
+            print(f"\n🧠 LPA (Builder): {self.results['lpa_builder_ms']:.4f} ms")
+        if 'lpa_native_ms' in self.results:
+            print(f"🧠 LPA (Native):  {self.results['lpa_native_ms']:.4f} ms")
+            print(f"🧠 LPA Overhead:  {self.results['lpa_overhead_ratio']:.2f}x")
         
         if 'build_time_ms' in self.results and 'exec_time_ms' in self.results:
             ratio = self.results['build_time_ms'] / self.results['exec_time_ms']
@@ -416,6 +562,8 @@ def main():
     profiler.profile_fusion_opportunities()
     profiler.profile_loop_overhead()
     profiler.compare_with_native()
+    profiler.compare_batch_vs_fallback()
+    profiler.compare_lpa()
     
     # Generate report
     results = profiler.generate_report()

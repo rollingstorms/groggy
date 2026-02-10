@@ -20,6 +20,10 @@ Implement LPA with `map_nodes(async_update=True)` to model in-place label change
 **Time:** 45 minutes · **Difficulty:** Advanced  
 Combine steps into multi-part metrics, wrap builder factories for reuse, and mix pre/post-processing around native algorithms.
 
+### [5. Sampler Pipelines](05_sampler.md)
+**Time:** 20 minutes · **Difficulty:** Intermediate  
+Build a subgraph sampler with neighborhoods and per-item mapping.
+
 ## Learning Path
 
 ```
@@ -41,6 +45,7 @@ Start → Hello World
 - Attach: `b.attach_as("attr_name", vals)`
 - Loops: `with b.iterate(k): ...` (enables Batch Executor when compatible)
 - Run: `algo = b.build(); result = graph.view().apply(algo)`
+- Samplers: `sampler = b.build_sampler(); samples = graph.view().sample(sampler)`
 
 ## Prerequisites
 

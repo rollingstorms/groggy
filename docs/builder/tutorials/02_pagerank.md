@@ -165,7 +165,7 @@ def pagerank(sG, damping=0.85, max_iter=100):
     is_sink = (degrees == 0.0)
     
     # Iterate until convergence (or max_iter)
-    with G.builder.iter.loop(max_iter):
+    with G.iterate(max_iter):
         # Compute contributions (sinks contribute 0)
         contrib = is_sink.where(0.0, ranks * inv_degrees)
         
@@ -288,7 +288,7 @@ After many iterations, these values converge to the final PageRank!
 
 ## Key Takeaways
 
-✅ Use `G.builder.iter.loop(n)` for fixed iteration loops  
+✅ Use `G.iterate(n)` for fixed iteration loops  
 ✅ Use `G.builder.var("name", value)` to carry values between iterations  
 ✅ Use `G @ values` to aggregate neighbor values  
 ✅ Use `mask.where(if_true, if_false)` for conditional logic  
@@ -300,13 +300,13 @@ After many iterations, these values converge to the final PageRank!
 
 ❌ **Forgetting to reassign loop variables**
 ```python
-with G.builder.iter.loop(10):
+with G.iterate(10):
     ranks = damping * neighbor_sum  # Wrong! This doesn't carry forward
 ```
 
 ✅ **Correct**
 ```python
-with G.builder.iter.loop(10):
+with G.iterate(10):
     new_ranks = damping * neighbor_sum
     ranks = G.builder.var("ranks", new_ranks)  # Explicitly reassign
 ```
@@ -327,14 +327,14 @@ result = non_empty.where(compute_value(), 0.0)
 
 ❌ **Modifying loop-invariant variables inside the loop**
 ```python
-with G.builder.iter.loop(10):
+with G.iterate(10):
     degrees = ranks.degrees()  # Wasteful! Degrees don't change
 ```
 
 ✅ **Compute constants outside the loop**
 ```python
 degrees = ranks.degrees()  # Compute once
-with G.builder.iter.loop(10):
+with G.iterate(10):
     # Use degrees here
 ```
 

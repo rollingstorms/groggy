@@ -4,14 +4,14 @@
 
 ## Overview
 
-Access IterOps through `sG.builder.iter`:
+Access IterOps through `sG.builder.iter`, but prefer the shorter `sG.iterate(...)` form when possible:
 
 ```python
 @algorithm
 def example(sG, max_iter=100):
     values = sG.nodes(1.0)
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         # Iterative updates
         values = sG.builder.var("values", values * 2.0)
     
@@ -25,7 +25,7 @@ def example(sG, max_iter=100):
 Fixed iteration loop.
 
 ```python
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     # Code here runs 100 times
     values = sG.builder.var("values", updated_values)
 ```
@@ -43,7 +43,7 @@ def pagerank(sG, max_iter=100, damping=0.85):
     ranks = sG.nodes(1.0 / sG.N)
     deg = ranks.degrees()
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         contrib = ranks / (deg + 1e-9)
         neighbor_sum = sG @ contrib
         ranks = sG.builder.var("ranks",
@@ -62,16 +62,16 @@ def pagerank(sG, max_iter=100, damping=0.85):
 **Loop-Carried Dependencies:**
 
 ```python
-with sG.builder.iter.loop(10):
+with sG.iterate(10):
     # ✅ Correct - updates 'values' variable
     values = sG.builder.var("values", values * 2.0)
 
 # ❌ Incorrect - creates new variable each iteration (not updated)
-with sG.builder.iter.loop(10):
+with sG.iterate(10):
     values = values * 2.0  # Doesn't propagate across iterations
 ```
 
-### `loop_range(start, end, step=1)`
+### `loop_range(start, end, step=1)` (legacy)
 
 Loop with range (like Python's `range()`).
 
@@ -100,7 +100,7 @@ def gradual_decay(sG):
     return values
 ```
 
-**Note:** Iteration variable access is limited in current implementation.
+**Note:** `loop_range` does not currently have a `sG.iterate_range(...)` alias. Prefer `sG.iterate(...)` unless you specifically need range semantics.
 
 ## Convergence-Based Loops
 
@@ -198,7 +198,7 @@ Set update strategy for the loop.
 
 ```python
 sG.builder.iter.set_strategy("async")
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     # Updates happen asynchronously
     pass
 ```
@@ -229,7 +229,7 @@ def lpa_async(sG, max_iter=10):
     # Set async strategy
     sG.builder.iter.set_strategy("async")
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         labels = sG.builder.graph_ops.neighbor_mode_update(
             labels, include_self=True, ordered=True
         )
@@ -253,7 +253,7 @@ Use custom update schedule.
 # Update every 2 iterations
 schedule = sG.builder.iter.every_n_iterations(2)
 
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     with sG.builder.iter.with_schedule(schedule):
         values = sG.builder.var("values", expensive_update)
 ```
@@ -271,7 +271,7 @@ def progressive_update(sG):
     fast_values = sG.nodes(1.0)
     slow_values = sG.nodes(1.0)
     
-    with sG.builder.iter.loop(100):
+    with sG.iterate(100):
         # Fast update every iteration
         fast_values = sG.builder.var("fast", fast_values * 0.99)
         
@@ -291,7 +291,7 @@ def progressive_update(sG):
 Break loop if condition is true.
 
 ```python
-with sG.builder.iter.loop(1000):
+with sG.iterate(1000):
     # ...
     converged = max_diff < tolerance
     sG.builder.iter.break_if(converged)
@@ -307,7 +307,7 @@ with sG.builder.iter.loop(1000):
 def early_stopping(sG, threshold=1e-6):
     values = sG.nodes(1.0)
     
-    with sG.builder.iter.loop(1000):
+    with sG.iterate(1000):
         old_values = values
         values = sG.builder.var("values", update_values(values))
         
@@ -327,7 +327,7 @@ def early_stopping(sG, threshold=1e-6):
 Skip rest of iteration if condition is false.
 
 ```python
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     should_update = check_condition()
     sG.builder.iter.continue_if(should_update)
     
@@ -342,7 +342,7 @@ with sG.builder.iter.loop(100):
 def conditional_propagation(sG, max_iter=100):
     values = sG.nodes(1.0)
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         # Check if any values are active
         has_active = (values > 0.01).reduce("sum")
         
@@ -360,10 +360,10 @@ def conditional_propagation(sG, max_iter=100):
 Loops can be nested:
 
 ```python
-with sG.builder.iter.loop(outer_iters):
+with sG.iterate(outer_iters):
     # Outer loop body
     
-    with sG.builder.iter.loop(inner_iters):
+    with sG.iterate(inner_iters):
         # Inner loop body
         values = sG.builder.var("values", updated)
 ```
@@ -375,9 +375,9 @@ with sG.builder.iter.loop(outer_iters):
 def two_phase(sG, outer=10, inner=50):
     values = sG.nodes(1.0)
     
-    with sG.builder.iter.loop(outer):
+    with sG.iterate(outer):
         # Phase 1: Fast updates
-        with sG.builder.iter.loop(inner):
+        with sG.iterate(inner):
             values = sG.builder.var("values", values * 0.99)
         
         # Phase 2: Refinement (runs once per outer iteration)
@@ -395,7 +395,7 @@ def two_phase(sG, outer=10, inner=50):
 Get current iteration number (within loop).
 
 ```python
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     iter_num = sG.builder.iter.iteration_count()
     # Use iter_num in computation
 ```
@@ -409,7 +409,7 @@ with sG.builder.iter.loop(100):
 def scheduled_decay(sG, max_iter=100):
     values = sG.nodes(100.0)
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         iter_num = sG.builder.iter.iteration_count()
         
         # Decay rate decreases over time
@@ -440,7 +440,7 @@ total = loop_info.total_iterations()
 Simple fixed-count loop:
 
 ```python
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     values = sG.builder.var("values", update_function(values))
 ```
 
@@ -459,7 +459,7 @@ with sG.builder.iter.until_converged(tolerance=1e-6, max_iter=1000):
 Manual convergence check:
 
 ```python
-with sG.builder.iter.loop(1000):
+with sG.iterate(1000):
     old = values
     values = sG.builder.var("values", update_function(values))
     
@@ -474,7 +474,7 @@ Non-deterministic but faster:
 
 ```python
 sG.builder.iter.set_strategy("async")
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     values = sG.builder.var("values", update_function(values))
 ```
 
@@ -483,7 +483,7 @@ with sG.builder.iter.loop(100):
 Update multiple variables:
 
 ```python
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     new_x = update_x(x, y)
     new_y = update_y(x, y)
     
@@ -496,7 +496,7 @@ with sG.builder.iter.loop(100):
 Different operations at different phases:
 
 ```python
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     # Always do fast update
     values = sG.builder.var("values", fast_update(values))
     
@@ -538,11 +538,11 @@ Keep loop bodies focused:
 
 ```python
 # ✅ Good - focused loop body
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     values = sG.builder.var("values", core_update(values))
 
 # ❌ Avoid - complex loop body
-with sG.builder.iter.loop(100):
+with sG.iterate(100):
     # Many operations make loop harder to optimize
     a = complex_op_1()
     b = complex_op_2()
@@ -559,13 +559,13 @@ Loop count must be known at algorithm definition time:
 ```python
 # ❌ Doesn't work - can't be dynamic
 param = load_from_somewhere()
-with sG.builder.iter.loop(param):
+with sG.iterate(param):
     pass
 
 # ✅ Works - pass as parameter
 @algorithm
 def my_algo(sG, max_iter):
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         pass
 ```
 
@@ -588,11 +588,11 @@ Variables updated in loops must use `sG.builder.var()`:
 
 ```python
 # ❌ Doesn't create loop-carried dependency
-with sG.builder.iter.loop(10):
+with sG.iterate(10):
     values = values * 2.0  # Creates new variable each time
 
 # ✅ Correct
-with sG.builder.iter.loop(10):
+with sG.iterate(10):
     values = sG.builder.var("values", values * 2.0)
 ```
 
@@ -632,7 +632,7 @@ def lpa_async(sG, max_iter=10):
     
     sG.builder.iter.set_strategy("async")
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         labels = sG.builder.graph_ops.neighbor_mode_update(
             labels, include_self=True, ordered=True
         )
@@ -648,7 +648,7 @@ def belief_propagation(sG, max_iter=50, damping=0.5):
     beliefs = sG.nodes(1.0)
     messages = sG.nodes(0.0)
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         # Update messages
         new_messages = sG @ beliefs
         messages = sG.builder.var("messages",
@@ -671,7 +671,7 @@ def iterative_refinement(sG, max_iter=100):
     coarse = sG.nodes(1.0)
     fine = sG.nodes(0.0)
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         # Coarse update (every iteration)
         coarse = sG.builder.var("coarse", sG @ coarse * 0.9)
         

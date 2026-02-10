@@ -67,7 +67,10 @@ pub use normalization::{
     ClipValuesStep, NormalizeMethod, NormalizeNodeValuesStep, NormalizeValuesStep, StandardizeStep,
 };
 pub use pathfinding::{KShortestPathsStep, RandomWalkStep, ShortestPathMapStep};
-pub use sampling::{EntityType, ReservoirSampleStep, SampleEdgesStep, SampleNodesStep, SampleSpec};
+pub use sampling::{
+    EmitMode, EntityType, ForEachSubgraphStep, IterateEdgesStep, IterateNodesStep, NeighborsStep,
+    ReservoirSampleStep, SampleEdgesStep, SampleNodesStep, SampleSpec, EmitSubgraphsStep,
+};
 pub use structural::{
     EdgeWeightSumStep, KCoreMarkStep, NodeDegreeStep, TriangleCountStep, WeightedDegreeStep,
 };

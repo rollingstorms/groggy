@@ -35,7 +35,7 @@ def algorithm(name_or_func: Optional[Union[str, Callable]] = None):
         ...     ranks = sG.nodes(1.0 / sG.N)
         ...     deg = ranks.degrees()
         ...
-        ...     with sG.builder.iter.loop(max_iter):
+        ...     with sG.iterate(max_iter):
         ...         neighbor_sum = sG @ (ranks / (deg + 1e-9))
         ...         ranks = sG.builder.var("ranks", damping * neighbor_sum + (1 - damping) / sG.N)
         ...
@@ -48,7 +48,7 @@ def algorithm(name_or_func: Optional[Union[str, Callable]] = None):
         >>> @algorithm
         ... def label_propagation(sG, max_iter=10):
         ...     labels = sG.nodes(unique=True)
-        ...     with sG.builder.iter.loop(max_iter):
+        ...     with sG.iterate(max_iter):
         ...         labels = sG.builder.graph_ops.neighbor_mode_update(labels)
         ...     return labels
     """

@@ -201,6 +201,18 @@ class VarHandle:
         return f"Var({self.name})"
 
 
+class SubgraphArrayHandle(VarHandle):
+    """
+    Handle representing a SubgraphArray.
+    """
+
+    def map(self, fn):
+        """
+        Map a function over each subgraph in this array.
+        """
+        return self.builder.each(self, fn)
+
+
 class GraphHandle:
     """
     Handle representing the input graph with topological operations.
@@ -276,7 +288,7 @@ class GraphHandle:
 
     def iterate(self, count: int):
         """
-        Fixed iteration loop - cleaner than sG.builder.iter.loop().
+        Fixed iteration loop - cleaner than sG.iterate().
 
         Args:
             count: Number of iterations

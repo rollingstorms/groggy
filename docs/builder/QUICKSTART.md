@@ -34,6 +34,28 @@ scores = result.nodes()["popularity"]
 print(scores)  # {1: 0.67, 2: 0.67, 3: 1.0, 4: 0.33}
 ```
 
+## Your First Algorithm (Builder API)
+
+If you prefer the explicit builder API instead of the decorator:
+
+```python
+import groggy as gr
+
+g = gr.Graph()
+g.add_edges([(1, 2), (1, 3), (2, 3), (3, 4)])
+
+b = gr.builder("popularity")
+nodes = b.init_nodes(default=0.0)
+degrees = b.node_degrees(nodes)
+normalized = b.normalize(degrees, method="max")
+b.attach_as("popularity", normalized)
+
+algo = b.build()
+result = g.view().apply(algo)
+scores = result.nodes["popularity"]
+print(scores)
+```
+
 ## Core Concepts
 
 ### 1. The `@algorithm` Decorator
@@ -117,7 +139,7 @@ normalized = values.normalize()  # Sum to 1.0
 ### 6. Iteration
 
 ```python
-with sG.builder.iter.loop(max_iter):
+with sG.iterate(max_iter):
     # Compute new values
     new_values = some_computation(old_values)
     
@@ -145,7 +167,7 @@ def pagerank(sG, damping=0.85, max_iter=100):
     ranks = sG.nodes(1.0 / sG.N)
     deg = ranks.degrees()
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         contrib = ranks / (deg + 1e-9)
         neighbor_sum = sG @ contrib
         ranks = sG.builder.var("ranks",

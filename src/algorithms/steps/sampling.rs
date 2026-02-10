@@ -9,13 +9,15 @@
 
 use std::collections::HashMap;
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::subgraphs::Subgraph;
+use crate::traits::SubgraphOperations;
 use crate::types::{EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{Step, StepMetadata, StepScope, StepVariables};
 
 /// Specification for sampling: either a fraction or absolute count.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -194,6 +196,381 @@ impl Step for SampleEdgesStep {
         }
 
         scope.variables_mut().set_edge_map(&self.target, result);
+        Ok(())
+    }
+}
+
+/// Iterate nodes and emit one subgraph per node.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IterateNodesStep {
+    target: String,
+}
+
+impl IterateNodesStep {
+    pub fn new(target: impl Into<String>) -> Self {
+        Self {
+            target: target.into(),
+        }
+    }
+}
+
+impl Step for IterateNodesStep {
+    fn id(&self) -> &'static str {
+        "sample.iterate_nodes"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: "Create one subgraph per node in the input".to_string(),
+            cost_hint: CostHint::Linear,
+        }
+    }
+
+    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        let graph_ref = scope.subgraph().graph();
+        let mut subgraphs = Vec::new();
+        for &node in scope.subgraph().nodes().iter() {
+            let mut nodes = std::collections::HashSet::new();
+            nodes.insert(node);
+            let sg = Subgraph::from_nodes(
+                graph_ref.clone(),
+                nodes,
+                "sample_iterate_nodes".to_string(),
+            )?;
+            subgraphs.push(sg);
+        }
+        scope
+            .variables_mut()
+            .set_subgraph_array(self.target.clone(), subgraphs);
+        Ok(())
+    }
+}
+
+/// Iterate edges and emit one subgraph per edge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IterateEdgesStep {
+    target: String,
+}
+
+impl IterateEdgesStep {
+    pub fn new(target: impl Into<String>) -> Self {
+        Self {
+            target: target.into(),
+        }
+    }
+}
+
+impl Step for IterateEdgesStep {
+    fn id(&self) -> &'static str {
+        "sample.iterate_edges"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: "Create one subgraph per edge in the input".to_string(),
+            cost_hint: CostHint::Linear,
+        }
+    }
+
+    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        let graph_ref = scope.subgraph().graph();
+        let graph = graph_ref.borrow();
+        let mut subgraphs = Vec::new();
+        for &edge in scope.subgraph().edges().iter() {
+            let (source, target) = graph.edge_endpoints(edge)?;
+            let mut nodes = std::collections::HashSet::new();
+            nodes.insert(source);
+            nodes.insert(target);
+            let mut edges = std::collections::HashSet::new();
+            edges.insert(edge);
+            let sg = Subgraph::new(
+                graph_ref.clone(),
+                nodes,
+                edges,
+                "sample_iterate_edges".to_string(),
+            );
+            subgraphs.push(sg);
+        }
+        scope
+            .variables_mut()
+            .set_subgraph_array(self.target.clone(), subgraphs);
+        Ok(())
+    }
+}
+
+/// Expand each subgraph in an array to its k-hop neighborhood.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NeighborsStep {
+    source: String,
+    hops: usize,
+    target: String,
+}
+
+impl NeighborsStep {
+    pub fn new(source: impl Into<String>, hops: usize, target: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+            hops,
+            target: target.into(),
+        }
+    }
+}
+
+impl Step for NeighborsStep {
+    fn id(&self) -> &'static str {
+        "sample.neighbors"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: "Expand each seed subgraph to its k-hop neighborhood".to_string(),
+            cost_hint: CostHint::Linear,
+        }
+    }
+
+    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        let seeds = scope.variables().subgraph_array(&self.source)?;
+        let mut out = Vec::with_capacity(seeds.len());
+        for seed in seeds {
+            let node_ids: Vec<NodeId> = seed.node_set().iter().copied().collect();
+            let graph_ref = seed.graph();
+            if node_ids.is_empty() {
+                out.push(Subgraph::new(
+                    graph_ref.clone(),
+                    std::collections::HashSet::new(),
+                    std::collections::HashSet::new(),
+                    "sample_neighbors_empty".to_string(),
+                ));
+                continue;
+            }
+            let neighborhood = graph_ref
+                .borrow_mut()
+                .unified_neighborhood(&node_ids, self.hops)
+                .map_err(|err| anyhow::anyhow!(err))?;
+            let nodes = neighborhood.node_set().clone();
+            let edges = neighborhood.edge_set().clone();
+            out.push(Subgraph::new(
+                graph_ref.clone(),
+                nodes,
+                edges,
+                format!("sample_neighbors_hops_{}", self.hops),
+            ));
+        }
+        scope
+            .variables_mut()
+            .set_subgraph_array(self.target.clone(), out);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EmitMode {
+    PerSeed,
+    Unified,
+}
+
+/// Emit subgraphs from a selection or existing subgraph array.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmitSubgraphsStep {
+    source: String,
+    target: String,
+    mode: EmitMode,
+    induced: bool,
+}
+
+impl EmitSubgraphsStep {
+    pub fn new(
+        source: impl Into<String>,
+        target: impl Into<String>,
+        mode: EmitMode,
+        induced: bool,
+    ) -> Self {
+        Self {
+            source: source.into(),
+            target: target.into(),
+            mode,
+            induced,
+        }
+    }
+}
+
+impl Step for EmitSubgraphsStep {
+    fn id(&self) -> &'static str {
+        "sample.emit_subgraphs"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: "Emit subgraphs from a selection".to_string(),
+            cost_hint: CostHint::Linear,
+        }
+    }
+
+    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        if let Ok(array) = scope.variables().subgraph_array(&self.source) {
+            scope
+                .variables_mut()
+                .set_subgraph_array(self.target.clone(), array.clone());
+            return Ok(());
+        }
+
+        let graph_ref = scope.subgraph().graph();
+        if let Ok(node_map) = scope.variables().node_map(&self.source) {
+            let nodes: Vec<NodeId> = node_map.keys().copied().collect();
+            let mut out = Vec::new();
+            match self.mode {
+                EmitMode::Unified => {
+                    let node_set: std::collections::HashSet<NodeId> =
+                        nodes.into_iter().collect();
+                    let sg = if self.induced {
+                        Subgraph::from_nodes(
+                            graph_ref.clone(),
+                            node_set,
+                            "sample_emit_nodes".to_string(),
+                        )?
+                    } else {
+                        Subgraph::new(
+                            graph_ref.clone(),
+                            node_set,
+                            std::collections::HashSet::new(),
+                            "sample_emit_nodes".to_string(),
+                        )
+                    };
+                    out.push(sg);
+                }
+                EmitMode::PerSeed => {
+                    for node in nodes {
+                        let mut set = std::collections::HashSet::new();
+                        set.insert(node);
+                        let sg = Subgraph::from_nodes(
+                            graph_ref.clone(),
+                            set,
+                            "sample_emit_node".to_string(),
+                        )?;
+                        out.push(sg);
+                    }
+                }
+            }
+            scope.variables_mut().set_subgraph_array(self.target.clone(), out);
+            return Ok(());
+        }
+
+        let edge_map = scope.variables().edge_map(&self.source)?;
+        let edges: Vec<EdgeId> = edge_map.keys().copied().collect();
+        let mut out = Vec::new();
+        match self.mode {
+            EmitMode::Unified => {
+                let graph = graph_ref.borrow();
+                let mut node_set = std::collections::HashSet::new();
+                let mut edge_set = std::collections::HashSet::new();
+                for edge in edges {
+                    let (source, target) = graph.edge_endpoints(edge)?;
+                    node_set.insert(source);
+                    node_set.insert(target);
+                    edge_set.insert(edge);
+                }
+                let sg = if self.induced {
+                    Subgraph::from_nodes(
+                        graph_ref.clone(),
+                        node_set,
+                        "sample_emit_edges_induced".to_string(),
+                    )?
+                } else {
+                    Subgraph::new(
+                        graph_ref.clone(),
+                        node_set,
+                        edge_set,
+                        "sample_emit_edges".to_string(),
+                    )
+                };
+                out.push(sg);
+            }
+            EmitMode::PerSeed => {
+                let graph = graph_ref.borrow();
+                for edge in edges {
+                    let (source, target) = graph.edge_endpoints(edge)?;
+                    let mut node_set = std::collections::HashSet::new();
+                    node_set.insert(source);
+                    node_set.insert(target);
+                    let mut edge_set = std::collections::HashSet::new();
+                    edge_set.insert(edge);
+                    out.push(Subgraph::new(
+                        graph_ref.clone(),
+                        node_set,
+                        edge_set,
+                        "sample_emit_edge".to_string(),
+                    ));
+                }
+            }
+        }
+        scope.variables_mut().set_subgraph_array(self.target.clone(), out);
+        Ok(())
+    }
+}
+
+/// Map a sub-pipeline over each subgraph in a subgraph array.
+pub struct ForEachSubgraphStep {
+    source: String,
+    target: String,
+    body_steps: Vec<Box<dyn Step>>,
+}
+
+impl ForEachSubgraphStep {
+    pub fn new(
+        source: impl Into<String>,
+        target: impl Into<String>,
+        body_steps: Vec<Box<dyn Step>>,
+    ) -> Self {
+        Self {
+            source: source.into(),
+            target: target.into(),
+            body_steps,
+        }
+    }
+}
+
+impl Step for ForEachSubgraphStep {
+    fn id(&self) -> &'static str {
+        "sample.for_each"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: "Map a sub-pipeline over subgraphs".to_string(),
+            cost_hint: CostHint::Linear,
+        }
+    }
+
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        let inputs = scope.variables().subgraph_array(&self.source)?;
+        let mut outputs = Vec::with_capacity(inputs.len());
+
+        for sg in inputs {
+            let mut vars = StepVariables::default();
+            for step in &self.body_steps {
+                let mut inner_scope = StepScope::new(sg, &mut vars);
+                step.apply(ctx, &mut inner_scope)?;
+            }
+
+            if let Ok(out_array) = vars.subgraph_array("__sample_output__") {
+                if let Some(first) = out_array.first() {
+                    outputs.push(first.clone());
+                    continue;
+                }
+            }
+
+            outputs.push(sg.clone());
+        }
+
+        scope
+            .variables_mut()
+            .set_subgraph_array(self.target.clone(), outputs);
         Ok(())
     }
 }

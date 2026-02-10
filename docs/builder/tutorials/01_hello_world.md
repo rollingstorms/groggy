@@ -81,6 +81,25 @@ for nid, score in zip(result.nodes.ids(), result.nodes["node_popularity"]):
 - `init_nodes` → `node_degrees` → `normalize` → `attach_as` covers many scoring tasks.
 - `build()` returns a handle you can run with `subgraph.apply(...)`.
 
+## Bonus: A Simple Sampler Pipeline
+
+Sampler pipelines return a `SubgraphArray` instead of a single `Subgraph`.
+
+```python
+import groggy as gr
+
+g = gr.generators.karate_club()
+
+b = gr.builder("random_100_1hop")
+nodes = b.sample_nodes(count=100, seed=42)
+nbh = b.neighbors(nodes, hops=1)
+b.emit_subgraphs(nbh, mode="unified")
+
+sampler = b.build_sampler()
+samples = g.view().sample(sampler)
+print(len(samples))  # 1
+```
+
 Next: [Tutorial 2: PageRank](02_pagerank.md) to learn loops and the Batch Executor.
 
 ❌ **Forgetting the decorator**

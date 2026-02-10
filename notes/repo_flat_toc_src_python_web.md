@@ -1,0 +1,13838 @@
+# Groggy Repo Flat TOC + API Index (src, python-groggy, web)
+
+This file is auto-generated. It lists every file under src/, python-groggy/, and web/, plus detected public APIs and scaffolding markers.
+
+## python-groggy/.cargo/config.toml (99 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/Cargo.toml (780 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/pyproject.toml (1239 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/__init__.py (9463 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def format_array
+  - def format_matrix
+  - def format_table
+- Other functions/classes (detected):
+  - def _setup_widget_environment
+  - def _subgraph_apply
+  - def _graph_apply
+  - def _jupyter_labextension_paths
+
+## python-groggy/python/groggy/__init__.pyi (1769 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class Graph
+  - class Subgraph
+  - class TemporalSnapshot
+  - class ExistenceIndex
+  - def add_node
+  - def add_edge
+  - def view
+  - def connected_components
+  - def snapshot_at_commit
+  - def snapshot_at_timestamp
+  - def apply
+  - def table
+  - def viz
+  - def commit_id
+  - def timestamp
+  - def author
+  - def message
+  - def parents
+  - def node_exists
+  - def edge_exists
+  - def node_attr
+  - def neighbors
+  - def neighbors_bulk
+  - def existence
+  - def as_subgraph
+  - def contains_node
+  - def contains_edge
+  - def nodes
+  - def edges
+- Other functions/classes (detected):
+  - def __init__
+
+## python-groggy/python/groggy/_frontend.py (163 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/_groggy.pyi (223094 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class AggregationFunction
+  - class AggregationResult
+  - class ArrayArray
+  - class AttrValue
+  - class AttributeFilter
+  - class BaseArray
+  - class BaseTable
+  - class BranchInfo
+  - class Commit
+  - class ComponentSubgraph
+  - class ComponentsArray
+  - class ComposerPreview
+  - class DisplayConfig
+  - class Edge
+  - class EdgeFilter
+  - class EdgeStrategy
+  - class EdgesAccessor
+  - class EdgesArray
+  - class EdgesArrayIterator
+  - class EdgesTable
+  - class Graph
+  - class GraphMatrix
+  - class GraphTable
+  - class GroupedAggregationResult
+  - class HistoricalView
+  - class HistoryStatistics
+  - class MatrixArray
+  - class MatrixArrayIterator
+  - class MetaEdge
+  - class MetaNode
+  - class MetaNodeArray
+  - class MetaNodePlan
+  - class NeighborhoodResult
+  - class NeighborhoodStats
+  - class NeighborhoodSubgraph
+  - class Node
+  - class NodeFilter
+  - class NodesAccessor
+  - class NodesArray
+  - class NodesArrayIterator
+  - class NodesTable
+  - class NumArray
+  - class PyAttributeCollection
+  - class PyComponentsArrayIterator
+  - class PyNumArrayIterator
+  - class PyResultHandle
+  - class PySubgraphArrayIterator
+  - class PyTableArrayCoreIterator
+  - class PyTableArrayIterator
+  - class StatsArray
+  - class Subgraph
+  - class SubgraphArray
+  - class TableArray
+  - class TableArrayIterator
+  - class TableFormatter
+  - class VizAccessor
+  - def array
+  - def bool_array
+  - def format_table_function
+  - def int_array
+  - def matrix
+  - def merge
+  - def num_array
+  - def ones_bool
+  - def parse_edge_query
+  - def parse_node_query
+  - def table
+  - def zeros_bool
+  - def aggregate
+  - def concat
+  - def count
+  - def first
+  - def from_string
+  - def last
+  - def max
+  - def mean
+  - def min
+  - def sum
+  - def attribute
+  - def count
+  - def operation
+  - def value
+  - def agg
+  - def count
+  - def is_empty
+  - def keys
+  - def max
+  - def mean
+  - def min
+  - def std
+  - def sum
+  - def to_type
+  - def type_name
+  - def value
+  - def equals
+  - def greater_than
+  - def greater_than_or_equal
+  - def less_than
+  - def less_than_or_equal
+  - def not_equals
+  - def append
+  - def append_element
+  - def apply
+  - def square
+  - def apply_to_each
+  - def contains
+  - def corr
+  - def count
+  - def cov
+  - def cummax
+  - def cummin
+  - def cumsum
+  - def describe
+  - def drop_duplicates_elements
+  - def drop_elements
+  - def dropna
+  - def dtype
+  - def expanding
+  - def extend
+  - def extend_elements
+  - def fillna
+  - def filter
+  - def get
+  - def get_percentile
+  - def has_nulls
+  - def head
+  - def infer_numeric_type
+  - def insert
+  - def is_empty
+  - def is_numeric
+  - def isna
+  - def iter
+  - def len
+  - def map
+  - def max
+  - def mean
+  - def median
+  - def min
+  - def notna
+  - def null_count
+  - def numeric_compatibility_info
+  - def nunique
+  - def pct_change
+  - def percentile
+  - def percentiles
+  - def quantile
+  - def quantiles
+  - def remove
+  - def reverse
+  - def rolling
+  - def shift
+  - def sort
+  - def std
+  - def sum
+  - def tail
+  - def to_list
+  - def to_num_array
+  - def to_table
+  - def to_table_with_name
+  - def to_table_with_prefix
+  - def to_table_with_suffix
+  - def to_type
+  - def unique
+  - def value_counts
+  - def var
+  - def column_names
+  - def columns
+  - def ncols
+  - def nrows
+  - def shape
+  - def add_prefix
+  - def add_suffix
+  - def agg
+  - def aggregate
+  - def append
+  - def append_row
+  - def apply
+  - def apply_to_columns
+  - def sum_column
+  - def apply_to_rows
+  - def sum_row
+  - def assign
+  - def check_outliers
+  - def column
+  - def column_info
+  - def corr
+  - def corr_columns
+  - def cov
+  - def cov_columns
+  - def cummax
+  - def cummin
+  - def cumsum
+  - def describe
+  - def drop_columns
+  - def drop_duplicates
+  - def drop_rows
+  - def dropna
+  - def dropna_subset
+  - def expanding
+  - def expanding_all
+  - def extend
+  - def extend_rows
+  - def fillna
+  - def fillna_all
+  - def filter
+  - def from_csv
+  - def from_dict
+  - def from_json
+  - def from_parquet
+  - def get_column_numeric
+  - def get_column_raw
+  - def get_percentile
+  - def group_by
+  - def group_by_agg
+  - def groupby
+  - def groupby_single
+  - def has_column
+  - def has_nulls
+  - def head
+  - def intersect
+  - def is_empty
+  - def isin
+  - def isna
+  - def iter
+  - def join
+  - def median
+  - def melt
+  - def nlargest
+  - def notna
+  - def nsmallest
+  - def null_counts
+  - def parse_join_on
+  - def pct_change
+  - def percentile
+  - def percentiles
+  - def pivot_table
+  - def profile
+  - def quantile
+  - def quantiles
+  - def query
+  - def rename
+  - def reorder_columns
+  - def rich_display
+  - def rolling
+  - def rolling_all
+  - def sample
+  - def select
+  - def set_column
+  - def set_value
+  - def set_values_by_mask
+  - def set_values_by_range
+  - def shift
+  - def slice
+  - def sort_by
+  - def sort_values
+  - def std
+  - def tail
+  - def to_csv
+  - def to_edges_table
+  - def to_json
+  - def to_nodes_table
+  - def to_pandas
+  - def to_parquet
+  - def to_type
+  - def union
+  - def validate_schema
+  - def value_counts
+  - def var
+  - def head
+  - def is_current
+  - def name
+  - def author
+  - def id
+  - def message
+  - def parents
+  - def timestamp
+  - def component_id
+  - def component_size
+  - def edge_count
+  - def is_largest_component
+  - def node_count
+  - def total_components
+  - def contains_edge
+  - def contains_node
+  - def edge_ids
+  - def node_ids
+  - def viz
+  - def collapse
+  - def filter
+  - def largest_component
+  - def neighborhood
+  - def sample
+  - def sizes
+  - def table
+  - def to_list
+  - def edge_strategy
+  - def entity_type
+  - def meta_edges_count
+  - def meta_node_attributes
+  - def will_include_edge_count
+  - def max_cols
+  - def max_rows
+  - def default
+  - def entity_type
+  - def id
+  - def is_active
+  - def source
+  - def target
+  - def keys
+  - def summary
+  - def values
+  - def and_filters
+  - def attribute_equals
+  - def attribute_filter
+  - def connects_any
+  - def connects_nodes
+  - def has_attribute
+  - def not_filter
+  - def or_filters
+  - def source_attribute_equals
+  - def source_or_target_attribute_equals
+  - def source_or_target_attribute_in
+  - def target_attribute_equals
+  - def aggregate
+  - def contract_all
+  - def drop_all
+  - def keep_external
+  - def attributes
+  - def base
+  - def meta
+  - def sources
+  - def targets
+  - def viz
+  - def all
+  - def array
+  - def attribute_names
+  - def filter
+  - def group_by
+  - def ids
+  - def matrix
+  - def set_attrs
+  - def table
+  - def weight_matrix
+  - def contains
+  - def filter
+  - def filter_by_size
+  - def filter_by_weight
+  - def first
+  - def interactive
+  - def is_empty
+  - def iter
+  - def last
+  - def nodes
+  - def stats
+  - def table
+  - def to_list
+  - def total_edge_count
+  - def union
+  - def collect
+  - def filter
+  - def filter_by_weight
+  - def nodes
+  - def table
+  - def viz
+  - def as_tuples
+  - def auto_assign_edge_ids
+  - def base_table
+  - def drop_columns
+  - def edge_ids
+  - def filter
+  - def filter_by_attr
+  - def filter_by_sources
+  - def filter_by_targets
+  - def from_csv
+  - def from_dict
+  - def from_json
+  - def from_parquet
+  - def group_by
+  - def head
+  - def interactive
+  - def interactive_embed
+  - def interactive_viz
+  - def into_base_table
+  - def iter
+  - def ncols
+  - def nrows
+  - def rich_display
+  - def select
+  - def shape
+  - def slice
+  - def sort_by
+  - def sort_values
+  - def sources
+  - def tail
+  - def targets
+  - def to_csv
+  - def to_json
+  - def to_pandas
+  - def to_parquet
+  - def unique_attr_values
+  - def edge_ids
+  - def edges
+  - def is_directed
+  - def is_undirected
+  - def node_ids
+  - def nodes
+  - def add_edge
+  - def add_edges
+  - def add_graph
+  - def add_node
+  - def add_nodes
+  - def adjacency_list
+  - def aggregate
+  - def all_edge_attribute_names
+  - def all_node_attribute_names
+  - def bfs
+  - def branches
+  - def calculate_similarity
+  - def checkout_branch
+  - def child_meta_nodes
+  - def clustering_coefficient
+  - def collapse
+  - def commit
+  - def commit_history
+  - def connected_components
+  - def contains_edge
+  - def contains_node
+  - def create_branch
+  - def degree
+  - def density
+  - def dfs
+  - def edge_attribute_keys
+  - def edge_count
+  - def edge_endpoints
+  - def edges_table
+  - def entity_type
+  - def filter_edges
+  - def filter_nodes
+  - def get_edge_attr
+  - def get_edge_attribute
+  - def get_edge_attrs
+  - def get_node_attr
+  - def get_node_attribute
+  - def get_node_attrs
+  - def get_node_mapping
+  - def group_by
+  - def group_nodes_by_attribute
+  - def has_edge
+  - def has_edge_attribute
+  - def has_edge_between
+  - def has_meta_nodes
+  - def has_node
+  - def has_node_attribute
+  - def has_path
+  - def has_uncommitted_changes
+  - def hierarchy_level
+  - def historical_view
+  - def in_degree
+  - def induced_subgraph
+  - def intersect_with
+  - def is_connected
+  - def is_empty
+  - def laplacian_matrix
+  - def merge_with
+  - def meta_nodes
+  - def neighborhood
+  - def neighbors
+  - def node_attribute_keys
+  - def node_count
+  - def out_degree
+  - def parent_meta_node
+  - def remove_edge
+  - def remove_edges
+  - def remove_node
+  - def remove_nodes
+  - def resolve_string_id_to_node
+  - def sample
+  - def set_edge_attr
+  - def set_edge_attrs
+  - def set_node_attr
+  - def set_node_attrs
+  - def shortest_path
+  - def shortest_path_subgraph
+  - def subgraph_from_edges
+  - def subtract_from
+  - def summary
+  - def table
+  - def to_edges
+  - def to_graph
+  - def to_matrix
+  - def to_networkx
+  - def to_nodes
+  - def transition_matrix
+  - def transitivity
+  - def view
+  - def viz
+  - def columns
+  - def data
+  - def dtype
+  - def grad
+  - def is_numeric
+  - def is_sparse
+  - def is_square
+  - def is_symmetric
+  - def requires_grad
+  - def shape
+  - def abs
+  - def apply
+  - def backward
+  - def cholesky_decomposition
+  - def concatenate
+  - def dense
+  - def dense_html_repr
+  - def determinant
+  - def dropout
+  - def eigenvalue_decomposition
+  - def elementwise_multiply
+  - def elu
+  - def exp
+  - def filter
+  - def flatten
+  - def from_base_array
+  - def from_data
+  - def from_flattened
+  - def from_graph_attributes
+  - def gelu
+  - def get
+  - def get_cell
+  - def get_column
+  - def get_column_by_name
+  - def get_row
+  - def identity
+  - def inverse
+  - def is_empty
+  - def iter_columns
+  - def iter_rows
+  - def leaky_relu
+  - def log
+  - def lu_decomposition
+  - def map
+  - def max
+  - def max_axis
+  - def mean
+  - def mean_axis
+  - def min
+  - def min_axis
+  - def multiply
+  - def norm
+  - def norm_inf
+  - def norm_l1
+  - def ones
+  - def power
+  - def preview
+  - def qr_decomposition
+  - def rank
+  - def relu
+  - def repeat
+  - def requires_grad_
+  - def reshape
+  - def rich_display
+  - def scalar_multiply
+  - def set
+  - def sigmoid
+  - def softmax
+  - def solve
+  - def split
+  - def sqrt
+  - def stack
+  - def std_axis
+  - def sum
+  - def sum_axis
+  - def summary
+  - def svd
+  - def tanh
+  - def tile
+  - def to_base_array
+  - def to_degree_matrix
+  - def to_dict
+  - def to_laplacian
+  - def to_list
+  - def to_normalized_laplacian
+  - def to_numpy
+  - def to_pandas
+  - def to_table_for_streaming
+  - def trace
+  - def transpose
+  - def var_axis
+  - def zero_grad
+  - def zeros
+  - def edges
+  - def nodes
+  - def viz
+  - def auto_assign_edge_ids
+  - def from_federated_bundles
+  - def get_bundle_info
+  - def head
+  - def is_empty
+  - def load_bundle
+  - def merge
+  - def ncols
+  - def nrows
+  - def save_bundle
+  - def shape
+  - def stats
+  - def tail
+  - def to_edges
+  - def to_graph
+  - def to_nodes
+  - def to_subgraphs
+  - def validate
+  - def verify_bundle
+  - def attribute
+  - def groups
+  - def operation
+  - def state_id
+  - def current_state_edges
+  - def current_state_nodes
+  - def total_branches
+  - def total_commits
+  - def uncommitted_changes
+  - def correlation_matrix
+  - def dimension_stats
+  - def filter
+  - def filter_by_size
+  - def first
+  - def is_empty
+  - def iter
+  - def last
+  - def mean_eigenvalue
+  - def stack
+  - def stats_summary
+  - def subgraphs
+  - def table
+  - def to_list
+  - def collect
+  - def eigen
+  - def filter
+  - def multiply
+  - def transform
+  - def aggregated_from
+  - def edge_count
+  - def entity_type
+  - def id
+  - def is_active
+  - def is_meta_edge
+  - def source
+  - def target
+  - def expand
+  - def keys
+  - def meta_properties
+  - def summary
+  - def values
+  - def degree
+  - def entity_type
+  - def has_subgraph
+  - def id
+  - def is_active
+  - def meta_edges
+  - def neighbors
+  - def subgraph
+  - def subgraph_id
+  - def expand
+  - def keys
+  - def re_aggregate
+  - def summary
+  - def values
+  - def iter
+  - def add_to_graph
+  - def preview
+  - def execution_time_ms
+  - def largest_neighborhood_size
+  - def neighborhoods
+  - def total_neighborhoods
+  - def operation_counts
+  - def total_neighborhoods
+  - def total_nodes_sampled
+  - def total_time_ms
+  - def avg_nodes_per_neighborhood
+  - def avg_time_per_neighborhood_ms
+  - def central_nodes
+  - def hops
+  - def is_central_node
+  - def subgraph
+  - def degree
+  - def entity_type
+  - def id
+  - def is_active
+  - def neighbors
+  - def keys
+  - def summary
+  - def values
+  - def and_filters
+  - def attribute_equals
+  - def attribute_filter
+  - def has_attribute
+  - def not_filter
+  - def or_filters
+  - def attributes
+  - def base
+  - def meta
+  - def subgraphs
+  - def viz
+  - def all
+  - def array
+  - def attribute_names
+  - def filter
+  - def get_meta_node
+  - def group_by
+  - def ids
+  - def matrix
+  - def set_attrs
+  - def table
+  - def contains
+  - def filter
+  - def filter_by_size
+  - def first
+  - def interactive
+  - def is_empty
+  - def iter
+  - def last
+  - def stats
+  - def table
+  - def to_list
+  - def total_node_count
+  - def union
+  - def collect
+  - def filter
+  - def table
+  - def viz
+  - def base_table
+  - def drop_columns
+  - def filter
+  - def filter_by_attr
+  - def from_csv
+  - def from_dict
+  - def from_json
+  - def from_parquet
+  - def group_by
+  - def head
+  - def interactive
+  - def interactive_embed
+  - def interactive_viz
+  - def into_base_table
+  - def is_empty
+  - def iter
+  - def ncols
+  - def node_ids
+  - def nrows
+  - def rich_display
+  - def select
+  - def shape
+  - def slice
+  - def sort_by
+  - def sort_values
+  - def tail
+  - def to_csv
+  - def to_json
+  - def to_pandas
+  - def to_parquet
+  - def unique_attr_values
+  - def with_attributes
+  - def dtype
+  - def contains
+  - def count
+  - def first
+  - def is_empty
+  - def last
+  - def max
+  - def mean
+  - def min
+  - def nunique
+  - def reshape
+  - def std
+  - def sum
+  - def to_list
+  - def to_type
+  - def unique
+  - def var
+  - def compute_stats
+  - def len
+  - def sample_values
+  - def edges
+  - def nodes
+  - def result_type
+  - def collect
+  - def dtype
+  - def contains
+  - def count
+  - def first
+  - def is_empty
+  - def last
+  - def max
+  - def mean
+  - def min
+  - def nunique
+  - def reshape
+  - def std
+  - def sum
+  - def to_list
+  - def to_type
+  - def unique
+  - def var
+  - def edge_ids
+  - def edges
+  - def hierarchy_level
+  - def node_ids
+  - def nodes
+  - def viz
+  - def adjacency_list
+  - def bfs
+  - def calculate_similarity
+  - def child_meta_nodes
+  - def clustering_coefficient
+  - def collapse
+  - def connected_components
+  - def contains_edge
+  - def contains_node
+  - def degree
+  - def density
+  - def dfs
+  - def edge_count
+  - def edge_endpoints
+  - def edges_table
+  - def entity_type
+  - def filter_edges
+  - def filter_nodes
+  - def get_edge_attribute
+  - def get_node_attribute
+  - def group_by
+  - def has_edge
+  - def has_edge_between
+  - def has_meta_nodes
+  - def has_node
+  - def has_path
+  - def in_degree
+  - def induced_subgraph
+  - def intersect_with
+  - def is_connected
+  - def is_empty
+  - def merge_with
+  - def meta_nodes
+  - def neighborhood
+  - def neighbors
+  - def node_count
+  - def out_degree
+  - def parent_meta_node
+  - def sample
+  - def set_edge_attrs
+  - def set_node_attrs
+  - def shortest_path_subgraph
+  - def subgraph_from_edges
+  - def subtract_from
+  - def summary
+  - def table
+  - def to_edges
+  - def to_graph
+  - def adjacency_matrix
+  - def adj
+  - def to_matrix
+  - def to_networkx
+  - def to_nodes
+  - def transitivity
+  - def viz
+  - def collapse
+  - def collect
+  - def edges_table
+  - def extract_node_attribute
+  - def group_by
+  - def is_empty
+  - def map
+  - def merge
+  - def nodes_table
+  - def sample
+  - def summary
+  - def table
+  - def to_list
+  - def agg
+  - def apply
+  - def apply_reduce
+  - def apply_to_array
+  - def apply_to_list
+  - def concat
+  - def count
+  - def describe
+  - def drop_columns
+  - def filter
+  - def head
+  - def is_empty
+  - def iter
+  - def map
+  - def max_column
+  - def mean
+  - def mean_column
+  - def min_column
+  - def rename
+  - def sample
+  - def select
+  - def shape
+  - def shape_detailed
+  - def skip
+  - def sort_by
+  - def std_column
+  - def sum
+  - def sum_column
+  - def tail
+  - def take
+  - def to_list
+  - def total_count
+  - def agg
+  - def collect
+  - def filter
+  - def group_by
+  - def join
+  - def skip
+  - def take
+  - def format_data_structure
+  - def format_table
+  - def create_fallback_visualization
+  - def server
+  - def show
+  - def update
+- Other functions/classes (detected):
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __init__
+  - def __iter__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __setitem__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __next__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __next__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __next__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __next__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __next__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __getitem__
+  - def __hash__
+  - def __init__
+  - def __iter__
+  - def __len__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+  - def __eq__
+  - def __hash__
+  - def __init__
+  - def __repr__
+  - def __str__
+
+## python-groggy/python/groggy/algorithms/__init__.py (3695 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def list
+  - def categories
+  - def info
+  - def search
+
+## python-groggy/python/groggy/algorithms/base.py (3867 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class AlgorithmHandle
+  - class RustAlgorithmHandle
+  - def to_spec
+  - def id
+  - def id
+  - def metadata
+  - def with_params
+  - def validate
+  - def to_spec
+  - def algorithm
+- Other functions/classes (detected):
+  - def __init__
+  - def __repr__
+
+## python-groggy/python/groggy/algorithms/centrality.py (3348 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def pagerank
+  - def betweenness
+  - def closeness
+
+## python-groggy/python/groggy/algorithms/community.py (4632 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def lpa
+  - def louvain
+  - def leiden
+  - def connected_components
+
+## python-groggy/python/groggy/algorithms/pathfinding.py (4247 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def dijkstra
+  - def bfs
+  - def dfs
+  - def astar
+
+## python-groggy/python/groggy/builder/__init__.py (2014 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/builder/algorithm_builder.py (43849 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class AlgorithmBuilder
+  - def graph
+  - def message_pass
+  - def auto_var
+  - def var
+  - def input
+  - def constant
+  - def init_nodes
+  - def load_attr
+  - def graph_node_count
+  - def graph_edge_count
+  - def load_edge_attr
+  - def node_degrees
+  - def normalize
+  - def iterate
+  - def attach_as
+  - def map_nodes
+  - def build
+  - def follow_rename_chain
+  - def get_ir_stats
+  - def visualize_ir
+  - def builder
+- Other functions/classes (detected):
+  - def __init__
+  - def _new_var
+  - def _finalize_loop
+  - def _unroll_ir_loop
+  - def _expand_renames_for_iterations
+  - def _materialize_scalar_operands
+  - def _apply_renames_to_aliases
+  - def _apply_renames_to_step_fields
+  - def _resolve_rename
+  - def _rebuild_ir_from_steps
+  - def _merge_steps_topologically
+  - def _add_ir_node
+  - def _remove_ir_nodes
+  - def _get_steps_from_ir
+
+## python-groggy/python/groggy/builder/decorators.py (5262 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def algorithm
+  - def decorator
+  - def wrapper
+  - def compiled
+  - def traced
+  - def builder_algorithm
+- Other functions/classes (detected):
+  - def _create_algorithm_wrapper
+
+## python-groggy/python/groggy/builder/examples.py (9788 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def pagerank
+  - def pagerank_simple
+  - def label_propagation
+  - def label_propagation_sync
+  - def degree_centrality
+  - def weighted_degree
+  - def node_attribute_propagation
+  - def pagerank_old_style
+
+## python-groggy/python/groggy/builder/execution/__init__.py (144 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/builder/execution/context.py (9748 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class MessagePassContext
+  - def pull
+  - def apply
+  - def capture_node
+  - def options_dict
+- Other functions/classes (detected):
+  - def __init__
+  - def __enter__
+  - def __exit__
+  - def _validate_operation
+
+## python-groggy/python/groggy/builder/ir/__init__.py (1301 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/builder/ir/analysis.py (19275 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class LivenessInfo
+  - class LoopInfo
+  - class DependencyChain
+  - class DataflowAnalysis
+  - class DataflowAnalyzer
+  - def analyze
+  - def print_analysis
+  - def analyze_dataflow
+- Other functions/classes (detected):
+  - def __init__
+  - def _analyze_dependencies
+  - def _analyze_liveness
+  - def _analyze_loops
+  - def _detect_fusion_chains
+  - def _try_build_chain
+  - def _can_fuse
+  - def _classify_chain_pattern
+  - def _estimate_fusion_benefit
+  - def _compute_critical_path
+
+## python-groggy/python/groggy/builder/ir/batch.py (26314 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class BatchExecutionPlan
+  - class BatchPlanGenerator
+  - class SlotAllocator
+  - class IRToBatchCompiler
+  - def to_json
+  - def from_json
+  - def to_binary
+  - def from_binary
+  - def generate
+  - def visit
+  - def compile_to_batch
+  - def estimate_performance
+  - def compute_lifetimes
+  - def allocate
+  - def get_slot
+  - def compile_loop_body
+  - def compile_loop_to_batch_plan
+- Other functions/classes (detected):
+  - def __init__
+  - def _compute_execution_order
+  - def _compute_live_ranges
+  - def _assign_variable_slots
+  - def _pack_operations
+  - def _extract_constants
+  - def __init__
+  - def __init__
+  - def _lower_step
+  - def _lower_binary_op
+  - def _lower_constant
+  - def _lower_neighbor_aggregate
+  - def _lower_load
+  - def _lower_store
+  - def _lower_alias
+
+## python-groggy/python/groggy/builder/ir/graph.py (10262 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class IRGraph
+  - def add_node
+  - def get_node
+  - def get_defining_node
+  - def get_using_nodes
+  - def get_dependencies
+  - def get_dependents
+  - def topological_order
+  - def visit
+  - def stats
+  - def to_dot
+  - def pretty_print
+  - def to_steps
+  - def to_json
+  - def rebuild_var_tracking
+  - def clone
+  - def rebuild_var_tracking
+- Other functions/classes (detected):
+  - def __init__
+  - def __len__
+  - def __repr__
+
+## python-groggy/python/groggy/builder/ir/memory.py (14695 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class MemoryAllocation
+  - class InPlaceCandidate
+  - class BufferReuseOpportunity
+  - class MemoryAnalysis
+  - def bytes
+  - def get_summary
+  - def print_report
+  - def analyze_memory
+- Other functions/classes (detected):
+  - def __init__
+  - def _analyze
+  - def _track_allocations
+  - def _estimate_variable_size
+  - def _infer_element_type
+  - def _find_in_place_candidates
+  - def _is_in_place_capable
+  - def _can_overwrite_v2
+  - def _get_in_place_reason
+  - def _find_reuse_opportunities
+  - def _buffers_compatible
+  - def _estimate_peak_memory
+  - def _estimate_savings
+
+## python-groggy/python/groggy/builder/ir/nodes.py (23567 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - class IRDomain
+  - class IRNode
+  - class CoreIRNode
+  - class GraphIRNode
+  - class AttrIRNode
+  - class ControlIRNode
+  - class LoopIRNode
+  - class ExecutionBlockNode
+  - def to_dict
+  - def to_step
+  - def to_dict
+  - def to_step
+  - def to_dict
+  - def to_step
+  - def to_dict
+  - def to_step
+  - def to_dict
+  - def to_step
+  - def iterations
+  - def body
+  - def loop_vars
+  - def batch_plan
+  - def to_dict
+  - def to_step
+  - def is_batch_compatible
+  - def mode
+  - def target
+  - def body_nodes
+  - def add_body_node
+  - def to_dict
+  - def to_step
+  - def expand_to_steps
+- Other functions/classes (detected):
+  - def __repr__
+  - def __init__
+  - def __init__
+  - def __init__
+  - def __init__
+  - def __init__
+  - def __init__
+
+## python-groggy/python/groggy/builder/ir/optimizer.py (26902 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class IROptimizer
+  - def optimize
+  - def dead_code_elimination
+  - def constant_folding
+  - def common_subexpression_elimination
+  - def fuse_arithmetic
+  - def fuse_neighbor_operations
+  - def optimize_ir
+- Other functions/classes (detected):
+  - def __init__
+  - def _mark_live_nodes
+  - def _has_side_effects
+  - def _try_fold_constant
+  - def _operation_signature
+  - def _apply_replacements
+  - def _try_fuse_binary_chain
+  - def _try_fuse_conditional
+  - def _is_scalar_variable
+  - def _ensure_node_map
+  - def _fuse_neighbor_mul_pattern
+  - def _fuse_arithmetic_chains
+
+## python-groggy/python/groggy/builder/ir/parallel.py (13105 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class ParallelGroup
+  - class ParallelExecutionPlan
+  - class ParallelAnalyzer
+  - def to_json
+  - def analyze
+  - def print_parallelism_report
+  - def analyze_parallelism
+  - def is_data_parallel_op
+  - def is_thread_safe_op
+- Other functions/classes (detected):
+  - def __init__
+  - def _build_dependency_graph
+  - def _compute_execution_levels
+  - def _create_parallel_groups
+  - def _estimate_group_parallelism
+  - def _estimate_speedup
+
+## python-groggy/python/groggy/builder/traits/__init__.py (343 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/builder/traits/attr.py (3792 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class AttrOps
+  - def load
+  - def load_edge
+  - def save
+  - def save_edge
+  - def groupby
+- Other functions/classes (detected):
+  - def __init__
+
+## python-groggy/python/groggy/builder/traits/core.py (25397 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class CoreOps
+  - def constant
+  - def add
+  - def sub
+  - def mul
+  - def div
+  - def recip
+  - def compare
+  - def where
+  - def reduce_scalar
+  - def broadcast_scalar
+  - def neighbor_agg
+  - def collect_neighbor_values
+  - def mode
+  - def update_in_place
+  - def neighbor_mode_update
+  - def normalize_sum
+  - def histogram
+  - def clip
+  - def pow
+  - def abs
+  - def sqrt
+  - def exp
+  - def log
+  - def min
+  - def max
+- Other functions/classes (detected):
+  - def __init__
+  - def _add_op
+  - def _ensure_var
+
+## python-groggy/python/groggy/builder/traits/graph.py (9854 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class GraphOps
+  - def degree
+  - def node_degree
+  - def neighbor_agg
+  - def collect_neighbor_values
+  - def neighbor_mode_update
+  - def neighbors
+  - def subgraph
+  - def connected_components
+  - def shortest_paths
+- Other functions/classes (detected):
+  - def __init__
+
+## python-groggy/python/groggy/builder/traits/iter.py (2539 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class IterOps
+  - def loop
+  - def until_converged
+  - def strategy
+- Other functions/classes (detected):
+  - def __init__
+
+## python-groggy/python/groggy/builder/varhandle.py (11594 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class VarHandle
+  - class GraphHandle
+  - class SubgraphHandle
+  - def where
+  - def reduce
+  - def degrees
+  - def normalize
+  - def nodes
+  - def edges
+  - def var
+  - def iterate
+  - def until_converged
+  - def N
+  - def M
+- Other functions/classes (detected):
+  - def __init__
+  - def __add__
+  - def __radd__
+  - def __sub__
+  - def __rsub__
+  - def __mul__
+  - def __rmul__
+  - def __truediv__
+  - def __rtruediv__
+  - def __neg__
+  - def __pow__
+  - def __eq__
+  - def __ne__
+  - def __lt__
+  - def __le__
+  - def __gt__
+  - def __ge__
+  - def __invert__
+  - def __and__
+  - def __or__
+  - def __matmul__
+  - def __repr__
+  - def __init__
+  - def __matmul__
+  - def __repr__
+  - def __init__
+  - def __repr__
+
+## python-groggy/python/groggy/builder.py (57381 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class LoopContext
+  - class VarHandle
+  - class SubgraphHandle
+  - class CoreOps
+  - class AlgorithmBuilder
+  - class BuiltAlgorithm
+  - def add
+  - def sub
+  - def mul
+  - def div
+  - def recip
+  - def compare
+  - def where
+  - def reduce_scalar
+  - def broadcast_scalar
+  - def neighbor_agg
+  - def collect_neighbor_values
+  - def mode
+  - def update_in_place
+  - def neighbor_mode_update
+  - def normalize_sum
+  - def histogram
+  - def clip
+  - def auto_var
+  - def input
+  - def init_nodes
+  - def load_attr
+  - def graph_node_count
+  - def graph_edge_count
+  - def load_edge_attr
+  - def node_degrees
+  - def normalize
+  - def iterate
+  - def remap_value
+  - def map_nodes
+  - def var
+  - def attach_as
+  - def build
+  - def id
+  - def to_spec
+  - def rewrite_vars
+  - def builder
+- Other functions/classes (detected):
+  - def __init__
+  - def __enter__
+  - def __exit__
+  - def __init__
+  - def __repr__
+  - def __init__
+  - def __repr__
+  - def __init__
+  - def _ensure_var
+  - def __init__
+  - def _new_var
+  - def _finalize_loop
+  - def __init__
+  - def _resolve_with_alias
+  - def _resolve_operand
+  - def _encode_step
+  - def _validate
+  - def __repr__
+
+## python-groggy/python/groggy/builder.pyi (11567 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class LoopContext
+  - class VarHandle
+  - class SubgraphHandle
+  - class CoreOps
+  - class AlgorithmBuilder
+  - class BuiltAlgorithm
+  - def add
+  - def sub
+  - def mul
+  - def div
+  - def update_in_place
+  - def neighbor_mode_update
+  - def normalize_sum
+  - def auto_var
+  - def input
+  - def init_nodes
+  - def load_attr
+  - def load_edge_attr
+  - def node_degrees
+  - def normalize
+  - def iterate
+  - def map_nodes
+  - def var
+  - def attach_as
+  - def build
+  - def id
+  - def to_spec
+  - def builder
+- Other functions/classes (detected):
+  - def __init__
+  - def __enter__
+  - def __exit__
+  - def __init__
+  - def __repr__
+  - def __init__
+  - def __repr__
+  - def __init__
+  - def __init__
+  - def __init__
+  - def __repr__
+
+## python-groggy/python/groggy/builder_original.py (67933 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class LoopContext
+  - class VarHandle
+  - class SubgraphHandle
+  - class CoreOps
+  - class AlgorithmBuilder
+  - class BuiltAlgorithm
+  - def add
+  - def sub
+  - def mul
+  - def div
+  - def recip
+  - def compare
+  - def where
+  - def reduce_scalar
+  - def broadcast_scalar
+  - def neighbor_agg
+  - def collect_neighbor_values
+  - def mode
+  - def update_in_place
+  - def neighbor_mode_update
+  - def normalize_sum
+  - def histogram
+  - def clip
+  - def auto_var
+  - def input
+  - def init_nodes
+  - def load_attr
+  - def graph_node_count
+  - def graph_edge_count
+  - def load_edge_attr
+  - def node_degrees
+  - def normalize
+  - def iterate
+  - def collect_strings
+  - def remap_values
+  - def map_nodes
+  - def var
+  - def attach_as
+  - def build
+  - def id
+  - def name
+  - def steps
+  - def to_spec
+  - def rewrite_vars
+  - def builder
+- Other functions/classes (detected):
+  - def __init__
+  - def __enter__
+  - def __exit__
+  - def __init__
+  - def __repr__
+  - def __init__
+  - def __repr__
+  - def __init__
+  - def _ensure_var
+  - def __init__
+  - def _new_var
+  - def _finalize_loop
+  - def _is_loop_candidate
+  - def __init__
+  - def _resolve_with_alias
+  - def _resolve_operand
+  - def _encode_step
+  - def _validate
+  - def __repr__
+
+## python-groggy/python/groggy/display/README.md (6500 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/display/__init__.py (1249 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def configure_display
+
+## python-groggy/python/groggy/display/array_display.py (7781 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class ArrayDisplayFormatter
+  - def format
+  - def format_array
+- Other functions/classes (detected):
+  - def __init__
+  - def _format_empty_array
+  - def _format_array_value
+  - def _build_border_line
+  - def _build_header_line
+  - def _build_data_line
+  - def _build_ellipsis_line
+
+## python-groggy/python/groggy/display/demo.py (4188 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def demo_table_display
+  - def demo_matrix_display
+  - def demo_array_display
+  - def main
+
+## python-groggy/python/groggy/display/formatters.py (1849 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def format_data_structure
+- Other functions/classes (detected):
+  - def _detect_data_type
+
+## python-groggy/python/groggy/display/integration_example.py (5020 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class PyGraphTableWithDisplay
+  - class PyGraphMatrixWithDisplay
+  - class PyGraphArrayWithDisplay
+  - def demo_integration
+- Other functions/classes (detected):
+  - def __init__
+  - def _get_display_data
+  - def _count_nulls
+  - def __repr__
+  - def __str__
+  - def __init__
+  - def _get_display_data
+  - def __repr__
+  - def __str__
+  - def __init__
+  - def _get_display_data
+  - def __repr__
+  - def __str__
+
+## python-groggy/python/groggy/display/matrix_display.py (5543 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class MatrixDisplayFormatter
+  - def format
+  - def format_matrix
+- Other functions/classes (detected):
+  - def __init__
+  - def _format_empty_matrix
+  - def _format_matrix_value
+  - def _calculate_matrix_column_widths
+  - def _build_border_line
+  - def _build_matrix_row
+
+## python-groggy/python/groggy/display/table_display.py (8130 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class TableDisplayFormatter
+  - def format
+  - def format_table
+- Other functions/classes (detected):
+  - def __init__
+  - def _format_empty_table
+  - def _format_dtype
+  - def _format_value
+  - def _build_border_line
+  - def _build_data_line
+
+## python-groggy/python/groggy/display/test_simple.py (684 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def simple_test
+
+## python-groggy/python/groggy/display/truncation.py (6711 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def truncate_rows
+  - def truncate_columns
+  - def create_ellipsis_row
+  - def truncate_string
+  - def calculate_column_widths
+  - def smart_matrix_truncation
+
+## python-groggy/python/groggy/display/unicode_chars.py (2383 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class BoxChars
+  - class Symbols
+  - class Colors
+  - def has_color_support
+  - def colorize
+
+## python-groggy/python/groggy/enhanced_query.py (8650 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class EnhancedQueryEngine
+  - class EnhancedSubgraph
+  - def filter_nodes
+  - def filter_edges
+  - def enhanced_filter_nodes
+  - def enhanced_filter_edges
+- Other functions/classes (detected):
+  - def __init__
+  - def _evaluate_node_query
+  - def _evaluate_edge_query
+  - def _evaluate_and_node_query
+  - def _evaluate_or_node_query
+  - def _evaluate_not_node_query
+  - def _evaluate_and_edge_query
+  - def _evaluate_or_edge_query
+  - def _evaluate_not_edge_query
+  - def _create_node_subgraph
+  - def __init__
+  - def __repr__
+
+## python-groggy/python/groggy/errors.py (2118 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class GroggyError
+  - class NodeNotFoundError
+  - class EdgeNotFoundError
+  - class InvalidInputError
+  - class NotImplementedError
+  - class ValidationError
+- Other functions/classes (detected):
+  - def __init__
+  - def __init__
+  - def __init__
+  - def __init__
+
+## python-groggy/python/groggy/examples.py (6899 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def example_single_algorithm
+  - def example_multi_algorithm_pipeline
+  - def example_algorithm_discovery
+  - def example_parameter_customization
+  - def example_error_handling
+  - def example_algorithm_reuse
+  - def run_all_examples
+
+## python-groggy/python/groggy/expr_parser.py (4123 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def parse_expression
+  - def build_neighbor_aggregation_expr
+- Other functions/classes (detected):
+  - def _parse_inner_expression
+
+## python-groggy/python/groggy/generators.py (27302 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def complete_graph
+  - def erdos_renyi
+  - def barabasi_albert
+  - def watts_strogatz
+  - def cycle_graph
+  - def path_graph
+  - def star_graph
+  - def grid_graph
+  - def tree
+  - def karate_club
+  - def social_network
+  - def meta_api_graph
+- Other functions/classes (detected):
+  - def _create_minimal_meta_api_graph
+
+## python-groggy/python/groggy/graph.py (20042 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class Graph
+  - def load_from_path
+  - def add_node
+  - def add_nodes
+  - def add_edge
+  - def add_edges
+  - def remove_node
+  - def remove_edge
+  - def remove_nodes
+  - def remove_edges
+  - def set_node_attribute
+  - def set_edge_attribute
+  - def get_node_attribute
+  - def get_edge_attribute
+  - def get_node_attributes
+  - def get_edge_attributes
+  - def set_node_attributes
+  - def set_edge_attributes
+  - def get_nodes_attributes
+  - def get_edges_attributes
+  - def contains_node
+  - def contains_edge
+  - def node_ids
+  - def edge_ids
+  - def edge_endpoints
+  - def neighbors
+  - def degree
+  - def statistics
+  - def memory_statistics
+  - def commit
+  - def has_uncommitted_changes
+  - def create_branch
+  - def checkout_branch
+- Other functions/classes (detected):
+  - def __init__
+  - def __repr__
+  - def __len__
+
+## python-groggy/python/groggy/imports.py (31554 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def from_csv
+  - def from_pandas
+  - def from_numpy
+  - def from_json
+  - def from_parquet
+  - def from_dict
+- Other functions/classes (detected):
+  - def _isna_fallback
+  - def _handle_unknown_result_types
+  - def _suggest_column_mapping
+  - def _apply_node_id_mapping
+  - def _create_table_with_mapping
+
+## python-groggy/python/groggy/jupyter_utils.py (4914 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def display_table
+  - def display_graph_tables
+  - def embed_table_html
+
+## python-groggy/python/groggy/labextension/core.d.ts (1802 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/labextension/extension.d.ts (255 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/labextension/index.d.ts (357 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/labextension/index.js (42254 bytes)
+- TODO/FIXME/etc: 0
+- Other functions/classes (detected):
+  - activateWidgetExtension
+
+## python-groggy/python/groggy/labextension/package.json (907 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/labextension/plugin.d.ts (296 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/labextension/plugin.js (40652 bytes)
+- TODO/FIXME/etc: 0
+- Other functions/classes (detected):
+  - activateWidgetExtension
+
+## python-groggy/python/groggy/labextension/widget.d.ts (2100 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/nbextension/index.js (26716 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/networkx_compat.py (10375 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - def to_networkx
+  - def from_networkx
+  - def to_networkx_method
+- Other functions/classes (detected):
+  - def _convert_networkx_attr_value
+  - def _add_networkx_methods
+
+## python-groggy/python/groggy/pipeline.py (14054 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class Pipeline
+  - def apply
+  - def run
+  - def last_profile
+  - def pipeline
+  - def print_profile
+- Other functions/classes (detected):
+  - def __init__
+  - def _validate_algorithms
+  - def _build_spec
+  - def _ensure_built
+  - def __call__
+  - def __del__
+  - def __repr__
+  - def __len__
+
+## python-groggy/python/groggy/static/__init__.py (41 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/static/groggy-viz-core.standalone.js (30650 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/static/groggy-widget.js (16127 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/style/__init__.py (419 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy/style/style_system.py (12956 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class ThemeType
+  - class NodeStyle
+  - class EdgeStyle
+  - class CanvasStyle
+  - class GroggyStyleSystem
+  - def to_dict
+  - def to_dict
+  - def to_dict
+  - def get_node_style
+  - def get_edge_style
+  - def get_canvas_style
+  - def customize_nodes
+  - def customize_edges
+  - def customize_canvas
+  - def set_theme
+  - def clear_customizations
+  - def to_css_dict
+  - def to_css_string
+  - def to_js_config
+  - def apply_to_html_template
+- Other functions/classes (detected):
+  - def __init__
+  - def _validate_theme
+  - def __repr__
+
+## python-groggy/python/groggy/table_extensions.py (5891 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class EdgesTableAccessor
+  - def add_table_methods
+  - def table
+  - def add_edges_table_accessor
+  - def add_table_conversion_methods
+  - def to_nodes_table
+  - def to_edges_table
+- Other functions/classes (detected):
+  - def __init__
+
+## python-groggy/python/groggy/types.py (1829 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class AttrValue
+  - class AttributeFilter
+  - class NodeFilter
+  - class EdgeFilter
+  - def value
+  - def type_name
+- Other functions/classes (detected):
+  - def __init__
+  - def _determine_type
+  - def __repr__
+  - def __eq__
+  - def __init__
+  - def __init__
+  - def __init__
+
+## python-groggy/python/groggy/widgets/__init__.py (800 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class GroggyGraphWidget
+- Other functions/classes (detected):
+  - def __init__
+
+## python-groggy/python/groggy/widgets/graph_widget.py (19278 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class widgets
+  - class DOMWidget
+  - class Unicode
+  - class Dict
+  - class List
+  - class Int
+  - class Bool
+  - class Float
+  - class GroggyGraphWidget
+  - class GroggyGraphWidget
+  - def observe
+  - def validate
+  - def tag
+  - def tag
+  - def tag
+  - def tag
+  - def tag
+  - def tag
+  - def on_node_click
+  - def on_node_hover
+  - def on_node_double_click
+  - def on_layout_change
+  - def on_selection_change
+  - def on_camera_change
+  - def set_layout
+  - def select_nodes
+  - def clear_selection
+  - def focus_on_node
+  - def reset_camera
+  - def set_theme
+  - def export_positions
+  - def import_positions
+  - def get_graph_stats
+- Other functions/classes (detected):
+  - def __init__
+  - def __init__
+  - def _extract_and_sync_data
+  - def _set_demo_data
+  - def _apply_style_system
+  - def _on_selection_change
+  - def _on_hover_change
+  - def _on_layout_change
+  - def _on_camera_change
+  - def _handle_custom_message
+  - def __repr__
+  - def __init__
+
+## python-groggy/python/groggy/widgets/widget_loader.py (26127 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - class GroggyGraphModel
+  - class GroggyGraphView
+  - class MinimalWidgetModel
+  - class MinimalWidgetView
+  - def get_widget_js_path
+  - def get_widget_js_content
+  - def get_widget_js_url
+  - def load_widget_js
+  - def ensure_widget_loaded
+  - def auto_load_widget
+
+## python-groggy/python/groggy/widgets/widget_view.js (21260 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy-0.5.1.dist-info/INSTALLER (4 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy-0.5.1.dist-info/METADATA (11878 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy-0.5.1.dist-info/RECORD (4833 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy-0.5.1.dist-info/REQUESTED (0 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy-0.5.1.dist-info/WHEEL (102 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy-0.5.1.dist-info/direct_url.json (151 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/python/groggy-0.5.1.dist-info/licenses/LICENSE (1076 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/src/ffi/api/graph.rs (113933 bytes)
+- TODO/FIXME/etc: 4
+- Public APIs:
+  - struct PyAggregationResult
+  - struct PyGraph
+  - fn as_subgraph
+  - fn group_nodes_by_attribute
+  - fn group_by
+  - fn add_graph
+  - fn view
+  - fn is_connected
+  - fn connected_components
+  - fn clustering_coefficient
+  - fn transitivity
+  - fn has_path
+  - fn sample
+  - fn induced_subgraph
+  - fn subgraph_from_edges
+  - fn summary
+  - fn degree
+  - fn in_degree
+  - fn out_degree
+  - fn to_nodes
+  - fn to_edges
+  - fn edges_table
+  - fn to_graph
+  - fn has_edge_between
+  - fn calculate_similarity
+  - fn shortest_path_subgraph
+  - fn get_node_attribute
+  - fn get_edge_attribute
+  - fn entity_type
+  - fn viz
+  - fn merge_with
+  - fn intersect_with
+  - fn subtract_from
+  - fn parent_meta_node
+  - fn child_meta_nodes
+  - fn has_meta_nodes
+  - fn meta_nodes
+  - fn hierarchy_level
+  - fn collapse
+  - fn adjacency_list
+  - fn experimental
+  - fn table
+  - fn to_subgraph
+  - fn create_node_view_internal
+  - fn create_edge_view_internal
+  - fn get_edge_endpoints
+  - fn get_node_ids
+  - fn get_edge_ids
+  - fn has_node_internal
+  - fn has_edge_internal
+  - fn get_node_count
+  - fn get_edge_count
+  - fn node_ids_vec
+  - fn edge_ids_vec
+  - fn get_node_ids_array
+  - fn get_edge_ids_array
+  - fn group_nodes_by_attribute_internal
+- Other functions/classes (detected):
+  - value
+  - __repr__
+  - clone
+  - as_subgraph
+  - new
+  - is_directed
+  - is_undirected
+  - add_node
+  - add_nodes
+  - resolve_string_id_to_node
+  - __repr__
+  - __len__
+  - has_node
+  - has_edge
+  - node_count
+  - edge_count
+  - density
+  - contains_node
+  - contains_edge
+  - edge_endpoints
+  - node_ids
+  - is_empty
+  - edge_ids
+  - nodes
+  - edges
+  - getitem
+  - add_edges
+  - filter_nodes
+  - filter_edges
+  - group_nodes_by_attribute
+  - group_by
+  - remove_node
+  - remove_edge
+  - remove_nodes
+  - remove_edges
+  - add_edge
+  - set_node_attr
+  - get_node_attr
+  - set_edge_attr
+  - get_edge_attr
+  - set_node_attrs
+  - get_node_attrs
+  - set_edge_attrs
+  - get_edge_attrs
+  - has_node_attribute
+  - has_edge_attribute
+  - node_attribute_keys
+  - edge_attribute_keys
+  - all_node_attribute_names
+  - all_edge_attribute_names
+  - neighbors
+  - neighborhood
+  - shortest_path
+  - bfs
+  - dfs
+  - laplacian_matrix
+  - transition_matrix
+  - to_matrix
+  - aggregate
+  - commit
+  - create_branch
+  - checkout_branch
+  - branches
+  - commit_history
+  - historical_view
+  - snapshot_at_commit
+  - snapshot_at_timestamp
+  - build_temporal_index
+  - neighbors_at_commit
+  - neighbors_in_window
+  - node_attr_history
+  - has_uncommitted_changes
+  - get_node_mapping
+  - add_graph
+  - view
+  - is_connected
+  - connected_components
+  - clustering_coefficient
+  - transitivity
+  - has_path
+  - sample
+  - induced_subgraph
+  - subgraph_from_edges
+  - summary
+  - degree
+  - in_degree
+  - out_degree
+  - to_nodes
+  - to_edges
+  - edges_table
+  - to_graph
+  - has_edge_between
+  - calculate_similarity
+  - shortest_path_subgraph
+  - get_node_attribute
+  - get_edge_attribute
+  - entity_type
+  - viz
+  - merge_with
+  - intersect_with
+  - subtract_from
+  - parent_meta_node
+  - child_meta_nodes
+  - has_meta_nodes
+  - meta_nodes
+  - hierarchy_level
+  - collapse
+  - adjacency_list
+  - to_networkx
+  - experimental
+  - __getattr__
+  - table
+  - to_subgraph
+  - create_node_view_internal
+  - create_edge_view_internal
+  - create_nodes_accessor_internal
+  - create_edges_accessor_internal
+  - warm_caches_after_bulk_operation
+  - warm_caches
+  - get_edge_endpoints
+  - get_node_ids
+  - get_edge_ids
+  - has_node_internal
+  - has_edge_internal
+  - get_node_count
+  - get_edge_count
+  - node_ids_vec
+  - edge_ids_vec
+  - get_node_ids_array
+  - get_edge_ids_array
+  - group_nodes_by_attribute_internal
+  - _get_node_attr_column
+  - validate_node_filter_attributes
+  - validate_edge_filter_attributes
+  - attribute_exists_on_nodes
+  - attribute_exists_on_edges
+  - add_subgraphs
+
+## python-groggy/src/ffi/api/graph_analysis.rs (16171 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyGraphAnalysis
+  - fn new
+  - fn neighbors
+  - fn neighborhood
+  - fn shortest_path
+  - fn bfs
+  - fn dfs
+- Other functions/classes (detected):
+  - new
+  - neighbors
+  - neighborhood
+  - shortest_path
+  - bfs
+  - dfs
+
+## python-groggy/src/ffi/api/graph_attributes.rs (14576 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyGraphAttr
+  - fn new
+  - fn get_node_attr
+  - fn get_node_attrs
+  - fn get_edge_attr
+  - fn get_edge_attrs
+  - fn has_node_attribute
+  - fn has_edge_attribute
+  - fn node_attribute_keys
+  - fn edge_attribute_keys
+  - struct PyGraphAttrMut
+  - fn new
+  - fn set_node_attr
+  - fn set_node_attrs
+  - fn set_edge_attr
+  - fn set_edge_attrs
+- Other functions/classes (detected):
+  - new
+  - get_node_attr
+  - get_node_attrs
+  - get_edge_attr
+  - get_edge_attrs
+  - has_node_attribute
+  - has_edge_attribute
+  - node_attribute_keys
+  - edge_attribute_keys
+  - new
+  - set_node_attr
+  - set_node_attrs
+  - set_edge_attr
+  - set_edge_attrs
+
+## python-groggy/src/ffi/api/graph_matrix.rs (2659 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyGraphMatrixHelper
+  - fn new
+  - fn laplacian_matrix
+  - fn transition_matrix
+  - fn to_matrix
+- Other functions/classes (detected):
+  - new
+  - laplacian_matrix
+  - transition_matrix
+  - to_matrix
+
+## python-groggy/src/ffi/api/graph_query.rs (13178 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyGraphQuery
+  - fn filter_nodes
+  - fn filter_edges
+- Other functions/classes (detected):
+  - filter_nodes
+  - filter_edges
+  - filter_subgraph_nodes
+  - aggregate
+  - execute
+  - get_stats
+  - aggregate_custom_nodes
+
+## python-groggy/src/ffi/api/graph_version.rs (12441 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyGraphVersion
+  - struct PyCommit
+  - fn from_core_commit
+  - fn from_commit_info
+  - struct PyBranchInfo
+  - fn new
+  - struct PyHistoricalView
+  - struct PyHistoryStatistics
+  - fn new
+- Other functions/classes (detected):
+  - from_core_commit
+  - from_commit_info
+  - id
+  - parents
+  - message
+  - author
+  - timestamp
+  - __repr__
+  - new
+  - name
+  - head
+  - is_current
+  - __repr__
+  - state_id
+  - __repr__
+  - commit
+  - create_branch
+  - checkout_branch
+  - branches
+  - commit_history
+  - historical_view
+  - has_uncommitted_changes
+  - create_snapshot
+  - restore_snapshot
+  - get_history
+  - get_node_mapping
+  - get_info
+  - new
+  - total_commits
+  - total_branches
+  - uncommitted_changes
+  - current_state_nodes
+  - current_state_edges
+  - __str__
+  - __repr__
+
+## python-groggy/src/ffi/api/mod.rs (420 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod graph
+  - mod graph_analysis
+  - mod graph_attributes
+  - mod graph_matrix
+  - mod graph_query
+  - mod graph_version
+  - mod pipeline
+
+## python-groggy/src/ffi/api/pipeline.rs (22680 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyPipelineHandle
+  - fn py_build_pipeline
+  - fn py_run_pipeline
+  - fn py_get_pipeline_context_info
+  - fn py_drop_pipeline
+  - fn py_get_algorithm_metadata
+  - fn py_validate_algorithm_params
+  - fn py_list_algorithm_categories
+  - fn py_list_algorithms
+  - fn pipeline
+- Other functions/classes (detected):
+  - registry
+  - next_id
+  - py_build_pipeline
+  - py_run_pipeline
+  - py_get_pipeline_context_info
+  - py_drop_pipeline
+  - py_get_algorithm_metadata
+  - py_validate_algorithm_params
+  - py_list_algorithm_categories
+  - py_list_algorithms
+  - pipeline
+
+## python-groggy/src/ffi/delegation/error_handling.rs (7796 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - type DelegationResult
+  - enum DelegationError
+  - trait TryMapOps
+  - trait DelegationResultExt
+  - trait SafeDelegation
+- Other functions/classes (detected):
+  - fmt
+  - from
+  - from
+  - from
+  - from
+  - into_delegation_result
+  - into_delegation_result
+  - test_try_map_success
+  - test_try_map_error
+  - test_try_map_collect_errors
+
+## python-groggy/src/ffi/delegation/examples.rs (7348 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn example_subgraph_operations
+  - fn example_num_array_operations
+  - fn example_delegating_iterator
+  - fn example_error_handling
+  - fn example_complex_chaining_pattern
+  - fn demonstrate_delegation_benefits
+  - fn run_all_examples
+- Other functions/classes (detected):
+  - example_subgraph_operations
+  - example_num_array_operations
+  - example_delegating_iterator
+  - example_error_handling
+  - example_complex_chaining_pattern
+  - demonstrate_delegation_benefits
+  - run_all_examples
+  - test_num_array_operations
+  - test_delegating_iterator
+  - test_array_transformations
+
+## python-groggy/src/ffi/delegation/forwarding.rs (8517 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ForwardingArray
+  - fn new
+  - fn iter_refs
+  - fn iter_cloned
+  - fn into_iter
+  - struct ForwardingIterator
+  - fn new
+  - fn into_delegating_iter
+  - fn neighborhood
+  - fn table
+  - fn agg
+  - fn filter_tables
+- Other functions/classes (detected):
+  - new
+  - iter_refs
+  - iter_cloned
+  - into_iter
+  - len
+  - is_empty
+  - get
+  - take
+  - skip
+  - mean
+  - sum
+  - min
+  - max
+  - std_dev
+  - median
+  - variance
+  - percentile
+  - add
+  - multiply
+  - correlate
+  - into_delegating_iter
+  - next
+  - neighborhood
+  - table
+  - agg
+  - filter_tables
+
+## python-groggy/src/ffi/delegation/implementations.rs (9480 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn forward_subgraph_operations
+  - fn forward_array_operations
+  - trait DynamicDelegation
+- Other functions/classes (detected):
+  - neighborhood
+  - table
+  - sample
+  - filter_nodes
+  - edges_table
+  - density
+  - is_connected
+  - agg
+  - filter
+  - group_by
+  - join
+  - sort_by
+  - select
+  - unique
+  - count
+  - agg
+  - filter
+  - group_by
+  - join
+  - sort_by
+  - select
+  - unique
+  - count
+  - connected_components
+  - shortest_path
+  - bfs
+  - dfs
+  - pagerank
+  - minimum_spanning_tree
+  - clustering_coefficient
+  - delegate_operation
+  - delegate_operation
+
+## python-groggy/src/ffi/delegation/mod.rs (2656 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod error_handling
+  - mod examples
+  - mod forwarding
+  - mod implementations
+  - mod traits
+
+## python-groggy/src/ffi/delegation/traits.rs (8835 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait SubgraphOps
+  - trait TableOps
+  - trait GraphOps
+  - trait BaseArrayOps
+  - trait NumArrayOps
+  - struct DelegatingIterator
+  - fn new
+  - fn map
+  - fn flat_map
+  - fn filter
+  - fn take
+  - fn skip
+  - fn collect_vec
+  - fn neighborhood
+  - fn table
+  - fn sample
+  - fn agg
+  - fn filter_table
+- Other functions/classes (detected):
+  - neighborhood
+  - table
+  - sample
+  - filter_nodes
+  - edges_table
+  - density
+  - is_connected
+  - agg
+  - filter
+  - group_by
+  - join
+  - sort_by
+  - select
+  - unique
+  - count
+  - connected_components
+  - shortest_path
+  - bfs
+  - dfs
+  - pagerank
+  - minimum_spanning_tree
+  - clustering_coefficient
+  - len
+  - is_empty
+  - get
+  - take
+  - skip
+  - mean
+  - sum
+  - min
+  - max
+  - std_dev
+  - median
+  - variance
+  - percentile
+  - add
+  - multiply
+  - correlate
+  - take
+  - skip
+  - collect_vec
+  - next
+  - neighborhood
+  - table
+  - sample
+  - agg
+  - filter_table
+
+## python-groggy/src/ffi/display/mod.rs (6897 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyDisplayConfig
+  - fn new
+  - fn default
+  - fn max_rows
+  - fn set_max_rows
+  - fn max_cols
+  - fn set_max_cols
+  - fn precision
+  - fn set_precision
+  - fn __repr__
+  - struct PyTableFormatter
+  - fn format_table
+  - fn format_data_structure
+  - trait ToDisplayData
+  - fn register_display_functions
+  - fn format_table_function
+- Other functions/classes (detected):
+  - new
+  - default
+  - max_rows
+  - set_max_rows
+  - max_cols
+  - set_max_cols
+  - precision
+  - set_precision
+  - __repr__
+  - format_table
+  - format_data_structure
+  - python_dict_to_rust_hashmap
+  - python_to_json_value
+  - to_display_data
+  - register_display_functions
+  - format_table_function
+
+## python-groggy/src/ffi/entities/edge.rs (7584 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyEdge
+  - fn from_edge
+- Other functions/classes (detected):
+  - from_edge
+  - id
+  - __getitem__
+  - __setitem__
+  - __contains__
+  - __getattr__
+  - source
+  - target
+  - keys
+  - values
+  - entity_type
+  - is_active
+  - summary
+  - __str__
+  - __repr__
+
+## python-groggy/src/ffi/entities/meta_edge.rs (10127 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyMetaEdge
+  - fn from_meta_edge
+- Other functions/classes (detected):
+  - from_meta_edge
+  - id
+  - __getitem__
+  - __setitem__
+  - __contains__
+  - source
+  - target
+  - is_meta_edge
+  - edge_count
+  - aggregated_from
+  - expand
+  - meta_properties
+  - keys
+  - values
+  - entity_type
+  - is_active
+  - summary
+  - __str__
+  - __repr__
+
+## python-groggy/src/ffi/entities/meta_node.rs (11208 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyMetaNode
+  - fn from_meta_node
+- Other functions/classes (detected):
+  - from_meta_node
+  - id
+  - __getitem__
+  - __setitem__
+  - __contains__
+  - degree
+  - neighbors
+  - has_subgraph
+  - subgraph_id
+  - subgraph
+  - expand
+  - meta_edges
+  - re_aggregate
+  - keys
+  - values
+  - entity_type
+  - is_active
+  - summary
+  - __str__
+  - __repr__
+
+## python-groggy/src/ffi/entities/mod.rs (456 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod edge
+  - mod meta_edge
+  - mod meta_node
+  - mod node
+
+## python-groggy/src/ffi/entities/node.rs (7601 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyNode
+  - fn from_node
+- Other functions/classes (detected):
+  - from_node
+  - id
+  - __getitem__
+  - __setitem__
+  - __contains__
+  - __getattr__
+  - degree
+  - neighbors
+  - keys
+  - values
+  - entity_type
+  - is_active
+  - summary
+  - __str__
+  - __repr__
+
+## python-groggy/src/ffi/errors.rs (1505 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyGraphError
+- Other functions/classes (detected):
+  - from
+  - from
+
+## python-groggy/src/ffi/experimental.rs (7105 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - struct ExperimentalRegistry
+  - struct ExperimentalMethod
+  - fn new
+  - fn has_method
+  - fn list_methods
+  - fn describe
+  - fn call
+  - fn get_registry
+- Other functions/classes (detected):
+  - new
+  - has_method
+  - list_methods
+  - describe
+  - call
+  - get_registry
+  - experimental_pagerank
+  - experimental_detect_communities
+  - test_registry_initialization
+  - test_method_descriptions
+
+## python-groggy/src/ffi/mod.rs (1329 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod errors
+  - mod types
+  - mod utils
+  - mod experimental
+  - mod api
+  - mod display
+  - mod query
+  - mod storage
+  - mod subgraphs
+  - mod temporal
+  - mod entities
+  - mod delegation
+  - mod traits
+  - mod neural
+  - mod viz_accessor
+
+## python-groggy/src/ffi/neural/activations.rs (6610 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn relu
+  - fn sigmoid
+  - fn tanh
+  - fn softmax
+  - fn gelu
+- Other functions/classes (detected):
+  - relu
+  - sigmoid
+  - tanh
+  - softmax
+  - gelu
+
+## python-groggy/src/ffi/neural/mod.rs (916 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod activations
+  - fn neural
+  - fn create_neural_submodule
+- Other functions/classes (detected):
+  - neural
+  - create_neural_submodule
+
+## python-groggy/src/ffi/query/mod.rs (209 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod query
+  - mod query_parser
+  - mod traversal
+
+## python-groggy/src/ffi/query/query.rs (9291 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyAttributeFilter
+  - struct PyNodeFilter
+  - struct PyEdgeFilter
+  - struct PyAggregationResult
+  - struct PyGroupedAggregationResult
+- Other functions/classes (detected):
+  - equals
+  - greater_than
+  - less_than
+  - not_equals
+  - greater_than_or_equal
+  - less_than_or_equal
+  - has_attribute
+  - attribute_equals
+  - attribute_filter
+  - and_filters
+  - or_filters
+  - not_filter
+  - has_attribute
+  - attribute_equals
+  - attribute_filter
+  - and_filters
+  - or_filters
+  - not_filter
+  - connects_nodes
+  - connects_any
+  - source_attribute_equals
+  - target_attribute_equals
+  - source_or_target_attribute_equals
+  - source_or_target_attribute_in
+  - value
+  - __repr__
+  - value
+  - __repr__
+
+## python-groggy/src/ffi/query/query_parser.rs (6653 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyQueryParser
+  - fn new
+  - fn parse_node_query
+  - fn parse_edge_query
+  - fn parse_node_query_debug
+  - fn parse_edge_query_debug
+  - fn validate_node_query
+  - fn validate_edge_query
+  - fn get_node_query_error
+  - fn get_edge_query_error
+  - fn reset
+  - fn info
+  - fn __str__
+  - fn __repr__
+  - fn parse_node_query
+  - fn parse_edge_query
+- Other functions/classes (detected):
+  - new
+  - parse_node_query
+  - parse_edge_query
+  - parse_node_query_debug
+  - parse_edge_query_debug
+  - validate_node_query
+  - validate_edge_query
+  - get_node_query_error
+  - get_edge_query_error
+  - reset
+  - info
+  - __str__
+  - __repr__
+  - default
+  - parse_node_query
+  - parse_edge_query
+  - test_python_query_parser
+  - test_validation_methods
+  - test_error_reporting_methods
+  - test_edge_queries
+  - test_debug_methods
+
+## python-groggy/src/ffi/query/traversal.rs (2031 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyAggregationResult
+  - fn new
+  - struct PyGroupedAggregationResult
+  - fn new
+- Other functions/classes (detected):
+  - value
+  - operation
+  - attribute
+  - count
+  - __repr__
+  - new
+  - groups
+  - operation
+  - attribute
+  - __repr__
+  - new
+
+## python-groggy/src/ffi/storage/accessors.rs (122585 bytes)
+- TODO/FIXME/etc: 4
+- Public APIs:
+  - struct NodesIterator
+  - struct PyNodesAccessor
+  - fn table
+  - fn ids
+  - fn group_by
+  - fn set_attrs_internal
+  - fn node_count
+  - fn to_subgraphs
+  - fn to_edges
+  - fn append
+  - fn extend
+  - fn drop_rows
+  - struct EdgesIterator
+  - struct PyEdgesAccessor
+  - fn table
+  - fn ids
+  - fn group_by
+  - fn set_attrs_internal
+  - fn edge_count
+  - fn nodes
+  - fn to_nodes
+  - fn to_subgraphs
+- Other functions/classes (detected):
+  - attr_value_to_python_value
+  - create_node_entity_from_core
+  - create_edge_entity_from_core
+  - __iter__
+  - __next__
+  - set_attrs
+  - attribute_names
+  - filter
+  - __getitem__
+  - __iter__
+  - __len__
+  - __setitem__
+  - __str__
+  - attributes
+  - table
+  - ids
+  - all
+  - _get_node_attribute_column
+  - subgraphs
+  - get_meta_node
+  - base
+  - meta
+  - matrix
+  - array
+  - group_by
+  - viz
+  - create_constrained_nodes_table
+  - get_filtered_node_ids
+  - set_attrs_internal
+  - apply_node_auto_slice
+  - node_count
+  - to_subgraphs
+  - to_edges
+  - convert_python_to_base_array
+  - append
+  - extend
+  - drop_rows
+  - __iter__
+  - __next__
+  - set_attrs
+  - attribute_names
+  - filter
+  - __getitem__
+  - __iter__
+  - __len__
+  - __setitem__
+  - __str__
+  - attributes
+  - all
+  - __getattr__
+  - _get_edge_attribute_column
+  - base
+  - meta
+  - table
+  - ids
+  - sources
+  - targets
+  - matrix
+  - weight_matrix
+  - array
+  - group_by
+  - viz
+  - create_constrained_edges_table
+  - set_attrs_internal
+  - get_filtered_edge_ids
+  - apply_edge_auto_slice
+  - edge_count
+  - nodes
+  - to_nodes
+  - to_subgraphs
+  - convert_python_to_base_array
+
+## python-groggy/src/ffi/storage/array.rs (86095 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct PyBaseArray
+  - fn is_empty
+  - fn __getattr__
+  - fn _repr_html_
+  - fn to_table_with_name
+  - fn to_table_with_prefix
+  - fn to_table_with_suffix
+  - fn append_element
+  - fn extend_elements
+  - fn drop_elements
+  - fn drop_duplicates_elements
+  - fn len
+  - fn get
+  - fn append
+  - fn extend
+  - fn insert
+  - fn remove
+  - fn filter
+  - fn map
+  - fn sort
+  - fn reverse
+  - fn value_counts
+  - fn apply
+  - fn quantile
+  - fn quantiles
+  - fn percentile
+  - fn get_percentile
+  - fn percentiles
+  - fn corr
+  - fn cov
+  - fn rolling
+  - fn expanding
+  - fn cumsum
+  - fn cummin
+  - fn cummax
+  - fn shift
+  - fn pct_change
+  - struct PyBaseArrayIterator
+  - struct PyNodesArray
+  - fn _repr_html_
+  - struct PyNodesArrayIterator
+  - struct PyEdgesArray
+  - fn _repr_html_
+  - struct PyEdgesArrayIterator
+  - struct PyMetaNodeArray
+  - struct PyMetaNodeArrayIterator
+  - struct PyNeighborsArrayIterator
+  - struct PySubgraphArrayIterator
+  - struct PyEdgeGroupsIterator
+- Other functions/classes (detected):
+  - new
+  - __len__
+  - is_empty
+  - contains
+  - to_list
+  - __getitem__
+  - __repr__
+  - dtype
+  - head
+  - tail
+  - unique
+  - describe
+  - sum
+  - mean
+  - median
+  - std
+  - var
+  - min
+  - max
+  - count
+  - nunique
+  - isna
+  - notna
+  - dropna
+  - has_nulls
+  - null_count
+  - fillna
+  - iter
+  - apply_to_each
+  - __getattr__
+  - _repr_html_
+  - to_table
+  - __gt__
+  - __lt__
+  - __ge__
+  - __le__
+  - __eq__
+  - __ne__
+  - to_type
+  - infer_numeric_type
+  - to_num_array
+  - is_numeric
+  - numeric_compatibility_info
+  - to_table_with_name
+  - to_table_with_prefix
+  - to_table_with_suffix
+  - append_element
+  - extend_elements
+  - drop_elements
+  - drop_duplicates_elements
+  - len
+  - get
+  - append
+  - extend
+  - insert
+  - remove
+  - filter
+  - map
+  - sort
+  - reverse
+  - value_counts
+  - apply
+  - quantile
+  - quantiles
+  - percentile
+  - get_percentile
+  - percentiles
+  - corr
+  - cov
+  - rolling
+  - expanding
+  - cumsum
+  - cummin
+  - cummax
+  - shift
+  - pct_change
+  - filter
+  - map
+  - take
+  - skip
+  - collect
+  - new
+  - __len__
+  - __getitem__
+  - __repr__
+  - iter
+  - _repr_html_
+  - to_table
+  - filter_by_degree
+  - get_neighbors
+  - to_subgraph
+  - collect
+  - new
+  - __len__
+  - __repr__
+  - iter
+  - _repr_html_
+  - to_table
+  - filter_by_weight
+  - group_by_source
+  - collect
+  - __len__
+  - __repr__
+  - iter
+  - expand
+  - re_aggregate
+  - collect
+  - flatten
+  - collect
+  - filter_nodes
+  - collect
+  - collect
+
+## python-groggy/src/ffi/storage/array_array.rs (14744 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyArrayArray
+  - fn from_array_array
+  - fn new
+  - fn with_keys
+- Other functions/classes (detected):
+  - from_array_array
+  - new
+  - with_keys
+  - to_numeric_array_array
+  - py_new
+  - __len__
+  - is_empty
+  - __getitem__
+  - __repr__
+  - mean
+  - sum
+  - min
+  - max
+  - std
+  - count
+  - agg
+  - keys
+  - to_type
+  - test_py_array_array_creation
+  - test_py_array_array_getitem
+  - test_py_array_array_aggregations
+
+## python-groggy/src/ffi/storage/components.rs (21411 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - struct PyComponentsArray
+  - fn len
+  - fn is_empty
+  - fn from_components
+  - struct PyComponentsArrayIterator
+  - struct PyComponentsIterator
+  - struct PyMetaNodeIterator
+- Other functions/classes (detected):
+  - len
+  - is_empty
+  - from_components
+  - __len__
+  - __getitem__
+  - __iter__
+  - __repr__
+  - collapse
+  - to_list
+  - sizes
+  - largest_component
+  - table
+  - sample
+  - neighborhood
+  - filter
+  - viz
+  - __iter__
+  - __next__
+  - len
+  - get
+  - iter
+  - filter_nodes
+  - filter_edges
+  - collapse
+  - collect
+  - table
+  - sample
+  - neighborhood
+  - collect
+
+## python-groggy/src/ffi/storage/edges_array.rs (11902 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct PyEdgesArray
+  - fn new
+  - fn interactive
+  - struct PyEdgesArrayIterator
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - __len__
+  - is_empty
+  - __getitem__
+  - first
+  - last
+  - contains
+  - to_list
+  - table
+  - nodes
+  - filter
+  - filter_by_size
+  - filter_by_weight
+  - union
+  - total_edge_count
+  - stats
+  - iter
+  - __repr__
+  - __str__
+  - interactive
+  - new
+  - table
+  - nodes
+  - filter
+  - filter_by_weight
+  - collect
+  - __len__
+
+## python-groggy/src/ffi/storage/matrix.rs (83601 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - struct PyGraphMatrix
+  - fn new
+  - fn shape
+  - fn rich_display
+  - fn flatten
+  - fn from_flattened
+  - fn to_base_array
+  - fn from_base_array
+  - fn from_graph_matrix
+  - fn to_table
+- Other functions/classes (detected):
+  - new
+  - is_empty
+  - zeros
+  - ones
+  - identity
+  - from_data
+  - from_graph_attributes
+  - shape
+  - dtype
+  - columns
+  - is_square
+  - is_symmetric
+  - is_numeric
+  - requires_grad
+  - grad
+  - requires_grad_
+  - backward
+  - zero_grad
+  - __getitem__
+  - get_cell
+  - get
+  - set
+  - __setitem__
+  - get_row
+  - get_column_by_name
+  - get_column
+  - iter_rows
+  - iter_columns
+  - transpose
+  - multiply
+  - inverse
+  - power
+  - reshape
+  - elementwise_multiply
+  - determinant
+  - trace
+  - norm
+  - norm_l1
+  - norm_inf
+  - sum_axis
+  - mean_axis
+  - std_axis
+  - var_axis
+  - min_axis
+  - max_axis
+  - sum
+  - mean
+  - min
+  - max
+  - to_pandas
+  - __repr__
+  - __str__
+  - rich_display
+  - _repr_html_
+  - dense_html_repr
+  - _get_display_data
+  - __iter__
+  - __matmul__
+  - __mul__
+  - __add__
+  - __sub__
+  - __pow__
+  - __truediv__
+  - __neg__
+  - __abs__
+  - __gt__
+  - __lt__
+  - __ge__
+  - __le__
+  - relu
+  - sigmoid
+  - tanh
+  - softmax
+  - gelu
+  - scalar_multiply
+  - data
+  - preview
+  - is_sparse
+  - summary
+  - dense
+  - to_numpy
+  - to_table_for_streaming
+  - flatten
+  - from_flattened
+  - to_base_array
+  - from_base_array
+  - to_degree_matrix
+  - to_normalized_laplacian
+  - to_laplacian
+  - concatenate
+  - stack
+  - split
+  - leaky_relu
+  - elu
+  - dropout
+  - solve
+  - svd
+  - qr_decomposition
+  - lu_decomposition
+  - cholesky_decomposition
+  - eigenvalue_decomposition
+  - rank
+  - tile
+  - repeat
+  - abs
+  - exp
+  - log
+  - sqrt
+  - to_list
+  - to_dict
+  - apply
+  - map
+  - filter
+  - __iter__
+  - __next__
+  - to_display_data
+  - from_graph_matrix
+  - to_table
+
+## python-groggy/src/ffi/storage/matrix_array.rs (12890 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyMatrixArray
+  - fn new
+  - struct PyMatrixArrayIterator
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - __len__
+  - is_empty
+  - __getitem__
+  - first
+  - last
+  - to_list
+  - mean_eigenvalue
+  - dimension_stats
+  - correlation_matrix
+  - stats_summary
+  - stack
+  - filter
+  - filter_by_size
+  - subgraphs
+  - table
+  - iter
+  - __repr__
+  - __str__
+  - new
+  - multiply
+  - eigen
+  - transform
+  - filter
+  - collect
+  - __len__
+
+## python-groggy/src/ffi/storage/mod.rs (1378 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod array
+  - mod array_array
+  - mod matrix
+  - mod num_array
+  - mod table
+  - mod accessors
+  - mod components
+  - mod edges_array
+  - mod matrix_array
+  - mod nodes_array
+  - mod subgraph_array
+  - mod table_array
+  - mod table_array_core
+  - mod views
+
+## python-groggy/src/ffi/storage/nodes_array.rs (10018 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct PyNodesArray
+  - fn new
+  - fn interactive
+  - struct PyNodesArrayIterator
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - __len__
+  - is_empty
+  - __getitem__
+  - first
+  - last
+  - contains
+  - to_list
+  - table
+  - filter
+  - filter_by_size
+  - union
+  - total_node_count
+  - stats
+  - iter
+  - __repr__
+  - __str__
+  - interactive
+  - new
+  - table
+  - filter
+  - collect
+  - __len__
+
+## python-groggy/src/ffi/storage/num_array.rs (44203 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyNumArray
+  - fn is_empty
+  - fn new_with_inference
+  - fn new_with_dtype
+  - fn from_attr_values
+  - fn new_bool
+  - fn new_int64
+  - fn new_float64
+  - fn new
+  - fn from_node_ids
+  - fn as_float64_array
+  - fn len
+  - fn to_float64_vec
+  - fn get_f64
+  - fn get_dtype
+  - fn get_list
+  - fn to_int64_vec
+  - fn to_bool_vec
+  - fn is_empty
+  - struct PyNumArrayIterator
+  - fn int_array
+  - fn bool_array
+  - fn num_array
+  - type PyIntArray
+  - type PyStatsArray
+  - type PyStatsArrayIterator
+- Other functions/classes (detected):
+  - dtype
+  - len
+  - is_empty
+  - to_float64_vec
+  - to_int64_vec
+  - to_bool_vec
+  - get_element
+  - to_list
+  - contains_py
+  - new_with_inference
+  - new_with_dtype
+  - from_attr_values
+  - new_bool
+  - new_int64
+  - new_float64
+  - new
+  - from_node_ids
+  - as_float64_array
+  - len
+  - to_float64_vec
+  - get_f64
+  - get_dtype
+  - get_list
+  - to_int64_vec
+  - to_bool_vec
+  - __new__
+  - dtype
+  - __len__
+  - is_empty
+  - contains
+  - __getitem__
+  - to_list
+  - __repr__
+  - to_type
+  - mean
+  - sum
+  - min
+  - max
+  - std
+  - var
+  - first
+  - last
+  - count
+  - isna
+  - notna
+  - nunique
+  - unique
+  - __gt__
+  - __lt__
+  - __ge__
+  - __le__
+  - __eq__
+  - __ne__
+  - reshape
+  - __iter__
+  - __iter__
+  - __next__
+  - int_array
+  - bool_array
+  - num_array
+
+## python-groggy/src/ffi/storage/subgraph_array.rs (25449 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct PySubgraphArray
+  - fn new
+  - fn from_arc
+  - fn len
+  - fn is_empty_pub
+  - fn as_vec
+  - fn group_by
+  - struct PySubgraphArrayIterator
+- Other functions/classes (detected):
+  - new
+  - from_arc
+  - len
+  - is_empty_pub
+  - as_vec
+  - extract_columns_as_tables
+  - __len__
+  - is_empty
+  - __getitem__
+  - extract_node_attribute
+  - __iter__
+  - to_list
+  - __repr__
+  - collect
+  - collapse
+  - table
+  - sample
+  - group_by
+  - nodes_table
+  - edges_table
+  - summary
+  - viz
+  - map
+  - merge
+  - len
+  - get
+  - iter
+  - from
+  - from
+  - __iter__
+  - __next__
+
+## python-groggy/src/ffi/storage/table.rs (256172 bytes)
+- TODO/FIXME/etc: 7
+- Public APIs:
+  - struct PyBaseTable
+  - fn new
+  - fn from_dict
+  - fn nrows
+  - fn ncols
+  - fn column_names
+  - fn columns
+  - fn column
+  - fn shape
+  - fn is_empty
+  - fn has_column
+  - fn head
+  - fn tail
+  - fn iter
+  - fn sort_by
+  - fn sort_values
+  - fn select
+  - fn drop_columns
+  - fn assign
+  - fn set_column
+  - fn set_value
+  - fn set_values_by_mask
+  - fn set_values_by_range
+  - fn __setitem__
+  - fn filter
+  - fn group_by
+  - fn slice
+  - fn __str__
+  - fn __repr__
+  - fn __len__
+  - fn __iter__
+  - fn to_pandas
+  - fn to_type
+  - fn __getitem__
+  - fn rich_display
+  - fn to_csv
+  - fn from_csv
+  - fn to_parquet
+  - fn from_parquet
+  - fn to_json
+  - fn from_json
+  - fn aggregate
+  - fn agg
+  - fn describe
+  - fn dropna
+  - fn dropna_subset
+  - fn isna
+  - fn notna
+  - fn has_nulls
+  - fn null_counts
+  - fn fillna
+  - fn fillna_all
+  - fn groupby
+  - fn groupby_single
+  - fn sample
+  - fn join
+  - fn union
+  - fn intersect
+  - fn column_info
+  - fn get_column_raw
+  - fn get_column_numeric
+  - fn group_by_agg
+  - fn rename
+  - fn add_prefix
+  - fn add_suffix
+  - fn reorder_columns
+  - fn append_row
+  - fn extend_rows
+  - fn drop_rows
+  - fn drop_duplicates
+  - fn isin
+  - fn nlargest
+  - fn nsmallest
+  - fn query
+  - fn value_counts
+  - fn pivot_table
+  - fn melt
+  - fn apply_to_columns
+  - fn apply_to_rows
+  - fn apply
+  - fn append
+  - fn extend
+  - fn quantile
+  - fn quantiles
+  - fn percentile
+  - fn percentiles
+  - fn get_percentile
+  - fn median
+  - fn std
+  - fn var
+  - fn corr
+  - fn corr_columns
+  - fn cov
+  - fn cov_columns
+  - fn rolling
+  - fn expanding
+  - fn cumsum
+  - fn cummin
+  - fn cummax
+  - fn shift
+  - fn pct_change
+  - fn rolling_all
+  - fn expanding_all
+  - fn profile
+  - fn check_outliers
+  - fn validate_schema
+  - fn from_table
+  - struct PyBaseTableRowIterator
+  - struct PyNodesTable
+  - fn new
+  - fn from_dict
+  - fn node_ids
+  - fn with_attributes
+  - fn filter_by_attr
+  - fn unique_attr_values
+  - fn nrows
+  - fn ncols
+  - fn is_empty
+  - fn shape
+  - fn base_table
+  - fn into_base_table
+  - fn to_pandas
+  - fn iter
+  - fn __str__
+  - fn __repr__
+  - fn __len__
+  - fn __iter__
+  - fn head
+  - fn tail
+  - fn sort_by
+  - fn sort_values
+  - fn select
+  - fn drop_columns
+  - fn filter
+  - fn group_by
+  - fn slice
+  - fn __getitem__
+  - fn rich_display
+  - fn __getattr__
+  - fn to_csv
+  - fn from_csv
+  - fn to_parquet
+  - fn from_parquet
+  - fn to_json
+  - fn from_json
+  - fn interactive
+  - fn interactive_embed
+  - fn interactive_viz
+  - struct PyNodesTableRowIterator
+  - struct PyEdgesTable
+  - fn new
+  - fn from_dict
+  - fn edge_ids
+  - fn sources
+  - fn targets
+  - fn as_tuples
+  - fn filter_by_sources
+  - fn filter_by_targets
+  - fn filter_by_attr
+  - fn unique_attr_values
+  - fn nrows
+  - fn ncols
+  - fn shape
+  - fn base_table
+  - fn into_base_table
+  - fn auto_assign_edge_ids
+  - fn to_pandas
+  - fn iter
+  - fn __str__
+  - fn __repr__
+  - fn __len__
+  - fn __iter__
+  - fn head
+  - fn tail
+  - fn sort_by
+  - fn sort_values
+  - fn select
+  - fn drop_columns
+  - fn filter
+  - fn group_by
+  - fn slice
+  - fn __getitem__
+  - fn rich_display
+  - fn __getattr__
+  - fn to_csv
+  - fn from_csv
+  - fn to_parquet
+  - fn from_parquet
+  - fn to_json
+  - fn from_json
+  - fn interactive
+  - fn interactive_embed
+  - fn interactive_viz
+  - struct PyEdgesTableRowIterator
+  - struct PyGraphTable
+  - fn new
+  - fn nrows
+  - fn ncols
+  - fn shape
+  - fn is_empty
+  - fn nodes
+  - fn edges
+  - fn validate
+  - fn auto_assign_edge_ids
+  - fn to_graph
+  - fn __str__
+  - fn __repr__
+  - fn __len__
+  - fn head
+  - fn tail
+  - fn merge
+  - fn from_federated_bundles
+  - fn stats
+  - fn __getitem__
+  - fn save_bundle
+  - fn load_bundle
+  - fn get_bundle_info
+  - fn verify_bundle
+  - fn to_nodes
+  - fn to_edges
+  - fn to_subgraphs
+  - fn from_table
+  - struct PyTableArray
+  - fn new
+  - fn __len__
+  - fn __getitem__
+  - fn __iter__
+  - fn __str__
+  - fn __repr__
+  - fn to_list
+  - fn mean
+  - fn max
+  - fn all
+  - fn agg
+  - fn iter_agg
+  - struct PyTableArrayIterator
+  - struct PyNodesTableArray
+  - fn __len__
+  - fn __getitem__
+  - fn __iter__
+  - fn __str__
+  - fn __repr__
+  - fn to_list
+  - fn __getattr__
+  - struct PyNodesTableArrayIterator
+  - struct PyEdgesTableArray
+  - fn __len__
+  - fn __getitem__
+  - fn __iter__
+  - fn __str__
+  - fn __repr__
+  - fn to_list
+  - fn __getattr__
+  - struct PyEdgesTableArrayIterator
+- Other functions/classes (detected):
+  - clone
+  - default
+  - new
+  - from_dict
+  - nrows
+  - ncols
+  - column_names
+  - columns
+  - column
+  - shape
+  - is_empty
+  - has_column
+  - head
+  - tail
+  - iter
+  - sort_by
+  - sort_values
+  - select
+  - drop_columns
+  - assign
+  - set_column
+  - set_value
+  - set_values_by_mask
+  - set_values_by_range
+  - __setitem__
+  - filter
+  - group_by
+  - slice
+  - __str__
+  - __repr__
+  - __len__
+  - __iter__
+  - to_pandas
+  - to_type
+  - __getitem__
+  - rich_display
+  - _repr_html_
+  - to_csv
+  - from_csv
+  - to_parquet
+  - from_parquet
+  - to_json
+  - from_json
+  - aggregate
+  - agg
+  - describe
+  - dropna
+  - dropna_subset
+  - isna
+  - notna
+  - has_nulls
+  - null_counts
+  - fillna
+  - fillna_all
+  - groupby
+  - groupby_single
+  - sample
+  - join
+  - union
+  - intersect
+  - column_info
+  - get_column_raw
+  - get_column_numeric
+  - group_by_agg
+  - parse_join_on
+  - rename
+  - add_prefix
+  - add_suffix
+  - reorder_columns
+  - append_row
+  - extend_rows
+  - drop_rows
+  - drop_duplicates
+  - isin
+  - nlargest
+  - nsmallest
+  - query
+  - value_counts
+  - pivot_table
+  - melt
+  - apply_to_columns
+  - apply_to_rows
+  - apply
+  - append
+  - extend
+  - quantile
+  - quantiles
+  - percentile
+  - percentiles
+  - get_percentile
+  - median
+  - std
+  - var
+  - corr
+  - corr_columns
+  - cov
+  - cov_columns
+  - rolling
+  - expanding
+  - cumsum
+  - cummin
+  - cummax
+  - shift
+  - pct_change
+  - rolling_all
+  - expanding_all
+  - profile
+  - check_outliers
+  - validate_schema
+  - to_display_data
+  - from_table
+  - parse_column_key
+  - apply_row_column_update
+  - parse_slice
+  - filter_by_python_function
+  - __iter__
+  - __next__
+  - new
+  - from_dict
+  - node_ids
+  - with_attributes
+  - filter_by_attr
+  - unique_attr_values
+  - nrows
+  - ncols
+  - is_empty
+  - shape
+  - base_table
+  - into_base_table
+  - to_pandas
+  - iter
+  - __str__
+  - __repr__
+  - __len__
+  - __iter__
+  - head
+  - tail
+  - sort_by
+  - sort_values
+  - select
+  - drop_columns
+  - filter
+  - group_by
+  - slice
+  - __getitem__
+  - _get_display_data
+  - rich_display
+  - __getattr__
+  - to_csv
+  - from_csv
+  - to_parquet
+  - from_parquet
+  - to_json
+  - from_json
+  - interactive
+  - interactive_embed
+  - interactive_viz
+  - viz
+  - __iter__
+  - __next__
+  - new
+  - from_dict
+  - edge_ids
+  - sources
+  - targets
+  - as_tuples
+  - filter_by_sources
+  - filter_by_targets
+  - filter_by_attr
+  - unique_attr_values
+  - nrows
+  - ncols
+  - shape
+  - base_table
+  - into_base_table
+  - auto_assign_edge_ids
+  - to_pandas
+  - iter
+  - __str__
+  - __repr__
+  - __len__
+  - __iter__
+  - head
+  - tail
+  - sort_by
+  - sort_values
+  - select
+  - drop_columns
+  - filter
+  - group_by
+  - slice
+  - __getitem__
+  - _get_display_data
+  - rich_display
+  - __getattr__
+  - to_csv
+  - from_csv
+  - to_parquet
+  - from_parquet
+  - to_json
+  - from_json
+  - interactive
+  - interactive_embed
+  - interactive_viz
+  - viz
+  - __iter__
+  - __next__
+  - new
+  - nrows
+  - ncols
+  - shape
+  - is_empty
+  - nodes
+  - edges
+  - validate
+  - auto_assign_edge_ids
+  - to_graph
+  - __str__
+  - __repr__
+  - __len__
+  - head
+  - tail
+  - merge
+  - from_federated_bundles
+  - stats
+  - __getitem__
+  - _get_display_data
+  - save_bundle
+  - load_bundle
+  - get_bundle_info
+  - verify_bundle
+  - to_nodes
+  - to_edges
+  - to_subgraphs
+  - viz
+  - json_value_to_py_dict
+  - from_table
+  - new
+  - __len__
+  - __getitem__
+  - __iter__
+  - __str__
+  - __repr__
+  - to_list
+  - mean
+  - max
+  - all
+  - agg
+  - iter_agg
+  - calculate_aggregation
+  - aggregate_groups
+  - is_column_eligible
+  - apply_aggregation
+  - __iter__
+  - __next__
+  - extract_column
+  - __len__
+  - __getitem__
+  - __iter__
+  - __str__
+  - __repr__
+  - to_list
+  - __getattr__
+  - __iter__
+  - __next__
+  - __len__
+  - __getitem__
+  - __iter__
+  - __str__
+  - __repr__
+  - to_list
+  - __getattr__
+  - __iter__
+  - __next__
+
+## python-groggy/src/ffi/storage/table_array.rs (12177 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyTableArray
+  - fn new
+  - fn from_arc
+  - struct PyTableArrayIterator
+  - struct PyTableArrayChainIterator
+- Other functions/classes (detected):
+  - new
+  - from_arc
+  - __len__
+  - is_empty
+  - __getitem__
+  - extract_column
+  - __iter__
+  - to_list
+  - __repr__
+  - collect
+  - iter
+  - agg
+  - filter
+  - map
+  - from
+  - from
+  - __iter__
+  - __next__
+  - agg
+  - filter
+  - collect
+  - group_by
+  - join
+  - take
+  - skip
+
+## python-groggy/src/ffi/storage/table_array_core.rs (16659 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyTableArrayCore
+  - struct PyTableArrayCoreIterator
+- Other functions/classes (detected):
+  - new
+  - __len__
+  - is_empty
+  - __getitem__
+  - __repr__
+  - sum
+  - mean
+  - count
+  - agg
+  - take
+  - skip
+  - concat
+  - shape
+  - filter
+  - to_list
+  - map
+  - __iter__
+  - iter
+  - head
+  - tail
+  - sample
+  - select
+  - sort_by
+  - drop_columns
+  - rename
+  - apply
+  - apply_to_list
+  - apply_to_array
+  - apply_reduce
+  - total_count
+  - shape_detailed
+  - describe
+  - sum_column
+  - mean_column
+  - min_column
+  - max_column
+  - std_column
+  - __iter__
+  - __next__
+  - collect
+
+## python-groggy/src/ffi/storage/views.rs (16347 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyNodeView
+  - struct NodeViewIterator
+  - struct PyEdgeView
+  - struct EdgeViewIterator
+- Other functions/classes (detected):
+  - __getitem__
+  - __setitem__
+  - id
+  - __contains__
+  - keys
+  - values
+  - neighbors
+  - items
+  - update
+  - __str__
+  - to_dict
+  - item
+  - __iter__
+  - __iter__
+  - __next__
+  - clone
+  - __getitem__
+  - __setitem__
+  - id
+  - edge_id
+  - source
+  - target
+  - endpoints
+  - __contains__
+  - keys
+  - values
+  - items
+  - update
+  - __str__
+  - to_dict
+  - item
+  - __iter__
+  - __iter__
+  - __next__
+  - clone
+
+## python-groggy/src/ffi/subgraphs/component.rs (3052 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyComponentSubgraph
+  - fn from_core_component
+- Other functions/classes (detected):
+  - from_core_component
+  - component_id
+  - is_largest_component
+  - component_size
+  - total_components
+  - node_count
+  - edge_count
+  - contains_node
+  - contains_edge
+  - node_ids
+  - edge_ids
+  - __repr__
+  - __str__
+
+## python-groggy/src/ffi/subgraphs/composer.rs (12291 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyEdgeStrategy
+  - struct PyComposerPreview
+  - struct PyMetaNodePlan
+  - fn add_to_graph
+  - fn parse_node_aggs_from_python
+  - fn parse_edge_aggs_from_python
+  - struct PyMetaNodePlanExecutor
+  - fn new
+  - fn execute_immediately
+- Other functions/classes (detected):
+  - new
+  - aggregate
+  - keep_external
+  - drop_all
+  - contract_all
+  - __str__
+  - __repr__
+  - meta_node_attributes
+  - meta_edges_count
+  - edge_strategy
+  - will_include_edge_count
+  - entity_type
+  - __str__
+  - __repr__
+  - preview
+  - with_node_agg
+  - with_edge_agg
+  - with_edge_strategy
+  - with_entity_type
+  - with_preset
+  - add_to_graph
+  - __str__
+  - __repr__
+  - parse_node_aggs_from_python
+  - parse_edge_aggs_from_python
+  - new
+  - preview
+  - add_to_graph
+  - __str__
+  - __repr__
+
+## python-groggy/src/ffi/subgraphs/hierarchical.rs (18687 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyAggregationFunction
+  - struct PyExternalEdgeStrategy
+  - struct PyMetaEdgeStrategy
+  - struct PyEdgeAggregationFunction
+  - struct PyEdgeAggregationConfig
+  - fn parse_edge_config
+  - struct PyMetaNodeOld
+  - fn from_meta_node
+  - fn parse_aggregation_functions
+  - trait PyHierarchicalOperations
+- Other functions/classes (detected):
+  - sum
+  - mean
+  - max
+  - min
+  - count
+  - first
+  - last
+  - concat
+  - from_string
+  - __str__
+  - __repr__
+  - aggregate
+  - copy
+  - aggregate
+  - count
+  - none
+  - __str__
+  - __repr__
+  - auto
+  - explicit
+  - none
+  - __str__
+  - __repr__
+  - sum
+  - mean
+  - max
+  - min
+  - count
+  - concat
+  - concat_unique
+  - first
+  - last
+  - from_string
+  - __str__
+  - __repr__
+  - new
+  - default
+  - __repr__
+  - parse_edge_config
+  - from_meta_node
+  - node_id
+  - has_subgraph
+  - subgraph_id
+  - subgraph
+  - expand
+  - attributes
+  - re_aggregate
+  - __str__
+  - __repr__
+  - entity_type
+  - is_subgraph_node
+  - parse_aggregation_functions
+  - add_to_graph
+  - parent_meta_node
+  - child_meta_nodes
+  - hierarchy_level
+
+## python-groggy/src/ffi/subgraphs/mod.rs (212 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod component
+  - mod composer
+  - mod hierarchical
+  - mod neighborhood
+  - mod subgraph
+
+## python-groggy/src/ffi/subgraphs/neighborhood.rs (21128 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyNeighborhoodSubgraph
+  - fn subgraph
+  - struct PyNeighborhoodArray
+  - fn from_result
+  - fn inner
+  - struct PyNeighborhoodArrayIterator
+  - struct PyNeighborhoodResult
+  - struct PyNeighborhoodResultIterator
+  - struct PyNeighborhoodStats
+- Other functions/classes (detected):
+  - subgraph
+  - central_nodes
+  - hops
+  - is_central_node
+  - subgraph_py
+  - __repr__
+  - __str__
+  - __getattr__
+  - from_result
+  - inner
+  - total_neighborhoods
+  - largest_neighborhood_size
+  - execution_time_ms
+  - __len__
+  - __getitem__
+  - __iter__
+  - to_list
+  - collect
+  - is_empty
+  - table
+  - sample
+  - group_by
+  - nodes_table
+  - edges_table
+  - summary
+  - viz
+  - map
+  - merge
+  - collapse
+  - __repr__
+  - extract_columns_as_tables
+  - extract_node_attribute
+  - __iter__
+  - __next__
+  - neighborhoods
+  - total_neighborhoods
+  - largest_neighborhood_size
+  - execution_time_ms
+  - __len__
+  - __getitem__
+  - __iter__
+  - __repr__
+  - __iter__
+  - __next__
+  - total_neighborhoods
+  - total_nodes_sampled
+  - total_time_ms
+  - operation_counts
+  - avg_nodes_per_neighborhood
+  - avg_time_per_neighborhood_ms
+  - __repr__
+
+## python-groggy/src/ffi/subgraphs/subgraph.rs (76116 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - struct PySubgraph
+  - fn from_core_subgraph
+  - fn from_trait_object
+  - fn apply
+  - fn table
+  - fn neighborhood
+  - fn sample
+  - fn collapse
+  - fn to_nodes
+  - fn to_edges
+  - fn to_matrix
+  - fn group_by
+- Other functions/classes (detected):
+  - from_core_subgraph
+  - from_trait_object
+  - try_apply_pipeline_object
+  - algorithm_to_spec
+  - collect_algorithm_specs
+  - nodes
+  - edges
+  - __len__
+  - node_count
+  - edge_count
+  - node_ids
+  - edge_ids
+  - has_node
+  - has_edge
+  - apply
+  - density
+  - connected_components
+  - is_connected
+  - has_path
+  - table
+  - edges_table
+  - filter_nodes
+  - filter_edges
+  - to_graph
+  - to_networkx
+  - degree
+  - in_degree
+  - out_degree
+  - calculate_similarity
+  - __getitem__
+  - neighborhood
+  - sample
+  - __repr__
+  - is_empty
+  - summary
+  - contains_node
+  - contains_edge
+  - neighbors
+  - edge_endpoints
+  - has_edge_between
+  - get_node_attribute
+  - get_edge_attribute
+  - set_node_attrs
+  - set_edge_attrs
+  - clustering_coefficient
+  - transitivity
+  - entity_type
+  - bfs
+  - dfs
+  - shortest_path_subgraph
+  - induced_subgraph
+  - subgraph_from_edges
+  - merge_with
+  - intersect_with
+  - subtract_from
+  - parent_meta_node
+  - child_meta_nodes
+  - hierarchy_level
+  - has_meta_nodes
+  - meta_nodes
+  - collapse
+  - __str__
+  - to_nodes
+  - to_edges
+  - to_matrix
+  - adjacency_matrix
+  - adj
+  - adjacency_list
+  - group_by
+  - __getattr__
+  - parse_enhanced_aggregation_spec
+
+## python-groggy/src/ffi/temporal.rs (13572 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PyTemporalSnapshot
+  - struct PyExistenceIndex
+  - struct PyTemporalIndex
+  - struct PyIndexStatistics
+  - struct PyTemporalScope
+  - struct PyTemporalDelta
+  - struct PyChangedEntities
+- Other functions/classes (detected):
+  - commit_id
+  - timestamp
+  - author
+  - message
+  - parents
+  - node_exists
+  - edge_exists
+  - node_attr
+  - edge_attr
+  - neighbors
+  - neighbors_bulk
+  - existence
+  - as_subgraph
+  - contains_node
+  - contains_edge
+  - nodes
+  - edges
+  - node_exists_at
+  - edge_exists_at
+  - nodes_at_commit
+  - edges_at_commit
+  - neighbors_at_commit
+  - neighbors_bulk_at_commit
+  - neighbors_in_window
+  - node_attr_at_commit
+  - node_attr_history
+  - edge_attr_at_commit
+  - edge_attr_history
+  - commits_in_time_range
+  - nodes_changed_in_commit
+  - edges_changed_in_commit
+  - statistics
+  - total_nodes
+  - total_edges
+  - total_commits
+  - node_attr_timelines
+  - edge_attr_timelines
+  - __repr__
+  - new
+  - current_commit
+  - window
+  - has_window
+  - has_reference
+  - window_size
+  - with_metadata
+  - __repr__
+  - from_commit
+  - to_commit
+  - nodes_added
+  - nodes_removed
+  - edges_added
+  - edges_removed
+  - is_empty
+  - summary
+  - affected_nodes
+  - affected_edges
+  - __repr__
+  - modified_nodes
+  - modified_edges
+  - is_empty
+  - total_changes
+  - node_change_type
+  - edge_change_type
+  - __repr__
+
+## python-groggy/src/ffi/traits/mod.rs (412 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/src/ffi/types.rs (20607 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct PyAttrValue
+  - fn new
+  - fn from_attr_value
+  - fn to_attr_value
+  - fn to_python_value
+  - fn from_py_value
+  - fn __str__
+  - struct PyResultHandle
+  - struct PyAttributeCollection
+- Other functions/classes (detected):
+  - new
+  - from_attr_value
+  - to_attr_value
+  - to_python_value
+  - from_py_value
+  - py_new
+  - value
+  - type_name
+  - __repr__
+  - __str__
+  - __eq__
+  - __hash__
+  - to_object
+  - nodes
+  - edges
+  - result_type
+  - __repr__
+  - len
+  - compute_stats
+  - sample_values
+
+## python-groggy/src/ffi/utils/config.rs (187 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## python-groggy/src/ffi/utils/convert.rs (8130 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn networkx_graph_to_python
+  - fn python_to_networkx_graph
+- Other functions/classes (detected):
+  - networkx_graph_to_python
+  - networkx_value_to_python
+  - python_to_networkx_graph
+  - python_to_networkx_value
+  - test_networkx_value_conversion
+
+## python-groggy/src/ffi/utils/helpers.rs (8450 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn python_value_to_attr_value
+  - fn attr_value_to_python_value
+  - fn graph_error_to_py_err
+- Other functions/classes (detected):
+  - python_value_to_attr_value
+  - attr_value_to_python_value
+  - graph_error_to_py_err
+
+## python-groggy/src/ffi/utils/indexing.rs (7314 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn python_index_to_slice_index
+  - fn python_slice_to_slice_index
+- Other functions/classes (detected):
+  - python_index_to_slice_index
+  - python_slice_to_slice_index
+  - test_single_integer_conversion
+  - test_list_conversion
+
+## python-groggy/src/ffi/utils/matrix_indexing.rs (6924 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn python_to_matrix_index
+  - fn python_to_matrix_slice
+  - enum MatrixIndexResult
+  - fn parse_matrix_index
+- Other functions/classes (detected):
+  - python_to_matrix_index
+  - python_to_matrix_slice
+  - parse_matrix_index
+  - test_single_integer_to_matrix_index
+  - test_tuple_to_matrix_slice
+
+## python-groggy/src/ffi/utils/mod.rs (230 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod config
+  - mod convert
+  - mod helpers
+  - mod indexing
+  - mod matrix_indexing
+
+## python-groggy/src/ffi/viz_accessor.rs (41837 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct VizAccessor
+  - fn with_data_source
+  - fn without_data_source
+- Other functions/classes (detected):
+  - find_available_port
+  - show
+  - server
+  - update
+  - create_fallback_visualization
+  - __repr__
+  - with_data_source
+  - without_data_source
+  - get_server_info
+  - normalize_layout_name
+  - parse_layout_kwargs_typed
+  - ensure_server_and_display_iframe
+  - send_control_message_to_server
+  - parse_layout_parameters
+  - update_existing_server
+  - extract_port_from_iframe
+  - test_extract_port_from_iframe
+
+## python-groggy/src/lib.rs (25650 bytes)
+- TODO/FIXME/etc: 1
+- Other functions/classes (detected):
+  - num_array
+  - array
+  - matrix
+  - table
+  - merge
+  - table
+  - bool_array_factory
+  - ones_bool_factory
+  - zeros_bool_factory
+  - int_array_factory
+  - _groggy
+
+## python-groggy/src/module.rs (133 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn register_submodules
+- Other functions/classes (detected):
+  - register_submodules
+
+## src/algorithms/builder.rs (12628 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn register_algorithms
+  - fn validate_pipeline
+- Other functions/classes (detected):
+  - register_algorithms
+  - get_schema_registry
+  - validate_pipeline
+  - try_from_spec
+  - id
+  - metadata
+  - execute
+  - extract_definition
+  - convert_params
+  - json_to_param
+  - infer_array_param
+  - json_array_inference_detects_ints
+  - json_array_inference_falls_back_to_json
+  - definition_parses_steps_array_only
+  - register_algorithm_allows_instantiation
+
+## src/algorithms/centrality/betweenness.rs (19037 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BetweennessCentrality
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - get
+  - new
+  - metadata_template
+  - shortest_paths
+  - eq
+  - cmp
+  - partial_cmp
+  - compute
+  - id
+  - metadata
+  - execute
+  - register
+  - betweenness_high_on_bridge
+
+## src/algorithms/centrality/closeness.rs (12354 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ClosenessCentrality
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - get
+  - new
+  - metadata_template
+  - compute
+  - id
+  - metadata
+  - execute
+  - register
+  - closeness_prefers_central_node
+
+## src/algorithms/centrality/mod.rs (659 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn register_algorithms
+- Other functions/classes (detected):
+  - register_algorithms
+
+## src/algorithms/centrality/pagerank.rs (15680 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PageRank
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - get
+  - new
+  - metadata_template
+  - id
+  - metadata
+  - execute
+  - register
+  - pagerank_handles_small_graph
+
+## src/algorithms/centrality/traversal_utils.rs (3532 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn bfs_shortest_paths
+  - fn dijkstra_shortest_paths
+- Other functions/classes (detected):
+  - bfs_shortest_paths
+  - eq
+  - cmp
+  - partial_cmp
+
+## src/algorithms/community/components.rs (38733 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum ComponentMode
+  - struct ConnectedComponents
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - from_str
+  - to_str
+  - from
+  - new
+  - get
+  - bfs_components
+  - tarjan_components
+  - new
+  - metadata_template
+  - compute_undirected_or_weak
+  - compute_strong
+  - id
+  - metadata
+  - execute
+  - register
+  - test_undirected_components
+  - test_strong_components
+  - test_weak_vs_strong
+
+## src/algorithms/community/girvan_newman.rs (31118 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct GirvanNewman
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - get
+  - new
+  - metadata_template
+  - compute_edge_betweenness_csr
+  - compute_unweighted_betweenness
+  - compute_weighted_betweenness
+  - eq
+  - partial_cmp
+  - cmp
+  - compute_communities_unionfind
+  - find
+  - union
+  - compute
+  - id
+  - metadata
+  - execute
+  - register
+  - test_girvan_newman_small_graph
+  - test_girvan_newman_disconnected
+  - test_girvan_newman_weighted
+
+## src/algorithms/community/infomap.rs (14486 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct Infomap
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - get
+  - new
+  - metadata_template
+  - id
+  - metadata
+  - execute
+  - register
+  - test_infomap_basic
+  - test_infomap_empty
+  - test_infomap_parameter_validation
+
+## src/algorithms/community/leiden.rs (16399 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct Leiden
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - metadata_template
+  - move_phase
+  - refinement_phase
+  - id
+  - metadata
+  - execute
+  - register
+  - make_two_cliques
+  - test_leiden_two_cliques
+  - test_leiden_empty_graph
+  - test_connected_components_detection
+
+## src/algorithms/community/louvain.rs (18038 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct Louvain
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - get
+  - new
+  - metadata_template
+  - id
+  - metadata
+  - execute
+  - persist_partition
+  - register
+  - louvain_separates_components
+
+## src/algorithms/community/lpa.rs (16543 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct LabelPropagation
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - get
+  - new
+  - label_for
+  - into_pairs
+  - new
+  - metadata_template
+  - initialise_labels
+  - dominant_label
+  - run_iterations
+  - id
+  - metadata
+  - execute
+  - register
+  - label_propagation_clusters_components
+
+## src/algorithms/community/mod.rs (641 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod modularity
+  - mod utils
+  - fn register_algorithms
+- Other functions/classes (detected):
+  - register_algorithms
+
+## src/algorithms/community/modularity.rs (4544 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ModularityData
+  - fn new
+  - fn total_edges
+  - fn degree
+  - fn modularity
+  - fn modularity_delta
+- Other functions/classes (detected):
+  - new
+  - total_edges
+  - degree
+  - modularity
+  - modularity_delta
+
+## src/algorithms/community/utils.rs (7738 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn find_connected_components
+  - struct UnionFind
+  - fn new
+  - fn find
+  - fn union
+  - fn get_components
+  - fn count_components
+- Other functions/classes (detected):
+  - find_connected_components
+  - new
+  - find
+  - union
+  - get_components
+  - count_components
+  - test_find_connected_components_single
+  - test_find_connected_components_multiple
+  - test_union_find_basic
+  - test_union_find_no_merge_same_set
+  - test_union_find_path_compression
+
+## src/algorithms/execution/batch_executor.rs (21570 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - struct BatchExecutor
+  - fn new
+  - fn execute
+  - fn allocate_slots_for_jit
+  - fn get_slot_pointers
+- Other functions/classes (detected):
+  - new
+  - execute
+  - allocate_slots
+  - allocate_slots_for_jit
+  - get_slot_pointers
+  - execute_instruction
+  - load_node_prop
+  - store_node_prop
+  - load_scalar
+  - neighbor_aggregate
+  - neighbor_mode
+  - fused_neighbor_mul_agg
+  - fused_madd
+  - fused_axpy
+  - copy_slot
+  - get_float_vec
+  - get_float_vec_mut
+  - value_to_f64
+  - test_batch_executor_creation
+  - test_arithmetic_operations
+
+## src/algorithms/execution/batch_plan.rs (9616 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - type SlotId
+  - enum BatchInstruction
+  - enum AggregateOp
+  - enum Direction
+  - enum TieBreak
+  - struct BatchPlan
+  - fn new
+  - fn with_name
+  - fn validate
+- Other functions/classes (detected):
+  - new
+  - with_name
+  - validate
+  - validate_instruction
+  - test_batch_plan_validation
+  - test_batch_plan_invalid_slot
+  - test_serialization
+
+## src/algorithms/execution/jit/compiler.rs (21116 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - fn compile_batch_plan
+- Other functions/classes (detected):
+  - compile_arithmetic_op
+  - compile_load_scalar
+  - compile_fused_madd
+  - compile_copy_slot
+  - compile_batch_plan
+  - compile_instruction
+  - create_slots
+  - test_compile_empty_plan
+  - test_compile_load_scalar
+  - test_compile_add
+  - test_compile_arithmetic_ops
+  - test_compile_fused_madd
+  - test_compile_multiple_iterations
+  - test_compile_carried_slots
+  - test_compile_validation_fails_invalid_slot
+
+## src/algorithms/execution/jit/context.rs (2021 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct JitContext
+  - fn new
+  - fn clear
+- Other functions/classes (detected):
+  - new
+  - clear
+
+## src/algorithms/execution/jit/mod.rs (2881 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - mod compiler
+  - mod context
+  - type CompiledFunction
+  - struct JitManager
+  - fn new
+  - fn compile
+  - fn is_platform_supported
+  - fn is_compatible
+- Other functions/classes (detected):
+  - new
+  - compile
+  - is_platform_supported
+  - is_compatible
+  - default
+  - test_jit_manager_creation
+
+## src/algorithms/execution/mod.rs (1206 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod batch_executor
+  - mod batch_plan
+
+## src/algorithms/mod.rs (29701 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod builder
+  - mod centrality
+  - mod community
+  - mod execution
+  - mod pathfinding
+  - mod pipeline
+  - mod registry
+  - mod steps
+  - mod temporal
+  - fn ensure_algorithms_registered
+  - enum CostHint
+  - struct AlgorithmMetadata
+  - struct ParameterMetadata
+  - enum ParameterType
+  - struct AlgorithmParams
+  - fn new
+  - fn insert
+  - fn set_int
+  - fn set_float
+  - fn set_bool
+  - fn set_text
+  - fn from_json_map
+  - fn get
+  - fn expect_int
+  - fn get_int
+  - fn expect_float
+  - fn get_float
+  - fn expect_bool
+  - fn get_bool
+  - fn expect_text
+  - fn get_text
+  - fn iter
+  - enum AlgorithmParamValue
+  - fn as_attr_value
+  - fn from_attr_value
+  - struct CallCounter
+  - fn increment
+  - fn count
+  - fn total_duration
+  - fn avg_duration
+  - struct Context
+  - fn new
+  - fn with_cancel_token
+  - fn with_temporal_scope
+  - fn record_duration
+  - fn with_scoped_timer
+  - fn begin_step
+  - fn finish_step
+  - fn emit_iteration
+  - fn take_iteration_events
+  - fn timers
+  - fn timer_snapshot
+  - fn record_call
+  - fn with_counted_timer
+  - fn call_counters
+  - fn call_counter_snapshot
+  - fn record_stat
+  - fn stat_snapshot
+  - fn print_profiling_report
+  - fn persist_results
+  - fn set_persist_results
+  - fn add_output
+  - fn take_outputs
+  - fn is_cancelled
+  - fn cancel_token
+  - fn temporal_scope
+  - fn set_temporal_scope
+  - fn clear_temporal_scope
+  - fn delta
+  - fn changed_entities
+  - struct IterationEvent
+  - enum AlgorithmOutput
+  - trait Algorithm
+  - trait ConfigurableAlgorithm
+  - type AlgorithmResult
+- Other functions/classes (detected):
+  - ensure_algorithms_registered
+  - default
+  - default
+  - new
+  - insert
+  - set_int
+  - set_float
+  - set_bool
+  - set_text
+  - from_json_map
+  - get
+  - expect_int
+  - get_int
+  - expect_float
+  - get_float
+  - expect_bool
+  - get_bool
+  - expect_text
+  - get_text
+  - iter
+  - deref
+  - as_attr_value
+  - from_attr_value
+  - from
+  - from
+  - from
+  - from
+  - from
+  - from
+  - from
+  - from
+  - from
+  - from
+  - increment
+  - count
+  - total_duration
+  - avg_duration
+  - new
+  - with_cancel_token
+  - with_temporal_scope
+  - record_duration
+  - begin_step
+  - finish_step
+  - emit_iteration
+  - take_iteration_events
+  - timers
+  - timer_snapshot
+  - record_call
+  - call_counters
+  - call_counter_snapshot
+  - record_stat
+  - stat_snapshot
+  - print_profiling_report
+  - persist_results
+  - set_persist_results
+  - add_output
+  - take_outputs
+  - is_cancelled
+  - cancel_token
+  - temporal_scope
+  - set_temporal_scope
+  - clear_temporal_scope
+  - delta
+  - changed_entities
+  - default
+  - id
+  - metadata
+  - execute
+  - default_params
+  - context_tracks_timers
+  - algorithm_params_round_trip
+  - algorithm_param_value_to_attr
+  - expect_helpers_validate_presence
+
+## src/algorithms/pathfinding/astar.rs (12752 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct AStarPathfinding
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - metadata_template
+  - resolve_node
+  - heuristics_map
+  - run
+  - eq
+  - cmp
+  - partial_cmp
+  - id
+  - metadata
+  - execute
+  - register
+
+## src/algorithms/pathfinding/bfs_dfs.rs (13254 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BfsTraversal
+  - fn new
+  - struct DfsTraversal
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - visit_order_dfs
+  - new
+  - metadata_template
+  - execute_impl
+  - id
+  - metadata
+  - execute
+  - new
+  - metadata_template
+  - execute_impl
+  - id
+  - metadata
+  - execute
+  - register
+
+## src/algorithms/pathfinding/dijkstra.rs (9154 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct DijkstraShortestPath
+  - fn new
+  - fn register
+- Other functions/classes (detected):
+  - new
+  - metadata_template
+  - resolve_source
+  - run
+  - id
+  - metadata
+  - execute
+  - register
+  - dijkstra_finds_shortest_distance
+
+## src/algorithms/pathfinding/mod.rs (568 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod utils
+  - fn register_algorithms
+- Other functions/classes (detected):
+  - register_algorithms
+
+## src/algorithms/pathfinding/utils.rs (19984 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn bfs_layers
+  - fn dijkstra
+  - fn collect_edge_weights
+  - fn bfs_layers_csr
+  - fn dijkstra_csr
+- Other functions/classes (detected):
+  - new
+  - get
+  - bfs_layers
+  - eq
+  - cmp
+  - partial_cmp
+  - collect_edge_weights
+  - bfs_layers_csr
+  - eq
+  - cmp
+  - partial_cmp
+  - dijkstra_csr
+  - create_test_graph
+  - test_bfs_csr_matches_legacy
+  - test_dijkstra_csr_matches_legacy
+  - test_bfs_csr_reachability
+  - test_bfs_auto_uses_csr
+
+## src/algorithms/pipeline.rs (8113 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct AlgorithmSpec
+  - fn param
+  - struct PipelineSpec
+  - fn is_empty
+  - struct PipelineBuilder
+  - fn new
+  - fn with_algorithm
+  - fn from_spec
+  - fn as_spec
+  - fn build
+  - struct Pipeline
+  - fn run
+  - fn metadata
+  - enum PipelineValidationError
+- Other functions/classes (detected):
+  - param
+  - is_empty
+  - new
+  - from_spec
+  - as_spec
+  - build
+  - validate_specs
+  - run
+  - metadata
+  - fmt
+  - id
+  - execute
+  - pipeline_runs_registered_algorithm
+  - builder_validates_unknown_algorithm
+  - pipeline_spec_roundtrip
+  - validation_rejects_missing_identifier
+
+## src/algorithms/registry.rs (4768 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - type AlgorithmFactory
+  - struct Registry
+  - fn register_factory
+  - fn register_with_metadata
+  - fn instantiate
+  - fn contains
+  - fn metadata
+  - fn list
+  - fn global_registry
+- Other functions/classes (detected):
+  - instantiate
+  - contains
+  - metadata
+  - list
+  - global_registry
+  - id
+  - execute
+  - register_and_instantiate
+
+## src/algorithms/steps/aggregations.rs (31145 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum Reduction
+  - struct ReduceNodeValuesStep
+  - fn new
+  - struct StdDevStep
+  - fn new
+  - struct MedianStep
+  - fn new
+  - struct ModeStep
+  - fn new
+  - struct QuantileStep
+  - fn new
+  - struct EntropyStep
+  - fn new
+  - struct HistogramStep
+  - fn new
+  - enum NeighborAggType
+  - struct NeighborAggregationStep
+  - fn new
+  - fn with_weights
+  - fn with_direction
+- Other functions/classes (detected):
+  - extract_numeric_values
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - with_weights
+  - with_direction
+  - id
+  - metadata
+  - apply
+  - test_std_dev
+  - test_median_odd
+  - test_median_even
+  - test_quantile
+  - test_entropy
+  - test_histogram_bins
+  - test_neighbor_agg_type
+
+## src/algorithms/steps/arithmetic.rs (46451 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BinaryArithmeticStep
+  - struct RecipStep
+  - fn new
+  - enum CompareOp
+  - fn from_str
+  - struct CompareStep
+  - fn new
+  - fn with_scalar_right
+  - struct WhereStep
+  - fn new
+  - fn with_scalar_flags
+  - enum ReductionOp
+  - fn from_str
+  - struct ReduceScalarStep
+  - fn new
+  - struct BroadcastScalarStep
+  - fn new
+  - struct CollectNeighborValuesStep
+  - enum ModeTieBreak
+  - struct ModeListStep
+  - fn new
+  - fn new
+- Other functions/classes (detected):
+  - apply
+  - id
+  - metadata
+  - apply
+  - from
+  - as_f64
+  - apply_add
+  - apply_sub
+  - apply_mul
+  - apply_div
+  - new
+  - id
+  - metadata
+  - apply
+  - apply_recip_scalar
+  - from_str
+  - description
+  - apply
+  - new
+  - with_scalar_right
+  - id
+  - metadata
+  - apply
+  - new
+  - with_scalar_flags
+  - id
+  - metadata
+  - apply
+  - where_node_map
+  - where_edge_map
+  - from_str
+  - description
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - broadcast_to_node_map
+  - broadcast_to_edge_map
+  - value_to_json
+  - new
+  - id
+  - metadata
+  - apply
+  - compare_json_values
+  - json_to_algorithm_value
+  - new
+  - id
+  - metadata
+  - apply
+
+## src/algorithms/steps/attributes.rs (9498 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct LoadNodeAttrStep
+  - fn new
+  - struct AttachNodeAttrStep
+  - fn new
+  - struct LoadEdgeAttrStep
+  - fn new
+  - struct AttachEdgeAttrStep
+  - fn new
+  - struct EdgeWeightScaleStep
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+
+## src/algorithms/steps/community.rs (19291 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum SeedStrategy
+  - fn from_str
+  - struct CommunitySeedStep
+  - fn new
+  - struct ModularityGainStep
+  - fn new
+  - struct LabelPropagateStep
+  - fn new
+- Other functions/classes (detected):
+  - from_str
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - make_test_graph
+  - test_community_seed_singleton
+  - test_community_seed_random
+  - test_label_propagate_step
+  - test_modularity_gain_empty_graph
+  - test_modularity_gain_with_partition
+
+## src/algorithms/steps/composition.rs (13441 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait StepTemplate
+  - struct StepComposer
+  - fn new
+  - fn auto_var
+  - fn add_step
+  - fn init_nodes
+  - fn load_node_attr
+  - fn attach_node_attr
+  - fn binary_op
+  - fn add
+  - fn sub
+  - fn mul
+  - fn div
+  - fn normalize
+  - fn node_degree
+  - fn reduce_nodes
+  - fn build
+  - mod templates
+  - struct DegreeCentrality
+  - struct WeightedAverage
+  - struct ZScoreNormalization
+- Other functions/classes (detected):
+  - generate
+  - id
+  - description
+  - new
+  - auto_var
+  - add_step
+  - init_nodes
+  - load_node_attr
+  - attach_node_attr
+  - binary_op
+  - add
+  - sub
+  - mul
+  - div
+  - normalize
+  - node_degree
+  - reduce_nodes
+  - build
+  - default
+  - id
+  - description
+  - generate
+  - id
+  - description
+  - generate
+  - id
+  - description
+  - generate
+  - composer_generates_steps
+  - auto_var_generates_unique_names
+  - degree_centrality_template
+
+## src/algorithms/steps/core.rs (14573 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait Step
+  - struct StepMetadata
+  - struct StepSpec
+  - enum StepValue
+  - struct NodeColumn
+  - fn new
+  - fn get
+  - fn iter
+  - fn values_mut
+  - fn nodes
+  - fn into_pairs
+  - struct StepVariables
+  - fn neighbors
+  - fn set_node_map
+  - fn set_node_column
+  - fn node_map
+  - fn node_column
+  - fn node_column_mut
+  - fn node_map_mut
+  - fn set_scalar
+  - fn set_edge_map
+  - fn set_snapshot
+  - fn snapshot
+  - fn set_temporal_index
+  - fn temporal_index
+  - fn scalar
+  - fn edge_map
+  - fn contains
+  - fn iter
+  - fn count
+  - struct StepScope
+  - fn new
+  - fn subgraph
+  - fn variables
+  - fn variables_mut
+  - fn input
+  - fn edge_input
+  - fn node_ids
+  - fn edge_ids
+  - struct StepInput
+  - struct StepEdgeInput
+  - type StepFactory
+  - struct StepRegistry
+  - fn register
+  - fn instantiate
+  - fn contains
+  - fn metadata
+  - fn global_step_registry
+- Other functions/classes (detected):
+  - id
+  - metadata
+  - apply
+  - new
+  - get
+  - iter
+  - values_mut
+  - nodes
+  - into_pairs
+  - default
+  - drop
+  - new
+  - neighbors
+  - set_node_map
+  - set_node_column
+  - node_map
+  - node_column
+  - node_column_mut
+  - node_map_mut
+  - set_scalar
+  - set_edge_map
+  - set_snapshot
+  - snapshot
+  - set_temporal_index
+  - temporal_index
+  - scalar
+  - edge_map
+  - contains
+  - iter
+  - count
+  - new
+  - subgraph
+  - variables
+  - variables_mut
+  - input
+  - edge_input
+  - node_ids
+  - edge_ids
+  - instantiate
+  - contains
+  - metadata
+  - global_step_registry
+
+## src/algorithms/steps/direction.rs (4870 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum NeighborDirection
+  - fn from_str
+  - fn as_str
+  - fn add_reverse_edges
+  - fn edge_mapping
+- Other functions/classes (detected):
+  - default
+  - from_str
+  - as_str
+  - add_reverse_edges
+  - edge_mapping
+  - test_direction_parsing
+  - test_default_direction
+  - test_reverse_edges
+  - test_edge_mapping
+  - test_serialization
+
+## src/algorithms/steps/execution_block.rs (25711 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum ExecutionMode
+  - struct BodyNode
+  - struct BlockBody
+  - struct BlockOptions
+  - struct ExecutionBlockStep
+  - fn new
+- Other functions/classes (detected):
+  - default_true
+  - default
+  - new
+  - body
+  - execute_message_pass
+  - validate_body_support
+  - evaluate_body_for_node
+  - evaluate_body_node
+  - id
+  - metadata
+  - apply
+  - apply_arithmetic
+  - compute_mode
+  - json_value_to_param
+  - value_to_f64
+  - sum_neighbors
+  - resolve_node_value
+
+## src/algorithms/steps/expression.rs (21343 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum BinaryOp
+  - enum UnaryOp
+  - enum Expr
+  - struct ExprContext
+  - struct CsrContext
+  - fn new
+  - fn with_value
+  - fn with_csr
+  - fn eval
+  - fn constant
+  - fn var
+  - fn attr
+  - fn binary
+- Other functions/classes (detected):
+  - new
+  - with_value
+  - with_csr
+  - eval
+  - constant
+  - var
+  - attr
+  - binary
+  - eval_binary_op
+  - eval_unary_op
+  - eval_function
+  - test_constant_expr
+  - test_binary_op_add_ints
+  - test_binary_op_mul_floats
+  - test_unary_op_neg
+  - test_unary_op_sqrt
+
+## src/algorithms/steps/filtering.rs (12397 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum Predicate
+  - fn eval
+  - enum SortOrder
+  - struct SortNodesByAttrStep
+  - fn new
+  - struct FilterNodesByAttrStep
+  - fn new
+  - struct FilterEdgesByAttrStep
+  - fn new
+  - struct TopKStep
+  - fn new
+- Other functions/classes (detected):
+  - eval
+  - compare_values
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - test_predicate_eq
+  - test_predicate_gt
+  - test_predicate_contains
+  - test_predicate_range
+
+## src/algorithms/steps/flow.rs (14127 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct FlowUpdateStep
+  - fn new
+  - struct ResidualCapacityStep
+  - fn new
+  - struct AliasStep
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - add_flow_values
+  - subtract_flow_values
+  - is_positive
+  - test_add_flow_values
+  - test_subtract_flow_values
+  - test_is_positive
+  - test_flow_arithmetic_type_promotion
+  - test_is_positive_edge_cases
+  - new
+  - id
+  - metadata
+  - apply
+
+## src/algorithms/steps/fused.rs (22710 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct FusedNeighborMulAgg
+  - fn new
+  - fn with_direction
+  - fn from_spec
+  - struct FusedAXPY
+  - fn new
+  - fn from_spec
+  - struct FusedMADD
+  - fn new
+  - fn from_spec
+- Other functions/classes (detected):
+  - new
+  - with_direction
+  - from_spec
+  - id
+  - metadata
+  - apply
+  - new
+  - from_spec
+  - id
+  - metadata
+  - apply
+  - new
+  - from_spec
+  - id
+  - metadata
+  - apply
+  - test_fused_neighbor_mul_agg
+  - test_fused_axpy_vectors
+  - test_fused_madd
+
+## src/algorithms/steps/init.rs (6165 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct InitNodesStep
+  - fn new
+  - struct InitNodesWithIndexStep
+  - fn new
+  - struct InitScalarStep
+  - fn new
+  - struct InitEdgesStep
+  - fn new
+  - struct GraphNodeCountStep
+  - fn new
+  - struct GraphEdgeCountStep
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+
+## src/algorithms/steps/loop_step.rs (14134 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct LoopStep
+  - fn new
+  - fn with_loop_vars
+  - fn deserialize_loop_step
+- Other functions/classes (detected):
+  - new
+  - with_loop_vars
+  - try_batch_plan
+  - body_steps
+  - id
+  - apply
+  - deserialize_loop_step
+  - test_loop_step_creation
+  - test_loop_step_with_vars
+
+## src/algorithms/steps/mod.rs (38013 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod composition
+  - mod direction
+  - mod schema
+  - mod temporal
+  - mod validation
+- Other functions/classes (detected):
+  - sample_subgraph
+  - init_nodes_sets_values
+  - load_node_attr_fetches_values
+  - load_entity_id_defaults_to_node_id
+  - attach_node_attr_persists_values
+  - binary_arithmetic_add_maps
+  - binary_arithmetic_add_strings
+  - node_degree_step_computes_degrees
+  - normalize_node_values_step_scales_values
+  - normalize_node_values_step_max_method
+  - normalize_node_values_step_minmax_method
+  - ensure_core_steps_registers_once
+  - weighted_degree_step_computes_weighted_degrees
+  - k_core_mark_step_identifies_cores
+  - triangle_count_step_counts_triangles
+  - normalize_values_step_works_on_edges
+  - standardize_step_computes_z_scores
+  - clip_values_step_clamps_range
+  - map_nodes_expr_doubles_values
+  - map_nodes_expr_uses_neighbor_count
+  - diff_nodes_step_detects_changes
+  - diff_edges_step_detects_changes
+  - window_aggregate_sums_history
+  - temporal_filter_created_after_filters_nodes
+  - mark_changed_nodes_marks_created_nodes
+  - snapshot_at_step_stores_snapshot
+  - temporal_window_step_marks_nodes_in_range
+  - filter_nodes_by_attr_gt
+  - top_k_selects_highest
+  - sample_nodes_with_fraction
+  - sample_nodes_with_count
+  - sample_nodes_reproducibility
+  - reservoir_sample_from_map
+
+## src/algorithms/steps/normalization.rs (11867 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum NormalizeMethod
+  - struct NormalizeValuesStep
+  - fn new
+  - struct NormalizeNodeValuesStep
+  - fn new
+  - struct StandardizeStep
+  - fn new
+  - struct ClipValuesStep
+  - fn new
+- Other functions/classes (detected):
+  - value_as_f64
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+
+## src/algorithms/steps/pathfinding.rs (30639 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ShortestPathMapStep
+  - fn new
+  - struct KShortestPathsStep
+  - fn new
+  - struct RandomWalkStep
+  - fn new
+- Other functions/classes (detected):
+  - ensure_csr_cache
+  - new
+  - resolve_source
+  - id
+  - metadata
+  - apply
+  - new
+  - resolve_node_id
+  - dijkstra_with_path
+  - eq
+  - cmp
+  - partial_cmp
+  - yens_algorithm
+  - eq
+  - cmp
+  - partial_cmp
+  - id
+  - metadata
+  - apply
+  - new
+  - resolve_start_nodes
+  - perform_walk
+  - id
+  - metadata
+  - apply
+  - test_shortest_path_map_unweighted
+  - test_random_walk_basic
+
+## src/algorithms/steps/registry.rs (64792 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn register_core_steps
+  - fn ensure_core_steps_registered
+- Other functions/classes (detected):
+  - register_core_steps
+  - ensure_core_steps_registered
+
+## src/algorithms/steps/sampling.rs (11199 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum SampleSpec
+  - struct SampleNodesStep
+  - fn new
+  - struct SampleEdgesStep
+  - fn new
+  - struct ReservoirSampleStep
+  - enum EntityType
+  - fn new
+- Other functions/classes (detected):
+  - calculate_sample_size
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - sample_nodes
+  - sample_edges
+  - test_sample_spec_fraction
+  - test_sample_spec_count
+  - test_sample_spec_invalid_fraction
+  - test_sample_spec_count_too_large
+  - test_sample_reproducibility
+
+## src/algorithms/steps/schema.rs (12025 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct StepSchema
+  - struct ParameterSchema
+  - enum ParameterType
+  - fn is_compatible
+  - enum Constraint
+  - struct SchemaRegistry
+  - fn new
+  - fn register
+  - fn get
+  - fn contains
+  - fn step_ids
+  - fn find_by_tag
+  - fn export_json
+  - struct StepSchemaBuilder
+  - fn new
+  - fn description
+  - fn cost_hint
+  - fn input
+  - fn output
+  - fn param
+  - fn tag
+  - fn build
+  - struct ParameterSchemaBuilder
+  - fn new
+  - fn description
+  - fn required
+  - fn optional
+  - fn default
+  - fn constraint
+  - fn build
+- Other functions/classes (detected):
+  - is_compatible
+  - fmt
+  - fmt
+  - new
+  - register
+  - get
+  - contains
+  - step_ids
+  - find_by_tag
+  - export_json
+  - new
+  - description
+  - cost_hint
+  - input
+  - output
+  - param
+  - tag
+  - build
+  - new
+  - description
+  - required
+  - optional
+  - default
+  - constraint
+  - build
+  - parameter_type_compatibility
+  - build_schema_with_fluent_api
+  - schema_registry_stores_and_retrieves
+
+## src/algorithms/steps/structural.rs (12005 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct NodeDegreeStep
+  - fn new
+  - struct WeightedDegreeStep
+  - fn new
+  - struct KCoreMarkStep
+  - fn new
+  - struct TriangleCountStep
+  - fn new
+  - struct EdgeWeightSumStep
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+
+## src/algorithms/steps/temporal.rs (33102 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct DiffNodesStep
+  - fn new
+  - struct DiffEdgesStep
+  - fn new
+  - struct WindowAggregateStep
+  - enum AggregateFunction
+  - fn from_str
+  - fn new
+  - struct TemporalFilterStep
+  - enum TemporalPredicate
+  - fn new
+  - fn created_after
+  - fn created_before
+  - fn existed_at
+  - fn modified_in_range
+  - struct MarkChangedNodesStep
+  - fn new
+  - fn all_changes
+  - fn created_only
+  - fn modified_only
+  - struct SnapshotAtStep
+  - enum SnapshotReference
+  - fn new_at_commit
+  - fn new_at_timestamp
+  - struct TemporalWindowStep
+  - fn new
+  - struct DecayStep
+  - fn new
+  - fn with_time_delta
+- Other functions/classes (detected):
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - from_str
+  - apply
+  - requires_numeric
+  - to_float
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - created_after
+  - created_before
+  - existed_at
+  - modified_in_range
+  - id
+  - metadata
+  - apply
+  - new
+  - all_changes
+  - created_only
+  - modified_only
+  - id
+  - metadata
+  - apply
+  - new_at_commit
+  - new_at_timestamp
+  - id
+  - metadata
+  - apply
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - with_time_delta
+  - id
+  - metadata
+  - apply
+  - snapshot_attr_history
+  - is_placeholder_value
+  - resolve_history_value
+  - resolve_placeholder_from_pool
+  - ensure_temporal_index
+  - snapshot_at_commit
+  - snapshot_at_timestamp
+  - resolve_snapshot_pair
+  - bool_to_param
+  - node_existed_in_window
+  - change_matches
+  - test_aggregate_function_from_str
+  - test_aggregate_count
+  - test_aggregate_sum
+  - test_aggregate_avg
+  - test_aggregate_empty
+
+## src/algorithms/steps/transformations.rs (19950 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait NodeMapFn
+  - struct MapNodesStep
+  - fn new
+  - struct NeighborModeUpdateStep
+  - fn new
+  - fn with_output
+  - struct MapNodesExprStep
+  - fn new
+  - fn with_async_update
+  - struct UpdateInPlaceStep
+  - fn new
+  - fn with_output
+- Other functions/classes (detected):
+  - map
+  - map
+  - new
+  - id
+  - metadata
+  - apply
+  - new
+  - with_output
+  - id
+  - metadata
+  - apply
+  - compare_values
+  - new
+  - with_async_update
+  - id
+  - metadata
+  - apply
+  - new
+  - with_output
+  - id
+  - metadata
+  - apply
+
+## src/algorithms/steps/validation.rs (20637 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ValidationReport
+  - fn new
+  - fn is_valid
+  - fn add_error
+  - fn add_warning
+  - fn format
+  - struct ValidationError
+  - struct ValidationWarning
+  - enum ErrorCategory
+  - struct PipelineValidator
+  - fn new
+  - fn validate
+- Other functions/classes (detected):
+  - new
+  - is_valid
+  - add_error
+  - add_warning
+  - format
+  - default
+  - fmt
+  - fmt
+  - new
+  - validate
+  - validate_step
+  - validate_inputs
+  - validate_parameters
+  - validate_parameter_value
+  - validate_outputs
+  - check_unused_variables
+  - infer_param_type
+  - check_constraint
+  - validate_missing_required_input
+  - validate_type_mismatch
+  - validate_constraint_violation
+
+## src/algorithms/temporal.rs (13005 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct TemporalScope
+  - fn at_commit
+  - fn with_window
+  - fn with_reference
+  - fn with_metadata
+  - fn has_window
+  - fn has_reference
+  - fn window_size
+  - struct TemporalMetadata
+  - struct TemporalDelta
+  - struct NodeAttrChange
+  - struct EdgeAttrChange
+  - fn compute
+  - fn is_empty
+  - fn summary
+  - fn affected_nodes
+  - fn affected_edges
+  - struct ChangedEntities
+  - fn empty
+  - fn is_empty
+  - fn total_changes
+  - fn add_node
+  - fn add_edge
+  - fn merge
+  - enum ChangeType
+  - fn combine
+- Other functions/classes (detected):
+  - at_commit
+  - with_window
+  - with_reference
+  - with_metadata
+  - has_window
+  - has_reference
+  - window_size
+  - compute
+  - is_empty
+  - summary
+  - affected_nodes
+  - affected_edges
+  - empty
+  - is_empty
+  - total_changes
+  - add_node
+  - add_edge
+  - merge
+  - combine
+  - test_temporal_scope_creation
+  - test_temporal_scope_with_window
+  - test_temporal_delta_empty
+  - test_changed_entities
+  - test_change_type_combine
+
+## src/api/graph.rs (139190 bytes)
+- TODO/FIXME/etc: 8
+- Public APIs:
+  - struct Graph
+  - fn new
+  - fn new_with_type
+  - fn new_directed
+  - fn new_undirected
+  - fn with_config
+  - fn into_shared
+  - fn attach_self_reference
+  - fn shared_reference
+  - fn load_from_path
+  - fn graph_type
+  - fn is_directed
+  - fn is_undirected
+  - fn node_count
+  - fn edge_count
+  - fn is_empty
+  - fn pool
+  - fn pool_mut
+  - fn space
+  - fn space_mut
+  - fn add_node
+  - fn add_nodes
+  - fn add_edge
+  - fn add_edges
+  - fn add_graph
+  - fn remove_node
+  - fn remove_edge
+  - fn try_remove_edge
+  - fn remove_edges
+  - fn remove_nodes
+  - fn set_node_attr
+  - fn set_edge_attr
+  - fn get_node_attr
+  - fn get_edge_attr
+  - fn get_node_attrs
+  - fn get_node_attrs_bulk
+  - fn get_edge_attrs
+  - fn get_edge_attrs_bulk
+  - fn is_meta_node
+  - fn is_base_node
+  - fn get_meta_nodes
+  - fn get_base_nodes
+  - fn create_meta_node
+  - fn get_nodes_attrs
+  - fn get_edges_attrs
+  - fn _get_node_attribute_column
+  - fn _get_edge_attribute_column
+  - fn _get_node_attributes_for_nodes
+  - fn _get_edge_attributes_for_edges
+  - fn contains_node
+  - fn contains_edge
+  - fn node_ids
+  - fn edge_ids
+  - fn node_ids_set
+  - fn edge_ids_set
+  - fn edge_sources
+  - fn edge_targets
+  - fn degree
+  - fn in_degree
+  - fn out_degree
+  - fn neighbors
+  - fn neighbors_bulk
+  - fn get_columnar_topology
+  - fn edge_endpoints
+  - fn has_edge_between
+  - fn incident_edges
+  - fn has_node
+  - fn has_edge
+  - fn neighbors_filtered
+  - fn degree_filtered
+  - fn has_edge_between_filtered
+  - fn statistics
+  - fn memory_statistics
+  - fn commit
+  - fn has_uncommitted_changes
+  - fn reset_hard
+  - fn create_branch
+  - fn checkout_branch
+  - fn list_branches
+  - fn commit_history
+  - fn find_nodes
+  - fn find_edges
+  - fn bfs
+  - fn dfs
+  - fn shortest_path
+  - fn all_paths
+  - fn connected_components
+  - fn traversal_statistics
+  - fn neighborhood
+  - fn multi_neighborhood
+  - fn k_hop_neighborhood
+  - fn unified_neighborhood
+  - fn neighborhood_statistics
+  - fn query
+  - fn view_at_commit
+  - fn snapshot_at_commit
+  - fn snapshot_at_timestamp
+  - fn build_temporal_index
+  - fn neighbors_at_commit
+  - fn neighbors_in_window
+  - fn node_attr_history
+  - fn diff_commits
+  - fn from_snapshot
+  - fn to_networkx
+  - fn optimize
+  - fn gc_history
+  - fn save_to_path
+  - fn aggregate_node_attribute
+  - fn aggregate_edge_attribute
+  - fn group_nodes_by_attribute
+  - fn adjacency_matrix
+  - fn adjacency
+  - fn to_matrix
+  - fn to_matrix_f64
+  - fn to_matrix_f32
+  - fn to_matrix_i64
+  - fn to_adjacency_matrix
+  - fn to_weighted_adjacency_matrix
+  - fn weighted_adjacency_matrix
+  - fn dense_adjacency_matrix
+  - fn sparse_adjacency_matrix
+  - fn laplacian_matrix
+  - fn subgraph_adjacency_matrix
+  - fn custom_adjacency_matrix
+  - fn set_node_attrs
+  - fn set_node_attr_column
+  - fn set_edge_attrs
+  - fn table
+  - fn nodes_table
+  - fn edges_table
+  - fn viz
+  - struct GraphStatistics
+  - struct CommitInfo
+  - struct AggregationResult
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - new_with_type
+  - new_directed
+  - new_undirected
+  - with_config
+  - into_shared
+  - attach_self_reference
+  - shared_reference
+  - load_from_path
+  - graph_type
+  - is_directed
+  - is_undirected
+  - node_count
+  - edge_count
+  - is_empty
+  - pool
+  - pool_mut
+  - space
+  - space_mut
+  - add_node
+  - add_nodes
+  - add_edge
+  - add_edges
+  - add_graph
+  - remove_node
+  - remove_edge
+  - try_remove_edge
+  - remove_edges
+  - remove_nodes
+  - set_node_attr
+  - set_edge_attr
+  - get_node_attr
+  - get_edge_attr
+  - get_node_attrs
+  - get_node_attrs_bulk
+  - get_edge_attrs
+  - get_edge_attrs_bulk
+  - is_meta_node
+  - is_base_node
+  - get_meta_nodes
+  - get_base_nodes
+  - validate_meta_node
+  - validate_base_node
+  - create_meta_node
+  - set_meta_node_attributes_atomic
+  - validate_meta_node_structure_for_id
+  - get_nodes_attrs
+  - get_edges_attrs
+  - _get_node_attribute_column
+  - _get_edge_attribute_column
+  - _get_node_attributes_for_nodes
+  - _get_edge_attributes_for_edges
+  - contains_node
+  - contains_edge
+  - node_ids
+  - edge_ids
+  - node_ids_set
+  - edge_ids_set
+  - edge_sources
+  - edge_targets
+  - degree
+  - in_degree
+  - out_degree
+  - neighbors
+  - neighbors_bulk
+  - get_columnar_topology
+  - edge_endpoints
+  - has_edge_between
+  - incident_edges
+  - has_node
+  - has_edge
+  - neighbors_filtered
+  - degree_filtered
+  - has_edge_between_filtered
+  - statistics
+  - memory_statistics
+  - calculate_pool_memory
+  - estimate_attribute_memory
+  - calculate_space_memory
+  - calculate_history_memory
+  - calculate_memory_efficiency
+  - calculate_compression_stats
+  - commit
+  - has_uncommitted_changes
+  - reset_hard
+  - create_branch
+  - checkout_branch
+  - list_branches
+  - commit_history
+  - find_nodes
+  - find_edges
+  - bfs
+  - dfs
+  - shortest_path
+  - all_paths
+  - connected_components
+  - traversal_statistics
+  - neighborhood
+  - multi_neighborhood
+  - k_hop_neighborhood
+  - unified_neighborhood
+  - neighborhood_statistics
+  - query
+  - view_at_commit
+  - snapshot_at_commit
+  - snapshot_at_timestamp
+  - build_temporal_index
+  - neighbors_at_commit
+  - neighbors_in_window
+  - node_attr_history
+  - diff_commits
+  - reset_to_snapshot
+  - from_snapshot
+  - to_networkx
+  - optimize
+  - gc_history
+  - save_to_path
+  - aggregate_node_attribute
+  - aggregate_edge_attribute
+  - group_nodes_by_attribute
+  - adjacency_matrix
+  - adjacency
+  - to_matrix_f64
+  - to_matrix_f32
+  - to_matrix_i64
+  - weighted_adjacency_matrix
+  - dense_adjacency_matrix
+  - sparse_adjacency_matrix
+  - laplacian_matrix
+  - subgraph_adjacency_matrix
+  - custom_adjacency_matrix
+  - set_node_attrs
+  - set_node_attr_column
+  - set_edge_attrs
+  - table
+  - nodes_table
+  - edges_table
+  - viz
+  - new
+  - extract_numeric
+  - default
+  - test_add_node_entity_type_indexed
+  - test_add_nodes_entity_type_indexed
+  - test_bulk_node_attrs_tracked
+  - test_bulk_edge_attrs_tracked
+  - test_add_graph_topology_preserved
+  - test_neighbors_bulk
+
+## src/core/mod.rs (1127 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/display/array_formatter.rs (8126 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn format_array
+  - struct ArrayDisplayFormatter
+  - fn new
+  - fn format
+- Other functions/classes (detected):
+  - format_array
+  - new
+  - format
+  - format_array_value
+  - format_dtype
+  - extract_data
+  - extract_dtype
+  - extract_shape
+  - extract_name
+
+## src/display/matrix_formatter.rs (6042 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn format_matrix
+  - struct MatrixDisplayFormatter
+  - fn new
+  - fn format
+- Other functions/classes (detected):
+  - format_matrix
+  - new
+  - format
+  - format_matrix_value
+  - extract_shape
+  - extract_data
+  - extract_dtype
+  - extract_column_names
+
+## src/display/mod.rs (2568 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod array_formatter
+  - mod matrix_formatter
+  - mod table_formatter
+  - mod truncation
+  - mod unicode_chars
+  - trait RichDisplay
+  - struct DisplayConfig
+  - fn detect_display_type
+  - fn format_data_structure
+- Other functions/classes (detected):
+  - rich_display
+  - to_display_data
+  - default
+  - detect_display_type
+  - format_data_structure
+
+## src/display/table_formatter.rs (11557 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn format_table
+  - struct TableDisplayFormatter
+  - fn new
+  - fn format
+- Other functions/classes (detected):
+  - format_table
+  - new
+  - format
+  - format_empty_table
+  - format_dtype
+  - format_value
+  - format_number
+  - extract_columns
+  - extract_dtypes
+  - extract_data
+  - extract_shape
+  - extract_nulls
+  - extract_index_type
+  - build_border_line
+  - build_data_line
+
+## src/display/truncation.rs (4232 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn truncate_string
+  - fn truncate_rows
+  - fn truncate_columns
+  - fn calculate_column_widths
+- Other functions/classes (detected):
+  - truncate_string
+  - calculate_column_widths
+
+## src/display/unicode_chars.rs (2888 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BoxChars
+  - const TOP_LEFT
+  - const TOP_RIGHT
+  - const BOTTOM_LEFT
+  - const BOTTOM_RIGHT
+  - const HORIZONTAL
+  - const VERTICAL
+  - const CROSS
+  - const T_TOP
+  - const T_BOTTOM
+  - const T_LEFT
+  - const T_RIGHT
+  - const HORIZONTAL_DOUBLE
+  - const VERTICAL_DOUBLE
+  - struct Symbols
+  - const ELLIPSIS
+  - const DOT_SEPARATOR
+  - const NULL_DISPLAY
+  - const TRUNCATION_INDICATOR
+  - const HEADER_PREFIX
+  - struct Colors
+  - const RESET
+  - const BOLD
+  - const DIM
+  - const RED
+  - const GREEN
+  - const YELLOW
+  - const BLUE
+  - const MAGENTA
+  - const CYAN
+  - const WHITE
+  - const GRAY
+  - fn colorize
+  - fn bold
+  - fn dim
+- Other functions/classes (detected):
+  - colorize
+  - bold
+  - dim
+
+## src/entities/edge.rs (4141 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct Edge
+  - fn new
+  - fn id
+- Other functions/classes (detected):
+  - new
+  - id
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - edge_id
+
+## src/entities/meta_edge.rs (9107 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct MetaEdge
+  - fn new
+  - fn id
+- Other functions/classes (detected):
+  - new
+  - id
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - edge_id
+  - is_meta_edge
+  - edge_count
+  - aggregated_from
+  - expand
+  - meta_properties
+
+## src/entities/meta_node.rs (8341 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct MetaNode
+  - fn new
+  - fn id
+  - fn has_contained_subgraph
+  - fn contained_subgraph_id
+  - fn expand_to_subgraph
+- Other functions/classes (detected):
+  - new
+  - id
+  - has_contained_subgraph
+  - contained_subgraph_id
+  - expand_to_subgraph
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - node_id
+  - subgraph_id
+  - subgraph
+
+## src/entities/mod.rs (528 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod edge
+  - mod meta_edge
+  - mod meta_node
+  - mod node
+
+## src/entities/node.rs (4148 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct Node
+  - fn new
+  - fn id
+- Other functions/classes (detected):
+  - new
+  - id
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - node_id
+
+## src/errors.rs (25966 bytes)
+- TODO/FIXME/etc: 5
+- Public APIs:
+  - enum GraphError
+  - fn node_not_found
+  - fn edge_not_found
+  - fn state_not_found
+  - fn branch_not_found
+  - fn uncommitted_changes
+  - fn attribute_not_found
+  - fn internal
+  - fn internal_with_context
+  - fn is_user_error
+  - fn is_recoverable
+  - fn category
+  - fn short_description
+  - fn suggestions
+  - enum ErrorCategory
+  - enum EntityType
+  - struct MergeConflictDetail
+  - type GraphResult
+  - fn io_error_to_graph_error
+- Other functions/classes (detected):
+  - node_not_found
+  - edge_not_found
+  - state_not_found
+  - branch_not_found
+  - uncommitted_changes
+  - attribute_not_found
+  - internal
+  - internal_with_context
+  - is_user_error
+  - is_recoverable
+  - category
+  - short_description
+  - suggestions
+  - fmt
+  - fmt
+  - source
+  - io_error_to_graph_error
+  - from
+
+## src/lib.rs (12366 bytes)
+- TODO/FIXME/etc: 8
+- Public APIs:
+  - mod errors
+  - mod types
+  - mod algorithms
+  - mod core
+  - mod entities
+  - mod query
+  - mod state
+  - mod storage
+  - mod subgraphs
+  - mod temporal
+  - mod traits
+  - mod utils
+  - mod display
+  - mod viz
+  - mod api
+  - mod graph
+  - const VERSION
+  - const NAME
+  - fn info
+  - struct LibraryInfo
+  - fn banner
+- Other functions/classes (detected):
+  - info
+  - banner
+  - test_library_info
+  - test_basic_integration
+  - test_error_handling
+
+## src/query/mod.rs (295 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod query
+  - mod query_parser
+  - mod traversal
+
+## src/query/query.rs (22243 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct QueryEngine
+  - fn new
+  - fn find_nodes_by_filter_with_space
+  - fn filter_nodes
+  - fn filter_edges
+  - fn find_edges_by_filter_with_space
+  - enum AttributeFilter
+  - fn matches
+  - enum NodeFilter
+  - enum EdgeFilter
+- Other functions/classes (detected):
+  - new
+  - find_nodes_by_filter_with_space
+  - filter_nodes
+  - node_matches_filter_with_topology
+  - node_matches_filter
+  - edge_matches_filter
+  - edge_matches_filter_impl
+  - filter_edges
+  - find_edges_by_filter_with_space
+  - matches
+  - default
+
+## src/query/query_parser.rs (23284 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - type QueryResult
+  - enum QueryError
+  - enum Token
+  - enum CompOp
+  - enum LogicalOp
+  - struct QueryParser
+  - fn new
+  - fn parse_node_query
+  - fn parse_edge_query
+- Other functions/classes (detected):
+  - fmt
+  - from
+  - new
+  - parse_node_query
+  - parse_edge_query
+  - tokenize
+  - parse_node_expression
+  - parse_node_or
+  - parse_node_and
+  - parse_node_not
+  - parse_node_primary
+  - parse_node_comparison
+  - parse_edge_expression
+  - parse_edge_or
+  - parse_edge_and
+  - parse_edge_not
+  - parse_edge_primary
+  - parse_edge_comparison
+  - current_token
+  - advance
+  - match_token
+  - expect_identifier
+  - expect_value
+  - default
+  - test_simple_comparison
+  - test_string_equals
+  - test_complex_logical
+  - test_has_attribute
+  - test_not_filter
+  - test_error_cases
+  - test_edge_queries
+
+## src/query/traversal.rs (47944 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - struct TraversalEngine
+  - struct FilterCache
+  - fn new
+  - fn get
+  - fn insert
+  - fn clear
+  - fn new
+  - fn with_config
+  - fn bfs
+  - fn dfs
+  - fn shortest_path
+  - fn all_paths
+  - fn connected_components
+  - fn connected_components_for_nodes
+  - fn statistics
+  - fn clear_stats
+  - struct TraversalConfig
+  - struct TraversalOptions
+  - struct PathFindingOptions
+  - struct TraversalResult
+  - enum TraversalAlgorithm
+  - struct TraversalMetadata
+  - struct Path
+  - struct PathMetadata
+  - struct ConnectedComponentsResult
+  - struct ConnectedComponent
+  - struct TraversalStats
+  - fn average_time_per_traversal
+  - fn average_nodes_per_traversal
+- Other functions/classes (detected):
+  - new
+  - get
+  - insert
+  - clear
+  - new
+  - with_config
+  - bfs
+  - dfs
+  - shortest_path
+  - all_paths
+  - connected_components
+  - connected_components_for_nodes
+  - should_visit_node
+  - should_visit_node_inline
+  - get_eligible_nodes
+  - get_edge_weight
+  - reconstruct_path
+  - find_edge_between
+  - find_all_paths_recursive
+  - statistics
+  - clear_stats
+  - eq
+  - partial_cmp
+  - cmp
+  - new
+  - get_state
+  - return_state
+  - default
+  - default
+  - default
+  - new
+  - record_traversal
+  - clear
+  - average_time_per_traversal
+  - average_nodes_per_traversal
+  - default
+
+## src/state/change_tracker.rs (27922 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct ChangeTracker
+  - fn new
+  - fn with_strategy
+  - fn with_custom_strategy
+  - fn record_node_addition
+  - fn record_nodes_addition
+  - fn record_node_removal
+  - fn record_edge_addition
+  - fn record_edges_addition
+  - fn record_edge_removal
+  - fn record_attr_changes
+  - fn record_attr_change
+  - fn record_node_additions
+  - fn has_changes
+  - fn change_count
+  - fn get_modified_nodes
+  - fn get_modified_edges
+  - fn is_node_modified
+  - fn is_edge_modified
+  - fn create_delta
+  - fn create_change_set
+  - fn create_changeset
+  - fn clear
+  - fn strategy_name
+  - fn storage_characteristics
+  - fn change_summary
+  - fn generate_reverse_operations
+  - fn merge
+  - fn would_conflict_with
+  - fn optimize
+  - fn memory_usage
+  - fn statistics
+  - fn time_since_first_change
+  - struct ChangeSet
+  - fn new
+  - fn is_empty
+  - struct ChangeSummary
+  - fn is_empty
+  - fn description
+  - enum ReverseOperation
+  - fn execute
+  - struct MergeConflict
+  - enum ConflictType
+  - struct ChangeStatistics
+- Other functions/classes (detected):
+  - new
+  - with_strategy
+  - with_custom_strategy
+  - record_node_addition
+  - record_nodes_addition
+  - record_node_removal
+  - record_edge_addition
+  - record_edges_addition
+  - record_edge_removal
+  - record_node_additions
+  - has_changes
+  - change_count
+  - get_modified_nodes
+  - get_modified_edges
+  - is_node_modified
+  - is_edge_modified
+  - create_delta
+  - create_change_set
+  - create_changeset
+  - clear
+  - strategy_name
+  - storage_characteristics
+  - change_summary
+  - generate_reverse_operations
+  - merge
+  - would_conflict_with
+  - optimize
+  - memory_usage
+  - statistics
+  - time_since_first_change
+  - new
+  - is_empty
+  - is_empty
+  - description
+  - execute
+  - default
+
+## src/state/delta.rs (11700 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ColumnIndexDelta
+  - fn new
+  - fn add_index_change
+  - fn get_change
+  - fn has_change
+  - fn len
+  - fn is_empty
+  - struct ColumnDelta
+  - fn new
+  - fn with_capacity
+  - fn add_change
+  - fn get
+  - fn has_change
+  - fn len
+  - fn is_empty
+  - fn merge
+  - struct DeltaObject
+  - fn new
+  - fn new_with_indices
+  - fn empty
+  - fn is_empty
+  - fn change_count
+- Other functions/classes (detected):
+  - new
+  - add_index_change
+  - get_change
+  - has_change
+  - len
+  - is_empty
+  - new
+  - with_capacity
+  - add_change
+  - get
+  - has_change
+  - len
+  - is_empty
+  - merge
+  - new
+  - new_with_indices
+  - empty
+  - is_empty
+  - change_count
+  - eq
+  - test_column_delta_basic_operations
+  - test_column_delta_maintains_order
+
+## src/state/history.rs (45824 bytes)
+- TODO/FIXME/etc: 6
+- Public APIs:
+  - struct HistoryForest
+  - fn new
+  - fn create_commit
+  - fn create_merge_commit
+  - fn create_branch
+  - fn delete_branch
+  - fn update_branch_head
+  - fn list_branches
+  - fn get_branch_head
+  - fn get_commit
+  - fn get_commit_history
+  - fn commit_at_or_before
+  - fn get_branch_history
+  - fn get_children
+  - fn get_parents
+  - fn is_ancestor
+  - fn find_common_ancestor
+  - fn diff_commits
+  - fn get_commit_delta
+  - fn reconstruct_state_at
+  - fn get_delta_sequence
+  - fn find_reachable_commits
+  - fn garbage_collect
+  - fn statistics
+  - fn list_all_commits
+  - fn has_commit
+  - struct Commit
+  - fn new
+  - fn is_root
+  - fn is_merge
+  - struct Delta
+  - fn from_changes
+  - fn is_empty
+  - fn summary
+  - struct CommitDiff
+  - struct AttributeChange
+  - enum EntityType
+  - struct HistoryStatistics
+  - struct HistoricalView
+  - fn new
+  - fn clear_cache
+  - fn is_cached
+  - fn get_node_ids
+  - fn has_node
+  - fn node_count
+  - fn get_node_attribute
+  - fn get_node_attributes
+  - fn get_edge_ids
+  - fn has_edge
+  - fn edge_count
+  - fn get_edge_endpoints
+  - fn get_edge_attribute
+  - fn get_edge_attributes
+  - fn get_neighbors
+  - fn get_degree
+  - fn are_connected
+  - fn state_id
+  - fn get_state_metadata
+  - fn is_root
+  - fn get_parent
+  - fn get_children
+  - fn summary
+  - fn diff_with
+  - fn path_to
+  - struct ViewSummary
+  - fn description
+  - fn age_seconds
+- Other functions/classes (detected):
+  - new
+  - create_commit
+  - create_merge_commit
+  - create_branch
+  - delete_branch
+  - update_branch_head
+  - list_branches
+  - get_branch_head
+  - get_commit
+  - get_commit_history
+  - commit_at_or_before
+  - get_branch_history
+  - get_children
+  - get_parents
+  - is_ancestor
+  - find_common_ancestor
+  - diff_commits
+  - get_commit_delta
+  - reconstruct_state_at
+  - get_delta_sequence
+  - find_reachable_commits
+  - garbage_collect
+  - statistics
+  - list_all_commits
+  - has_commit
+  - new
+  - is_root
+  - is_merge
+  - from_changes
+  - is_empty
+  - summary
+  - default
+  - new
+  - get_snapshot
+  - clear_cache
+  - is_cached
+  - get_node_ids
+  - has_node
+  - node_count
+  - get_node_attribute
+  - get_node_attributes
+  - get_edge_ids
+  - has_edge
+  - edge_count
+  - get_edge_endpoints
+  - get_edge_attribute
+  - get_edge_attributes
+  - get_neighbors
+  - get_degree
+  - are_connected
+  - state_id
+  - get_state_metadata
+  - is_root
+  - get_parent
+  - get_children
+  - summary
+  - diff_with
+  - path_to
+  - description
+  - age_seconds
+
+## src/state/mod.rs (749 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod change_tracker
+  - mod delta
+  - mod history
+  - mod ref_manager
+  - mod space
+  - mod state
+  - mod topology
+
+## src/state/ref_manager.rs (23792 bytes)
+- TODO/FIXME/etc: 6
+- Public APIs:
+  - struct Branch
+  - fn new
+  - fn with_description
+  - fn update_head
+  - fn set_description
+  - fn is_older_than_days
+  - struct RefManager
+  - fn new
+  - fn with_default_branch
+  - fn create_branch
+  - fn checkout_branch
+  - fn delete_branch
+  - fn list_branches
+  - fn get_current_branch
+  - fn get_branch
+  - fn update_current_branch_head
+  - fn update_branch_head
+  - fn create_tag
+  - fn delete_tag
+  - fn list_tags
+  - fn get_tag
+  - fn get_referenced_states
+  - fn prune_invalid_branches
+  - fn prune_invalid_tags
+  - fn statistics
+  - fn current_branch_name
+  - fn default_branch_name
+  - fn has_branch
+  - fn has_tag
+  - struct BranchInfo
+  - fn display_name
+  - fn age_days
+  - struct TagInfo
+  - struct RefStatistics
+- Other functions/classes (detected):
+  - new
+  - with_description
+  - update_head
+  - set_description
+  - is_older_than_days
+  - new
+  - with_default_branch
+  - create_branch
+  - checkout_branch
+  - delete_branch
+  - list_branches
+  - get_current_branch
+  - get_branch
+  - update_current_branch_head
+  - update_branch_head
+  - create_tag
+  - delete_tag
+  - list_tags
+  - get_tag
+  - get_referenced_states
+  - prune_invalid_branches
+  - prune_invalid_tags
+  - statistics
+  - list_branch_names
+  - current_branch_name
+  - default_branch_name
+  - has_branch
+  - has_tag
+  - default
+  - display_name
+  - age_days
+  - test_ref_manager_creation
+  - test_branch_creation_and_deletion
+  - test_branch_checkout
+  - test_tag_operations
+  - test_reference_cleanup
+  - test_error_handling
+
+## src/state/space.rs (30095 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - struct TopologySnapshot
+  - struct GraphSpace
+  - fn new
+  - fn activate_node
+  - fn activate_nodes
+  - fn deactivate_nodes
+  - fn deactivate_node
+  - fn activate_edge
+  - fn deactivate_edge
+  - fn activate_edges
+  - fn deactivate_edges
+  - fn set_attr_index
+  - fn get_attr_index
+  - fn get_node_attr_index
+  - fn get_node_attr_indices_for_attr
+  - fn set_node_attr_index
+  - fn get_edge_attr_index
+  - fn set_edge_attr_index
+  - fn get_edge_attr_indices_for_attr
+  - fn get_node_attr_indices
+  - fn get_edge_attr_indices
+  - fn get_attribute_indices_nodes
+  - fn get_attribute_indices_edges
+  - fn get_attributes_nodes
+  - fn get_attributes_edges
+  - fn get_nodes_with_attribute
+  - fn get_attributes_for_nodes
+  - fn get_attributes_for_edges
+  - fn node_count
+  - fn edge_count
+  - fn contains_node
+  - fn is_node_active
+  - fn contains_edge
+  - fn is_edge_active
+  - fn is_subgraph_active
+  - fn has_node
+  - fn has_edge
+  - fn get_active_nodes
+  - fn get_active_edges
+  - fn node_ids
+  - fn edge_ids
+  - fn node_ids_set
+  - fn edge_ids_set
+  - fn snapshot
+  - fn snapshot_csr
+  - fn get_version
+  - fn has_uncommitted_changes
+  - fn uncommitted_change_count
+  - fn change_summary
+  - fn get_base_state
+  - fn create_change_delta
+  - fn get_attribute_indices
+  - fn get_attributes
+- Other functions/classes (detected):
+  - new
+  - try_get_snapshot
+  - set_snapshot
+  - new
+  - activate_node
+  - deactivate_nodes
+  - deactivate_node
+  - activate_edge
+  - deactivate_edge
+  - deactivate_edges
+  - get_node_attr_index
+  - get_node_attr_indices_for_attr
+  - set_node_attr_index
+  - get_edge_attr_index
+  - set_edge_attr_index
+  - get_edge_attr_indices_for_attr
+  - get_node_attr_indices
+  - get_edge_attr_indices
+  - get_attribute_indices_nodes
+  - get_attribute_indices_edges
+  - get_nodes_with_attribute
+  - node_count
+  - edge_count
+  - contains_node
+  - is_node_active
+  - contains_edge
+  - is_edge_active
+  - is_subgraph_active
+  - has_node
+  - has_edge
+  - get_active_nodes
+  - get_active_edges
+  - node_ids
+  - edge_ids
+  - node_ids_set
+  - edge_ids_set
+  - snapshot
+  - snapshot_csr
+  - rebuild_topology
+  - get_version
+  - has_uncommitted_changes
+  - uncommitted_change_count
+  - change_summary
+  - get_base_state
+  - create_change_delta
+  - get_attribute_indices
+
+## src/state/state.rs (25630 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - struct StateObject
+  - struct StateMetadata
+  - fn new
+  - fn new_root
+  - fn parent
+  - fn delta
+  - fn metadata
+  - fn is_root
+  - fn content_hash
+  - fn timestamp
+  - fn author
+  - fn label
+  - fn message
+  - fn tags
+  - fn add_tag
+  - fn remove_tag
+  - fn has_tag
+  - fn set_label
+  - fn set_message
+  - fn delta_size
+  - fn is_empty_delta
+  - fn new
+  - fn with_message
+  - fn timestamp_string
+  - fn short_hash
+  - struct GraphSnapshot
+  - fn empty
+  - fn apply_delta
+  - fn reconstruct_from_deltas
+  - fn diff_with
+  - fn statistics
+  - fn contains_node
+  - fn contains_edge
+  - fn get_neighbors
+  - struct StateDiff
+  - fn empty
+  - fn is_empty
+  - fn summary
+  - struct AttributeChange
+  - enum EntityType
+  - struct SnapshotStatistics
+  - struct DiffSummary
+  - fn merge_snapshots
+  - fn validate_snapshot
+- Other functions/classes (detected):
+  - new
+  - new_root
+  - parent
+  - delta
+  - metadata
+  - is_root
+  - content_hash
+  - timestamp
+  - author
+  - label
+  - message
+  - tags
+  - add_tag
+  - remove_tag
+  - has_tag
+  - set_label
+  - set_message
+  - delta_size
+  - is_empty_delta
+  - new
+  - with_message
+  - timestamp_string
+  - short_hash
+  - empty
+  - apply_delta
+  - reconstruct_from_deltas
+  - diff_with
+  - statistics
+  - estimate_memory_usage
+  - contains_node
+  - contains_edge
+  - get_neighbors
+  - empty
+  - is_empty
+  - summary
+  - merge_snapshots
+  - validate_snapshot
+  - test_state_object_creation
+  - test_state_tags
+
+## src/state/topology/csr.rs (4521 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct Csr
+  - fn node_count
+  - fn neighbors
+  - struct CsrScratch
+  - struct CsrOptions
+  - fn build_csr_from_edges_with_scratch
+- Other functions/classes (detected):
+  - node_count
+  - neighbors
+  - prepare
+  - default
+
+## src/state/topology/mod.rs (251 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod csr
+
+## src/storage/adjacency.rs (5021 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum MatrixFormat
+  - enum MatrixType
+  - type AdjacencyMatrix
+  - struct AdjacencyMatrixBuilder
+  - fn from_edges
+  - fn from_weighted_edges
+  - fn laplacian_from_edges
+  - fn normalized_laplacian_from_edges
+  - fn is_valid_adjacency
+  - fn node_degrees
+  - fn in_degrees
+  - fn out_degrees
+- Other functions/classes (detected):
+  - from_edges
+  - from_weighted_edges
+  - laplacian_from_edges
+  - normalized_laplacian_from_edges
+  - is_valid_adjacency
+  - node_degrees
+  - in_degrees
+  - out_degrees
+  - test_adjacency_matrix_unified
+  - test_weighted_adjacency_matrix
+
+## src/storage/advanced_matrix/backend.rs (32151 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - enum BackendError
+  - type BackendResult
+  - enum OperationType
+  - struct BackendPerformance
+  - enum BackendHint
+  - trait ComputeBackend
+  - trait ComputeBackendExt
+  - struct SVDResult
+  - struct QRResult
+  - struct NativeBackend
+  - struct BackendSelector
+  - fn new
+  - fn select_backend
+  - fn available_backends
+  - fn benchmark_backend
+- Other functions/classes (detected):
+  - fmt
+  - name
+  - is_available
+  - supports_dtype
+  - supports_operation
+  - optimal_threshold
+  - performance_characteristics
+  - name
+  - is_available
+  - supports_dtype
+  - supports_operation
+  - optimal_threshold
+  - performance_characteristics
+  - new
+  - select_backend
+  - available_backends
+  - benchmark_backend
+  - default
+  - test_native_backend_gemm
+  - test_native_backend_gemv
+  - test_backend_selection
+  - test_dtype_promotion
+
+## src/storage/advanced_matrix/backends/blas.rs (7533 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BlasBackend
+  - enum BlasType
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - detect_blas_library
+  - get_performance_for_blas_type
+  - name
+  - is_available
+  - supports_dtype
+  - supports_operation
+  - optimal_threshold
+  - performance_characteristics
+  - test_blas_stub
+  - test_performance_characteristics
+
+## src/storage/advanced_matrix/backends/mod.rs (535 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod blas
+  - mod numpy
+
+## src/storage/advanced_matrix/backends/numpy.rs (5940 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct NumPyBackend
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - name
+  - is_available
+  - supports_dtype
+  - supports_operation
+  - optimal_threshold
+  - performance_characteristics
+  - test_numpy_stub
+
+## src/storage/advanced_matrix/benchmarks.rs (18264 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BenchmarkResult
+  - fn calculate_gflops
+  - struct BenchmarkConfig
+  - struct MatrixBenchmarkSuite
+  - fn new
+  - fn run_comprehensive_benchmarks
+  - fn generate_report
+  - fn export_to_csv
+  - fn get_results
+  - fn quick_benchmark
+- Other functions/classes (detected):
+  - calculate_gflops
+  - default
+  - new
+  - run_comprehensive_benchmarks
+  - benchmark_operation
+  - generate_report
+  - export_to_csv
+  - get_results
+  - quick_benchmark
+  - test_gflops_calculation
+  - test_benchmark_config
+  - test_benchmark_suite_creation
+
+## src/storage/advanced_matrix/memory.rs (20002 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - enum MemoryError
+  - type MemoryResult
+  - enum BackendId
+  - enum MatrixLayout
+  - const SIMD_ALIGNMENT
+  - fn align_to_simd_boundary
+  - fn get_simd_alignment
+  - struct AlignedBuffer
+  - fn as_slice
+  - fn as_slice_mut
+  - trait BackendView
+  - struct NativeView
+  - struct SharedBuffer
+  - fn new
+  - fn from_data
+  - fn shape
+  - fn layout
+  - fn len
+  - fn is_empty
+  - fn data
+  - fn data_mut
+  - fn view_for_backend
+  - fn sync_from_backend
+  - fn modification_count
+  - fn to_vec
+  - struct AdvancedMemoryPool
+  - fn new
+  - fn allocate
+  - fn deallocate
+  - fn allocate_shared_buffer
+  - fn prefetch_for_operation
+  - fn clear
+  - fn stats
+  - struct MemoryPoolStats
+  - fn get_memory_pool
+  - fn get_f64_memory_pool
+  - fn get_f32_memory_pool
+  - fn get_i64_memory_pool
+  - fn get_i32_memory_pool
+- Other functions/classes (detected):
+  - fmt
+  - align_to_simd_boundary
+  - fmt
+  - new
+  - as_slice
+  - as_slice_mut
+  - as_ptr
+  - as_mut_ptr
+  - drop
+  - backend_id
+  - data
+  - data_mut
+  - sync_to_main
+  - sync_from_main
+  - backend_id
+  - data
+  - data_mut
+  - sync_to_main
+  - sync_from_main
+  - fmt
+  - new
+  - from_data
+  - shape
+  - layout
+  - len
+  - is_empty
+  - data
+  - data_mut
+  - view_for_backend
+  - sync_from_backend
+  - mark_modified
+  - modification_count
+  - to_vec
+  - clone
+  - new
+  - allocate
+  - deallocate
+  - allocate_shared_buffer
+  - get_bucket_size
+  - try_reuse_from_bucket
+  - prefetch_for_operation
+  - clear
+  - stats
+  - default
+  - get_f64_memory_pool
+  - get_f32_memory_pool
+  - get_i64_memory_pool
+  - get_i32_memory_pool
+  - test_aligned_buffer_allocation
+  - test_shared_buffer_creation
+  - test_memory_pool_allocation
+  - test_simd_alignment
+  - test_shared_buffer_from_data
+
+## src/storage/advanced_matrix/mod.rs (1412 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod backend
+  - mod backends
+  - mod benchmarks
+  - mod memory
+  - mod neural
+  - mod numeric_type
+  - mod operations
+  - mod unified_matrix
+
+## src/storage/advanced_matrix/neural/activations.rs (17231 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait ActivationFunction
+  - enum ActivationType
+  - struct ActivationOps
+  - fn relu
+  - fn relu_inplace
+  - fn relu_derivative
+  - fn gelu
+  - fn gelu_derivative
+  - fn sigmoid
+  - fn sigmoid_derivative
+  - fn tanh
+  - fn tanh_derivative
+  - fn swish
+  - fn swish_derivative
+  - fn leaky_relu
+  - fn elu
+  - fn softmax
+  - struct ReLU
+  - struct GELU
+  - struct Sigmoid
+  - struct Tanh
+  - fn relu
+  - fn gelu
+  - fn sigmoid
+  - fn tanh
+  - fn softmax
+- Other functions/classes (detected):
+  - forward
+  - backward
+  - forward_inplace
+  - name
+  - forward
+  - backward
+  - forward_inplace
+  - name
+  - forward
+  - backward
+  - forward_inplace
+  - name
+  - forward
+  - backward
+  - forward_inplace
+  - name
+  - forward
+  - backward
+  - forward_inplace
+  - name
+  - test_relu_properties
+  - test_activation_function_names
+  - test_activation_type_enum
+
+## src/storage/advanced_matrix/neural/autodiff.rs (53940 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - type NodeId
+  - enum Operation
+  - struct ComputationNode
+  - fn new
+  - fn add_input
+  - fn set_gradient
+  - fn accumulate_gradient
+  - struct ComputationGraph
+  - fn new
+  - fn execution_order
+  - fn nodes
+  - fn create_leaf
+  - fn create_operation
+  - fn get_node
+  - fn update_execution_order
+  - fn forward
+  - fn backward
+  - struct AutoDiffTensor
+  - fn new
+  - fn from_data
+  - fn new_in_graph
+  - fn clone_to_graph
+  - fn like_new
+  - fn from_data_in_graph
+  - fn like_from_data
+  - fn graph_arc
+  - fn add
+  - fn subtract
+  - fn multiply
+  - fn matmul
+  - fn sum
+  - fn relu
+  - fn backward
+  - fn grad
+  - struct GradientTape
+  - fn new
+  - fn watch
+  - fn record_operation
+  - fn backward_pass
+- Other functions/classes (detected):
+  - new
+  - add_input
+  - set_gradient
+  - accumulate_gradient
+  - new
+  - execution_order
+  - nodes
+  - create_leaf
+  - create_operation
+  - get_node
+  - update_execution_order
+  - forward
+  - compute_forward_operation
+  - get_input_values
+  - reduce_sum
+  - backward
+  - elementwise_pow_u32
+  - compute_backward_operation
+  - accumulate_per_input
+  - default
+  - new
+  - from_data
+  - new_in_graph
+  - clone_to_graph
+  - like_new
+  - from_data_in_graph
+  - like_from_data
+  - graph_arc
+  - ensure_same_graph
+  - to_graph_const_only
+  - ensure_same_graph_or_import_const
+  - add
+  - subtract
+  - multiply
+  - matmul
+  - sum
+  - relu
+  - backward
+  - grad
+  - new
+  - watch
+  - record_operation
+  - default
+  - test_computation_graph_creation
+  - test_operation_enum
+  - test_node_creation
+  - test_autodiff_tensor_creation
+  - test_simple_addition_forward
+  - test_simple_subtraction_forward
+  - test_simple_multiplication_forward
+  - test_chain_operations
+  - test_gradient_computation_simple
+  - test_gradient_computation_subtract
+  - test_gradient_computation_multiply
+  - test_chain_rule
+  - test_matmul_forward
+  - test_relu_forward
+  - test_sum_reduction
+  - test_numerical_gradient_check
+  - test_graph_topology_order
+  - grad_scalar_times_scalar_const
+  - grad_square_via_duplicate_input
+  - dbg_mul_scalar_grad
+
+## src/storage/advanced_matrix/neural/convolution.rs (16808 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum PaddingMode
+  - struct ConvolutionConfig
+  - fn output_dimensions
+  - struct Conv2D
+  - fn new
+  - fn with_bias
+  - fn forward
+  - struct ConvTensor
+  - fn zeros
+  - fn dimensions
+  - fn get_batch_slice
+  - fn set_batch_slice
+  - fn im2col_transform
+  - struct ConvolutionOps
+  - fn direct_conv2d
+  - fn fft_conv2d
+  - fn winograd_conv2d
+- Other functions/classes (detected):
+  - default
+  - output_dimensions
+  - new
+  - with_bias
+  - forward
+  - forward_with_im2col
+  - im2col_transform
+  - calculate_padding
+  - add_bias_broadcast
+  - zeros
+  - dimensions
+  - get_batch_slice
+  - set_batch_slice
+  - test_convolution_config
+  - test_output_dimensions
+  - test_padding_modes
+
+## src/storage/advanced_matrix/neural/fusion.rs (26319 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum FusionPattern
+  - enum ActivationType
+  - enum ElementWiseOp
+  - struct FusedOperation
+  - type FusionKernel
+  - fn execute
+  - struct FusionEngine
+  - struct FusionStatistics
+  - fn new
+  - fn register_pattern
+  - fn analyze_fusion_opportunities
+  - fn optimize_computation_graph
+  - fn get_statistics
+  - fn clear_statistics
+  - struct FusionOpportunity
+  - struct OptimizationResult
+  - fn new
+  - fn optimize_computation_graph
+- Other functions/classes (detected):
+  - fmt
+  - execute
+  - new
+  - register_default_patterns
+  - register_pattern
+  - analyze_fusion_opportunities
+  - analyze_window
+  - detect_pattern
+  - is_gelu_approximation_pattern
+  - is_stable_softmax_pattern
+  - is_layer_norm_pattern
+  - select_non_overlapping_opportunities
+  - estimate_speedup
+  - estimate_memory_reduction
+  - optimize_computation_graph
+  - apply_fusion
+  - create_fused_node
+  - get_fusion_inputs
+  - get_fusion_output_shape
+  - redirect_dependencies
+  - remove_fused_nodes
+  - fused_linear_relu_kernel
+  - fused_elementwise_chain_kernel
+  - fused_gelu_approximation_kernel
+  - fused_stable_softmax_kernel
+  - fused_layer_norm_kernel
+  - get_statistics
+  - clear_statistics
+  - default
+  - new
+  - test_fusion_engine_creation
+  - test_fusion_patterns
+  - test_activation_types
+  - test_element_wise_ops
+  - test_optimization_result
+
+## src/storage/advanced_matrix/neural/mod.rs (1314 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod activations
+  - mod autodiff
+  - mod convolution
+  - mod fusion
+
+## src/storage/advanced_matrix/numeric_type.rs (14657 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum DType
+  - const fn
+  - fn promote
+  - const fn
+  - const fn
+  - const fn
+  - trait NumericType
+- Other functions/classes (detected):
+  - promote
+  - zero
+  - one
+  - from_f64
+  - to_f64
+  - is_finite
+  - abs
+  - add
+  - sub
+  - mul
+  - div
+  - fma
+  - simd_add
+  - simd_mul
+  - simd_fma
+  - simd_reduce_sum
+  - simd_reduce_max
+  - simd_reduce_min
+  - zero
+  - one
+  - from_f64
+  - to_f64
+  - is_finite
+  - abs
+  - add
+  - sub
+  - mul
+  - div
+  - fma
+  - simd_reduce_sum
+  - simd_reduce_max
+  - simd_reduce_min
+  - zero
+  - one
+  - from_f64
+  - to_f64
+  - is_finite
+  - abs
+  - add
+  - sub
+  - mul
+  - div
+  - fma
+  - simd_reduce_sum
+  - simd_reduce_max
+  - simd_reduce_min
+  - zero
+  - one
+  - from_f64
+  - to_f64
+  - is_finite
+  - abs
+  - add
+  - sub
+  - mul
+  - div
+  - simd_reduce_sum
+  - simd_reduce_max
+  - simd_reduce_min
+  - zero
+  - one
+  - from_f64
+  - to_f64
+  - is_finite
+  - abs
+  - add
+  - sub
+  - mul
+  - div
+  - simd_reduce_sum
+  - simd_reduce_max
+  - simd_reduce_min
+  - zero
+  - one
+  - from_f64
+  - to_f64
+  - is_finite
+  - abs
+  - add
+  - sub
+  - mul
+  - div
+  - simd_reduce_sum
+  - simd_reduce_max
+  - simd_reduce_min
+  - zero
+  - one
+  - from_f64
+  - to_f64
+  - is_finite
+  - abs
+  - add
+  - sub
+  - mul
+  - div
+  - simd_reduce_sum
+  - simd_reduce_max
+  - simd_reduce_min
+  - test_dtype_promotion
+  - test_numeric_type_operations
+  - test_simd_reductions
+  - test_type_conversions
+
+## src/storage/advanced_matrix/operations.rs (14332 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait MatrixOperations
+  - struct ActivationFunctions
+  - fn relu
+  - fn relu_inplace
+  - fn sigmoid
+  - fn tanh
+  - struct MathFunctions
+  - fn exp
+  - fn ln
+  - fn sqrt
+  - fn pow
+  - fn abs
+  - struct MatrixUtils
+  - fn random
+  - fn constant
+  - fn diag
+  - fn extract_diag
+  - fn eye
+  - fn from_fn
+  - struct MatrixStats
+  - fn mean
+  - fn std
+  - fn row_means
+  - fn col_means
+  - fn frobenius_norm
+- Other functions/classes (detected):
+  - reshape
+  - slice
+  - reshape
+  - slice
+  - test_relu_activation
+  - test_matrix_reshape
+  - test_matrix_slice
+  - test_matrix_stats
+  - test_matrix_utils
+  - test_element_wise_functions
+
+## src/storage/advanced_matrix/unified_matrix.rs (27716 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum MatrixError
+  - type MatrixResult
+  - struct Strides
+  - fn row_major
+  - fn column_major
+  - fn index
+  - struct Shape
+  - fn new
+  - fn as_tuple
+  - fn total_elements
+  - fn is_square
+  - fn is_vector
+  - fn transpose
+  - enum MatrixStorage
+  - struct SparseMatrix
+  - struct MatrixView
+  - struct LazyMatrix
+  - struct UnifiedMatrix
+  - fn new
+  - fn new_with_layout
+  - fn from_data
+  - fn identity
+  - fn zeros
+  - fn ones
+  - fn shape
+  - fn rows
+  - fn cols
+  - fn len
+  - fn is_empty
+  - fn layout
+  - fn strides
+  - fn with_backend_hint
+  - fn get
+  - fn set
+  - fn fill
+  - fn matmul
+  - fn add
+  - fn subtract
+  - fn mul
+  - fn scale
+  - fn scalar_multiply
+  - fn sum
+  - fn max
+  - fn min
+  - fn transpose
+  - fn to_vec
+  - fn elementwise_multiply
+  - type Matrix64
+  - type Matrix32
+  - type MatrixI64
+  - type MatrixI32
+- Other functions/classes (detected):
+  - fmt
+  - from
+  - row_major
+  - column_major
+  - index
+  - new
+  - as_tuple
+  - total_elements
+  - is_square
+  - is_vector
+  - transpose
+  - fmt
+  - fmt
+  - new
+  - new_with_layout
+  - from_data
+  - identity
+  - zeros
+  - ones
+  - shape
+  - rows
+  - cols
+  - len
+  - is_empty
+  - layout
+  - strides
+  - with_backend_hint
+  - get
+  - set
+  - fill
+  - matmul
+  - add
+  - subtract
+  - mul
+  - scale
+  - scalar_multiply
+  - sum
+  - max
+  - min
+  - transpose
+  - to_vec
+  - elementwise_multiply
+  - clone
+  - test_matrix_creation
+  - test_matrix_from_data
+  - test_identity_matrix
+  - test_matrix_addition
+  - test_matrix_multiplication
+  - test_scalar_multiplication
+  - test_matrix_reductions
+  - test_matrix_transpose
+
+## src/storage/array/array_array.rs (12566 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ArrayArray
+  - fn new
+  - fn with_keys
+  - fn with_named_keys
+  - fn len
+  - fn is_empty
+  - fn get
+  - fn keys
+  - fn key_name
+  - fn into_arrays
+  - fn iter
+  - fn mean
+  - fn sum
+  - fn min
+  - fn max
+  - fn std
+  - fn count
+  - fn to_table_with_aggregation
+- Other functions/classes (detected):
+  - new
+  - with_keys
+  - with_named_keys
+  - len
+  - is_empty
+  - get
+  - keys
+  - key_name
+  - into_arrays
+  - iter
+  - mean
+  - sum
+  - min
+  - max
+  - std
+  - count
+  - to_table_with_aggregation
+  - fmt
+  - test_array_array_creation
+  - test_array_array_with_keys
+  - test_mean_aggregation
+  - test_sum_aggregation
+  - test_min_max_aggregation
+  - test_std_aggregation
+  - test_count_aggregation
+  - test_empty_array_handling
+  - test_to_table_with_keys
+  - test_to_table_with_named_keys
+  - test_to_table_without_keys
+
+## src/storage/array/base.rs (22603 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BaseArray
+  - fn new
+  - fn with_name
+  - fn dtype
+  - fn name
+  - fn set_name
+  - fn from_node_ids
+  - fn from_edge_ids
+  - fn from_attr_values
+  - fn as_node_ids
+  - fn as_edge_ids
+  - fn as_node_ids_filtered
+  - fn as_edge_ids_filtered
+  - fn sort_indices
+  - fn take_indices
+  - fn eq_string
+  - fn filter_by_mask
+  - fn slice
+  - fn unique_values
+  - fn data
+  - fn set
+  - fn data_mut
+  - fn head
+  - fn tail
+  - fn unique
+  - fn value_counts
+  - fn sum
+  - fn mean
+  - fn min
+  - fn max
+  - fn count
+  - fn nunique
+  - fn describe
+  - fn isin
+- Other functions/classes (detected):
+  - new
+  - with_name
+  - dtype
+  - name
+  - set_name
+  - from_node_ids
+  - from_edge_ids
+  - from_attr_values
+  - as_node_ids
+  - as_edge_ids
+  - as_node_ids_filtered
+  - as_edge_ids_filtered
+  - sort_indices
+  - take_indices
+  - eq_string
+  - filter_by_mask
+  - slice
+  - unique_values
+  - data
+  - set
+  - data_mut
+  - len
+  - get
+  - iter
+  - head
+  - tail
+  - unique
+  - value_counts
+  - sum
+  - mean
+  - min
+  - max
+  - count
+  - nunique
+  - compare_values
+  - describe
+  - isin
+  - fmt
+  - fmt
+
+## src/storage/array/base_array.rs (74927 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BaseArray
+  - fn new
+  - fn len
+  - fn is_empty
+  - fn get
+  - fn iter
+  - fn clone_vec
+  - fn as_slice
+  - fn first
+  - fn last
+  - fn contains
+  - fn map
+  - fn filter
+  - fn from_attr_values
+  - fn data
+  - fn set
+  - fn slice
+  - fn sort_indices
+  - fn take_indices
+  - fn filter_by_mask
+  - fn from_node_ids
+  - fn as_node_ids
+  - fn as_node_ids_filtered
+  - fn unique_values
+  - fn from_edge_ids
+  - fn as_edge_ids_filtered
+  - fn interactive
+  - fn to_table_with_name
+  - fn to_table_with_prefix
+  - fn to_table_with_suffix
+  - fn append_element
+  - fn extend_elements
+  - fn drop_elements
+  - fn drop_duplicates_elements
+  - fn sample
+  - fn sum
+  - fn mean
+  - fn median
+  - fn std
+  - fn var
+  - fn min
+  - fn max
+  - fn count
+  - fn nunique
+  - fn isna
+  - fn notna
+  - fn dropna
+  - fn has_nulls
+  - fn null_count
+  - fn fillna
+  - fn str
+  - fn isin
+  - fn value_counts
+  - fn apply
+  - fn quantile
+  - fn quantiles
+  - fn get_percentile
+  - fn percentiles
+  - fn corr
+  - fn cov
+  - fn rolling
+  - fn expanding
+  - fn cumsum
+  - fn cummin
+  - fn cummax
+  - fn shift
+  - fn pct_change
+  - struct StringAccessor
+  - fn new
+  - fn upper
+  - fn lower
+  - fn len
+  - fn strip
+  - fn contains
+  - fn startswith
+  - fn endswith
+  - fn replace
+  - fn split
+  - fn slice
+  - fn pad
+- Other functions/classes (detected):
+  - new
+  - len
+  - is_empty
+  - get
+  - iter
+  - clone_vec
+  - as_slice
+  - first
+  - last
+  - contains
+  - from
+  - from
+  - from_attr_values
+  - data
+  - set
+  - slice
+  - sort_indices
+  - take_indices
+  - filter_by_mask
+  - from_node_ids
+  - as_node_ids
+  - as_node_ids_filtered
+  - unique_values
+  - from_edge_ids
+  - as_edge_ids_filtered
+  - interactive
+  - to_table_with_name
+  - to_table_with_prefix
+  - to_table_with_suffix
+  - append_element
+  - extend_elements
+  - drop_elements
+  - drop_duplicates_elements
+  - sample
+  - weighted_sample_with_replacement
+  - weighted_sample_without_replacement
+  - sum
+  - mean
+  - median
+  - std
+  - var
+  - min
+  - max
+  - count
+  - nunique
+  - extract_numeric
+  - isna
+  - notna
+  - dropna
+  - has_nulls
+  - null_count
+  - fillna
+  - str
+  - isin
+  - value_counts
+  - quantile
+  - quantiles
+  - get_percentile
+  - percentiles
+  - corr
+  - cov
+  - pearson_correlation
+  - compute_ranks
+  - kendall_correlation
+  - rolling
+  - expanding
+  - cumsum
+  - cummin
+  - cummax
+  - shift
+  - pct_change
+  - new
+  - upper
+  - lower
+  - len
+  - strip
+  - contains
+  - startswith
+  - endswith
+  - replace
+  - split
+  - slice
+  - pad
+  - into_iter
+  - len
+  - get
+  - iter
+  - to_vec
+  - test_basic_operations
+  - test_map_and_filter
+  - test_empty_array
+
+## src/storage/array/benchmark.rs (12188 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BenchmarkConfig
+  - struct BenchmarkResults
+  - struct MemoryComparison
+  - fn eager_avg_time
+  - fn lazy_avg_time
+  - fn performance_ratio
+  - fn performance_improvement
+  - fn lazy_is_faster
+  - struct Benchmarker
+  - fn new
+  - fn with_config
+  - fn run_comprehensive_benchmark
+  - fn print_results
+  - fn quick_benchmark
+  - fn should_use_lazy_evaluation
+- Other functions/classes (detected):
+  - default
+  - eager_avg_time
+  - lazy_avg_time
+  - performance_ratio
+  - performance_improvement
+  - lazy_is_faster
+  - new
+  - with_config
+  - run_comprehensive_benchmark
+  - generate_test_data
+  - benchmark_eager_evaluation
+  - benchmark_lazy_evaluation
+  - benchmark_memory_usage
+  - print_results
+  - default
+  - new
+  - len
+  - get
+  - iter
+  - quick_benchmark
+  - should_use_lazy_evaluation
+  - test_quick_benchmark
+  - test_benchmark_results_calculations
+
+## src/storage/array/bool_array.rs (10097 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct BoolArray
+  - fn new
+  - fn from_slice
+  - fn len
+  - fn is_empty
+  - fn get
+  - fn iter
+  - fn count
+  - fn count_false
+  - fn any
+  - fn all
+  - fn percentage
+  - fn nonzero
+  - fn to_indices
+  - fn false_indices
+  - fn apply_mask
+  - fn as_num_array
+  - fn into_num_array
+  - fn to_vec
+- Other functions/classes (detected):
+  - new
+  - from_slice
+  - len
+  - is_empty
+  - get
+  - iter
+  - count
+  - count_false
+  - any
+  - all
+  - percentage
+  - nonzero
+  - to_indices
+  - false_indices
+  - as_num_array
+  - into_num_array
+  - to_vec
+  - bitand
+  - bitand
+  - bitor
+  - bitor
+  - not
+  - not
+  - fmt
+  - test_bool_array_creation
+  - test_bool_array_statistics
+  - test_bool_array_indices
+  - test_bool_array_operations
+  - test_apply_mask
+  - test_empty_array
+
+## src/storage/array/indexing.rs (9356 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum SliceIndex
+  - fn resolve_indices
+  - trait AdvancedIndexing
+- Other functions/classes (detected):
+  - resolve_indices
+  - resolve_negative_index
+  - resolve_range_indices
+  - get_slice
+  - get_single
+  - len
+  - is_empty
+  - get_slice
+  - get_single
+  - len
+  - get_slice
+  - get_single
+  - len
+  - get_slice
+  - get_single
+  - len
+  - test_single_index_resolution
+  - test_range_index_resolution
+  - test_list_index_resolution
+  - test_bool_array_indexing
+  - test_advanced_indexing_base_array
+
+## src/storage/array/iterator.rs (12314 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ArrayIterator
+  - fn new
+  - fn with_graph
+  - fn len
+  - fn is_empty
+  - fn filter
+  - fn map
+  - fn collect
+  - fn into_vec
+  - fn take
+  - fn skip
+  - fn filter_nodes
+  - fn filter_edges
+  - fn collapse
+  - fn filter_by_degree
+  - fn get_neighbors
+  - fn to_subgraph
+  - fn expand
+  - fn re_aggregate
+  - fn filter_by_weight
+  - fn filter_by_endpoints
+  - fn group_by_source
+- Other functions/classes (detected):
+  - new
+  - with_graph
+  - len
+  - is_empty
+  - collect
+  - into_vec
+  - take
+  - skip
+  - filter_nodes
+  - filter_edges
+  - collapse
+  - filter_by_degree
+  - get_neighbors
+  - to_subgraph
+  - expand
+  - re_aggregate
+  - filter_by_weight
+  - filter_by_endpoints
+  - group_by_source
+  - new
+  - len
+  - get
+  - iter
+
+## src/storage/array/lazy_iterator.rs (22863 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum LazyOperation
+  - struct LazyArrayIterator
+  - fn new
+  - fn with_graph
+  - fn source_len
+  - fn estimated_len
+  - fn is_empty
+  - fn filter
+  - fn take
+  - fn skip
+  - fn sample
+  - fn collect
+  - fn collect_as_array
+  - fn filter_nodes
+  - fn filter_edges
+  - fn collapse
+  - fn filter_by_degree
+  - fn get_neighbors
+  - fn to_subgraph
+  - fn expand
+  - fn re_aggregate
+  - fn filter_by_weight
+  - fn filter_by_endpoints
+  - fn group_by_source
+- Other functions/classes (detected):
+  - new
+  - with_graph
+  - source_len
+  - estimated_len
+  - is_empty
+  - filter
+  - take
+  - skip
+  - sample
+  - collect
+  - collect_as_array
+  - optimize_operations
+  - fuse_consecutive_filters
+  - optimize_take_skip_chains
+  - early_termination_optimization
+  - optimize_operation_chain
+  - reorder_for_performance
+  - execute_operations_static
+  - execute_filter_static
+  - execute_filter_nodes_static
+  - execute_filter_edges_static
+  - execute_sample_static
+  - execute_collapse_static
+  - filter_nodes
+  - filter_edges
+  - collapse
+  - filter_by_degree
+  - get_neighbors
+  - to_subgraph
+  - expand
+  - re_aggregate
+  - filter_by_weight
+  - filter_by_endpoints
+  - group_by_source
+  - new
+  - len
+  - get
+  - iter
+
+## src/storage/array/memory_profiler.rs (14942 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct TrackingAllocator
+  - const fn
+  - fn current_allocated
+  - fn peak_allocated
+  - fn allocation_count
+  - fn reset
+  - struct MemorySnapshot
+  - fn memory_overhead_percent
+  - fn memory_churn
+  - struct NumArrayMemoryProfiler
+  - fn new
+  - fn profile_operation
+  - fn profile_numarray_operations
+  - fn generate_memory_report
+  - fn print_memory_analysis
+  - fn quick_memory_analysis
+  - fn detailed_memory_analysis
+- Other functions/classes (detected):
+  - current_allocated
+  - peak_allocated
+  - allocation_count
+  - reset
+  - memory_overhead_percent
+  - memory_churn
+  - new
+  - profile_numarray_operations
+  - generate_memory_report
+  - print_memory_analysis
+  - default
+  - quick_memory_analysis
+  - detailed_memory_analysis
+  - test_memory_profiler_creation
+  - test_memory_snapshot_calculations
+  - test_quick_memory_analysis
+
+## src/storage/array/mod.rs (1479 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod array_array
+  - mod base
+  - mod base_array
+  - mod benchmark
+  - mod bool_array
+  - mod indexing
+  - mod iterator
+  - mod lazy_iterator
+  - mod memory_profiler
+  - mod num_array
+  - mod numarray_benchmark
+  - mod query
+  - mod simd_optimizations
+  - mod specialized
+  - mod traits
+
+## src/storage/array/num_array.rs (11454 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct NumArray
+  - fn new
+  - fn from_base
+  - fn len
+  - fn is_empty
+  - fn get
+  - fn iter
+  - fn first
+  - fn last
+  - fn mean
+  - fn sum
+  - fn min
+  - fn max
+  - fn std_dev
+  - fn variance
+  - fn median
+  - fn percentile
+  - fn correlate
+  - fn add
+  - fn multiply
+  - fn describe
+  - struct StatsSummary
+  - fn is_valid
+  - fn sum_simd
+  - fn mean_simd
+  - fn std_dev_simd
+  - fn variance_simd
+  - fn min_simd
+  - fn max_simd
+  - fn median_optimized
+  - fn sum_auto
+  - fn mean_auto
+  - fn median_auto
+- Other functions/classes (detected):
+  - new
+  - from_base
+  - len
+  - is_empty
+  - get
+  - iter
+  - first
+  - last
+  - mean
+  - sum
+  - min
+  - max
+  - std_dev
+  - variance
+  - median
+  - percentile
+  - correlate
+  - add
+  - multiply
+  - describe
+  - is_valid
+  - from
+  - from
+  - from
+  - sum_simd
+  - mean_simd
+  - std_dev_simd
+  - variance_simd
+  - min_simd
+  - max_simd
+  - median_optimized
+  - sum_auto
+  - mean_auto
+  - median_auto
+  - test_basic_stats
+  - test_correlation
+  - test_element_wise_operations
+  - test_empty_num_array
+  - test_describe
+
+## src/storage/array/numarray_benchmark.rs (22025 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct NumArrayBenchmarkConfig
+  - struct OperationResult
+  - struct NumArrayBenchmarkResults
+  - fn get_operation_result
+  - fn baseline_improvement
+  - fn generate_summary
+  - struct NumArrayBenchmarker
+  - fn new
+  - fn with_config
+  - fn run_comprehensive_benchmark
+  - fn print_results
+  - fn quick_numarray_benchmark
+  - fn benchmark_specific_operation
+- Other functions/classes (detected):
+  - default
+  - get_operation_result
+  - baseline_improvement
+  - generate_summary
+  - new
+  - with_config
+  - run_comprehensive_benchmark
+  - benchmark_statistical_operations
+  - benchmark_elementwise_operations
+  - benchmark_allocation_operations
+  - benchmark_iterator_operations
+  - run_baseline_comparisons
+  - generate_f64_test_data
+  - estimate_memory_usage
+  - print_results
+  - default
+  - quick_numarray_benchmark
+  - benchmark_specific_operation
+  - test_quick_benchmark
+  - test_specific_operation_benchmark
+  - test_benchmark_configuration
+
+## src/storage/array/query.rs (10320 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct QueryEvaluator
+  - fn new
+  - fn evaluate
+  - struct BatchQueryEvaluator
+  - fn new
+  - fn filter_values
+  - fn filter_indices
+- Other functions/classes (detected):
+  - new
+  - evaluate
+  - evaluate_or_expression
+  - evaluate_and_expression
+  - evaluate_simple_expression
+  - try_parse_comparison
+  - parse_value
+  - compare_values
+  - evaluate_length_expression
+  - evaluate_even_expression
+  - new
+  - filter_values
+  - filter_indices
+  - test_simple_comparisons
+  - test_or_expressions
+  - test_length_expressions
+  - test_batch_filtering
+
+## src/storage/array/simd_optimizations.rs (7749 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn simd_sum
+  - fn simd_mean
+  - fn simd_variance
+  - fn simd_std_dev
+  - fn simd_min
+  - fn simd_max
+  - fn quickselect_median
+- Other functions/classes (detected):
+  - simd_sum
+  - simd_mean
+  - simd_variance
+  - simd_std_dev
+  - simd_min
+  - simd_max
+  - quickselect_median
+  - quickselect
+  - partition
+  - test_simd_sum
+  - test_simd_mean
+  - test_simd_variance
+  - test_simd_min_max
+  - test_quickselect_median
+
+## src/storage/array/specialized.rs (8560 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct NodesArray
+  - fn new
+  - fn with_graph
+  - fn with_name
+  - fn node_ids
+  - fn name
+  - struct EdgesArray
+  - fn new
+  - fn with_graph
+  - fn edge_ids
+  - struct MetaNodeArray
+  - fn new
+  - fn with_graph
+  - fn meta_nodes
+- Other functions/classes (detected):
+  - new
+  - with_graph
+  - with_name
+  - node_ids
+  - name
+  - len
+  - get
+  - iter
+  - new
+  - with_graph
+  - edge_ids
+  - len
+  - get
+  - iter
+  - new
+  - with_graph
+  - meta_nodes
+  - len
+  - get
+  - iter
+  - fmt
+  - fmt
+  - fmt
+
+## src/storage/array/traits.rs (2464 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait ArrayOps
+  - trait SubgraphLike
+  - trait NodeIdLike
+  - trait MetaNodeLike
+  - trait EdgeLike
+- Other functions/classes (detected):
+  - len
+  - is_empty
+  - get
+  - iter
+  - lazy_iter
+  - to_vec
+
+## src/storage/edge.rs (6846 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct EntityEdge
+  - fn new
+  - fn edge_id
+  - fn exists
+- Other functions/classes (detected):
+  - new
+  - edge_id
+  - exists
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - edge_id
+  - endpoints
+  - source
+  - target
+  - other_endpoint
+  - connects
+  - edge_attributes
+  - get_edge_attribute
+  - set_edge_attribute
+  - is_directed
+  - weight
+  - set_weight
+  - capacity
+  - as_subgraph
+  - parallel_edges
+
+## src/storage/matrix/conversions.rs (5669 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait FromAttrValue
+  - trait NumericTypeExt
+- Other functions/classes (detected):
+  - from_attr_value
+  - from_attr_value
+  - from_attr_value
+  - from_attr_value
+  - from_attr_value
+  - from_attr_value
+  - from_attr_value
+  - from_attr_value
+  - test_f64_conversions
+  - test_i64_conversions
+  - test_bool_conversions
+
+## src/storage/matrix/matrix_core.rs (112031 bytes)
+- TODO/FIXME/etc: 6
+- Public APIs:
+  - struct MatrixProperties
+  - fn analyze
+  - enum Axis
+  - enum JoinType
+  - struct GraphMatrix
+  - fn from_storage
+  - fn zeros
+  - fn zeros_with_type
+  - fn ones
+  - fn is_empty
+  - fn eye
+  - fn shape
+  - fn from_row_major_data
+  - fn adjacency_from_edges
+  - fn weighted_adjacency_from_edges
+  - fn set_column_names
+  - fn column_names
+  - fn row_labels
+  - fn set_row_labels
+  - fn to_dense_html
+  - fn zeros_f64
+  - fn adjacency_from_edges_f64
+  - fn weighted_adjacency_from_edges_f64
+  - fn from_row_major_data_f64
+  - fn matmul
+  - fn relu
+  - fn gelu
+  - fn to_vec
+  - fn leaky_relu
+  - fn elu
+  - fn dropout
+  - fn conv2d
+  - fn requires_grad
+  - fn backward
+  - fn grad
+  - fn zero_grad
+  - fn requires_grad_enabled
+  - fn cast
+  - fn is_sparse
+  - fn is_square
+  - fn is_numeric
+  - fn is_symmetric
+  - fn dtype
+  - fn identity
+  - fn get
+  - fn set
+  - fn get_checked
+  - fn set_column_names_result
+  - fn get_row
+  - fn get_column
+  - fn get_column_by_name
+  - fn transpose
+  - fn multiply
+  - fn subtract
+  - fn elementwise_multiply
+  - fn power
+  - fn mean_axis
+  - fn std_axis
+  - fn var_axis
+  - fn min_axis
+  - fn max_axis
+  - fn materialize
+  - fn preview
+  - fn summary_info
+  - fn dense
+  - fn from_arrays
+  - fn sum_axis
+  - fn reshape
+  - fn sum
+  - fn mean
+  - fn min
+  - fn max
+  - fn trace
+  - fn norm
+  - fn norm_l1
+  - fn norm_inf
+  - fn to_laplacian
+  - fn to_normalized_laplacian
+  - fn to_normalized_laplacian_standard
+  - fn is_adjacency_matrix
+  - fn to_degree_matrix
+  - fn concatenate
+  - fn stack
+  - fn split
+  - fn determinant
+  - fn inverse
+  - fn solve
+  - fn svd
+  - fn qr_decomposition
+  - fn lu_decomposition
+  - fn cholesky_decomposition
+  - fn eigenvalue_decomposition
+  - fn rank
+  - fn tile
+  - fn repeat
+  - fn abs
+  - fn exp
+  - fn log
+  - fn sqrt
+  - fn select_columns
+  - fn scalar_multiply
+  - fn add
+  - fn column_variances
+  - fn concatenate_columns
+  - fn column_means
+- Other functions/classes (detected):
+  - from_storage
+  - zeros
+  - zeros_with_type
+  - ones
+  - is_empty
+  - eye
+  - shape
+  - from_row_major_data
+  - adjacency_from_edges
+  - weighted_adjacency_from_edges
+  - set_column_names
+  - column_names
+  - row_labels
+  - set_row_labels
+  - values_are_equal_within_tolerance
+  - to_dense_html
+  - to_table
+  - zeros_f64
+  - adjacency_from_edges_f64
+  - weighted_adjacency_from_edges_f64
+  - from_row_major_data_f64
+  - matmul
+  - relu
+  - gelu
+  - to_vec
+  - leaky_relu
+  - elu
+  - dropout
+  - conv2d
+  - requires_grad
+  - backward
+  - grad
+  - zero_grad
+  - requires_grad_enabled
+  - is_sparse
+  - is_square
+  - is_numeric
+  - is_symmetric
+  - dtype
+  - identity
+  - get
+  - set
+  - get_checked
+  - set_column_names_result
+  - get_row
+  - get_column
+  - get_column_by_name
+  - transpose
+  - multiply
+  - subtract
+  - elementwise_multiply
+  - power
+  - mean_axis
+  - std_axis
+  - var_axis
+  - min_axis
+  - max_axis
+  - materialize
+  - preview
+  - summary_info
+  - dense
+  - from_arrays
+  - sum_axis
+  - reshape
+  - sum
+  - mean
+  - min
+  - max
+  - trace
+  - norm
+  - norm_l1
+  - norm_inf
+  - to_laplacian
+  - to_normalized_laplacian
+  - to_normalized_laplacian_standard
+  - is_adjacency_matrix
+  - to_degree_matrix
+  - concatenate
+  - stack
+  - split
+  - determinant
+  - create_minor
+  - inverse
+  - inverse_gaussian_elimination
+  - solve
+  - svd
+  - qr_decomposition
+  - lu_decomposition
+  - cholesky_decomposition
+  - eigenvalue_decomposition
+  - eigendecomposition
+  - rank
+  - tile
+  - repeat
+  - abs
+  - exp
+  - log
+  - sqrt
+  - add
+  - add
+  - sub
+  - sub
+  - mul
+  - mul
+  - default
+  - select_columns
+  - scalar_multiply
+  - add
+  - column_variances
+  - concatenate_columns
+  - column_means
+
+## src/storage/matrix/mod.rs (530 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod conversions
+  - mod matrix_core
+  - mod slicing
+
+## src/storage/matrix/slicing.rs (9916 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - enum MatrixIndex
+  - fn to_slice_index
+  - fn resolve_indices
+  - struct MatrixSlice
+  - fn new
+  - fn row
+  - fn column
+  - trait MatrixSlicing
+- Other functions/classes (detected):
+  - to_slice_index
+  - resolve_indices
+  - new
+  - row
+  - column
+  - get_submatrix
+  - get_row
+  - get_column
+  - get_rows
+  - get_columns
+  - get_cell
+  - get_submatrix
+  - get_row
+  - get_column
+  - get_rows
+  - get_columns
+  - get_cell
+  - create_test_matrix
+  - test_single_cell_access
+  - test_row_access
+  - test_column_access
+  - test_submatrix_slicing
+  - test_range_slicing
+
+## src/storage/mod.rs (1284 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod adjacency
+  - mod advanced_matrix
+  - mod array
+  - mod edge
+  - mod matrix
+  - mod node
+  - mod pool
+  - mod table
+
+## src/storage/node.rs (11193 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct EntityNode
+  - fn new
+  - fn node_id
+  - fn exists
+- Other functions/classes (detected):
+  - new
+  - node_id
+  - exists
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - node_id
+  - degree
+  - neighbors
+  - node_attributes
+  - get_node_attribute
+  - set_node_attribute
+  - expand_to_subgraph
+  - is_meta_node
+  - contained_entities
+  - neighborhood
+  - shortest_paths
+  - incident_edges
+  - is_connected_to
+  - test_entity_node_operations
+
+## src/storage/pool.rs (35145 bytes)
+- TODO/FIXME/etc: 4
+- Public APIs:
+  - struct AttributeColumn
+  - struct AttributeMemoryPool
+  - fn new
+  - fn get_string
+  - fn return_string
+  - fn get_float_vec
+  - fn return_float_vec
+  - fn stats
+  - fn new
+  - fn with_capacity
+  - fn push
+  - fn extend_values
+  - fn reserve_capacity
+  - fn get
+  - fn len
+  - fn is_empty
+  - fn as_slice
+  - fn memory_stats
+  - fn memory_usage
+  - fn ensure_len
+  - fn set
+  - struct GraphPool
+  - fn new
+  - fn new_with_type
+  - fn graph_type
+  - fn commit_baseline
+  - fn get_attr_by_index
+  - fn add_node
+  - fn add_nodes_bulk
+  - fn ensure_node_id_exists
+  - fn add_edge
+  - fn add_edges
+  - fn add_edge_with_id
+  - fn get_edge_endpoints
+  - fn set_attr
+  - fn set_attrs
+  - fn set_bulk_attr
+  - fn set_bulk_attrs
+  - fn set_attr_pairs
+  - fn get_attribute_values
+  - fn get_node_attribute_column
+  - fn get_edge_attribute_column
+  - fn get_attribute_values_iter
+  - fn statistics
+  - fn attribute_names
+  - fn get_node_attribute
+  - fn set_node_attribute
+  - fn get_all_node_attributes
+  - fn get_edge_attribute
+  - fn set_edge_attribute
+  - fn get_all_edge_attributes
+  - fn has_edge_between
+  - fn get_incident_edges
+  - fn store_subgraph
+  - fn get_subgraph
+  - fn get_subgraph_attribute
+  - fn set_subgraph_attribute
+  - fn update_stored_subgraphs_remove_edge
+  - fn update_stored_subgraphs_remove_node
+  - struct PoolStatistics
+- Other functions/classes (detected):
+  - new
+  - get_string
+  - return_string
+  - get_float_vec
+  - return_float_vec
+  - stats
+  - new
+  - with_capacity
+  - push
+  - extend_values
+  - reserve_capacity
+  - get
+  - len
+  - is_empty
+  - as_slice
+  - memory_stats
+  - memory_usage
+  - ensure_len
+  - set
+  - new
+  - new_with_type
+  - graph_type
+  - commit_baseline
+  - get_attr_by_index
+  - add_node
+  - add_nodes_bulk
+  - ensure_node_id_exists
+  - ensure_edge_slot
+  - write_edge_slot
+  - add_edge
+  - add_edges
+  - add_edge_with_id
+  - get_edge_endpoints
+  - set_attr
+  - set_attrs
+  - set_bulk_attr
+  - get_attribute_values
+  - get_node_attribute_column
+  - get_edge_attribute_column
+  - statistics
+  - attribute_names
+  - get_node_attribute
+  - set_node_attribute
+  - get_all_node_attributes
+  - get_edge_attribute
+  - set_edge_attribute
+  - get_all_edge_attributes
+  - has_edge_between
+  - get_incident_edges
+  - store_subgraph
+  - get_subgraph
+  - get_subgraph_attribute
+  - set_subgraph_attribute
+  - update_stored_subgraphs_remove_edge
+  - update_stored_subgraphs_remove_node
+  - default
+
+## src/storage/table/base.rs (235282 bytes)
+- TODO/FIXME/etc: 9
+- Public APIs:
+  - struct BaseTable
+  - fn new
+  - fn from_columns
+  - fn with_column_order
+  - fn columns
+  - fn column_order
+  - fn as_nodes_table
+  - fn to_nodes
+  - fn as_edges_table
+  - fn to_edges
+  - fn assign
+  - fn set_column
+  - fn set_value
+  - fn set_values_by_mask
+  - fn set_values_by_range
+  - fn set_multiple_values
+  - fn sample
+  - fn filter_by_mask
+  - fn __repr__
+  - fn _repr_html_
+  - fn rich_display
+  - fn interactive_display
+  - fn get_display_config
+  - fn set_display_config
+  - fn evaluate_predicate
+  - fn compare_attr_value
+  - fn isin
+  - fn nlargest
+  - fn nsmallest
+  - fn query
+  - fn get_column
+  - fn pivot_table
+  - fn melt
+  - fn value_counts
+  - fn quantile
+  - fn quantiles
+  - fn get_percentile
+  - fn percentiles
+  - fn median
+  - fn std
+  - fn var
+  - fn corr_columns
+  - fn corr
+  - fn cov_columns
+  - fn cov
+  - fn apply_to_columns
+  - fn apply_to_rows
+  - fn append
+  - fn extend
+  - fn rolling
+  - fn expanding
+  - fn cumsum
+  - fn cummin
+  - fn cummax
+  - fn shift
+  - fn pct_change
+  - fn rolling_all
+  - fn expanding_all
+  - fn profile
+  - fn check_outliers
+  - fn validate_schema
+  - fn to_csv
+  - fn from_csv
+  - fn to_parquet
+  - fn from_parquet
+  - fn to_json
+  - fn from_json
+  - fn group_by_agg
+  - fn aggregate
+  - fn select_rows
+  - fn inner_join
+  - fn left_join
+  - fn right_join
+  - fn outer_join
+  - fn cross_join
+  - fn union
+  - fn stack
+  - fn concat
+  - fn intersect
+  - fn describe
+  - fn dropna
+  - fn dropna_subset
+  - fn isna
+  - fn notna
+  - fn has_nulls
+  - fn null_counts
+  - fn fillna
+  - fn fillna_all
+  - fn groupby
+  - fn groupby_single
+  - fn rename
+  - fn add_prefix
+  - fn add_suffix
+  - fn reorder_columns
+  - fn append_row
+  - fn extend_rows
+  - fn drop_rows
+  - fn drop_duplicates
+  - fn interactive
+  - fn interactive_embed
+  - fn close_streaming
+  - fn increment_version
+  - fn streaming_config
+  - fn set_streaming_config
+  - fn stop_all_servers
+  - fn active_servers_count
+  - struct InteractiveConfig
+  - fn with_port
+  - fn auto_port
+  - struct BrowserConfig
+  - struct BrowserInterface
+- Other functions/classes (detected):
+  - clone
+  - new
+  - from_columns
+  - with_column_order
+  - columns
+  - column_order
+  - as_nodes_table
+  - to_nodes
+  - as_edges_table
+  - to_edges
+  - assign
+  - set_column
+  - set_value
+  - set_values_by_mask
+  - set_values_by_range
+  - set_multiple_values
+  - sample
+  - calculate_row_weights
+  - weighted_sample_with_replacement
+  - weighted_sample_without_replacement
+  - default
+  - nrows
+  - ncols
+  - column_names
+  - column
+  - column_by_index
+  - has_column
+  - head
+  - tail
+  - slice
+  - sort_by
+  - sort_values
+  - filter
+  - group_by
+  - select
+  - with_column
+  - drop_columns
+  - pivot_table
+  - melt
+  - filter_by_mask
+  - to_data_window
+  - create_ellipses_data_window
+  - infer_column_data_type
+  - __repr__
+  - _repr_html_
+  - rich_display
+  - interactive_display
+  - get_display_config
+  - set_display_config
+  - fmt
+  - evaluate_predicate
+  - evaluate_simple_predicate
+  - evaluate_compound_predicate
+  - evaluate_in_predicate
+  - evaluate_like_predicate
+  - evaluate_between_predicate
+  - matches_like_pattern
+  - compare_attr_value
+  - isin
+  - nlargest
+  - nsmallest
+  - compare_attr_values_for_sort
+  - query
+  - get_column
+  - pivot_table
+  - melt
+  - value_counts
+  - quantile
+  - quantiles
+  - get_percentile
+  - percentiles
+  - median
+  - std
+  - var
+  - corr_columns
+  - corr
+  - cov_columns
+  - cov
+  - append
+  - extend
+  - aggregate_values
+  - attr_value_to_string
+  - rolling
+  - expanding
+  - cumsum
+  - cummin
+  - cummax
+  - shift
+  - pct_change
+  - rolling_all
+  - expanding_all
+  - profile
+  - check_outliers
+  - validate_schema
+  - attr_value_to_csv_string
+  - parse_csv_field
+  - attr_value_to_json
+  - json_value_to_attr_value
+  - group_by_agg
+  - apply_aggregation
+  - aggregate
+  - compare_values
+  - select_rows
+  - inner_join
+  - left_join
+  - right_join
+  - outer_join
+  - cross_join
+  - union
+  - stack
+  - concat
+  - intersect
+  - describe
+  - calculate_column_statistics
+  - percentile
+  - dropna
+  - dropna_subset
+  - isna
+  - notna
+  - has_nulls
+  - null_counts
+  - fillna
+  - fillna_all
+  - groupby
+  - groupby_single
+  - rename
+  - add_prefix
+  - add_suffix
+  - reorder_columns
+  - append_row
+  - extend_rows
+  - drop_rows
+  - drop_duplicates
+  - interactive
+  - interactive_embed
+  - close_streaming
+  - increment_version
+  - streaming_config
+  - set_streaming_config
+  - stop_all_servers
+  - active_servers_count
+  - total_rows
+  - total_cols
+  - get_window
+  - get_schema
+  - supports_streaming
+  - get_column_types
+  - get_column_names
+  - get_source_id
+  - get_version
+  - get_graph_nodes
+  - compute_layout
+  - default
+  - with_port
+  - auto_port
+  - default
+  - index
+
+## src/storage/table/edges.rs (38320 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct EdgeConfig
+  - struct EdgesTable
+  - fn new
+  - fn from_base_table
+  - fn edge_ids
+  - fn sources
+  - fn targets
+  - fn as_tuples
+  - fn filter_by_sources
+  - fn filter_by_targets
+  - fn with_attributes
+  - fn into_base_table
+  - fn base_table
+  - fn base_table_mut
+  - fn auto_assign_edge_ids
+  - fn validate_edges
+  - fn validate_edge_structure
+  - fn get_by_edge_id
+  - fn iter_with_edge_info
+  - fn incoming_edges
+  - fn outgoing_edges
+  - fn edge_stats
+  - fn base
+  - fn into_base
+  - fn filter_by_attr
+  - fn unique_attr_values
+  - fn is_empty
+  - fn get_column
+  - fn interactive
+- Other functions/classes (detected):
+  - default
+  - new
+  - from_base_table
+  - edge_ids
+  - sources
+  - targets
+  - as_tuples
+  - filter_by_sources
+  - filter_by_targets
+  - with_attributes
+  - into_base_table
+  - base_table
+  - base_table_mut
+  - auto_assign_edge_ids
+  - validate_edges
+  - validate_edge_structure
+  - get_by_edge_id
+  - iter_with_edge_info
+  - incoming_edges
+  - outgoing_edges
+  - edge_stats
+  - base
+  - into_base
+  - filter_by_attr
+  - unique_attr_values
+  - is_empty
+  - get_column
+  - interactive
+  - nrows
+  - ncols
+  - column_names
+  - column
+  - column_by_index
+  - has_column
+  - head
+  - tail
+  - slice
+  - sort_by
+  - sort_values
+  - filter
+  - group_by
+  - select
+  - with_column
+  - drop_columns
+  - pivot_table
+  - melt
+  - fmt
+  - from
+  - total_rows
+  - total_cols
+  - get_window
+  - get_schema
+  - supports_streaming
+  - get_column_types
+  - get_column_names
+  - get_source_id
+  - get_version
+  - supports_graph_view
+  - get_graph_nodes
+  - get_graph_edges
+  - get_graph_metadata
+  - compute_layout
+
+## src/storage/table/graph_table.rs (83964 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - struct ValidationPolicy
+  - enum ValidationStrictness
+  - enum ConflictResolution
+  - struct MergeOptions
+  - fn new
+  - fn domain_prefix
+  - struct ValidationReport
+  - fn new
+  - fn is_valid
+  - fn has_warnings
+  - struct EnhancedBundleMetadata
+  - struct BundleChecksums
+  - struct BundleSchemaInfo
+  - struct BundleValidationSummary
+  - struct BundleManifest
+  - struct FileEntry
+  - struct ValidationReportJson
+  - struct GraphTable
+  - fn new
+  - fn with_policy
+  - fn empty
+  - fn nodes
+  - fn edges
+  - fn nodes_mut
+  - fn edges_mut
+  - fn policy
+  - fn set_policy
+  - fn validate
+  - fn conform
+  - fn stats
+  - fn merge
+  - fn from_federated_bundles
+  - fn get_nodes
+  - fn get_edges
+  - fn neighbors
+  - fn to_graph
+  - fn auto_assign_edge_ids
+  - fn into_components
+  - fn components
+  - fn interactive
+  - fn to_matrix
+  - fn to_matrix_f64
+  - fn to_matrix_f32
+  - fn to_matrix_i64
+  - fn edges_to_matrix
+  - fn shape
+  - fn is_empty
+  - fn from_components
+  - fn from_data
+  - struct BundleMetadata
+  - fn new
+  - fn save_bundle
+  - fn load_bundle
+  - fn validate_bundle
+  - fn bundle_info
+- Other functions/classes (detected):
+  - new
+  - domain_prefix
+  - default
+  - default
+  - new
+  - is_valid
+  - has_warnings
+  - new
+  - with_policy
+  - empty
+  - nodes
+  - edges
+  - nodes_mut
+  - edges_mut
+  - policy
+  - set_policy
+  - validate
+  - conform
+  - stats
+  - merge_with_domain_prefix
+  - merge_with_collision_detection
+  - merge_simple_concat
+  - merge_with_attribute_strategy
+  - from_federated_bundles
+  - _add_domain_metadata
+  - get_nodes
+  - get_edges
+  - neighbors
+  - to_graph
+  - auto_assign_edge_ids
+  - into_components
+  - components
+  - interactive
+  - nrows
+  - ncols
+  - column_names
+  - column
+  - column_by_index
+  - has_column
+  - head
+  - tail
+  - slice
+  - sort_by
+  - sort_values
+  - filter
+  - group_by
+  - select
+  - with_column
+  - drop_columns
+  - pivot_table
+  - melt
+  - fmt
+  - to_matrix_f64
+  - to_matrix_f32
+  - to_matrix_i64
+  - shape
+  - is_empty
+  - from_components
+  - from_data
+  - new
+  - calculate_checksum
+  - serialize_nodes_to_csv
+  - serialize_edges_to_csv
+  - attr_value_to_csv_string
+  - parse_nodes_from_csv
+  - parse_edges_from_csv
+  - parse_field_simple
+  - total_rows
+  - total_cols
+  - get_window
+  - get_schema
+  - supports_streaming
+  - get_column_types
+  - get_column_names
+  - get_source_id
+  - get_version
+  - supports_graph_view
+  - get_graph_nodes
+  - get_graph_edges
+  - get_graph_metadata
+  - compute_layout
+
+## src/storage/table/integration_tests.rs (7875 bytes)
+- TODO/FIXME/etc: 6
+- Other functions/classes (detected):
+  - test_basetable_from_basearray_columns
+  - test_table_column_iter_chaining
+  - test_basearray_iter_operations
+  - test_table_operations
+  - test_column_access_properties
+
+## src/storage/table/mod.rs (541 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod base
+  - mod edges
+  - mod graph_table
+  - mod integration_tests
+  - mod nodes
+  - mod table_array
+  - mod traits
+
+## src/storage/table/nodes.rs (22754 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct NodesTable
+  - fn new
+  - fn from_base_table
+  - fn node_ids
+  - fn with_attributes
+  - fn filter_by_attr
+  - fn unique_attr_values
+  - fn into_base_table
+  - fn base_table
+  - fn base_table_mut
+  - fn validate_uids
+  - fn validate_node_structure
+  - fn get_by_uid
+  - fn iter_with_ids
+  - fn base
+  - fn into_base
+  - fn is_empty
+  - fn get_column
+  - fn interactive
+- Other functions/classes (detected):
+  - new
+  - from_base_table
+  - node_ids
+  - with_attributes
+  - filter_by_attr
+  - unique_attr_values
+  - into_base_table
+  - base_table
+  - base_table_mut
+  - validate_uids
+  - validate_node_structure
+  - get_by_uid
+  - iter_with_ids
+  - base
+  - into_base
+  - is_empty
+  - get_column
+  - interactive
+  - nrows
+  - ncols
+  - column_names
+  - column
+  - column_by_index
+  - has_column
+  - head
+  - tail
+  - slice
+  - sort_by
+  - sort_values
+  - filter
+  - group_by
+  - select
+  - with_column
+  - drop_columns
+  - pivot_table
+  - melt
+  - fmt
+  - from
+  - total_rows
+  - total_cols
+  - get_window
+  - get_schema
+  - supports_streaming
+  - get_column_types
+  - get_column_names
+  - get_source_id
+  - get_version
+  - supports_graph_view
+  - get_graph_nodes
+  - get_graph_edges
+  - get_graph_metadata
+  - compute_layout
+
+## src/storage/table/table_array.rs (39157 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct TableArray
+  - fn new
+  - fn from_tables
+  - fn from_tables_with_keys
+  - fn len
+  - fn is_empty
+  - fn get
+  - fn get_mut
+  - fn push
+  - fn push_with_key
+  - fn sum
+  - fn mean
+  - fn count
+  - fn agg
+  - fn iter
+  - fn iter_mut
+  - fn filter
+  - fn take
+  - fn skip
+  - fn join
+  - fn map
+  - fn reduce
+  - fn shape
+  - fn concat
+  - fn head
+  - fn tail
+  - fn sample
+  - fn select
+  - fn sort_by
+  - fn drop_columns
+  - fn rename
+  - fn apply
+  - fn apply_to_vec
+  - fn apply_to_array
+  - fn apply_reduce
+  - fn total_count
+  - fn shape_detailed
+  - fn describe
+  - fn sum_column
+  - fn mean_column
+  - fn min_column
+  - fn max_column
+  - fn std_column
+- Other functions/classes (detected):
+  - new
+  - from_tables
+  - from_tables_with_keys
+  - len
+  - is_empty
+  - get
+  - get_mut
+  - push
+  - push_with_key
+  - sum
+  - mean
+  - count
+  - agg
+  - iter
+  - iter_mut
+  - take
+  - skip
+  - join
+  - shape
+  - concat
+  - head
+  - tail
+  - sample
+  - select
+  - sort_by
+  - drop_columns
+  - rename
+  - total_count
+  - shape_detailed
+  - describe
+  - sum_column
+  - mean_column
+  - min_column
+  - max_column
+  - std_column
+  - compare_attr_values
+  - default
+
+## src/storage/table/traits.rs (6829 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait Table
+  - struct TableRowIterator
+  - fn new
+  - struct TableRow
+  - fn index
+  - fn get
+  - fn column_names
+  - fn to_hash_map
+- Other functions/classes (detected):
+  - nrows
+  - ncols
+  - column_names
+  - shape
+  - is_empty
+  - column
+  - column_by_index
+  - has_column
+  - head
+  - tail
+  - slice
+  - sort_by
+  - sort_values
+  - filter
+  - group_by
+  - select
+  - with_column
+  - drop_columns
+  - pivot_table
+  - melt
+  - iter
+  - new
+  - next
+  - index
+  - get
+  - column_names
+  - to_hash_map
+
+## src/subgraphs/component.rs (20293 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ComponentSubgraph
+  - fn new
+  - fn from_analysis
+  - fn total_components
+- Other functions/classes (detected):
+  - new
+  - from_analysis
+  - total_components
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - node_set
+  - edge_set
+  - connected_components
+  - bfs
+  - dfs
+  - shortest_path_subgraph
+  - induced_subgraph
+  - subgraph_from_edges
+  - viz
+  - component_id
+  - is_largest_component
+  - merge_with
+  - boundary_nodes
+  - test_component_subgraph_creation
+  - test_component_algorithms
+
+## src/subgraphs/composer.rs (25200 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - enum EdgeStrategy
+  - fn from_str
+  - enum NodeAggregation
+  - fn target_attr
+  - fn function
+  - fn source_attr
+  - struct EdgeAggregation
+  - struct ComposerPreset
+  - fn get_preset
+  - struct MetaNodePlan
+  - fn new
+  - fn with_preset
+  - fn with_node_agg
+  - fn with_edge_agg
+  - fn with_edge_strategy
+  - fn with_entity_type
+  - fn preview
+  - struct ComposerPreview
+  - fn add_to_graph
+  - fn add_to_graph_with_defaults
+- Other functions/classes (detected):
+  - default
+  - from_str
+  - target_attr
+  - function
+  - source_attr
+  - get_preset
+  - new
+  - with_preset
+  - with_node_agg
+  - with_edge_agg
+  - with_edge_strategy
+  - with_entity_type
+  - preview
+  - estimate_meta_edges_count
+  - convert_to_agg_functions
+  - convert_to_edge_config
+
+## src/subgraphs/filtered.rs (24673 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct FilteredSubgraph
+  - fn new
+  - fn from_criteria
+  - fn original_node_count
+  - fn original_edge_count
+- Other functions/classes (detected):
+  - new
+  - from_criteria
+  - original_node_count
+  - original_edge_count
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - node_set
+  - edge_set
+  - connected_components
+  - bfs
+  - dfs
+  - shortest_path_subgraph
+  - induced_subgraph
+  - subgraph_from_edges
+  - viz
+  - filter_criteria
+  - reapply_filter
+  - and_filter
+  - or_filter
+  - not_filter
+  - add_criteria
+  - test_filtered_subgraph_creation
+  - test_filter_combination
+
+## src/subgraphs/hierarchical.rs (25794 bytes)
+- TODO/FIXME/etc: 4
+- Public APIs:
+  - enum AggregationFunction
+  - fn from_string
+  - fn aggregate
+  - struct MetaNode
+  - fn new
+  - fn node_id
+  - fn has_contained_subgraph
+  - fn contained_subgraph_id
+  - fn expand_to_subgraph
+  - fn aggregated_attributes
+  - fn re_aggregate
+  - trait HierarchicalOperations
+- Other functions/classes (detected):
+  - from_string
+  - fmt
+  - aggregate
+  - aggregate_sum
+  - aggregate_mean
+  - aggregate_max
+  - aggregate_min
+  - aggregate_concat
+  - new
+  - node_id
+  - has_contained_subgraph
+  - contained_subgraph_id
+  - expand_to_subgraph
+  - aggregated_attributes
+  - re_aggregate
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - collapse_to_meta_node
+  - parent_meta_node
+  - child_meta_nodes
+  - hierarchy_level
+  - to_root
+  - siblings
+  - collapse_to_meta_node
+  - parent_meta_node
+  - child_meta_nodes
+  - hierarchy_level
+  - to_root
+  - siblings
+  - test_aggregation_functions
+  - test_text_aggregation
+  - test_aggregation_function_parsing
+  - test_meta_node_creation
+  - test_subgraph_collapse_to_node
+  - test_hierarchical_operations_trait
+
+## src/subgraphs/mod.rs (550 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod component
+  - mod composer
+  - mod filtered
+  - mod hierarchical
+  - mod neighborhood
+  - mod subgraph
+  - mod visualization
+
+## src/subgraphs/neighborhood.rs (32136 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct NeighborhoodResult
+  - struct NeighborhoodSubgraph
+  - fn from_expansion
+  - fn from_stored
+  - fn new
+  - struct NeighborhoodSampler
+  - fn new
+  - fn set_graph_ref
+  - fn single_neighborhood
+  - fn multi_neighborhood
+  - fn k_hop_neighborhood
+  - fn unified_neighborhood
+  - fn stats
+  - fn clear_stats
+  - struct NeighborhoodStats
+- Other functions/classes (detected):
+  - from_expansion
+  - from_stored
+  - new
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - node_set
+  - edge_set
+  - induced_subgraph
+  - subgraph_from_edges
+  - connected_components
+  - bfs
+  - dfs
+  - shortest_path_subgraph
+  - viz
+  - central_nodes
+  - hops
+  - expand_by
+  - merge_with
+  - new
+  - set_graph_ref
+  - graph_ref
+  - single_neighborhood
+  - calculate_induced_edges
+  - multi_neighborhood
+  - k_hop_neighborhood
+  - unified_neighborhood
+  - stats
+  - clear_stats
+  - default
+  - new
+  - record_neighborhood
+  - clear
+  - test_neighborhood_operations
+
+## src/subgraphs/subgraph.rs (70401 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - enum SimilarityMetric
+  - struct Subgraph
+  - fn new
+  - fn new_with_content_id
+  - fn from_nodes
+  - fn new_with_simple_id
+  - fn calculate_induced_edges
+  - fn graph
+  - fn nodes
+  - fn edges
+  - fn subgraph_type
+  - fn node_count
+  - fn edge_count
+  - fn has_node
+  - fn has_edge
+  - fn node_ids
+  - fn edge_ids
+  - fn nodes_table
+  - fn edges_table
+  - fn table
+  - fn filter_nodes_by_attributes
+  - fn filter_nodes_by_attribute
+  - fn is_connected
+  - fn to_networkx
+  - fn has_path
+  - fn viz
+  - fn get_node_attribute_column
+  - fn get_edge_attribute_column
+  - fn get_node_attributes_for_nodes
+  - fn set_node_attribute_bulk
+  - fn set_node_attributes_for_nodes
+  - fn set_node_attributes_bulk
+  - fn set_edge_attribute_bulk
+  - fn clustering_coefficient
+  - fn transitivity
+  - fn density
+  - fn merge_with
+  - fn intersect_with
+  - fn subtract_from
+  - fn calculate_similarity
+  - fn find_overlaps
+  - fn group_by_nodes
+  - fn group_by_edges
+- Other functions/classes (detected):
+  - new
+  - new_with_content_id
+  - generate_simple_id
+  - from_nodes
+  - new_with_simple_id
+  - calculate_induced_edges
+  - graph
+  - nodes
+  - edges
+  - subgraph_type
+  - node_count
+  - edge_count
+  - has_node
+  - has_edge
+  - node_ids
+  - edge_ids
+  - get_or_build_csr_internal
+  - nodes_table
+  - edges_table
+  - table
+  - filter_nodes_by_attributes
+  - filter_nodes_by_attribute
+  - is_connected
+  - to_networkx
+  - has_path
+  - viz
+  - get_node_attribute_column
+  - get_edge_attribute_column
+  - get_node_attributes_for_nodes
+  - set_node_attribute_bulk
+  - set_node_attributes_for_nodes
+  - set_node_attributes_bulk
+  - set_edge_attribute_bulk
+  - clustering_coefficient
+  - calculate_node_clustering_coefficient
+  - transitivity
+  - density
+  - merge_with
+  - intersect_with
+  - subtract_from
+  - calculate_similarity
+  - find_overlaps
+  - group_by_nodes
+  - group_by_edges
+  - fmt
+  - entity_id
+  - entity_type
+  - graph_ref
+  - related_entities
+  - summary
+  - node_set
+  - edge_set
+  - induced_subgraph
+  - subgraph_from_edges
+  - connected_components
+  - bfs
+  - dfs
+  - shortest_path_subgraph
+  - viz
+  - neighbors
+  - degree
+  - test_subgraph_creation
+  - test_subgraph_algorithms
+  - test_structural_metrics
+  - test_subgraph_set_operations
+
+## src/subgraphs/visualization.rs (12340 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct SubgraphDataSource
+  - fn from_subgraph_operations
+  - fn from_subgraph
+- Other functions/classes (detected):
+  - from_subgraph
+  - total_rows
+  - total_cols
+  - get_window
+  - get_schema
+  - supports_streaming
+  - get_column_types
+  - get_column_names
+  - get_source_id
+  - get_version
+  - get_graph_nodes
+  - get_graph_edges
+  - get_graph_metadata
+  - compute_layout
+
+## src/temporal/index.rs (18606 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct TemporalIndex
+  - fn new
+  - fn from_history
+  - fn node_exists_at
+  - fn node_lifetime_range
+  - fn node_creation_commit
+  - fn node_deletion_commit
+  - fn edge_exists_at
+  - fn nodes_at_commit
+  - fn edges_at_commit
+  - fn neighbors_at_commit
+  - fn neighbors_bulk_at_commit
+  - fn neighbors_in_window
+  - fn node_attr_at_commit
+  - fn node_attr_history
+  - fn edge_attr_at_commit
+  - fn edge_attr_history
+  - fn commits_in_time_range
+  - fn nodes_changed_in_commit
+  - fn nodes_changed_in_range
+  - fn edges_changed_in_commit
+  - fn statistics
+  - struct IndexStatistics
+- Other functions/classes (detected):
+  - new
+  - from_history
+  - process_commit
+  - node_exists_at
+  - node_lifetime_range
+  - node_creation_commit
+  - node_deletion_commit
+  - edge_exists_at
+  - nodes_at_commit
+  - edges_at_commit
+  - neighbors_at_commit
+  - neighbors_bulk_at_commit
+  - neighbors_in_window
+  - node_attr_at_commit
+  - node_attr_history
+  - edge_attr_at_commit
+  - edge_attr_history
+  - commits_in_time_range
+  - nodes_changed_in_commit
+  - nodes_changed_in_range
+  - edges_changed_in_commit
+  - statistics
+  - default
+  - test_empty_index
+  - test_node_lifetime_tracking
+  - test_attribute_timeline
+
+## src/temporal/mod.rs (154 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod index
+  - mod snapshot
+
+## src/temporal/snapshot.rs (5421 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ExistenceIndex
+  - fn new
+  - fn contains_node
+  - fn contains_edge
+  - fn nodes
+  - fn edges
+  - struct LineageMetadata
+  - struct TemporalSnapshot
+  - fn at_commit
+  - fn at_timestamp
+  - fn lineage
+  - fn existence
+  - fn node_exists
+  - fn edge_exists
+  - fn node_attr
+  - fn edge_attr
+  - fn neighbors
+  - fn neighbors_bulk
+  - fn as_subgraph
+- Other functions/classes (detected):
+  - new
+  - contains_node
+  - contains_edge
+  - nodes
+  - edges
+  - at_commit
+  - at_timestamp
+  - from_components
+  - lineage
+  - existence
+  - node_exists
+  - edge_exists
+  - node_attr
+  - edge_attr
+  - neighbors
+  - neighbors_bulk
+  - as_subgraph
+
+## src/traits/component_operations.rs (3870 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait ComponentOperations
+- Other functions/classes (detected):
+  - component_id
+  - is_largest_component
+  - component_size
+  - merge_with
+  - boundary_nodes
+  - internal_density
+  - is_strongly_connected
+
+## src/traits/edge_operations.rs (8675 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait EdgeOperations
+- Other functions/classes (detected):
+  - edge_id
+  - endpoints
+  - source
+  - target
+  - other_endpoint
+  - connects
+  - edge_attributes
+  - get_edge_attribute
+  - set_edge_attribute
+  - is_directed
+  - weight
+  - set_weight
+  - capacity
+  - as_subgraph
+  - parallel_edges
+
+## src/traits/filter_operations.rs (11687 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait FilterOperations
+  - enum FilterCriteria
+  - fn complexity_score
+  - fn matches_node
+  - fn matches_edge
+  - struct FilterStats
+  - fn filtering_efficiency
+  - fn selectivity
+- Other functions/classes (detected):
+  - filter_criteria
+  - reapply_filter
+  - and_filter
+  - or_filter
+  - not_filter
+  - add_criteria
+  - filter_stats
+  - matches_node_filter
+  - matches_edge_filter
+  - complexity_score
+  - matches_node
+  - matches_edge
+  - filtering_efficiency
+  - selectivity
+
+## src/traits/graph_entity.rs (7816 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - trait GraphEntity
+  - const MAX_RELATIONS
+  - trait SafeGraphEntity
+- Other functions/classes (detected):
+  - entity_id
+  - entity_type
+  - graph_ref
+  - get_attribute
+  - set_attribute
+  - is_active
+  - related_entities
+  - summary
+  - contains_entity
+  - relation_count
+  - validate
+  - check_cycles
+
+## src/traits/meta_operations.rs (7037 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - trait MetaNodeOperations
+  - trait MetaEdgeOperations
+- Other functions/classes (detected):
+  - has_subgraph
+  - subgraph_id
+  - subgraph
+  - expand
+  - meta_edges
+  - re_aggregate
+  - is_meta_edge
+  - edge_count
+  - aggregated_from
+  - expand
+  - meta_properties
+
+## src/traits/mod.rs (1033 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod component_operations
+  - mod edge_operations
+  - mod filter_operations
+  - mod graph_entity
+  - mod meta_operations
+  - mod neighborhood_operations
+  - mod node_operations
+  - mod subgraph_operations
+
+## src/traits/neighborhood_operations.rs (7171 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait NeighborhoodOperations
+  - struct NeighborhoodStats
+  - fn average_degree
+  - fn expansion_factor
+- Other functions/classes (detected):
+  - central_nodes
+  - hops
+  - is_central_node
+  - expansion_stats
+  - calculate_density
+  - expand_by
+  - nodes_at_hop
+  - boundary_nodes
+  - merge_with
+  - average_degree
+  - expansion_factor
+
+## src/traits/node_operations.rs (12324 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - trait NodeOperations
+- Other functions/classes (detected):
+  - node_id
+  - degree
+  - neighbors
+  - node_attributes
+  - get_node_attribute
+  - set_node_attribute
+  - expand_to_subgraph
+  - is_meta_node
+  - contained_entities
+  - neighborhood
+  - shortest_paths
+  - incident_edges
+  - is_connected_to
+
+## src/traits/subgraph_operations.rs (49750 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - struct AggregationSpec
+  - enum ExternalEdgeStrategy
+  - enum MetaEdgeStrategy
+  - enum NodeStrategy
+  - enum EdgeAggregationFunction
+  - fn from_string
+  - fn aggregate
+  - struct EdgeAggregationConfig
+  - trait SubgraphOperations
+- Other functions/classes (detected):
+  - default
+  - default
+  - default
+  - default
+  - from_string
+  - aggregate
+  - default
+  - node_set
+  - edge_set
+  - node_count
+  - edge_count
+  - contains_node
+  - contains_edge
+  - density
+  - get_node_attribute
+  - get_edge_attribute
+  - neighbors
+  - degree
+  - edge_endpoints
+  - has_edge_between
+  - induced_subgraph
+  - subgraph_from_edges
+  - connected_components
+  - bfs
+  - dfs
+  - shortest_path_subgraph
+  - collapse_to_node_with_defaults_and_edge_config
+  - collapse_to_node_with_defaults
+  - aggregate_attribute_with_defaults
+  - create_meta_edges_with_config
+  - create_aggregated_meta_edge
+  - create_count_meta_edge
+  - create_meta_edges
+  - parent_subgraph
+  - child_subgraphs
+  - set_node_attrs
+  - set_node_attr_column
+  - set_edge_attrs
+  - collapse
+  - viz
+
+## src/types.rs (42991 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - type NodeId
+  - type EdgeId
+  - type AttrName
+  - type StateId
+  - type BranchName
+  - type SubgraphId
+  - enum EntityId
+  - fn is_valid
+  - fn numeric_id
+  - enum GraphType
+  - enum AttrValue
+  - enum CompactString
+  - fn new
+  - fn as_str
+  - fn memory_size
+  - enum NumericType
+  - fn can_convert_to
+  - fn promote_with
+  - fn size_bytes
+  - fn is_integer
+  - fn is_float
+  - fn numeric_type
+  - fn is_numeric
+  - fn to_numeric_type
+  - struct CompressedData
+  - enum CompressionAlgorithm
+  - fn compress_text
+  - fn compress_float_vec
+  - fn decompress_text
+  - fn decompress_float_vec
+  - fn compression_ratio
+  - fn memory_size
+  - enum AttrValueType
+  - fn is_numeric
+  - fn type_name
+  - fn dtype
+  - fn memory_size
+  - fn can_optimize
+  - fn optimize
+  - fn as_float
+  - fn as_int
+  - fn as_text
+  - fn get_text
+  - fn as_float_vec
+  - fn get_float_vec
+  - fn as_bool
+  - fn as_bytes
+  - struct MemoryStatistics
+  - struct MemoryEfficiency
+  - struct CompressionStatistics
+- Other functions/classes (detected):
+  - is_valid
+  - numeric_id
+  - default
+  - default
+  - eq
+  - new
+  - as_str
+  - memory_size
+  - default
+  - partial_cmp
+  - cmp
+  - type_discriminant
+  - cmp_text_content
+  - parse_numeric
+  - can_convert_to
+  - promote_with
+  - size_bytes
+  - is_integer
+  - is_float
+  - numeric_type
+  - is_numeric
+  - to_numeric_type
+  - compress_text
+  - compress_float_vec
+  - decompress_text
+  - decompress_float_vec
+  - run_length_encode
+  - run_length_decode
+  - compression_ratio
+  - memory_size
+  - is_numeric
+  - fmt
+  - type_name
+  - dtype
+  - memory_size
+  - can_optimize
+  - optimize
+  - as_float
+  - as_int
+  - as_text
+  - get_text
+  - as_float_vec
+  - get_float_vec
+  - as_bool
+  - as_bytes
+
+## src/utils/config.rs (19166 bytes)
+- TODO/FIXME/etc: 6
+- Public APIs:
+  - struct GraphConfig
+  - fn new
+  - fn memory_optimized
+  - fn performance_optimized
+  - fn development_optimized
+  - fn production_optimized
+  - fn validate
+  - fn effective_worker_threads
+  - fn memory_cleanup_threshold
+  - fn with_memory_limit
+  - fn with_cache_settings
+  - fn with_worker_threads
+  - fn with_storage_strategy
+  - fn from_environment
+  - fn to_environment
+  - enum ConfigError
+- Other functions/classes (detected):
+  - new
+  - memory_optimized
+  - performance_optimized
+  - development_optimized
+  - production_optimized
+  - validate
+  - effective_worker_threads
+  - memory_cleanup_threshold
+  - with_memory_limit
+  - with_cache_settings
+  - with_worker_threads
+  - with_storage_strategy
+  - from_environment
+  - to_environment
+  - default
+  - fmt
+
+## src/utils/convert.rs (15676 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct NetworkXGraph
+  - struct NetworkXNode
+  - struct NetworkXEdge
+  - enum NetworkXValue
+  - fn graph_to_networkx
+  - fn subgraph_to_networkx
+  - fn networkx_to_graph
+  - trait ToNetworkX
+- Other functions/classes (detected):
+  - from
+  - graph_to_networkx
+  - subgraph_to_networkx
+  - networkx_to_graph
+  - networkx_value_to_attr_value
+  - to_networkx
+  - to_networkx
+  - to_networkx
+  - test_graph_to_networkx
+  - test_subgraph_to_networkx
+  - test_bidirectional_conversion
+
+## src/utils/mod.rs (356 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod config
+  - mod convert
+  - mod strategies
+  - mod util
+
+## src/utils/strategies.rs (19371 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait TemporalStorageStrategy
+  - struct StorageCharacteristics
+  - enum StorageStrategyType
+  - fn name
+  - fn description
+  - fn create_strategy
+  - struct IndexDeltaStrategy
+  - fn new
+  - fn record_node_attr_index_change
+  - fn record_edge_attr_index_change
+- Other functions/classes (detected):
+  - record_node_addition
+  - record_node_removal
+  - record_edge_addition
+  - record_edge_removal
+  - record_node_attr_change
+  - record_node_attr_changes_bulk
+  - record_edge_attr_change
+  - record_edge_attr_changes_bulk
+  - create_delta
+  - create_change_set
+  - has_changes
+  - change_count
+  - clear_changes
+  - strategy_name
+  - storage_characteristics
+  - as_any
+  - name
+  - description
+  - default
+  - create_strategy
+  - new
+  - record_node_attr_index_change
+  - record_edge_attr_index_change
+  - update_change_metadata
+  - current_timestamp
+  - record_node_addition
+  - record_node_removal
+  - record_edge_addition
+  - record_edge_removal
+  - record_node_attr_change
+  - record_node_attr_changes_bulk
+  - record_edge_attr_change
+  - record_edge_attr_changes_bulk
+  - create_delta
+  - create_change_set
+  - has_changes
+  - change_count
+  - clear_changes
+  - strategy_name
+  - storage_characteristics
+  - as_any
+  - default
+
+## src/utils/util.rs (8405 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn content_hash
+  - fn attr_value_hash
+  - fn merge_sorted_indices
+  - fn binary_search_insert_point
+  - fn validate_attr_compatibility
+  - fn timestamp_now
+- Other functions/classes (detected):
+  - attr_value_hash
+  - merge_sorted_indices
+  - binary_search_insert_point
+  - validate_attr_compatibility
+  - timestamp_now
+  - test_merge_sorted_indices
+  - test_merge_with_duplicates
+
+## src/viz/display/compact.rs (19495 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct BoxChars
+  - fn heavy
+  - fn light
+  - fn ascii
+  - struct CompactFormatter
+  - fn new
+  - fn format_minimal_width
+  - fn format_full_width
+- Other functions/classes (detected):
+  - heavy
+  - light
+  - ascii
+  - new
+  - format_minimal_width
+  - format_full_width
+  - calculate_compact_widths
+  - calculate_full_widths
+  - truncate_cell_value
+  - type_aware_truncation
+  - truncate_float
+  - truncate_integer
+  - truncate_string
+  - truncate_datetime
+  - truncate_json
+  - render_table_with_widths
+  - render_data_row
+  - render_border_line
+  - default
+  - create_test_data
+  - test_compact_width_calculation
+  - test_float_truncation
+  - test_integer_truncation
+  - test_string_truncation
+  - test_table_rendering
+  - test_box_drawing_characters
+  - test_numeric_alignment
+
+## src/viz/display/data.rs (7924 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct DataWindow
+  - fn new
+  - fn with_window_info
+  - fn displayed_rows
+  - fn displayed_cols
+  - fn is_complete
+  - fn truncation_info
+  - struct DataSchema
+  - fn new
+  - fn all_strings
+  - fn get_column
+  - struct ColumnSchema
+  - enum DataType
+  - fn from_str
+  - fn is_numeric
+  - fn supports_precision_truncation
+  - fn supports_scientific_notation
+- Other functions/classes (detected):
+  - new
+  - with_window_info
+  - displayed_rows
+  - displayed_cols
+  - is_complete
+  - truncation_info
+  - new
+  - all_strings
+  - get_column
+  - fmt
+  - from_str
+  - is_numeric
+  - supports_precision_truncation
+  - supports_scientific_notation
+  - test_data_window_creation
+  - test_data_window_with_truncation
+  - test_data_type_classification
+  - test_data_type_from_string
+
+## src/viz/display/engine.rs (11428 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct DisplayEngine
+  - fn new
+  - fn with_config
+  - fn format_unicode
+  - fn format_html
+  - fn rich_display
+  - fn set_config
+  - fn get_current_theme
+  - struct DisplayConfig
+  - fn compact
+  - fn full_width
+  - fn html
+  - fn dense_matrix
+  - fn interactive
+  - fn with_theme
+  - fn with_compact_mode
+  - fn with_max_cell_width
+  - fn with_precision
+  - enum OutputFormat
+- Other functions/classes (detected):
+  - new
+  - with_config
+  - format_unicode
+  - format_html
+  - rich_display
+  - set_config
+  - get_current_theme
+  - default
+  - compact
+  - full_width
+  - html
+  - dense_matrix
+  - interactive
+  - with_theme
+  - with_compact_mode
+  - with_max_cell_width
+  - with_precision
+  - default
+  - fmt
+  - create_test_data
+  - test_display_engine_creation
+  - test_display_config_builder
+  - test_format_unicode
+  - test_format_html
+  - test_rich_display_formats
+  - test_config_variations
+
+## src/viz/display/html.rs (15950 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct HtmlRenderer
+  - fn new
+  - fn render_semantic_table
+- Other functions/classes (detected):
+  - new
+  - render_semantic_table
+  - render_header_row
+  - render_data_row
+  - render_table_info
+  - render_javascript
+  - render_empty_table
+  - format_cell_value
+  - format_float_value
+  - format_integer_value
+  - format_boolean_value
+  - format_datetime_value
+  - format_json_value
+  - add_thousand_separators
+  - is_cell_truncated
+  - escape_html
+  - default
+  - create_test_data
+  - test_html_table_generation
+  - test_data_type_classes
+  - test_boolean_formatting
+  - test_number_formatting
+  - test_html_escaping
+  - test_empty_table
+  - test_truncation_info
+  - test_javascript_inclusion
+  - test_thousand_separators
+
+## src/viz/display/mod.rs (1481 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod compact
+  - mod data
+  - mod engine
+  - mod html
+  - mod theme
+  - enum TruncationStrategy
+- Other functions/classes (detected):
+  - default
+
+## src/viz/display/theme.rs (12272 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct ThemeSystem
+  - fn new
+  - fn get_theme
+  - fn register_theme
+  - fn theme_names
+  - struct Theme
+  - fn sleek
+  - fn light
+  - fn dark
+  - fn publication
+  - fn minimal
+  - struct UnicodeStyle
+  - struct ColorPalette
+  - fn light
+  - fn dark
+  - fn publication
+  - fn minimal
+  - fn sleek
+  - enum BuiltInTheme
+  - fn name
+  - fn all
+- Other functions/classes (detected):
+  - new
+  - get_theme
+  - register_theme
+  - theme_names
+  - default
+  - sleek
+  - light
+  - dark
+  - publication
+  - minimal
+  - default
+  - light
+  - dark
+  - publication
+  - minimal
+  - sleek
+  - name
+  - all
+  - test_theme_system_creation
+  - test_get_theme
+  - test_theme_properties
+  - test_color_palettes
+  - test_builtin_theme_enum
+  - test_custom_theme_registration
+
+## src/viz/display/themes/dark.css (4084 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/viz/display/themes/light.css (3782 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/viz/display/themes/minimal.css (5613 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/viz/display/themes/publication.css (5991 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/viz/display/themes/sleek.css (3990 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/viz/embeddings/debug.rs (20477 bytes)
+- TODO/FIXME/etc: 3
+- Public APIs:
+  - struct EmbeddingDebugData
+  - struct EmbeddingSnapshot
+  - struct PerformanceMetrics
+  - struct GraphMetadata
+  - fn new
+  - fn add_snapshot
+  - fn record_iteration_time
+  - fn record_memory_usage
+  - fn finalize
+  - fn export_to_file
+  - fn create_visualization_html
+  - fn is_energy_decreasing
+  - fn energy_decrease_rate
+  - fn has_converged
+  - fn from_graph
+  - fn new
+  - fn average_iteration_time
+  - fn current_memory_usage_mb
+  - struct DebuggableEmbedding
+  - fn new
+  - fn with_debug
+  - fn get_debug_data
+  - fn export_debug_data
+- Other functions/classes (detected):
+  - new
+  - add_snapshot
+  - record_iteration_time
+  - record_memory_usage
+  - finalize
+  - export_to_file
+  - create_visualization_html
+  - is_energy_decreasing
+  - energy_decrease_rate
+  - has_converged
+  - from_graph
+  - new
+  - average_iteration_time
+  - current_memory_usage_mb
+  - current_timestamp
+  - new
+  - with_debug
+  - get_debug_data
+  - export_debug_data
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - default_dimensions
+  - path_graph
+  - cycle_graph
+  - star_graph
+  - karate_club
+  - test_debug_data_creation
+  - test_embedding_snapshot
+  - test_convergence_analysis
+  - test_debuggable_embedding
+  - test_export_functionality
+
+## src/viz/embeddings/energy.rs (22052 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct EnergyEmbedding
+  - fn new
+  - fn with_debug
+  - fn with_seed
+  - struct ForceDirectedEmbedding
+  - fn new
+  - struct EnergyEmbeddingBuilder
+  - fn new
+  - fn iterations
+  - fn learning_rate
+  - fn annealing
+  - fn energy_function
+  - fn with_spring_electric
+  - fn seed
+  - fn debug
+  - fn build
+  - fn compute
+- Other functions/classes (detected):
+  - new
+  - with_debug
+  - with_seed
+  - initialize_positions
+  - compute_energy_and_gradients
+  - compute_spring_electric_energy
+  - optimize
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - default_dimensions
+  - new
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - default_dimensions
+  - new
+  - iterations
+  - learning_rate
+  - annealing
+  - energy_function
+  - with_spring_electric
+  - seed
+  - debug
+  - build
+  - compute
+  - path_graph
+  - cycle_graph
+  - star_graph
+  - karate_club
+  - test_energy_embedding_basic
+  - test_force_directed_embedding
+  - test_energy_convergence
+  - test_reproducible_results
+
+## src/viz/embeddings/flat_embedding.rs (21685 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct FlatEmbedConfig
+  - fn compute_flat_embedding
+  - fn compute_flat_embedding_from_matrix
+- Other functions/classes (detected):
+  - default
+  - compute_flat_embedding
+  - extract_edges_from_graph
+  - optimize_flat_positions
+  - compute_flat_energy
+  - clip_to_circle
+  - compute_flat_embedding_from_matrix
+  - test_flat_embed_config_creation
+  - test_flat_embed_config_custom
+  - test_extract_edges_basic
+  - test_compute_flat_embedding_empty
+  - test_compute_flat_embedding_single_node
+  - test_compute_flat_embedding_simple_graph
+  - test_energy_function_shapes
+  - test_optimization_loop_stability
+  - test_clip_to_circle_no_panic
+  - test_flat_embedding_matrix_wrapper
+  - test_flat_embedding_larger_graph
+
+## src/viz/embeddings/mod.rs (16686 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - mod debug
+  - mod energy
+  - mod flat_embedding
+  - mod random
+  - mod spectral
+  - trait EmbeddingEngine
+  - struct EmbeddingConfig
+  - enum EmbeddingMethod
+  - enum EnergyFunction
+  - enum GraphTransform
+  - enum MatrixTransform
+  - enum RandomDistribution
+  - enum CombinationStrategy
+  - enum StressType
+  - struct EmbeddingEngineFactory
+  - fn create_engine
+  - fn available_methods
+  - trait GraphEmbeddingExt
+- Other functions/classes (detected):
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - default_dimensions
+  - validate_graph
+  - default
+  - create_engine
+  - available_methods
+  - new
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - new
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - default_dimensions
+  - spectral_embedding
+  - energy_embedding
+  - random_embedding
+  - compute_embedding
+  - spectral_embedding
+  - energy_embedding
+  - random_embedding
+  - compute_embedding
+  - path_graph
+  - karate_club
+  - test_embedding_factory
+  - test_graph_extension_trait
+  - test_custom_matrix_embedding
+
+## src/viz/embeddings/random.rs (13853 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct RandomEmbedding
+  - fn new
+  - fn gaussian
+  - fn uniform
+  - fn spherical
+  - fn with_seed
+  - fn with_normalization
+  - struct RandomEmbeddingBuilder
+  - fn new
+  - fn gaussian
+  - fn uniform
+  - fn spherical
+  - fn normalized
+  - fn seed
+  - fn build
+  - fn compute
+  - trait GraphRandomExt
+- Other functions/classes (detected):
+  - new
+  - gaussian
+  - uniform
+  - spherical
+  - with_seed
+  - with_normalization
+  - generate_values
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - default_dimensions
+  - new
+  - gaussian
+  - uniform
+  - spherical
+  - normalized
+  - seed
+  - build
+  - compute
+  - random
+  - random
+  - path_graph
+  - cycle_graph
+  - star_graph
+  - complete_graph
+  - test_gaussian_embedding
+  - test_uniform_embedding
+  - test_spherical_embedding
+  - test_normalized_gaussian
+  - test_random_embedding_builder
+  - test_different_seeds_produce_different_results
+  - test_edge_cases
+
+## src/viz/embeddings/spectral.rs (14337 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - struct SpectralEmbedding
+  - fn new
+  - fn default
+  - struct SpectralEmbeddingBuilder
+  - fn new
+  - fn normalized
+  - fn eigenvalue_threshold
+  - fn skip_constant_eigenvector
+  - fn build
+  - fn compute
+  - trait GraphSpectralExt
+- Other functions/classes (detected):
+  - new
+  - default
+  - compute_laplacian
+  - compute_eigenvectors
+  - compute_embedding
+  - supports_incremental
+  - supports_streaming
+  - name
+  - default_dimensions
+  - validate_graph
+  - new
+  - normalized
+  - eigenvalue_threshold
+  - skip_constant_eigenvector
+  - build
+  - compute
+  - spectral
+  - spectral
+  - path_graph
+  - cycle_graph
+  - star_graph
+  - karate_club
+  - test_spectral_embedding_basic
+  - test_spectral_embedding_preserves_structure
+  - test_spectral_embedding_builder
+  - test_normalized_vs_unnormalized
+  - test_eigenvalue_ordering
+  - test_spectral_edge_cases
+
+## src/viz/layouts/mod.rs (66191 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait LayoutEngine
+  - struct ForceDirectedLayout
+  - struct NodeConstraint
+  - enum ConstraintType
+  - fn new
+  - fn with_charge
+  - fn with_distance
+  - fn with_iterations
+  - fn with_gravity
+  - fn with_friction
+  - fn with_alpha_decay
+  - fn with_bounds
+  - fn enable_optimization
+  - fn add_constraint
+  - struct CircularLayout
+  - type LayoutFunction
+  - struct LayoutPlugin
+  - struct ParameterSpec
+  - enum ParameterType
+  - enum ParameterValue
+  - struct ParameterConstraints
+  - struct CustomLayout
+  - fn new
+  - fn set_parameter
+  - fn get_parameter
+  - struct LayoutRegistry
+  - fn new
+  - fn register_layout
+  - fn get_layout
+  - fn list_layouts
+  - fn get_plugin_info
+  - fn search_by_tags
+  - fn create_layout_with_params
+  - static ref
+  - fn global
+  - fn register_simple_layout
+  - fn create_grid_layout_plugin
+  - fn create_random_layout_plugin
+  - struct HoneycombLayout
+  - struct EnergyBasedLayout
+  - enum EnergyFunction
+  - struct EnergyLevel
+  - fn new
+  - fn with_energy_function
+  - fn with_cooling
+  - fn register_example_layouts
+  - fn register_advanced_layouts
+- Other functions/classes (detected):
+  - compute_layout
+  - name
+  - supports_incremental
+  - default
+  - new
+  - with_charge
+  - with_distance
+  - with_iterations
+  - with_gravity
+  - with_friction
+  - with_alpha_decay
+  - with_bounds
+  - enable_optimization
+  - add_constraint
+  - initialize_positions
+  - initialize_simulation
+  - calculate_repulsive_forces
+  - barnes_hut_forces
+  - calculate_attractive_forces
+  - apply_gravity
+  - apply_collision_forces
+  - apply_constraints
+  - update_physics
+  - calculate_energy
+  - update_alpha
+  - compute_layout
+  - name
+  - supports_incremental
+  - default
+  - compute_layout
+  - name
+  - new
+  - set_parameter
+  - get_parameter
+  - validate_parameter_type
+  - validate_parameter_constraints
+  - compute_layout
+  - name
+  - supports_incremental
+  - clone
+  - new
+  - get_layout
+  - list_layouts
+  - get_plugin_info
+  - search_by_tags
+  - create_layout_with_params
+  - register_builtin_layouts
+  - global
+  - create_grid_layout_plugin
+  - create_random_layout_plugin
+  - default
+  - hex_to_pixel
+  - spiral_hex_coordinates
+  - energy_optimize
+  - compute_layout
+  - name
+  - supports_incremental
+  - default
+  - new
+  - with_energy_function
+  - with_cooling
+  - initialize_random_positions
+  - calculate_energy
+  - simulated_annealing
+  - global_optimization
+  - compute_layout
+  - name
+  - supports_incremental
+  - register_example_layouts
+  - register_advanced_layouts
+
+## src/viz/mod.rs (63155 bytes)
+- TODO/FIXME/etc: 2
+- Public APIs:
+  - mod embeddings
+  - mod projection
+  - mod realtime
+  - enum VizBackend
+  - fn from_string
+  - fn as_str
+  - struct RenderOptions
+  - enum RenderResult
+  - mod display
+  - mod layouts
+  - mod streaming
+  - struct VizModule
+  - fn new
+  - fn save
+  - fn show
+  - fn render
+  - fn interactive
+  - fn static_viz
+  - fn with_config
+  - fn from_nodes_table
+  - fn from_edges_table
+  - fn from_graph_table
+  - fn supports_graph_view
+  - fn get_info
+  - struct VizConfig
+  - struct PerformanceConfig
+  - struct InteractiveOptions
+  - struct InteractionConfig
+  - struct StaticOptions
+  - enum ExportFormat
+  - enum InteractiveViz
+  - struct RealTimeVisualization
+  - fn start
+  - fn get_config
+  - fn get_data_info
+  - struct InteractiveVizSession
+  - fn url
+  - fn port
+  - fn stop
+  - struct StaticViz
+  - struct DataSourceInfo
+  - struct GraphInfo
+- Other functions/classes (detected):
+  - from_string
+  - as_str
+  - new
+  - save
+  - show
+  - render
+  - render_jupyter
+  - render_realtime
+  - render_file
+  - render_local
+  - interactive
+  - static_viz
+  - generate_static_html
+  - generate_simple_svg
+  - get_html_template
+  - generate_jupyter_html
+  - generate_local_html
+  - with_config
+  - from_nodes_table
+  - from_edges_table
+  - from_graph_table
+  - supports_graph_view
+  - get_info
+  - default
+  - default
+  - default
+  - default
+  - start
+  - get_config
+  - get_data_info
+  - url
+  - port
+  - stop
+
+## src/viz/projection/algorithms.rs (25320 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PCAProjection
+  - fn new
+  - struct TSNEProjection
+  - fn new
+  - struct UMAPProjection
+  - fn new
+  - struct MultiScaleProjection
+  - fn new
+  - struct CustomMatrixProjection
+  - fn new
+  - struct EnergyBasedProjection
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - compute_pca
+  - project_embedding
+  - supports_incremental
+  - supports_interpolation
+  - name
+  - new
+  - compute_distances
+  - compute_probabilities
+  - optimize_embedding
+  - project_embedding
+  - supports_incremental
+  - supports_interpolation
+  - name
+  - new
+  - compute_knn_graph
+  - optimize_umap
+  - project_embedding
+  - supports_incremental
+  - supports_interpolation
+  - name
+  - new
+  - project_embedding
+  - supports_incremental
+  - supports_interpolation
+  - name
+  - new
+  - project_embedding
+  - supports_incremental
+  - supports_interpolation
+  - name
+  - new
+  - project_embedding
+  - supports_incremental
+  - supports_interpolation
+  - name
+  - create_test_embedding
+  - create_test_graph
+  - test_pca_projection
+  - test_tsne_projection
+  - test_umap_projection
+  - test_energy_based_projection
+  - test_custom_matrix_projection
+
+## src/viz/projection/honeycomb.rs (33492 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct HexCoord
+  - fn new
+  - fn to_cube
+  - fn from_cube
+  - fn distance
+  - fn neighbors
+  - fn lerp
+  - struct HoneycombGrid
+  - fn new
+  - fn hex_to_pixel
+  - fn pixel_to_hex
+  - fn map_positions_to_grid
+  - fn map_with_flat_embedding
+  - fn get_hex_coord
+  - fn get_node_at_hex
+  - fn is_occupied
+  - fn get_occupied_coords
+  - fn get_bounding_box
+- Other functions/classes (detected):
+  - new
+  - to_cube
+  - from_cube
+  - distance
+  - neighbors
+  - lerp
+  - new
+  - hex_to_pixel
+  - pixel_to_hex
+  - map_positions_to_grid
+  - map_spiral
+  - map_density_based
+  - map_distance_preserving
+  - map_custom
+  - map_with_flat_embedding
+  - map_energy_based
+  - generate_spiral_coordinates
+  - compute_density_map
+  - find_center_point
+  - compute_placement_error
+  - get_hex_coord
+  - get_node_at_hex
+  - is_occupied
+  - get_occupied_coords
+  - get_bounding_box
+  - generate_hex_centers_in_circle
+  - assign_unique_cells
+  - assign_to_honeycomb_grid
+  - generate_adaptive_hex_centers
+  - generate_hex_centers_in_circle_with_params
+  - test_hex_coord_distance
+  - test_hex_coord_neighbors
+  - test_hex_to_pixel_conversion
+  - test_spiral_coordinates
+  - test_grid_mapping
+  - test_cube_coordinates
+
+## src/viz/projection/interpolation.rs (21066 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct InterpolationEngine
+  - fn new
+  - fn interpolate_positions
+  - fn interpolate_with_honeycomb
+  - struct AnimationState
+  - fn new
+  - fn start
+  - fn stop
+  - fn update
+  - fn current_positions
+  - fn is_active
+  - fn progress
+  - fn set_progress
+  - struct AnimationManager
+  - fn new
+  - fn add_animation
+  - fn start_animation
+  - fn stop_animation
+  - fn update_all
+  - fn get_current_positions
+  - fn cleanup_completed
+  - fn has_active_animations
+- Other functions/classes (detected):
+  - new
+  - interpolate_positions
+  - interpolate_with_honeycomb
+  - linear_interpolation
+  - bezier_interpolation
+  - spline_interpolation
+  - spring_physics_interpolation
+  - apply_easing
+  - cubic_bezier
+  - catmull_rom_spline
+  - apply_honeycomb_constraints
+  - new
+  - start
+  - stop
+  - update
+  - current_positions
+  - is_active
+  - progress
+  - set_progress
+  - new
+  - add_animation
+  - start_animation
+  - stop_animation
+  - update_all
+  - get_current_positions
+  - cleanup_completed
+  - has_active_animations
+  - default
+  - test_linear_interpolation
+  - test_easing_functions
+  - test_animation_state
+  - test_animation_manager
+  - test_spring_physics
+
+## src/viz/projection/mod.rs (16259 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod algorithms
+  - mod honeycomb
+  - mod interpolation
+  - mod quality
+  - trait ProjectionEngine
+  - struct ProjectionConfig
+  - enum ProjectionMethod
+  - struct HoneycombConfig
+  - enum HoneycombLayoutStrategy
+  - struct QualityConfig
+  - struct QualityThresholds
+  - struct InterpolationConfig
+  - enum InterpolationMethod
+  - enum EasingFunction
+  - struct ProjectionEngineFactory
+  - fn create_engine
+  - fn available_methods
+  - trait GraphProjectionExt
+- Other functions/classes (detected):
+  - project_embedding
+  - supports_incremental
+  - supports_interpolation
+  - name
+  - validate_embedding
+  - default
+  - default
+  - default
+  - default
+  - default
+  - create_engine
+  - available_methods
+  - project_to_honeycomb
+  - project_pca
+  - project_tsne
+  - project_umap
+  - project_to_honeycomb
+  - project_pca
+  - project_tsne
+  - project_umap
+  - test_projection_config_defaults
+  - test_projection_factory
+  - test_available_methods
+
+## src/viz/projection/quality.rs (25701 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct QualityMetrics
+  - struct QualityEvaluator
+  - fn new
+  - fn evaluate_projection
+  - fn meets_quality_thresholds
+  - fn suggest_improvements
+  - struct QualityOptimizer
+  - fn new
+  - fn optimize_projection
+- Other functions/classes (detected):
+  - new
+  - evaluate_projection
+  - meets_quality_thresholds
+  - suggest_improvements
+  - compute_pairwise_distances
+  - compute_2d_distances
+  - compute_neighborhood_preservation
+  - compute_distance_correlation
+  - compute_stress
+  - compute_clustering_preservation
+  - compute_local_continuity
+  - compute_global_structure
+  - compute_overall_score
+  - compute_correlation
+  - simple_kmeans
+  - positions_to_matrix
+  - new
+  - optimize_projection
+  - create_test_embedding
+  - create_test_positions
+  - create_test_graph
+  - test_quality_evaluation
+  - test_distance_computation
+  - test_correlation_computation
+  - test_quality_thresholds
+  - test_improvement_suggestions
+
+## src/viz/realtime/accessor/engine_messages.rs (9861 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct EngineSnapshot
+  - struct Node
+  - struct Edge
+  - struct NodePosition
+  - struct GraphMeta
+  - enum EngineUpdate
+  - struct GraphPatch
+  - struct PositionsPayload
+  - struct UiPayload
+  - struct UpdateEnvelope
+  - enum ControlMsg
+  - enum TableDataType
+  - struct SortColumn
+  - fn new
+  - fn new
+  - fn empty
+  - fn is_empty
+  - fn node_count
+  - fn edge_count
+  - fn affects_positions
+  - fn affects_structure
+- Other functions/classes (detected):
+  - new
+  - new
+  - empty
+  - is_empty
+  - node_count
+  - edge_count
+  - affects_positions
+  - affects_structure
+
+## src/viz/realtime/accessor/mod.rs (351 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod engine_messages
+  - mod realtime_viz_accessor
+
+## src/viz/realtime/accessor/realtime_viz_accessor.rs (54190 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait RealtimeVizAccessor
+  - struct DataSourceRealtimeAccessor
+  - fn new
+  - fn with_verbosity
+  - fn with_layout
+  - fn with_layout_and_config
+- Other functions/classes (detected):
+  - initial_snapshot
+  - apply_control
+  - node_count
+  - edge_count
+  - has_positions
+  - get_table_data
+  - new
+  - sanitize_attributes_for_realtime
+  - with_verbosity
+  - with_layout
+  - with_layout_and_config
+  - value_to_categorical_color
+  - value_to_gradient_color
+  - resolve_string_param
+  - resolve_f64_param
+  - scale_value
+  - get_column_stats
+  - apply_auto_curvature
+  - convert_nodes
+  - convert_edges
+  - compute_positions
+  - generate_default_positions
+  - create_meta
+  - initial_snapshot
+  - apply_control
+  - node_count
+  - edge_count
+  - has_positions
+  - get_table_data
+  - attr_value_to_json
+  - new
+  - total_rows
+  - total_cols
+  - supports_streaming
+  - supports_graph_view
+  - get_window
+  - get_schema
+  - get_column_types
+  - get_column_names
+  - get_source_id
+  - get_version
+  - get_graph_nodes
+  - get_graph_edges
+  - get_graph_metadata
+  - compute_layout
+  - test_initial_snapshot
+  - test_control_messages
+
+## src/viz/realtime/engine.rs (88767 bytes)
+- TODO/FIXME/etc: 18
+- Public APIs:
+  - struct RealTimeVizEngine
+  - enum ControlCommand
+  - enum FilterType
+  - enum SelectionMode
+  - fn new
+  - fn initialize
+  - fn start
+  - fn stop
+  - fn graph
+  - fn handle_control_command
+  - fn load_snapshot
+  - fn apply
+  - fn subscribe
+  - fn fallback_to_accessor_layout
+  - fn get_sync_stats
+  - fn force_flush_updates
+  - fn get_graph
+  - struct PerformanceMonitor
+  - fn new
+  - fn start
+  - fn stop
+  - struct IncrementalUpdateManager
+  - struct GraphChange
+  - enum GraphChangeType
+  - fn new
+  - fn initialize
+  - fn has_pending_updates
+  - struct AnimationController
+  - enum AnimationType
+- Other functions/classes (detected):
+  - fmt
+  - new
+  - initialize
+  - start
+  - stop
+  - graph
+  - compute_initial_layout
+  - process_control_command
+  - handle_control_command
+  - needs_update
+  - update_visualization
+  - update_animations
+  - interpolate_positions
+  - apply_easing_function
+  - update_performance_metrics
+  - adapt_quality_settings
+  - reduce_quality_settings
+  - increase_quality_settings
+  - center_and_fit_positions
+  - apply_layout_algorithm
+  - apply_force_directed_layout
+  - node_count_from_state
+  - apply_circular_layout
+  - apply_grid_layout
+  - trigger_full_recomputation
+  - trigger_projection_recomputation
+  - trigger_view_aware_projection
+  - apply_3d_view_transform
+  - apply_nd_rotation
+  - rotate_embedding_nd
+  - process_interaction_commands
+  - trigger_quality_recomputation
+  - apply_realtime_filter
+  - update_node_selection
+  - animate_zoom_to_region
+  - pan_view
+  - add_nodes_incrementally
+  - add_edges_incrementally
+  - remove_nodes_incrementally
+  - reset_view_to_default
+  - process_incremental_updates
+  - update_filter_transitions
+  - update_dynamic_aspects
+  - load_snapshot
+  - apply
+  - apply_update_directly
+  - apply_layout_change
+  - cancel_interpolation
+  - reset_layout_config_for
+  - broadcast_view_state
+  - set_interaction_controller
+  - configure_controller_for_layout
+  - calculate_honeycomb_cell_size_from_bins
+  - auto_scale_honeycomb_cell_size
+  - update_layout_param_if_changed
+  - handle_node_drag_event
+  - broadcast_envelope
+  - subscribe
+  - fallback_to_accessor_layout
+  - get_sync_stats
+  - force_flush_updates
+  - get_graph
+  - new
+  - start
+  - stop
+  - new
+  - initialize
+  - has_pending_updates
+  - test_engine_creation
+  - test_easing_functions
+  - test_position_interpolation
+  - center_and_fit_positions_centers_and_scales
+
+## src/viz/realtime/engine_sync.rs (14203 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct EngineSyncManager
+  - fn new
+  - fn set_coalescing_window
+  - fn set_max_batch_size
+  - fn queue_snapshot
+  - fn queue_update
+  - fn get_ready_updates
+  - fn flush_all_coalesced
+  - fn get_stats
+  - struct SyncStats
+- Other functions/classes (detected):
+  - new
+  - set_coalescing_window
+  - set_max_batch_size
+  - queue_snapshot
+  - queue_update
+  - try_coalesce_update
+  - get_ready_updates
+  - flush_oldest_updates
+  - flush_all_coalesced
+  - get_stats
+
+## src/viz/realtime/interaction/globe_controller.rs (4089 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct GlobeController
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - quat
+  - store_quat
+  - orbit
+  - pan
+  - zoom
+  - roll
+  - name
+  - on_pointer
+  - on_wheel
+  - on_node_drag
+  - view_3d
+  - on_activate
+  - as_any
+
+## src/viz/realtime/interaction/math.rs (3416 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn clamp
+  - struct Vec3
+  - fn new
+  - fn add
+  - fn sub
+  - fn mul
+  - fn dot
+  - fn cross
+  - fn norm
+  - fn normalized
+  - struct Quat
+  - fn identity
+  - fn from_axis_angle
+  - fn normalized
+  - fn mul
+  - fn rotate_vec3
+- Other functions/classes (detected):
+  - clamp
+  - new
+  - add
+  - sub
+  - mul
+  - dot
+  - cross
+  - norm
+  - normalized
+  - identity
+  - from_axis_angle
+  - normalized
+  - mul
+  - rotate_vec3
+
+## src/viz/realtime/interaction/mod.rs (14079 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod globe_controller
+  - mod math
+  - mod pan_controller
+  - enum PointerPhase
+  - struct PointerEvent
+  - enum WheelEvent
+  - enum NodeDragEvent
+  - struct ViewState2D
+  - struct ViewState3D
+  - enum InteractionCommand
+  - trait InteractionController
+  - enum NodeDragPolicy
+  - enum CanvasDragPolicy
+  - struct HoneycombController
+  - fn new
+  - fn set_embedding_dims
+  - fn configure_auto_scaling
+  - fn rotate_embedding_axes
+  - fn get_rotations
+- Other functions/classes (detected):
+  - name
+  - on_pointer
+  - on_wheel
+  - on_node_drag
+  - view_2d
+  - view_3d
+  - on_activate
+  - as_any
+  - new
+  - set_embedding_dims
+  - configure_auto_scaling
+  - rotate_embedding_axes
+  - get_rotations
+  - constrain_drag_position
+  - apply_honeycomb_constraints
+  - name
+  - on_pointer
+  - on_wheel
+  - on_node_drag
+  - on_activate
+  - as_any
+
+## src/viz/realtime/interaction/pan_controller.rs (2111 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct PanController
+  - fn new
+- Other functions/classes (detected):
+  - new
+  - clamp_zoom
+  - name
+  - on_pointer
+  - on_wheel
+  - on_node_drag
+  - view_2d
+  - on_activate
+  - as_any
+
+## src/viz/realtime/mod.rs (30128 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod accessor
+  - mod engine
+  - mod engine_sync
+  - mod interaction
+  - mod server
+  - enum LayoutKind
+  - fn as_str
+  - fn is_layout_parameter
+  - struct LayoutKindParseError
+  - struct RealTimeVizConfig
+  - struct RealTimeConfig
+  - struct PerformanceConfig
+  - struct InteractionConfig
+  - struct SelectionConfig
+  - struct FilterConfig
+  - struct StreamingConfig
+  - struct RealTimeVizState
+  - struct AnimationState
+  - struct PerformanceMetrics
+  - struct SelectionState
+  - struct SelectionAnalytics
+  - struct BoundingBox
+  - struct FilterState
+  - struct AttributeFilter
+  - enum AttributeFilterType
+  - struct DegreeFilter
+  - struct CommunityFilter
+  - struct FilterTransitionState
+  - enum VizParameter
+  - fn is_some
+  - fn as_column
+  - fn as_array
+  - fn as_value
+  - struct VizConfig
+  - fn new
+  - fn with_node_color
+  - fn with_node_size
+  - fn with_edge_color
+  - fn with_layout_algorithm
+  - fn with_layout_param
+  - fn with_tooltip_columns
+  - fn validate_array_lengths
+- Other functions/classes (detected):
+  - as_str
+  - is_layout_parameter
+  - fmt
+  - fmt
+  - from_str
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - default
+  - is_some
+  - as_column
+  - as_array
+  - as_value
+  - default
+  - new
+  - with_node_color
+  - with_node_size
+  - with_edge_color
+  - with_layout_algorithm
+  - with_layout_param
+  - with_tooltip_columns
+  - validate_array_lengths
+  - test_realtime_viz_config_defaults
+  - test_performance_metrics_initialization
+  - test_animation_state_initialization
+  - test_filter_state_initialization
+
+## src/viz/realtime/server/mod.rs (308 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - mod realtime_server
+  - mod ws_bridge
+
+## src/viz/realtime/server/realtime_server.rs (60562 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - struct RealtimeServerHandle
+  - fn stop
+  - struct RealtimeServer
+  - fn new
+  - fn with_accessor
+  - fn with_verbosity
+  - fn start
+  - fn start_with_cancellation
+  - fn get_ws_bridge
+  - fn port
+  - fn create_realtime_server
+  - fn start_realtime_background
+- Other functions/classes (detected):
+  - stop
+  - new
+  - with_accessor
+  - with_verbosity
+  - start
+  - handle_connection
+  - start_with_cancellation
+  - generate_websocket_accept
+  - get_ws_bridge
+  - port
+  - process_control_message
+  - create_realtime_server
+  - start_realtime_background
+
+## src/viz/realtime/server/ws_bridge.rs (27138 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - type ClientId
+  - enum WsMessage
+  - struct TableDataWindow
+  - struct WsBridge
+  - fn new
+  - fn set_control_sender
+  - fn set_snapshot
+  - fn get_snapshot
+  - fn broadcast_update
+  - fn send_to_client
+  - fn handle_websocket_stream
+- Other functions/classes (detected):
+  - parse_control_message
+  - new
+  - set_control_sender
+  - set_snapshot
+  - get_snapshot
+  - create_browser_friendly_snapshot_json
+  - broadcast_update
+  - send_to_client
+  - handle_websocket_stream
+  - handle_control_message_static
+  - send_control_ack_static
+
+## src/viz/streaming/css/graph_visualization.css (13025 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/viz/streaming/css/sleek.css (3990 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)
+
+## src/viz/streaming/data_source.rs (7345 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - trait DataSource
+  - struct DataWindow
+  - struct DataSchema
+  - struct WindowKey
+  - struct DataWindowMetadata
+  - fn new
+  - fn is_empty
+  - fn size
+  - fn mark_cached
+  - fn set_load_time
+  - struct GraphNode
+  - struct GraphEdge
+  - struct Position
+  - struct GraphMetadata
+  - enum LayoutAlgorithm
+  - enum HierarchicalDirection
+  - struct NodePosition
+- Other functions/classes (detected):
+  - total_rows
+  - total_cols
+  - get_window
+  - get_schema
+  - supports_streaming
+  - get_column_types
+  - get_column_names
+  - get_cache_key
+  - get_source_id
+  - get_version
+  - supports_graph_view
+  - get_graph_nodes
+  - get_graph_edges
+  - get_graph_metadata
+  - compute_layout
+  - new
+  - is_empty
+  - size
+  - mark_cached
+  - set_load_time
+  - default
+
+## src/viz/streaming/graph_data_source.rs (15032 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct GraphDataSource
+  - fn new
+  - fn new_with_label
+  - fn node
+  - fn edge
+- Other functions/classes (detected):
+  - new
+  - new_with_label
+  - graph_nodes
+  - graph_edges
+  - viz_nodes
+  - viz_edges
+  - total_rows
+  - total_cols
+  - get_window
+  - get_schema
+  - supports_streaming
+  - get_column_types
+  - get_column_names
+  - get_source_id
+  - get_version
+  - supports_graph_view
+  - get_graph_nodes
+  - get_graph_edges
+  - get_graph_metadata
+  - compute_layout
+  - record_attribute_type
+  - attr_to_string
+  - extract_position
+  - extract_weight
+  - attr_to_f64
+  - fallback_positions
+  - grid_layout
+  - hierarchical_layout
+  - node
+  - edge
+
+## src/viz/streaming/mod.rs (417 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - mod data_source
+  - mod graph_data_source
+  - mod server
+  - mod types
+  - mod util
+  - mod virtual_scroller
+
+## src/viz/streaming/server.rs (2343 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct StreamingServer
+  - fn new
+  - fn start_background
+- Other functions/classes (detected):
+  - new
+  - start_background
+
+## src/viz/streaming/types.rs (25557 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct GraphNodeData
+  - struct GraphEdgeData
+  - struct PositionData
+  - struct GraphMetadataData
+  - struct NodePositionData
+  - fn attr_value_to_display_text
+  - fn attr_value_to_json
+  - fn data_window_to_json
+  - enum WireCell
+  - struct JsonDataWindow
+  - enum WSMessage
+  - struct DataUpdate
+  - enum UpdateType
+  - struct ClientState
+  - struct ProtocolMeta
+  - struct ServerStats
+  - type ConnectionId
+  - struct ServerHandle
+  - fn stop
+  - struct StreamingConfig
+  - enum StreamingError
+  - type StreamingResult
+  - struct NodeAnalytics
+  - struct CentralityMeasures
+  - struct NodeTooltipData
+  - struct EdgeTooltipData
+  - struct TooltipAttribute
+  - struct TooltipMetric
+  - enum AttributeDisplayType
+  - enum MetricFormat
+  - struct PathInfo
+  - enum SelectionType
+  - struct BoundingBox
+  - struct SelectionAnalytics
+  - enum KeyboardAction
+  - struct HighlightChange
+  - enum HighlightElementType
+  - enum HighlightType
+  - enum SearchType
+  - struct SearchFilter
+  - enum SearchOperator
+  - struct SearchResult
+  - enum SearchResultType
+  - struct MatchedField
+  - struct HighlightData
+  - struct HighlightRegion
+- Other functions/classes (detected):
+  - from
+  - from
+  - from
+  - from
+  - attr_value_to_display_text
+  - attr_value_to_json
+  - data_window_to_json
+  - attr_to_wire
+  - stop
+  - drop
+  - default
+  - fmt
+  - source
+  - from
+
+## src/viz/streaming/util.rs (1250 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - fn attr_value_to_display_text
+- Other functions/classes (detected):
+  - attr_value_to_display_text
+
+## src/viz/streaming/virtual_scroller.rs (10663 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs:
+  - struct VirtualScrollManager
+  - fn new
+  - fn get_visible_window
+  - fn get_window_at_offset
+  - fn handle_scroll
+  - fn preload_buffer
+  - fn get_cache_stats
+  - fn clear_cache
+  - fn get_config
+  - struct VirtualScrollConfig
+  - struct UpdateResult
+  - struct CacheStats
+  - struct LRUCache
+  - fn new
+  - fn get
+  - fn put
+  - fn contains
+  - fn clear
+  - fn get_stats
+  - enum VirtualScrollError
+  - type VirtualScrollResult
+- Other functions/classes (detected):
+  - new
+  - get_visible_window
+  - get_window_at_offset
+  - handle_scroll
+  - preload_buffer
+  - needs_data_update
+  - get_from_cache
+  - store_in_cache
+  - is_in_cache
+  - get_cache_stats
+  - clear_cache
+  - get_config
+  - default
+  - new
+  - get
+  - put
+  - contains
+  - clear
+  - get_stats
+  - update_access_order
+  - evict_lru
+  - fmt
+
+## web/app.js (85710 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs:
+  - class RealtimeViz
+
+## web/index.html (10835 bytes)
+- TODO/FIXME/etc: 1
+- Public APIs: (none detected)
+
+## web/styles.css (10535 bytes)
+- TODO/FIXME/etc: 0
+- Public APIs: (none detected)

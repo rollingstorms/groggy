@@ -19,6 +19,8 @@ use super::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, AlgorithmParams, Context, CostHint,
 };
 
+pub const SAMPLE_OUTPUT_VAR: &str = "__sample_output__";
+
 /// Register builder-related algorithms (custom step pipelines).
 pub fn register_algorithms(registry: &Registry) -> Result<()> {
     registry.register_factory("builder.step_pipeline", |spec| {
@@ -191,6 +193,87 @@ impl Algorithm for StepPipelineAlgorithm {
         }
 
         Ok(subgraph)
+    }
+}
+
+pub struct StepSamplePipeline {
+    display_name: String,
+    steps: Vec<Box<dyn Step>>,
+}
+
+impl StepSamplePipeline {
+    pub fn try_from_spec(spec: &AlgorithmSpec) -> Result<Self> {
+        ensure_core_steps_registered();
+
+        let definition = extract_definition(spec)?;
+
+        let mut step_specs = Vec::with_capacity(definition.steps.len());
+        for raw_step in &definition.steps {
+            let params = convert_params(raw_step.params.clone())?;
+            let step_spec = StepSpec {
+                id: raw_step.id.clone(),
+                params,
+                inputs: raw_step.inputs.clone(),
+                outputs: raw_step.outputs.clone(),
+            };
+            step_specs.push(step_spec);
+        }
+
+        let registry = global_step_registry();
+        let mut instantiated_steps = Vec::with_capacity(step_specs.len());
+        for step_spec in step_specs {
+            let step = registry.instantiate(&step_spec)?;
+            instantiated_steps.push(step);
+        }
+
+        let name = if !definition.name.is_empty() {
+            definition.name
+        } else {
+            spec.params
+                .get_text("name")
+                .unwrap_or("Custom Sample Pipeline")
+                .to_string()
+        };
+
+        Ok(Self {
+            display_name: name,
+            steps: instantiated_steps,
+        })
+    }
+
+    pub fn run(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Vec<Subgraph>> {
+        let execution_id = EXECUTION_COUNTER.fetch_add(1, Ordering::SeqCst);
+        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+            eprintln!(
+                "[exec_{}] Sample pipeline '{}' starting with {} steps",
+                execution_id,
+                self.display_name,
+                self.steps.len()
+            );
+        }
+
+        let mut variables = StepVariables::default();
+
+        for (index, step) in self.steps.iter().enumerate() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("sample pipeline cancelled before step {index}"));
+            }
+
+            ctx.begin_step(index, step.id());
+            let result = {
+                let mut scope = StepScope::new(&subgraph, &mut variables);
+                step.apply(ctx, &mut scope)
+            };
+            ctx.finish_step();
+            result?;
+        }
+
+        let output = variables
+            .subgraph_array(SAMPLE_OUTPUT_VAR)
+            .map(|array| array.clone())
+            .map_err(|_| anyhow!("sample pipeline did not emit any subgraphs"))?;
+
+        Ok(output)
     }
 }
 

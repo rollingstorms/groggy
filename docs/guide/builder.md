@@ -23,7 +23,7 @@ If a single native algorithm fits, prefer `groggy.algorithms` directly; the buil
 ## Batch Executor at a Glance {#batch-executor-at-a-glance}
 
 - What it does: collapses structured loops into batched kernels for iterative algorithms.
-- When it kicks in: loop bodies expressed via `builder.iterate()` that use supported steps (attr load/store, neighbor maps, arithmetic, normalize, etc.).
+- When it kicks in: loop bodies expressed via `builder.iterate()` that use supported steps (attr load/store, neighbor aggregates, arithmetic, scalar loads).
 - Fallback: unsupported ops or validation failures drop to the regular step interpreter; behavior stays correct.
 - Performance (illustrative):
   - PageRank: ~100x faster (1000 nodes, 100 iterations)
@@ -102,10 +102,55 @@ communities = graph.view().apply(lpa_algo).nodes["community"]
 - Attribute pipelines: load attrs, transform with `core.add/mul/sub/div`, attach back with `attach_as`.
 - Iterative refinement: express update rules in `builder.iterate()` to unlock batching (PageRank, LPA, custom relaxations).
 - Masked workflows: load attributes, build boolean masks, and attach them for downstream filtering.
+- Sampler pipelines: build a subgraph sampler and run it via `subgraph.sample(sampler)` to get a `SubgraphArray`.
+
+## Sampler Pipelines
+
+Sampler pipelines compile the same DSL into a `SubgraphArray` instead of a single `Subgraph`.
+Use `build_sampler()` and `subgraph.sample(...)` for dataset-ready sampling flows.
+
+### Basic: 1-hop neighborhoods from random nodes
+
+```python
+import groggy as gr
+
+b = gr.builder("random_100_1hop")
+nodes = b.sample_nodes(count=100, seed=42)
+nbh = b.neighbors(nodes, hops=1)
+b.emit_subgraphs(nbh, mode="unified")
+
+sampler = b.build_sampler()
+samples = graph.view().sample(sampler)  # SubgraphArray (len=1)
+```
+
+### Map over subgraphs with `map()`
+
+`SubgraphArrayHandle.map(...)` runs a sub-pipeline over each subgraph in the array.
+
+```python
+b = gr.builder("per_item_sample")
+nbh = b.neighbors(b.iterate_nodes(), hops=1)
+sampled = nbh.map(lambda b: b.sample_nodes(count=100, seed=42))
+b.emit_subgraphs(sampled, mode="per_item")
+
+samples = graph.view().sample(b.build_sampler())
+```
+
+### Emit modes
+
+- `mode="per_item"`: one output subgraph per input item
+- `mode="unified"`: a single subgraph from all selected items
 
 ## Compatibility and Pitfalls
 
 - Batch Executor only activates for loops created via `builder.iterate()` and supported steps; incompatible steps run correctly but without batching.
+- Supported loop body steps today include core arithmetic (`core.add`, `core.sub`, `core.mul`, `core.div`, `core.constant`, `core.min`, `core.max`, `core.abs`, `core.clip`, `core.recip`, `core.sqrt`, `core.exp`, `core.log`, `core.pow`, `core.compare`, `core.where`, `core.reduce_scalar`, `core.broadcast_scalar`).
+- Supported graph steps include `graph.neighbor_sum`, `graph.neighbor_mean`, `graph.neighbor_min`, `graph.neighbor_max`, `graph.neighbor_agg`, `core.collect_neighbor_values`, `core.mode_list`, `core.neighbor_mode_update`.
+- Supported load/store steps include `init_nodes_with_index`, `init_nodes`, `init_scalar`, `load_attr`, `load_edge_attr`, `attach_attr`, `alias`, plus `node_degree`, `graph_node_count`, `graph_edge_count`, and `normalize` / `normalize_sum`.
+- `map_nodes` is supported when `async_update=False` and the expression is composed of arithmetic and neighbor aggregations.
+- For diagnostics, set `GROGGY_DEBUG_BATCH=1` to see why a loop was not batched.
+- To force fallback execution (for benchmarking), set `GROGGY_DISABLE_BATCH=1`.
+- JIT compilation is disabled on ARM64; Batch Executor remains the portable fast path.
 - Keep loop bodies deterministic and attribute-centric (no Python-side state mutation inside the loop).
 - Default values matter: set `default` when loading attrs to avoid missing-data surprises.
 - Prefer scalar literals in `core.*` ops; they’re converted to constants inside the plan.
@@ -115,3 +160,4 @@ communities = graph.view().apply(lpa_algo).nodes["community"]
 
 - `docs/guide/algorithms.md` for native algorithms you can combine.
 - `docs/guide/performance.md` for tuning and benchmarking tips.
+- `benches/batch_executor_bench.py` and `benches/builder_ir_profile.py` for batch executor performance checks.

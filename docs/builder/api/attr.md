@@ -90,7 +90,7 @@ def weighted_pagerank(sG, damping=0.85, max_iter=100):
     ranks = sG.nodes(1.0 / sG.N)
     deg = ranks.degrees()
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         contrib = ranks / (deg + 1e-9)
         
         # Weighted neighbor aggregation
@@ -565,7 +565,7 @@ def propagate_attribute(sG, attr_name, decay=0.9, max_iter=10):
     initial = sG.builder.attr.load(attr_name, default=0.0)
     values = initial
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         neighbor_avg = sG.builder.graph_ops.neighbor_agg(values, "mean")
         values = sG.builder.var("values",
             decay * neighbor_avg + (1 - decay) * initial

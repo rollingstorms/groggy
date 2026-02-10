@@ -33,6 +33,9 @@ class VarHandle:
     def __init__(self, name: str, builder: AlgorithmBuilder) -> None: ...
     def __repr__(self) -> str: ...
 
+class SubgraphArrayHandle(VarHandle):
+    def map(self, fn: Any) -> "SubgraphArrayHandle": ...
+
 class SubgraphHandle:
     """
     Handle representing a reference to the input subgraph.
@@ -342,6 +345,33 @@ class AlgorithmBuilder:
             ... )
         """
         ...
+
+    def iterate_nodes(self) -> SubgraphArrayHandle: ...
+    def iterate_edges(self) -> SubgraphArrayHandle: ...
+    def neighbors(self, seeds: VarHandle, hops: int = 1) -> SubgraphArrayHandle: ...
+    def sample_nodes(
+        self,
+        *,
+        count: Optional[int] = ...,
+        fraction: Optional[float] = ...,
+        seed: Optional[int] = ...,
+    ) -> VarHandle: ...
+    def sample_edges(
+        self,
+        *,
+        count: Optional[int] = ...,
+        fraction: Optional[float] = ...,
+        seed: Optional[int] = ...,
+    ) -> VarHandle: ...
+    def emit_subgraphs(
+        self,
+        values: VarHandle,
+        *,
+        mode: str = ...,
+        induced: bool = ...,
+    ) -> SubgraphArrayHandle: ...
+    def each(self, subgraphs: SubgraphArrayHandle, fn: Any) -> SubgraphArrayHandle: ...
+    def build_sampler(self, validate: bool = ..., optimize: bool = ...) -> Any: ...
 
     def var(self, name: str, value: VarHandle) -> VarHandle:
         """

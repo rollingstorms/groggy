@@ -80,6 +80,22 @@ neighborhoods = g.nodes[:5].neighborhood(depth=2)
 print(f"{len(neighborhoods)} neighborhoods")
 ```
 
+### From Samplers
+
+Custom samplers built with the Builder DSL return `SubgraphArray`:
+
+```python
+import groggy as gr
+
+b = gr.builder("sample_100_1hop")
+nodes = b.sample_nodes(count=100, seed=42)
+nbh = b.neighbors(nodes, hops=1)
+b.emit_subgraphs(nbh, mode="unified")
+
+samples = g.view().sample(b.build_sampler())
+print(len(samples))
+```
+
 ---
 
 ## Accessing Elements

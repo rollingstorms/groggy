@@ -173,7 +173,7 @@ neighbor_lists = sG.builder.graph_ops.collect_neighbor_values(labels)
 def lpa(sG, max_iter=10):
     labels = sG.nodes(unique=True)
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         # Collect labels from neighbors (and self)
         neighbor_labels = sG.builder.graph_ops.collect_neighbor_values(
             labels, include_self=True
@@ -214,7 +214,7 @@ most_common = sG.builder.core.mode(neighbor_lists)
 def lpa_fast(sG, max_iter=10):
     labels = sG.nodes(unique=True)
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         labels = sG.builder.graph_ops.neighbor_mode_update(
             labels, include_self=True, ordered=True
         )
@@ -620,7 +620,7 @@ active = sG.builder.graph_ops.subgraph(is_active)
 def influence_propagation(sG, seed_influence, decay=0.9, max_iter=10):
     influence = seed_influence
     
-    with sG.builder.iter.loop(max_iter):
+    with sG.iterate(max_iter):
         # Propagate with decay
         neighbor_influence = sG @ influence
         influence = sG.builder.var("influence",

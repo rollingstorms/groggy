@@ -87,6 +87,14 @@ tracemalloc.stop()
 
 ## Optimization Patterns
 
+### Pattern 0: Batch Executor for Loops
+
+If you use `builder.iterate()`, Groggy will attempt to compile the loop body into a Batch Plan and execute it in Rust with a single FFI call per loop. This is the portable fast path and works on macOS ARM64 where JIT compilation is not available.
+
+Tips:
+- Set `GROGGY_DEBUG_BATCH=1` to see why a loop was not batched.
+- Set `GROGGY_DISABLE_BATCH=1` to force fallback execution (useful for A/B benchmarking).
+
 ### Pattern 1: Bulk Operations
 
 **Avoid:** Loops over individual operations

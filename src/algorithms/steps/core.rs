@@ -60,6 +60,8 @@ pub enum StepValue {
     NodeColumn(NodeColumn),
     /// Mapping from edge id → value.
     EdgeMap(HashMap<EdgeId, AlgorithmParamValue>),
+    /// Collection of subgraphs (sampling output).
+    SubgraphArray(Vec<Subgraph>),
     /// Scalar helper value.
     Scalar(AlgorithmParamValue),
     /// Immutable temporal snapshot cached for reuse.
@@ -141,6 +143,13 @@ impl StepValue {
             _ => Err(anyhow!("variable '{name}' is not a scalar")),
         }
     }
+
+    pub(crate) fn expect_subgraph_array(&self, name: &str) -> Result<&Vec<Subgraph>> {
+        match self {
+            StepValue::SubgraphArray(array) => Ok(array),
+            _ => Err(anyhow!("variable '{name}' is not a subgraph array")),
+        }
+    }
 }
 
 /// Mutable variable storage passed between steps.
@@ -219,6 +228,18 @@ impl StepVariables {
             .get(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| value.expect_node_map(name))
+    }
+
+    pub fn set_subgraph_array(&mut self, name: impl Into<String>, array: Vec<Subgraph>) {
+        self.values
+            .insert(name.into(), StepValue::SubgraphArray(array));
+    }
+
+    pub fn subgraph_array(&self, name: &str) -> Result<&Vec<Subgraph>> {
+        self.values
+            .get(name)
+            .ok_or_else(|| anyhow!("variable '{name}' not found"))
+            .and_then(|value| value.expect_subgraph_array(name))
     }
 
     pub fn node_column(&self, name: &str) -> Result<&NodeColumn> {

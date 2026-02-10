@@ -28,6 +28,35 @@ pub enum BatchInstruction {
     /// Load a scalar value into a slot (broadcast to all nodes)
     LoadScalar { dst: SlotId, value: f64 },
 
+    /// Broadcast a scalar slot to a vector slot
+    BroadcastScalar { dst: SlotId, scalar: SlotId },
+
+    /// Initialize a vector slot with a scalar value
+    InitNodes { dst: SlotId, value: f64 },
+
+    /// Load a node attribute directly from the graph
+    LoadNodeAttr {
+        dst: SlotId,
+        attr_name: String,
+        default: f64,
+    },
+
+    /// Load an edge attribute directly from the graph
+    LoadEdgeAttr {
+        dst: SlotId,
+        attr_name: String,
+        default: f64,
+    },
+
+    /// Node degree vector
+    NodeDegree { dst: SlotId },
+
+    /// Graph node count (scalar)
+    GraphNodeCount { dst: SlotId },
+
+    /// Graph edge count (scalar)
+    GraphEdgeCount { dst: SlotId },
+
     /// Element-wise addition: dst = lhs + rhs
     Add {
         dst: SlotId,
@@ -54,6 +83,114 @@ pub enum BatchInstruction {
         dst: SlotId,
         lhs: SlotId,
         rhs: SlotId,
+    },
+
+    /// Element-wise minimum: dst = min(lhs, rhs)
+    Min {
+        dst: SlotId,
+        lhs: SlotId,
+        rhs: SlotId,
+    },
+
+    /// Element-wise maximum: dst = max(lhs, rhs)
+    Max {
+        dst: SlotId,
+        lhs: SlotId,
+        rhs: SlotId,
+    },
+
+    /// Element-wise absolute value: dst = abs(src)
+    Abs { dst: SlotId, src: SlotId },
+
+    /// Element-wise clip: dst = min(max(src, min), max)
+    Clip {
+        dst: SlotId,
+        src: SlotId,
+        min: f64,
+        max: f64,
+    },
+
+    /// Element-wise reciprocal: dst = 1 / (src + epsilon)
+    Recip {
+        dst: SlotId,
+        src: SlotId,
+        epsilon: f64,
+    },
+
+    /// Element-wise sqrt
+    Sqrt { dst: SlotId, src: SlotId },
+
+    /// Element-wise exp
+    Exp { dst: SlotId, src: SlotId },
+
+    /// Element-wise log
+    Log { dst: SlotId, src: SlotId },
+
+    /// Element-wise power: dst = pow(base, exp)
+    Pow {
+        dst: SlotId,
+        base: SlotId,
+        exp: SlotId,
+    },
+
+    /// Element-wise comparison: dst (bool) = lhs op rhs
+    Compare {
+        dst: SlotId,
+        lhs: SlotId,
+        op: CompareOp,
+        rhs: SlotId,
+    },
+
+    /// Element-wise select: dst = if condition then if_true else if_false
+    Where {
+        dst: SlotId,
+        condition: SlotId,
+        if_true: SlotId,
+        if_false: SlotId,
+    },
+
+    /// Reduce a vector to a scalar
+    ReduceScalar {
+        dst: SlotId,
+        src: SlotId,
+        operation: AggregateOp,
+    },
+
+    /// Normalize a vector by sum/min/max
+    Normalize {
+        dst: SlotId,
+        src: SlotId,
+        method: AggregateOp,
+        epsilon: f64,
+    },
+
+    /// Update a target slot in place with values from source
+    UpdateInPlace {
+        source: SlotId,
+        target: SlotId,
+        ordered: bool,
+    },
+
+    /// Update labels in place by taking the mode of neighbor labels
+    NeighborModeUpdate {
+        target: SlotId,
+        include_self: bool,
+        tie_break: TieBreak,
+        ordered: bool,
+    },
+
+    /// Collect neighbor values into lists
+    CollectNeighborValues {
+        dst: SlotId,
+        src: SlotId,
+        include_self: bool,
+    },
+
+    /// Compute mode of lists
+    ModeList {
+        dst: SlotId,
+        src: SlotId,
+        tie_break: TieBreak,
     },
 
     /// Aggregate neighbor values: dst = sum/mean/max/min(neighbors[src])
@@ -106,6 +243,18 @@ pub enum AggregateOp {
     Mean,
     Min,
     Max,
+}
+
+/// Comparison operators for Compare instruction
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CompareOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 }
 
 /// Edge direction for neighbor operations
@@ -217,13 +366,79 @@ impl BatchPlan {
             BatchInstruction::LoadNodeProp { dst, .. } => check_slot(*dst, "dst"),
             BatchInstruction::StoreNodeProp { src, .. } => check_slot(*src, "src"),
             BatchInstruction::LoadScalar { dst, .. } => check_slot(*dst, "dst"),
+            BatchInstruction::InitNodes { dst, .. } => check_slot(*dst, "dst"),
+            BatchInstruction::LoadNodeAttr { dst, .. } => check_slot(*dst, "dst"),
+            BatchInstruction::LoadEdgeAttr { dst, .. } => check_slot(*dst, "dst"),
+            BatchInstruction::NodeDegree { dst } => check_slot(*dst, "dst"),
+            BatchInstruction::GraphNodeCount { dst } => check_slot(*dst, "dst"),
+            BatchInstruction::GraphEdgeCount { dst } => check_slot(*dst, "dst"),
             BatchInstruction::Add { dst, lhs, rhs }
             | BatchInstruction::Sub { dst, lhs, rhs }
             | BatchInstruction::Mul { dst, lhs, rhs }
-            | BatchInstruction::Div { dst, lhs, rhs } => {
+            | BatchInstruction::Div { dst, lhs, rhs }
+            | BatchInstruction::Min { dst, lhs, rhs }
+            | BatchInstruction::Max { dst, lhs, rhs } => {
                 check_slot(*dst, "dst")?;
                 check_slot(*lhs, "lhs")?;
                 check_slot(*rhs, "rhs")
+            }
+            BatchInstruction::Abs { dst, src }
+            | BatchInstruction::Sqrt { dst, src }
+            | BatchInstruction::Exp { dst, src }
+            | BatchInstruction::Log { dst, src } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*src, "src")
+            }
+            BatchInstruction::Clip { dst, src, .. }
+            | BatchInstruction::Recip { dst, src, .. } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*src, "src")
+            }
+            BatchInstruction::Pow { dst, base, exp } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*base, "base")?;
+                check_slot(*exp, "exp")
+            }
+            BatchInstruction::Compare { dst, lhs, rhs, .. } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*lhs, "lhs")?;
+                check_slot(*rhs, "rhs")
+            }
+            BatchInstruction::Where {
+                dst,
+                condition,
+                if_true,
+                if_false,
+            } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*condition, "condition")?;
+                check_slot(*if_true, "if_true")?;
+                check_slot(*if_false, "if_false")
+            }
+            BatchInstruction::ReduceScalar { dst, src, .. } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*src, "src")
+            }
+            BatchInstruction::BroadcastScalar { dst, scalar } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*scalar, "scalar")
+            }
+            BatchInstruction::Normalize { dst, src, .. } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*src, "src")
+            }
+            BatchInstruction::UpdateInPlace { source, target, .. } => {
+                check_slot(*source, "source")?;
+                check_slot(*target, "target")
+            }
+            BatchInstruction::NeighborModeUpdate { target, .. } => check_slot(*target, "target"),
+            BatchInstruction::CollectNeighborValues { dst, src, .. } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*src, "src")
+            }
+            BatchInstruction::ModeList { dst, src, .. } => {
+                check_slot(*dst, "dst")?;
+                check_slot(*src, "src")
             }
             BatchInstruction::NeighborAggregate { dst, src, .. }
             | BatchInstruction::NeighborMode { dst, src, .. } => {

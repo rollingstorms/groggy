@@ -466,7 +466,7 @@ output = mask.where(a, b)
 ### PageRank Iteration
 
 ```python
-with sG.builder.iter.loop(max_iter):
+with sG.iterate(max_iter):
     # Compute contribution from each node
     contrib = ranks / (degrees + 1e-9)
     

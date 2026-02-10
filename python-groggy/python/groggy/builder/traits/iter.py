@@ -34,7 +34,7 @@ class IterOps:
             Context manager for loop body
 
         Example:
-            >>> with builder.iter.loop(100):
+            >>> with builder.iterate(100):
             ...     neighbor_sum = G @ ranks
             ...     ranks = builder.var("ranks", 0.85 * neighbor_sum + 0.15 / G.N)
         """
