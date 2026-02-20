@@ -1878,7 +1878,7 @@ impl PyGraph {
 
     /// Sample k random nodes from the graph.
     pub fn sample(slf: PyRef<Self>, py: Python, k: usize) -> PyResult<PySubgraph> {
-        Self::with_full_view(slf, py, |subgraph, _py| subgraph.sample(k))
+        Self::with_full_view(slf, py, |subgraph, _py| subgraph.sample_k(k))
     }
 
     /// Create induced subgraph from list of nodes.

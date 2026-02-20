@@ -314,7 +314,7 @@ impl PySubgraphArray {
         let mut sampled = Vec::new();
 
         for subgraph in self.inner.iter() {
-            match subgraph.sample(k) {
+            match subgraph.sample_k(k) {
                 Ok(sampled_subgraph) => sampled.push(sampled_subgraph),
                 Err(_) => continue, // Skip failed subgraphs
             }

@@ -1048,14 +1048,7 @@ impl PySubgraph {
     #[pyo3(signature = (sampler_or_k))]
     pub fn sample(&self, py: Python, sampler_or_k: &PyAny) -> PyResult<PyObject> {
         if let Ok(k) = sampler_or_k.extract::<usize>() {
-            let node_ids: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
-
-            if k >= node_ids.len() {
-                return Ok(PySubgraph::from_core_subgraph(self.inner.clone())?.into_py(py));
-            }
-
-            let _sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
-            return Ok(PySubgraph::from_core_subgraph(self.inner.clone())?.into_py(py));
+            return Ok(self.sample_k(k)?.into_py(py));
         }
 
         if sampler_or_k.hasattr("to_spec")? {
@@ -1069,6 +1062,17 @@ impl PySubgraph {
         Err(PyTypeError::new_err(
             "sample() expects an int or a sampler with to_spec()",
         ))
+    }
+
+    pub(crate) fn sample_k(&self, k: usize) -> PyResult<PySubgraph> {
+        let node_ids: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
+
+        if k >= node_ids.len() {
+            return PySubgraph::from_core_subgraph(self.inner.clone());
+        }
+
+        let _sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
+        PySubgraph::from_core_subgraph(self.inner.clone())
     }
 
     // === String representations ===

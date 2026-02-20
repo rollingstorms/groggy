@@ -232,7 +232,7 @@ impl PyComponentsArray {
 
         for i in 0..self.components_data.len() {
             if let Ok(component) = self.__getitem__(i as isize) {
-                match component.sample(k) {
+                match component.sample_k(k) {
                     Ok(sampled_component) => sampled.push(sampled_component),
                     Err(_) => continue, // Skip failed components
                 }
@@ -517,7 +517,7 @@ impl PyComponentsIterator {
         let mut sampled = Vec::new();
 
         for component in components {
-            match component.sample(k) {
+            match component.sample_k(k) {
                 Ok(sampled_component) => sampled.push(sampled_component),
                 Err(_) => continue, // Skip failed components
             }
