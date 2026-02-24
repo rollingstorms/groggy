@@ -5,38 +5,20 @@ This module provides the main AlgorithmBuilder class that coordinates
 domain-specific trait classes (CoreOps, GraphOps, AttrOps, IterOps).
 """
 
-import importlib.util
-# Import the original implementation temporarily during refactor
-# This will be fully replaced as we migrate functionality
-import sys
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
 from groggy.builder.execution import MessagePassContext
 from groggy.builder.ir import IRGraph, IRNode
+from groggy.builder.legacy_compat import (BuiltAlgorithm, BuiltSampler,
+                                          LoopContext, finalize_legacy_loop_steps)
 from groggy.builder.traits.attr import AttrOps
 from groggy.builder.traits.core import CoreOps
 from groggy.builder.traits.graph import GraphOps
 from groggy.builder.traits.iter import IterOps
-from groggy.builder.varhandle import (GraphHandle, SubgraphHandle, SubgraphArrayHandle,
-                                      VarHandle)
-
-# Load the original builder module for LoopContext and BuiltAlgorithm
-builder_original_path = Path(__file__).parent.parent / "builder_original.py"
-spec = importlib.util.spec_from_file_location(
-    "builder_original",
-    str(builder_original_path),
-)
-builder_original = importlib.util.module_from_spec(spec)
-sys.modules["builder_original"] = builder_original
-spec.loader.exec_module(builder_original)
-
-# Import remaining classes from original
-LoopContext = builder_original.LoopContext
-BuiltAlgorithm = builder_original.BuiltAlgorithm
-BuiltSampler = builder_original.BuiltSampler
+from groggy.builder.varhandle import (GraphHandle, SubgraphArrayHandle,
+                                      SubgraphHandle, VarHandle)
 
 
 class AlgorithmBuilder:
@@ -514,20 +496,9 @@ class AlgorithmBuilder:
             iterations: Number of times to repeat
             loop_vars: Variables at loop start
         """
-        # First, unroll the steps using the original implementation
-        from builder_original import AlgorithmBuilder as OriginalBuilder
-
-        temp_builder = OriginalBuilder(self.name)
-        temp_builder.steps = self.steps
-        temp_builder.variables = self.variables
-        temp_builder._var_counter = self._var_counter
-
-        temp_builder._finalize_loop(start_step, iterations, loop_vars)
-
-        # Copy back the modified state
-        self.steps = temp_builder.steps
-        self.variables = temp_builder.variables
-        self._var_counter = temp_builder._var_counter
+        # Reuse the legacy loop lowering logic while the IR builder remains
+        # step-list compatible with the original representation.
+        finalize_legacy_loop_steps(self, start_step, iterations, loop_vars)
 
         # Now rebuild IR graph to reflect unrolled steps
         if self.use_ir:
