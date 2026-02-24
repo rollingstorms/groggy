@@ -34,9 +34,29 @@ flowchart TD
     GraphMatrix --> NumArray
 ```
 
-## Diagram Plan
+## Source of Truth
 
-The Mermaid diagram above is the **core view**. Keep the diagram scoped to core types to preserve readability as the API grows.
+The Mermaid diagram above is a **curated core view** for readability.
+
+The full transformation graph is now generated dynamically from the live Groggy API and can be loaded through the Groggy generator:
+
+```python
+import groggy as gr
+
+api_graph = gr.generators.meta_api_graph()
+graph_table = api_graph.table()
+nodes_table = graph_table.nodes()
+edges_table = graph_table.edges()
+```
+
+This graph bundle is built by:
+
+- `notes/meta_api_discovery/meta_api_graph_builder.py`
+- analyzed in `notes/meta_api_discovery/Meta_API_Discovery_Analysis_Dynamic_Pure_Groggy.ipynb`
+
+### Why the docs keep a smaller diagram
+
+The dynamic meta-graph includes many inferred return types and helper/accessor objects. The docs intentionally show only the most important connected-view types so the transformation model stays learnable.
 
 ---
 
@@ -477,6 +497,8 @@ Path:
 Code:
 g.nodes["age"].filter(lambda x: x > 30).to_numeric().mean()
 ```
+
+For the current generated transformation graph (including inferred return types), use `gr.generators.meta_api_graph()` and inspect it directly.
 
 ---
 
