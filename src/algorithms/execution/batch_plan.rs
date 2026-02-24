@@ -389,8 +389,7 @@ impl BatchPlan {
                 check_slot(*dst, "dst")?;
                 check_slot(*src, "src")
             }
-            BatchInstruction::Clip { dst, src, .. }
-            | BatchInstruction::Recip { dst, src, .. } => {
+            BatchInstruction::Clip { dst, src, .. } | BatchInstruction::Recip { dst, src, .. } => {
                 check_slot(*dst, "dst")?;
                 check_slot(*src, "src")
             }

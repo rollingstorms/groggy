@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::subgraphs::Subgraph;
@@ -233,11 +233,8 @@ impl Step for IterateNodesStep {
         for &node in scope.subgraph().nodes().iter() {
             let mut nodes = std::collections::HashSet::new();
             nodes.insert(node);
-            let sg = Subgraph::from_nodes(
-                graph_ref.clone(),
-                nodes,
-                "sample_iterate_nodes".to_string(),
-            )?;
+            let sg =
+                Subgraph::from_nodes(graph_ref.clone(), nodes, "sample_iterate_nodes".to_string())?;
             subgraphs.push(sg);
         }
         scope
@@ -412,10 +409,46 @@ impl Step for EmitSubgraphsStep {
     }
 
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        if let Ok(array) = scope.variables().subgraph_array(&self.source) {
+        if let Ok(array) = scope
+            .variables()
+            .subgraph_array(&self.source)
+            .map(|a| a.clone())
+        {
+            let out = match self.mode {
+                EmitMode::PerSeed => array,
+                EmitMode::Unified => {
+                    if array.is_empty() {
+                        Vec::new()
+                    } else {
+                        let graph_ref = scope.subgraph().graph();
+                        let mut node_set = std::collections::HashSet::new();
+                        let mut edge_set = std::collections::HashSet::new();
+                        for sg in &array {
+                            node_set.extend(sg.nodes().iter().copied());
+                            edge_set.extend(sg.edge_ids().iter().copied());
+                        }
+
+                        let unified = if self.induced {
+                            Subgraph::from_nodes(
+                                graph_ref,
+                                node_set,
+                                "sample_emit_subgraphs_unified".to_string(),
+                            )?
+                        } else {
+                            Subgraph::new(
+                                graph_ref,
+                                node_set,
+                                edge_set,
+                                "sample_emit_subgraphs_unified".to_string(),
+                            )
+                        };
+                        vec![unified]
+                    }
+                }
+            };
             scope
                 .variables_mut()
-                .set_subgraph_array(self.target.clone(), array.clone());
+                .set_subgraph_array(self.target.clone(), out);
             return Ok(());
         }
 
@@ -425,8 +458,7 @@ impl Step for EmitSubgraphsStep {
             let mut out = Vec::new();
             match self.mode {
                 EmitMode::Unified => {
-                    let node_set: std::collections::HashSet<NodeId> =
-                        nodes.into_iter().collect();
+                    let node_set: std::collections::HashSet<NodeId> = nodes.into_iter().collect();
                     let sg = if self.induced {
                         Subgraph::from_nodes(
                             graph_ref.clone(),
@@ -456,7 +488,9 @@ impl Step for EmitSubgraphsStep {
                     }
                 }
             }
-            scope.variables_mut().set_subgraph_array(self.target.clone(), out);
+            scope
+                .variables_mut()
+                .set_subgraph_array(self.target.clone(), out);
             return Ok(());
         }
 
@@ -508,7 +542,9 @@ impl Step for EmitSubgraphsStep {
                 }
             }
         }
-        scope.variables_mut().set_subgraph_array(self.target.clone(), out);
+        scope
+            .variables_mut()
+            .set_subgraph_array(self.target.clone(), out);
         Ok(())
     }
 }

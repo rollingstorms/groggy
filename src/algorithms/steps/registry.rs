@@ -17,6 +17,7 @@ use super::attributes::{
 };
 use super::community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
 use super::core::{global_step_registry, StepMetadata, StepRegistry};
+use super::drawing::SmoothStrokeAttrsStep;
 use super::execution_block::{BlockBody, BlockOptions, ExecutionBlockStep, ExecutionMode};
 use super::expression::Expr;
 use super::filtering::{
@@ -56,9 +57,7 @@ fn json_to_param(value: serde_json::Value) -> Result<AlgorithmParamValue> {
         serde_json::Value::Array(items) => {
             AlgorithmParamValue::Json(serde_json::Value::Array(items))
         }
-        serde_json::Value::Object(map) => {
-            AlgorithmParamValue::Json(serde_json::Value::Object(map))
-        }
+        serde_json::Value::Object(map) => AlgorithmParamValue::Json(serde_json::Value::Object(map)),
     })
 }
 
@@ -1384,11 +1383,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let hops = spec
-                .params
-                .get_int("hops")
-                .map(|v| v as usize)
-                .unwrap_or(1);
+            let hops = spec.params.get_int("hops").map(|v| v as usize).unwrap_or(1);
             Ok(Box::new(super::sampling::NeighborsStep::new(
                 source, hops, target,
             )))
@@ -1407,9 +1402,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let target = spec.params.expect_text("target")?.to_string();
             let mode = match spec.params.get_text("mode") {
                 Some("unified") => super::sampling::EmitMode::Unified,
-                Some("per_item") | Some("per-item") | None => {
-                    super::sampling::EmitMode::PerSeed
-                }
+                Some("per_item") | Some("per-item") | None => super::sampling::EmitMode::PerSeed,
                 Some(other) => return Err(anyhow!("unknown emit mode: {}", other)),
             };
             let induced = spec.params.get_bool("induced").unwrap_or(true);
@@ -1961,6 +1954,61 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             Ok(Box::new(super::flow::AliasStep::new(
                 source.to_string(),
                 target.to_string(),
+            )))
+        },
+    )?;
+
+    registry.register(
+        "drot.smooth_strokes",
+        StepMetadata {
+            id: "drot.smooth_strokes".to_string(),
+            description: "Smooth stroke attributes grouped by stroke id".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let attr_x = spec.params.get_text("attr_x").unwrap_or("x").to_string();
+            let attr_y = spec.params.get_text("attr_y").unwrap_or("y").to_string();
+            let attr_t = spec.params.get_text("attr_t").unwrap_or("t").to_string();
+            let attr_stroke = spec
+                .params
+                .get_text("attr_stroke")
+                .unwrap_or("stroke_id")
+                .to_string();
+            let target_x = spec
+                .params
+                .get_text("target_x")
+                .unwrap_or("x_smooth")
+                .to_string();
+            let target_y = spec
+                .params
+                .get_text("target_y")
+                .unwrap_or("y_smooth")
+                .to_string();
+            let window_raw = spec.params.get_int("window").unwrap_or(3);
+            if window_raw <= 0 {
+                return Err(anyhow!("drot.smooth_strokes: 'window' must be > 0"));
+            }
+            let window = usize::try_from(window_raw)
+                .map_err(|_| anyhow!("drot.smooth_strokes: invalid 'window'"))?;
+
+            let iterations_raw = spec.params.get_int("iterations").unwrap_or(1);
+            if iterations_raw <= 0 {
+                return Err(anyhow!("drot.smooth_strokes: 'iterations' must be > 0"));
+            }
+            let iterations = usize::try_from(iterations_raw)
+                .map_err(|_| anyhow!("drot.smooth_strokes: invalid 'iterations'"))?;
+            let stroke_id = spec.params.get_int("stroke_id");
+
+            Ok(Box::new(SmoothStrokeAttrsStep::new(
+                AttrName::from(attr_x),
+                AttrName::from(attr_y),
+                AttrName::from(attr_t),
+                AttrName::from(attr_stroke),
+                AttrName::from(target_x),
+                AttrName::from(target_y),
+                window,
+                iterations,
+                stroke_id,
             )))
         },
     )?;

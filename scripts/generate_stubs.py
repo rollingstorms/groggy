@@ -271,7 +271,8 @@ def generate_stub_for_module(module_name: str, output_path: Path):
     
     # Write to file
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text('\n'.join(lines))
+    normalized = "\n".join(line.rstrip() for line in lines).rstrip() + "\n"
+    output_path.write_text(normalized)
     print(f"✅ Generated stub file: {output_path}")
     print(f"   - {len(functions)} module-level functions")
     print(f"   - {len(classes)} classes")

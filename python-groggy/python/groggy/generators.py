@@ -827,7 +827,7 @@ def meta_api_graph() -> Graph:
     This serves as the ultimate meta-example: Groggy analyzing its own API structure!
 
     Returns:
-        Graph: The API meta-graph (35 nodes, 205 edges representing 205 methods)
+        Graph: The API meta-graph (nodes and edges vary by build)
 
     Example:
         >>> api_graph = meta_api_graph()
@@ -853,7 +853,7 @@ def meta_api_graph() -> Graph:
 
         bundle_path = os.path.join(
             os.path.dirname(__file__),
-            "../../../documentation/meta_api_discovery/groggy_api_meta_graph",
+            "../../../notes/meta_api_discovery/meta_api_graph_bundle",
         )
 
         if not os.path.exists(bundle_path):

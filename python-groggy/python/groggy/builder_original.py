@@ -1729,36 +1729,38 @@ class BuiltAlgorithm(AlgorithmHandle):
                 params["seed"] = step["seed"]
             return {"id": "core.sample_edges", "params": params}
 
-        if step_type in ["sample.iterate_nodes", "iterate_nodes"]:
+        if step_type in ["sample.iterate_nodes", "iterate_nodes", "core.iterate_nodes"]:
             return {
                 "id": "sample.iterate_nodes",
                 "params": {"target": step["output"]},
             }
 
-        if step_type in ["sample.iterate_edges", "iterate_edges"]:
+        if step_type in ["sample.iterate_edges", "iterate_edges", "core.iterate_edges"]:
             return {
                 "id": "sample.iterate_edges",
                 "params": {"target": step["output"]},
             }
 
-        if step_type in ["sample.neighbors", "neighbors"]:
+        if step_type in ["sample.neighbors", "neighbors", "core.neighbors"]:
+            source = step.get("input", step.get("source"))
             params = {
-                "source": self._resolve_operand(step["input"], alias_map),
+                "source": self._resolve_operand(source, alias_map),
                 "target": step["output"],
                 "hops": step.get("hops", 1),
             }
             return {"id": "sample.neighbors", "params": params}
 
-        if step_type in ["sample.emit_subgraphs", "emit_subgraphs"]:
+        if step_type in ["sample.emit_subgraphs", "emit_subgraphs", "core.emit_subgraphs"]:
+            source = step.get("input", step.get("source"))
             params = {
-                "source": self._resolve_operand(step["input"], alias_map),
+                "source": self._resolve_operand(source, alias_map),
                 "target": step["output"],
                 "mode": step.get("mode", "per_item"),
                 "induced": step.get("induced", True),
             }
             return {"id": "sample.emit_subgraphs", "params": params}
 
-        if step_type in ["sample.for_each", "for_each"]:
+        if step_type in ["sample.for_each", "for_each", "core.for_each"]:
             body_steps = step.get("body", [])
             body_alias_map = dict(alias_map)
             body_specs: list[Dict[str, Any]] = []
@@ -1777,7 +1779,9 @@ class BuiltAlgorithm(AlgorithmHandle):
                     body_specs.append(encoded_body)
 
             params = {
-                "source": self._resolve_operand(step["input"], alias_map),
+                "source": self._resolve_operand(
+                    step.get("input", step.get("source")), alias_map
+                ),
                 "target": step["output"],
                 "body": body_specs,
             }
@@ -1992,6 +1996,12 @@ class BuiltAlgorithm(AlgorithmHandle):
 
         return errors, warnings
 
+    def __repr__(self) -> str:
+        return f"BuiltAlgorithm('{self._name}', {len(self._steps)} steps)"
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
 
 class BuiltSampler(BuiltAlgorithm):
     """Sampler pipeline built from composed steps."""
@@ -2003,6 +2013,19 @@ class BuiltSampler(BuiltAlgorithm):
     def to_spec(self) -> Dict[str, Any]:
         alias_map: Dict[str, str] = {}
         encoded_steps: list[Dict[str, Any]] = []
+        prev_output: Optional[str] = None
+        prev_non_alias_step_type: Optional[str] = None
+        implicit_source_steps = {
+            "sample.neighbors",
+            "neighbors",
+            "core.neighbors",
+            "sample.emit_subgraphs",
+            "emit_subgraphs",
+            "core.emit_subgraphs",
+            "sample.for_each",
+            "for_each",
+            "core.for_each",
+        }
 
         for step in self._steps:
             if step.get("type") == "alias":
@@ -2013,9 +2036,54 @@ class BuiltSampler(BuiltAlgorithm):
                     alias_map[target] = resolved_source
                 continue
 
-            encoded = self._encode_step(step, alias_map)
+            step_to_encode = step
+            step_type = step.get("type")
+            if (
+                step_type in implicit_source_steps
+                and "input" not in step
+                and "source" not in step
+                and prev_output is not None
+            ):
+                step_to_encode = dict(step)
+                step_to_encode["input"] = prev_output
+
+            # IR sampler lowering may emit `core.neighbors` without an explicit source.
+            # If the previous step sampled node/edge IDs, reconstruct the missing
+            # iterate step so `sample.neighbors` receives a subgraph array.
+            if (
+                step_type in {"core.neighbors", "sample.neighbors", "neighbors"}
+                and prev_output is not None
+                and "input" not in step
+                and "source" not in step
+            ):
+                if prev_non_alias_step_type in {
+                    "core.sample_nodes",
+                    "sample_nodes",
+                    "core.sample_edges",
+                    "sample_edges",
+                }:
+                    bridge_name = f"{prev_output}__seed_subgraphs"
+                    encoded_steps.append(
+                        {
+                            "id": "sample.emit_subgraphs",
+                            "params": {
+                                "source": prev_output,
+                                "target": bridge_name,
+                                "mode": "per_item",
+                                "induced": True,
+                            },
+                        }
+                    )
+                    step_to_encode = dict(step_to_encode)
+                    step_to_encode["input"] = bridge_name
+
+            encoded = self._encode_step(step_to_encode, alias_map)
             if encoded is not None:
                 encoded_steps.append(encoded)
+            if isinstance(step.get("output"), str):
+                prev_output = step["output"]
+            if isinstance(step_type, str):
+                prev_non_alias_step_type = step_type
 
         pipeline_definition = {
             "name": self._name,
@@ -2033,7 +2101,7 @@ class BuiltSampler(BuiltAlgorithm):
         }
 
     def __repr__(self) -> str:
-        return f"BuiltAlgorithm('{self._name}', {len(self._steps)} steps)"
+        return f"BuiltSampler('{self._name}', {len(self._steps)} steps)"
 
 
 def builder(name: str) -> AlgorithmBuilder:

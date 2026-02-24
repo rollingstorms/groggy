@@ -3,6 +3,7 @@ target/
 Cargo.lock
 *.so
 *.dist-info
+dist/
 
 # Python
 __pycache__/
@@ -44,6 +45,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.obsidian/
+docs/.obsidian/
+notes/.obsidian/
 archive/
 notebooks/
 

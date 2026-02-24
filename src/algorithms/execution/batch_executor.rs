@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use crate::algorithms::steps::StepScope;
 use crate::algorithms::AlgorithmParamValue;
+use crate::traits::subgraph_operations::SubgraphOperations;
 use crate::types::AttrName;
 use crate::types::NodeId;
 
@@ -26,6 +27,7 @@ pub struct BatchExecutor {
     node_count: usize,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 enum SlotData {
     FloatVec(Vec<f64>),
@@ -39,8 +41,6 @@ enum SlotData {
 
 struct BatchExecContext {
     nodes: Arc<[NodeId]>,
-    node_index: Option<HashMap<NodeId, usize>>,
-    neighbor_lists: Option<Vec<Vec<NodeId>>>,
     neighbor_indices: Option<Vec<Vec<usize>>>,
 }
 
@@ -93,16 +93,17 @@ impl BatchExecutor {
         for iter in 0..iterations {
             // Execute instruction sequence
             for (idx, instr) in plan.instructions.iter().enumerate() {
-                self.execute_instruction(instr, scope, &context).map_err(|e| {
-                    anyhow!(
-                        "Iteration {}/{}, instruction {}/{}: {}",
-                        iter + 1,
-                        iterations,
-                        idx + 1,
-                        plan.instructions.len(),
-                        e
-                    )
-                })?;
+                self.execute_instruction(instr, scope, &context)
+                    .map_err(|e| {
+                        anyhow!(
+                            "Iteration {}/{}, instruction {}/{}: {}",
+                            iter + 1,
+                            iterations,
+                            idx + 1,
+                            plan.instructions.len(),
+                            e
+                        )
+                    })?;
             }
 
             // Copy carried variables for next iteration (phi nodes)
@@ -143,7 +144,9 @@ impl BatchExecutor {
     /// 3. The slot count matches what was allocated
     pub fn get_slot_pointers(&mut self) -> Vec<*mut f64> {
         for slot in 0..self.slots.len() {
-            let converted = self.to_f64_vec(slot).unwrap_or_else(|_| vec![0.0; self.node_count]);
+            let converted = self
+                .to_f64_vec(slot)
+                .unwrap_or_else(|_| vec![0.0; self.node_count]);
             self.slots[slot] = SlotData::FloatVec(converted);
         }
         self.slots
@@ -236,9 +239,11 @@ impl BatchExecutor {
                 if_true,
                 if_false,
             } => self.where_op(*dst, *condition, *if_true, *if_false),
-            BatchInstruction::ReduceScalar { dst, src, operation } => {
-                self.reduce_scalar(*dst, *src, *operation)
-            }
+            BatchInstruction::ReduceScalar {
+                dst,
+                src,
+                operation,
+            } => self.reduce_scalar(*dst, *src, *operation),
             BatchInstruction::Normalize {
                 dst,
                 src,
@@ -261,9 +266,11 @@ impl BatchExecutor {
                 src,
                 include_self,
             } => self.collect_neighbor_values(*dst, *src, *include_self, scope, context),
-            BatchInstruction::ModeList { dst, src, tie_break } => {
-                self.mode_list(*dst, *src, *tie_break)
-            }
+            BatchInstruction::ModeList {
+                dst,
+                src,
+                tie_break,
+            } => self.mode_list(*dst, *src, *tie_break),
             BatchInstruction::NeighborAggregate {
                 dst,
                 src,
@@ -282,17 +289,15 @@ impl BatchExecutor {
                 multiplier,
                 operation,
                 direction,
-            } => {
-                self.fused_neighbor_mul_agg(
-                    *dst,
-                    *src,
-                    *multiplier,
-                    *operation,
-                    *direction,
-                    scope,
-                    context,
-                )
-            }
+            } => self.fused_neighbor_mul_agg(
+                *dst,
+                *src,
+                *multiplier,
+                *operation,
+                *direction,
+                scope,
+                context,
+            ),
             BatchInstruction::FusedMADD { dst, a, b, c } => self.fused_madd(*dst, *a, *b, *c),
             BatchInstruction::FusedAXPY { dst, alpha, x, y } => {
                 self.fused_axpy(*dst, *alpha, *x, *y)
@@ -455,6 +460,12 @@ impl BatchExecutor {
                             var_name
                         ));
                     }
+                    SlotData::ListVec(_) => {
+                        return Err(anyhow!(
+                            "StoreNodeProp: list slot not supported for '{}'",
+                            var_name
+                        ));
+                    }
                 }
             } else {
                 // Fallback: build mapping (rare case where orderings differ)
@@ -492,7 +503,7 @@ impl BatchExecutor {
                         }
                     }
                     SlotData::FloatScalar(value) => {
-                        for (slot_idx, &node) in nodes.iter().enumerate() {
+                        for &node in nodes.iter() {
                             if let Some(&col_idx) = node_to_col_idx.get(&node) {
                                 values_mut[col_idx] = AlgorithmParamValue::Float(*value);
                             } else {
@@ -505,7 +516,7 @@ impl BatchExecutor {
                         }
                     }
                     SlotData::IntScalar(value) => {
-                        for (slot_idx, &node) in nodes.iter().enumerate() {
+                        for &node in nodes.iter() {
                             if let Some(&col_idx) = node_to_col_idx.get(&node) {
                                 values_mut[col_idx] = AlgorithmParamValue::Int(*value);
                             } else {
@@ -520,6 +531,12 @@ impl BatchExecutor {
                     SlotData::BoolVec(_) | SlotData::BoolScalar(_) => {
                         return Err(anyhow!(
                             "StoreNodeProp: boolean slot not supported for '{}'",
+                            var_name
+                        ));
+                    }
+                    SlotData::ListVec(_) => {
+                        return Err(anyhow!(
+                            "StoreNodeProp: list slot not supported for '{}'",
                             var_name
                         ));
                     }
@@ -556,6 +573,12 @@ impl BatchExecutor {
                         var_name
                     ));
                 }
+                SlotData::ListVec(_) => {
+                    return Err(anyhow!(
+                        "StoreNodeProp: list slot not supported for '{}'",
+                        var_name
+                    ));
+                }
             }
             scope.variables_mut().set_node_map(var_name, map);
             false
@@ -569,14 +592,13 @@ impl BatchExecutor {
                 SlotData::IntScalar(_) => 1,
                 SlotData::BoolVec(values) => values.len().min(5),
                 SlotData::BoolScalar(_) => 1,
+                SlotData::ListVec(values) => values.len().min(5),
             };
             let sample: Vec<f64> = match &src_slot {
                 SlotData::FloatVec(values) => values.iter().copied().take(sample_len).collect(),
-                SlotData::IntVec(values) => values
-                    .iter()
-                    .take(sample_len)
-                    .map(|v| *v as f64)
-                    .collect(),
+                SlotData::IntVec(values) => {
+                    values.iter().take(sample_len).map(|v| *v as f64).collect()
+                }
                 SlotData::FloatScalar(value) => vec![*value],
                 SlotData::IntScalar(value) => vec![*value as f64],
                 SlotData::BoolVec(values) => values
@@ -585,6 +607,11 @@ impl BatchExecutor {
                     .map(|v| if *v { 1.0 } else { 0.0 })
                     .collect(),
                 SlotData::BoolScalar(value) => vec![if *value { 1.0 } else { 0.0 }],
+                SlotData::ListVec(values) => values
+                    .iter()
+                    .take(sample_len)
+                    .map(|list| list.first().copied().unwrap_or(0.0))
+                    .collect(),
             };
             eprintln!(
                 "[BATCH_EXECUTOR] store '{}' sample ({} nodes, column={}) {:?}",
@@ -596,6 +623,7 @@ impl BatchExecutor {
                     SlotData::IntScalar(_) => 1,
                     SlotData::BoolVec(values) => values.len(),
                     SlotData::BoolScalar(_) => 1,
+                    SlotData::ListVec(values) => values.len(),
                 },
                 wrote_column,
                 sample
@@ -660,7 +688,7 @@ impl BatchExecutor {
                 .subgraph()
                 .get_edge_attribute(*edge, &AttrName::from(attr_name.to_string()))?
                 .and_then(AlgorithmParamValue::from_attr_value)
-                .unwrap_or_else(|| AlgorithmParamValue::Float(default));
+                .unwrap_or(AlgorithmParamValue::Float(default));
             map.insert(*edge, value);
         }
         scope
@@ -708,7 +736,10 @@ impl BatchExecutor {
             SlotData::BoolScalar(value) => {
                 self.slots[dst] = SlotData::BoolVec(vec![*value; self.node_count]);
             }
-            SlotData::FloatVec(_) | SlotData::IntVec(_) | SlotData::BoolVec(_) => {
+            SlotData::FloatVec(_)
+            | SlotData::IntVec(_)
+            | SlotData::BoolVec(_)
+            | SlotData::ListVec(_) => {
                 return Err(anyhow!("BroadcastScalar expects a scalar slot"));
             }
         }
@@ -778,7 +809,7 @@ impl BatchExecutor {
         let true_slot = self.slots[if_true].clone();
         let false_slot = self.slots[if_false].clone();
 
-        match (true_slot, false_slot) {
+        match (&true_slot, &false_slot) {
             (SlotData::IntVec(a), SlotData::IntVec(b)) => {
                 let mut out = vec![0; self.node_count];
                 for i in 0..self.node_count {
@@ -789,13 +820,13 @@ impl BatchExecutor {
             (SlotData::IntScalar(a), SlotData::IntScalar(b)) => {
                 let mut out = vec![0; self.node_count];
                 for i in 0..self.node_count {
-                    out[i] = if cond[i] { a } else { b };
+                    out[i] = if cond[i] { *a } else { *b };
                 }
                 self.slots[dst] = SlotData::IntVec(out);
             }
             _ => {
-                let true_vec = self.to_f64_vec_from_slot(true_slot)?;
-                let false_vec = self.to_f64_vec_from_slot(false_slot)?;
+                let true_vec = self.to_f64_vec_from_slot(&true_slot)?;
+                let false_vec = self.to_f64_vec_from_slot(&false_slot)?;
                 let mut out = vec![0.0; self.node_count];
                 for i in 0..self.node_count {
                     out[i] = if cond[i] { true_vec[i] } else { false_vec[i] };
@@ -834,14 +865,8 @@ impl BatchExecutor {
                             values.iter().sum::<f64>() / values.len() as f64
                         }
                     }
-                    AggregateOp::Min => values
-                        .iter()
-                        .copied()
-                        .fold(f64::INFINITY, f64::min),
-                    AggregateOp::Max => values
-                        .iter()
-                        .copied()
-                        .fold(f64::NEG_INFINITY, f64::max),
+                    AggregateOp::Min => values.iter().copied().fold(f64::INFINITY, f64::min),
+                    AggregateOp::Max => values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
                 };
                 self.slots[dst] = SlotData::FloatScalar(scalar);
             }
@@ -897,7 +922,7 @@ impl BatchExecutor {
         target: SlotId,
         include_self: bool,
         tie_break: TieBreak,
-        scope: &mut StepScope,
+        _scope: &mut StepScope,
         context: &BatchExecContext,
     ) -> Result<()> {
         let neighbor_indices = context.neighbor_indices.as_ref().ok_or_else(|| {
@@ -914,7 +939,7 @@ impl BatchExecutor {
                 }
 
                 let range = max_label.saturating_sub(min_label);
-                let use_dense = range >= 0 && range <= 10_000;
+                let use_dense = (0..=10_000).contains(&range);
 
                 if use_dense {
                     let len = (range + 1) as usize;
@@ -1086,7 +1111,7 @@ impl BatchExecutor {
         dst: SlotId,
         src: SlotId,
         include_self: bool,
-        scope: &mut StepScope,
+        _scope: &mut StepScope,
         context: &BatchExecContext,
     ) -> Result<()> {
         let nodes = &context.nodes;
@@ -1173,7 +1198,6 @@ impl BatchExecutor {
         _scope: &mut StepScope,
         context: &BatchExecContext,
     ) -> Result<()> {
-        let nodes = &context.nodes;
         let neighbor_indices = context.neighbor_indices.as_ref().ok_or_else(|| {
             anyhow!("Neighbor aggregation requested without cached neighbor context")
         })?;
@@ -1232,10 +1256,10 @@ impl BatchExecutor {
         _scope: &mut StepScope,
         context: &BatchExecContext,
     ) -> Result<()> {
-        let nodes = &context.nodes;
-        let neighbor_indices = context.neighbor_indices.as_ref().ok_or_else(|| {
-            anyhow!("Neighbor mode requested without cached neighbor context")
-        })?;
+        let neighbor_indices = context
+            .neighbor_indices
+            .as_ref()
+            .ok_or_else(|| anyhow!("Neighbor mode requested without cached neighbor context"))?;
 
         // Work with slots
         let src_vec = self.to_f64_vec(src)?;
@@ -1297,7 +1321,6 @@ impl BatchExecutor {
         _scope: &mut StepScope,
         context: &BatchExecContext,
     ) -> Result<()> {
-        let nodes = &context.nodes;
         let neighbor_indices = context.neighbor_indices.as_ref().ok_or_else(|| {
             anyhow!("Neighbor aggregation requested without cached neighbor context")
         })?;
@@ -1385,36 +1408,51 @@ impl BatchExecutor {
 
     /// Helper: get immutable reference to float vector in a slot
     fn to_f64_vec(&self, slot: SlotId) -> Result<Vec<f64>> {
-        self.to_f64_vec_from_slot(self.slots.get(slot).ok_or_else(|| {
-            anyhow!("slot {} out of bounds for batch executor", slot)
-        })?)
+        self.to_f64_vec_from_slot(
+            self.slots
+                .get(slot)
+                .ok_or_else(|| anyhow!("slot {} out of bounds for batch executor", slot))?,
+        )
     }
 
     fn to_f64_vec_from_slot(&self, slot: &SlotData) -> Result<Vec<f64>> {
-        Ok(match slot {
+        let out = match slot {
             SlotData::FloatVec(values) => values.clone(),
             SlotData::IntVec(values) => values.iter().map(|v| *v as f64).collect(),
-            SlotData::BoolVec(values) => values.iter().map(|v| if *v { 1.0 } else { 0.0 }).collect(),
+            SlotData::BoolVec(values) => {
+                values.iter().map(|v| if *v { 1.0 } else { 0.0 }).collect()
+            }
             SlotData::FloatScalar(value) => vec![*value; self.node_count],
             SlotData::IntScalar(value) => vec![*value as f64; self.node_count],
             SlotData::BoolScalar(value) => vec![if *value { 1.0 } else { 0.0 }; self.node_count],
-        })
+            SlotData::ListVec(_) => {
+                return Err(anyhow!("expected numeric slot, got list slot"));
+            }
+        };
+        Ok(out)
     }
 
     fn to_bool_vec(&self, slot: SlotId) -> Result<Vec<bool>> {
-        match self.slots.get(slot).ok_or_else(|| {
-            anyhow!("slot {} out of bounds for batch executor", slot)
-        })? {
+        match self
+            .slots
+            .get(slot)
+            .ok_or_else(|| anyhow!("slot {} out of bounds for batch executor", slot))?
+        {
             SlotData::BoolVec(values) => Ok(values.clone()),
             SlotData::BoolScalar(value) => Ok(vec![*value; self.node_count]),
             SlotData::FloatVec(values) => Ok(values.iter().map(|v| *v != 0.0).collect()),
             SlotData::IntVec(values) => Ok(values.iter().map(|v| *v != 0).collect()),
             SlotData::FloatScalar(value) => Ok(vec![*value != 0.0; self.node_count]),
             SlotData::IntScalar(value) => Ok(vec![*value != 0; self.node_count]),
+            SlotData::ListVec(_) => Err(anyhow!("expected scalar/vector slot, got list slot")),
         }
     }
 
-    fn build_context(&mut self, plan: &BatchPlan, scope: &mut StepScope) -> Result<BatchExecContext> {
+    fn build_context(
+        &mut self,
+        plan: &BatchPlan,
+        scope: &mut StepScope,
+    ) -> Result<BatchExecContext> {
         let nodes = scope.subgraph().ordered_nodes();
         if nodes.len() != self.node_count {
             return Err(anyhow!(
@@ -1458,15 +1496,11 @@ impl BatchExecutor {
 
             Ok(BatchExecContext {
                 nodes,
-                node_index: Some(node_index),
-                neighbor_lists: Some(neighbor_lists),
                 neighbor_indices: Some(neighbor_indices),
             })
         } else {
             Ok(BatchExecContext {
                 nodes,
-                node_index: None,
-                neighbor_lists: None,
                 neighbor_indices: None,
             })
         }

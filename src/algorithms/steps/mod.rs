@@ -13,6 +13,7 @@ mod community;
 pub mod composition;
 mod core;
 pub mod direction;
+mod drawing;
 mod execution_block;
 mod expression;
 mod filtering;
@@ -68,8 +69,9 @@ pub use normalization::{
 };
 pub use pathfinding::{KShortestPathsStep, RandomWalkStep, ShortestPathMapStep};
 pub use sampling::{
-    EmitMode, EntityType, ForEachSubgraphStep, IterateEdgesStep, IterateNodesStep, NeighborsStep,
-    ReservoirSampleStep, SampleEdgesStep, SampleNodesStep, SampleSpec, EmitSubgraphsStep,
+    EmitMode, EmitSubgraphsStep, EntityType, ForEachSubgraphStep, IterateEdgesStep,
+    IterateNodesStep, NeighborsStep, ReservoirSampleStep, SampleEdgesStep, SampleNodesStep,
+    SampleSpec,
 };
 pub use structural::{
     EdgeWeightSumStep, KCoreMarkStep, NodeDegreeStep, TriangleCountStep, WeightedDegreeStep,
@@ -81,6 +83,7 @@ pub use fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
 
 // Re-export direction types
 pub use direction::NeighborDirection;
+pub use drawing::SmoothStrokeAttrsStep;
 
 // Re-export execution block types
 pub use execution_block::{BlockBody, BlockOptions, BodyNode, ExecutionBlockStep, ExecutionMode};

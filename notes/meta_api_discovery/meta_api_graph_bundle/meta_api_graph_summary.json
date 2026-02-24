@@ -1,0 +1,141 @@
+{
+  "meta_graph_stats": {
+    "nodes": 56,
+    "edges": 587,
+    "types_discovered": 56
+  },
+  "type_info": {
+    "Graph": {
+      "type_name": "Graph",
+      "class_name": "Graph",
+      "module": "builtins",
+      "docstring": "Python wrapper for the main Graph"
+    },
+    "NodesAccessor": {
+      "type_name": "NodesAccessor",
+      "class_name": "NodesAccessor",
+      "module": "builtins",
+      "docstring": "Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView"
+    },
+    "EdgesAccessor": {
+      "type_name": "EdgesAccessor",
+      "class_name": "EdgesAccessor",
+      "module": "builtins",
+      "docstring": "Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  "
+    },
+    "GraphTable": {
+      "type_name": "GraphTable",
+      "class_name": "GraphTable",
+      "module": "groggy",
+      "docstring": "Python wrapper for GraphTable"
+    },
+    "NodesTable": {
+      "type_name": "NodesTable",
+      "class_name": "NodesTable",
+      "module": "groggy",
+      "docstring": "Python wrapper for NodesTable"
+    },
+    "EdgesTable": {
+      "type_name": "EdgesTable",
+      "class_name": "EdgesTable",
+      "module": "groggy",
+      "docstring": "Python wrapper for EdgesTable"
+    },
+    "NodesArray": {
+      "type_name": "NodesArray",
+      "class_name": "NodesArray",
+      "module": "builtins",
+      "docstring": "NodesArray: Collection of NodesAccessor objects with delegation to BaseArray\nProvides basic array operations and graph-specific transformations"
+    },
+    "NumArray": {
+      "type_name": "NumArray",
+      "class_name": "NumArray",
+      "module": "builtins",
+      "docstring": "Unified statistical array supporting all numeric types internally"
+    },
+    "SubgraphArray": {
+      "type_name": "SubgraphArray",
+      "class_name": "SubgraphArray",
+      "module": "builtins",
+      "docstring": "Specialized array for PySubgraph objects\n\nNote: Uses Arc<Vec<PySubgraph>> for zero-copy sharing. PySubgraph is marked\nas `unsendable` so this won't be used across threads. Arc is used here for\nefficient cloning/sharing within a single thread."
+    },
+    "TableArray": {
+      "type_name": "TableArray",
+      "class_name": "TableArray",
+      "module": "builtins",
+      "docstring": "Specialized array for table objects (PyObject wrapper for tables)"
+    },
+    "Subgraph": {
+      "type_name": "Subgraph",
+      "class_name": "Subgraph",
+      "module": "builtins",
+      "docstring": "Python wrapper for core Subgraph - Pure delegation to existing trait methods\n\nThis completely replaces the complex dual-mode PySubgraph with simple delegation\nto the existing SubgraphOperations trait methods. Same API, much simpler implementation."
+    },
+    "GraphMatrix": {
+      "type_name": "GraphMatrix",
+      "class_name": "GraphMatrix",
+      "module": "builtins",
+      "docstring": "Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays"
+    },
+    "ComponentsArray": {
+      "type_name": "ComponentsArray",
+      "class_name": "ComponentsArray",
+      "module": "builtins",
+      "docstring": "Lazy array of connected components - avoids creating hundreds of PySubgraphs immediately"
+    },
+    "BaseTable": {
+      "type_name": "BaseTable",
+      "class_name": "BaseTable",
+      "module": "groggy",
+      "docstring": "Python wrapper for BaseTable"
+    },
+    "AttrName": {
+      "type_name": "AttrName",
+      "class_name": "str",
+      "module": "builtins",
+      "docstring": "str(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to sys.getdefaultencoding().\nerrors defaults to 'strict'."
+    },
+    "BranchName": {
+      "type_name": "BranchName",
+      "class_name": "str",
+      "module": "builtins",
+      "docstring": "str(object='') -> str\nstr(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to sys.getdefaultencoding().\nerrors defaults to 'strict'."
+    },
+    "DisplayConfig": {
+      "type_name": "DisplayConfig",
+      "class_name": "DisplayConfig",
+      "module": "groggy.display",
+      "docstring": "Python wrapper for DisplayConfig"
+    },
+    "EdgeId": {
+      "type_name": "EdgeId",
+      "class_name": "int",
+      "module": "builtins",
+      "docstring": "int([x]) -> integer\nint(x, base=10) -> integer\n\nConvert a number or string to an integer, or return 0 if no arguments\nare given.  If x is a number, return x.__int__().  For floating point\nnumbers, this truncates towards zero.\n\nIf x is not a number or if base is given, then x must be a string,\nbytes, or bytearray instance representing an integer literal in the\ngiven base.  The literal can be preceded by '+' or '-' and be surrounded\nby whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\nBase 0 means to interpret the base from the string as an integer literal.\n>>> int('0b100', base=0)\n4"
+    },
+    "GroggyError": {
+      "type_name": "GroggyError",
+      "class_name": "GroggyError",
+      "module": "groggy.errors",
+      "docstring": "Base exception for all Groggy errors"
+    },
+    "InvalidInputError": {
+      "type_name": "InvalidInputError",
+      "class_name": "InvalidInputError",
+      "module": "groggy.errors",
+      "docstring": "Raised for invalid input parameters"
+    },
+    "NodeId": {
+      "type_name": "NodeId",
+      "class_name": "int",
+      "module": "builtins",
+      "docstring": "int([x]) -> integer\nint(x, base=10) -> integer\n\nConvert a number or string to an integer, or return 0 if no arguments\nare given.  If x is a number, return x.__int__().  For floating point\nnumbers, this truncates towards zero.\n\nIf x is not a number or if base is given, then x must be a string,\nbytes, or bytearray instance representing an integer literal in the\ngiven base.  The literal can be preceded by '+' or '-' and be surrounded\nby whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\nBase 0 means to interpret the base from the string as an integer literal.\n>>> int('0b100', base=0)\n4"
+    },
+    "StateId": {
+      "type_name": "StateId",
+      "class_name": "int",
+      "module": "builtins",
+      "docstring": "int([x]) -> integer\nint(x, base=10) -> integer\n\nConvert a number or string to an integer, or return 0 if no arguments\nare given.  If x is a number, return x.__int__().  For floating point\nnumbers, this truncates towards zero.\n\nIf x is not a number or if base is given, then x must be a string,\nbytes, or bytearray instance representing an integer literal in the\ngiven base.  The literal can be preceded by '+' or '-' and be surrounded\nby whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\nBase 0 means to interpret the base from the string as an integer literal.\n>>> int('0b100', base=0)\n4"
+    }
+  }
+}

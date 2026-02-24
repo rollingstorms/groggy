@@ -10,28 +10,33 @@ This conceptual model makes Groggy easier to learn: once you understand which ob
 
 ## The Object Transformation Graph
 
+```mermaid
+flowchart TD
+    Graph["Graph"]
+    Subgraph["Subgraph"]
+    SubgraphArray["SubgraphArray"]
+    GraphTable["GraphTable"]
+    NodesTable["NodesTable"]
+    EdgesTable["EdgesTable"]
+    BaseArray["BaseArray"]
+    NumArray["NumArray"]
+    GraphMatrix["GraphMatrix"]
+
+    Graph --> Subgraph
+    Graph --> GraphTable
+    Graph --> BaseArray
+    Graph --> GraphMatrix
+    Subgraph --> SubgraphArray
+    SubgraphArray --> GraphTable
+    GraphTable --> NodesTable
+    GraphTable --> EdgesTable
+    BaseArray --> NumArray
+    GraphMatrix --> NumArray
 ```
-                         ┌─────────┐
-                         │  Graph  │
-                         └────┬────┘
-                              │
-           ┌──────────────────┼──────────────────┐
-           │                  │                  │
-           ↓                  ↓                  ↓
-      ┌────────┐         ┌──────────┐      ┌─────────┐
-      │Subgraph│         │GraphTable│      │BaseArray│
-      └────┬───┘         └────┬─────┘      └────┬────┘
-           │                  │                  │
-           ↓                  ↓                  ↓
-    ┌────────────┐       ┌────────┐        ┌─────────┐
-    │SubgraphArr │       │NodesTab│        │ NumArray│
-    └──────┬─────┘       │EdgesTab│        └─────────┘
-           │             └────────┘
-           ↓
-      ┌────────┐
-      │  Table │
-      └────────┘
-```
+
+## Diagram Plan
+
+The Mermaid diagram above is the **core view**. Keep the diagram scoped to core types to preserve readability as the API grows.
 
 ---
 
