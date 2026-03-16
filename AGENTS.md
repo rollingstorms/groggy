@@ -16,6 +16,7 @@
 ## Development Principles & Performance
 - Preserve attribute-first, columnar operations; bulk paths beat per-item loops.
 - Enforce no business logic in FFI; cross-language safety and error translation take priority.
+- For network/graph analysis in this repo, use Groggy APIs exclusively; do not substitute other graph libraries.
 - Benchmark optimizations in `benches/` (via `cargo bench`) and capture notes when performance trade-offs are introduced.
 - Watch the 100ns per-call FFI budget and maintain O(1) amortized expectations for core mutations.
 

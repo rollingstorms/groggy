@@ -34,6 +34,24 @@ flowchart TD
     GraphMatrix --> NumArray
 ```
 
+## Big Picture (What You Can Do)
+
+The transformation graph is easier to learn if you think in **capabilities**, not individual edges:
+
+- `Graph`: the source object for most workflows.
+- `Subgraph` / `SubgraphArray`: view-oriented analysis and algorithm outputs.
+- `GraphTable` / `NodesTable` / `EdgesTable`: tabular inspection, filtering, and aggregation.
+- `BaseArray` / `NumArray`: attribute extraction, statistics, and column-level processing.
+- `GraphMatrix`: structural / linear-algebra views of the graph.
+
+### Common paths (mental model)
+
+- **Explore structure**: `Graph -> Subgraph -> SubgraphArray`
+- **Inspect as tables**: `Graph -> GraphTable -> NodesTable / EdgesTable`
+- **Analyze attributes**: `Graph -> BaseArray -> NumArray`
+- **Matrix-based analysis**: `Graph -> GraphMatrix -> NumArray`
+- **Round-trip / materialize**: `Subgraph -> Graph`, `GraphTable -> Graph`
+
 ## Source of Truth
 
 The Mermaid diagram above is a **curated core view** for readability.
