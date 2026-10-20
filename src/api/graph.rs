@@ -2234,11 +2234,7 @@ impl Graph {
 
     /// Compare two commits and show differences
     pub fn diff_commits(&self, from: StateId, to: StateId) -> Result<CommitDiff, GraphError> {
-        let _ = (from, to); // Silence unused parameter warning
-        Err(GraphError::NotImplemented {
-            feature: "commit diffs".to_string(),
-            tracking_issue: None,
-        })
+        self.history.diff_commits(from, to)
     }
 
     /*

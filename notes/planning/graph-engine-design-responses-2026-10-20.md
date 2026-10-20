@@ -24,6 +24,8 @@ Bulk setter implementation update: `set_node_attrs`, `set_edge_attrs`, and `set_
 
 Batch implementation update: Rust `GraphBatch` and Python `GraphBatch` can stage new nodes, edges referring to those new nodes, property assignments, and removals. `apply_batch` checks an expected published state, rejects a dirty legacy working graph, validates semantic inputs before mutation, and records one new state on success. Existing single and bulk methods still use manual `commit`; the accepted one-operation-batch rule requires a compatibility migration. This batch path is in-memory only, with no durability claim yet.
 
+Comparison implementation update: `diff_commits(from, to)` now compares reconstructed published states in Rust and Python and reports added/removed node and edge IDs plus typed property before/after values in deterministic order. Unknown state IDs fail explicitly. This is a state comparison; it does not yet report every intermediate action between those states, and revert or endpoint rewiring remains future work.
+
 ## Emerging model
 
 - **Identity and lifetime:** GraphSpace should be the authority for membership in the selected state; GraphPool stores entities, properties and history references. An inactive ID remains inspectable in history until an explicit destructive purge. Never reuse an ID while any retained state references it.

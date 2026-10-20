@@ -363,14 +363,14 @@ impl GraphSnapshot {
         let self_nodes: HashSet<_> = self.active_nodes.iter().collect();
         let other_nodes: HashSet<_> = other.active_nodes.iter().collect();
 
-        let nodes_added = other
+        let mut nodes_added: Vec<_> = other
             .active_nodes
             .iter()
             .filter(|&&node| !self_nodes.contains(&node))
             .cloned()
             .collect();
 
-        let nodes_removed = self
+        let mut nodes_removed: Vec<_> = self
             .active_nodes
             .iter()
             .filter(|&&node| !other_nodes.contains(&node))
@@ -378,14 +378,14 @@ impl GraphSnapshot {
             .collect();
 
         // Compare edges
-        let edges_added = other
+        let mut edges_added: Vec<_> = other
             .edges
             .iter()
             .filter(|(edge_id, _)| !self.edges.contains_key(edge_id))
             .map(|(edge_id, &(source, target))| (*edge_id, source, target))
             .collect();
 
-        let edges_removed = self
+        let mut edges_removed: Vec<_> = self
             .edges
             .iter()
             .filter(|(edge_id, _)| !other.edges.contains_key(edge_id))
@@ -474,6 +474,22 @@ impl GraphSnapshot {
                 }
             }
         }
+
+        nodes_added.sort_unstable();
+        nodes_removed.sort_unstable();
+        edges_added.sort_unstable_by_key(|(id, _, _)| *id);
+        edges_removed.sort_unstable();
+        attribute_changes.sort_unstable_by(|left, right| {
+            let kind = |change: &AttributeChange| match change.entity_type {
+                EntityType::Node => 0,
+                EntityType::Edge => 1,
+            };
+            (kind(left), left.entity_id, &left.attr_name).cmp(&(
+                kind(right),
+                right.entity_id,
+                &right.attr_name,
+            ))
+        });
 
         StateDiff {
             from_state: self.state_id,

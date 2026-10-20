@@ -496,16 +496,30 @@ impl HistoryForest {
 
     /// Compute the changes between two commits
     pub fn diff_commits(&self, from: StateId, to: StateId) -> Result<CommitDiff, GraphError> {
-        let _ = (from, to); // Silence unused warnings
-                            // Basic implementation returns empty diff
+        let before = self.reconstruct_state_at(from)?;
+        let after = self.reconstruct_state_at(to)?;
+        let diff = before.diff_with(&after);
         Ok(CommitDiff {
             from_commit: from,
             to_commit: to,
-            nodes_added: Vec::new(),
-            nodes_removed: Vec::new(),
-            edges_added: Vec::new(),
-            edges_removed: Vec::new(),
-            attr_changes: Vec::new(),
+            nodes_added: diff.nodes_added,
+            nodes_removed: diff.nodes_removed,
+            edges_added: diff.edges_added,
+            edges_removed: diff.edges_removed,
+            attr_changes: diff
+                .attribute_changes
+                .into_iter()
+                .map(|change| AttributeChange {
+                    entity_type: match change.entity_type {
+                        crate::state::state::EntityType::Node => EntityType::Node,
+                        crate::state::state::EntityType::Edge => EntityType::Edge,
+                    },
+                    entity_id: change.entity_id,
+                    attr_name: change.attr_name,
+                    old_value: change.old_value,
+                    new_value: change.new_value,
+                })
+                .collect(),
         })
     }
 
@@ -523,6 +537,11 @@ impl HistoryForest {
     /// Reconstruct the complete graph state at a specific commit
     /// This is expensive but necessary for time-travel functionality
     pub fn reconstruct_state_at(&self, commit_id: StateId) -> Result<GraphSnapshot, GraphError> {
+        if commit_id != 0 && !self.commits.contains_key(&commit_id) {
+            return Err(GraphError::InvalidInput(format!(
+                "Commit {commit_id} not found"
+            )));
+        }
         // Collect all deltas from root to this commit
         let mut deltas_to_apply = Vec::new();
         let mut current_id = commit_id;

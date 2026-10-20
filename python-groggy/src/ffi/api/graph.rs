@@ -1274,6 +1274,44 @@ impl PyGraph {
         self.inner.borrow().current_state_id()
     }
 
+    /// Compare the effective contents of two published states.
+    fn diff_commits(&self, py: Python, from: StateId, to: StateId) -> PyResult<PyObject> {
+        let diff = self
+            .inner
+            .borrow()
+            .diff_commits(from, to)
+            .map_err(graph_error_to_py_err)?;
+        let output = PyDict::new(py);
+        output.set_item("from_state", diff.from_commit)?;
+        output.set_item("to_state", diff.to_commit)?;
+        output.set_item("nodes_added", diff.nodes_added)?;
+        output.set_item("nodes_removed", diff.nodes_removed)?;
+        output.set_item("edges_added", diff.edges_added)?;
+        output.set_item("edges_removed", diff.edges_removed)?;
+        let changes = PyList::empty(py);
+        for change in diff.attr_changes {
+            let item = PyDict::new(py);
+            let kind = match change.entity_type {
+                groggy::state::history::EntityType::Node => "node",
+                groggy::state::history::EntityType::Edge => "edge",
+            };
+            item.set_item("entity_type", kind)?;
+            item.set_item("entity_id", change.entity_id)?;
+            item.set_item("name", change.attr_name)?;
+            item.set_item(
+                "old",
+                change.old_value.map(|value| PyAttrValue::new(value)),
+            )?;
+            item.set_item(
+                "new",
+                change.new_value.map(|value| PyAttrValue::new(value)),
+            )?;
+            changes.append(item)?;
+        }
+        output.set_item("attribute_changes", changes)?;
+        Ok(output.to_object(py))
+    }
+
     /// Commit current state of the graph (FFI wrapper around core history system)
     fn commit(&mut self, message: String, author: String) -> PyResult<StateId> {
         self.inner
