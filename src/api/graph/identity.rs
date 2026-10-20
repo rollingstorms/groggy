@@ -39,7 +39,11 @@ pub(super) struct ExternalIdentityIndex {
 }
 
 impl ExternalIdentityIndex {
-    fn validate_binding(&self, name: &str, entity: ExternalEntityRef) -> GraphResult<()> {
+    pub(super) fn validate_binding(
+        &self,
+        name: &str,
+        entity: ExternalEntityRef,
+    ) -> GraphResult<()> {
         if name.is_empty() {
             return Err(GraphError::InvalidInput(
                 "External ID must not be empty".into(),
@@ -53,6 +57,9 @@ impl ExternalIdentityIndex {
             }
         }
         Ok(())
+    }
+    pub(super) fn reserve_bindings(&mut self, bindings: Vec<(String, ExternalEntityRef)>) {
+        self.bindings.extend(bindings);
     }
 }
 
@@ -495,5 +502,87 @@ impl Graph {
             )));
         }
         Ok(matches.first().copied())
+    }
+}
+
+impl Graph {
+    /// Prepare published upserts without allocating IDs or touching reservations.
+    pub(crate) fn published_node_upserts(
+        &self,
+        rows: Vec<NodeUpsert>,
+    ) -> GraphResult<(crate::GraphBatch, Vec<NodeId>)> {
+        use crate::{BatchNodeRef, GraphBatch};
+        let resolved = self.prepare_node_upserts(&rows, None)?;
+        let first = self.pool.borrow().statistics().node_count;
+        let mut batch = GraphBatch::default();
+        let mut ids = Vec::with_capacity(rows.len());
+        for (row, existing) in rows.into_iter().zip(resolved) {
+            let (reference, id) = match existing {
+                Some(id) => (BatchNodeRef::Existing(id), id),
+                None => {
+                    let position = batch.add_nodes;
+                    let id = first.checked_add(position).ok_or_else(|| {
+                        GraphError::InvalidInput("Node ID allocation overflow".into())
+                    })?;
+                    batch.add_nodes += 1;
+                    let reference = BatchNodeRef::Added(position);
+                    batch.node_external_ids.push((reference, row.external_id));
+                    (reference, id)
+                }
+            };
+            for (name, value) in row.attrs {
+                let value = super::kinds::normalize_kind_property(&name, value, true)?;
+                if existing.is_none() || self.get_node_attr(id, &name)?.as_ref() != Some(&value) {
+                    batch
+                        .node_attrs
+                        .entry(name)
+                        .or_default()
+                        .push((reference, value));
+                }
+            }
+            ids.push(id);
+        }
+        Ok((batch, ids))
+    }
+
+    pub(crate) fn published_edge_upserts(
+        &self,
+        rows: Vec<EdgeUpsert>,
+    ) -> GraphResult<(crate::GraphBatch, Vec<EdgeId>)> {
+        use crate::{BatchEdgeRef, BatchNodeRef, GraphBatch};
+        let resolved = self.prepare_edge_upserts(&rows, None)?;
+        let first = self.pool.borrow().statistics().edge_count;
+        let mut batch = GraphBatch::default();
+        let mut ids = Vec::with_capacity(rows.len());
+        for (row, existing) in rows.into_iter().zip(resolved) {
+            let (reference, id) = match existing {
+                Some(id) => (BatchEdgeRef::Existing(id), id),
+                None => {
+                    let position = batch.add_edges.len();
+                    let id = first.checked_add(position).ok_or_else(|| {
+                        GraphError::InvalidInput("Edge ID allocation overflow".into())
+                    })?;
+                    batch.add_edges.push((
+                        BatchNodeRef::Existing(row.source),
+                        BatchNodeRef::Existing(row.target),
+                    ));
+                    let reference = BatchEdgeRef::Added(position);
+                    batch.edge_external_ids.push((reference, row.external_id));
+                    (reference, id)
+                }
+            };
+            for (name, value) in row.attrs {
+                let value = super::kinds::normalize_kind_property(&name, value, false)?;
+                if existing.is_none() || self.get_edge_attr(id, &name)?.as_ref() != Some(&value) {
+                    batch
+                        .edge_attrs
+                        .entry(name)
+                        .or_default()
+                        .push((reference, value));
+                }
+            }
+            ids.push(id);
+        }
+        Ok((batch, ids))
     }
 }

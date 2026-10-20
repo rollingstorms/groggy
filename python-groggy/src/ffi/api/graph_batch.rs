@@ -55,7 +55,7 @@ fn pairs<'py>(value: &'py PyAny, context: &str) -> PyResult<Vec<(&'py PyAny, &'p
         .collect()
 }
 
-fn timestamp(value: &PyAny) -> PyResult<i64> {
+pub(crate) fn timestamp(value: &PyAny) -> PyResult<i64> {
     if value.is_instance_of::<pyo3::types::PyBool>()
         || !value.is_instance_of::<pyo3::types::PyLong>()
     {
@@ -87,6 +87,8 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
             "remove_edges",
             "effective_at",
             "change_times",
+            "node_external_ids",
+            "edge_external_ids",
         ]
         .contains(&key.as_str())
         {
@@ -131,6 +133,20 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
             result
                 .change_times
                 .push((key, timestamp(field("effective_at")?)?));
+        }
+    }
+    if let Some(rows) = description.get_item("node_external_ids")? {
+        for (reference, name) in pairs(rows, "node_external_ids")? {
+            result
+                .node_external_ids
+                .push((node_ref(reference)?, name.extract()?));
+        }
+    }
+    if let Some(rows) = description.get_item("edge_external_ids")? {
+        for (reference, name) in pairs(rows, "edge_external_ids")? {
+            result
+                .edge_external_ids
+                .push((edge_ref(reference)?, name.extract()?));
         }
     }
     if let Some(count) = description.get_item("add_nodes")? {

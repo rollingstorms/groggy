@@ -1896,14 +1896,7 @@ impl Graph {
         self.apply_batch_internal(batch, expected_state, message, author, Some(schema))
     }
 
-    fn apply_batch_internal(
-        &mut self,
-        batch: GraphBatch,
-        expected_state: StateId,
-        message: String,
-        author: String,
-        schema: Option<&GraphSchema>,
-    ) -> GraphResult<BatchResult> {
+    pub(crate) fn validate_write_head(&self, expected_state: StateId) -> GraphResult<()> {
         if expected_state != self.current_commit {
             return Err(GraphError::InvalidInput(format!(
                 "Stale graph batch: expected state {expected_state}, current state {}",
@@ -1917,6 +1910,19 @@ impl Graph {
         }
         self.history.get_branch_head(&self.current_branch)?;
 
+        Ok(())
+    }
+
+    fn apply_batch_internal(
+        &mut self,
+        batch: GraphBatch,
+        expected_state: StateId,
+        message: String,
+        author: String,
+        schema: Option<&GraphSchema>,
+    ) -> GraphResult<BatchResult> {
+        self.validate_write_head(expected_state)?;
+
         let allocated = self.pool.borrow().statistics();
         let prepared = batch.prepare(
             |id| self.space.contains_node(id),
@@ -1926,6 +1932,16 @@ impl Graph {
             allocated.edge_count,
         )?;
 
+        let mut identity_errors = Vec::new();
+        for (position, (name, entity)) in prepared.identity_bindings.iter().enumerate() {
+            if let Err(error) = self.identities.validate_binding(name, *entity) {
+                identity_errors.push(format!("identity_bindings[{position}]: {error}"));
+            }
+        }
+        if !identity_errors.is_empty() {
+            return Err(GraphError::InvalidInput(identity_errors.join("; ")));
+        }
+
         if let Some(schema) = schema {
             let violations = schema.validate_proposed(
                 self,
@@ -1933,25 +1949,7 @@ impl Graph {
                 allocated.node_count,
                 allocated.edge_count,
             )?;
-            if !violations.is_empty() {
-                let details: Vec<_> = violations
-                    .into_iter()
-                    .map(|violation| {
-                        let (kind, id) = match violation.entity {
-                            ExternalEntityRef::Node(id) => ("node", id),
-                            ExternalEntityRef::Edge(id) => ("edge", id),
-                        };
-                        format!(
-                            "{kind} {id} [{}].{}: {}",
-                            violation.selector, violation.property, violation.message
-                        )
-                    })
-                    .collect();
-                return Err(GraphError::InvalidInput(format!(
-                    "Schema rejected batch: {}",
-                    details.join("; ")
-                )));
-            }
+            schema::reject_violations(violations)?;
         }
 
         let publication =
@@ -1962,10 +1960,11 @@ impl Graph {
             Vec::new()
         };
         let added_edges = self.add_edges(&prepared.add_edges)?;
-        self.set_node_attrs(prepared.node_attrs)?;
-        self.set_edge_attrs(prepared.edge_attrs)?;
+        self.write_node_attrs(prepared.node_attrs)?;
+        self.write_edge_attrs(prepared.edge_attrs)?;
         self.remove_edges(&prepared.remove_edges)?;
         self.remove_nodes(&prepared.remove_nodes)?;
+        self.identities.reserve_bindings(prepared.identity_bindings);
         let state_id = self.commit_internal(message, author, Some(publication))?;
         Ok(BatchResult {
             state_id,

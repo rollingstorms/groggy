@@ -13,6 +13,7 @@ pub struct GraphWriter<'a> {
     expected_state: StateId,
     author: String,
     schema: Option<&'a GraphSchema>,
+    effective_at: Option<crate::TimestampMicros>,
 }
 impl Graph {
     /// Start a publishing write session at the current head. No state is changed.
@@ -23,6 +24,7 @@ impl Graph {
             expected_state,
             author: author.into(),
             schema: None,
+            effective_at: None,
         }
     }
 }
@@ -30,6 +32,11 @@ impl<'a> GraphWriter<'a> {
     /// Require each resulting graph to satisfy this policy during the session.
     pub fn with_schema(mut self, schema: &'a GraphSchema) -> Self {
         self.schema = Some(schema);
+        self
+    }
+    /// Use an explicit effective-time default for session operations unless a batch supplies its own.
+    pub fn with_effective_at(mut self, effective_at: Option<crate::TimestampMicros>) -> Self {
+        self.effective_at = effective_at;
         self
     }
     /// Select the optimistic head expected for the next operation.
@@ -48,9 +55,12 @@ impl<'a> GraphWriter<'a> {
     /// Publish a staged mixed operation, advancing the session only on success.
     pub fn apply_batch(
         &mut self,
-        batch: GraphBatch,
+        mut batch: GraphBatch,
         message: impl Into<String>,
     ) -> GraphResult<BatchResult> {
+        if batch.effective_at.is_none() {
+            batch.effective_at = self.effective_at;
+        }
         let result = if let Some(schema) = self.schema {
             self.graph.apply_batch_with_schema(
                 batch,
@@ -231,5 +241,52 @@ impl<'a> GraphWriter<'a> {
                 "remove_edges",
             )?
             .state_id)
+    }
+    /// Explicitly assign or rename a node ID and publish its index/property change together.
+    pub fn set_node_external_id(&mut self, node: NodeId, name: String) -> GraphResult<StateId> {
+        Ok(self
+            .apply_batch(
+                GraphBatch {
+                    node_external_ids: vec![(BatchNodeRef::Existing(node), name)],
+                    ..Default::default()
+                },
+                "set_node_external_id",
+            )?
+            .state_id)
+    }
+    /// Explicitly assign or rename an edge ID in one version.
+    pub fn set_edge_external_id(&mut self, edge: EdgeId, name: String) -> GraphResult<StateId> {
+        Ok(self
+            .apply_batch(
+                GraphBatch {
+                    edge_external_ids: vec![(BatchEdgeRef::Existing(edge), name)],
+                    ..Default::default()
+                },
+                "set_edge_external_id",
+            )?
+            .state_id)
+    }
+    fn publish_upsert_plan(&mut self, batch: GraphBatch, message: &str) -> GraphResult<()> {
+        self.graph.validate_write_head(self.expected_state)?;
+        if batch.has_operations() {
+            self.apply_batch(batch, message)?;
+        } else if let Some(schema) = self.schema {
+            self.graph.check_schema_policy(schema)?;
+        }
+        Ok(())
+    }
+    /// Idempotent managed node upserts through the checked publication boundary.
+    pub fn upsert_nodes(&mut self, rows: Vec<crate::NodeUpsert>) -> GraphResult<Vec<NodeId>> {
+        self.graph.validate_write_head(self.expected_state)?;
+        let (batch, ids) = self.graph.published_node_upserts(rows)?;
+        self.publish_upsert_plan(batch, "upsert_nodes")?;
+        Ok(ids)
+    }
+    /// Idempotent managed edge upserts, preserving endpoints and parallel identities.
+    pub fn upsert_edges(&mut self, rows: Vec<crate::EdgeUpsert>) -> GraphResult<Vec<EdgeId>> {
+        self.graph.validate_write_head(self.expected_state)?;
+        let (batch, ids) = self.graph.published_edge_upserts(rows)?;
+        self.publish_upsert_plan(batch, "upsert_edges")?;
+        Ok(ids)
     }
 }

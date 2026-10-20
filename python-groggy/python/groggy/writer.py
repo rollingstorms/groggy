@@ -116,3 +116,29 @@ class GraphWriter:
         for edge in edges:
             batch.remove_edge(edge)
         return self.apply_batch(batch, "remove_edges")["state_id"]
+
+    def set_node_external_id(self, node, external_id, *, effective_at=None):
+        batch = GraphBatch()
+        batch.set_node_external_id(node, external_id, effective_at=effective_at)
+        return self.apply_batch(batch, "set_node_external_id")["state_id"]
+
+    def set_edge_external_id(self, edge, external_id, *, effective_at=None):
+        batch = GraphBatch()
+        batch.set_edge_external_id(edge, external_id, effective_at=effective_at)
+        return self.apply_batch(batch, "set_edge_external_id")["state_id"]
+
+    def upsert_nodes(self, rows, *, uid_key="external_id", effective_at=None):
+        result = self._graph.publish_upsert_nodes(
+            rows, self._state_id, author=self._author, uid_key=uid_key,
+            schema=self._schema, effective_at=effective_at,
+        )
+        self._state_id = result["state_id"]
+        return result["node_ids"]
+
+    def upsert_edges(self, rows, *, uid_key="external_id", effective_at=None):
+        result = self._graph.publish_upsert_edges(
+            rows, self._state_id, author=self._author, uid_key=uid_key,
+            schema=self._schema, effective_at=effective_at,
+        )
+        self._state_id = result["state_id"]
+        return result["edge_ids"]

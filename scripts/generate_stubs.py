@@ -92,6 +92,8 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'apply_batch': 'Dict[str, Any]',
             'writer': 'GraphWriter',
             'publication_metadata': 'Optional[Dict[str, Any]]',
+            'publish_upsert_nodes': 'Dict[str, Any]',
+            'publish_upsert_edges': 'Dict[str, Any]',
             'load_from_path': 'Graph',
             'save_to_path': 'None',
         },

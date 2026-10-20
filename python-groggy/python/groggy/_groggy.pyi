@@ -5138,6 +5138,21 @@ class Graph:
         """
         ...
 
+    def publish_upsert_edges(self, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Publish managed edge upserts and identity-index updates through one checked batch.
+        """
+        ...
+
+
+    def publish_upsert_nodes(self, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Publish managed node upserts and identity-index updates through one checked batch.
+        """
+        ...
+
+
+
 
 
 

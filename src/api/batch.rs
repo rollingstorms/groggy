@@ -40,6 +40,9 @@ pub struct GraphBatch {
     pub edge_attrs: HashMap<AttrName, Vec<(BatchEdgeRef, AttrValue)>>,
     pub remove_edges: Vec<BatchEdgeRef>,
     pub remove_nodes: Vec<BatchNodeRef>,
+    /// Explicit initial assignment or rename; ordinary external_id property writes remain forbidden.
+    pub node_external_ids: Vec<(BatchNodeRef, String)>,
+    pub edge_external_ids: Vec<(BatchEdgeRef, String)>,
     /// Default effective time in signed Unix microseconds; None uses publication time.
     pub effective_at: Option<TimestampMicros>,
     /// Explicit per-operation overrides. Duplicate or unrelated targets reject the batch.
@@ -60,6 +63,7 @@ pub(crate) struct PreparedBatch {
     pub edge_attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     pub remove_edges: Vec<EdgeId>,
     pub remove_nodes: Vec<NodeId>,
+    pub identity_bindings: Vec<(String, crate::ExternalEntityRef)>,
     pub effective_at: Option<TimestampMicros>,
     pub change_times: BTreeMap<ChangeKey, TimestampMicros>,
 }
@@ -85,6 +89,18 @@ fn edge_id(reference: BatchEdgeRef, first: EdgeId, count: usize) -> Result<EdgeI
 }
 
 impl GraphBatch {
+    /// Whether any mutation is staged (time metadata alone is not a mutation).
+    pub fn has_operations(&self) -> bool {
+        self.add_nodes > 0
+            || !self.add_edges.is_empty()
+            || !self.remove_nodes.is_empty()
+            || !self.remove_edges.is_empty()
+            || !self.node_external_ids.is_empty()
+            || !self.edge_external_ids.is_empty()
+            || self.node_attrs.values().any(|v| !v.is_empty())
+            || self.edge_attrs.values().any(|v| !v.is_empty())
+    }
+
     pub(crate) fn prepare<NodeActive, EdgeActive, EdgeEndpoints>(
         self,
         node_active: NodeActive,
@@ -250,6 +266,81 @@ impl GraphBatch {
             edge_attrs.insert(name, resolved);
         }
 
+        let mut identity_bindings = Vec::new();
+        {
+            use crate::ExternalEntityRef;
+            let mut seen_entities = HashSet::new();
+            let mut seen_names = HashSet::new();
+            let mut register =
+                |entity: Result<ExternalEntityRef, String>, name: String, context: String| {
+                    match entity {
+                        Err(error) => errors.push(format!("{context}: {error}")),
+                        Ok(entity) => {
+                            let retained = match entity {
+                                ExternalEntityRef::Node(id) => {
+                                    known_node(id) && !seen_removed_nodes.contains(&id)
+                                }
+                                ExternalEntityRef::Edge(id) => {
+                                    let endpoints = if (next_edge_id..edge_end).contains(&id) {
+                                        resolved_edges.get(id - next_edge_id).copied()
+                                    } else {
+                                        edge_endpoints(id)
+                                    };
+                                    known_edge(id)
+                                        && !seen_removed_edges.contains(&id)
+                                        && endpoints.is_some_and(|(a, b)| {
+                                            !seen_removed_nodes.contains(&a)
+                                                && !seen_removed_nodes.contains(&b)
+                                        })
+                                }
+                            };
+                            if !retained {
+                                errors.push(format!(
+                                    "{context}: {entity:?} is not active in resulting state"
+                                ));
+                            }
+                            if name.is_empty() {
+                                errors.push(format!("{context}: external ID must not be empty"));
+                            }
+                            if !seen_entities.insert(entity) {
+                                errors.push(format!(
+                                    "{context}: duplicate identity assignment for {entity:?}"
+                                ));
+                            }
+                            if !seen_names.insert(name.clone()) {
+                                errors.push(format!("{context}: duplicate external ID {name:?}"));
+                            }
+                            match entity {
+                                ExternalEntityRef::Node(id) => node_attrs
+                                    .entry(super::graph::EXTERNAL_ID.into())
+                                    .or_default()
+                                    .push((id, AttrValue::Text(name.clone()))),
+                                ExternalEntityRef::Edge(id) => edge_attrs
+                                    .entry(super::graph::EXTERNAL_ID.into())
+                                    .or_default()
+                                    .push((id, AttrValue::Text(name.clone()))),
+                            }
+                            identity_bindings.push((name, entity));
+                        }
+                    }
+                };
+            for (position, (reference, name)) in self.node_external_ids.into_iter().enumerate() {
+                register(
+                    node_id(reference, next_node_id, self.add_nodes).map(ExternalEntityRef::Node),
+                    name,
+                    format!("node_external_ids[{position}]"),
+                );
+            }
+            for (position, (reference, name)) in self.edge_external_ids.into_iter().enumerate() {
+                register(
+                    edge_id(reference, next_edge_id, self.add_edges.len())
+                        .map(ExternalEntityRef::Edge),
+                    name,
+                    format!("edge_external_ids[{position}]"),
+                );
+            }
+        }
+
         let mut available = HashSet::new();
         available.extend((next_node_id..node_end).map(ChangeKey::NodeAdded));
         available.extend(removed_nodes.iter().copied().map(ChangeKey::NodeRemoved));
@@ -333,6 +424,7 @@ impl GraphBatch {
             edge_attrs,
             remove_edges: removed_edges,
             remove_nodes: removed_nodes,
+            identity_bindings,
             effective_at: self.effective_at,
             change_times,
         })

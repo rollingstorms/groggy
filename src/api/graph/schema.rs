@@ -305,3 +305,31 @@ impl Graph {
         schema.validate_graph(self)
     }
 }
+
+pub(super) fn reject_violations(violations: Vec<SchemaViolation>) -> GraphResult<()> {
+    if violations.is_empty() {
+        return Ok(());
+    }
+    let details: Vec<_> = violations
+        .into_iter()
+        .map(|violation| {
+            let (kind, id) = match violation.entity {
+                ExternalEntityRef::Node(id) => ("node", id),
+                ExternalEntityRef::Edge(id) => ("edge", id),
+            };
+            format!(
+                "{kind} {id} [{}].{}: {}",
+                violation.selector, violation.property, violation.message
+            )
+        })
+        .collect();
+    Err(GraphError::InvalidInput(format!(
+        "Schema rejected batch: {}",
+        details.join("; ")
+    )))
+}
+impl Graph {
+    pub(crate) fn check_schema_policy(&self, schema: &GraphSchema) -> GraphResult<()> {
+        reject_violations(self.validate_schema(schema)?)
+    }
+}

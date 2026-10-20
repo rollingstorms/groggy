@@ -40,3 +40,21 @@ assert scores[0]["effective_at"] == -10
 `publication_metadata(state_id)` returns `recorded_at`, the effective default, and a stable list of actual change times. Entries identify change kind, entity ID, optional property name, and effective time. Before/after values remain in the same version's typed delta. A legacy manual commit returns `None`. Unknown/duplicate override targets, invalid reference handles, non-integer timestamps, booleans and integer overflow reject before mutation. Callers cannot override recorded time through a raw batch field.
 
 Implicit edge removal takes the earliest effective removal time of its removed endpoints. An explicit edge removal uses its own effective override/default instead. Timestamp reconstruction in item 16 will consume these records; the old `snapshot_at_timestamp` still selects whole-second commit times and is not an effective-time query. These changes do not establish durable publication or crash recovery, which require the storage work in item 10.
+
+## Managed identities and upserts
+
+A mixed batch can explicitly assign or rename external IDs using `set_node_external_id` and `set_edge_external_id`, including handles for entities created in that batch. Name collisions, duplicate assignments and inactive resulting targets reject before allocation or reservation. Schema checks see the proposed identity properties. Reservation/index publication accompanies the typed property delta; old names remain retained after renames.
+
+```python
+batch = GraphBatch(effective_at=100)
+node = batch.add_node(name="identity")
+batch.set_node_external_id(node, "source-identity")
+result = w.apply_batch(batch, "named source")
+assert g.node_by_external_id("source-identity") == result["added_nodes"][0]
+assert w.upsert_nodes([{"external_id": "person", "name": "Ada"}])
+state = w.state_id
+assert w.upsert_nodes([{"external_id": "person", "name": "Ada"}])
+assert w.state_id == state
+```
+
+The writer supports managed node/edge upserts and explicit renames. Idempotent upserts publish no version when their normalized payloads are unchanged; they still check the expected head, dirty-state guard and session schema. Edge upserts preserve endpoints, direction and parallel instance IDs. Python uses native `publish_upsert_nodes` / `publish_upsert_edges` to return both IDs and the exact resulting state, avoiding a separate mutable-head read. Existing `Graph.upsert_nodes` / `upsert_edges` retain legacy manual grouping. Custom input identity keys are consumed into the same managed `external_id` property.

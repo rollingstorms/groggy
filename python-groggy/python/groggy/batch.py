@@ -38,6 +38,8 @@ class GraphBatch:
         self._edge_attrs: dict[str, list[tuple[Any, Any]]] = {}
         self._remove_nodes: list[Any] = []
         self._remove_edges: list[Any] = []
+        self._node_external_ids = []
+        self._edge_external_ids = []
 
     def _ref(self, value: Any, kind: type) -> Any:
         if isinstance(value, kind):
@@ -80,6 +82,14 @@ class GraphBatch:
         self._remove_edges.append(edge)
         self._time("edge_removed", edge, effective_at)
 
+    def set_node_external_id(self, node, external_id, *, effective_at=None):
+        self._node_external_ids.append((node, external_id))
+        self._time("node_attr", node, effective_at, "external_id")
+
+    def set_edge_external_id(self, edge, external_id, *, effective_at=None):
+        self._edge_external_ids.append((edge, external_id))
+        self._time("edge_attr", edge, effective_at, "external_id")
+
     def _time(self, kind, entity, effective_at, name=None):
         if effective_at is not None:
             self._change_times.append((kind, entity, name, effective_at))
@@ -93,6 +103,8 @@ class GraphBatch:
                  "name": name, "effective_at": at}
                 for kind, entity, name, at in self._change_times
             ],
+            "node_external_ids": [(self._ref(node, AddedNode), name) for node, name in self._node_external_ids],
+            "edge_external_ids": [(self._ref(edge, AddedEdge), name) for edge, name in self._edge_external_ids],
             "add_nodes": self._add_nodes,
             "add_edges": [
                 (self._ref(source, AddedNode), self._ref(target, AddedNode))
