@@ -19,9 +19,7 @@ use crate::state::change_tracker::ChangeTracker;
 use crate::state::history::{CommitDiff, HistoricalView, HistoryForest};
 use crate::state::ref_manager::BranchInfo;
 use crate::state::space::GraphSpace;
-use crate::storage::adjacency::{
-    AdjacencyMatrix, AdjacencyMatrixBuilder, MatrixFormat, MatrixType,
-};
+use crate::storage::adjacency::{AdjacencyMatrix, MatrixFormat, MatrixType};
 use crate::storage::pool::GraphPool;
 use crate::subgraphs::neighborhood::NeighborhoodSampler;
 use crate::temporal::TemporalSnapshot;
@@ -2723,7 +2721,11 @@ impl Graph {
             }
         }
 
-        AdjacencyMatrixBuilder::from_edges(&nodes, &edges)
+        crate::storage::matrix::GraphMatrix::adjacency_from_edges_with_direction(
+            &nodes,
+            &edges,
+            self.is_directed(),
+        )
     }
 
     /// Simple adjacency matrix (alias for adjacency_matrix)
@@ -2878,7 +2880,7 @@ impl Graph {
             }
         }
 
-        GraphMatrix::adjacency_from_edges(&nodes, &edges)
+        GraphMatrix::adjacency_from_edges_with_direction(&nodes, &edges, self.is_directed())
     }
 
     /// Create weighted GraphMatrix adjacency representation
@@ -2894,34 +2896,21 @@ impl Graph {
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
 
-        // Convert edges to (source, target, weight) tuples using bulk operations
-        let mut weighted_edges = Vec::new();
-
-        // Prepare bulk input for weight attributes
-        let edge_indices: Vec<(NodeId, Option<usize>)> =
-            edge_ids.iter().map(|&id| (id, None)).collect();
-
-        // Single bulk operation to get all weight values
-        let pool_ref = self.pool.borrow();
-        let weight_values =
-            pool_ref.get_attribute_values(&weight_attr.to_string(), &edge_indices, false);
-
-        // Create weight lookup map for O(1) access
-        let weight_map: std::collections::HashMap<NodeId, &AttrValue> = weight_values
-            .iter()
-            .filter_map(|(id, val_opt)| val_opt.map(|val| (*id, val)))
-            .collect();
-
-        // Build weighted edges using bulk results
-        for edge_id in edge_ids {
+        // Resolve the active edge column through GraphSpace's attribute indices.
+        let weights = self.get_edges_attrs(&weight_attr.to_string(), &edge_ids)?;
+        let mut weighted_edges = Vec::with_capacity(edge_ids.len());
+        for (edge_id, weight_value) in edge_ids.into_iter().zip(weights) {
             if let Ok((source, target)) = self.edge_endpoints(edge_id) {
-                let weight_value = weight_map.get(&edge_id).unwrap_or(&&AttrValue::Float(1.0));
-                let weight = T::from_attr_value(weight_value)?;
+                let weight = T::from_attr_value(&weight_value.unwrap_or(AttrValue::Float(1.0)))?;
                 weighted_edges.push((source, target, weight));
             }
         }
 
-        GraphMatrix::weighted_adjacency_from_edges(&nodes, &weighted_edges)
+        GraphMatrix::weighted_adjacency_from_edges_with_direction(
+            &nodes,
+            &weighted_edges,
+            self.is_directed(),
+        )
     }
 
     /// Generate weighted adjacency matrix using specified edge attribute
@@ -2946,7 +2935,11 @@ impl Graph {
             }
         }
 
-        AdjacencyMatrixBuilder::from_weighted_edges(&nodes, &weighted_edges)
+        crate::storage::matrix::GraphMatrix::weighted_adjacency_from_edges_with_direction(
+            &nodes,
+            &weighted_edges,
+            self.is_directed(),
+        )
     }
 
     /// Generate dense adjacency matrix
@@ -2991,7 +2984,11 @@ impl Graph {
             }
         }
 
-        AdjacencyMatrixBuilder::from_edges(node_ids, &subgraph_edges)
+        crate::storage::matrix::GraphMatrix::adjacency_from_edges_with_direction(
+            node_ids,
+            &subgraph_edges,
+            self.is_directed(),
+        )
     }
 
     /// Generate custom adjacency matrix with full control

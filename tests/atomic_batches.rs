@@ -128,7 +128,9 @@ fn batch_rejects_stale_or_dirty_head_without_changes() {
         "test".into(),
     );
     assert!(dirty.unwrap_err().to_string().contains("uncommitted"));
-    assert_eq!(graph.node_ids(), vec![0, 1]);
+    let mut live_nodes = graph.node_ids();
+    live_nodes.sort_unstable();
+    assert_eq!(live_nodes, vec![0, 1]);
     assert_eq!(graph.current_state_id(), first.state_id);
 }
 

@@ -405,7 +405,9 @@ impl QueryEngine {
             EdgeFilter::ConnectsNodes { source, target } => {
                 if let Some((edge_source, edge_target)) = pool.get_edge_endpoints(edge_id) {
                     (edge_source == *source && edge_target == *target)
-                        || (edge_source == *target && edge_target == *source)
+                        || (pool.graph_type() == crate::types::GraphType::Undirected
+                            && edge_source == *target
+                            && edge_target == *source)
                 } else {
                     false
                 }

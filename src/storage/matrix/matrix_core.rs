@@ -215,6 +215,15 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Create adjacency matrix from edge data
     pub fn adjacency_from_edges(nodes: &[NodeId], edges: &[(NodeId, NodeId)]) -> GraphResult<Self> {
+        Self::adjacency_from_edges_with_direction(nodes, edges, false)
+    }
+
+    /// Create adjacency matrix while preserving directed edge orientation.
+    pub fn adjacency_from_edges_with_direction(
+        nodes: &[NodeId],
+        edges: &[(NodeId, NodeId)],
+        directed: bool,
+    ) -> GraphResult<Self> {
         let size = nodes.len();
         if size == 0 {
             return Ok(Self::zeros(0, 0));
@@ -232,9 +241,10 @@ impl<T: NumericType> GraphMatrix<T> {
             if let (Some(&src_idx), Some(&tgt_idx)) =
                 (node_to_index.get(&source), node_to_index.get(&target))
             {
-                // Set both directions for undirected graph (symmetric adjacency matrix)
                 matrix_data[src_idx * size + tgt_idx] = T::one();
-                matrix_data[tgt_idx * size + src_idx] = T::one();
+                if !directed {
+                    matrix_data[tgt_idx * size + src_idx] = T::one();
+                }
             }
         }
 
@@ -245,6 +255,15 @@ impl<T: NumericType> GraphMatrix<T> {
     pub fn weighted_adjacency_from_edges(
         nodes: &[NodeId],
         weighted_edges: &[(NodeId, NodeId, T)],
+    ) -> GraphResult<Self> {
+        Self::weighted_adjacency_from_edges_with_direction(nodes, weighted_edges, false)
+    }
+
+    /// Create weighted adjacency while preserving directed edge orientation.
+    pub fn weighted_adjacency_from_edges_with_direction(
+        nodes: &[NodeId],
+        weighted_edges: &[(NodeId, NodeId, T)],
+        directed: bool,
     ) -> GraphResult<Self> {
         let size = nodes.len();
         if size == 0 {
@@ -263,9 +282,10 @@ impl<T: NumericType> GraphMatrix<T> {
             if let (Some(&src_idx), Some(&tgt_idx)) =
                 (node_to_index.get(&source), node_to_index.get(&target))
             {
-                // Set both directions for undirected graph (symmetric adjacency matrix)
                 matrix_data[src_idx * size + tgt_idx] = weight;
-                matrix_data[tgt_idx * size + src_idx] = weight;
+                if !directed {
+                    matrix_data[tgt_idx * size + src_idx] = weight;
+                }
             }
         }
 

@@ -17,7 +17,8 @@ use crate::types::{AttrName, AttrValue, NodeId};
 
 fn visit_order_dfs(subgraph: &Subgraph, start: NodeId) -> Result<Vec<NodeId>> {
     // Try CSR path first for optimal performance
-    if let Some(csr) = subgraph.csr_cache_get(false) {
+    let add_reverse = subgraph.graph().borrow().is_undirected();
+    if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
         let nodes = subgraph.ordered_nodes();
         let n = nodes.len();
 
@@ -161,7 +162,7 @@ impl Algorithm for BfsTraversal {
         ctx.record_call("bfs.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = false;
+        let add_reverse = subgraph.graph().borrow().is_undirected();
         if subgraph.csr_cache_get(add_reverse).is_some() {
             ctx.record_call("bfs.csr_cache_hit", std::time::Duration::from_nanos(0));
         } else {
@@ -305,7 +306,7 @@ impl Algorithm for DfsTraversal {
         ctx.record_call("dfs.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = false;
+        let add_reverse = subgraph.graph().borrow().is_undirected();
         if subgraph.csr_cache_get(add_reverse).is_some() {
             ctx.record_call("dfs.csr_cache_hit", std::time::Duration::from_nanos(0));
         } else {

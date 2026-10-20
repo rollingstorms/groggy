@@ -196,7 +196,8 @@ impl AStarPathfinding {
             }
 
             // Try CSR path for optimal performance
-            let neighbors: Vec<NodeId> = if let Some(csr) = subgraph.csr_cache_get(false) {
+            let add_reverse = subgraph.graph().borrow().is_undirected();
+            let neighbors: Vec<NodeId> = if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
                 let nodes = subgraph.ordered_nodes();
                 if let Some(node_idx) = nodes.iter().position(|&n| n == node) {
                     csr.neighbors(node_idx)
@@ -283,7 +284,7 @@ impl Algorithm for AStarPathfinding {
         ctx.record_call("astar.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = false;
+        let add_reverse = subgraph.graph().borrow().is_undirected();
         if subgraph.csr_cache_get(add_reverse).is_some() {
             ctx.record_call("astar.csr_cache_hit", std::time::Duration::from_nanos(0));
         } else {

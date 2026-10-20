@@ -347,11 +347,8 @@ impl TraversalEngine {
             distance: 0.0,
         });
 
-        // Get columnar topology with cache maintenance (make owned copies)
-        let (edge_ids_ref, sources_ref, targets_ref, _) = space.snapshot(pool);
-        let edge_ids: Vec<EdgeId> = edge_ids_ref.as_ref().clone();
-        let sources: Vec<NodeId> = sources_ref.as_ref().clone();
-        let targets: Vec<NodeId> = targets_ref.as_ref().clone();
+        // The snapshot adjacency applies the graph's direction policy.
+        let (_, _, _, neighbors) = space.snapshot(pool);
 
         while let Some(DijkstraNode {
             id: current,
@@ -382,16 +379,8 @@ impl TraversalEngine {
 
             state.visited.insert(current);
 
-            // Explore neighbors directly from topology
-            for i in 0..sources.len() {
-                let (neighbor, edge_id) = if sources[i] == current {
-                    (targets[i], edge_ids[i])
-                } else if targets[i] == current {
-                    (sources[i], edge_ids[i])
-                } else {
-                    continue;
-                };
-
+            // Explore only traversable edge instances from this node.
+            for &(neighbor, edge_id) in neighbors.get(&current).into_iter().flatten() {
                 if state.visited.contains(&neighbor) {
                     continue;
                 }
@@ -998,7 +987,9 @@ impl TraversalEngine {
 
         for i in 0..sources.len() {
             if (sources[i] == node1 && targets[i] == node2)
-                || (sources[i] == node2 && targets[i] == node1)
+                || (pool.graph_type() == crate::types::GraphType::Undirected
+                    && sources[i] == node2
+                    && targets[i] == node1)
             {
                 return Ok(Some(edge_ids[i]));
             }
@@ -1052,20 +1043,9 @@ impl TraversalEngine {
                 },
             });
         } else {
-            // Continue exploring - get topology data
-            let (_edge_ids, sources, targets, _) = space.snapshot(pool);
-
-            // Collect neighbors first to avoid borrowing conflicts
-            let mut neighbors = Vec::new();
-            for i in 0..sources.len() {
-                if sources[i] == current {
-                    neighbors.push(targets[i]);
-                } else if targets[i] == current {
-                    neighbors.push(sources[i]);
-                }
-            }
-
-            for neighbor in neighbors {
+            // The snapshot adjacency applies the graph's direction policy.
+            let (_, _, _, neighbors) = space.snapshot(pool);
+            for &(neighbor, _) in neighbors.get(&current).into_iter().flatten() {
                 if !visited.contains(&neighbor) {
                     self.find_all_paths_recursive(
                         pool, space, neighbor, target, max_length, path, visited, all_paths,

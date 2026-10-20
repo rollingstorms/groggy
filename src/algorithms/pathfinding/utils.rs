@@ -61,7 +61,8 @@ impl NodeIndexer {
 
 pub fn bfs_layers(subgraph: &Subgraph, source: NodeId) -> HashMap<NodeId, usize> {
     // Try CSR path first for optimal performance
-    if let Some(csr) = subgraph.csr_cache_get(false) {
+    let add_reverse = subgraph.graph().borrow().is_undirected();
+    if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
         let nodes = subgraph.ordered_nodes();
         let indexer = NodeIndexer::new(&nodes);
 
@@ -150,7 +151,8 @@ where
     SF: FnMut(NodeId, NodeId) -> f64,
 {
     // Try CSR path first for optimal performance
-    if let Some(csr) = subgraph.csr_cache_get(false) {
+    let add_reverse = subgraph.graph().borrow().is_undirected();
+    if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
         let nodes = subgraph.ordered_nodes();
         let indexer = NodeIndexer::new(&nodes);
 

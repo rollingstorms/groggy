@@ -19,7 +19,10 @@ fn live_reads_exclude_removed_edges_and_nodes() {
     assert!(graph.edge_ids().is_empty());
     assert!(graph.incident_edges(source).unwrap().is_empty());
     assert!(graph.edge_endpoints(edge).is_err());
-    assert_eq!(graph.get_edges_attrs(&"weight".into(), &[edge]).unwrap(), vec![None]);
+    assert_eq!(
+        graph.get_edges_attrs(&"weight".into(), &[edge]).unwrap(),
+        vec![None]
+    );
 
     graph.remove_node(source).unwrap();
     assert!(!graph.contains_node(source));
@@ -28,7 +31,9 @@ fn live_reads_exclude_removed_edges_and_nodes() {
     assert!(graph.neighbors(source).is_err());
     assert!(graph.get_node_attr(source, &"entity_type".into()).is_err());
     assert_eq!(
-        graph.get_nodes_attrs(&"entity_type".into(), &[source]).unwrap(),
+        graph
+            .get_nodes_attrs(&"entity_type".into(), &[source])
+            .unwrap(),
         vec![None]
     );
 }
