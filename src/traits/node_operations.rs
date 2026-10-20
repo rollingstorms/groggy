@@ -56,18 +56,17 @@ pub trait NodeOperations: GraphEntity {
         graph.neighbors(self.node_id())
     }
 
-    /// All node attributes from GraphPool
+    /// All attributes of an active node
     ///
     /// # Returns
     /// HashMap of all attributes for this node
     ///
     /// # Performance
-    /// Iterates through node's attributes in GraphPool columnar storage
+    /// Uses the graph's active-state check before reading columnar values
     fn node_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
         let binding = self.graph_ref();
         let graph = binding.borrow();
-        let x = graph.pool().get_all_node_attributes(self.node_id());
-        x
+        graph.get_node_attrs(self.node_id())
     }
 
     /// Get specific node attribute from GraphPool
@@ -110,9 +109,7 @@ pub trait NodeOperations: GraphEntity {
         let subgraph_id_opt = {
             let binding = self.graph_ref();
             let graph = binding.borrow();
-            let x = graph
-                .pool()
-                .get_node_attribute(self.node_id(), &"contained_subgraph".into())?;
+            let x = graph.get_node_attr(self.node_id(), &"contained_subgraph".into())?;
             x
         };
 
@@ -132,9 +129,8 @@ pub trait NodeOperations: GraphEntity {
                     let _central_nodes = {
                         let binding = self.graph_ref();
                         let graph = binding.borrow();
-                        let x = if let Some(AttrValue::NodeArray(central)) = graph
-                            .pool()
-                            .get_node_attribute(self.node_id(), &"central_nodes".into())?
+                        let x = if let Some(AttrValue::NodeArray(central)) =
+                            graph.get_node_attr(self.node_id(), &"central_nodes".into())?
                         {
                             central
                         } else {
@@ -146,9 +142,8 @@ pub trait NodeOperations: GraphEntity {
                     let _hops = {
                         let binding = self.graph_ref();
                         let graph = binding.borrow();
-                        let x = if let Some(AttrValue::SmallInt(h)) = graph
-                            .pool()
-                            .get_node_attribute(self.node_id(), &"expansion_hops".into())?
+                        let x = if let Some(AttrValue::SmallInt(h)) =
+                            graph.get_node_attr(self.node_id(), &"expansion_hops".into())?
                         {
                             h as usize
                         } else {
@@ -202,8 +197,7 @@ pub trait NodeOperations: GraphEntity {
     fn is_meta_node(&self) -> bool {
         self.graph_ref()
             .borrow()
-            .pool()
-            .get_node_attribute(self.node_id(), &"contained_subgraph".into())
+            .get_node_attr(self.node_id(), &"contained_subgraph".into())
             .map(|attr_opt| attr_opt.is_some())
             .unwrap_or(false)
     }

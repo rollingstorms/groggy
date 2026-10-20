@@ -103,18 +103,17 @@ pub trait EdgeOperations: GraphEntity {
         Ok((source == node1 && target == node2) || (source == node2 && target == node1))
     }
 
-    /// All edge attributes from GraphPool
+    /// All attributes of an active edge
     ///
     /// # Returns
     /// HashMap of all attributes for this edge
     ///
     /// # Performance
-    /// Iterates through edge's attributes in GraphPool columnar storage
+    /// Uses the graph's active-state check before reading columnar values
     fn edge_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
         let binding = self.graph_ref();
         let graph = binding.borrow();
-        let x = graph.pool().get_all_edge_attributes(self.edge_id());
-        x
+        graph.get_edge_attrs(self.edge_id())
     }
 
     /// Get specific edge attribute from GraphPool

@@ -293,8 +293,8 @@ impl MetaNode {
 
         let mut attributes = HashMap::new();
 
-        // First, get all attributes that the pool can see directly
-        let pool_attributes = graph.pool().get_all_node_attributes(self.node_id)?;
+        // Read the active node's attributes through the graph state.
+        let pool_attributes = graph.get_node_attrs(self.node_id)?;
 
         // Add non-system attributes from pool
         for (attr_name, attr_value) in pool_attributes {

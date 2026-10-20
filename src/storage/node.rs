@@ -99,8 +99,7 @@ impl NodeOperations for EntityNode {
 
     fn node_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
         let graph = self.graph_ref.borrow();
-        let x = graph.pool().get_all_node_attributes(self.node_id);
-        x
+        graph.get_node_attrs(self.node_id)
     }
 
     fn get_node_attribute(&self, name: &AttrName) -> GraphResult<Option<AttrValue>> {
@@ -115,9 +114,7 @@ impl NodeOperations for EntityNode {
         // First check if this node has a subgraph reference
         let subgraph_id_opt = {
             let graph = self.graph_ref.borrow();
-            let x = graph
-                .pool()
-                .get_node_attribute(self.node_id, &"contained_subgraph".into())?;
+            let x = graph.get_node_attr(self.node_id, &"contained_subgraph".into())?;
             x
         };
 
@@ -131,9 +128,8 @@ impl NodeOperations for EntityNode {
 
             let central_nodes = {
                 let graph = self.graph_ref.borrow();
-                let x = if let Some(AttrValue::NodeArray(central)) = graph
-                    .pool()
-                    .get_node_attribute(self.node_id, &"central_nodes".into())?
+                let x = if let Some(AttrValue::NodeArray(central)) =
+                    graph.get_node_attr(self.node_id, &"central_nodes".into())?
                 {
                     central
                 } else {
@@ -144,9 +140,8 @@ impl NodeOperations for EntityNode {
 
             let hops = {
                 let graph = self.graph_ref.borrow();
-                let x = if let Some(AttrValue::SmallInt(h)) = graph
-                    .pool()
-                    .get_node_attribute(self.node_id, &"expansion_hops".into())?
+                let x = if let Some(AttrValue::SmallInt(h)) =
+                    graph.get_node_attr(self.node_id, &"expansion_hops".into())?
                 {
                     h as usize
                 } else {
@@ -186,8 +181,7 @@ impl NodeOperations for EntityNode {
     fn is_meta_node(&self) -> bool {
         self.graph_ref
             .borrow()
-            .pool()
-            .get_node_attribute(self.node_id, &"contained_subgraph".into())
+            .get_node_attr(self.node_id, &"contained_subgraph".into())
             .map(|attr_opt| attr_opt.is_some())
             .unwrap_or(false)
     }

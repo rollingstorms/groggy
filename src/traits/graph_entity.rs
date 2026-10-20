@@ -40,13 +40,13 @@ pub trait GraphEntity: std::fmt::Debug {
     /// Rc<RefCell<Graph>> providing access to all storage infrastructure
     fn graph_ref(&self) -> Rc<RefCell<Graph>>;
 
-    /// Get attribute value from GraphPool (no copying - direct reference)
+    /// Get an attribute from the selected live graph state.
     ///
     /// # Arguments
     /// * `name` - Attribute name to retrieve
     ///
     /// # Returns
-    /// Optional reference to the attribute value stored in GraphPool
+    /// A cloned attribute value, or an error if a node or edge is inactive
     ///
     /// # Performance
     /// O(1) - Direct lookup in our optimized columnar storage
@@ -54,22 +54,8 @@ pub trait GraphEntity: std::fmt::Debug {
         let binding = self.graph_ref();
         let graph = binding.borrow();
         match self.entity_id() {
-            EntityId::Node(id) | EntityId::MetaNode(id) => {
-                if let Some(index) = graph.space().get_node_attr_index(id, name) {
-                    let pool = graph.pool();
-                    Ok(pool.get_attr_by_index(name, index, true).cloned())
-                } else {
-                    Ok(None)
-                }
-            }
-            EntityId::Edge(id) => {
-                if let Some(index) = graph.space().get_edge_attr_index(id, name) {
-                    let pool = graph.pool();
-                    Ok(pool.get_attr_by_index(name, index, false).cloned())
-                } else {
-                    Ok(None)
-                }
-            }
+            EntityId::Node(id) | EntityId::MetaNode(id) => graph.get_node_attr(id, name),
+            EntityId::Edge(id) => graph.get_edge_attr(id, name),
             EntityId::Subgraph(id)
             | EntityId::Neighborhood(id)
             | EntityId::Component(id)

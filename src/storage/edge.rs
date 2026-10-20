@@ -136,8 +136,7 @@ impl EdgeOperations for EntityEdge {
 
     fn edge_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
         let graph = self.graph_ref.borrow();
-        let x = graph.pool().get_all_edge_attributes(self.edge_id);
-        x
+        graph.get_edge_attrs(self.edge_id)
     }
 
     fn get_edge_attribute(&self, name: &AttrName) -> GraphResult<Option<AttrValue>> {

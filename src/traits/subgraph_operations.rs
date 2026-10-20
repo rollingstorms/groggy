@@ -459,7 +459,7 @@ pub trait SubgraphOperations: GraphEntity {
         }
     }
 
-    /// Edge attribute access using GraphPool (no copying)
+    /// Edge attribute access through the active graph state
     ///
     /// # Arguments
     /// * `edge_id` - Edge whose attribute to retrieve
@@ -477,8 +477,7 @@ pub trait SubgraphOperations: GraphEntity {
     ) -> GraphResult<Option<AttrValue>> {
         let binding = self.graph_ref();
         let graph = binding.borrow();
-        let x = graph.pool().get_edge_attribute(edge_id, name);
-        x
+        graph.get_edge_attr(edge_id, name)
     }
 
     /// Topology queries using our existing efficient algorithms

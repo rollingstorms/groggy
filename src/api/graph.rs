@@ -1583,6 +1583,10 @@ impl Graph {
 
     /// Get all edges connected to a node (only active edges)
     pub fn incident_edges(&self, node: NodeId) -> GraphResult<Vec<EdgeId>> {
+        if !self.space.contains_node(node) {
+            return Err(GraphError::node_not_found(node, "get incident edges"));
+        }
+
         let pool = self.pool.borrow();
         let all_incident_edges = pool.get_incident_edges(node)?;
 
