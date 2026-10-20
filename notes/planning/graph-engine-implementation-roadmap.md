@@ -8,7 +8,7 @@ Groggy's original vision is a Rust graph engine with a Python API, separate topo
 
 The concrete integration target is [Graphiti](https://github.com/getzep/graphiti/blob/main/README.md): Graphiti produces episodes, entities, facts, provenance, time fields, and embeddings; Groggy stores and queries them. This plan does not assume Groggy performs Graphiti's LLM extraction. Graphiti's [driver interface](https://github.com/getzep/graphiti/blob/main/graphiti_core/driver/driver.py) defines the eventual backend compatibility target.
 
-The stages are ordered by dependency. Each item may call for verification, repair, completion, or a new capability. Item numbers remain continuous so individual work items are easy to reference.
+The stages describe related work, with Graphiti-specific integration deferred until the Groggy core is finished. Each item may call for verification, repair, completion, or a new capability. Item numbers remain continuous so individual work items are easy to reference. The owner's "number 25" in the later flat list means the Graphiti ingest adapter, numbered 20 here; the related driver is numbered 25 here.
 
 ## Immediate next implementation slice
 
@@ -55,23 +55,23 @@ Make changes atomic and persistent, then complete the Git-like history promised 
 
 ## Stage 3 — Temporal knowledge graph ingest
 
-Represent Graphiti's time and provenance model and ingest its output reliably. Completion of this stage is the first useful Graphiti storage milestone.
+Complete Groggy's temporal and provenance primitives. The Graphiti-specific ingest adapter at item 20 is deferred until the core graph, history, view, table, query, and analytics work is finished.
 
 16. **Add effective time separately from recorded time.** Graphiti facts have valid and invalid times, and property changes also need an effective timestamp. Use an explicit per-change time when supplied, otherwise the batch's publication clock; the engine separately records when the batch was accepted. Reconstruct a branch-scoped graph view for “what was true at T”, using the latest published version on that branch at view creation. Apply a `recorded_by=U` cutoff only when the caller explicitly requests “what did we know by U?”; the resulting view remains pinned. This uses the same immutable view and graph-to-table interface as a present-state selection; derived subgraphs and tables inherit the state/time pins. The current `snapshot_at_timestamp` selects only a whole-second commit timestamp across all commits and is insufficient for these reads.
 17. **Model episodes and provenance directly.** Store raw episode identity and content, the entities and facts derived from it, and links back to the source. Invalidate or supersede facts without erasing their evidence.
 18. **Build primary and secondary indexes.** At minimum: UUID, group, node label, edge type, endpoints, property equality/range, and time-window indexes. Keep every index correct under update, deletion, checkout, and recovery.
 19. **Expose one coherent Python API.** Mirror the Rust contract for IDs, transactions, queries, temporal reads, properties, and errors. Verify the built Python extension end to end; passing Rust tests does not establish Python behavior.
-20. **Build a Graphiti data adapter.** Prove a round trip for Graphiti episodes, entities, facts, embeddings, attributes, UUIDs, group IDs, provenance, and time fields. Re-ingesting the same episode must be idempotent; invalidating a fact must preserve its history.
+20. **Deferred — build a Graphiti data adapter.** After the Groggy core is finished, prove a round trip for Graphiti episodes, entities, facts, embeddings, attributes, UUIDs, group IDs, provenance, and time fields. Re-ingesting the same episode must be idempotent; invalidating a fact must preserve its history.
 
 ## Stage 4 — Queries, retrieval, and Graphiti driver
 
-Make the stored graph searchable and usable as Graphiti's backing database.
+Finish Groggy's native graph and retrieval capabilities. The Graphiti driver at item 25 follows the deferred ingest adapter.
 
 21. **Create a usable graph query layer.** Provide indexed node and edge selection, directed pattern matching, bounded traversal, property filters, temporal filters, ordering, and pagination. Define results independently of internal storage layout.
 22. **Add full-text search.** Index episode content, entity names and summaries, and fact text; support ranked keyword retrieval and group filtering.
 23. **Add vector search.** Store embeddings with dimensions and model metadata, support nearest-neighbor search, and keep vector indexes synchronized with updates and persistence.
 24. **Combine retrieval modes.** Merge keyword, vector, temporal, and graph-neighborhood results with inspectable scores. Graphiti's search relies on this combination.
-25. **Implement a Graphiti storage driver.** Implement Graphiti's required query, session, transaction, indexing, graph-operation, and search behavior. Serve operations natively where possible and implement the required query behavior for remaining calls; run Graphiti ingest and search flows against it.
+25. **Deferred — implement a Graphiti storage driver.** After the core and ingest adapter, implement Graphiti's required query, session, transaction, indexing, graph-operation, and search behavior. Serve operations natively where possible and implement the required query behavior for remaining calls; run Graphiti ingest and search flows against it.
 
 ## Stage 5 — Connected computing and analytics
 
@@ -87,9 +87,9 @@ Complete Groggy's broader structural-computing vision on top of a correct graph 
 
 Prove compatibility and reliability at realistic scale, then document actual capabilities.
 
-31. **Run differential and failure testing.** Compare Groggy with Neo4j on the same Graphiti corpus: duplicate ingest, changing and contradictory facts, historical reads, group isolation, search, restart, and failed mid-batch writes.
+31. **Run differential and failure testing.** Compare core graph and temporal behavior with Neo4j on shared fixtures, and test restart and failed mid-batch writes. Defer Graphiti corpus comparisons, including duplicate episode ingest and search, until the adapter and driver are implemented.
 32. **Measure and optimize the intended workload.** Benchmark ingestion throughput, indexed lookup, temporal reads, neighborhood expansion, and hybrid search at realistic graph sizes. Use results to improve memory layout, indexing, compaction, and concurrency.
 33. **Finish operational tools.** Provide migration/version checks, backups and restore, integrity checks, observability, and clear limits for graph size, concurrent writers, and recovery time.
 34. **Publish an honest capability matrix.** Mark features implemented only when their Rust API, Python API, persistence, and correctness tests meet the contract. Update old roadmap completion claims accordingly.
 
-The first meaningful Graphiti milestone is the end of Stage 3 (items 1–20): reliably ingest, persist, update, and historically inspect its graph. The end of Stage 4 (item 25) is the Graphiti backing-database milestone. Stages 5 and 6 complete the broader graph-engine vision and operational proof.
+The near-term milestone is a coherent Groggy core: reliable writes, temporal reconstruction, immutable connected views and tables, native queries, and corrected analytics, with persistence and failure testing. After that, item 20 provides a Graphiti ingest milestone and item 25 provides the Graphiti backing-database milestone. The remaining operations and scale work establishes production readiness.

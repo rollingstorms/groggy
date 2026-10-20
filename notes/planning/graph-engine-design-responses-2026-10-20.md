@@ -36,6 +36,8 @@ View clarification: A historical timestamp is another selector for the same stat
 
 Recorded-time query clarification: The `recorded_by` cutoff is supplied only when the caller explicitly asks for an as-known-then view. An effective-time query without that cutoff uses the latest published version on the selected branch at view creation and remains pinned to that version afterward. Groggy still records the batch's acceptance time automatically as history metadata; making the query cutoff optional does not make that metadata optional.
 
+Integration sequencing clarification: The owner deferred item 25 in the recent flat implementation list, the Graphiti ingest adapter, until Groggy's core graph, history, view, table, query, and analytics ideas are finished. In the staged roadmap this is item 20; its related Graphiti storage driver is roadmap item 25 and follows the adapter. Keep Graphiti as a future compatibility target and motivation for lossless core primitives, without treating integration as the next milestone.
+
 ## Emerging model
 
 - **Identity and lifetime:** GraphSpace should be the authority for membership in the selected state; GraphPool stores entities, properties and history references. An inactive ID remains inspectable in history until an explicit destructive purge. Never reuse an ID while any retained state references it.
