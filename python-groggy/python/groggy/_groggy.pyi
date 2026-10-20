@@ -4,6 +4,7 @@
 # Generated WITH experimental-delegation feature enabled
 
 from __future__ import annotations  # Enable forward references
+from .writer import GraphWriter
 from typing import Any, List, Dict, Optional, Tuple, Union, Iterator
 
 # Module-level functions
@@ -5123,6 +5124,21 @@ class Graph:
         Apply one validated mixed write against an expected published state.
         """
         ...
+
+    def publication_metadata(self, *args, **kwargs) -> Optional[Dict[str, Any]]:
+        """
+        Get immutable effective/recorded times for an automatic publication.
+        """
+        ...
+
+
+    def writer(self, *args, **kwargs) -> GraphWriter:
+        """
+        Start an optimistic direct-write session; each call publishes one batch.
+        """
+        ...
+
+
 
 
 

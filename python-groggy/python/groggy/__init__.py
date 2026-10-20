@@ -27,6 +27,7 @@ from .generators import (barabasi_albert, complete_graph, cycle_graph,
                          social_network, star_graph, tree, watts_strogatz)
 from .types import AttrName, BranchName, EdgeId, NodeId, StateId
 from .batch import AddedEdge, AddedNode, GraphBatch
+from .writer import GraphWriter
 
 # Note: array, matrix, table are now imported directly as auto-converting builder functions
 # The classes BaseArray, GraphMatrix, GraphTable are still available for direct instantiation
@@ -70,6 +71,7 @@ ExistenceIndex = _groggy.ExistenceIndex
 __all__ = [
     "Graph",
     "GraphBatch",
+    "GraphWriter",
     "AddedNode",
     "AddedEdge",
     "Subgraph",

@@ -11,6 +11,7 @@
 pub mod change_tracker;
 pub mod delta;
 pub mod history;
+pub mod publication;
 pub mod ref_manager;
 pub mod space;
 pub mod state;

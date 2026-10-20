@@ -14,6 +14,7 @@
 mod identity;
 pub(crate) mod kinds;
 mod persistence;
+mod publication;
 mod schema;
 use identity::ExternalIdentityIndex;
 pub use identity::{EdgeUpsert, ExternalEntityRef, NodeUpsert, EXTERNAL_ID};
@@ -1953,6 +1954,8 @@ impl Graph {
             }
         }
 
+        let publication =
+            self.batch_publication(&prepared, allocated.node_count, allocated.edge_count)?;
         let added_nodes = if prepared.add_nodes > 0 {
             self.add_nodes(prepared.add_nodes)
         } else {
@@ -1963,7 +1966,7 @@ impl Graph {
         self.set_edge_attrs(prepared.edge_attrs)?;
         self.remove_edges(&prepared.remove_edges)?;
         self.remove_nodes(&prepared.remove_nodes)?;
-        let state_id = self.commit(message, author)?;
+        let state_id = self.commit_internal(message, author, Some(publication))?;
         Ok(BatchResult {
             state_id,
             added_nodes,
@@ -1980,6 +1983,15 @@ impl Graph {
     /// 4. Clear change tracker
     /// 5. Return new commit ID
     pub fn commit(&mut self, message: String, author: String) -> Result<StateId, GraphError> {
+        self.commit_internal(message, author, None)
+    }
+
+    fn commit_internal(
+        &mut self,
+        message: String,
+        author: String,
+        publication: Option<crate::PublicationMetadata>,
+    ) -> GraphResult<StateId> {
         // Create changeset from current changes
         let changeset = self
             .change_tracker
@@ -1998,9 +2010,13 @@ impl Graph {
         };
 
         // Create commit in history
-        let new_commit_id = self
-            .history
-            .create_commit(changeset, message, author, parent)?;
+        let new_commit_id = self.history.create_commit_with_publication(
+            changeset,
+            message,
+            author,
+            parent,
+            publication,
+        )?;
 
         // Update current commit and branch head
         self.current_commit = new_commit_id;
@@ -2075,6 +2091,15 @@ impl Graph {
             }
         }
         branches
+    }
+
+    /// Read engine-recorded and effective times for an automatically published batch.
+    /// Legacy manual commits have no publication record and return None.
+    pub fn publication_metadata(
+        &self,
+        state: StateId,
+    ) -> GraphResult<Option<crate::PublicationMetadata>> {
+        Ok(self.history.get_commit(state)?.publication.clone())
     }
 
     /// Get the commit history

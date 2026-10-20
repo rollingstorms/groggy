@@ -135,6 +135,51 @@ impl HistoryForest {
         author: String,
         parent: Option<StateId>,
     ) -> Result<StateId, GraphError> {
+        self.create_commit_with_publication(changes, message, author, parent, None)
+    }
+
+    /// Create a version with optional engine publication/effective-time metadata.
+    pub fn create_commit_with_publication(
+        &mut self,
+        changes: ChangeSet,
+        message: String,
+        author: String,
+        parent: Option<StateId>,
+        mut publication: Option<crate::PublicationMetadata>,
+    ) -> Result<StateId, GraphError> {
+        if let Some(metadata) = &mut publication {
+            use crate::ChangeKey;
+            let mut actual = std::collections::BTreeMap::new();
+            let mut add = |key: ChangeKey| {
+                actual.insert(
+                    key.clone(),
+                    metadata
+                        .change_times
+                        .get(&key)
+                        .copied()
+                        .unwrap_or(metadata.effective_at),
+                );
+            };
+            for id in &changes.nodes_added {
+                add(ChangeKey::NodeAdded(*id));
+            }
+            for id in &changes.nodes_removed {
+                add(ChangeKey::NodeRemoved(*id));
+            }
+            for (id, _, _) in &changes.edges_added {
+                add(ChangeKey::EdgeAdded(*id));
+            }
+            for id in &changes.edges_removed {
+                add(ChangeKey::EdgeRemoved(*id));
+            }
+            for (id, name, _, _) in &changes.node_attr_changes {
+                add(ChangeKey::NodeAttribute(*id, name.clone()));
+            }
+            for (id, name, _, _) in &changes.edge_attr_changes {
+                add(ChangeKey::EdgeAttribute(*id, name.clone()));
+            }
+            metadata.change_times = actual;
+        }
         // 1. Create Delta from the changes
         let delta = Delta::from_changes(changes);
 
@@ -152,12 +197,13 @@ impl HistoryForest {
             Some(p) => vec![p],
             None => vec![],
         };
-        let commit = Commit::new(
+        let commit = Commit::with_publication(
             self.next_state_id,
             parents,
             delta_arc.clone(),
             message,
             author,
+            publication,
         );
 
         // 5. Store commit
@@ -758,6 +804,9 @@ pub struct Commit {
     /// When this commit was created (Unix timestamp)
     pub timestamp: u64,
 
+    /// Automatic publication metadata; absent on legacy manually grouped writes.
+    pub publication: Option<crate::PublicationMetadata>,
+
     /// Content hash for verification and deduplication
     pub content_hash: [u8; 32],
 }
@@ -771,15 +820,31 @@ impl Commit {
         message: String,
         author: String,
     ) -> Self {
+        Self::with_publication(id, parents, delta, message, author, None)
+    }
+
+    fn with_publication(
+        id: StateId,
+        parents: Vec<StateId>,
+        delta: Arc<Delta>,
+        message: String,
+        author: String,
+        publication: Option<crate::PublicationMetadata>,
+    ) -> Self {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         use std::time::{SystemTime, UNIX_EPOCH};
 
-        // Set timestamp to current time
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        // The legacy seconds field uses the same captured engine clock for batches.
+        let timestamp = publication
+            .as_ref()
+            .map(|metadata| (metadata.recorded_at.max(0) as u64) / 1_000_000)
+            .unwrap_or_else(|| {
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0)
+            });
 
         // Compute content hash from all fields
         let mut hasher = DefaultHasher::new();
@@ -789,6 +854,7 @@ impl Commit {
         message.hash(&mut hasher);
         author.hash(&mut hasher);
         timestamp.hash(&mut hasher);
+        publication.hash(&mut hasher);
         let hash_u64 = hasher.finish();
 
         // Convert u64 hash to [u8; 32] (simple but deterministic)
@@ -805,6 +871,7 @@ impl Commit {
             message,
             author,
             timestamp,
+            publication,
             content_hash,
         }
     }

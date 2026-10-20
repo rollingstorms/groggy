@@ -163,15 +163,18 @@ pub mod viz;
 pub mod api {
     pub mod batch;
     pub mod graph;
+    pub mod writer;
 }
 
 // Re-export commonly used types and the main API
-pub use api::batch::{BatchEdgeRef, BatchNodeRef, BatchResult, GraphBatch};
+pub use api::batch::{BatchChangeRef, BatchEdgeRef, BatchNodeRef, BatchResult, GraphBatch};
 pub use api::graph::{
     EdgeUpsert, ExternalEntityRef, Graph, GraphSchema, NodeUpsert, PropertyConstraint,
     PropertyKind, SchemaViolation, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
 };
+pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};
+pub use state::publication::{ChangeKey, PublicationMetadata, TimestampMicros};
 pub use state::{HistoricalView, HistoryForest, ViewSummary};
 pub use types::{
     AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, NumericType, StateId,

@@ -90,6 +90,8 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'edges_with_relationship_type': 'List[int]',
             'validate_schema': 'List[Dict[str, Any]]',
             'apply_batch': 'Dict[str, Any]',
+            'writer': 'GraphWriter',
+            'publication_metadata': 'Optional[Dict[str, Any]]',
             'load_from_path': 'Graph',
             'save_to_path': 'None',
         },
@@ -250,6 +252,7 @@ def generate_stub_for_module(module_name: str, output_path: Path):
     lines.append("")
     lines.append("from __future__ import annotations  # Enable forward references")
     lines.append("from typing import Any, List, Dict, Optional, Tuple, Union, Iterator")
+    lines.append("from .writer import GraphWriter")
     lines.append("")
     
     # Get all members

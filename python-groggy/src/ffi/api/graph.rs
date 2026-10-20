@@ -331,6 +331,23 @@ impl PyGraph {
         Ok(output.to_object(py))
     }
 
+    /// Start an optimistic direct-write session; each call publishes one batch.
+    #[pyo3(signature = (*, author="writer", schema=None))]
+    fn writer(
+        slf: PyRef<'_, Self>,
+        py: Python,
+        author: &str,
+        schema: Option<&PyDict>,
+    ) -> PyResult<PyObject> {
+        if let Some(schema) = schema {
+            parse_schema(schema)?;
+        }
+        let class = py.import("groggy.writer")?.getattr("GraphWriter")?;
+        Ok(class
+            .call1((slf.into_py(py), author, schema))?
+            .to_object(py))
+    }
+
     /// Check if this graph is directed
     #[getter]
     fn is_directed(&self) -> bool {
@@ -1553,6 +1570,19 @@ impl PyGraph {
         output.set_item("added_nodes", result.added_nodes)?;
         output.set_item("added_edges", result.added_edges)?;
         Ok(output.to_object(py))
+    }
+
+    /// Get immutable effective/recorded times for an automatic publication.
+    fn publication_metadata(&self, py: Python, state_id: StateId) -> PyResult<PyObject> {
+        match self
+            .inner
+            .borrow()
+            .publication_metadata(state_id)
+            .map_err(graph_error_to_py_err)?
+        {
+            Some(metadata) => crate::ffi::api::graph_batch::publication_to_python(py, &metadata),
+            None => Ok(py.None()),
+        }
     }
 
     #[getter]

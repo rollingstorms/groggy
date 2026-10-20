@@ -1,8 +1,9 @@
 //! Staging and validation for one logical graph write.
 
 use crate::errors::{GraphError, GraphResult};
+use crate::state::publication::{ChangeKey, TimestampMicros};
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId, StateId};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BatchNodeRef {
@@ -18,6 +19,17 @@ pub enum BatchEdgeRef {
     Added(usize),
 }
 
+/// Reference to the staged operation whose effective time is being overridden.
+#[derive(Debug, Clone)]
+pub enum BatchChangeRef {
+    NodeAdded(BatchNodeRef),
+    NodeRemoved(BatchNodeRef),
+    EdgeAdded(BatchEdgeRef),
+    EdgeRemoved(BatchEdgeRef),
+    NodeAttribute(BatchNodeRef, AttrName),
+    EdgeAttribute(BatchEdgeRef, AttrName),
+}
+
 /// One mixed write. Operations execute in this order: add nodes, add edges,
 /// assign properties, remove explicit edges, then remove nodes and their edges.
 #[derive(Debug, Default)]
@@ -28,6 +40,10 @@ pub struct GraphBatch {
     pub edge_attrs: HashMap<AttrName, Vec<(BatchEdgeRef, AttrValue)>>,
     pub remove_edges: Vec<BatchEdgeRef>,
     pub remove_nodes: Vec<BatchNodeRef>,
+    /// Default effective time in signed Unix microseconds; None uses publication time.
+    pub effective_at: Option<TimestampMicros>,
+    /// Explicit per-operation overrides. Duplicate or unrelated targets reject the batch.
+    pub change_times: Vec<(BatchChangeRef, TimestampMicros)>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -44,6 +60,8 @@ pub(crate) struct PreparedBatch {
     pub edge_attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     pub remove_edges: Vec<EdgeId>,
     pub remove_nodes: Vec<NodeId>,
+    pub effective_at: Option<TimestampMicros>,
+    pub change_times: BTreeMap<ChangeKey, TimestampMicros>,
 }
 
 fn node_id(reference: BatchNodeRef, first: NodeId, count: usize) -> Result<NodeId, String> {
@@ -232,6 +250,65 @@ impl GraphBatch {
             edge_attrs.insert(name, resolved);
         }
 
+        let mut available = HashSet::new();
+        available.extend((next_node_id..node_end).map(ChangeKey::NodeAdded));
+        available.extend(removed_nodes.iter().copied().map(ChangeKey::NodeRemoved));
+        available.extend((next_edge_id..edge_end).map(ChangeKey::EdgeAdded));
+        available.extend(removed_edges.iter().copied().map(ChangeKey::EdgeRemoved));
+        for (name, values) in &node_attrs {
+            available.extend(
+                values
+                    .iter()
+                    .map(|(id, _)| ChangeKey::NodeAttribute(*id, name.clone())),
+            );
+        }
+        for (name, values) in &edge_attrs {
+            available.extend(
+                values
+                    .iter()
+                    .map(|(id, _)| ChangeKey::EdgeAttribute(*id, name.clone())),
+            );
+        }
+        let mut change_times = BTreeMap::new();
+        for (position, (target, at)) in self.change_times.into_iter().enumerate() {
+            let key = match target {
+                BatchChangeRef::NodeAdded(reference) => {
+                    node_id(reference, next_node_id, self.add_nodes).map(ChangeKey::NodeAdded)
+                }
+                BatchChangeRef::NodeRemoved(reference) => {
+                    node_id(reference, next_node_id, self.add_nodes).map(ChangeKey::NodeRemoved)
+                }
+                BatchChangeRef::EdgeAdded(reference) => {
+                    edge_id(reference, next_edge_id, self.add_edges.len()).map(ChangeKey::EdgeAdded)
+                }
+                BatchChangeRef::EdgeRemoved(reference) => {
+                    edge_id(reference, next_edge_id, self.add_edges.len())
+                        .map(ChangeKey::EdgeRemoved)
+                }
+                BatchChangeRef::NodeAttribute(reference, name) => {
+                    node_id(reference, next_node_id, self.add_nodes)
+                        .map(|id| ChangeKey::NodeAttribute(id, name))
+                }
+                BatchChangeRef::EdgeAttribute(reference, name) => {
+                    edge_id(reference, next_edge_id, self.add_edges.len())
+                        .map(|id| ChangeKey::EdgeAttribute(id, name))
+                }
+            };
+            match key {
+                Ok(key) if !available.contains(&key) => errors.push(format!(
+                    "change_times[{position}]: no staged operation for {key:?}"
+                )),
+                Ok(key) => {
+                    if change_times.insert(key.clone(), at).is_some() {
+                        errors.push(format!(
+                            "change_times[{position}]: duplicate time for {key:?}"
+                        ));
+                    }
+                }
+                Err(error) => errors.push(format!("change_times[{position}]: {error}")),
+            }
+        }
+
         if !errors.is_empty() {
             return Err(GraphError::InvalidInput(format!(
                 "Invalid graph batch: {}",
@@ -256,6 +333,8 @@ impl GraphBatch {
             edge_attrs,
             remove_edges: removed_edges,
             remove_nodes: removed_nodes,
+            effective_at: self.effective_at,
+            change_times,
         })
     }
 }

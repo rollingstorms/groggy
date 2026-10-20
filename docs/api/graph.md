@@ -106,6 +106,8 @@ Property conversion, explicit vector types and snapshot null semantics are docum
 
 Semantic kinds and explicit schema validation are documented in [Labels, relationship types and schema](kinds-schema.md).
 
+Automatically publishing direct writes and effective-time metadata are documented in [Publishing writes](publishing-writes.md).
+
 ## Detailed Method Reference
 
 ### Creation & Construction
