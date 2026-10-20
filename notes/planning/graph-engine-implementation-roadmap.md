@@ -2,7 +2,7 @@
 
 Status: **staged implementation plan; compare each item against the [current-state review](../architecture/current-state-review-2026-10-19.md) and the [decision record](graph-engine-design-responses-2026-10-20.md).** This list originally overstated missing foundations. Many core types, APIs, and architectural choices already exist. Each item should begin by identifying what Groggy already implements; the work is to repair a demonstrated mismatch or add a clearly needed capability, not redesign settled foundations.
 
-The owner's first-pass answers, accepted recommendations, and remaining open choices are recorded in the [2026-10-20 design responses](graph-engine-design-responses-2026-10-20.md).
+The owner's first-pass answers, accepted recommendations, and remaining open choices are recorded in the [2026-10-20 design responses](graph-engine-design-responses-2026-10-20.md). The companion [open-questions appendix](open-questions-appendix-2026-10-20.md) collects remaining choices as A01-A17, with provisional suggestions and the staged roadmap references.
 
 Groggy's original vision is a Rust graph engine with a Python API, separate topology and columnar properties, tracked changes, connected graph and table views, and graph analytics. See [Origins & Design](../../docs/concepts/origins.md), [Design Decisions](../../docs/appendices/design-decisions.md), and the [temporal extensions plan](temporal-extensions-plan.md).
 
