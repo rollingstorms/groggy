@@ -357,7 +357,7 @@ impl TraversalEngine {
         {
             // Early termination if we reached the target
             if current == end {
-                let path = self.reconstruct_path(&state.predecessors, start, end, pool, space)?;
+                let path = self.reconstruct_path(&state.predecessors, start, end, distance)?;
                 self.state_pool.return_state(state);
 
                 let duration = start_time.elapsed();
@@ -395,7 +395,7 @@ impl TraversalEngine {
                     || new_distance < state.distances[&neighbor]
                 {
                     state.distances.insert(neighbor, new_distance);
-                    state.predecessors.insert(neighbor, current);
+                    state.predecessors.insert(neighbor, (current, edge_id));
                     heap.push(DijkstraNode {
                         id: neighbor,
                         distance: new_distance,
@@ -428,6 +428,7 @@ impl TraversalEngine {
 
         let mut all_paths = Vec::new();
         let mut current_path = Vec::new();
+        let mut current_edges = Vec::new();
         let mut visited = HashSet::new();
 
         self.find_all_paths_recursive(
@@ -437,6 +438,7 @@ impl TraversalEngine {
             end,
             max_length,
             &mut current_path,
+            &mut current_edges,
             &mut visited,
             &mut all_paths,
         )?;
@@ -923,30 +925,22 @@ impl TraversalEngine {
     /// Reconstruct path from predecessor information
     fn reconstruct_path(
         &self,
-        predecessors: &HashMap<NodeId, NodeId>,
+        predecessors: &HashMap<NodeId, (NodeId, EdgeId)>,
         start: NodeId,
         end: NodeId,
-        pool: &GraphPool,
-        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
+        total_weight: f64,
     ) -> GraphResult<Path> {
         let mut path_nodes = Vec::new();
         let mut path_edges = Vec::new();
         let mut current = end;
-        let mut total_weight = 0.0;
 
         // Build path backwards
         path_nodes.push(current);
 
         while current != start {
-            if let Some(&predecessor) = predecessors.get(&current) {
+            if let Some(&(predecessor, edge_id)) = predecessors.get(&current) {
                 path_nodes.push(predecessor);
-
-                // Find the edge between predecessor and current
-                if let Some(edge_id) = self.find_edge_between(pool, space, predecessor, current)? {
-                    path_edges.push(edge_id);
-                    total_weight += self.get_edge_weight(pool, space, edge_id, &None);
-                }
-
+                path_edges.push(edge_id);
                 current = predecessor;
             } else {
                 return Err(crate::errors::GraphError::InternalError {
@@ -975,29 +969,6 @@ impl TraversalEngine {
         })
     }
 
-    /// Find edge between two nodes (helper for path reconstruction)
-    fn find_edge_between(
-        &self,
-        pool: &GraphPool,
-        space: &GraphSpace,
-        node1: NodeId,
-        node2: NodeId,
-    ) -> GraphResult<Option<EdgeId>> {
-        let (edge_ids, sources, targets, _) = space.snapshot(pool);
-
-        for i in 0..sources.len() {
-            if (sources[i] == node1 && targets[i] == node2)
-                || (pool.graph_type() == crate::types::GraphType::Undirected
-                    && sources[i] == node2
-                    && targets[i] == node1)
-            {
-                return Ok(Some(edge_ids[i]));
-            }
-        }
-
-        Ok(None)
-    }
-
     /// Recursive helper for finding all paths
     fn find_all_paths_recursive(
         &mut self,
@@ -1007,6 +978,7 @@ impl TraversalEngine {
         target: NodeId,
         max_length: usize,
         path: &mut Vec<NodeId>,
+        path_edges: &mut Vec<EdgeId>,
         visited: &mut HashSet<NodeId>,
         all_paths: &mut Vec<Path>,
     ) -> GraphResult<()> {
@@ -1019,22 +991,14 @@ impl TraversalEngine {
 
         if current == target {
             // Found a path - convert to Path structure
-            let path_nodes = path.clone();
-            let mut path_edges = Vec::new();
-            let mut total_weight = 0.0;
-
-            for i in 0..path_nodes.len() - 1 {
-                if let Some(edge_id) =
-                    self.find_edge_between(pool, space, path_nodes[i], path_nodes[i + 1])?
-                {
-                    path_edges.push(edge_id);
-                    total_weight += self.get_edge_weight(pool, space, edge_id, &None);
-                }
-            }
+            let total_weight = path_edges
+                .iter()
+                .map(|&edge_id| self.get_edge_weight(pool, space, edge_id, &None))
+                .sum();
 
             all_paths.push(Path {
-                nodes: path_nodes,
-                edges: path_edges,
+                nodes: path.clone(),
+                edges: path_edges.clone(),
                 total_weight,
                 metadata: PathMetadata {
                     algorithm: "all_paths".to_string(),
@@ -1045,11 +1009,14 @@ impl TraversalEngine {
         } else {
             // The snapshot adjacency applies the graph's direction policy.
             let (_, _, _, neighbors) = space.snapshot(pool);
-            for &(neighbor, _) in neighbors.get(&current).into_iter().flatten() {
+            for &(neighbor, edge_id) in neighbors.get(&current).into_iter().flatten() {
                 if !visited.contains(&neighbor) {
+                    path_edges.push(edge_id);
                     self.find_all_paths_recursive(
-                        pool, space, neighbor, target, max_length, path, visited, all_paths,
+                        pool, space, neighbor, target, max_length, path, path_edges, visited,
+                        all_paths,
                     )?;
+                    path_edges.pop();
                 }
             }
         }
@@ -1147,7 +1114,7 @@ struct TraversalState {
     #[allow(dead_code)] // TODO: Implement queue-based traversal
     queue: VecDeque<NodeId>,
     distances: HashMap<NodeId, f64>,
-    predecessors: HashMap<NodeId, NodeId>,
+    predecessors: HashMap<NodeId, (NodeId, EdgeId)>,
     component_work_queue: Vec<usize>,
     component_ids: Vec<usize>,
     component_nodes: Vec<usize>,

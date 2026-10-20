@@ -22,4 +22,6 @@ Item 2 live-state audit: `Graph` is the checked read boundary for node and edge 
 
 Item 3 direction audit: Directed edge lookup and filtering, BFS/DFS, shortest path, all paths, and graph adjacency matrices now follow stored edge orientation. The pathfinding algorithm CSR cache uses the backing graph's direction; undirected paths retain reverse traversal. Focused checks are `tests/directed_contract.rs` and `tests/test_directed_contract.py`. Distinct weak/strong component definitions and algorithm-specific directed variants remain in item 28; stable path edge selection among parallel edges remains in item 4.
 
+Item 4 edge identity audit: Parallel edges and self-loops have separate stable edge IDs. Shortest path now retains the chosen edge ID and its actual path weight; all simple paths enumerate parallel edge instances separately. Recorded snapshots preserve both parallel edge IDs and their typed values. Focused checks are `tests/edge_identity_contract.rs` and `tests/test_edge_identity_contract.py`. The proposed explicit endpoint-rewiring mutation is a separate history/change operation in item 13.
+
 For each subsequent item, add focused Rust and Python conformance checks for the behavior being changed, then update this baseline when the contract or a documented gap changes.
