@@ -161,8 +161,8 @@ impl GraphBatch {
         for (name, values) in node_keys {
             let mut resolved = Vec::with_capacity(values.len());
             let mut seen = HashSet::new();
-            if name == "entity_type" && !values.is_empty() {
-                errors.push("node_attrs.entity_type: system-managed attribute".into());
+            if (name == "entity_type" || name == super::graph::EXTERNAL_ID) && !values.is_empty() {
+                errors.push(format!("node_attrs.{name}: system-managed attribute"));
             }
             for (position, (reference, value)) in values.into_iter().enumerate() {
                 match node_id(reference, next_node_id, self.add_nodes) {
@@ -189,6 +189,9 @@ impl GraphBatch {
         for (name, values) in edge_keys {
             let mut resolved = Vec::with_capacity(values.len());
             let mut seen = HashSet::new();
+            if name == super::graph::EXTERNAL_ID && !values.is_empty() {
+                errors.push("edge_attrs.external_id: system-managed attribute".into());
+            }
             for (position, (reference, value)) in values.into_iter().enumerate() {
                 match edge_id(reference, next_edge_id, self.add_edges.len()) {
                     Ok(id) => {

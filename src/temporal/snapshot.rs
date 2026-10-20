@@ -134,6 +134,41 @@ impl TemporalSnapshot {
         self.existence.contains_edge(edge_id)
     }
 
+    /// Find a node by its external identity in this immutable state (a snapshot scan).
+    pub fn node_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<NodeId> {
+        self.node_attributes.iter().find_map(|(&id, attrs)| {
+            (self.node_exists(id) && Self::identity_matches(attrs, external_id, group_id))
+                .then_some(id)
+        })
+    }
+
+    /// Find an edge by its external identity in this immutable state (a snapshot scan).
+    pub fn edge_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<EdgeId> {
+        self.edge_attributes.iter().find_map(|(&id, attrs)| {
+            (self.edge_exists(id) && Self::identity_matches(attrs, external_id, group_id))
+                .then_some(id)
+        })
+    }
+
+    fn identity_matches(
+        attrs: &HashMap<AttrName, AttrValue>,
+        name: &str,
+        group: Option<&str>,
+    ) -> bool {
+        attrs
+            .get(crate::EXTERNAL_ID)
+            .and_then(AttrValue::get_text)
+            .as_deref()
+            == Some(name)
+            && group.map_or(true, |group| {
+                attrs
+                    .get("group_id")
+                    .and_then(AttrValue::get_text)
+                    .as_deref()
+                    == Some(group)
+            })
+    }
+
     pub fn node_attr(&self, node_id: NodeId, attr: &AttrName) -> Option<AttrValue> {
         self.node_attributes
             .get(&node_id)

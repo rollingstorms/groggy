@@ -75,6 +75,17 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'edges': 'EdgesAccessor',
             'node_ids': 'NumArray',
             'edge_ids': 'NumArray',
+            'upsert_nodes': 'List[int]',
+            'upsert_edges': 'List[int]',
+            'node_by_external_id': 'Optional[int]',
+            'edge_by_external_id': 'Optional[int]',
+            'set_node_external_id': 'None',
+            'set_edge_external_id': 'None',
+            'allocated_entity_for_external_id': 'Optional[Tuple[str, int]]',
+        },
+        'TemporalSnapshot': {
+            'node_by_external_id': 'Optional[int]',
+            'edge_by_external_id': 'Optional[int]',
         },
         'Subgraph': {
             'filter_nodes': 'Subgraph',

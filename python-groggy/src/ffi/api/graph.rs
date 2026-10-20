@@ -6,7 +6,10 @@ use crate::ffi::api::graph_batch::parse_batch;
 
 use groggy::subgraphs::Subgraph;
 use groggy::traits::SubgraphOperations;
-use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, NodeId, StateId};
+use groggy::{
+    AttrName, AttrValue as RustAttrValue, EdgeId, EdgeUpsert, ExternalEntityRef,
+    Graph as RustGraph, NodeId, NodeUpsert, StateId,
+};
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
@@ -72,6 +75,35 @@ fn parse_creation_attrs(
         }
     }
     (parsed, errors)
+}
+
+/// Decode all rows before a core upsert is allowed to mutate the graph.
+fn parse_identity_rows<T>(
+    data: &PyAny,
+    mut parse: impl FnMut(&PyDict) -> PyResult<T>,
+) -> PyResult<(Vec<T>, Vec<usize>, Vec<String>)> {
+    let mut rows = Vec::new();
+    let mut positions = Vec::new();
+    let mut errors = Vec::new();
+    for (position, row) in data.iter()?.enumerate() {
+        let decoded = row
+            .and_then(|row| row.downcast::<PyDict>().map_err(Into::into))
+            .and_then(&mut parse);
+        match decoded {
+            Ok(row) => {
+                rows.push(row);
+                positions.push(position);
+            }
+            Err(error) => errors.push(format!("{position}: {error}")),
+        }
+    }
+    Ok((rows, positions, errors))
+}
+
+fn required_identity_field(row: &PyDict, key: &str) -> PyResult<String> {
+    row.get_item(key)?
+        .ok_or_else(|| PyKeyError::new_err(format!("Missing key: {key}")))?
+        .extract()
 }
 
 /// Specification for neighborhood hop parameters
@@ -260,6 +292,11 @@ impl PyGraph {
 
     #[pyo3(signature = (node_id = None, **kwargs))]
     fn add_node(&mut self, node_id: Option<NodeId>, kwargs: Option<&PyDict>) -> PyResult<NodeId> {
+        if node_id.is_some() {
+            return Err(PyValueError::new_err(
+                "Custom internal node IDs are unsupported; use upsert_nodes with external_id",
+            ));
+        }
         let (attrs, mut errors) = parse_creation_attrs(kwargs, &[]);
         if !errors.is_empty() {
             if let Err(error) = self
@@ -279,12 +316,6 @@ impl PyGraph {
                 .add_nodes_with_attrs(vec![attrs])
                 .map_err(graph_error_to_py_err)?[0]
         };
-        // Explicit internal IDs remain a separate compatibility issue (roadmap item 6).
-        if let Some(id) = node_id {
-            if id != actual_node_id {
-                eprintln!("Warning: Custom node IDs not yet supported, using auto-generated ID {} instead of {}", actual_node_id, id);
-            }
-        }
 
         Ok(actual_node_id)
     }
@@ -342,6 +373,12 @@ impl PyGraph {
                         errors.join("; ")
                     )));
                 }
+                if let Some(key) = &uid_key {
+                    self.inner
+                        .borrow()
+                        .validate_new_text_ids(key, &user_ids)
+                        .map_err(graph_error_to_py_err)?;
+                }
                 let node_ids = self
                     .inner
                     .borrow_mut()
@@ -364,36 +401,156 @@ impl PyGraph {
         })
     }
 
+    /// Upsert rows by a managed external ID, preserving unspecified properties.
+    #[pyo3(signature = (rows, uid_key = "external_id"))]
+    fn upsert_nodes(&mut self, rows: &PyAny, uid_key: &str) -> PyResult<Vec<NodeId>> {
+        let (rows, positions, mut errors) = parse_identity_rows(rows, |row| {
+            let id = required_identity_field(row, uid_key);
+            let (attrs, mut errors) = parse_creation_attrs(Some(row), &[uid_key]);
+            if let Err(error) = &id {
+                errors.push(error.to_string());
+            }
+            if !errors.is_empty() {
+                return Err(PyValueError::new_err(errors.join("; ")));
+            }
+            Ok(NodeUpsert {
+                external_id: id?,
+                attrs,
+            })
+        })?;
+        if !errors.is_empty() {
+            if let Err(error) = self
+                .inner
+                .borrow()
+                .validate_node_upserts(&rows, Some(&positions))
+            {
+                errors.push(graph_error_to_py_err(error).to_string());
+            }
+            return Err(PyValueError::new_err(format!(
+                "Invalid upsert rows: {}",
+                errors.join("; ")
+            )));
+        }
+        self.inner
+            .borrow_mut()
+            .upsert_nodes(rows)
+            .map_err(graph_error_to_py_err)
+    }
+
+    /// Edge endpoints can be internal numeric IDs or managed external string IDs.
+    #[pyo3(signature = (rows, uid_key = "external_id"))]
+    fn upsert_edges(&mut self, rows: &PyAny, uid_key: &str) -> PyResult<Vec<EdgeId>> {
+        if uid_key == "source" || uid_key == "target" {
+            return Err(PyValueError::new_err(
+                "The external-ID key must differ from source and target",
+            ));
+        }
+        let (rows, positions, mut errors) = parse_identity_rows(rows, |row| {
+            let id = required_identity_field(row, uid_key);
+            let endpoint = |key: &str| -> PyResult<NodeId> {
+                let value = row
+                    .get_item(key)?
+                    .ok_or_else(|| PyKeyError::new_err(format!("Missing key: {key}")))?;
+                if let Ok(id) = value.extract::<NodeId>() {
+                    return Ok(id);
+                }
+                let name: String = value.extract()?;
+                self.inner
+                    .borrow()
+                    .node_by_external_id(&name, None)
+                    .ok_or_else(|| {
+                        PyKeyError::new_err(format!("No active node with external ID {name:?}"))
+                    })
+            };
+            let source = endpoint("source");
+            let target = endpoint("target");
+            let (attrs, mut errors) =
+                parse_creation_attrs(Some(row), &[uid_key, "source", "target"]);
+            if let Err(error) = &id {
+                errors.push(error.to_string());
+            }
+            if let Err(error) = &source {
+                errors.push(format!("source: {error}"));
+            }
+            if let Err(error) = &target {
+                errors.push(format!("target: {error}"));
+            }
+            if !errors.is_empty() {
+                return Err(PyValueError::new_err(errors.join("; ")));
+            }
+            Ok(EdgeUpsert {
+                external_id: id?,
+                source: source?,
+                target: target?,
+                attrs,
+            })
+        })?;
+        if !errors.is_empty() {
+            if let Err(error) = self
+                .inner
+                .borrow()
+                .validate_edge_upserts(&rows, Some(&positions))
+            {
+                errors.push(graph_error_to_py_err(error).to_string());
+            }
+            return Err(PyValueError::new_err(format!(
+                "Invalid upsert rows: {}",
+                errors.join("; ")
+            )));
+        }
+        self.inner
+            .borrow_mut()
+            .upsert_edges(rows)
+            .map_err(graph_error_to_py_err)
+    }
+
+    #[pyo3(signature = (external_id, group_id = None))]
+    fn node_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<NodeId> {
+        self.inner
+            .borrow()
+            .node_by_external_id(external_id, group_id)
+    }
+
+    #[pyo3(signature = (external_id, group_id = None))]
+    fn edge_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<EdgeId> {
+        self.inner
+            .borrow()
+            .edge_by_external_id(external_id, group_id)
+    }
+
+    fn set_node_external_id(&mut self, node: NodeId, external_id: String) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .set_node_external_id(node, external_id)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn set_edge_external_id(&mut self, edge: EdgeId, external_id: String) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .set_edge_external_id(edge, external_id)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn allocated_entity_for_external_id(&self, external_id: &str) -> Option<(&'static str, usize)> {
+        self.inner
+            .borrow()
+            .allocated_entity_for_external_id(external_id)
+            .map(|entity| match entity {
+                ExternalEntityRef::Node(id) => ("node", id),
+                ExternalEntityRef::Edge(id) => ("edge", id),
+            })
+    }
+
     /// Helper method to resolve string ID to NodeId using uid_key attribute
     fn resolve_string_id_to_node(&self, string_id: &str, uid_key: &str) -> PyResult<NodeId> {
-        let node_ids = self.inner.borrow_mut().node_ids();
-
-        for node_id in node_ids {
-            if let Ok(Some(attr_value)) = self
-                .inner
-                .borrow_mut()
-                .get_node_attr(node_id, &uid_key.to_string())
-            {
-                match attr_value {
-                    RustAttrValue::Text(s) => {
-                        if s == string_id {
-                            return Ok(node_id);
-                        }
-                    }
-                    RustAttrValue::CompactText(s) => {
-                        if s.as_str() == string_id {
-                            return Ok(node_id);
-                        }
-                    }
-                    _ => continue, // Skip non-text attributes
-                }
-            }
-        }
-
-        Err(PyErr::new::<PyKeyError, _>(format!(
-            "No node found with {}='{}'",
-            uid_key, string_id
-        )))
+        self.inner
+            .borrow()
+            .node_by_unique_text_attr(uid_key, string_id)
+            .map_err(graph_error_to_py_err)?
+            .ok_or_else(|| {
+                PyKeyError::new_err(format!("No node found with {uid_key}={string_id:?}"))
+            })
     }
 
     /// String representation
@@ -637,6 +794,13 @@ impl PyGraph {
             })();
             match result {
                 Ok(edge) => {
+                    if let Err(error) = self
+                        .inner
+                        .borrow()
+                        .validate_new_edge_attrs(std::slice::from_ref(&edge.2))
+                    {
+                        errors.push(format!("{position}: {error}"));
+                    }
                     let graph = self.inner.borrow();
                     if !graph.has_node(edge.0) || !graph.has_node(edge.1) {
                         errors.push(format!(
@@ -944,6 +1108,13 @@ impl PyGraph {
         };
 
         let (attrs, mut errors) = parse_creation_attrs(kwargs, &[]);
+        if let Err(error) = self
+            .inner
+            .borrow()
+            .validate_new_edge_attrs(std::slice::from_ref(&attrs))
+        {
+            errors.push(error.to_string());
+        }
         if !errors.is_empty() {
             let graph = self.inner.borrow();
             if !graph.has_node(source_id) {
@@ -1527,6 +1698,11 @@ impl PyGraph {
                     dict.set_item(node_id, attr_value_py)?;
                 } else {
                     // Return attribute_value -> node_id mapping (default behavior)
+                    if dict.contains(attr_value_py.clone_ref(py))? {
+                        return Err(PyValueError::new_err(format!(
+                            "Ambiguous mapping for {uid_key}: duplicate property value"
+                        )));
+                    }
                     dict.set_item(attr_value_py, node_id)?;
                 }
             }
@@ -1543,81 +1719,13 @@ impl PyGraph {
     /// Node and edge IDs may be remapped to avoid conflicts.
     /// Attributes are preserved during the merge.
     pub fn add_graph(&mut self, _py: Python, other: &PyGraph) -> PyResult<()> {
-        // Get all nodes from the other graph with their attributes
-        let other_node_ids = other.inner.borrow().node_ids();
-        let other_edge_ids = other.inner.borrow().edge_ids();
-
-        // Track ID mappings to handle potential conflicts
-        let mut node_id_mapping = std::collections::HashMap::new();
-
-        // Add all nodes from other graph
-        for &old_node_id in &other_node_ids {
-            // Get all attributes for this node
-            let mut node_attrs = std::collections::HashMap::new();
-
-            // Get attribute names for this node (this is a simplified approach)
-            // TODO: This could be more efficient with a proper attribute iteration API
-            let sample_attrs = ["name", "label", "type", "value", "weight", "id"]; // Common attribute names
-            for attr_name in &sample_attrs {
-                if let Ok(Some(attr_value)) = other
-                    .inner
-                    .borrow()
-                    .get_node_attr(old_node_id, &attr_name.to_string())
-                {
-                    node_attrs.insert(attr_name.to_string(), attr_value);
-                }
-            }
-
-            // Add the node to this graph
-            let new_node_id = self.inner.borrow_mut().add_node();
-            node_id_mapping.insert(old_node_id, new_node_id);
-
-            // Set all attributes on the new node
-            for (attr_name, attr_value) in node_attrs {
-                let _ = self
-                    .inner
-                    .borrow_mut()
-                    .set_node_attr(new_node_id, attr_name, attr_value);
-            }
+        if Rc::ptr_eq(&self.inner, &other.inner) {
+            return Err(PyValueError::new_err("Cannot add a graph to itself"));
         }
-
-        // Add all edges from other graph
-        for &old_edge_id in &other_edge_ids {
-            if let Ok((old_source, old_target)) = other.inner.borrow().edge_endpoints(old_edge_id) {
-                // Map old node IDs to new node IDs
-                if let (Some(&new_source), Some(&new_target)) = (
-                    node_id_mapping.get(&old_source),
-                    node_id_mapping.get(&old_target),
-                ) {
-                    // Add the edge
-                    match self.inner.borrow_mut().add_edge(new_source, new_target) {
-                        Ok(new_edge_id) => {
-                            // Copy edge attributes
-                            let sample_edge_attrs = ["weight", "label", "type", "capacity"]; // Common edge attribute names
-                            for attr_name in &sample_edge_attrs {
-                                if let Ok(Some(attr_value)) = other
-                                    .inner
-                                    .borrow()
-                                    .get_edge_attr(old_edge_id, &attr_name.to_string())
-                                {
-                                    let _ = self.inner.borrow_mut().set_edge_attr(
-                                        new_edge_id,
-                                        attr_name.to_string(),
-                                        attr_value,
-                                    );
-                                }
-                            }
-                        }
-                        Err(_) => {
-                            // Skip edges that can't be added (e.g., duplicates in undirected graphs)
-                            continue;
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
+        self.inner
+            .borrow_mut()
+            .add_graph(&other.inner.borrow())
+            .map_err(graph_error_to_py_err)
     }
 
     /// Return a full-view Subgraph (whole graph as a subgraph).

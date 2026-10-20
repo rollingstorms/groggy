@@ -5005,6 +5005,41 @@ class Graph:
         ...
 
 
+    def allocated_entity_for_external_id(self, *args, **kwargs) -> Optional[Tuple[str, int]]:
+        ...
+
+
+    def edge_by_external_id(self, *args, **kwargs) -> Optional[int]:
+        ...
+
+
+    def node_by_external_id(self, *args, **kwargs) -> Optional[int]:
+        ...
+
+
+    def set_edge_external_id(self, *args, **kwargs) -> None:
+        ...
+
+
+    def set_node_external_id(self, *args, **kwargs) -> None:
+        ...
+
+
+    def upsert_edges(self, *args, **kwargs) -> List[int]:
+        """
+        Edge endpoints can be internal numeric IDs or managed external string IDs.
+        """
+        ...
+
+
+    def upsert_nodes(self, *args, **kwargs) -> List[int]:
+        """
+        Upsert rows by a managed external ID, preserving unspecified properties.
+        """
+        ...
+
+
+
 class GraphMatrix:
     """
     Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
@@ -10177,6 +10212,15 @@ class TemporalSnapshot:
 
     def parents(self, *args, **kwargs) -> Any:
         ...
+
+
+    def edge_by_external_id(self, *args, **kwargs) -> Optional[int]:
+        ...
+
+
+    def node_by_external_id(self, *args, **kwargs) -> Optional[int]:
+        ...
+
 
 
 class VizAccessor:

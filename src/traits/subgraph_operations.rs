@@ -1202,19 +1202,7 @@ pub trait SubgraphOperations: GraphEntity {
             return Ok(());
         }
 
-        // Use optimized vectorized pool operation
-        let index_changes = graph.pool_mut().set_bulk_attrs(filtered_attrs, true);
-
-        // Update space attribute indices in bulk
-        for (attr_name, entity_indices) in index_changes {
-            for (node_id, new_index) in entity_indices {
-                graph
-                    .space_mut()
-                    .set_node_attr_index(node_id, attr_name.clone(), new_index);
-            }
-        }
-
-        Ok(())
+        graph.set_node_attrs(filtered_attrs)
     }
 
     /// Optimized variant for setting a single node attribute column
@@ -1258,32 +1246,7 @@ pub trait SubgraphOperations: GraphEntity {
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
 
-        // Batch validation - check all edges exist upfront
-        for edge_values in attrs_values.values() {
-            for &(edge_id, _) in edge_values {
-                if !graph.space().contains_edge(edge_id) {
-                    return Err(crate::errors::GraphError::edge_not_found(
-                        edge_id,
-                        "set bulk edge attributes",
-                    )
-                    .into());
-                }
-            }
-        }
-
-        // Use optimized vectorized pool operation
-        let index_changes = graph.pool_mut().set_bulk_attrs(attrs_values, false);
-
-        // Update space attribute indices in bulk
-        for (attr_name, entity_indices) in index_changes {
-            for (edge_id, new_index) in entity_indices {
-                graph
-                    .space_mut()
-                    .set_edge_attr_index(edge_id, attr_name.clone(), new_index);
-            }
-        }
-
-        Ok(())
+        graph.set_edge_attrs(attrs_values)
     }
 
     /// MetaGraph Composer API - Clean interface for meta-node creation

@@ -167,7 +167,7 @@ pub mod api {
 
 // Re-export commonly used types and the main API
 pub use api::batch::{BatchEdgeRef, BatchNodeRef, BatchResult, GraphBatch};
-pub use api::graph::Graph;
+pub use api::graph::{EdgeUpsert, ExternalEntityRef, Graph, NodeUpsert, EXTERNAL_ID};
 pub use errors::{GraphError, GraphResult};
 pub use state::{HistoricalView, HistoryForest, ViewSummary};
 pub use types::{

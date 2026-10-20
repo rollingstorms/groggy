@@ -11,6 +11,10 @@
 //! - HistoryForest = Version Control (immutable snapshots, branching)
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
+mod identity;
+use identity::ExternalIdentityIndex;
+pub use identity::{EdgeUpsert, ExternalEntityRef, NodeUpsert, EXTERNAL_ID};
+
 use crate::api::batch::{BatchResult, GraphBatch};
 use crate::errors::{GraphError, GraphResult};
 use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
@@ -75,6 +79,9 @@ pub struct Graph {
     /// This is where the actual attribute data lives
     /// Wrapped in Rc<RefCell<>> for interior mutability access from GraphSpace
     pool: Rc<RefCell<GraphPool>>,
+
+    /// Allocation-lifetime external identities, independent of active graph state.
+    identities: ExternalIdentityIndex,
 
     /*
     === VERSION CONTROL SYSTEM ===
@@ -165,6 +172,7 @@ impl Graph {
             traversal_engine: TraversalEngine::new(),
             neighborhood_sampler: NeighborhoodSampler::new(),
             self_reference: None,
+            identities: ExternalIdentityIndex::default(),
             change_tracker: ChangeTracker::new(),
             config,
         }
@@ -197,6 +205,7 @@ impl Graph {
             traversal_engine: TraversalEngine::new(),
             neighborhood_sampler: NeighborhoodSampler::new(),
             self_reference: None,
+            identities: ExternalIdentityIndex::default(),
             change_tracker: ChangeTracker::new(),
             config,
         }
@@ -269,9 +278,22 @@ impl Graph {
         if let Some(nodes) = graph_data.get("nodes").and_then(|v| v.as_array()) {
             for node in nodes {
                 if let Some(node_id) = node.get("id").and_then(|v| v.as_u64()) {
-                    let _node_id = node_id as crate::types::NodeId;
-                    let added_node_id = graph.add_node();
-                    // Note: We assume the loaded node_id matches the added one for now
+                    let added_node_id = usize::try_from(node_id).map_err(|_| {
+                        GraphError::InvalidInput("Stored node ID exceeds platform range".into())
+                    })?;
+                    if added_node_id == usize::MAX || graph.has_node(added_node_id) {
+                        return Err(GraphError::InvalidInput(format!(
+                            "Invalid or duplicate stored node ID {added_node_id}"
+                        )));
+                    }
+                    graph.pool.borrow_mut().ensure_node_id_exists(added_node_id);
+                    graph.space.activate_node(added_node_id);
+                    graph.change_tracker.record_node_addition(added_node_id);
+                    graph.set_node_attr_internal(
+                        added_node_id,
+                        "entity_type".into(),
+                        AttrValue::Text("base".into()),
+                    )?;
 
                     // Load node attributes
                     if let Some(attrs) = node.get("attributes").and_then(|v| v.as_object()) {
@@ -292,7 +314,20 @@ impl Graph {
                                 serde_json::Value::Bool(b) => crate::types::AttrValue::Bool(*b),
                                 _ => continue,
                             };
-                            graph.set_node_attr(added_node_id, key.clone(), attr_value)?;
+                            if key == EXTERNAL_ID {
+                                let id = attr_value.as_text().ok_or_else(|| {
+                                    GraphError::InvalidInput("external_id must be text".into())
+                                })?;
+                                graph.set_node_external_id(added_node_id, id.to_owned())?;
+                            } else if key == "entity_type" {
+                                graph.set_node_attr_internal(
+                                    added_node_id,
+                                    key.clone(),
+                                    attr_value,
+                                )?;
+                            } else {
+                                graph.set_node_attr(added_node_id, key.clone(), attr_value)?;
+                            }
                         }
                     }
                 }
@@ -309,7 +344,30 @@ impl Graph {
                     let source = source as crate::types::NodeId;
                     let target = target as crate::types::NodeId;
 
-                    let edge_id = graph.add_edge(source, target)?;
+                    let edge_id = if let Some(id) = edge.get("id").and_then(|value| value.as_u64())
+                    {
+                        let id = usize::try_from(id).map_err(|_| {
+                            GraphError::InvalidInput("Stored edge ID exceeds platform range".into())
+                        })?;
+                        if id == usize::MAX || graph.has_edge(id) {
+                            return Err(GraphError::InvalidInput(format!(
+                                "Invalid or duplicate stored edge ID {id}"
+                            )));
+                        }
+                        if !graph.has_node(source) || !graph.has_node(target) {
+                            return Err(GraphError::InvalidInput(format!(
+                                "Stored edge {id} has inactive endpoints ({source}, {target})"
+                            )));
+                        }
+                        graph.pool.borrow_mut().add_edge_with_id(id, source, target);
+                        graph.space.activate_edge(id, source, target);
+                        graph
+                            .change_tracker
+                            .record_edge_addition(id, source, target);
+                        id
+                    } else {
+                        graph.add_edge(source, target)?
+                    };
 
                     // Load edge attributes
                     if let Some(attrs) = edge.get("attributes").and_then(|v| v.as_object()) {
@@ -330,7 +388,14 @@ impl Graph {
                                 serde_json::Value::Bool(b) => crate::types::AttrValue::Bool(*b),
                                 _ => continue,
                             };
-                            graph.set_edge_attr(edge_id, key.clone(), attr_value)?;
+                            if key == EXTERNAL_ID {
+                                let id = attr_value.as_text().ok_or_else(|| {
+                                    GraphError::InvalidInput("external_id must be text".into())
+                                })?;
+                                graph.set_edge_external_id(edge_id, id.to_owned())?;
+                            } else {
+                                graph.set_edge_attr(edge_id, key.clone(), attr_value)?;
+                            }
                         }
                     }
                 }
@@ -490,14 +555,16 @@ impl Graph {
         &self,
         rows: &[HashMap<AttrName, AttrValue>],
     ) -> GraphResult<()> {
-        let errors: Vec<_> = rows
-            .iter()
-            .enumerate()
-            .filter(|(_, attrs)| attrs.contains_key("entity_type"))
-            .map(|(position, _)| {
-                format!("{position}.entity_type: system-managed node attribute cannot be changed")
-            })
-            .collect();
+        let mut errors = Vec::new();
+        for (position, attrs) in rows.iter().enumerate() {
+            for name in ["entity_type", EXTERNAL_ID] {
+                if attrs.contains_key(name) {
+                    errors.push(format!(
+                        "{position}.{name}: system-managed node attribute cannot be changed"
+                    ));
+                }
+            }
+        }
         if !errors.is_empty() {
             return Err(GraphError::InvalidInput(format!(
                 "Invalid node attributes at batch positions {}",
@@ -506,6 +573,24 @@ impl Graph {
         }
 
         Ok(())
+    }
+
+    /// Validate new edge properties before allocating any edge ID.
+    pub fn validate_new_edge_attrs(
+        &self,
+        rows: &[HashMap<AttrName, AttrValue>],
+    ) -> GraphResult<()> {
+        let invalid: Vec<_> = rows
+            .iter()
+            .enumerate()
+            .filter(|(_, attrs)| attrs.contains_key(EXTERNAL_ID))
+            .map(|(position, _)| format!("{position}.external_id: use the external-ID API"))
+            .collect();
+        if invalid.is_empty() {
+            Ok(())
+        } else {
+            Err(GraphError::InvalidInput(invalid.join("; ")))
+        }
     }
 
     /// Add nodes with properties, validating all rows before allocating IDs.
@@ -592,6 +677,23 @@ impl Graph {
 
     /// Add all nodes and edges from another graph to this graph
     pub fn add_graph(&mut self, other: &Graph) -> Result<(), GraphError> {
+        if other.node_ids().iter().any(|&id| {
+            other
+                .get_node_attr(id, &EXTERNAL_ID.into())
+                .ok()
+                .flatten()
+                .is_some()
+        }) || other.edge_ids().iter().any(|&id| {
+            other
+                .get_edge_attr(id, &EXTERNAL_ID.into())
+                .ok()
+                .flatten()
+                .is_some()
+        }) {
+            return Err(GraphError::InvalidInput(
+                "add_graph cannot copy managed external IDs; use explicit upserts".into(),
+            ));
+        }
         // Step 1: Create ID mapping by adding nodes
         let other_nodes = other.node_ids();
         let node_count = other_nodes.len();
@@ -795,6 +897,11 @@ impl Graph {
         attr: AttrName,
         value: AttrValue,
     ) -> Result<(), GraphError> {
+        if attr == EXTERNAL_ID {
+            return Err(GraphError::InvalidInput(
+                "external_id is system-managed; use set_node_external_id".into(),
+            ));
+        }
         // WORF SAFETY: Prevent direct entity_type modification
         if attr == "entity_type" {
             return Err(GraphError::InvalidInput(
@@ -849,6 +956,11 @@ impl Graph {
         attr: AttrName,
         value: AttrValue,
     ) -> Result<(), GraphError> {
+        if attr == EXTERNAL_ID {
+            return Err(GraphError::InvalidInput(
+                "external_id is system-managed; use set_edge_external_id".into(),
+            ));
+        }
         // 1. Validate edge is active
         if !self.space.contains_edge(edge) {
             return Err(GraphError::EdgeNotFound {
@@ -2320,6 +2432,7 @@ impl Graph {
         &mut self,
         snapshot: crate::state::state::GraphSnapshot,
     ) -> Result<(), GraphError> {
+        let identity_bindings = self.snapshot_identity_bindings(&snapshot)?;
         let allocated = self.pool.borrow().statistics();
         // 1. Clear current state
         self.pool = Rc::new(RefCell::new(
@@ -2377,6 +2490,7 @@ impl Graph {
             .borrow_mut()
             .reserve_id_counters(allocated.node_count, allocated.edge_count);
 
+        self.retain_snapshot_identity_bindings(identity_bindings);
         Ok(())
     }
 
@@ -2461,6 +2575,16 @@ impl Graph {
                 for (key, value) in attrs {
                     let json_value = match value {
                         crate::types::AttrValue::Text(s) => serde_json::Value::String(s),
+                        crate::types::AttrValue::CompactText(s) => {
+                            serde_json::Value::String(s.as_str().to_owned())
+                        }
+                        crate::types::AttrValue::CompressedText(data) => {
+                            serde_json::Value::String(data.decompress_text().map_err(|error| {
+                                GraphError::InvalidInput(format!(
+                                    "Cannot export text property {key}: {error}"
+                                ))
+                            })?)
+                        }
                         crate::types::AttrValue::Int(i) => {
                             serde_json::Value::Number(serde_json::Number::from(i))
                         }
@@ -2500,6 +2624,18 @@ impl Graph {
                     for (key, value) in attrs {
                         let json_value = match value {
                             crate::types::AttrValue::Text(s) => serde_json::Value::String(s),
+                            crate::types::AttrValue::CompactText(s) => {
+                                serde_json::Value::String(s.as_str().to_owned())
+                            }
+                            crate::types::AttrValue::CompressedText(data) => {
+                                serde_json::Value::String(data.decompress_text().map_err(
+                                    |error| {
+                                        GraphError::InvalidInput(format!(
+                                            "Cannot export text property {key}: {error}"
+                                        ))
+                                    },
+                                )?)
+                            }
                             crate::types::AttrValue::Int(i) => {
                                 serde_json::Value::Number(serde_json::Number::from(i))
                             }
@@ -3155,6 +3291,10 @@ impl Graph {
             let column_positions = positions
                 .and_then(|positions| positions.get(attr_name))
                 .map(Vec::as_slice);
+            if attr_name == EXTERNAL_ID && !values.is_empty() {
+                errors
+                    .push("external_id: system-managed attribute; use the external-ID API".into());
+            }
             self.collect_invalid_attr_targets(
                 attr_name,
                 values,
@@ -3199,6 +3339,14 @@ impl Graph {
         attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> GraphResult<()> {
         self.validate_node_attrs(&attrs_values, None)?;
+        self.write_node_attrs(attrs_values)
+    }
+
+    // Internal column writer: the coordinator must validate the complete operation first.
+    fn write_node_attrs(
+        &mut self,
+        attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
+    ) -> GraphResult<()> {
         // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<NodeId, Option<usize>>> = HashMap::new();
         for (attr_name, node_values) in &attrs_values {
@@ -3254,6 +3402,9 @@ impl Graph {
         if attr_name == "entity_type" {
             errors.push("entity_type: system-managed node attribute cannot be changed".into());
         }
+        if attr_name == EXTERNAL_ID {
+            errors.push("external_id: system-managed attribute; use set_node_external_id".into());
+        }
         self.collect_invalid_attr_targets(&attr_name, &node_values, true, None, &mut errors);
         if !errors.is_empty() {
             return Err(GraphError::InvalidInput(format!(
@@ -3299,6 +3450,14 @@ impl Graph {
         attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> GraphResult<()> {
         self.validate_edge_attrs(&attrs_values, None)?;
+        self.write_edge_attrs(attrs_values)
+    }
+
+    // Internal column writer: the coordinator must validate the complete operation first.
+    fn write_edge_attrs(
+        &mut self,
+        attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
+    ) -> GraphResult<()> {
         // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<EdgeId, Option<usize>>> = HashMap::new();
         for (attr_name, edge_values) in &attrs_values {

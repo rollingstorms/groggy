@@ -45,6 +45,16 @@ impl PyTemporalSnapshot {
         self.inner.existence().contains_edge(edge_id as EdgeId)
     }
 
+    #[pyo3(signature = (external_id, group_id = None))]
+    fn node_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<NodeId> {
+        self.inner.node_by_external_id(external_id, group_id)
+    }
+
+    #[pyo3(signature = (external_id, group_id = None))]
+    fn edge_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<EdgeId> {
+        self.inner.edge_by_external_id(external_id, group_id)
+    }
+
     fn node_attr(&self, node_id: u64, attr: &str) -> Option<PyAttrValue> {
         self.inner
             .node_attr(node_id as NodeId, &AttrName::from(attr.to_string()))
