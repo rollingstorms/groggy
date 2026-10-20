@@ -1,4 +1,4 @@
-//! Explicit schema auditing. Installation/enforcement across every write is item 9.
+//! Shared schema validation for active graphs and proposed batch states.
 use super::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -78,7 +78,8 @@ pub struct GraphSchema {
 /// One deterministic, structured schema finding; auditing never mutates the graph.
 #[derive(Debug, Clone)]
 pub struct SchemaViolation {
-    /// Active node or edge carrying the offending value.
+    /// Active or proposed node/edge carrying the offending value.
+    /// Proposed IDs are not allocated when validation rejects the batch.
     pub entity: ExternalEntityRef,
     /// Node label or relationship type selecting this rule.
     pub selector: String,
@@ -113,17 +114,45 @@ impl GraphSchema {
 
     /// Audit active graph properties against all applicable rules, in stable order.
     pub fn validate_graph(&self, graph: &Graph) -> GraphResult<Vec<SchemaViolation>> {
+        self.validate_state(graph.node_ids(), graph.edge_ids(), |is_node, id, name| {
+            if is_node {
+                graph.get_node_attr(id, &name.into())
+            } else {
+                graph.get_edge_attr(id, &name.into())
+            }
+        })
+    }
+
+    // One validator serves audit and pre-publication enforcement, so absence,
+    // nullability and logical families have identical semantics in both paths.
+    fn validate_state<F>(
+        &self,
+        mut nodes: Vec<NodeId>,
+        mut edges: Vec<EdgeId>,
+        mut property: F,
+    ) -> GraphResult<Vec<SchemaViolation>>
+    where
+        F: FnMut(bool, usize, &str) -> GraphResult<Option<AttrValue>>,
+    {
         self.validate_definition()?;
         let mut violations = Vec::new();
-        let mut nodes = graph.node_ids();
         nodes.sort_unstable();
         for id in nodes {
-            for label in graph.node_labels(id)? {
+            let labels = match property(true, id, LABELS)? {
+                None => Vec::new(),
+                Some(AttrValue::TextVec(labels)) => labels,
+                Some(_) => {
+                    return Err(GraphError::InvalidInput(
+                        "Stored labels are not a text vector".into(),
+                    ))
+                }
+            };
+            for label in labels {
                 if let Some(rules) = self.node_labels.get(&label) {
                     for (name, rule) in rules {
                         check(
                             rule,
-                            graph.get_node_attr(id, name)?,
+                            property(true, id, name)?,
                             ExternalEntityRef::Node(id),
                             &label,
                             name,
@@ -133,15 +162,20 @@ impl GraphSchema {
                 }
             }
         }
-        let mut edges = graph.edge_ids();
         edges.sort_unstable();
         for id in edges {
-            if let Some(kind) = graph.edge_relationship_type(id)? {
+            let kind = match property(false, id, RELATIONSHIP_TYPE)? {
+                None | Some(AttrValue::Null) => None,
+                Some(value) => Some(value.get_text().ok_or_else(|| {
+                    GraphError::InvalidInput("Stored relationship_type is not text".into())
+                })?),
+            };
+            if let Some(kind) = kind {
                 if let Some(rules) = self.relationship_types.get(&kind) {
                     for (name, rule) in rules {
                         check(
                             rule,
-                            graph.get_edge_attr(id, name)?,
+                            property(false, id, name)?,
                             ExternalEntityRef::Edge(id),
                             &kind,
                             name,
@@ -153,7 +187,89 @@ impl GraphSchema {
         }
         Ok(violations)
     }
+
+    /// Validate a prepared overlay without allocating entities, touching property
+    /// pools, recording changes or reconstructing/cloning the entire graph.
+    pub(super) fn validate_proposed(
+        &self,
+        graph: &Graph,
+        batch: &crate::api::batch::PreparedBatch,
+        first_node: NodeId,
+        first_edge: EdgeId,
+    ) -> GraphResult<Vec<SchemaViolation>> {
+        let removed_nodes: HashSet<_> = batch.remove_nodes.iter().copied().collect();
+        let removed_edges: HashSet<_> = batch.remove_edges.iter().copied().collect();
+        let added_nodes = first_node..first_node + batch.add_nodes;
+        let added_edges = first_edge..first_edge + batch.add_edges.len();
+        let mut nodes = graph.node_ids();
+        nodes.extend(added_nodes.clone());
+        nodes.retain(|id| !removed_nodes.contains(id));
+        let mut edges = Vec::new();
+        for id in graph.edge_ids() {
+            if removed_edges.contains(&id) {
+                continue;
+            }
+            let (source, target) = graph.edge_endpoints(id)?;
+            if !removed_nodes.contains(&source) && !removed_nodes.contains(&target) {
+                edges.push(id);
+            }
+        }
+        for (offset, &(source, target)) in batch.add_edges.iter().enumerate() {
+            let id = first_edge + offset;
+            if !removed_edges.contains(&id)
+                && !removed_nodes.contains(&source)
+                && !removed_nodes.contains(&target)
+            {
+                edges.push(id);
+            }
+        }
+        let node_updates = assignment_index(&batch.node_attrs);
+        let edge_updates = assignment_index(&batch.edge_attrs);
+        self.validate_state(nodes, edges, |is_node, id, name| {
+            let updates = if is_node {
+                &node_updates
+            } else {
+                &edge_updates
+            };
+            if let Some(value) = updates.get(&id).and_then(|row| row.get(name)) {
+                return Ok(Some((**value).clone()));
+            }
+            let added = if is_node {
+                added_nodes.contains(&id)
+            } else {
+                added_edges.contains(&id)
+            };
+            if added {
+                return Ok(if is_node && name == "entity_type" {
+                    Some(AttrValue::Text("base".into()))
+                } else {
+                    None
+                });
+            }
+            if is_node {
+                graph.get_node_attr(id, &name.into())
+            } else {
+                graph.get_edge_attr(id, &name.into())
+            }
+        })
+    }
 }
+// Index only staged assignments; existing values remain in their current columns.
+fn assignment_index(
+    columns: &HashMap<AttrName, Vec<(usize, AttrValue)>>,
+) -> HashMap<usize, HashMap<&str, &AttrValue>> {
+    let mut by_entity: HashMap<_, HashMap<_, _>> = HashMap::new();
+    for (name, values) in columns {
+        for (id, value) in values {
+            by_entity
+                .entry(*id)
+                .or_default()
+                .insert(name.as_str(), value);
+        }
+    }
+    by_entity
+}
+
 fn check(
     rule: &PropertyConstraint,
     value: Option<AttrValue>,

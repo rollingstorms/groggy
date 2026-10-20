@@ -89,6 +89,7 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'nodes_with_label': 'List[int]',
             'edges_with_relationship_type': 'List[int]',
             'validate_schema': 'List[Dict[str, Any]]',
+            'apply_batch': 'Dict[str, Any]',
             'load_from_path': 'Graph',
             'save_to_path': 'None',
         },
@@ -416,6 +417,8 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
             lines.append(f"    def __getattr__(self, name: str) -> Any:")
             if not method_doc:
                 method_doc = "Dynamic attribute access for runtime attribute dictionaries"
+        elif class_name == 'Graph' and method_name == 'apply_batch':
+            lines.append("    def apply_batch(self, batch: Any, expected_state: int, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
         elif method_name == 'experimental':
             # Special handling for experimental method
             lines.append(f"    def experimental(self, method_name: str, *args, **kwargs) -> Any:")

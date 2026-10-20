@@ -36,6 +36,15 @@ use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 use crate::ffi::api::graph_analysis::PyGraphAnalysis;
 use crate::ffi::api::graph_matrix::PyGraphMatrixHelper;
 
+/// Translate a schema dictionary; all rule semantics remain in the Rust core.
+fn parse_schema(schema: &PyDict) -> PyResult<groggy::GraphSchema> {
+    let value = crate::ffi::utils::python_value_to_attr_value(schema)?;
+    let RustAttrValue::Json(json) = value else {
+        return Err(PyTypeError::new_err("Schema must be a dictionary"));
+    };
+    groggy::GraphSchema::from_json(&json).map_err(graph_error_to_py_err)
+}
+
 /// Decode all rows before a core upsert is allowed to mutate the graph.
 fn parse_identity_rows<T>(
     data: &PyAny,
@@ -299,11 +308,7 @@ impl PyGraph {
 
     /// Audit an explicit schema; this does not install a write policy.
     fn validate_schema(&self, py: Python, schema: &PyDict) -> PyResult<PyObject> {
-        let value = crate::ffi::utils::python_value_to_attr_value(schema)?;
-        let RustAttrValue::Json(json) = value else {
-            return Err(PyTypeError::new_err("Schema must be a dictionary"));
-        };
-        let schema = groggy::GraphSchema::from_json(&json).map_err(graph_error_to_py_err)?;
+        let schema = parse_schema(schema)?;
         let violations = self
             .inner
             .borrow()
@@ -1515,6 +1520,9 @@ impl PyGraph {
     // === VERSION CONTROL OPERATIONS ===
 
     /// Apply one validated mixed write against an expected published state.
+    /// Optional schema checks the entire proposed result before any mutation.
+    /// This call does not install a schema policy on subsequent writes.
+    #[pyo3(signature = (batch, expected_state, message, author, *, schema=None))]
     fn apply_batch(
         &mut self,
         py: Python,
@@ -1522,13 +1530,24 @@ impl PyGraph {
         expected_state: StateId,
         message: String,
         author: String,
+        schema: Option<&PyDict>,
     ) -> PyResult<PyObject> {
         let batch = parse_batch(batch)?;
-        let result = self
-            .inner
-            .borrow_mut()
-            .apply_batch(batch, expected_state, message, author)
-            .map_err(graph_error_to_py_err)?;
+        let schema = schema.map(parse_schema).transpose()?;
+        let result = if let Some(schema) = &schema {
+            self.inner.borrow_mut().apply_batch_with_schema(
+                batch,
+                expected_state,
+                message,
+                author,
+                schema,
+            )
+        } else {
+            self.inner
+                .borrow_mut()
+                .apply_batch(batch, expected_state, message, author)
+        }
+        .map_err(graph_error_to_py_err)?;
         let output = PyDict::new(py);
         output.set_item("state_id", result.state_id)?;
         output.set_item("added_nodes", result.added_nodes)?;

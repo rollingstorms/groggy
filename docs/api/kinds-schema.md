@@ -54,8 +54,30 @@ A property rule has `type`, `required` (default true) and `nullable` (default fa
 
 Findings contain `entity_type`, `entity_id`, `selector`, `property` and `message`, ordered by nodes then edges, ID, label/type and property. Unknown schema fields or types and empty selectors raise errors. Multiple labels can impose conflicting constraints; validation reports each violated rule. Rust exposes `GraphSchema`, `PropertyConstraint`, `PropertyKind`, `SchemaViolation` and the same checked graph helpers.
 
+## Schema-controlled batch publication
+
+Pass `schema=` to `apply_batch` to enforce the rules on that call's complete proposed resulting graph:
+
+```python
+from groggy import Graph, GraphBatch
+
+graph = Graph()
+batch = GraphBatch()
+batch.add_node(labels=["Entity"], name="Ada")
+policy = {"node_labels": {"Entity": {"name": {"type": "text"}}}}
+result = graph.apply_batch(batch, graph.current_state_id, "person", "example", schema=policy)
+assert graph.current_state_id == result["state_id"]
+assert not graph.has_uncommitted_changes()
+```
+
+Rust provides `apply_batch_with_schema(batch, expected_state, message, author, &schema)`; the existing `apply_batch` remains the flexible path. Omit the Python `schema` argument or pass `None` to use that same flexible path. Passing a schema does not install a policy on future writes.
+
+Validation combines staged properties with unchanged live values, applies label/type changes together with their required properties, and excludes removed nodes/edges plus edges removed through node deletion. It also checks untouched surviving entities, so a previously invalid graph must be repaired or have those entities/selectors removed in the batch before this policy can succeed. Unknown labels and untyped entities remain allowed under the schema model.
+
+Every schema finding is reported before allocation or property/history writes. Rejection preserves current state, history, dirty tracking and allocation counters; success publishes one state using the existing batch coordinator. Proposed entity IDs shown in errors are prospective IDs and have not been reserved. Existing stale-state and uncommitted-legacy-write guards still apply. Schema checking uses an overlay of staged assignments and reads existing columns, rather than cloning/reconstructing the graph. It scans the proposed graph; it is not an indexed incremental check. Existing constraints on required, nullable and logical property types are identical to explicit auditing.
+
 ## Remaining enforcement work
 
-Schema validation is an explicit audit, not graph-wide enforcement. Installing an enforced schema requires the mutation boundary in item 9 to validate the resulting state before allocation/publication, including creation and multi-property changes. Existing infallible Rust creation methods cannot report required-field errors; they need a compatible checked path or an explicit policy restriction. This slice does not silently impose required fields on those methods.
+Schema validation via `validate_schema` is an explicit audit; schema-controlled batches enforce policy only for the call. Installing a graph-wide enforced schema still requires every direct writer to join the checked publication boundary in item 9. Existing infallible Rust creation methods cannot report required-field errors; they need a compatible checked path or an explicit policy restriction. This slice does not silently impose required fields on those methods.
 
 Schema policy versioning/persistence, ontology migrations, relationship endpoint constraints, uniqueness constraints beyond managed external IDs, and indexed label/type selection remain open. Existing files using incompatible values in `labels` or `relationship_type` now fail checked loading explicitly; callers must migrate those properties. Graphiti-specific label mapping remains the adapter's responsibility.

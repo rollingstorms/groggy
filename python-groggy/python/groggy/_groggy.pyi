@@ -5118,6 +5118,14 @@ class Graph:
         """
         ...
 
+    def apply_batch(self, batch: Any, expected_state: int, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Apply one validated mixed write against an expected published state.
+        """
+        ...
+
+
+
 
 
 

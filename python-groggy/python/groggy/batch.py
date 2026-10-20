@@ -23,7 +23,9 @@ class GraphBatch:
 
     Existing entities use their integer IDs. ``add_node`` and ``add_edge`` return
     handles for entities created by this batch. A handle cannot be used in a
-    different batch.
+    different batch. Pass ``schema=...`` to ``Graph.apply_batch`` to validate
+    the complete proposed graph before allocation or publication. This policy
+    applies to that call only.
     """
 
     def __init__(self) -> None:

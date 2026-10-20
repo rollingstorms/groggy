@@ -1879,6 +1879,30 @@ impl Graph {
         message: String,
         author: String,
     ) -> GraphResult<BatchResult> {
+        self.apply_batch_internal(batch, expected_state, message, author, None)
+    }
+
+    /// Publish one batch only if its complete resulting graph satisfies schema.
+    /// This policy applies to this call; it is not installed on future writes.
+    pub fn apply_batch_with_schema(
+        &mut self,
+        batch: GraphBatch,
+        expected_state: StateId,
+        message: String,
+        author: String,
+        schema: &GraphSchema,
+    ) -> GraphResult<BatchResult> {
+        self.apply_batch_internal(batch, expected_state, message, author, Some(schema))
+    }
+
+    fn apply_batch_internal(
+        &mut self,
+        batch: GraphBatch,
+        expected_state: StateId,
+        message: String,
+        author: String,
+        schema: Option<&GraphSchema>,
+    ) -> GraphResult<BatchResult> {
         if expected_state != self.current_commit {
             return Err(GraphError::InvalidInput(format!(
                 "Stale graph batch: expected state {expected_state}, current state {}",
@@ -1900,6 +1924,34 @@ impl Graph {
             allocated.node_count,
             allocated.edge_count,
         )?;
+
+        if let Some(schema) = schema {
+            let violations = schema.validate_proposed(
+                self,
+                &prepared,
+                allocated.node_count,
+                allocated.edge_count,
+            )?;
+            if !violations.is_empty() {
+                let details: Vec<_> = violations
+                    .into_iter()
+                    .map(|violation| {
+                        let (kind, id) = match violation.entity {
+                            ExternalEntityRef::Node(id) => ("node", id),
+                            ExternalEntityRef::Edge(id) => ("edge", id),
+                        };
+                        format!(
+                            "{kind} {id} [{}].{}: {}",
+                            violation.selector, violation.property, violation.message
+                        )
+                    })
+                    .collect();
+                return Err(GraphError::InvalidInput(format!(
+                    "Schema rejected batch: {}",
+                    details.join("; ")
+                )));
+            }
+        }
 
         let added_nodes = if prepared.add_nodes > 0 {
             self.add_nodes(prepared.add_nodes)

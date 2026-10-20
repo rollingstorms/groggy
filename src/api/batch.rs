@@ -164,8 +164,9 @@ impl GraphBatch {
             if (name == "entity_type" || name == super::graph::EXTERNAL_ID) && !values.is_empty() {
                 errors.push(format!("node_attrs.{name}: system-managed attribute"));
             }
-            for (position, (reference, value)) in values.into_iter().enumerate() {
-                if let Err(error) = super::graph::kinds::validate_kind_property(&name, &value, true)
+            for (position, (reference, mut value)) in values.into_iter().enumerate() {
+                if let Err(error) =
+                    super::graph::kinds::normalize_kind_property_in_place(&name, &mut value, true)
                 {
                     errors.push(format!("node_attrs.{name}[{position}]: {error}"));
                 }
@@ -196,9 +197,9 @@ impl GraphBatch {
             if name == super::graph::EXTERNAL_ID && !values.is_empty() {
                 errors.push("edge_attrs.external_id: system-managed attribute".into());
             }
-            for (position, (reference, value)) in values.into_iter().enumerate() {
+            for (position, (reference, mut value)) in values.into_iter().enumerate() {
                 if let Err(error) =
-                    super::graph::kinds::validate_kind_property(&name, &value, false)
+                    super::graph::kinds::normalize_kind_property_in_place(&name, &mut value, false)
                 {
                     errors.push(format!("edge_attrs.{name}[{position}]: {error}"));
                 }
