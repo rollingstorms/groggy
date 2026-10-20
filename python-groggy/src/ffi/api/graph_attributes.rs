@@ -11,6 +11,13 @@ use pyo3::types::{PyDict, PyList};
 use pyo3::PyObject;
 use std::collections::HashMap;
 
+/// Partially decoded input retained only for read-only validation and diagnostics.
+struct ParsedAttributeColumn<T> {
+    values: Vec<(T, AttrValue)>,
+    positions: Vec<usize>,
+    errors: Vec<String>,
+}
+
 /// Clean attribute operations - 12 essential methods only
 /// Immutable attribute access (getters/utilities)
 pub struct PyGraphAttr {
@@ -171,7 +178,12 @@ impl PyGraphAttrMut {
 
     pub fn set_node_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         // Convert any format to standardized internal format
-        let standardized_attrs = self.normalize_attrs_format(py, attrs_dict, true)?;
+        let standardized_attrs =
+            self.normalize_attrs_format(py, attrs_dict, true, |values, positions| {
+                self.graph
+                    .borrow()
+                    .validate_node_attrs(values, Some(positions))
+            })?;
         self.graph
             .borrow_mut()
             .set_node_attrs(standardized_attrs)
@@ -194,7 +206,12 @@ impl PyGraphAttrMut {
 
     pub fn set_edge_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         // Convert any format to standardized internal format
-        let standardized_attrs = self.normalize_attrs_format(py, attrs_dict, false)?;
+        let standardized_attrs =
+            self.normalize_attrs_format(py, attrs_dict, false, |values, positions| {
+                self.graph
+                    .borrow()
+                    .validate_edge_attrs(values, Some(positions))
+            })?;
         self.graph
             .borrow_mut()
             .set_edge_attrs(standardized_attrs)
@@ -215,16 +232,46 @@ impl PyGraphAttrMut {
         py: Python,
         attrs_dict: &PyDict,
         is_nodes: bool,
+        validate: impl FnOnce(
+            &HashMap<String, Vec<(T, AttrValue)>>,
+            &HashMap<String, Vec<usize>>,
+        ) -> Result<(), groggy::GraphError>,
     ) -> PyResult<HashMap<String, Vec<(T, AttrValue)>>>
     where
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
         let mut normalized_attrs: HashMap<String, Vec<(T, AttrValue)>> = HashMap::new();
 
-        for (attr_name_py, attr_data_py) in attrs_dict.iter() {
-            let attr_name: String = attr_name_py.extract()?;
-            let attr_values = self.parse_attribute_format::<T>(py, attr_data_py, is_nodes)?;
-            normalized_attrs.insert(attr_name, attr_values);
+        let mut errors = Vec::new();
+        let mut input_positions = HashMap::new();
+        for (position, (attr_name_py, attr_data_py)) in attrs_dict.iter().enumerate() {
+            match attr_name_py.extract::<String>() {
+                Ok(name) => match self.parse_attribute_format::<T>(py, attr_data_py, is_nodes) {
+                    Ok(parsed) => {
+                        errors.extend(
+                            parsed
+                                .errors
+                                .into_iter()
+                                .map(|error| format!("{name}: {error}")),
+                        );
+                        input_positions.insert(name.clone(), parsed.positions);
+                        normalized_attrs.insert(name, parsed.values);
+                    }
+                    Err(error) => errors.push(format!("{name}: {error}")),
+                },
+                Err(error) => errors.push(format!("attribute[{position}].name: {error}")),
+            }
+        }
+        if !errors.is_empty() {
+            // Include semantic failures from decodable targets in the rejected call.
+            // Successful input is validated once by the core writer instead.
+            if let Err(error) = validate(&normalized_attrs, &input_positions) {
+                errors.push(error.to_string());
+            }
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid bulk attribute input: {}",
+                errors.join("; ")
+            )));
         }
 
         Ok(normalized_attrs)
@@ -236,7 +283,7 @@ impl PyGraphAttrMut {
         py: Python,
         attr_data: &PyAny,
         is_nodes: bool,
-    ) -> PyResult<Vec<(T, AttrValue)>>
+    ) -> PyResult<ParsedAttributeColumn<T>>
     where
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
@@ -252,7 +299,16 @@ impl PyGraphAttrMut {
 
         // Format 3: BaseArray
         if let Ok(base_array) = attr_data.extract::<PyRef<PyBaseArray>>() {
-            return self.parse_base_array_format::<T>(py, &base_array, is_nodes);
+            return self
+                .parse_base_array_format::<T>(py, &base_array, is_nodes)
+                .map(|values| {
+                    let positions = (0..values.len()).collect();
+                    ParsedAttributeColumn {
+                        values,
+                        positions,
+                        errors: Vec::new(),
+                    }
+                });
         }
 
         // Format 4: GraphTable - Temporarily disabled
@@ -273,18 +329,41 @@ impl PyGraphAttrMut {
         &self,
         py: Python,
         node_dict: &PyDict,
-    ) -> PyResult<Vec<(T, AttrValue)>>
+    ) -> PyResult<ParsedAttributeColumn<T>>
     where
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
         let mut attr_values = Vec::new();
-        for (id_py, value_py) in node_dict.iter() {
-            let id: T = self.extract_entity_id(py, id_py)?;
-
-            let attr_value = python_value_to_attr_value(value_py)?;
-            attr_values.push((id, attr_value));
+        let mut positions = Vec::new();
+        let mut errors = Vec::new();
+        for (position, (id_py, value_py)) in node_dict.iter().enumerate() {
+            let id = self.extract_entity_id::<T>(py, id_py);
+            let value = python_value_to_attr_value(value_py);
+            match id {
+                Ok(id) => {
+                    positions.push(position);
+                    match value {
+                        Ok(value) => attr_values.push((id, value)),
+                        Err(error) => {
+                            errors.push(format!("[{position}].value: {error}"));
+                            // Used only by read-only validation; errors prohibit the write.
+                            attr_values.push((id, AttrValue::Null));
+                        }
+                    }
+                }
+                Err(error) => {
+                    errors.push(format!("[{position}].id: {error}"));
+                    if let Err(error) = value {
+                        errors.push(format!("[{position}].value: {error}"));
+                    }
+                }
+            }
         }
-        Ok(attr_values)
+        Ok(ParsedAttributeColumn {
+            values: attr_values,
+            positions,
+            errors,
+        })
     }
 
     /// Parse column-centric format: {"nodes": [node_ids], "values": [values]}
@@ -292,7 +371,7 @@ impl PyGraphAttrMut {
         &self,
         py: Python,
         data_dict: &PyDict,
-    ) -> PyResult<Vec<(T, AttrValue)>>
+    ) -> PyResult<ParsedAttributeColumn<T>>
     where
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
@@ -315,13 +394,36 @@ impl PyGraphAttrMut {
         }
 
         let mut attr_values = Vec::new();
-        for (id_obj, value_py) in ids_objects.iter().zip(values.iter()) {
-            let id = self.extract_entity_id::<T>(py, id_obj.as_ref(py))?;
-            let attr_value = python_value_to_attr_value(value_py)?;
-            attr_values.push((id, attr_value));
+        let mut positions = Vec::new();
+        let mut errors = Vec::new();
+        for (position, (id_obj, value_py)) in ids_objects.iter().zip(values.iter()).enumerate() {
+            let id = self.extract_entity_id::<T>(py, id_obj.as_ref(py));
+            let value = python_value_to_attr_value(value_py);
+            match id {
+                Ok(id) => {
+                    positions.push(position);
+                    match value {
+                        Ok(value) => attr_values.push((id, value)),
+                        Err(error) => {
+                            errors.push(format!("[{position}].value: {error}"));
+                            // Used only by read-only validation; errors prohibit the write.
+                            attr_values.push((id, AttrValue::Null));
+                        }
+                    }
+                }
+                Err(error) => {
+                    errors.push(format!("[{position}].id: {error}"));
+                    if let Err(error) = value {
+                        errors.push(format!("[{position}].value: {error}"));
+                    }
+                }
+            }
         }
-
-        Ok(attr_values)
+        Ok(ParsedAttributeColumn {
+            values: attr_values,
+            positions,
+            errors,
+        })
     }
 
     /// Parse BaseArray format: values correspond to graph order

@@ -485,6 +485,48 @@ impl Graph {
         node_ids
     }
 
+    /// Validate properties for new node rows without allocating IDs or writing values.
+    pub fn validate_new_node_attrs(
+        &self,
+        rows: &[HashMap<AttrName, AttrValue>],
+    ) -> GraphResult<()> {
+        let errors: Vec<_> = rows
+            .iter()
+            .enumerate()
+            .filter(|(_, attrs)| attrs.contains_key("entity_type"))
+            .map(|(position, _)| {
+                format!("{position}.entity_type: system-managed node attribute cannot be changed")
+            })
+            .collect();
+        if !errors.is_empty() {
+            return Err(GraphError::InvalidInput(format!(
+                "Invalid node attributes at batch positions {}",
+                errors.join("; ")
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Add nodes with properties, validating all rows before allocating IDs.
+    /// Rows correspond to returned IDs; properties are written column by column.
+    pub fn add_nodes_with_attrs(
+        &mut self,
+        rows: Vec<HashMap<AttrName, AttrValue>>,
+    ) -> GraphResult<Vec<NodeId>> {
+        self.validate_new_node_attrs(&rows)?;
+        let nodes = self.add_nodes(rows.len());
+        let mut columns: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
+        for (node, attrs) in nodes.iter().copied().zip(rows) {
+            for (name, value) in attrs {
+                columns.entry(name).or_default().push((node, value));
+            }
+        }
+        // All IDs are newly allocated and unique; the reserved column was checked above.
+        self.set_node_attrs(columns)?;
+        Ok(nodes)
+    }
+
     /// Add an edge between two existing nodes
     ///
     /// ALGORITHM:
@@ -687,20 +729,53 @@ impl Graph {
         Ok(())
     }
 
-    /// Remove multiple edges efficiently
+    /// Remove multiple edges after validating the entire input, including duplicates.
     pub fn remove_edges(&mut self, edges: &[EdgeId]) -> Result<(), GraphError> {
+        self.validate_removal_targets(edges, false)?;
         for &edge_id in edges {
             self.remove_edge(edge_id)?;
         }
         Ok(())
     }
 
-    /// Remove multiple nodes efficiently
+    /// Remove multiple nodes and their incident edges after validating the entire input.
     pub fn remove_nodes(&mut self, nodes: &[NodeId]) -> Result<(), GraphError> {
+        self.validate_removal_targets(nodes, true)?;
         for &node_id in nodes {
             self.remove_node(node_id)?;
         }
         Ok(())
+    }
+
+    fn validate_removal_targets(&self, ids: &[usize], is_nodes: bool) -> GraphResult<()> {
+        let kind = if is_nodes { "node" } else { "edge" };
+        let mut seen = HashMap::new();
+        let mut errors = Vec::new();
+        for (position, &id) in ids.iter().enumerate() {
+            let active = if is_nodes {
+                self.space.contains_node(id)
+            } else {
+                self.space.contains_edge(id)
+            };
+            if !active {
+                errors.push(format!("{position}: {kind} {id} is not active"));
+            }
+            if let Some(first) = seen.get(&id) {
+                errors.push(format!(
+                    "{position}: duplicate {kind} {id} (first at {first})"
+                ));
+            } else {
+                seen.insert(id, position);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(GraphError::InvalidInput(format!(
+                "Invalid {kind} removals at batch positions {}",
+                errors.join("; ")
+            )))
+        }
     }
 
     /*
@@ -3032,11 +3107,16 @@ impl Graph {
         attr_name: &str,
         values: &[(usize, AttrValue)],
         is_node: bool,
+        positions: Option<&[usize]>,
         errors: &mut Vec<String>,
     ) {
         let kind = if is_node { "node" } else { "edge" };
         let mut first_positions = HashMap::new();
-        for (position, &(id, _)) in values.iter().enumerate() {
+        for (offset, &(id, _)) in values.iter().enumerate() {
+            let position = positions
+                .and_then(|positions| positions.get(offset))
+                .copied()
+                .unwrap_or(offset);
             let exists = if is_node {
                 self.space.contains_node(id)
             } else {
@@ -3063,6 +3143,7 @@ impl Graph {
         &self,
         attrs_values: &HashMap<AttrName, Vec<(usize, AttrValue)>>,
         is_node: bool,
+        positions: Option<&HashMap<AttrName, Vec<usize>>>,
     ) -> GraphResult<()> {
         let mut attrs: Vec<_> = attrs_values.iter().collect();
         attrs.sort_unstable_by_key(|(name, _)| *name);
@@ -3071,7 +3152,16 @@ impl Graph {
             if is_node && attr_name == "entity_type" && !values.is_empty() {
                 errors.push("entity_type: system-managed node attribute cannot be changed".into());
             }
-            self.collect_invalid_attr_targets(attr_name, values, is_node, &mut errors);
+            let column_positions = positions
+                .and_then(|positions| positions.get(attr_name))
+                .map(Vec::as_slice);
+            self.collect_invalid_attr_targets(
+                attr_name,
+                values,
+                is_node,
+                column_positions,
+                &mut errors,
+            );
         }
         if errors.is_empty() {
             Ok(())
@@ -3083,12 +3173,32 @@ impl Graph {
         }
     }
 
+    /// Validate node property assignments without changing values or change tracking.
+    /// Optional positions retain original input offsets when an adapter cannot decode some IDs.
+    pub fn validate_node_attrs(
+        &self,
+        attrs_values: &HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
+        positions: Option<&HashMap<AttrName, Vec<usize>>>,
+    ) -> GraphResult<()> {
+        self.validate_bulk_attr_targets(attrs_values, true, positions)
+    }
+
+    /// Validate edge property assignments without changing values or change tracking.
+    /// Optional positions retain original input offsets when an adapter cannot decode some IDs.
+    pub fn validate_edge_attrs(
+        &self,
+        attrs_values: &HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
+        positions: Option<&HashMap<AttrName, Vec<usize>>>,
+    ) -> GraphResult<()> {
+        self.validate_bulk_attr_targets(attrs_values, false, positions)
+    }
+
     /// Set node attributes in bulk (delegates to existing bulk operations)
     pub fn set_node_attrs(
         &mut self,
         attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> GraphResult<()> {
-        self.validate_bulk_attr_targets(&attrs_values, true)?;
+        self.validate_node_attrs(&attrs_values, None)?;
         // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<NodeId, Option<usize>>> = HashMap::new();
         for (attr_name, node_values) in &attrs_values {
@@ -3144,7 +3254,7 @@ impl Graph {
         if attr_name == "entity_type" {
             errors.push("entity_type: system-managed node attribute cannot be changed".into());
         }
-        self.collect_invalid_attr_targets(&attr_name, &node_values, true, &mut errors);
+        self.collect_invalid_attr_targets(&attr_name, &node_values, true, None, &mut errors);
         if !errors.is_empty() {
             return Err(GraphError::InvalidInput(format!(
                 "Invalid bulk attribute assignments: {}",
@@ -3188,7 +3298,7 @@ impl Graph {
         &mut self,
         attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> GraphResult<()> {
-        self.validate_bulk_attr_targets(&attrs_values, false)?;
+        self.validate_edge_attrs(&attrs_values, None)?;
         // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<EdgeId, Option<usize>>> = HashMap::new();
         for (attr_name, edge_values) in &attrs_values {

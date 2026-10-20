@@ -33,6 +33,47 @@ use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 use crate::ffi::api::graph_analysis::PyGraphAnalysis;
 use crate::ffi::api::graph_matrix::PyGraphMatrixHelper;
 
+/// Convert every property before a creation call can allocate an entity.
+fn parse_creation_attrs(
+    attrs: Option<&PyDict>,
+    excluded: &[&str],
+) -> (HashMap<String, RustAttrValue>, Vec<String>) {
+    let mut parsed = HashMap::new();
+    let mut errors = Vec::new();
+    if let Some(attrs) = attrs {
+        for (position, (key, value)) in attrs.iter().enumerate() {
+            let name = key.extract::<String>();
+            if name
+                .as_ref()
+                .map(|name| excluded.contains(&name.as_str()))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let converted = python_value_to_attr_value(value);
+            match name {
+                Ok(name) => match converted {
+                    Ok(value) => {
+                        parsed.insert(name, value);
+                    }
+                    Err(error) => {
+                        errors.push(format!("property[{position}].value: {error}"));
+                        // Preserve the property key for core validation; errors prevent publication.
+                        parsed.insert(name, RustAttrValue::Null);
+                    }
+                },
+                Err(error) => {
+                    errors.push(format!("property[{position}].name: {error}"));
+                    if let Err(error) = converted {
+                        errors.push(format!("property[{position}].value: {error}"));
+                    }
+                }
+            }
+        }
+    }
+    (parsed, errors)
+}
+
 /// Specification for neighborhood hop parameters
 #[derive(Debug, Clone)]
 
@@ -219,35 +260,29 @@ impl PyGraph {
 
     #[pyo3(signature = (node_id = None, **kwargs))]
     fn add_node(&mut self, node_id: Option<NodeId>, kwargs: Option<&PyDict>) -> PyResult<NodeId> {
-        // If node_id provided, validate it's not already taken, otherwise auto-generate
-        let actual_node_id = if let Some(id) = node_id {
-            // TODO: We should validate that this ID doesn't already exist
-            // For now, use the auto-generated approach since the core Graph.add_node() doesn't support custom IDs
-            // This is a limitation we'll need to address in the core Rust API
-            let generated_id = self.inner.borrow_mut().add_node();
-            if id != generated_id {
-                // For now, warn that we can't use custom IDs
-                // In a future version, we should add support to the core Graph API
-                eprintln!("Warning: Custom node IDs not yet supported, using auto-generated ID {} instead of {}", generated_id, id);
+        let (attrs, mut errors) = parse_creation_attrs(kwargs, &[]);
+        if !errors.is_empty() {
+            if let Err(error) = self
+                .inner
+                .borrow()
+                .validate_new_node_attrs(std::slice::from_ref(&attrs))
+            {
+                errors.push(error.to_string());
             }
-            generated_id
-        } else {
+            return Err(PyValueError::new_err(errors.join("; ")));
+        }
+        let actual_node_id = if attrs.is_empty() {
             self.inner.borrow_mut().add_node()
+        } else {
+            self.inner
+                .borrow_mut()
+                .add_nodes_with_attrs(vec![attrs])
+                .map_err(graph_error_to_py_err)?[0]
         };
-
-        // Fast path: if no kwargs, just return the node_id
-        if let Some(attrs) = kwargs {
-            if !attrs.is_empty() {
-                // Only do attribute setting if we actually have attributes
-                for (key, value) in attrs.iter() {
-                    let attr_name: String = key.extract()?;
-                    let attr_value = python_value_to_attr_value(value);
-
-                    self.inner
-                        .borrow_mut()
-                        .set_node_attr(actual_node_id, attr_name, attr_value?)
-                        .map_err(graph_error_to_py_err)?;
-                }
+        // Explicit internal IDs remain a separate compatibility issue (roadmap item 6).
+        if let Some(id) = node_id {
+            if id != actual_node_id {
+                eprintln!("Warning: Custom node IDs not yet supported, using auto-generated ID {} instead of {}", actual_node_id, id);
             }
         }
 
@@ -265,62 +300,55 @@ impl PyGraph {
 
         // Only use Python::with_gil for complex operations
         Python::with_gil(|py| {
-            if let Ok(node_data_list) = data.extract::<Vec<&PyDict>>() {
-                // New API: add_nodes([{"id": "alice", "age": 30}, ...], id_key="id")
-                let mut id_mapping = std::collections::HashMap::new();
-
-                // Create all nodes first
-                let node_ids = self.inner.borrow_mut().add_nodes(node_data_list.len());
-
-                // OPTIMIZATION: Collect attributes by name for bulk operations instead of individual calls
-                // This changes complexity from O(N × A × log N) to O(N × A)
-                let mut attrs_by_name: std::collections::HashMap<
-                    String,
-                    Vec<(NodeId, RustAttrValue)>,
-                > = std::collections::HashMap::new();
-
-                // Process each node's data
-                for (i, node_dict) in node_data_list.iter().enumerate() {
-                    let node_id = node_ids[i];
-
-                    // Extract the ID if id_key is provided
-                    if let Some(ref key) = uid_key {
-                        match node_dict.get_item(key) {
-                            Ok(Some(id_value)) => {
-                                if let Ok(user_id) = id_value.extract::<String>() {
-                                    id_mapping.insert(user_id, node_id);
-                                }
-                            }
-                            Ok(None) => {
-                                return Err(PyErr::new::<PyKeyError, _>(format!(
-                                    "Missing key: {}",
-                                    key
-                                )));
-                            }
-                            Err(e) => return Err(e),
+            if let Ok(node_data_list) = data.extract::<Vec<&PyAny>>() {
+                let mut rows = Vec::with_capacity(node_data_list.len());
+                let mut user_ids = Vec::with_capacity(node_data_list.len());
+                let mut errors = Vec::new();
+                for (position, node_data) in node_data_list.iter().enumerate() {
+                    let node_dict = match node_data.extract::<&PyDict>() {
+                        Ok(dict) => dict,
+                        Err(error) => {
+                            errors.push(format!("{position}: expected a node dictionary: {error}"));
+                            rows.push(HashMap::new());
+                            continue;
+                        }
+                    };
+                    if let Some(key) = &uid_key {
+                        let user_id = (|| -> PyResult<String> {
+                            node_dict
+                                .get_item(key)?
+                                .ok_or_else(|| PyKeyError::new_err(format!("Missing key: {key}")))?
+                                .extract::<String>()
+                        })();
+                        match user_id {
+                            Ok(id) => user_ids.push(id),
+                            Err(error) => errors.push(format!("{position}.{key}: {error}")),
                         }
                     }
-
-                    // Collect all attributes for bulk setting
-                    for (attr_key, attr_value) in node_dict.iter() {
-                        let attr_name: String = attr_key.extract()?;
-                        let attr_val = python_value_to_attr_value(attr_value)?;
-
-                        // Store all attributes including the id_key for later uid_key lookups
-                        attrs_by_name
-                            .entry(attr_name)
-                            .or_default()
-                            .push((node_id, attr_val));
+                    let (attrs, conversion_errors) = parse_creation_attrs(Some(node_dict), &[]);
+                    errors.extend(
+                        conversion_errors
+                            .into_iter()
+                            .map(|error| format!("{position}: {error}")),
+                    );
+                    rows.push(attrs);
+                }
+                if !errors.is_empty() {
+                    if let Err(error) = self.inner.borrow().validate_new_node_attrs(&rows) {
+                        errors.push(error.to_string());
                     }
+                    return Err(PyValueError::new_err(format!(
+                        "Invalid nodes at batch positions {}",
+                        errors.join("; ")
+                    )));
                 }
-
-                // OPTIMIZATION: Use bulk attribute setting - O(A) operations instead of O(N × A)
-                if !attrs_by_name.is_empty() {
-                    self.inner
-                        .borrow_mut()
-                        .set_node_attrs(attrs_by_name)
-                        .map_err(graph_error_to_py_err)?;
-                }
+                let node_ids = self
+                    .inner
+                    .borrow_mut()
+                    .add_nodes_with_attrs(rows)
+                    .map_err(graph_error_to_py_err)?;
+                let id_mapping: HashMap<_, _> =
+                    user_ids.into_iter().zip(node_ids.iter().copied()).collect();
 
                 // Return the mapping if id_key was provided, otherwise return node IDs
                 if uid_key.is_some() {
@@ -514,14 +542,18 @@ impl PyGraph {
         // conversion errors in a later row cannot leave earlier edges inserted.
         let source_field = source.as_deref().unwrap_or("source");
         let target_field = target.as_deref().unwrap_or("target");
-        let mut parsed: Vec<(NodeId, NodeId, std::collections::HashMap<String, RustAttrValue>)> =
-            Vec::new();
+        let mut parsed: Vec<(
+            NodeId,
+            NodeId,
+            std::collections::HashMap<String, RustAttrValue>,
+        )> = Vec::new();
         let mut errors = Vec::new();
         let rows = edges.iter().map_err(|_| {
             PyTypeError::new_err("add_edges expects an iterable of edge tuples or dictionaries")
         })?;
 
         for (position, row) in rows.enumerate() {
+            let mut conversion_errors = Vec::new();
             let result = (|| -> PyResult<_> {
                 let row = row?;
                 let (source_value, target_value, attributes) =
@@ -572,9 +604,7 @@ impl PyGraph {
                     })?;
                     if let Some(mapping) = &node_mapping {
                         return mapping.get(&external_id).copied().ok_or_else(|| {
-                            PyKeyError::new_err(format!(
-                                "Node {external_id} not found in mapping"
-                            ))
+                            PyKeyError::new_err(format!("Node {external_id} not found in mapping"))
                         });
                     }
                     if let Some(key) = &uid_key {
@@ -593,15 +623,14 @@ impl PyGraph {
                         let attrs_dict: &PyDict = attributes.extract().map_err(|_| {
                             PyTypeError::new_err("edge attributes must be a dictionary or None")
                         })?;
-                        for (key, value) in attrs_dict.iter() {
-                            let name: String = key.extract()?;
-                            if row.extract::<&PyDict>().is_ok()
-                                && (name == source_field || name == target_field)
-                            {
-                                continue;
-                            }
-                            attrs.insert(name, python_value_to_attr_value(value)?);
-                        }
+                        let excluded = if row.extract::<&PyDict>().is_ok() {
+                            vec![source_field, target_field]
+                        } else {
+                            Vec::new()
+                        };
+                        let (values, errors) = parse_creation_attrs(Some(attrs_dict), &excluded);
+                        attrs = values;
+                        conversion_errors = errors;
                     }
                 }
                 Ok((source_id, target_id, attrs))
@@ -620,6 +649,11 @@ impl PyGraph {
                 }
                 Err(error) => errors.push(format!("{position}: {error}")),
             }
+            errors.extend(
+                conversion_errors
+                    .into_iter()
+                    .map(|error| format!("{position}: {error}")),
+            );
         }
         if !errors.is_empty() {
             return Err(PyValueError::new_err(format!(
@@ -628,7 +662,10 @@ impl PyGraph {
             )));
         }
 
-        let edge_pairs: Vec<_> = parsed.iter().map(|(source, target, _)| (*source, *target)).collect();
+        let edge_pairs: Vec<_> = parsed
+            .iter()
+            .map(|(source, target, _)| (*source, *target))
+            .collect();
         let edge_ids = self
             .inner
             .borrow_mut()
@@ -639,7 +676,10 @@ impl PyGraph {
             std::collections::HashMap::new();
         for (edge_id, (_, _, attrs)) in edge_ids.iter().copied().zip(parsed) {
             for (name, value) in attrs {
-                attrs_by_name.entry(name).or_default().push((edge_id, value));
+                attrs_by_name
+                    .entry(name)
+                    .or_default()
+                    .push((edge_id, value));
             }
         }
         if !attrs_by_name.is_empty() {
@@ -903,25 +943,31 @@ impl PyGraph {
             ));
         };
 
-        // Add the edge
+        let (attrs, mut errors) = parse_creation_attrs(kwargs, &[]);
+        if !errors.is_empty() {
+            let graph = self.inner.borrow();
+            if !graph.has_node(source_id) {
+                errors.push(format!("source: node {source_id} is not active"));
+            }
+            if !graph.has_node(target_id) {
+                errors.push(format!("target: node {target_id} is not active"));
+            }
+            return Err(PyValueError::new_err(errors.join("; ")));
+        }
         let edge_id = self
             .inner
             .borrow_mut()
             .add_edge(source_id, target_id)
             .map_err(graph_error_to_py_err)?;
-
-        // Set attributes if provided
-        if let Some(attrs) = kwargs {
-            if !attrs.is_empty() {
-                for (key, value) in attrs.iter() {
-                    let attr_name: String = key.extract()?;
-                    let attr_value = python_value_to_attr_value(value);
-                    self.inner
-                        .borrow_mut()
-                        .set_edge_attr(edge_id, attr_name, attr_value?)
-                        .map_err(graph_error_to_py_err)?;
-                }
-            }
+        if !attrs.is_empty() {
+            let columns = attrs
+                .into_iter()
+                .map(|(name, value)| (name, vec![(edge_id, value)]))
+                .collect();
+            self.inner
+                .borrow_mut()
+                .set_edge_attrs(columns)
+                .map_err(graph_error_to_py_err)?;
         }
 
         Ok(edge_id)
@@ -1298,14 +1344,8 @@ impl PyGraph {
             item.set_item("entity_type", kind)?;
             item.set_item("entity_id", change.entity_id)?;
             item.set_item("name", change.attr_name)?;
-            item.set_item(
-                "old",
-                change.old_value.map(|value| PyAttrValue::new(value)),
-            )?;
-            item.set_item(
-                "new",
-                change.new_value.map(|value| PyAttrValue::new(value)),
-            )?;
+            item.set_item("old", change.old_value.map(|value| PyAttrValue::new(value)))?;
+            item.set_item("new", change.new_value.map(|value| PyAttrValue::new(value)))?;
             changes.append(item)?;
         }
         output.set_item("attribute_changes", changes)?;
@@ -2337,16 +2377,16 @@ impl PyGraph {
         // Try delegating to subgraph methods (like degree, in_degree, out_degree)
         // Create a full subgraph containing all nodes and edges
         // PERFORMANCE: Use reserved ID 2 for delegation views (fastest path)
-        
+
         use std::time::Instant;
         let delegation_start = Instant::now();
-        
+
         // OPTIMIZATION: Get HashSets directly (avoids Vec→HashSet conversion)
         let graph_ref = self.inner.borrow();
         let all_nodes = graph_ref.node_ids_set();
         let all_edges = graph_ref.edge_ids_set();
         drop(graph_ref); // Release borrow
-        
+
         let collect_elapsed = delegation_start.elapsed();
 
         let subgraph_create_start = Instant::now();
@@ -2363,17 +2403,17 @@ impl PyGraph {
         match PySubgraph::from_core_subgraph(concrete_subgraph) {
             Ok(py_subgraph) => {
                 let py_wrap_elapsed = py_wrap_start.elapsed();
-                
+
                 let py_new_start = Instant::now();
                 let subgraph_obj = Py::new(py, py_subgraph)?;
                 let py_new_elapsed = py_new_start.elapsed();
-                
+
                 let getattr_start = Instant::now();
                 match subgraph_obj.getattr(py, name.as_str()) {
                     Ok(result) => {
                         let getattr_elapsed = getattr_start.elapsed();
                         let total_elapsed = delegation_start.elapsed();
-                        
+
                         // Log delegation timing for debugging
                         if std::env::var("GROGGY_DEBUG_DELEGATION").is_ok() {
                             eprintln!("__getattr__ delegation timing for '{}':", name);
@@ -2384,7 +2424,7 @@ impl PyGraph {
                             eprintln!("  getattr: {:?}", getattr_elapsed);
                             eprintln!("  TOTAL: {:?}", total_elapsed);
                         }
-                        
+
                         return Ok(result);
                     }
                     Err(_) => {

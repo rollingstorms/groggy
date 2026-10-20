@@ -120,3 +120,13 @@ Numerical-core priority clarification: The owner also deferred item 27 in the re
 3. Are versions created automatically for every mutation, only for successful batches, or only when explicitly named? This determines whether a dirty working state exists.
 4. Is a property value allowed to change type without a schema migration? The recommendation is yes in flexible mode, no when a schema fixes the type.
 5. Define the policy for duplicate external IDs within one batch: reject them all, or coalesce only an explicitly declared idempotent upsert.
+
+## Item 5 implementation record — 2026-10-20
+
+Node/edge creation must parse all supplied Python properties before entity allocation. The Rust `add_nodes_with_attrs` boundary owns system-managed node-property validation and writes accepted rows through existing columnar setters. A malformed value, row, missing external key, or reserved node property leaves IDs unallocated.
+
+Bulk removals now validate all IDs first. Duplicate targets reject the call, consistently with duplicate property assignments; valid node removals may share incident edges and remove each edge once. Rejected calls leave topology and change tracking unchanged.
+
+Conversion errors aggregate across properties, node rows and bulk setter columns. Read-only Rust preflight validates decodable targets and reserved properties even when another value fails conversion, producing one combined report with original input positions. Temporary placeholder values never reach a write when any error exists. Structurally malformed input is reported at its row/column boundary. Automatic versions, schema enforcement, external-ID uniqueness, and crash recovery remain assigned to their roadmap items.
+
+Verification: the full locked Rust test suite passes, as do 71 focused Python/conformance/CRUD checks against the rebuilt extension. Rust formatting and diff whitespace checks pass. Strict Clippy remains blocked by nine existing sort/match lints outside this change; Black, isort and pre-commit are unavailable in the local runtime. The regenerated 37-page workbook was rendered and its affected pages visually checked.
