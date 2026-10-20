@@ -1851,15 +1851,10 @@ impl Graph {
         self.history.get_branch_head(&self.current_branch)?;
 
         let allocated = self.pool.borrow().statistics();
-        let active_nodes = self.node_ids_set();
-        let active_edges: HashMap<_, _> = self
-            .edge_ids()
-            .into_iter()
-            .map(|id| self.edge_endpoints(id).map(|endpoints| (id, endpoints)))
-            .collect::<GraphResult<_>>()?;
         let prepared = batch.prepare(
-            &active_nodes,
-            &active_edges,
+            |id| self.space.contains_node(id),
+            |id| self.space.contains_edge(id),
+            |id| self.pool.borrow().get_edge_endpoints(id),
             allocated.node_count,
             allocated.edge_count,
         )?;

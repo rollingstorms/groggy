@@ -67,13 +67,19 @@ fn edge_id(reference: BatchEdgeRef, first: EdgeId, count: usize) -> Result<EdgeI
 }
 
 impl GraphBatch {
-    pub(crate) fn prepare(
+    pub(crate) fn prepare<NodeActive, EdgeActive, EdgeEndpoints>(
         self,
-        active_nodes: &HashSet<NodeId>,
-        active_edges: &HashMap<EdgeId, (NodeId, NodeId)>,
+        node_active: NodeActive,
+        edge_active: EdgeActive,
+        edge_endpoints: EdgeEndpoints,
         next_node_id: NodeId,
         next_edge_id: EdgeId,
-    ) -> GraphResult<PreparedBatch> {
+    ) -> GraphResult<PreparedBatch>
+    where
+        NodeActive: Fn(NodeId) -> bool,
+        EdgeActive: Fn(EdgeId) -> bool,
+        EdgeEndpoints: Fn(EdgeId) -> Option<(NodeId, NodeId)>,
+    {
         if next_node_id.checked_add(self.add_nodes).is_none()
             || next_edge_id.checked_add(self.add_edges.len()).is_none()
         {
@@ -82,9 +88,10 @@ impl GraphBatch {
             ));
         }
         let mut errors = Vec::new();
-        let mut nodes = active_nodes.clone();
-        nodes.extend(next_node_id..next_node_id + self.add_nodes);
-        let mut edges = active_edges.clone();
+        let node_end = next_node_id + self.add_nodes;
+        let edge_end = next_edge_id + self.add_edges.len();
+        let known_node = |id| node_active(id) || (next_node_id..node_end).contains(&id);
+        let known_edge = |id| edge_active(id) || (next_edge_id..edge_end).contains(&id);
         let mut resolved_edges = Vec::with_capacity(self.add_edges.len());
 
         for (position, &(source_ref, target_ref)) in self.add_edges.iter().enumerate() {
@@ -92,12 +99,11 @@ impl GraphBatch {
             let target = node_id(target_ref, next_node_id, self.add_nodes);
             match (source, target) {
                 (Ok(source), Ok(target)) => {
-                    if !nodes.contains(&source) || !nodes.contains(&target) {
+                    if !known_node(source) || !known_node(target) {
                         errors.push(format!(
                             "add_edges[{position}]: endpoints ({source}, {target}) are not both active"
                         ));
                     }
-                    edges.insert(next_edge_id + position, (source, target));
                     resolved_edges.push((source, target));
                 }
                 (source, target) => {
@@ -113,7 +119,7 @@ impl GraphBatch {
         let mut seen_removed_nodes = HashSet::new();
         for (position, &reference) in self.remove_nodes.iter().enumerate() {
             match node_id(reference, next_node_id, self.add_nodes) {
-                Ok(id) if !nodes.contains(&id) => {
+                Ok(id) if !known_node(id) => {
                     errors.push(format!("remove_nodes[{position}]: node {id} is not active"));
                 }
                 Ok(id) if !seen_removed_nodes.insert(id) => {
@@ -128,7 +134,7 @@ impl GraphBatch {
         let mut seen_removed_edges = HashSet::new();
         for (position, &reference) in self.remove_edges.iter().enumerate() {
             match edge_id(reference, next_edge_id, self.add_edges.len()) {
-                Ok(id) if !edges.contains_key(&id) => {
+                Ok(id) if !known_edge(id) => {
                     errors.push(format!("remove_edges[{position}]: edge {id} is not active"));
                 }
                 Ok(id) if !seen_removed_edges.insert(id) => {
@@ -139,13 +145,15 @@ impl GraphBatch {
             }
         }
 
-        for id in &removed_nodes {
-            nodes.remove(id);
+        for (position, &(source, target)) in resolved_edges.iter().enumerate() {
+            if source != usize::MAX
+                && (seen_removed_nodes.contains(&source) || seen_removed_nodes.contains(&target))
+            {
+                errors.push(format!(
+                    "add_edges[{position}]: endpoint is removed in this batch"
+                ));
+            }
         }
-        for id in &removed_edges {
-            edges.remove(id);
-        }
-        edges.retain(|_, (source, target)| nodes.contains(source) && nodes.contains(target));
 
         let mut node_attrs = HashMap::new();
         let mut node_keys: Vec<_> = self.node_attrs.into_iter().collect();
@@ -159,7 +167,7 @@ impl GraphBatch {
             for (position, (reference, value)) in values.into_iter().enumerate() {
                 match node_id(reference, next_node_id, self.add_nodes) {
                     Ok(id) => {
-                        if !nodes.contains(&id) {
+                        if !known_node(id) || seen_removed_nodes.contains(&id) {
                             errors.push(format!("node_attrs.{name}[{position}]: node {id} is not active in the resulting state"));
                         }
                         if !seen.insert(id) {
@@ -184,7 +192,18 @@ impl GraphBatch {
             for (position, (reference, value)) in values.into_iter().enumerate() {
                 match edge_id(reference, next_edge_id, self.add_edges.len()) {
                     Ok(id) => {
-                        if !edges.contains_key(&id) {
+                        let endpoints = if (next_edge_id..edge_end).contains(&id) {
+                            resolved_edges.get(id - next_edge_id).copied()
+                        } else {
+                            edge_endpoints(id)
+                        };
+                        let retained = known_edge(id)
+                            && !seen_removed_edges.contains(&id)
+                            && endpoints.is_some_and(|(source, target)| {
+                                !seen_removed_nodes.contains(&source)
+                                    && !seen_removed_nodes.contains(&target)
+                            });
+                        if !retained {
                             errors.push(format!("edge_attrs.{name}[{position}]: edge {id} is not active in the resulting state"));
                         }
                         if !seen.insert(id) {

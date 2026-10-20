@@ -131,3 +131,25 @@ fn batch_rejects_stale_or_dirty_head_without_changes() {
     assert_eq!(graph.node_ids(), vec![0, 1]);
     assert_eq!(graph.current_state_id(), first.state_id);
 }
+
+#[test]
+fn batch_rejects_edge_whose_endpoint_is_removed_in_same_write() {
+    let mut graph = Graph::new();
+    let mut batch = GraphBatch {
+        add_nodes: 2,
+        add_edges: vec![(BatchNodeRef::Added(0), BatchNodeRef::Added(1))],
+        ..Default::default()
+    };
+    batch.remove_nodes.push(BatchNodeRef::Added(1));
+    let error = graph
+        .apply_batch(batch, 0, "contradictory".into(), "test".into())
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("add_edges[0]: endpoint is removed"),
+        "{error}"
+    );
+    assert!(graph.node_ids().is_empty());
+    assert!(graph.edge_ids().is_empty());
+    assert_eq!(graph.add_node(), 0);
+}
