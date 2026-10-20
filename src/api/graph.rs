@@ -2971,25 +2971,74 @@ impl Graph {
     // === BULK ATTRIBUTE OPERATIONS (FFI WRAPPERS) ===
     // These are thin wrappers around the trait system for FFI compatibility
 
+    fn collect_invalid_attr_targets(
+        &self,
+        attr_name: &str,
+        values: &[(usize, AttrValue)],
+        is_node: bool,
+        errors: &mut Vec<String>,
+    ) {
+        let kind = if is_node { "node" } else { "edge" };
+        let mut first_positions = HashMap::new();
+        for (position, &(id, _)) in values.iter().enumerate() {
+            let exists = if is_node {
+                self.space.contains_node(id)
+            } else {
+                self.space.contains_edge(id)
+            };
+            if !exists {
+                errors.push(format!(
+                    "{attr_name}[{position}]: {kind} {id} is not active"
+                ));
+            }
+            match first_positions.entry(id) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(position);
+                }
+                std::collections::hash_map::Entry::Occupied(entry) => errors.push(format!(
+                    "{attr_name}[{position}]: duplicate {kind} {id} (first at {attr_name}[{}])",
+                    entry.get()
+                )),
+            }
+        }
+    }
+
+    fn validate_bulk_attr_targets(
+        &self,
+        attrs_values: &HashMap<AttrName, Vec<(usize, AttrValue)>>,
+        is_node: bool,
+    ) -> GraphResult<()> {
+        let mut attrs: Vec<_> = attrs_values.iter().collect();
+        attrs.sort_unstable_by_key(|(name, _)| *name);
+        let mut errors = Vec::new();
+        for (attr_name, values) in attrs {
+            if is_node && attr_name == "entity_type" && !values.is_empty() {
+                errors.push("entity_type: system-managed node attribute cannot be changed".into());
+            }
+            self.collect_invalid_attr_targets(attr_name, values, is_node, &mut errors);
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(GraphError::InvalidInput(format!(
+                "Invalid bulk attribute assignments: {}",
+                errors.join("; ")
+            )))
+        }
+    }
+
     /// Set node attributes in bulk (delegates to existing bulk operations)
     pub fn set_node_attrs(
         &mut self,
         attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> GraphResult<()> {
-        // Optimized single-pass: validate AND collect old indices simultaneously
+        self.validate_bulk_attr_targets(&attrs_values, true)?;
+        // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<NodeId, Option<usize>>> = HashMap::new();
         for (attr_name, node_values) in &attrs_values {
             let mut attr_old_indices = HashMap::new();
             for &(node_id, _) in node_values {
-                // Validate node exists
-                if !self.space.contains_node(node_id) {
-                    return Err(crate::errors::GraphError::node_not_found(
-                        node_id,
-                        "set bulk node attributes",
-                    )
-                    .into());
-                }
-                // Collect old index for change tracking (single pass with validation)
+                // Collect old index for change tracking.
                 let old_index = self.space.get_node_attr_index(node_id, attr_name);
                 attr_old_indices.insert(node_id, old_index);
             }
@@ -3035,17 +3084,22 @@ impl Graph {
             return Ok(());
         }
 
-        // Validate nodes and collect previous indices for change tracking
+        let mut errors = Vec::new();
+        if attr_name == "entity_type" {
+            errors.push("entity_type: system-managed node attribute cannot be changed".into());
+        }
+        self.collect_invalid_attr_targets(&attr_name, &node_values, true, &mut errors);
+        if !errors.is_empty() {
+            return Err(GraphError::InvalidInput(format!(
+                "Invalid bulk attribute assignments: {}",
+                errors.join("; ")
+            )));
+        }
+
+        // Collect previous indices for change tracking after validation.
         let mut old_indices: HashMap<NodeId, Option<usize>> =
             HashMap::with_capacity(node_values.len());
         for (node_id, _) in &node_values {
-            if !self.space.contains_node(*node_id) {
-                return Err(crate::errors::GraphError::node_not_found(
-                    *node_id,
-                    "set bulk node attribute column",
-                )
-                .into());
-            }
             let previous = self.space.get_node_attr_index(*node_id, &attr_name);
             old_indices.insert(*node_id, previous);
         }
@@ -3078,20 +3132,13 @@ impl Graph {
         &mut self,
         attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> GraphResult<()> {
-        // Optimized single-pass: validate AND collect old indices simultaneously
+        self.validate_bulk_attr_targets(&attrs_values, false)?;
+        // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<EdgeId, Option<usize>>> = HashMap::new();
         for (attr_name, edge_values) in &attrs_values {
             let mut attr_old_indices = HashMap::new();
             for &(edge_id, _) in edge_values {
-                // Validate edge exists
-                if !self.space.contains_edge(edge_id) {
-                    return Err(crate::errors::GraphError::edge_not_found(
-                        edge_id,
-                        "set bulk edge attributes",
-                    )
-                    .into());
-                }
-                // Collect old index for change tracking (single pass with validation)
+                // Collect old index for change tracking.
                 let old_index = self.space.get_edge_attr_index(edge_id, attr_name);
                 attr_old_indices.insert(edge_id, old_index);
             }
