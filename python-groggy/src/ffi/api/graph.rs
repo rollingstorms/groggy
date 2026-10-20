@@ -28,54 +28,13 @@ use crate::ffi::query::traversal::PyGroupedAggregationResult;
 use crate::ffi::subgraphs::subgraph::PySubgraph;
 use crate::ffi::temporal::PyTemporalSnapshot;
 use crate::ffi::types::PyAttrValue;
-use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
+use crate::ffi::utils::{graph_error_to_py_err, parse_creation_attrs};
 
 // Import version control types
 use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 // Import internal helper classes
 use crate::ffi::api::graph_analysis::PyGraphAnalysis;
 use crate::ffi::api::graph_matrix::PyGraphMatrixHelper;
-
-/// Convert every property before a creation call can allocate an entity.
-fn parse_creation_attrs(
-    attrs: Option<&PyDict>,
-    excluded: &[&str],
-) -> (HashMap<String, RustAttrValue>, Vec<String>) {
-    let mut parsed = HashMap::new();
-    let mut errors = Vec::new();
-    if let Some(attrs) = attrs {
-        for (position, (key, value)) in attrs.iter().enumerate() {
-            let name = key.extract::<String>();
-            if name
-                .as_ref()
-                .map(|name| excluded.contains(&name.as_str()))
-                .unwrap_or(false)
-            {
-                continue;
-            }
-            let converted = python_value_to_attr_value(value);
-            match name {
-                Ok(name) => match converted {
-                    Ok(value) => {
-                        parsed.insert(name, value);
-                    }
-                    Err(error) => {
-                        errors.push(format!("property[{position}].value: {error}"));
-                        // Preserve the property key for core validation; errors prevent publication.
-                        parsed.insert(name, RustAttrValue::Null);
-                    }
-                },
-                Err(error) => {
-                    errors.push(format!("property[{position}].name: {error}"));
-                    if let Err(error) = converted {
-                        errors.push(format!("property[{position}].value: {error}"));
-                    }
-                }
-            }
-        }
-    }
-    (parsed, errors)
-}
 
 /// Decode all rows before a core upsert is allowed to mutate the graph.
 fn parse_identity_rows<T>(
@@ -1515,8 +1474,22 @@ impl PyGraph {
             item.set_item("entity_type", kind)?;
             item.set_item("entity_id", change.entity_id)?;
             item.set_item("name", change.attr_name)?;
-            item.set_item("old", change.old_value.map(|value| PyAttrValue::new(value)))?;
-            item.set_item("new", change.new_value.map(|value| PyAttrValue::new(value)))?;
+            item.set_item(
+                "old",
+                change
+                    .old_value
+                    .as_ref()
+                    .map(|value| crate::ffi::utils::attr_value_to_python_value(py, value))
+                    .transpose()?,
+            )?;
+            item.set_item(
+                "new",
+                change
+                    .new_value
+                    .as_ref()
+                    .map(|value| crate::ffi::utils::attr_value_to_python_value(py, value))
+                    .transpose()?,
+            )?;
             changes.append(item)?;
         }
         output.set_item("attribute_changes", changes)?;

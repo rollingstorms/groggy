@@ -448,6 +448,39 @@ class AttrValue:
         """
         ...
 
+    @staticmethod
+    def bool_vec(*args, **kwargs) -> AttrValue:
+        """
+        Explicit boolean vector constructor.
+        """
+        ...
+
+
+    @staticmethod
+    def float_vec(*args, **kwargs) -> AttrValue:
+        """
+        Explicit float32 vector constructor, including empty vectors and numeric casts.
+        """
+        ...
+
+
+    @staticmethod
+    def int_vec(*args, **kwargs) -> AttrValue:
+        """
+        Explicit int64 vector constructor.
+        """
+        ...
+
+
+    @staticmethod
+    def text_vec(*args, **kwargs) -> AttrValue:
+        """
+        Explicit text vector constructor.
+        """
+        ...
+
+
+
 
 class AttributeFilter:
     """

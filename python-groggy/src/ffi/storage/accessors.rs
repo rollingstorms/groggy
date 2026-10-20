@@ -13,26 +13,13 @@ use pyo3::types::{PyDict, PySlice};
 use std::collections::HashSet;
 
 // Import utils for conversion functions
-use crate::ffi::utils::python_value_to_attr_value;
+use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 
 // Import table FFI types
 
 // Import modern array FFI types
 use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::storage::num_array::PyNumArray;
-
-/// Utility function to convert AttrValue to Python object
-fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<PyObject> {
-    match attr_value {
-        AttrValue::Int(val) => Ok(val.to_object(py)),
-        AttrValue::SmallInt(val) => Ok((*val as i64).to_object(py)),
-        AttrValue::Float(val) => Ok(val.to_object(py)),
-        AttrValue::Bool(val) => Ok(val.to_object(py)),
-        AttrValue::Text(val) => Ok(val.to_object(py)),
-        AttrValue::CompactText(val) => Ok(val.as_str().to_object(py)),
-        _ => Ok(py.None()),
-    }
-}
 
 // Import types from our FFI modules
 use crate::ffi::subgraphs::subgraph::PySubgraph;
@@ -836,40 +823,12 @@ impl PyNodesAccessor {
             )));
         }
 
-        // Create attribute values in node_ids order (same as table order)
-        // This ensures g.nodes[g.nodes['attr'] == value] works correctly
-        let mut values: Vec<Option<PyObject>> = Vec::with_capacity(node_ids.len());
-
-        for &node_id in &node_ids {
-            if graph.contains_node(node_id) {
-                match graph.get_node_attr(node_id, &attr_name.to_string()) {
-                    Ok(Some(value)) => {
-                        // Convert the attribute value to Python object
-                        let py_value = attr_value_to_python_value(py, &value)?;
-                        values.push(Some(py_value));
-                    }
-                    Ok(None) => {
-                        values.push(None);
-                    }
-                    Err(_) => {
-                        values.push(None);
-                    }
-                }
-            } else {
-                values.push(None);
-            }
-        }
-
-        // Convert to AttrValue vector for BaseArray
-        let attr_values: Vec<groggy::AttrValue> = values
+        // Retain Rust property types until the selected cells cross the FFI boundary.
+        let attr_values: Vec<groggy::AttrValue> = graph
+            .get_nodes_attrs(&attr_name.to_string(), &node_ids)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?
             .into_iter()
-            .map(|opt_val| match opt_val {
-                Some(val) => {
-                    // Convert Python object back to AttrValue
-                    python_value_to_attr_value(val.as_ref(py)).unwrap_or(groggy::AttrValue::Null)
-                }
-                None => groggy::AttrValue::Null,
-            })
+            .map(|value| value.unwrap_or(groggy::AttrValue::Null))
             .collect();
 
         // Create BaseArray for mixed attribute data
@@ -2398,36 +2357,12 @@ impl PyEdgesAccessor {
             )));
         }
 
-        // Create attribute values in edge_ids order (same as table order)
-        // This ensures g.edges[g.edges['attr'] == value] works correctly
-        let mut values: Vec<Option<PyObject>> = Vec::with_capacity(edge_ids.len());
-
-        for &edge_id in &edge_ids {
-            match graph.get_edge_attr(edge_id, &attr_name.to_string()) {
-                Ok(Some(value)) => {
-                    // Convert the attribute value to Python object
-                    let py_value = attr_value_to_python_value(py, &value)?;
-                    values.push(Some(py_value));
-                }
-                Ok(None) => {
-                    values.push(None);
-                }
-                Err(_) => {
-                    values.push(None);
-                }
-            }
-        }
-
-        // Convert to AttrValue vector for BaseArray (consistent with nodes accessor)
-        let attr_values: Vec<groggy::AttrValue> = values
+        // Retain Rust property types until the selected cells cross the FFI boundary.
+        let attr_values: Vec<groggy::AttrValue> = graph
+            .get_edges_attrs(&attr_name.to_string(), &edge_ids)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?
             .into_iter()
-            .map(|opt_val| match opt_val {
-                Some(val) => {
-                    // Convert Python object back to AttrValue
-                    python_value_to_attr_value(val.as_ref(py)).unwrap_or(groggy::AttrValue::Null)
-                }
-                None => groggy::AttrValue::Null,
-            })
+            .map(|value| value.unwrap_or(groggy::AttrValue::Null))
             .collect();
 
         // Create BaseArray for mixed attribute data (consistent with nodes accessor)

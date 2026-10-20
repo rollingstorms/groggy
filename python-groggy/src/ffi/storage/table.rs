@@ -651,11 +651,8 @@ impl PyBaseTable {
                 let attr_values = column.data();
                 let py_objects: Vec<_> = attr_values
                     .iter()
-                    .map(|attr| {
-                        let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
-                        py_attr.to_object(py)
-                    })
-                    .collect();
+                    .map(|attr| crate::ffi::utils::attr_value_to_python_value(py, attr))
+                    .collect::<PyResult<Vec<_>>>()?;
                 data_dict.insert(col_name, py_objects);
             }
         }
@@ -718,7 +715,7 @@ impl PyBaseTable {
                     let py_attr_value = crate::ffi::types::PyAttrValue {
                         inner: attr_values[0].clone(),
                     };
-                    return Ok(py_attr_value.to_python_value(py));
+                    return py_attr_value.to_python_value(py);
                 }
 
                 // For multi-row tables, prefer StatsArray for numeric columns; fallback to BaseArray
@@ -3171,7 +3168,7 @@ impl PyBaseTable {
                 if let Some(column) = self.table.column(col_name) {
                     if let Some(value) = column.get(i) {
                         let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
-                        row_dict.set_item(col_name, py_attr.to_object(py))?;
+                        row_dict.set_item(col_name, py_attr.to_python_value(py)?)?;
                     } else {
                         row_dict.set_item(col_name, py.None())?;
                     }
@@ -3225,7 +3222,7 @@ impl PyBaseTableRowIterator {
                 let attr_values = column.data();
                 if let Some(value) = attr_values.get(self.current_row) {
                     let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
-                    dict.set_item(col_name, py_attr.to_object(py))?;
+                    dict.set_item(col_name, py_attr.to_python_value(py)?)?;
                 } else {
                     dict.set_item(col_name, py.None())?;
                 }
@@ -3654,7 +3651,7 @@ impl PyNodesTable {
                     let py_attr_value = crate::ffi::types::PyAttrValue {
                         inner: attr_values[0].clone(),
                     };
-                    return Ok(py_attr_value.to_python_value(py));
+                    return py_attr_value.to_python_value(py);
                 }
 
                 // For multi-row tables, prefer StatsArray for numeric columns; fallback to BaseArray
@@ -3870,7 +3867,7 @@ impl PyNodesTable {
                     let attr_values = column.data();
                     if let Some(value) = attr_values.get(row_idx) {
                         let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
-                        row_list.append(py_attr.to_object(py))?;
+                        row_list.append(py_attr.to_python_value(py)?)?;
                     } else {
                         row_list.append(py.None())?;
                     }
@@ -4177,7 +4174,7 @@ impl PyNodesTableRowIterator {
                 let attr_values = column.data();
                 if let Some(value) = attr_values.get(self.current_row) {
                     let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
-                    dict.set_item(col_name, py_attr.to_object(py))?;
+                    dict.set_item(col_name, py_attr.to_python_value(py)?)?;
                 } else {
                     dict.set_item(col_name, py.None())?;
                 }
@@ -4643,7 +4640,7 @@ impl PyEdgesTable {
                     let py_attr_value = crate::ffi::types::PyAttrValue {
                         inner: attr_values[0].clone(),
                     };
-                    return Ok(py_attr_value.to_python_value(py));
+                    return py_attr_value.to_python_value(py);
                 }
 
                 // For multi-row tables, prefer NumArray for numeric columns; fallback to BaseArray
@@ -4856,7 +4853,7 @@ impl PyEdgesTable {
                     let attr_values = column.data();
                     if let Some(value) = attr_values.get(row_idx) {
                         let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
-                        row_list.append(py_attr.to_object(py))?;
+                        row_list.append(py_attr.to_python_value(py)?)?;
                     } else {
                         row_list.append(py.None())?;
                     }
@@ -5190,7 +5187,7 @@ impl PyEdgesTableRowIterator {
                 let attr_values = column.data();
                 if let Some(value) = attr_values.get(self.current_row) {
                     let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
-                    dict.set_item(col_name, py_attr.to_object(py))?;
+                    dict.set_item(col_name, py_attr.to_python_value(py)?)?;
                 } else {
                     dict.set_item(col_name, py.None())?;
                 }
@@ -5396,19 +5393,7 @@ impl PyGraphTable {
                 ) {
                     Ok(stats.into_py(py))
                 } else {
-                    let py_objects: Vec<_> = attr_values
-                        .iter()
-                        .map(|attr| {
-                            let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
-                            py_attr.to_object(py)
-                        })
-                        .collect();
-                    // Convert PyObjects to AttrValues for BaseArray
-                    let attr_values: Result<Vec<AttrValue>, PyErr> = py_objects
-                        .into_iter()
-                        .map(|obj| crate::ffi::utils::python_value_to_attr_value(obj.as_ref(py)))
-                        .collect();
-                    let base_array = BaseArray::from_attr_values(attr_values?);
+                    let base_array = BaseArray::from_attr_values(attr_values.clone());
                     let py_array = PyBaseArray { inner: base_array };
                     Ok(py_array.into_py(py))
                 }
@@ -5494,7 +5479,7 @@ impl PyGraphTable {
                     let attr_values = column.data();
                     if let Some(value) = attr_values.get(row_idx) {
                         let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
-                        row_list.append(py_attr.to_object(py))?;
+                        row_list.append(py_attr.to_python_value(py)?)?;
                     } else {
                         row_list.append(py.None())?;
                     }

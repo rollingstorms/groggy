@@ -167,87 +167,7 @@ pub enum AttrValue {
 /// This allows Text("hello") to equal CompactText("hello") and CompressedText("hello")
 impl PartialEq for AttrValue {
     fn eq(&self, other: &Self) -> bool {
-        use AttrValue::*;
-        match (self, other) {
-            // Exact type matches
-            (Float(a), Float(b)) => a == b,
-            (Int(a), Int(b)) => a == b,
-            (Bool(a), Bool(b)) => a == b,
-            (SmallInt(a), SmallInt(b)) => a == b,
-            (FloatVec(a), FloatVec(b)) => a == b,
-            (IntVec(a), IntVec(b)) => a == b,
-            (TextVec(a), TextVec(b)) => a == b,
-            (BoolVec(a), BoolVec(b)) => a == b,
-            (Bytes(a), Bytes(b)) => a == b,
-            (Json(a), Json(b)) => a == b,
-
-            // Cross-type integer comparisons
-            (Int(a), SmallInt(b)) => *a == *b as i64,
-            (SmallInt(a), Int(b)) => *a as i64 == *b,
-
-            // Cross-type string comparisons - compare content, not storage format
-            (Text(a), Text(b)) => a == b,
-            (Text(a), CompactText(b)) => a.as_str() == b.as_str(),
-            (Text(a), CompressedText(b)) => {
-                if let Ok(decompressed) = b.decompress_text() {
-                    a.as_str() == decompressed.as_str()
-                } else {
-                    false
-                }
-            }
-            (CompactText(a), Text(b)) => a.as_str() == b.as_str(),
-            (CompactText(a), CompactText(b)) => a.as_str() == b.as_str(),
-            (CompactText(a), CompressedText(b)) => {
-                if let Ok(decompressed) = b.decompress_text() {
-                    a.as_str() == decompressed.as_str()
-                } else {
-                    false
-                }
-            }
-            (CompressedText(a), Text(b)) => {
-                if let Ok(decompressed) = a.decompress_text() {
-                    decompressed.as_str() == b.as_str()
-                } else {
-                    false
-                }
-            }
-            (CompressedText(a), CompactText(b)) => {
-                if let Ok(decompressed) = a.decompress_text() {
-                    decompressed.as_str() == b.as_str()
-                } else {
-                    false
-                }
-            }
-            (CompressedText(a), CompressedText(b)) => {
-                // For compressed text, try to decompress both and compare
-                match (a.decompress_text(), b.decompress_text()) {
-                    (Ok(a_text), Ok(b_text)) => a_text == b_text,
-                    _ => false,
-                }
-            }
-
-            // Cross-type float vector comparisons
-            (FloatVec(a), CompressedFloatVec(b)) => match b.decompress_float_vec() {
-                Ok(decompressed_b) => a == &decompressed_b,
-                Err(_) => false,
-            },
-            (CompressedFloatVec(a), FloatVec(b)) => match a.decompress_float_vec() {
-                Ok(decompressed_a) => &decompressed_a == b,
-                Err(_) => false,
-            },
-            (CompressedFloatVec(a), CompressedFloatVec(b)) => {
-                match (a.decompress_float_vec(), b.decompress_float_vec()) {
-                    (Ok(decompressed_a), Ok(decompressed_b)) => decompressed_a == decompressed_b,
-                    _ => false,
-                }
-            }
-
-            // Null comparisons - Null only equals Null
-            (Null, Null) => true,
-
-            // All other combinations are not equal
-            _ => false,
-        }
+        self.cmp(other) == std::cmp::Ordering::Equal
     }
 }
 
@@ -302,85 +222,79 @@ impl CompactString {
 // - Sort hash inputs to ensure deterministic ordering
 impl Hash for AttrValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        // Storage optimization never changes a logical value's hash.
+        self.type_discriminant().hash(state);
         match self {
-            AttrValue::Float(f) => {
-                0u8.hash(state); // Discriminant for Float variant
-                f.to_bits().hash(state); // Use to_bits() for consistent float hashing
+            Self::Float(value) => canonical_float_bits(*value).hash(state),
+            Self::Int(value) => value.hash(state),
+            Self::SmallInt(value) => (*value as i64).hash(state),
+            Self::Text(value) => {
+                0u8.hash(state);
+                value.hash(state);
             }
-            AttrValue::Int(i) => {
-                1u8.hash(state); // Discriminant for Int variant
-                i.hash(state);
+            Self::CompactText(value) => {
+                0u8.hash(state);
+                value.as_str().hash(state);
             }
-            AttrValue::Text(s) => {
-                2u8.hash(state); // Discriminant for Text variant
-                s.hash(state);
-            }
-            AttrValue::FloatVec(v) => {
-                3u8.hash(state); // Discriminant for FloatVec variant
-                v.len().hash(state); // Hash length first
-                for f in v {
-                    f.to_bits().hash(state); // Hash each float using to_bits()
+            Self::CompressedText(data) => match data.decompress_text() {
+                Ok(value) => {
+                    0u8.hash(state);
+                    value.hash(state);
                 }
+                Err(_) => {
+                    1u8.hash(state);
+                    data.hash(state);
+                }
+            },
+            Self::FloatVec(values) => {
+                0u8.hash(state);
+                hash_float_values(values, state);
             }
-            AttrValue::IntVec(v) => {
-                4u8.hash(state); // Discriminant for IntVec variant
-                v.hash(state);
-            }
-            AttrValue::TextVec(v) => {
-                5u8.hash(state); // Discriminant for TextVec variant
-                v.hash(state);
-            }
-            AttrValue::BoolVec(v) => {
-                6u8.hash(state); // Discriminant for BoolVec variant
-                v.hash(state);
-            }
-            AttrValue::Bool(b) => {
-                7u8.hash(state); // Discriminant for Bool variant
-                b.hash(state);
-            }
-            AttrValue::CompactText(cs) => {
-                8u8.hash(state); // Discriminant for CompactText variant
-                cs.as_str().hash(state);
-            }
-            AttrValue::SmallInt(i) => {
-                9u8.hash(state); // Discriminant for SmallInt variant
-                i.hash(state);
-            }
-            AttrValue::Bytes(bytes) => {
-                10u8.hash(state); // Discriminant for Bytes variant
-                bytes.hash(state);
-            }
-            AttrValue::CompressedText(cd) => {
-                11u8.hash(state); // Discriminant for CompressedText variant
-                cd.data.hash(state);
-                cd.original_size.hash(state);
-            }
-            AttrValue::CompressedFloatVec(cd) => {
-                12u8.hash(state); // Discriminant for CompressedFloatVec variant
-                cd.data.hash(state);
-                cd.original_size.hash(state);
-            }
-            AttrValue::Null => {
-                13u8.hash(state); // Discriminant for Null variant
-                                  // No additional data to hash for Null
-            }
-            AttrValue::SubgraphRef(id) => {
-                14u8.hash(state); // Discriminant for SubgraphRef variant
-                id.hash(state);
-            }
-            AttrValue::NodeArray(nodes) => {
-                15u8.hash(state); // Discriminant for NodeArray variant
-                nodes.hash(state);
-            }
-            AttrValue::EdgeArray(edges) => {
-                16u8.hash(state); // Discriminant for EdgeArray variant
-                edges.hash(state);
-            }
-            AttrValue::Json(json_str) => {
-                17u8.hash(state); // Discriminant for Json variant
-                json_str.hash(state);
-            }
+            Self::CompressedFloatVec(data) => match data.decompress_float_vec() {
+                Ok(values) => {
+                    0u8.hash(state);
+                    hash_float_values(&values, state);
+                }
+                Err(_) => {
+                    1u8.hash(state);
+                    data.hash(state);
+                }
+            },
+            Self::IntVec(values) => values.hash(state),
+            Self::TextVec(values) => values.hash(state),
+            Self::BoolVec(values) => values.hash(state),
+            Self::Bool(value) => value.hash(state),
+            Self::Bytes(values) => values.hash(state),
+            Self::Null => {}
+            Self::SubgraphRef(id) => id.hash(state),
+            Self::NodeArray(ids) => ids.hash(state),
+            Self::EdgeArray(ids) => ids.hash(state),
+            Self::Json(value) => value.hash(state),
         }
+    }
+}
+
+// Property identity groups signed zero together and all NaN encodings together.
+// Numerical arithmetic continues to use ordinary IEEE floating-point operations.
+fn canonical_float_bits(value: f32) -> u32 {
+    if value == 0.0 {
+        0
+    } else if value.is_nan() {
+        f32::NAN.to_bits()
+    } else {
+        value.to_bits()
+    }
+}
+
+fn compare_float_values(left: f32, right: f32) -> std::cmp::Ordering {
+    f32::from_bits(canonical_float_bits(left))
+        .total_cmp(&f32::from_bits(canonical_float_bits(right)))
+}
+
+fn hash_float_values<H: Hasher>(values: &[f32], state: &mut H) {
+    values.len().hash(state);
+    for value in values {
+        canonical_float_bits(*value).hash(state);
     }
 }
 
@@ -403,60 +317,55 @@ impl Ord for AttrValue {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::Ordering;
         use AttrValue::*;
-
+        let kind = self.type_discriminant().cmp(&other.type_discriminant());
+        if kind != Ordering::Equal {
+            return kind;
+        }
         match (self, other) {
-            // Same variant comparisons
-            (Int(a), Int(b)) => a.cmp(b),
-            (SmallInt(a), SmallInt(b)) => a.cmp(b),
-            (Float(a), Float(b)) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
-            (Bool(a), Bool(b)) => a.cmp(b),
-            (Text(a), Text(b)) => AttrValue::cmp_text_content(a, b),
-            (CompactText(a), CompactText(b)) => AttrValue::cmp_text_content(a.as_str(), b.as_str()),
-            (FloatVec(a), FloatVec(b)) => a.len().cmp(&b.len()).then_with(|| {
-                // Compare vectors lexicographically
-                for (va, vb) in a.iter().zip(b.iter()) {
-                    match va.partial_cmp(vb).unwrap_or(Ordering::Equal) {
-                        Ordering::Equal => continue,
-                        other => return other,
-                    }
-                }
-                Ordering::Equal
-            }),
-            (Bytes(a), Bytes(b)) => a.cmp(b),
-            (CompressedText(a), CompressedText(b)) => {
-                match (a.decompress_text(), b.decompress_text()) {
-                    (Ok(lhs), Ok(rhs)) => AttrValue::cmp_text_content(lhs.as_str(), rhs.as_str()),
-                    _ => a.data.cmp(&b.data),
+            (Int(left), Int(right)) => left.cmp(right),
+            (SmallInt(left), SmallInt(right)) => left.cmp(right),
+            (Int(left), SmallInt(right)) => left.cmp(&(*right as i64)),
+            (SmallInt(left), Int(right)) => (*left as i64).cmp(right),
+            (Float(left), Float(right)) => compare_float_values(*left, *right),
+            (Bool(left), Bool(right)) => left.cmp(right),
+            (IntVec(left), IntVec(right)) => left.cmp(right),
+            (TextVec(left), TextVec(right)) => left.cmp(right),
+            (BoolVec(left), BoolVec(right)) => left.cmp(right),
+            (Bytes(left), Bytes(right)) => left.cmp(right),
+            (SubgraphRef(left), SubgraphRef(right)) => left.cmp(right),
+            (NodeArray(left), NodeArray(right)) => left.cmp(right),
+            (EdgeArray(left), EdgeArray(right)) => left.cmp(right),
+            (Json(left), Json(right)) => left.cmp(right),
+            (Null, Null) => Ordering::Equal,
+            (
+                Text(_) | CompactText(_) | CompressedText(_),
+                Text(_) | CompactText(_) | CompressedText(_),
+            ) => match (self.text_content(), other.text_content()) {
+                (Ok(left), Ok(right)) => Self::cmp_text_content(&left, &right),
+                (Ok(_), Err(_)) => Ordering::Less,
+                (Err(_), Ok(_)) => Ordering::Greater,
+                _ => match (self, other) {
+                    (CompressedText(left), CompressedText(right)) => left.cmp(right),
+                    _ => kind,
+                },
+            },
+            (FloatVec(_) | CompressedFloatVec(_), FloatVec(_) | CompressedFloatVec(_)) => {
+                match (self.float_content(), other.float_content()) {
+                    (Ok(left), Ok(right)) => left
+                        .iter()
+                        .zip(right.iter())
+                        .map(|(left, right)| compare_float_values(*left, *right))
+                        .find(|order| *order != Ordering::Equal)
+                        .unwrap_or_else(|| left.len().cmp(&right.len())),
+                    (Ok(_), Err(_)) => Ordering::Less,
+                    (Err(_), Ok(_)) => Ordering::Greater,
+                    _ => match (self, other) {
+                        (CompressedFloatVec(left), CompressedFloatVec(right)) => left.cmp(right),
+                        _ => kind,
+                    },
                 }
             }
-            (CompressedFloatVec(a), CompressedFloatVec(b)) => a.data.cmp(&b.data),
-
-            // Cross-type comparisons - order by type discriminant first
-            (Int(a), SmallInt(b)) => a.cmp(&(*b as i64)),
-            (SmallInt(a), Int(b)) => (*a as i64).cmp(b),
-
-            // Text comparisons across storage types
-            (Text(a), CompactText(b)) => AttrValue::cmp_text_content(a.as_str(), b.as_str()),
-            (CompactText(a), Text(b)) => AttrValue::cmp_text_content(a.as_str(), b.as_str()),
-            (Text(a), CompressedText(b)) => match b.decompress_text() {
-                Ok(text) => AttrValue::cmp_text_content(a.as_str(), text.as_str()),
-                Err(_) => std::cmp::Ordering::Equal,
-            },
-            (CompressedText(a), Text(b)) => match a.decompress_text() {
-                Ok(text) => AttrValue::cmp_text_content(text.as_str(), b.as_str()),
-                Err(_) => std::cmp::Ordering::Equal,
-            },
-            (CompactText(a), CompressedText(b)) => match b.decompress_text() {
-                Ok(text) => AttrValue::cmp_text_content(a.as_str(), text.as_str()),
-                Err(_) => std::cmp::Ordering::Equal,
-            },
-            (CompressedText(a), CompactText(b)) => match a.decompress_text() {
-                Ok(text) => AttrValue::cmp_text_content(text.as_str(), b.as_str()),
-                Err(_) => std::cmp::Ordering::Equal,
-            },
-
-            // Different types - order by discriminant (type priority)
-            _ => self.type_discriminant().cmp(&other.type_discriminant()),
+            _ => kind,
         }
     }
 }
@@ -484,21 +393,36 @@ impl AttrValue {
 }
 
 impl AttrValue {
-    fn cmp_text_content(lhs: &str, rhs: &str) -> std::cmp::Ordering {
-        use std::cmp::Ordering;
-
-        fn parse_numeric(input: &str) -> Option<f64> {
-            let trimmed = input.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                trimmed.parse::<f64>().ok()
-            }
+    fn text_content(&self) -> Result<std::borrow::Cow<'_, str>, &'static str> {
+        match self {
+            Self::Text(value) => Ok(std::borrow::Cow::Borrowed(value)),
+            Self::CompactText(value) => Ok(std::borrow::Cow::Borrowed(value.as_str())),
+            Self::CompressedText(value) => value.decompress_text().map(std::borrow::Cow::Owned),
+            _ => Err("Not text"),
         }
+    }
 
-        match (parse_numeric(lhs), parse_numeric(rhs)) {
-            (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Equal),
-            _ => lhs.cmp(rhs),
+    fn float_content(&self) -> Result<std::borrow::Cow<'_, [f32]>, &'static str> {
+        match self {
+            Self::FloatVec(value) => Ok(std::borrow::Cow::Borrowed(value)),
+            Self::CompressedFloatVec(value) => {
+                value.decompress_float_vec().map(std::borrow::Cow::Owned)
+            }
+            _ => Err("Not a float vector"),
+        }
+    }
+
+    fn cmp_text_content(left: &str, right: &str) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        // Preserve natural numeric-text ordering, with literal spelling as a tie-break.
+        // Numeric and nonnumeric text occupy distinct groups to keep ordering transitive.
+        match (left.trim().parse::<f64>(), right.trim().parse::<f64>()) {
+            (Ok(left_number), Ok(right_number)) => left_number
+                .total_cmp(&right_number)
+                .then_with(|| left.cmp(right)),
+            (Ok(_), Err(_)) => Ordering::Less,
+            (Err(_), Ok(_)) => Ordering::Greater,
+            _ => left.cmp(right),
         }
     }
 }
@@ -681,7 +605,9 @@ impl AttrValue {
 
 /// Compressed data storage for large values (Memory Optimization 3)
 /// Uses simple run-length encoding and basic compression
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct CompressedData {
     /// Compressed bytes
     pub data: Vec<u8>,
@@ -691,7 +617,9 @@ pub struct CompressedData {
     algorithm: CompressionAlgorithm,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum CompressionAlgorithm {
     /// No compression (passthrough)
     None,
@@ -736,9 +664,7 @@ impl CompressedData {
 
     /// Compress float vector data
     pub fn compress_float_vec(vec: &[f32]) -> Self {
-        let bytes = unsafe {
-            std::slice::from_raw_parts(vec.as_ptr() as *const u8, std::mem::size_of_val(vec))
-        };
+        let bytes: Vec<u8> = vec.iter().flat_map(|value| value.to_le_bytes()).collect();
 
         // For small vectors, don't compress
         if vec.len() < 25 {
@@ -750,7 +676,7 @@ impl CompressedData {
         }
 
         // Run-length encoding can work well for sparse vectors
-        let compressed = Self::run_length_encode(bytes);
+        let compressed = Self::run_length_encode(&bytes);
 
         if compressed.len() < bytes.len() {
             Self {
@@ -774,6 +700,9 @@ impl CompressedData {
             CompressionAlgorithm::RunLength => Self::run_length_decode(&self.data)?,
             CompressionAlgorithm::Basic => return Err("Basic compression not implemented"),
         };
+        if bytes.len() != self.original_size {
+            return Err("Decompressed size does not match metadata");
+        }
 
         String::from_utf8(bytes).map_err(|_| "Invalid UTF-8")
     }
@@ -785,20 +714,18 @@ impl CompressedData {
             CompressionAlgorithm::RunLength => Self::run_length_decode(&self.data)?,
             CompressionAlgorithm::Basic => return Err("Basic compression not implemented"),
         };
+        if bytes.len() != self.original_size {
+            return Err("Decompressed size does not match metadata");
+        }
 
         if bytes.len() % std::mem::size_of::<f32>() != 0 {
             return Err("Invalid float vector data");
         }
 
-        let float_count = bytes.len() / std::mem::size_of::<f32>();
-        let mut result = Vec::with_capacity(float_count);
-
-        unsafe {
-            let float_ptr = bytes.as_ptr() as *const f32;
-            for i in 0..float_count {
-                result.push(*float_ptr.add(i));
-            }
-        }
+        let result = bytes
+            .chunks_exact(4)
+            .map(|bytes| f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+            .collect();
 
         Ok(result)
     }

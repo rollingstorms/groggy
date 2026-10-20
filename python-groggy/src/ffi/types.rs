@@ -3,7 +3,6 @@
 //! This module provides Python wrappers for core Groggy types.
 
 use groggy::{AttrValue as RustAttrValue, EdgeId, NodeId};
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -30,87 +29,13 @@ impl PyAttrValue {
     }
 
     /// Get the raw Python value for internal FFI usage
-    pub fn to_python_value(&self, py: Python) -> PyObject {
-        match &self.inner {
-            RustAttrValue::Int(i) => i.to_object(py),
-            RustAttrValue::Float(f) => f.to_object(py),
-            RustAttrValue::Text(s) => s.to_object(py),
-            RustAttrValue::Bool(b) => b.to_object(py),
-            RustAttrValue::FloatVec(v) => v.to_object(py),
-            RustAttrValue::IntVec(v) => v.to_object(py),
-            RustAttrValue::TextVec(v) => v.to_object(py),
-            RustAttrValue::BoolVec(v) => v.to_object(py),
-            RustAttrValue::Bytes(b) => b.to_object(py),
-            // Handle optimized variants by extracting their underlying value
-            RustAttrValue::CompactText(cs) => cs.as_str().to_object(py),
-            RustAttrValue::SmallInt(i) => i.to_object(py),
-            RustAttrValue::CompressedText(cd) => match cd.decompress_text() {
-                Ok(data) => data.to_object(py),
-                Err(_) => py.None(),
-            },
-            RustAttrValue::CompressedFloatVec(cd) => match cd.decompress_float_vec() {
-                Ok(data) => data.to_object(py),
-                Err(_) => py.None(),
-            },
-            // Handle additional variants
-            RustAttrValue::Null => py.None(),
-            RustAttrValue::SubgraphRef(id) => id.to_object(py),
-            RustAttrValue::NodeArray(nodes) => nodes.to_object(py),
-            RustAttrValue::EdgeArray(edges) => edges.to_object(py),
-            RustAttrValue::Json(json_str) => {
-                // For now, return the JSON string. Later we can implement full JSON->Python conversion
-                // TODO: Convert JSON back to Python objects (lists, dicts) using eval or json module
-                json_str.to_object(py)
-            }
-        }
+    pub fn to_python_value(&self, py: Python) -> PyResult<PyObject> {
+        crate::ffi::utils::attr_value_to_python_value(py, &self.inner)
     }
 
     /// Create PyAttrValue from Python value (public constructor)
     pub fn from_py_value(value: &PyAny) -> PyResult<Self> {
-        let rust_value = if value.is_none() {
-            RustAttrValue::Null
-        } else if let Ok(b) = value.extract::<bool>() {
-            RustAttrValue::Bool(b)
-        } else if let Ok(i) = value.extract::<i64>() {
-            RustAttrValue::Int(i)
-        } else if let Ok(f) = value.extract::<f64>() {
-            RustAttrValue::Float(f as f32) // Convert f64 to f32
-        } else if let Ok(f) = value.extract::<f32>() {
-            RustAttrValue::Float(f)
-        } else if let Ok(s) = value.extract::<String>() {
-            RustAttrValue::Text(s)
-        } else if let Ok(vec) = value.extract::<Vec<f32>>() {
-            RustAttrValue::FloatVec(vec)
-        } else if let Ok(vec) = value.extract::<Vec<f64>>() {
-            // Convert Vec<f64> to Vec<f32>
-            let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
-            RustAttrValue::FloatVec(f32_vec)
-        } else if let Ok(vec) = value.extract::<Vec<i64>>() {
-            RustAttrValue::IntVec(vec)
-        } else if let Ok(vec) = value.extract::<Vec<String>>() {
-            RustAttrValue::TextVec(vec)
-        } else if let Ok(vec) = value.extract::<Vec<bool>>() {
-            RustAttrValue::BoolVec(vec)
-        } else if let Ok(bytes) = value.extract::<Vec<u8>>() {
-            RustAttrValue::Bytes(bytes)
-        } else {
-            // For complex types, try to convert to JSON using Python's json module
-            let py = value.py();
-            let json = py.import("json")?;
-            match json.call_method1("dumps", (value,)) {
-                Ok(json_str_py) => {
-                    let json_str: String = json_str_py.extract()?;
-                    RustAttrValue::Json(json_str)
-                }
-                Err(_) => {
-                    return Err(PyErr::new::<PyTypeError, _>(
-                        "Unsupported attribute value type. Supported types: int, float, str, bool, List[int], List[str], List[bool], List[float], bytes, or any JSON-serializable type"
-                    ));
-                }
-            }
-        };
-
-        Ok(Self { inner: rust_value })
+        crate::ffi::utils::python_value_to_attr_value(value).map(Self::new)
     }
 }
 
@@ -121,35 +46,33 @@ impl PyAttrValue {
         Self::from_py_value(value)
     }
 
+    /// Explicit float32 vector constructor, including empty vectors and numeric casts.
+    #[staticmethod]
+    fn float_vec(values: Vec<f32>) -> Self {
+        Self::new(RustAttrValue::FloatVec(values))
+    }
+
+    /// Explicit int64 vector constructor.
+    #[staticmethod]
+    fn int_vec(values: Vec<i64>) -> Self {
+        Self::new(RustAttrValue::IntVec(values))
+    }
+
+    /// Explicit text vector constructor.
+    #[staticmethod]
+    fn text_vec(values: Vec<String>) -> Self {
+        Self::new(RustAttrValue::TextVec(values))
+    }
+
+    /// Explicit boolean vector constructor.
+    #[staticmethod]
+    fn bool_vec(values: Vec<bool>) -> Self {
+        Self::new(RustAttrValue::BoolVec(values))
+    }
+
     #[getter]
-    fn value(&self, py: Python) -> PyObject {
-        match &self.inner {
-            RustAttrValue::Int(i) => i.to_object(py),
-            RustAttrValue::Float(f) => f.to_object(py),
-            RustAttrValue::Text(s) => s.to_object(py),
-            RustAttrValue::Bool(b) => b.to_object(py),
-            RustAttrValue::FloatVec(v) => v.to_object(py),
-            RustAttrValue::IntVec(v) => v.to_object(py),
-            RustAttrValue::TextVec(v) => v.to_object(py),
-            RustAttrValue::BoolVec(v) => v.to_object(py),
-            RustAttrValue::Bytes(b) => b.to_object(py),
-            // Handle optimized variants by extracting their underlying value
-            RustAttrValue::CompactText(cs) => cs.as_str().to_object(py),
-            RustAttrValue::SmallInt(i) => i.to_object(py),
-            RustAttrValue::CompressedText(cd) => match cd.decompress_text() {
-                Ok(data) => data.to_object(py),
-                Err(_) => py.None(),
-            },
-            RustAttrValue::CompressedFloatVec(cd) => match cd.decompress_float_vec() {
-                Ok(data) => data.to_object(py),
-                Err(_) => py.None(),
-            },
-            RustAttrValue::SubgraphRef(subgraph_id) => subgraph_id.to_object(py),
-            RustAttrValue::NodeArray(node_ids) => node_ids.to_object(py),
-            RustAttrValue::EdgeArray(edge_ids) => edge_ids.to_object(py),
-            RustAttrValue::Null => py.None(),
-            RustAttrValue::Json(json_str) => json_str.to_object(py),
-        }
+    fn value(&self, py: Python) -> PyResult<PyObject> {
+        self.to_python_value(py)
     }
 
     #[getter]
@@ -246,126 +169,10 @@ impl PyAttrValue {
     }
 
     fn __hash__(&self) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        // Create a hash based on the variant and value
-        match &self.inner {
-            RustAttrValue::Int(i) => {
-                0u8.hash(&mut hasher);
-                i.hash(&mut hasher);
-            }
-            RustAttrValue::Float(f) => {
-                1u8.hash(&mut hasher);
-                f.to_bits().hash(&mut hasher);
-            }
-            RustAttrValue::Text(s) => {
-                2u8.hash(&mut hasher);
-                s.hash(&mut hasher);
-            }
-            RustAttrValue::Bool(b) => {
-                3u8.hash(&mut hasher);
-                b.hash(&mut hasher);
-            }
-            RustAttrValue::FloatVec(v) => {
-                4u8.hash(&mut hasher);
-                for f in v {
-                    f.to_bits().hash(&mut hasher);
-                }
-            }
-            RustAttrValue::Bytes(b) => {
-                5u8.hash(&mut hasher);
-                b.hash(&mut hasher);
-            }
-            RustAttrValue::CompactText(cs) => {
-                6u8.hash(&mut hasher);
-                cs.as_str().hash(&mut hasher);
-            }
-            RustAttrValue::SmallInt(i) => {
-                7u8.hash(&mut hasher);
-                i.hash(&mut hasher);
-            }
-            RustAttrValue::CompressedText(cd) => {
-                8u8.hash(&mut hasher);
-                if let Ok(text) = cd.decompress_text() {
-                    text.hash(&mut hasher);
-                }
-            }
-            RustAttrValue::CompressedFloatVec(cd) => {
-                9u8.hash(&mut hasher);
-                if let Ok(vec) = cd.decompress_float_vec() {
-                    for f in vec {
-                        f.to_bits().hash(&mut hasher);
-                    }
-                }
-            }
-            RustAttrValue::SubgraphRef(subgraph_id) => {
-                10u8.hash(&mut hasher);
-                subgraph_id.hash(&mut hasher);
-            }
-            RustAttrValue::NodeArray(node_ids) => {
-                11u8.hash(&mut hasher);
-                node_ids.hash(&mut hasher);
-            }
-            RustAttrValue::EdgeArray(edge_ids) => {
-                12u8.hash(&mut hasher);
-                edge_ids.hash(&mut hasher);
-            }
-            RustAttrValue::IntVec(v) => {
-                13u8.hash(&mut hasher);
-                v.hash(&mut hasher);
-            }
-            RustAttrValue::TextVec(v) => {
-                14u8.hash(&mut hasher);
-                v.hash(&mut hasher);
-            }
-            RustAttrValue::BoolVec(v) => {
-                15u8.hash(&mut hasher);
-                v.hash(&mut hasher);
-            }
-            RustAttrValue::Json(s) => {
-                16u8.hash(&mut hasher);
-                s.hash(&mut hasher);
-            }
-            RustAttrValue::Null => {
-                17u8.hash(&mut hasher);
-                // No additional data to hash for Null
-            }
-        }
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.inner.hash(&mut hasher);
         hasher.finish()
-    }
-}
-
-// ToPyObject implementation for PyAttrValue
-impl pyo3::ToPyObject for PyAttrValue {
-    fn to_object(&self, py: pyo3::Python<'_>) -> pyo3::PyObject {
-        match &self.inner {
-            RustAttrValue::Int(i) => i.to_object(py),
-            RustAttrValue::Float(f) => f.to_object(py),
-            RustAttrValue::Text(s) => s.to_object(py),
-            RustAttrValue::Bool(b) => b.to_object(py),
-            RustAttrValue::FloatVec(v) => v.to_object(py),
-            RustAttrValue::IntVec(v) => v.to_object(py),
-            RustAttrValue::TextVec(v) => v.to_object(py),
-            RustAttrValue::BoolVec(v) => v.to_object(py),
-            RustAttrValue::Bytes(b) => b.to_object(py),
-            RustAttrValue::CompactText(cs) => cs.as_str().to_object(py),
-            RustAttrValue::SmallInt(i) => (*i as i64).to_object(py),
-            RustAttrValue::CompressedText(cd) => match cd.decompress_text() {
-                Ok(data) => data.to_object(py),
-                Err(_) => py.None(),
-            },
-            RustAttrValue::CompressedFloatVec(cd) => match cd.decompress_float_vec() {
-                Ok(data) => data.to_object(py),
-                Err(_) => py.None(),
-            },
-            RustAttrValue::SubgraphRef(subgraph_id) => subgraph_id.to_object(py),
-            RustAttrValue::NodeArray(node_ids) => node_ids.to_object(py),
-            RustAttrValue::EdgeArray(edge_ids) => edge_ids.to_object(py),
-            RustAttrValue::Null => py.None(),
-            RustAttrValue::Json(json_str) => json_str.to_object(py),
-        }
     }
 }
 

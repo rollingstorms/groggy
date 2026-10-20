@@ -165,7 +165,7 @@ impl PyNodeView {
         if let Ok(attrs) = graph.get_node_attrs(self.node_id) {
             for (key, value) in attrs {
                 let py_attr = PyAttrValue::from_attr_value(value);
-                dict.set_item(key, py_attr.to_object(py))?;
+                dict.set_item(key, py_attr.to_python_value(py)?)?;
             }
         }
 
@@ -212,7 +212,8 @@ impl NodeViewIterator {
             self.index += 1;
 
             // Return (key, value) tuple
-            let tuple = pyo3::types::PyTuple::new(py, [key.to_object(py), value.to_object(py)]);
+            let tuple =
+                pyo3::types::PyTuple::new(py, [key.to_object(py), value.to_python_value(py)?]);
             Ok(Some(tuple.to_object(py)))
         } else {
             Ok(None)
@@ -468,7 +469,8 @@ impl EdgeViewIterator {
             self.index += 1;
 
             // Return (key, value) tuple
-            let tuple = pyo3::types::PyTuple::new(py, [key.to_object(py), value.to_object(py)]);
+            let tuple =
+                pyo3::types::PyTuple::new(py, [key.to_object(py), value.to_python_value(py)?]);
             Ok(Some(tuple.to_object(py)))
         } else {
             Ok(None)

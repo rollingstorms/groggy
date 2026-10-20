@@ -102,6 +102,8 @@ The following methods are available on `Graph` objects. This reference is genera
 
 Managed external IDs, node/edge upserts, rename rules and historical lookup are documented in [External identity and upserts](external-identity.md).
 
+Property conversion, explicit vector types and snapshot null semantics are documented in [Property values](property-values.md).
+
 ## Detailed Method Reference
 
 ### Creation & Construction

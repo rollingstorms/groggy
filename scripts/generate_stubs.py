@@ -83,6 +83,12 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'set_edge_external_id': 'None',
             'allocated_entity_for_external_id': 'Optional[Tuple[str, int]]',
         },
+        'AttrValue': {
+            'float_vec': 'AttrValue',
+            'int_vec': 'AttrValue',
+            'text_vec': 'AttrValue',
+            'bool_vec': 'AttrValue',
+        },
         'TemporalSnapshot': {
             'node_by_external_id': 'Optional[int]',
             'edge_by_external_id': 'Optional[int]',
@@ -409,7 +415,11 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
         else:
             # Use inferred return type if available, otherwise Any
             return_hint = inferred_return if inferred_return else "Any"
-            lines.append(f"    def {method_name}(self, *args, **kwargs) -> {return_hint}:")
+            if isinstance(inspect.getattr_static(cls, method_name), staticmethod):
+                lines.append("    @staticmethod")
+                lines.append(f"    def {method_name}(*args, **kwargs) -> {return_hint}:")
+            else:
+                lines.append(f"    def {method_name}(self, *args, **kwargs) -> {return_hint}:")
         
         # Add docstring
         if method_doc:

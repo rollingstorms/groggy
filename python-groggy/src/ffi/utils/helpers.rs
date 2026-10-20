@@ -1,170 +1,219 @@
 use groggy::{AttrValue as RustAttrValue, GraphError};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use std::collections::HashMap;
 
-/// Convert Python value to Rust AttrValue (reusing PyAttrValue conversion logic)
+/// Convert every property before a creation call can allocate an entity.
+pub fn parse_creation_attrs(
+    attrs: Option<&PyDict>,
+    excluded: &[&str],
+) -> (HashMap<String, RustAttrValue>, Vec<String>) {
+    let mut parsed = HashMap::new();
+    let mut errors = Vec::new();
+    if let Some(attrs) = attrs {
+        for (position, (key, value)) in attrs.iter().enumerate() {
+            let name = key.extract::<String>();
+            if name
+                .as_ref()
+                .map(|name| excluded.contains(&name.as_str()))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let converted = python_value_to_attr_value(value);
+            match name {
+                Ok(name) => match converted {
+                    Ok(value) => {
+                        parsed.insert(name, value);
+                    }
+                    Err(error) => {
+                        errors.push(format!("property[{position}].value: {error}"));
+                        // Preserve the property key for core validation; errors prevent publication.
+                        parsed.insert(name, RustAttrValue::Null);
+                    }
+                },
+                Err(error) => {
+                    errors.push(format!("property[{position}].name: {error}"));
+                    if let Err(error) = converted {
+                        errors.push(format!("property[{position}].value: {error}"));
+                    }
+                }
+            }
+        }
+    }
+    (parsed, errors)
+}
+
+/// Validate JSON object keys without silently coercing their types.
+fn validate_json_container(
+    value: &PyAny,
+    path: &mut std::collections::HashSet<usize>,
+    depth: usize,
+) -> PyResult<()> {
+    use pyo3::types::{PyDict, PyList, PyTuple};
+    if depth > 128 {
+        return Err(PyValueError::new_err(
+            "Structured properties exceed 128 nesting levels",
+        ));
+    }
+    if !(value.is_instance_of::<PyDict>()
+        || value.is_instance_of::<PyList>()
+        || value.is_instance_of::<PyTuple>())
+    {
+        return Ok(());
+    }
+    let identity = value.as_ptr() as usize;
+    if !path.insert(identity) {
+        return Err(PyValueError::new_err("Circular structured property"));
+    }
+    if let Ok(dict) = value.downcast::<PyDict>() {
+        for (key, value) in dict.iter() {
+            key.extract::<String>()
+                .map_err(|_| PyTypeError::new_err("Structured property keys must be strings"))?;
+            validate_json_container(value, path, depth + 1)?;
+        }
+    } else {
+        for item in value.iter()? {
+            validate_json_container(item?, path, depth + 1)?;
+        }
+    }
+    path.remove(&identity);
+    Ok(())
+}
+
+fn structured_property(value: &PyAny) -> PyResult<RustAttrValue> {
+    use pyo3::types::PyDict;
+    validate_json_container(value, &mut std::collections::HashSet::new(), 0)?;
+    let py = value.py();
+    let options = PyDict::new(py);
+    options.set_item("allow_nan", false)?;
+    options.set_item("sort_keys", true)?;
+    let json = py
+        .import("json")?
+        .call_method("dumps", (value,), Some(options))
+        .map_err(|error| {
+            PyTypeError::new_err(format!(
+                "Unsupported attribute value type {}: {error}",
+                value.get_type().name().unwrap_or("unknown")
+            ))
+        })?;
+    Ok(RustAttrValue::Json(json.extract()?))
+}
+
+/// One translation policy shared by constructors, graph writers and table adapters.
+/// Homogeneous lists retain their element type; heterogeneous containers use Json.
 pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
-    // Check for None/null first
+    use pyo3::types::{PyBool, PyByteArray, PyBytes, PyDict, PyLong, PyString};
+    if let Ok(typed) = value.extract::<PyRef<crate::ffi::types::PyAttrValue>>() {
+        return Ok(typed.inner.clone());
+    }
     if value.is_none() {
         return Ok(RustAttrValue::Null);
     }
-
-    // Fast path optimization: Check most common types first
-
-    // Check booleans FIRST (Python bool is a subtype of int, so this must come before int check)
-    if let Ok(b) = value.extract::<bool>() {
-        return Ok(RustAttrValue::Bool(b));
+    if value.is_instance_of::<PyBool>() {
+        return Ok(RustAttrValue::Bool(value.extract()?));
     }
-
-    // Check integers second (very common in benchmarks)
-    if let Ok(i) = value.extract::<i64>() {
-        return Ok(RustAttrValue::Int(i));
+    if value.is_instance_of::<PyLong>() {
+        return Ok(RustAttrValue::Int(value.extract()?));
     }
-
-    // Check strings third (also very common)
-    if let Ok(s) = value.extract::<String>() {
-        return Ok(RustAttrValue::Text(s));
+    if value.is_instance_of::<PyString>() {
+        return Ok(RustAttrValue::Text(value.extract()?));
     }
-
-    // Check floats fourth
-    if let Ok(f) = value.extract::<f64>() {
-        return Ok(RustAttrValue::Float(f as f32)); // Convert f64 to f32
+    if let Ok(bytes) = value.downcast::<PyBytes>() {
+        return Ok(RustAttrValue::Bytes(bytes.as_bytes().to_vec()));
     }
-
-    // Less common types
-    if let Ok(f) = value.extract::<f32>() {
-        return Ok(RustAttrValue::Float(f));
-    } else if let Ok(vec) = value.extract::<Vec<f32>>() {
-        return Ok(RustAttrValue::FloatVec(vec));
-    } else if let Ok(vec) = value.extract::<Vec<f64>>() {
-        // Convert Vec<f64> to Vec<f32>
-        let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
-        return Ok(RustAttrValue::FloatVec(f32_vec));
-    } else if let Ok(bytes) = value.extract::<Vec<u8>>() {
-        return Ok(RustAttrValue::Bytes(bytes));
+    if let Ok(bytes) = value.downcast::<PyByteArray>() {
+        return Ok(RustAttrValue::Bytes(bytes.to_vec()));
     }
-
-    // Check for generic list types that we can convert
-    if value.hasattr("__iter__").unwrap_or(false)
-        && !value.is_instance_of::<pyo3::types::PyString>()
-    {
-        // This is some kind of iterable (list, tuple, etc.) but not a string
-
-        // Try to extract as a list and convert all elements to the same type
-        if let Ok(list) = value.extract::<Vec<&PyAny>>() {
-            if list.is_empty() {
-                // Empty list - default to empty float vector
-                return Ok(RustAttrValue::FloatVec(vec![]));
-            }
-
-            // Try to determine the type by sampling the first element
-            let first_elem = list[0];
-
-            // Try as integers first
-            if first_elem.extract::<i64>().is_ok() {
-                let mut int_vec = Vec::with_capacity(list.len());
-                for item in list {
-                    match item.extract::<i64>() {
-                        Ok(i) => int_vec.push(i),
-                        Err(_) => {
-                            return Err(PyErr::new::<PyTypeError, _>(
-                                format!("Mixed types in list not supported. Expected all integers but found: {}", 
-                                    item.get_type().name()?)
-                            ));
-                        }
-                    }
-                }
-                // Store as comma-separated string for now (could add IntVec to AttrValue later)
-                let int_str = int_vec
-                    .iter()
-                    .map(|i| i.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",");
-                return Ok(RustAttrValue::Text(format!("[{}]", int_str)));
-            }
-
-            // Try as floats
-            if first_elem.extract::<f64>().is_ok() || first_elem.extract::<f32>().is_ok() {
-                let mut float_vec = Vec::with_capacity(list.len());
-                for item in list {
-                    if let Ok(f) = item.extract::<f64>() {
-                        float_vec.push(f as f32);
-                    } else if let Ok(f) = item.extract::<f32>() {
-                        float_vec.push(f);
-                    } else {
-                        return Err(PyErr::new::<PyTypeError, _>(format!(
-                            "Mixed types in list not supported. Expected all floats but found: {}",
-                            item.get_type().name()?
-                        )));
-                    }
-                }
-                return Ok(RustAttrValue::FloatVec(float_vec));
-            }
-
-            // Try as strings
-            if first_elem.extract::<String>().is_ok() {
-                let mut string_vec = Vec::with_capacity(list.len());
-                for item in list {
-                    match item.extract::<String>() {
-                        Ok(s) => string_vec.push(s),
-                        Err(_) => {
-                            return Err(PyErr::new::<PyTypeError, _>(
-                                format!("Mixed types in list not supported. Expected all strings but found: {}", 
-                                    item.get_type().name()?)
-                            ));
-                        }
-                    }
-                }
-                // Store as JSON-like string representation
-                let strings_json = format!(
-                    "[{}]",
-                    string_vec
-                        .iter()
-                        .map(|s| format!("\"{}\"", s.replace("\"", "\\\"")))
-                        .collect::<Vec<_>>()
-                        .join(",")
-                );
-                return Ok(RustAttrValue::Text(strings_json));
-            }
-
-            // If we get here, it's a list of an unsupported type
-            return Err(PyErr::new::<PyTypeError, _>(format!(
-                "Unsupported list element type: {}. Supported list types: [int], [float], [str]",
-                first_elem.get_type().name()?
-            )));
+    if value.is_instance_of::<PyDict>() {
+        return structured_property(value);
+    }
+    if let Ok(items) = value.extract::<Vec<&PyAny>>() {
+        if items.is_empty() {
+            return Ok(RustAttrValue::FloatVec(Vec::new()));
         }
+        if items.iter().all(|item| item.is_instance_of::<PyBool>()) {
+            return Ok(RustAttrValue::BoolVec(
+                items
+                    .iter()
+                    .map(|item| item.extract())
+                    .collect::<PyResult<_>>()?,
+            ));
+        }
+        if items.iter().all(|item| {
+            !item.is_instance_of::<PyBool>()
+                && (item.is_instance_of::<PyLong>() || item.hasattr("__index__").unwrap_or(false))
+        }) {
+            return Ok(RustAttrValue::IntVec(
+                items
+                    .iter()
+                    .map(|item| item.extract())
+                    .collect::<PyResult<_>>()?,
+            ));
+        }
+        if items.iter().all(|item| item.is_instance_of::<PyString>()) {
+            return Ok(RustAttrValue::TextVec(
+                items
+                    .iter()
+                    .map(|item| item.extract())
+                    .collect::<PyResult<_>>()?,
+            ));
+        }
+        if items
+            .iter()
+            .all(|item| !item.is_instance_of::<PyBool>() && item.extract::<f64>().is_ok())
+        {
+            return Ok(RustAttrValue::FloatVec(
+                items
+                    .iter()
+                    .map(|item| item.extract::<f64>().map(|value| value as f32))
+                    .collect::<PyResult<_>>()?,
+            ));
+        }
+        return structured_property(value);
     }
-
-    // If we get here, it's a completely unsupported type
-    Err(PyErr::new::<PyTypeError, _>(
-        format!("Unsupported attribute value type: {}. Supported types: int, float, str, bool, bytes, [int], [float], [str]", 
-            value.get_type().name()?)
-    ))
+    if value.hasattr("__index__")? {
+        return Ok(RustAttrValue::Int(value.extract()?));
+    }
+    if let Ok(number) = value.extract::<f64>() {
+        return Ok(RustAttrValue::Float(number as f32));
+    }
+    structured_property(value)
 }
 
-/// Convert Rust AttrValue to Python object
+/// Decode storage optimizations and structured values before exposing Python data.
 pub fn attr_value_to_python_value(py: Python, attr_value: &RustAttrValue) -> PyResult<PyObject> {
-    let py_value = match attr_value {
-        RustAttrValue::Int(i) => i.to_object(py),
-        RustAttrValue::Float(f) => f.to_object(py),
-        RustAttrValue::Text(s) => s.to_object(py),
-        RustAttrValue::Bool(b) => b.to_object(py),
-        RustAttrValue::FloatVec(vec) => vec.to_object(py),
-        RustAttrValue::Bytes(bytes) => bytes.to_object(py),
-        RustAttrValue::CompactText(compact_str) => compact_str.as_str().to_object(py),
-        RustAttrValue::SmallInt(i) => i.to_object(py),
-        RustAttrValue::CompressedText(_) => "compressed_text".to_object(py), // Placeholder
-        RustAttrValue::CompressedFloatVec(_) => vec!["compressed_floats"].to_object(py), // Placeholder
-        RustAttrValue::SubgraphRef(subgraph_id) => subgraph_id.to_object(py),
-        RustAttrValue::NodeArray(node_ids) => node_ids.to_object(py),
-        RustAttrValue::EdgeArray(edge_ids) => edge_ids.to_object(py),
-        RustAttrValue::IntVec(v) => v.to_object(py),
-        RustAttrValue::TextVec(v) => v.to_object(py),
-        RustAttrValue::BoolVec(v) => v.to_object(py),
-        RustAttrValue::Json(s) => s.to_object(py),
+    use pyo3::types::PyBytes;
+    Ok(match attr_value {
+        RustAttrValue::Int(value) => value.to_object(py),
+        RustAttrValue::SmallInt(value) => value.to_object(py),
+        RustAttrValue::Float(value) => value.to_object(py),
+        RustAttrValue::Bool(value) => value.to_object(py),
+        RustAttrValue::Text(value) => value.to_object(py),
+        RustAttrValue::CompactText(value) => value.as_str().to_object(py),
+        RustAttrValue::CompressedText(value) => value
+            .decompress_text()
+            .map_err(PyValueError::new_err)?
+            .to_object(py),
+        RustAttrValue::FloatVec(value) => value.to_object(py),
+        RustAttrValue::CompressedFloatVec(value) => value
+            .decompress_float_vec()
+            .map_err(PyValueError::new_err)?
+            .to_object(py),
+        RustAttrValue::IntVec(value) => value.to_object(py),
+        RustAttrValue::TextVec(value) => value.to_object(py),
+        RustAttrValue::BoolVec(value) => value.to_object(py),
+        RustAttrValue::Bytes(value) => PyBytes::new(py, value).to_object(py),
+        RustAttrValue::Json(value) => py
+            .import("json")?
+            .call_method1("loads", (value,))?
+            .to_object(py),
+        RustAttrValue::SubgraphRef(value) => value.to_object(py),
+        RustAttrValue::NodeArray(value) => value.to_object(py),
+        RustAttrValue::EdgeArray(value) => value.to_object(py),
         RustAttrValue::Null => py.None(),
-    };
-    Ok(py_value)
+    })
 }
 
 /// Convert Rust GraphError to Python exception
