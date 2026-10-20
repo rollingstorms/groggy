@@ -12,9 +12,13 @@
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
 mod identity;
+pub(crate) mod kinds;
 mod persistence;
+mod schema;
 use identity::ExternalIdentityIndex;
 pub use identity::{EdgeUpsert, ExternalEntityRef, NodeUpsert, EXTERNAL_ID};
+pub use kinds::{LABELS, RELATIONSHIP_TYPE};
+pub use schema::{GraphSchema, PropertyConstraint, PropertyKind, SchemaViolation};
 
 use crate::api::batch::{BatchResult, GraphBatch};
 use crate::errors::{GraphError, GraphResult};
@@ -392,6 +396,11 @@ impl Graph {
     ) -> GraphResult<()> {
         let mut errors = Vec::new();
         for (position, attrs) in rows.iter().enumerate() {
+            for (name, value) in attrs {
+                if let Err(error) = kinds::validate_kind_property(name, value, true) {
+                    errors.push(format!("{position}.{name}: {error}"));
+                }
+            }
             for name in ["entity_type", EXTERNAL_ID] {
                 if attrs.contains_key(name) {
                     errors.push(format!(
@@ -415,16 +424,21 @@ impl Graph {
         &self,
         rows: &[HashMap<AttrName, AttrValue>],
     ) -> GraphResult<()> {
-        let invalid: Vec<_> = rows
-            .iter()
-            .enumerate()
-            .filter(|(_, attrs)| attrs.contains_key(EXTERNAL_ID))
-            .map(|(position, _)| format!("{position}.external_id: use the external-ID API"))
-            .collect();
-        if invalid.is_empty() {
+        let mut errors = Vec::new();
+        for (position, attrs) in rows.iter().enumerate() {
+            for (name, value) in attrs {
+                if name == EXTERNAL_ID {
+                    errors.push(format!("{position}.external_id: use the external-ID API"));
+                }
+                if let Err(error) = kinds::validate_kind_property(name, value, false) {
+                    errors.push(format!("{position}.{name}: {error}"));
+                }
+            }
+        }
+        if errors.is_empty() {
             Ok(())
         } else {
-            Err(GraphError::InvalidInput(invalid.join("; ")))
+            Err(GraphError::InvalidInput(errors.join("; ")))
         }
     }
 
@@ -760,6 +774,8 @@ impl Graph {
             return Err(GraphError::node_not_found(node, "set attribute"));
         }
 
+        let value = kinds::normalize_kind_property(&attr, value, true)?;
+
         // 2. Get old index for change tracking
         let old_index = self.space.get_node_attr_index(node, &attr);
 
@@ -804,6 +820,8 @@ impl Graph {
                 suggestion: "Check if edge exists with contains_edge()".to_string(),
             });
         }
+
+        let value = kinds::normalize_kind_property(&attr, value, false)?;
 
         // 2. Get old index for change tracking
         let old_index = self.space.get_edge_attr_index(edge, &attr);
@@ -2955,11 +2973,15 @@ impl Graph {
     ) {
         let kind = if is_node { "node" } else { "edge" };
         let mut first_positions = HashMap::new();
-        for (offset, &(id, _)) in values.iter().enumerate() {
+        for (offset, (id, value)) in values.iter().enumerate() {
+            let id = *id;
             let position = positions
                 .and_then(|positions| positions.get(offset))
                 .copied()
                 .unwrap_or(offset);
+            if let Err(error) = kinds::validate_kind_property(attr_name, value, is_node) {
+                errors.push(format!("{attr_name}[{position}]: {error}"));
+            }
             let exists = if is_node {
                 self.space.contains_node(id)
             } else {
@@ -3052,8 +3074,15 @@ impl Graph {
     // Internal column writer: the coordinator must validate the complete operation first.
     fn write_node_attrs(
         &mut self,
-        attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
+        mut attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> GraphResult<()> {
+        for (name, values) in &mut attrs_values {
+            if name == LABELS || name == RELATIONSHIP_TYPE {
+                for (_, value) in values {
+                    kinds::normalize_kind_property_in_place(name, value, true)?;
+                }
+            }
+        }
         // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<NodeId, Option<usize>>> = HashMap::new();
         for (attr_name, node_values) in &attrs_values {
@@ -3120,6 +3149,10 @@ impl Graph {
             )));
         }
 
+        for (_, value) in &mut node_values {
+            kinds::normalize_kind_property_in_place(&attr_name, value, true)?;
+        }
+
         // Collect previous indices for change tracking after validation.
         let mut old_indices: HashMap<NodeId, Option<usize>> =
             HashMap::with_capacity(node_values.len());
@@ -3163,8 +3196,15 @@ impl Graph {
     // Internal column writer: the coordinator must validate the complete operation first.
     fn write_edge_attrs(
         &mut self,
-        attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
+        mut attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> GraphResult<()> {
+        for (name, values) in &mut attrs_values {
+            if name == LABELS || name == RELATIONSHIP_TYPE {
+                for (_, value) in values {
+                    kinds::normalize_kind_property_in_place(name, value, false)?;
+                }
+            }
+        }
         // All targets were validated before collecting their old indices.
         let mut old_indices: HashMap<AttrName, HashMap<EdgeId, Option<usize>>> = HashMap::new();
         for (attr_name, edge_values) in &attrs_values {

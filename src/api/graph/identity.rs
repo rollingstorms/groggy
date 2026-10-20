@@ -62,6 +62,11 @@ fn check_attrs(
     position: usize,
     errors: &mut Vec<String>,
 ) {
+    for (name, value) in attrs {
+        if let Err(error) = super::kinds::validate_kind_property(name, value, is_node) {
+            errors.push(format!("{position}.{name}: {error}"));
+        }
+    }
     if attrs.contains_key(EXTERNAL_ID) {
         errors.push(format!(
             "{position}.external_id: use the explicit identity field"
@@ -275,6 +280,7 @@ impl Graph {
                 bindings.push((row.external_id, ExternalEntityRef::Node(id)));
             }
             for (name, value) in attrs {
+                let value = super::kinds::normalize_kind_property(&name, value, true)?;
                 if self.get_node_attr(id, &name)?.as_ref() != Some(&value) {
                     columns.entry(name).or_default().push((id, value));
                 }
@@ -359,6 +365,7 @@ impl Graph {
                 bindings.push((row.external_id, ExternalEntityRef::Edge(id)));
             }
             for (name, value) in attrs {
+                let value = super::kinds::normalize_kind_property(&name, value, false)?;
                 if self.get_edge_attr(id, &name)?.as_ref() != Some(&value) {
                     columns.entry(name).or_default().push((id, value));
                 }

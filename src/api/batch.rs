@@ -165,6 +165,10 @@ impl GraphBatch {
                 errors.push(format!("node_attrs.{name}: system-managed attribute"));
             }
             for (position, (reference, value)) in values.into_iter().enumerate() {
+                if let Err(error) = super::graph::kinds::validate_kind_property(&name, &value, true)
+                {
+                    errors.push(format!("node_attrs.{name}[{position}]: {error}"));
+                }
                 match node_id(reference, next_node_id, self.add_nodes) {
                     Ok(id) => {
                         if !known_node(id) || seen_removed_nodes.contains(&id) {
@@ -193,6 +197,11 @@ impl GraphBatch {
                 errors.push("edge_attrs.external_id: system-managed attribute".into());
             }
             for (position, (reference, value)) in values.into_iter().enumerate() {
+                if let Err(error) =
+                    super::graph::kinds::validate_kind_property(&name, &value, false)
+                {
+                    errors.push(format!("edge_attrs.{name}[{position}]: {error}"));
+                }
                 match edge_id(reference, next_edge_id, self.add_edges.len()) {
                     Ok(id) => {
                         let endpoints = if (next_edge_id..edge_end).contains(&id) {

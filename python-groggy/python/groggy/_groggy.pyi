@@ -5085,6 +5085,41 @@ class Graph:
         """
         ...
 
+    def edge_relationship_type(self, *args, **kwargs) -> Optional[str]:
+        ...
+
+
+    def edges_with_relationship_type(self, *args, **kwargs) -> List[int]:
+        ...
+
+
+    def node_labels(self, *args, **kwargs) -> List[str]:
+        ...
+
+
+    def nodes_with_label(self, *args, **kwargs) -> List[int]:
+        ...
+
+
+    def set_edge_relationship_type(self, *args, **kwargs) -> None:
+        ...
+
+
+    def set_node_labels(self, *args, **kwargs) -> None:
+        """
+        Replace a node's semantic labels; independent of base/meta entity_type.
+        """
+        ...
+
+
+    def validate_schema(self, *args, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Audit an explicit schema; this does not install a write policy.
+        """
+        ...
+
+
+
 
 
 

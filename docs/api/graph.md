@@ -104,6 +104,8 @@ Managed external IDs, node/edge upserts, rename rules and historical lookup are 
 
 Property conversion, explicit vector types and snapshot null semantics are documented in [Property values](property-values.md).
 
+Semantic kinds and explicit schema validation are documented in [Labels, relationship types and schema](kinds-schema.md).
+
 ## Detailed Method Reference
 
 ### Creation & Construction

@@ -253,6 +253,79 @@ impl PyGraph {
         })
     }
 
+    /// Replace a node's semantic labels; independent of base/meta entity_type.
+    fn set_node_labels(&mut self, node: NodeId, labels: Vec<String>) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .set_node_labels(node, labels)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn node_labels(&self, node: NodeId) -> PyResult<Vec<String>> {
+        self.inner
+            .borrow()
+            .node_labels(node)
+            .map_err(graph_error_to_py_err)
+    }
+
+    #[pyo3(signature = (edge, kind=None))]
+    fn set_edge_relationship_type(&mut self, edge: EdgeId, kind: Option<String>) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .set_edge_relationship_type(edge, kind)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn edge_relationship_type(&self, edge: EdgeId) -> PyResult<Option<String>> {
+        self.inner
+            .borrow()
+            .edge_relationship_type(edge)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn nodes_with_label(&self, label: &str) -> PyResult<Vec<NodeId>> {
+        self.inner
+            .borrow()
+            .nodes_with_label(label)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn edges_with_relationship_type(&self, kind: &str) -> PyResult<Vec<EdgeId>> {
+        self.inner
+            .borrow()
+            .edges_with_relationship_type(kind)
+            .map_err(graph_error_to_py_err)
+    }
+
+    /// Audit an explicit schema; this does not install a write policy.
+    fn validate_schema(&self, py: Python, schema: &PyDict) -> PyResult<PyObject> {
+        let value = crate::ffi::utils::python_value_to_attr_value(schema)?;
+        let RustAttrValue::Json(json) = value else {
+            return Err(PyTypeError::new_err("Schema must be a dictionary"));
+        };
+        let schema = groggy::GraphSchema::from_json(&json).map_err(graph_error_to_py_err)?;
+        let violations = self
+            .inner
+            .borrow()
+            .validate_schema(&schema)
+            .map_err(graph_error_to_py_err)?;
+        let output = PyList::empty(py);
+        for violation in violations {
+            let row = PyDict::new(py);
+            let (kind, id) = match violation.entity {
+                groggy::ExternalEntityRef::Node(id) => ("node", id),
+                groggy::ExternalEntityRef::Edge(id) => ("edge", id),
+            };
+            row.set_item("entity_type", kind)?;
+            row.set_item("entity_id", id)?;
+            row.set_item("selector", violation.selector)?;
+            row.set_item("property", violation.property)?;
+            row.set_item("message", violation.message)?;
+            output.append(row)?;
+        }
+        Ok(output.to_object(py))
+    }
+
     /// Check if this graph is directed
     #[getter]
     fn is_directed(&self) -> bool {
