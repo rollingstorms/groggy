@@ -14,7 +14,7 @@
 use crate::errors::{GraphError, GraphResult};
 use crate::state::delta::DeltaObject;
 use crate::state::history::Delta;
-use crate::types::{AttrName, AttrValue, EdgeId, NodeId, StateId};
+use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId, StateId};
 use crate::utils::util::timestamp_now;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -229,6 +229,8 @@ Complete state representation and reconstruction algorithms
 /// PERFORMANCE: Memory-intensive but provides O(1) access to all data
 #[derive(Debug, Clone)]
 pub struct GraphSnapshot {
+    /// Directionality is part of the graph state, including historical reads.
+    pub graph_type: GraphType,
     /// All nodes that were active at this state
     /// DESIGN: Vec for iteration, but could be HashSet for contains() queries
     pub active_nodes: Vec<NodeId>,
@@ -252,7 +254,13 @@ pub struct GraphSnapshot {
 impl GraphSnapshot {
     /// Create an empty snapshot for the given state
     pub fn empty(state_id: StateId) -> Self {
+        Self::empty_with_type(state_id, GraphType::default())
+    }
+
+    /// Create an empty snapshot with explicit graph directionality.
+    pub fn empty_with_type(state_id: StateId, graph_type: GraphType) -> Self {
         Self {
+            graph_type,
             active_nodes: Vec::new(),
             edges: HashMap::new(),
             node_attributes: HashMap::new(),

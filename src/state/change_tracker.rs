@@ -48,7 +48,7 @@ pub struct ChangeTracker {
     strategy: Box<dyn TemporalStorageStrategy>,
 }
 
-use crate::errors::GraphError;
+use crate::errors::{GraphError, GraphResult};
 use crate::state::delta::DeltaObject;
 use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
@@ -307,6 +307,11 @@ impl ChangeTracker {
     /// Alias for create_change_set (backward compatibility)
     pub fn create_changeset(&self) -> ChangeSet {
         self.create_change_set()
+    }
+
+    /// Resolve stable column references into logical values for historical storage.
+    pub fn create_changeset_resolved(&self, pool: &GraphPool) -> GraphResult<ChangeSet> {
+        self.strategy.create_change_set_resolved(pool)
     }
 
     /*

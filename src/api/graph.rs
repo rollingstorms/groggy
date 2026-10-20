@@ -159,7 +159,7 @@ impl Graph {
         Self {
             space: GraphSpace::new(pool.clone(), 0), // base state = 0
             pool,
-            history: HistoryForest::new(),
+            history: HistoryForest::new_with_type(graph_type),
             current_branch: "main".to_string(),
             current_commit: 0,
             query_engine: QueryEngine::new(),
@@ -191,7 +191,7 @@ impl Graph {
         Self {
             space: GraphSpace::new(pool.clone(), 0), // base state = 0
             pool,
-            history: HistoryForest::new(),
+            history: HistoryForest::new_with_type(config.graph_type),
             current_branch: "main".to_string(),
             current_commit: 0,
             query_engine: QueryEngine::new(),
@@ -437,7 +437,9 @@ impl Graph {
 
         // Register the index in GraphSpace so the attribute is queryable
         self.space
-            .set_node_attr_index(node_id, entity_type_attr, index);
+            .set_node_attr_index(node_id, entity_type_attr.clone(), index);
+        self.change_tracker
+            .record_attr_change(node_id, entity_type_attr, None, index, true);
 
         node_id
     }
@@ -474,6 +476,11 @@ impl Graph {
                 self.space
                     .set_node_attr_index(node_id, entity_type_attr.clone(), new_index);
             }
+            let changes: Vec<_> = entity_indices
+                .iter()
+                .map(|&(node_id, new_index)| (node_id, entity_type_attr.clone(), None, new_index))
+                .collect();
+            self.change_tracker.record_attr_changes(&changes, true);
         }
 
         node_ids
@@ -503,22 +510,28 @@ impl Graph {
 
     /// Add multiple edges efficiently
     /// OPTIMIZED: True bulk operation with batch validation and vectorized operations
-    pub fn add_edges(&mut self, edges: &[(NodeId, NodeId)]) -> Vec<EdgeId> {
-        // Pre-filter valid edges in single pass
-        let valid_edges: Vec<_> = edges
+    pub fn add_edges(&mut self, edges: &[(NodeId, NodeId)]) -> GraphResult<Vec<EdgeId>> {
+        // Validate the entire batch before allocating any edge ID or changing state.
+        let invalid: Vec<_> = edges
             .iter()
-            .filter(|&&(source, target)| {
-                self.space.contains_node(source) && self.space.contains_node(target)
+            .enumerate()
+            .filter(|(_, (source, target))| {
+                !self.space.contains_node(*source) || !self.space.contains_node(*target)
             })
-            .cloned()
+            .map(|(index, &(source, target))| format!("{index}: ({source}, {target})"))
             .collect();
-
-        if valid_edges.is_empty() {
-            return Vec::new();
+        if !invalid.is_empty() {
+            return Err(GraphError::InvalidInput(format!(
+                "Invalid edge endpoints at batch positions {}",
+                invalid.join(", ")
+            )));
+        }
+        if edges.is_empty() {
+            return Ok(Vec::new());
         }
 
         // Use optimized bulk pool operation
-        let edge_ids = self.pool.borrow_mut().add_edges(&valid_edges);
+        let edge_ids = self.pool.borrow_mut().add_edges(edges);
 
         // Use optimized bulk space activation
         self.space.activate_edges(edge_ids.clone());
@@ -526,14 +539,14 @@ impl Graph {
         // Prepare data for change tracking
         let change_data: Vec<_> = edge_ids
             .iter()
-            .zip(valid_edges.iter())
+            .zip(edges.iter())
             .map(|(&edge_id, &(source, target))| (edge_id, source, target))
             .collect();
 
         // Single bulk change tracking update
         self.change_tracker.record_edges_addition(&change_data);
 
-        edge_ids
+        Ok(edge_ids)
     }
 
     /// Add all nodes and edges from another graph to this graph
@@ -591,7 +604,7 @@ impl Graph {
 
         // Add all edges and build edge ID mapping
         let new_edge_ids = if !edges_to_add.is_empty() {
-            self.add_edges(&edges_to_add)
+            self.add_edges(&edges_to_add)?
         } else {
             Vec::new()
         };
@@ -1536,6 +1549,9 @@ impl Graph {
 
     /// Get the endpoints of an edge
     pub fn edge_endpoints(&self, edge: EdgeId) -> Result<(NodeId, NodeId), GraphError> {
+        if !self.space.contains_edge(edge) {
+            return Err(GraphError::edge_not_found(edge, "get endpoints"));
+        }
         self.pool
             .borrow()
             .get_edge_endpoints(edge)
@@ -1548,8 +1564,20 @@ impl Graph {
 
     /// Check if there's an edge between two nodes
     pub fn has_edge_between(&self, source: NodeId, target: NodeId) -> GraphResult<bool> {
+        if !self.space.contains_node(source) || !self.space.contains_node(target) {
+            return Ok(false);
+        }
         let pool = self.pool.borrow();
-        Ok(pool.has_edge_between(source, target))
+        for edge_id in self.space.get_active_edges() {
+            if let Some((edge_source, edge_target)) = pool.get_edge_endpoints(edge_id) {
+                if edge_source == source && edge_target == target
+                    || (self.is_undirected() && edge_source == target && edge_target == source)
+                {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 
     /// Get all edges connected to a node (only active edges)
@@ -1611,7 +1639,7 @@ impl Graph {
             if filter_edges.contains(&edge_id) {
                 if let Ok((edge_source, edge_target)) = self.edge_endpoints(edge_id) {
                     if (edge_source == source && edge_target == target)
-                        || (edge_source == target && edge_target == source)
+                        || (self.is_undirected() && edge_source == target && edge_target == source)
                     {
                         return Ok(true);
                     }
@@ -1800,7 +1828,9 @@ impl Graph {
     /// 5. Return new commit ID
     pub fn commit(&mut self, message: String, author: String) -> Result<StateId, GraphError> {
         // Create changeset from current changes
-        let changeset = self.change_tracker.create_changeset();
+        let changeset = self
+            .change_tracker
+            .create_changeset_resolved(&self.pool.borrow())?;
 
         // Check if there are any changes to commit
         if changeset.is_empty() {
@@ -1832,18 +1862,14 @@ impl Graph {
 
     /// Check if there are uncommitted changes
     pub fn has_uncommitted_changes(&self) -> bool {
-        !self.change_tracker.create_changeset().is_empty()
+        self.change_tracker.has_changes()
     }
 
     /// Reset all uncommitted changes
     pub fn reset_hard(&mut self) -> Result<(), GraphError> {
-        // Clear the change tracker (this loses all uncommitted changes)
+        let snapshot = self.history.reconstruct_state_at(self.current_commit)?;
+        self.reset_to_snapshot(snapshot)?;
         self.change_tracker.clear();
-
-        // TODO: When HistoryForest is implemented:
-        // - Reset space to match current_commit state
-        // - Reload pool from historical state
-
         Ok(())
     }
 
@@ -2162,9 +2188,13 @@ impl Graph {
         &mut self,
         snapshot: crate::state::state::GraphSnapshot,
     ) -> Result<(), GraphError> {
+        let allocated = self.pool.borrow().statistics();
         // 1. Clear current state
-        self.pool = Rc::new(RefCell::new(crate::storage::pool::GraphPool::new()));
+        self.pool = Rc::new(RefCell::new(
+            crate::storage::pool::GraphPool::new_with_type(snapshot.graph_type),
+        ));
         self.space = crate::state::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
+        self.config.graph_type = snapshot.graph_type;
 
         // 2. Restore nodes
         for &node_id in &snapshot.active_nodes {
@@ -2210,12 +2240,17 @@ impl Graph {
             }
         }
 
+        // Switching branches must not recycle IDs held by the branch we left.
+        self.pool
+            .borrow_mut()
+            .reserve_id_counters(allocated.node_count, allocated.edge_count);
+
         Ok(())
     }
 
     /// Construct a fresh graph from a historical snapshot.
     pub fn from_snapshot(snapshot: crate::state::state::GraphSnapshot) -> Result<Self, GraphError> {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_with_type(snapshot.graph_type);
         graph.reset_to_snapshot(snapshot)?;
         Ok(graph)
     }

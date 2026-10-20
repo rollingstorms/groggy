@@ -14,7 +14,7 @@ use crate::errors::{GraphError, GraphResult};
 use crate::state::change_tracker::ChangeSet;
 use crate::state::ref_manager::BranchInfo;
 use crate::state::state::{GraphSnapshot, StateDiff, StateMetadata};
-use crate::types::{AttrName, AttrValue, BranchName, EdgeId, NodeId, StateId};
+use crate::types::{AttrName, AttrValue, BranchName, EdgeId, GraphType, NodeId, StateId};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -50,6 +50,7 @@ KEY INSIGHTS:
 /// - Change tracking (that's ChangeTracker's job)
 #[derive(Debug)]
 pub struct HistoryForest {
+    graph_type: GraphType,
     /*
     === COMMIT STORAGE ===
     The DAG of all commits in the system
@@ -93,10 +94,16 @@ pub struct HistoryForest {
 impl HistoryForest {
     /// Create a new empty history system
     pub fn new() -> Self {
+        Self::new_with_type(GraphType::default())
+    }
+
+    /// Create history for a graph with explicit directionality.
+    pub fn new_with_type(graph_type: GraphType) -> Self {
         let mut branches = HashMap::new();
         branches.insert("main".to_string(), 0); // main branch starts at state 0
 
         Self {
+            graph_type,
             commits: HashMap::new(),
             deltas: HashMap::new(),
             branches,
@@ -549,7 +556,8 @@ impl HistoryForest {
         }
 
         // Start with empty state and apply all deltas
-        GraphSnapshot::reconstruct_from_deltas(None, &deltas_to_apply)
+        let base = GraphSnapshot::empty_with_type(0, self.graph_type);
+        GraphSnapshot::reconstruct_from_deltas(Some(&base), &deltas_to_apply)
     }
 
     /// Get the sequence of deltas needed to go from one commit to another
@@ -828,9 +836,9 @@ impl Delta {
 
         // Extract changes from ChangeSet
         let nodes_added = changes.nodes_added.clone();
-        let nodes_removed = Vec::new(); // TODO: when we implement node removal
+        let nodes_removed = changes.nodes_removed.clone();
         let edges_added = changes.edges_added.clone();
-        let edges_removed = Vec::new(); // TODO: when we implement edge removal
+        let edges_removed = changes.edges_removed.clone();
         let node_attr_changes = changes.node_attr_changes.clone();
         let edge_attr_changes = changes.edge_attr_changes.clone();
 

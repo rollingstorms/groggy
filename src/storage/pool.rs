@@ -414,6 +414,13 @@ impl GraphPool {
         }
     }
 
+    /// Preserve allocated IDs when rebuilding an earlier working state. Historical
+    /// branches may still refer to IDs absent from the selected snapshot.
+    pub(crate) fn reserve_id_counters(&mut self, next_node_id: NodeId, next_edge_id: EdgeId) {
+        self.next_node_id = self.next_node_id.max(next_node_id);
+        self.next_edge_id = self.next_edge_id.max(next_edge_id);
+    }
+
     /// Ensure internal edge vectors can address the requested edge slot
     fn ensure_edge_slot(&mut self, edge_id: EdgeId) {
         if edge_id >= self.edge_sources.len() {

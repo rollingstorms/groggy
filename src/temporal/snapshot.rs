@@ -9,7 +9,7 @@ use crate::errors::GraphError;
 use crate::state::history::{Commit, HistoryForest};
 use crate::state::state::GraphSnapshot;
 use crate::subgraphs::Subgraph;
-use crate::types::{AttrName, AttrValue, EdgeId, NodeId, StateId};
+use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId, StateId};
 
 /// Convenience index for checking whether nodes/edges existed at a snapshot.
 #[derive(Debug, Clone)]
@@ -89,12 +89,15 @@ impl TemporalSnapshot {
         for &node in &snapshot.active_nodes {
             adjacency.entry(node).or_default();
         }
-        for (&edge_id, &(source, target)) in &snapshot.edges {
+        for &(source, target) in snapshot.edges.values() {
             adjacency.entry(source).or_default().push(target);
             adjacency.entry(target).or_default();
-            // For undirected graphs, we may need to add reverse neighbor.
-            // Snapshot does not indicate graph type, so preserve outgoing edge only.
-            let _ = edge_id; // silence unused warning when not compiled for undirected
+            if snapshot.graph_type == GraphType::Undirected && source != target {
+                adjacency.entry(target).or_default().push(source);
+            }
+        }
+        for neighbors in adjacency.values_mut() {
+            neighbors.sort_unstable();
         }
 
         let lineage = LineageMetadata {

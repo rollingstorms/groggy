@@ -3,8 +3,10 @@
 //! This module contains both the trait definition and all concrete implementations
 //! of different temporal storage strategies.
 
+use crate::errors::{GraphError, GraphResult};
 use crate::state::change_tracker::ChangeSet;
 use crate::state::delta::DeltaObject;
+use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use std::collections::HashMap;
 
@@ -106,6 +108,12 @@ pub trait TemporalStorageStrategy: std::fmt::Debug {
 
     /// Create a change set that can be passed to HistoryForest
     fn create_change_set(&self) -> ChangeSet;
+
+    /// Resolve append-only column references before persisting a historical state.
+    fn create_change_set_resolved(&self, pool: &GraphPool) -> GraphResult<ChangeSet> {
+        let _ = pool;
+        Ok(self.create_change_set())
+    }
 
     /*
     === CHANGE MANAGEMENT ===
@@ -502,6 +510,77 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
             node_attr_changes,
             edge_attr_changes,
         }
+    }
+
+    fn create_change_set_resolved(&self, pool: &GraphPool) -> GraphResult<ChangeSet> {
+        let mut changes = ChangeSet {
+            nodes_added: self.nodes_added.clone(),
+            nodes_removed: self.nodes_removed.clone(),
+            edges_added: self.edges_added.clone(),
+            edges_removed: self.edges_removed.clone(),
+            node_attr_changes: Vec::new(),
+            edge_attr_changes: Vec::new(),
+        };
+
+        let mut node_positions: HashMap<(NodeId, AttrName), usize> = HashMap::new();
+        for (node_id, attr, old_index, new_index) in &self.node_attr_index_changes {
+            let old_value = old_index
+                .map(|index| {
+                    pool.get_attr_by_index(attr, index, true)
+                        .cloned()
+                        .ok_or_else(|| GraphError::InvalidInput(format!(
+                            "Missing old node attribute value for node {node_id}, {attr}, index {index}"
+                        )))
+                })
+                .transpose()?;
+            let new_value = pool
+                .get_attr_by_index(attr, *new_index, true)
+                .cloned()
+                .ok_or_else(|| {
+                    GraphError::InvalidInput(format!(
+                    "Missing new node attribute value for node {node_id}, {attr}, index {new_index}"
+                ))
+                })?;
+            if let Some(&position) = node_positions.get(&(*node_id, attr.clone())) {
+                changes.node_attr_changes[position].3 = new_value;
+            } else {
+                node_positions.insert((*node_id, attr.clone()), changes.node_attr_changes.len());
+                changes
+                    .node_attr_changes
+                    .push((*node_id, attr.clone(), old_value, new_value));
+            }
+        }
+
+        let mut edge_positions: HashMap<(EdgeId, AttrName), usize> = HashMap::new();
+        for (edge_id, attr, old_index, new_index) in &self.edge_attr_index_changes {
+            let old_value = old_index
+                .map(|index| {
+                    pool.get_attr_by_index(attr, index, false)
+                        .cloned()
+                        .ok_or_else(|| GraphError::InvalidInput(format!(
+                            "Missing old edge attribute value for edge {edge_id}, {attr}, index {index}"
+                        )))
+                })
+                .transpose()?;
+            let new_value = pool
+                .get_attr_by_index(attr, *new_index, false)
+                .cloned()
+                .ok_or_else(|| {
+                    GraphError::InvalidInput(format!(
+                    "Missing new edge attribute value for edge {edge_id}, {attr}, index {new_index}"
+                ))
+                })?;
+            if let Some(&position) = edge_positions.get(&(*edge_id, attr.clone())) {
+                changes.edge_attr_changes[position].3 = new_value;
+            } else {
+                edge_positions.insert((*edge_id, attr.clone()), changes.edge_attr_changes.len());
+                changes
+                    .edge_attr_changes
+                    .push((*edge_id, attr.clone(), old_value, new_value));
+            }
+        }
+
+        Ok(changes)
     }
 
     fn has_changes(&self) -> bool {
