@@ -34,6 +34,8 @@ The owner's current description treats `commit` as an explicit immutable snapsho
 
 View clarification: A historical timestamp is another selector for the same state-pinned graph view model, not a separate kind of graph. A view fixes graph identity, lineage/version, effective time and optional recorded-time cutoff; subgraph filtering and graph-to-table conversion inherit those pins. The view may reconstruct lazily and share immutable storage. A table derived from it shows the same state and time, whether implemented as a lazy table view or a materialized table value. Current `Subgraph` fixes its ID sets but reads live parent values, while `g.table()` materializes current columns; both paths need an explicit state-pinned contract before they can be described as immutable historical views.
 
+Recorded-time query clarification: The `recorded_by` cutoff is supplied only when the caller explicitly asks for an as-known-then view. An effective-time query without that cutoff uses the latest published version on the selected branch at view creation and remains pinned to that version afterward. Groggy still records the batch's acceptance time automatically as history metadata; making the query cutoff optional does not make that metadata optional.
+
 ## Emerging model
 
 - **Identity and lifetime:** GraphSpace should be the authority for membership in the selected state; GraphPool stores entities, properties and history references. An inactive ID remains inspectable in history until an explicit destructive purge. Never reuse an ID while any retained state references it.
