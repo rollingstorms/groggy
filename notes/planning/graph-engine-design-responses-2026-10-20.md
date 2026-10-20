@@ -38,6 +38,8 @@ Recorded-time query clarification: The `recorded_by` cutoff is supplied only whe
 
 Integration sequencing clarification: The owner deferred item 25 in the recent flat implementation list, the Graphiti ingest adapter, until Groggy's core graph, history, view, table, query, and analytics ideas are finished. In the staged roadmap this is item 20; its related Graphiti storage driver is roadmap item 25 and follows the adapter. Keep Graphiti as a future compatibility target and motivation for lossless core primitives, without treating integration as the next milestone.
 
+Numerical-core priority clarification: The owner also deferred item 27 in the recent flat list, lexical search (roadmap item 22), along with Graphiti-oriented vector search and hybrid retrieval (roadmap items 23–24). This does not defer Groggy's vector and matrix *libraries*. Complete and optimize those existing numerical APIs as Groggy designed them: dependable vector/array operations, dense and sparse matrix behavior, shapes and broadcasting where promised, reductions, decompositions, and performance on columnar data. Use reference-result comparisons with NetworkX for graph algorithms and Neo4j for graph/query behavior while core work proceeds; Graphiti corpus comparison waits for integration.
+
 ## Emerging model
 
 - **Identity and lifetime:** GraphSpace should be the authority for membership in the selected state; GraphPool stores entities, properties and history references. An inactive ID remains inspectable in history until an explicit destructive purge. Never reuse an ID while any retained state references it.

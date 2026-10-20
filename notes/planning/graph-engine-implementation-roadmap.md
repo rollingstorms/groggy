@@ -8,7 +8,7 @@ Groggy's original vision is a Rust graph engine with a Python API, separate topo
 
 The concrete integration target is [Graphiti](https://github.com/getzep/graphiti/blob/main/README.md): Graphiti produces episodes, entities, facts, provenance, time fields, and embeddings; Groggy stores and queries them. This plan does not assume Groggy performs Graphiti's LLM extraction. Graphiti's [driver interface](https://github.com/getzep/graphiti/blob/main/graphiti_core/driver/driver.py) defines the eventual backend compatibility target.
 
-The stages describe related work, with Graphiti-specific integration deferred until the Groggy core is finished. Each item may call for verification, repair, completion, or a new capability. Item numbers remain continuous so individual work items are easy to reference. The owner's "number 25" in the later flat list means the Graphiti ingest adapter, numbered 20 here; the related driver is numbered 25 here.
+The stages describe related work, with Graphiti-specific integration and retrieval deferred until the Groggy core is finished. Each item may call for verification, repair, completion, or a new capability. Item numbers remain continuous so individual work items are easy to reference. The owner's "number 25" in the later flat list means the Graphiti ingest adapter, numbered 20 here; its "number 27" means lexical search, numbered 22 here. The related Graphiti driver is numbered 25 here.
 
 ## Immediate next implementation slice
 
@@ -65,12 +65,12 @@ Complete Groggy's temporal and provenance primitives. The Graphiti-specific inge
 
 ## Stage 4 — Queries, retrieval, and Graphiti driver
 
-Finish Groggy's native graph and retrieval capabilities. The Graphiti driver at item 25 follows the deferred ingest adapter.
+Finish Groggy's native graph query layer. Lexical, embedding, and hybrid retrieval at items 22–24 are deferred until the vector/matrix core is correct and the broader Groggy core is finished. The Graphiti driver at item 25 follows the deferred ingest adapter.
 
 21. **Create a usable graph query layer.** Provide indexed node and edge selection, directed pattern matching, bounded traversal, property filters, temporal filters, ordering, and pagination. Define results independently of internal storage layout.
-22. **Add full-text search.** Index episode content, entity names and summaries, and fact text; support ranked keyword retrieval and group filtering.
-23. **Add vector search.** Store embeddings with dimensions and model metadata, support nearest-neighbor search, and keep vector indexes synchronized with updates and persistence.
-24. **Combine retrieval modes.** Merge keyword, vector, temporal, and graph-neighborhood results with inspectable scores. Graphiti's search relies on this combination.
+22. **Deferred — add full-text search.** After the core, index retained text such as episode content, entity names and summaries, and fact text; support ranked keyword retrieval and group filtering.
+23. **Deferred — add embedding search.** After the vector/matrix library is correct and measured, store embeddings with dimensions and model metadata, support nearest-neighbor search, and keep search indexes synchronized with updates and persistence. This is distinct from completing the core vector library.
+24. **Deferred — combine retrieval modes.** After the core, merge keyword, vector, temporal, and graph-neighborhood results with inspectable scores. Graphiti's search relies on this combination.
 25. **Deferred — implement a Graphiti storage driver.** After the core and ingest adapter, implement Graphiti's required query, session, transaction, indexing, graph-operation, and search behavior. Serve operations natively where possible and implement the required query behavior for remaining calls; run Graphiti ingest and search flows against it.
 
 ## Stage 5 — Connected computing and analytics
@@ -80,16 +80,16 @@ Complete Groggy's broader structural-computing vision on top of a correct graph 
 26. **Make connected views trustworthy.** Implement the agreed immutable, state-pinned view contract. Current subgraphs can retain IDs while reading live parent values; audit and migrate those paths. Writes routed through a view must check its expected version and return a new view or conflict.
 27. **Complete graph-to-table and table-to-graph operations.** Preserve the structural-computing vision: columnar filtering, joins, aggregations, bulk updates, and conversions should remain connected to graph identity and history rather than becoming disconnected copies.
 28. **Correct core traversal and graph algorithms.** Validate start and end nodes, respect direction and active state, handle weights correctly, and reject unsupported inputs. Dijkstra currently accepts negative weights, and some traversals return a nonexistent start node as a result.
-29. **Correct numerical primitives before using them for analytics.** The matrix layer contains placeholder or incorrect behavior in `eye`, axis standard deviation, eigendecomposition, and SVD. Repair these against reference results before relying on PCA, spectral methods, or ML pipelines.
+29. **Complete and optimize Groggy's vector and matrix libraries.** Keep Groggy's existing API design rather than pursuing NumPy API parity. Audit vector/array arithmetic, shapes and broadcasting where promised, reductions, dense and sparse matrix operations, decompositions, numerical edge cases, and columnar interoperation. The matrix layer currently has placeholder or incorrect behavior in `eye`, axis standard deviation, eigendecomposition, and SVD. Verify results against trusted numerical references, then measure allocation, memory use, and throughput on representative data before relying on these primitives for PCA, spectral methods, or ML pipelines.
 30. **Finish the algorithm builder around corrected primitives.** Support repeatable graph and table pipelines, typed intermediate results, cancellation, and historical inputs. This fulfills the analytics vision after underlying computations are dependable.
 
 ## Stage 6 — Verification and operations
 
 Prove compatibility and reliability at realistic scale, then document actual capabilities.
 
-31. **Run differential and failure testing.** Compare core graph and temporal behavior with Neo4j on shared fixtures, and test restart and failed mid-batch writes. Defer Graphiti corpus comparisons, including duplicate episode ingest and search, until the adapter and driver are implemented.
-32. **Measure and optimize the intended workload.** Benchmark ingestion throughput, indexed lookup, temporal reads, neighborhood expansion, and hybrid search at realistic graph sizes. Use results to improve memory layout, indexing, compaction, and concurrency.
+31. **Run differential and failure testing.** Compare core graph, query, and temporal behavior with Neo4j and graph-algorithm results with NetworkX on shared, clearly defined fixtures. Test restart and failed mid-batch writes. Defer Graphiti corpus comparisons, including duplicate episode ingest and search, until the adapter and driver are implemented.
+32. **Measure and optimize the intended workload.** Benchmark ingestion throughput, indexed lookup, temporal reads, neighborhood expansion, vector/array and dense/sparse matrix operations at realistic sizes. Add hybrid-search benchmarks after that feature is implemented. Use results to improve memory layout, indexing, compaction, and concurrency.
 33. **Finish operational tools.** Provide migration/version checks, backups and restore, integrity checks, observability, and clear limits for graph size, concurrent writers, and recovery time.
 34. **Publish an honest capability matrix.** Mark features implemented only when their Rust API, Python API, persistence, and correctness tests meet the contract. Update old roadmap completion claims accordingly.
 
-The near-term milestone is a coherent Groggy core: reliable writes, temporal reconstruction, immutable connected views and tables, native queries, and corrected analytics, with persistence and failure testing. After that, item 20 provides a Graphiti ingest milestone and item 25 provides the Graphiti backing-database milestone. The remaining operations and scale work establishes production readiness.
+The near-term milestone is a coherent Groggy core: reliable writes, temporal reconstruction, immutable connected views and tables, native graph queries, corrected graph algorithms, and capable vector/matrix libraries, with persistence, reference-result comparisons, and failure testing. After that, items 20 and 22–25 provide Graphiti ingest, retrieval, and backing-database milestones. The remaining operations and scale work establishes production readiness.
