@@ -100,7 +100,7 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
         'DurableGraph': {
             'create': 'DurableGraph', 'open': 'DurableGraph',
             '__enter__': 'DurableGraph', '__exit__': 'bool',
-            'close': 'None', 'is_closed': 'bool',
+            'backup': 'None', 'close': 'None', 'is_closed': 'bool',
             'current_state_id': 'int', 'schema_revision': 'int',
             'recovered_tail_bytes': 'int', 'is_directed': 'bool',
             'has_uncommitted_changes': 'bool', 'node_count': 'int', 'edge_count': 'int',

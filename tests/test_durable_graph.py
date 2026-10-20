@@ -139,3 +139,27 @@ def test_identical_upsert_does_not_append_journal_record(tmp_path):
         assert writer.upsert_nodes([row]) == [0]
         assert writer.state_id == state
         assert path.read_bytes() == before
+
+
+def test_backup_preserves_full_history_without_overwriting(tmp_path):
+    live_path = tmp_path / "live.ggj"
+    backup_path = tmp_path / "backup.ggj"
+    with DurableGraph.create(live_path) as live:
+        writer = live.writer()
+        writer.upsert_nodes([{"external_id": "ada", "value": 1}])
+        first = writer.state_id
+        live.create_branch("archive", first)
+        writer.set_node_attr(0, "value", 2)
+        live.backup(backup_path)
+        with DurableGraph.open(backup_path) as restored:
+            assert restored.get_node_attr(0, "value") == 2
+            assert restored.snapshot_at_commit(first).node_attr(0, "value").value == 1
+            assert len(restored.commit_history()) == 2
+            assert len(restored.list_branches()) == 2
+            with pytest.raises(RuntimeError):
+                live.backup(backup_path)
+            writer.set_node_attr(0, "value", 3)
+            assert restored.get_node_attr(0, "value") == 2
+        assert live.get_node_attr(0, "value") == 3
+    with DurableGraph.open(live_path) as restored:
+        assert restored.get_node_attr(0, "value") == 3

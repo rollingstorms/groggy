@@ -217,3 +217,12 @@ Item 9's checked publication mechanism is implemented for its documented scalar,
 Verification: targeted durable tests cover every inline logical value family, stricter per-call schema replay, transient entity lifecycle, retained branches/IDs and publication clocks. Failure tests include interrupted header/payload boundaries, corrupt lengths/checksums, write/sync/rollback failure, and sync-before-publication recovery. Python additionally exits a subprocess without closing and verifies recovery. See docs/api/durable-storage.md for the exact supported boundary.
 
 Final journal verification: full locked Rust suite passed (416 library tests, 2 ignored, plus integration/doc suites), and 122 focused Python tests passed against the rebuilt extension. Strict Clippy retains eight pre-existing sort/match diagnostics; the new large-record enum warning was fixed with boxed payload storage. Workbook pages 9–10 were regenerated and visually checked.
+
+
+## Item 10 backup and retained-reference review — 2026-10-20
+
+DurableGraph.backup produces an independent complete journal through a synced sibling temporary file, replay verification, no-overwrite publication and directory sync. It preserves retained branches/history/reservations as well as active values; reopening uses the same recovery API. Failed copy/verification removes the temporary file. A directory-sync error after publication can leave a destination requiring reconciliation. This is a full log backup, not a compact checkpoint; verification replays the log.
+
+The next pooled-reference repair must address two existing issues together: node/edge removal currently mutates stored subgraph membership, and branch reset replaces the backing pool. Serializing an opaque SubgraphRef alone would therefore not make historical content safe. Keep pooled/meta journal writes rejected until immutable referents and exact snapshot restoration are implemented; this intersects items 12 and 26. Preserve the original vision and explicit deletion policy rather than silently exporting incomplete data.
+
+Backup verification: the full locked Rust suite passes, including eight durable integration tests and six journal failure-injection tests; 123 focused Python checks pass against the rebuilt extension. Formatting/diff checks pass. Strict Clippy reports the same eight pre-existing sort/match diagnostics and no new storage diagnostics. Updated workbook item 10 was rendered and checked.

@@ -33,6 +33,12 @@ A successful call is recoverable after reopening, subject to the filesystem/devi
 
 A partial final record is discarded and its byte count is available in `recovered_tail_bytes`. A complete corrupt record causes an error without truncating the file. The checksum detects accidental corruption; it is not an authentication mechanism. Failed writes attempt to truncate and sync back to the previous record boundary. If rollback fails, the result is indeterminate and the store rejects graph reads/writes until reopened. A crash after sync but before acknowledgement may leave an accepted transaction that replay recovers; callers must reconcile using identities/state rather than assume a failed or missing acknowledgement means nothing was stored. Identical managed upserts do not append another record.
 
+## Full-journal backup
+
+`graph.backup(destination)` writes a separately recoverable copy of the accepted journal, including all retained versions, branches, schema revisions and identity reservations. It copies to a sibling temporary file, syncs and verifies that copy, publishes it without overwriting an existing destination, and syncs the directory. Later source writes do not change the backup. Open the result with `DurableGraph.open`; no special restore loader is needed.
+
+Backup requires a healthy open store and an existing destination directory. The source writer stays exclusively borrowed while the copy is made. A copy/verification failure leaves no destination and removes the temporary file. A directory-sync failure after publication can leave a complete destination; inspect/reopen it before retrying. Never replace a live journal by copying a backup over it. Backup copies the full log and verifies it through replay, so time and disk cost grow with history. It is not a compact checkpoint and does not add support for pooled/meta contents.
+
 ## Installed policy
 
 Pass `schema=` to `create` to install a policy. It applies to every durable publication and branch switch. A writer's optional schema adds validation; it cannot weaken the installed policy. `schema()` returns a copy in Python. `set_schema(schema, expected_state, expected_revision)` validates before installation/removal and persists an independently incremented `schema_revision`. Policy revision is global to the store, not a branch ontology migration.

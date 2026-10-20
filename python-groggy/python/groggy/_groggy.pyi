@@ -3254,6 +3254,9 @@ class DurableGraph:
     def checkout_branch(self, *args, **kwargs) -> None:
         ...
 
+    def backup(self, destination: Any) -> None:
+        ...
+
     def close(self, *args, **kwargs) -> None:
         ...
 

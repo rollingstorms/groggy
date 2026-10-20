@@ -474,6 +474,47 @@ impl DurableGraph {
         }
         Ok(())
     }
+    /// Copy all accepted history to a separately recoverable journal.
+    /// The destination must not exist. A synced sibling temporary file is
+    /// published without replacing existing files, then its directory is synced.
+    /// A directory-sync error can leave a complete destination: reconcile it
+    /// before retrying. The source graph and its journal remain unchanged.
+    pub fn backup(&mut self, destination: &Path) -> GraphResult<()> {
+        self.ready()?;
+        self.graph
+            .validate_write_head(self.graph.current_state_id())?;
+        let parent = destination
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let mut temporary = tempfile::NamedTempFile::new_in(parent)
+            .map_err(|e| io_error(destination, "create_backup_temporary", e))?;
+        let mut source = self
+            .file
+            .try_clone()
+            .map_err(|e| io_error(&self.path, "clone_journal_for_backup", e))?;
+        source
+            .seek(SeekFrom::Start(0))
+            .map_err(|e| io_error(&self.path, "seek_backup_source", e))?;
+        std::io::copy(&mut source, temporary.as_file_mut())
+            .and_then(|_| temporary.as_file().sync_all())
+            .map_err(|e| io_error(destination, "copy_and_sync_backup", e))?;
+        // Verify the copied record stream before exposing its destination name.
+        // This also rejects a corrupt source without poisoning or replacing it.
+        let verified = Self::open(temporary.path())?;
+        if verified.recovered_tail_bytes() != 0 {
+            return Err(invalid("backup source has an incomplete journal tail"));
+        }
+        drop(verified);
+        temporary
+            .persist_noclobber(destination)
+            .map_err(|e| io_error(destination, "publish_backup_without_overwrite", e.error))?;
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|e| io_error(parent, "sync_backup_directory", e))?;
+        Ok(())
+    }
+
     /// Read through a checked immutable handle; failed durable execution requires reopening.
     pub fn graph(&self) -> GraphResult<&Graph> {
         self.ready()?;

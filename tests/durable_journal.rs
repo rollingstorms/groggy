@@ -295,3 +295,84 @@ fn inline_value_families_and_transient_entities_remain_replayable() {
         vec![3]
     );
 }
+
+#[test]
+fn backup_is_independent_complete_and_never_overwrites_existing_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("live.ggj");
+    let backup = dir.path().join("backup.ggj");
+    let mut live = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+    let first = live
+        .apply_batch(node("ada"), 0, "first".into(), "test".into())
+        .unwrap()
+        .state_id;
+    live.create_branch("archive".into(), first).unwrap();
+    let second = live
+        .apply_batch(node("retained"), first, "second".into(), "test".into())
+        .unwrap()
+        .state_id;
+    live.checkout_branch("archive".into(), second).unwrap();
+    let original = std::fs::read(&path).unwrap();
+    live.backup(&backup).unwrap();
+    assert!(DurableGraph::open(&path).is_err());
+    assert_eq!(std::fs::read(&backup).unwrap(), original);
+    assert!(live.backup(&backup).is_err());
+    assert!(live.backup(&path).is_err());
+    assert_eq!(std::fs::read(&backup).unwrap(), original);
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    let recovered = DurableGraph::open(&backup).unwrap();
+    assert_eq!(recovered.graph().unwrap().current_state_id(), first);
+    assert_eq!(recovered.graph().unwrap().commit_history().len(), 2);
+    assert!(recovered
+        .graph()
+        .unwrap()
+        .allocated_entity_for_external_id("retained")
+        .is_some());
+    assert_eq!(recovered.graph().unwrap().list_branches().len(), 2);
+    // Copying uses a cloned file descriptor; later appends must still target EOF.
+    let third = live
+        .apply_batch(node("next"), first, "third".into(), "test".into())
+        .unwrap()
+        .state_id;
+    drop(live);
+    assert_eq!(
+        DurableGraph::open(&path)
+            .unwrap()
+            .graph()
+            .unwrap()
+            .current_state_id(),
+        third
+    );
+    assert_eq!(recovered.graph().unwrap().current_state_id(), first);
+    assert_eq!(std::fs::read(&backup).unwrap(), original);
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
+}
+
+#[test]
+fn failed_backup_preserves_destination_and_source_and_cleans_temporary_files() {
+    use std::io::{Seek, SeekFrom, Write};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("live.ggj");
+    let backup = dir.path().join("backup.ggj");
+    let mut live = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+    live.apply_batch(node("ada"), 0, "first".into(), "test".into())
+        .unwrap();
+    let valid = std::fs::read(&path).unwrap();
+    let mut incomplete = valid.clone();
+    incomplete.extend_from_slice(b"GFRAME01\x01");
+    std::fs::write(&path, &incomplete).unwrap();
+    assert!(live.backup(&backup).is_err());
+    assert!(!backup.exists());
+    assert_eq!(std::fs::read(&path).unwrap(), incomplete);
+    std::fs::write(&path, valid).unwrap();
+    // External complete corruption must be detected before publishing a backup.
+    let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+    file.seek(SeekFrom::End(-1)).unwrap();
+    file.write_all(&[0xff]).unwrap();
+    file.sync_all().unwrap();
+    let corrupt = std::fs::read(&path).unwrap();
+    assert!(live.backup(&backup).is_err());
+    assert!(!backup.exists());
+    assert_eq!(std::fs::read(&path).unwrap(), corrupt);
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+}

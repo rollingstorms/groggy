@@ -67,6 +67,11 @@ impl PyDurableGraph {
             store: Some(DurableGraph::open(&path).map_err(graph_error_to_py_err)?),
         })
     }
+    fn backup(&mut self, destination: PathBuf) -> PyResult<()> {
+        self.core_mut()?
+            .backup(&destination)
+            .map_err(graph_error_to_py_err)
+    }
     fn close(&mut self) {
         self.store = None;
     }
