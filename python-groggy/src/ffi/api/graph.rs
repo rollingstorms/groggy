@@ -1,4 +1,5 @@
 use crate::ffi::api::graph_attributes::{PyGraphAttr, PyGraphAttrMut};
+use crate::ffi::api::graph_batch::parse_batch;
 // Graph FFI Coordinator
 //
 // Main Python bindings for the Graph API.
@@ -1245,6 +1246,33 @@ impl PyGraph {
     }
 
     // === VERSION CONTROL OPERATIONS ===
+
+    /// Apply one validated mixed write against an expected published state.
+    fn apply_batch(
+        &mut self,
+        py: Python,
+        batch: &PyAny,
+        expected_state: StateId,
+        message: String,
+        author: String,
+    ) -> PyResult<PyObject> {
+        let batch = parse_batch(batch)?;
+        let result = self
+            .inner
+            .borrow_mut()
+            .apply_batch(batch, expected_state, message, author)
+            .map_err(graph_error_to_py_err)?;
+        let output = PyDict::new(py);
+        output.set_item("state_id", result.state_id)?;
+        output.set_item("added_nodes", result.added_nodes)?;
+        output.set_item("added_edges", result.added_edges)?;
+        Ok(output.to_object(py))
+    }
+
+    #[getter]
+    fn current_state_id(&self) -> StateId {
+        self.inner.borrow().current_state_id()
+    }
 
     /// Commit current state of the graph (FFI wrapper around core history system)
     fn commit(&mut self, message: String, author: String) -> PyResult<StateId> {

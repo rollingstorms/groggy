@@ -13,9 +13,9 @@ The stages are ordered by dependency. Each item may call for verification, repai
 ## Immediate next implementation slice
 
 1. **Completed on this branch:** the existing `set_node_attrs`, `set_edge_attrs`, and column setter paths collect all inactive or unknown IDs and duplicate assignments before writing, with attribute and input positions in the error. Duplicate assignments are rejected as an implementation choice pending owner review. Vectorized pool writes and current Rust/Python entry points remain in use. Python conversion errors for malformed values are a separate parser concern.
-2. Add a staged mutation coordinator that can combine existing node insertion, edge insertion, property updates, and removals in one batch. Validate against the proposed resulting state, then publish all changes together or leave the working graph unchanged. A single write uses the same coordinator as a one-operation batch.
-3. Publish exactly one state/version and typed delta for a successful batch. Keep `commit` and `checkout` callable while their compatibility behavior is specified and migrated; do not silently create extra versions through wrapper calls.
-4. Prove the boundary with Rust and Python tests: multiple invalid inputs yield one complete error and zero changes; a failure late in a mixed batch leaves IDs, topology, properties, history, and indexes unchanged; a success produces one version whose old pinned view remains stable.
+2. **Explicit batch API implemented in Rust and Python:** `GraphBatch` combines node/edge insertion, property updates, and removals. It validates semantic errors against the proposed resulting state before calling existing bulk writers. This establishes all-or-nothing behavior for rejected input in a single-process graph; crash-safe rollback and durable publication belong to the storage milestone.
+3. **Batch publication implemented; legacy migration pending:** `apply_batch` checks the expected state and publishes one typed delta and state on success. Existing `commit`/`checkout` and direct mutation methods remain callable with their current manual-commit behavior. Route those direct methods through one-operation batches only with a compatible transition and explicit tests.
+4. Rust and Python tests now cover multiple semantic errors with zero writes, stale-state rejection, one successful state publication, and an unchanged older snapshot. Extend failure injection to storage/index publication boundaries when those components exist.
 
 ## Architecture refactor thread (cross-stage)
 
@@ -45,7 +45,7 @@ Preserve Groggy's established graph model and make its behavior consistent acros
 
 Make changes atomic and persistent, then complete the Git-like history promised by the original design.
 
-9. **Implement atomic write batches and transactions.** Compose the existing bulk operations under one batch boundary; do not replace their vectorized storage paths. An episode ingest may create an episode, update entities, add facts, invalidate older facts, and link provenance. Either the whole batch becomes visible as one version or none of it does.
+9. **Implement atomic write batches and transactions.** Rust/Python `GraphBatch` now publishes one in-memory state for a validated mixed write using existing bulk paths. Next: migrate direct methods, coordinate indexes, and make episode ingest durably atomic across entities, facts, and provenance.
 10. **Build durable storage and recovery.** The existing `Graph::save_to_path` writes a limited JSON representation and skips complex property types. Add a versioned on-disk format preserving IDs, schema, active state, properties, indexes, and history; test restart and interrupted writes.
 11. **Complete property history.** The first slice made commits resolve typed node and edge values and added tests for historical reads. Finish coalescing, deletion, unset/null distinctions, effective and recorded times, and all supported value types before treating the history contract as complete.
 12. **Make snapshots and state switching exact.** The first slice preserved direction and ID allocation across snapshots and branch switches. Extend reconstruction to all graph configuration and retained references, and verify state-pinned reads independently of the working head.

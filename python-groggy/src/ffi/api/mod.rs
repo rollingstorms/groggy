@@ -5,6 +5,7 @@
 
 // Graph API FFI bindings - core functionality
 pub mod graph;
+pub mod graph_batch;
 
 // Specialized operation modules
 pub mod graph_analysis;

@@ -161,10 +161,12 @@ pub mod viz;
 
 // Public API
 pub mod api {
+    pub mod batch;
     pub mod graph;
 }
 
 // Re-export commonly used types and the main API
+pub use api::batch::{BatchEdgeRef, BatchNodeRef, BatchResult, GraphBatch};
 pub use api::graph::Graph;
 pub use errors::{GraphError, GraphResult};
 pub use state::{HistoricalView, HistoryForest, ViewSummary};

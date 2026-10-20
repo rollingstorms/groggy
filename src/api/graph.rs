@@ -11,6 +11,7 @@
 //! - HistoryForest = Version Control (immutable snapshots, branching)
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
+use crate::api::batch::{BatchResult, GraphBatch};
 use crate::errors::{GraphError, GraphResult};
 use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
 use crate::query::traversal::TraversalEngine;
@@ -1817,6 +1818,69 @@ impl Graph {
     Git-like functionality for managing graph evolution.
     These coordinate between history system and current state.
     */
+
+    /// The published state selected as this graph's working head.
+    pub fn current_state_id(&self) -> StateId {
+        self.current_commit
+    }
+
+    /// Apply a validated mixed write and publish one new state.
+    ///
+    /// The existing bulk storage paths remain responsible for node, edge, and
+    /// property writes. The expected state rejects writes prepared against an
+    /// older head. This first batch API requires a clean working state while
+    /// legacy mutations still use explicit `commit`.
+    pub fn apply_batch(
+        &mut self,
+        batch: GraphBatch,
+        expected_state: StateId,
+        message: String,
+        author: String,
+    ) -> GraphResult<BatchResult> {
+        if expected_state != self.current_commit {
+            return Err(GraphError::InvalidInput(format!(
+                "Stale graph batch: expected state {expected_state}, current state {}",
+                self.current_commit
+            )));
+        }
+        if self.has_uncommitted_changes() {
+            return Err(GraphError::InvalidInput(
+                "Cannot publish a batch while legacy writes are uncommitted".into(),
+            ));
+        }
+        self.history.get_branch_head(&self.current_branch)?;
+
+        let allocated = self.pool.borrow().statistics();
+        let active_nodes = self.node_ids_set();
+        let active_edges: HashMap<_, _> = self
+            .edge_ids()
+            .into_iter()
+            .map(|id| self.edge_endpoints(id).map(|endpoints| (id, endpoints)))
+            .collect::<GraphResult<_>>()?;
+        let prepared = batch.prepare(
+            &active_nodes,
+            &active_edges,
+            allocated.node_count,
+            allocated.edge_count,
+        )?;
+
+        let added_nodes = if prepared.add_nodes > 0 {
+            self.add_nodes(prepared.add_nodes)
+        } else {
+            Vec::new()
+        };
+        let added_edges = self.add_edges(&prepared.add_edges)?;
+        self.set_node_attrs(prepared.node_attrs)?;
+        self.set_edge_attrs(prepared.edge_attrs)?;
+        self.remove_edges(&prepared.remove_edges)?;
+        self.remove_nodes(&prepared.remove_nodes)?;
+        let state_id = self.commit(message, author)?;
+        Ok(BatchResult {
+            state_id,
+            added_nodes,
+            added_edges,
+        })
+    }
 
     /// Commit current changes to history
     ///
