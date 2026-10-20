@@ -329,6 +329,23 @@ pub(super) fn reject_violations(violations: Vec<SchemaViolation>) -> GraphResult
     )))
 }
 impl Graph {
+    pub(crate) fn check_schema_at(&self, schema: &GraphSchema, state: StateId) -> GraphResult<()> {
+        let snapshot = self.history.reconstruct_state_at(state)?;
+        let violations = schema.validate_state(
+            snapshot.active_nodes.clone(),
+            snapshot.edges.keys().copied().collect(),
+            |is_node, id, name| {
+                let attributes = if is_node {
+                    &snapshot.node_attributes
+                } else {
+                    &snapshot.edge_attributes
+                };
+                Ok(attributes.get(&id).and_then(|row| row.get(name)).cloned())
+            },
+        )?;
+        reject_violations(violations)
+    }
+
     pub(crate) fn check_schema_policy(&self, schema: &GraphSchema) -> GraphResult<()> {
         reject_violations(self.validate_schema(schema)?)
     }

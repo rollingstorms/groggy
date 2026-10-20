@@ -26,6 +26,7 @@ cranelift-module = "0.102"
 cranelift-native = "0.102"
 cranelift-codegen = "0.102"
 serde_json = "1.0"
+ciborium = "=0.2.2" # Versioned binary transaction journal
 rayon = "1.7"
 parking_lot = "0.12"  # High-performance locks
 dashmap = "5.4"       # Concurrent HashMap

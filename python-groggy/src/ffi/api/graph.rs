@@ -37,7 +37,7 @@ use crate::ffi::api::graph_analysis::PyGraphAnalysis;
 use crate::ffi::api::graph_matrix::PyGraphMatrixHelper;
 
 /// Translate a schema dictionary; all rule semantics remain in the Rust core.
-fn parse_schema(schema: &PyDict) -> PyResult<groggy::GraphSchema> {
+pub(crate) fn parse_schema(schema: &PyDict) -> PyResult<groggy::GraphSchema> {
     let value = crate::ffi::utils::python_value_to_attr_value(schema)?;
     let RustAttrValue::Json(json) = value else {
         return Err(PyTypeError::new_err("Schema must be a dictionary"));
@@ -83,98 +83,92 @@ pub struct PyAggregationResult {
     pub value: f64,
 }
 
-impl PyGraph {
-    fn parse_node_upserts(&self, rows: &PyAny, uid_key: &str) -> PyResult<Vec<NodeUpsert>> {
-        let (rows, positions, mut errors) = parse_identity_rows(rows, |row| {
-            let id = required_identity_field(row, uid_key);
-            let (attrs, mut errors) = parse_creation_attrs(Some(row), &[uid_key]);
-            if let Err(error) = &id {
-                errors.push(error.to_string());
-            }
-            if !errors.is_empty() {
-                return Err(PyValueError::new_err(errors.join("; ")));
-            }
-            Ok(NodeUpsert {
-                external_id: id?,
-                attrs,
-            })
-        })?;
+pub(crate) fn parse_node_upserts(
+    graph: &RustGraph,
+    rows: &PyAny,
+    uid_key: &str,
+) -> PyResult<Vec<NodeUpsert>> {
+    let (rows, positions, mut errors) = parse_identity_rows(rows, |row| {
+        let id = required_identity_field(row, uid_key);
+        let (attrs, mut errors) = parse_creation_attrs(Some(row), &[uid_key]);
+        if let Err(error) = &id {
+            errors.push(error.to_string());
+        }
         if !errors.is_empty() {
-            if let Err(error) = self
-                .inner
-                .borrow()
-                .validate_node_upserts(&rows, Some(&positions))
-            {
-                errors.push(graph_error_to_py_err(error).to_string());
-            }
-            return Err(PyValueError::new_err(format!(
-                "Invalid upsert rows: {}",
-                errors.join("; ")
-            )));
+            return Err(PyValueError::new_err(errors.join("; ")));
         }
-        Ok(rows)
+        Ok(NodeUpsert {
+            external_id: id?,
+            attrs,
+        })
+    })?;
+    if !errors.is_empty() {
+        if let Err(error) = graph.validate_node_upserts(&rows, Some(&positions)) {
+            errors.push(graph_error_to_py_err(error).to_string());
+        }
+        return Err(PyValueError::new_err(format!(
+            "Invalid upsert rows: {}",
+            errors.join("; ")
+        )));
     }
-    fn parse_edge_upserts(&self, rows: &PyAny, uid_key: &str) -> PyResult<Vec<EdgeUpsert>> {
-        if uid_key == "source" || uid_key == "target" {
-            return Err(PyValueError::new_err(
-                "The external-ID key must differ from source and target",
-            ));
-        }
-        let (rows, positions, mut errors) = parse_identity_rows(rows, |row| {
-            let id = required_identity_field(row, uid_key);
-            let endpoint = |key: &str| -> PyResult<NodeId> {
-                let value = row
-                    .get_item(key)?
-                    .ok_or_else(|| PyKeyError::new_err(format!("Missing key: {key}")))?;
-                if let Ok(id) = value.extract::<NodeId>() {
-                    return Ok(id);
-                }
-                let name: String = value.extract()?;
-                self.inner
-                    .borrow()
-                    .node_by_external_id(&name, None)
-                    .ok_or_else(|| {
-                        PyKeyError::new_err(format!("No active node with external ID {name:?}"))
-                    })
-            };
-            let source = endpoint("source");
-            let target = endpoint("target");
-            let (attrs, mut errors) =
-                parse_creation_attrs(Some(row), &[uid_key, "source", "target"]);
-            if let Err(error) = &id {
-                errors.push(error.to_string());
+    Ok(rows)
+}
+pub(crate) fn parse_edge_upserts(
+    graph: &RustGraph,
+    rows: &PyAny,
+    uid_key: &str,
+) -> PyResult<Vec<EdgeUpsert>> {
+    if uid_key == "source" || uid_key == "target" {
+        return Err(PyValueError::new_err(
+            "The external-ID key must differ from source and target",
+        ));
+    }
+    let (rows, positions, mut errors) = parse_identity_rows(rows, |row| {
+        let id = required_identity_field(row, uid_key);
+        let endpoint = |key: &str| -> PyResult<NodeId> {
+            let value = row
+                .get_item(key)?
+                .ok_or_else(|| PyKeyError::new_err(format!("Missing key: {key}")))?;
+            if let Ok(id) = value.extract::<NodeId>() {
+                return Ok(id);
             }
-            if let Err(error) = &source {
-                errors.push(format!("source: {error}"));
-            }
-            if let Err(error) = &target {
-                errors.push(format!("target: {error}"));
-            }
-            if !errors.is_empty() {
-                return Err(PyValueError::new_err(errors.join("; ")));
-            }
-            Ok(EdgeUpsert {
-                external_id: id?,
-                source: source?,
-                target: target?,
-                attrs,
+            let name: String = value.extract()?;
+            graph.node_by_external_id(&name, None).ok_or_else(|| {
+                PyKeyError::new_err(format!("No active node with external ID {name:?}"))
             })
-        })?;
-        if !errors.is_empty() {
-            if let Err(error) = self
-                .inner
-                .borrow()
-                .validate_edge_upserts(&rows, Some(&positions))
-            {
-                errors.push(graph_error_to_py_err(error).to_string());
-            }
-            return Err(PyValueError::new_err(format!(
-                "Invalid upsert rows: {}",
-                errors.join("; ")
-            )));
+        };
+        let source = endpoint("source");
+        let target = endpoint("target");
+        let (attrs, mut errors) = parse_creation_attrs(Some(row), &[uid_key, "source", "target"]);
+        if let Err(error) = &id {
+            errors.push(error.to_string());
         }
-        Ok(rows)
+        if let Err(error) = &source {
+            errors.push(format!("source: {error}"));
+        }
+        if let Err(error) = &target {
+            errors.push(format!("target: {error}"));
+        }
+        if !errors.is_empty() {
+            return Err(PyValueError::new_err(errors.join("; ")));
+        }
+        Ok(EdgeUpsert {
+            external_id: id?,
+            source: source?,
+            target: target?,
+            attrs,
+        })
+    })?;
+    if !errors.is_empty() {
+        if let Err(error) = graph.validate_edge_upserts(&rows, Some(&positions)) {
+            errors.push(graph_error_to_py_err(error).to_string());
+        }
+        return Err(PyValueError::new_err(format!(
+            "Invalid upsert rows: {}",
+            errors.join("; ")
+        )));
     }
+    Ok(rows)
 }
 
 #[pymethods]
@@ -570,7 +564,7 @@ impl PyGraph {
     /// Upsert rows by a managed external ID, preserving unspecified properties.
     #[pyo3(signature = (rows, uid_key = "external_id"))]
     fn upsert_nodes(&mut self, rows: &PyAny, uid_key: &str) -> PyResult<Vec<NodeId>> {
-        let rows = self.parse_node_upserts(rows, uid_key)?;
+        let rows = parse_node_upserts(&self.inner.borrow(), rows, uid_key)?;
         self.inner
             .borrow_mut()
             .upsert_nodes(rows)
@@ -589,7 +583,7 @@ impl PyGraph {
         schema: Option<&PyDict>,
         effective_at: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let rows = self.parse_node_upserts(rows, uid_key)?;
+        let rows = parse_node_upserts(&self.inner.borrow(), rows, uid_key)?;
         let schema = schema.map(parse_schema).transpose()?;
         let at = effective_at
             .map(crate::ffi::api::graph_batch::timestamp)
@@ -621,7 +615,7 @@ impl PyGraph {
         schema: Option<&PyDict>,
         effective_at: Option<&PyAny>,
     ) -> PyResult<PyObject> {
-        let rows = self.parse_edge_upserts(rows, uid_key)?;
+        let rows = parse_edge_upserts(&self.inner.borrow(), rows, uid_key)?;
         let schema = schema.map(parse_schema).transpose()?;
         let at = effective_at
             .map(crate::ffi::api::graph_batch::timestamp)
@@ -644,7 +638,7 @@ impl PyGraph {
     /// Edge endpoints can be internal numeric IDs or managed external string IDs.
     #[pyo3(signature = (rows, uid_key = "external_id"))]
     fn upsert_edges(&mut self, rows: &PyAny, uid_key: &str) -> PyResult<Vec<EdgeId>> {
-        let rows = self.parse_edge_upserts(rows, uid_key)?;
+        let rows = parse_edge_upserts(&self.inner.borrow(), rows, uid_key)?;
         self.inner
             .borrow_mut()
             .upsert_edges(rows)
@@ -1750,9 +1744,9 @@ impl PyGraph {
         // Delegate to core history system
         self.inner
             .borrow_mut()
-            .commit_history()
+            .history_records()
             .into_iter()
-            .map(PyCommit::from_commit_info)
+            .map(PyCommit::from_core_commit)
             .collect()
     }
 

@@ -39,7 +39,7 @@ assert scores[0]["effective_at"] == -10
 
 `publication_metadata(state_id)` returns `recorded_at`, the effective default, and a stable list of actual change times. Entries identify change kind, entity ID, optional property name, and effective time. Before/after values remain in the same version's typed delta. A legacy manual commit returns `None`. Unknown/duplicate override targets, invalid reference handles, non-integer timestamps, booleans and integer overflow reject before mutation. Callers cannot override recorded time through a raw batch field.
 
-Implicit edge removal takes the earliest effective removal time of its removed endpoints. An explicit edge removal uses its own effective override/default instead. Timestamp reconstruction in item 16 will consume these records; the old `snapshot_at_timestamp` still selects whole-second commit times and is not an effective-time query. These changes do not establish durable publication or crash recovery, which require the storage work in item 10.
+Implicit edge removal takes the earliest effective removal time of its removed endpoints. An explicit edge removal uses its own effective override/default instead. Timestamp reconstruction in item 16 will consume these records; the old `snapshot_at_timestamp` still selects whole-second commit times and is not an effective-time query. For durable publication and crash recovery, use the [DurableGraph journal](durable-storage.md); an ordinary Graph writer remains in-memory.
 
 ## Managed identities and upserts
 
@@ -58,3 +58,7 @@ assert w.state_id == state
 ```
 
 The writer supports managed node/edge upserts and explicit renames. Idempotent upserts publish no version when their normalized payloads are unchanged; they still check the expected head, dirty-state guard and session schema. Edge upserts preserve endpoints, direction and parallel instance IDs. Python uses native `publish_upsert_nodes` / `publish_upsert_edges` to return both IDs and the exact resulting state, avoiding a separate mutable-head read. Existing `Graph.upsert_nodes` / `upsert_edges` retain legacy manual grouping. Custom input identity keys are consumed into the same managed `external_id` property.
+
+## Durable publication
+
+`DurableGraph.writer()` uses the same staged methods and expected-head checks, with a synced journal before publication. Its installed schema applies even when the session supplies no schema. See [durable storage](durable-storage.md) for recovery behavior and current pool/checkpoint/concurrency limits.

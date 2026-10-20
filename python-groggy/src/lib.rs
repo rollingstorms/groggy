@@ -489,6 +489,7 @@ fn int_array_factory(values: Vec<i64>) -> PyNumArray {
 fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register core graph components
     m.add_class::<PyGraph>()?;
+    m.add_class::<ffi::api::durable::PyDurableGraph>()?;
     m.add_class::<PySubgraph>()?;
 
     // Register array and matrix types

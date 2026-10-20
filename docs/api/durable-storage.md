@@ -1,0 +1,52 @@
+# Durable checked graphs
+
+`DurableGraph` adds a single-writer, binary transaction journal to the checked publication API. It starts a new empty graph; it does not turn an existing legacy `Graph` or its active JSON export into a complete backup.
+
+```python
+from groggy import DurableGraph
+
+with DurableGraph.create("example.ggj", directed=True) as graph:
+    writer = graph.writer(author="example")
+    nodes = writer.upsert_nodes([
+        {"external_id": "ada", "name": "Ada"},
+        {"external_id": "lin", "name": "Lin"},
+    ])
+    writer.add_edge(*nodes, relationship_type="KNOWS", effective_at=100)
+    saved_state = writer.state_id
+
+with DurableGraph.open("example.ggj") as graph:
+    assert graph.current_state_id == saved_state
+    assert graph.node_by_external_id("ada") == nodes[0]
+    assert len(graph.commit_history()) == 2
+```
+
+Both `create` and `open` take path-like objects. Creation never overwrites a file. One OS file lock excludes a second writer/open handle; close the store or leave its context manager to release it. This is an embedded single-writer API. Multi-client coordination remains future work.
+
+## Acceptance and failure contract
+
+1. Parse and validate the complete proposed mutation, expected head, managed identities, installed schema and any additional session schema.
+2. Capture one engine-recorded clock and resolve per-change effective times.
+3. Encode a bounded journal record, append its header/payload, and sync the file.
+4. Apply the prepared mutation and publish one in-memory state. Return success only after both the sync and publication succeed.
+
+A successful call is recoverable after reopening, subject to the filesystem/device honoring sync. Opening verifies the format version, contiguous sequence numbers, length redundancy and payload checksum. Replay preserves data versions, typed deltas, authors/messages, original recorded/effective clocks, content hashes, graph configuration, allocation counters, external-ID reservations, branch heads and installed schema revisions. Derived caches are reconstructed.
+
+A partial final record is discarded and its byte count is available in `recovered_tail_bytes`. A complete corrupt record causes an error without truncating the file. The checksum detects accidental corruption; it is not an authentication mechanism. Failed writes attempt to truncate and sync back to the previous record boundary. If rollback fails, the result is indeterminate and the store rejects graph reads/writes until reopened. A crash after sync but before acknowledgement may leave an accepted transaction that replay recovers; callers must reconcile using identities/state rather than assume a failed or missing acknowledgement means nothing was stored. Identical managed upserts do not append another record.
+
+## Installed policy
+
+Pass `schema=` to `create` to install a policy. It applies to every durable publication and branch switch. A writer's optional schema adds validation; it cannot weaken the installed policy. `schema()` returns a copy in Python. `set_schema(schema, expected_state, expected_revision)` validates before installation/removal and persists an independently incremented `schema_revision`. Policy revision is global to the store, not a branch ontology migration.
+
+`create_branch(name, expected_state)` and `checkout_branch(name, expected_state)` journal branch actions. A switch validates the target against the current installed policy before appending. Retained allocation counters and identity reservations survive switches and restart.
+
+## Rust
+
+`groggy::DurableGraph::create(path, config, schema)` / `open(path)` provide `apply_batch`, `apply_batch_with_schema`, managed upserts, policy changes and branch actions. `graph()?` borrows the graph immutably for reads; no mutable graph handle is exposed. Core mutation through `Graph::pool_mut` now requires `&mut Graph`, closing the interior-mutation escape through this read handle. Advanced callers of that accessor must hold an exclusive borrow.
+
+## Current limits
+
+The journal is format version 1 and uses CBOR records. Each record is limited to 256 MiB; larger transactions reject before append or mutation. All supported inline logical properties round-trip, including raw f32 bits and structured JSON values. Stored subgraph references and meta-node pool contents are rejected rather than silently dropped. General graph import, periodic checkpoints, compaction/pruning, format migration tooling, backup orchestration and broader multi-client support remain under storage/history/operations roadmap items. Opening replays the journal, so recovery time grows with retained operations; this is not yet a bounded-recovery storage engine.
+
+The current Python wrapper holds the GIL during journal I/O/replay because the underlying graph is thread-confined. It does not promise concurrent Python reader execution. Ordinary `Graph.writer` remains in-memory; legacy graph mutation and manual `commit` keep their existing behavior. Explicit checkpoint terminology/API migration and effective-time reconstruction are still separate work.
+
+Verification includes subprocess exit without close, replay after sync before in-memory publication, every partial-header boundary, partial payloads, checksum/length corruption, injected write/sync/rollback failures, schema rejection, stable history hashes, branches, reservations and typed property values. These tests exercise the implementation contract; they do not emulate every physical device failure.

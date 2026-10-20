@@ -3188,6 +3188,144 @@ class DisplayConfig:
         ...
 
 
+class DurableGraph:
+    @property
+    def current_state_id(self) -> int:
+        ...
+
+    @property
+    def is_closed(self) -> bool:
+        ...
+
+    @property
+    def is_directed(self) -> bool:
+        ...
+
+    @property
+    def recovered_tail_bytes(self) -> int:
+        ...
+
+    @property
+    def schema_revision(self) -> int:
+        ...
+
+    def __enter__(self, *args, **kwargs) -> DurableGraph:
+        ...
+
+    def __eq__(self, other: Any) -> bool:
+        """
+        Return self==value.
+        """
+        ...
+
+    def __exit__(self, *args, **kwargs) -> bool:
+        ...
+
+    def __hash__(self) -> int:
+        """
+        Return hash(self).
+        """
+        ...
+
+    def __init__(self, *args, **kwargs) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return repr(self).
+        """
+        ...
+
+    def __str__(self) -> str:
+        """
+        Return str(self).
+        """
+        ...
+
+    def allocated_entity_for_external_id(self, *args, **kwargs) -> Optional[Tuple[str, int]]:
+        ...
+
+    def apply_batch(self, *args, **kwargs) -> Dict[str, Any]:
+        ...
+
+    def checkout_branch(self, *args, **kwargs) -> None:
+        ...
+
+    def close(self, *args, **kwargs) -> None:
+        ...
+
+    def commit_history(self, *args, **kwargs) -> List[Commit]:
+        ...
+
+    def configuration(self, *args, **kwargs) -> Dict[str, Any]:
+        ...
+
+    @staticmethod
+    def create(*args, **kwargs) -> DurableGraph:
+        ...
+
+    def create_branch(self, *args, **kwargs) -> None:
+        ...
+
+    def edge_by_external_id(self, *args, **kwargs) -> Optional[int]:
+        ...
+
+    def edge_count(self, *args, **kwargs) -> int:
+        ...
+
+    def edge_ids(self, *args, **kwargs) -> List[int]:
+        ...
+
+    def get_edge_attr(self, *args, **kwargs) -> Any:
+        ...
+
+    def get_node_attr(self, *args, **kwargs) -> Any:
+        ...
+
+    def has_uncommitted_changes(self, *args, **kwargs) -> bool:
+        ...
+
+    def list_branches(self, *args, **kwargs) -> List[Dict[str, Any]]:
+        ...
+
+    def node_by_external_id(self, *args, **kwargs) -> Optional[int]:
+        ...
+
+    def node_count(self, *args, **kwargs) -> int:
+        ...
+
+    def node_ids(self, *args, **kwargs) -> List[int]:
+        ...
+
+    @staticmethod
+    def open(*args, **kwargs) -> DurableGraph:
+        ...
+
+    def publication_metadata(self, *args, **kwargs) -> Optional[Dict[str, Any]]:
+        ...
+
+    def publish_upsert_edges(self, *args, **kwargs) -> Dict[str, Any]:
+        ...
+
+    def publish_upsert_nodes(self, *args, **kwargs) -> Dict[str, Any]:
+        ...
+
+    def schema(self, *args, **kwargs) -> Optional[Dict[str, Any]]:
+        ...
+
+    def set_schema(self, *args, **kwargs) -> int:
+        ...
+
+    def snapshot_at_commit(self, *args, **kwargs) -> TemporalSnapshot:
+        ...
+
+    def writer(self, *args, **kwargs) -> GraphWriter:
+        ...
+
+
 class Edge:
     """
     Python wrapper for a regular graph edge

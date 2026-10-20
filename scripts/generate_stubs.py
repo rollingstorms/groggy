@@ -97,6 +97,25 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'load_from_path': 'Graph',
             'save_to_path': 'None',
         },
+        'DurableGraph': {
+            'create': 'DurableGraph', 'open': 'DurableGraph',
+            '__enter__': 'DurableGraph', '__exit__': 'bool',
+            'close': 'None', 'is_closed': 'bool',
+            'current_state_id': 'int', 'schema_revision': 'int',
+            'recovered_tail_bytes': 'int', 'is_directed': 'bool',
+            'has_uncommitted_changes': 'bool', 'node_count': 'int', 'edge_count': 'int',
+            'node_ids': 'List[int]', 'edge_ids': 'List[int]',
+            'get_node_attr': 'Any', 'get_edge_attr': 'Any',
+            'node_by_external_id': 'Optional[int]', 'edge_by_external_id': 'Optional[int]',
+            'allocated_entity_for_external_id': 'Optional[Tuple[str, int]]',
+            'writer': 'GraphWriter', 'apply_batch': 'Dict[str, Any]',
+            'publish_upsert_nodes': 'Dict[str, Any]', 'publish_upsert_edges': 'Dict[str, Any]',
+            'publication_metadata': 'Optional[Dict[str, Any]]',
+            'snapshot_at_commit': 'TemporalSnapshot', 'commit_history': 'List[Commit]',
+            'configuration': 'Dict[str, Any]', 'schema': 'Optional[Dict[str, Any]]',
+            'set_schema': 'int', 'create_branch': 'None', 'checkout_branch': 'None',
+            'list_branches': 'List[Dict[str, Any]]',
+        },
         'AttrValue': {
             'float_vec': 'AttrValue',
             'int_vec': 'AttrValue',
@@ -344,7 +363,7 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
         if name.startswith('_') and name not in ['__init__', '__len__', '__getitem__', 
                                                    '__setitem__', '__iter__', '__next__',
                                                    '__str__', '__repr__', '__eq__', '__hash__',
-                                                   '__getattr__']:
+                                                   '__getattr__', '__enter__', '__exit__']:
             continue  # Skip private methods except special ones
         
         # Check if it's a property (getset_descriptor from PyO3)

@@ -10,7 +10,16 @@ impl Graph {
         first_node: NodeId,
         first_edge: EdgeId,
     ) -> GraphResult<PublicationMetadata> {
-        let recorded_at = now_micros()?;
+        self.batch_publication_at(batch, first_node, first_edge, now_micros()?)
+    }
+
+    pub(super) fn batch_publication_at(
+        &self,
+        batch: &PreparedBatch,
+        first_node: NodeId,
+        first_edge: EdgeId,
+        recorded_at: crate::TimestampMicros,
+    ) -> GraphResult<PublicationMetadata> {
         let effective_at = batch.effective_at.unwrap_or(recorded_at);
         let time = |key: &ChangeKey| batch.change_times.get(key).copied().unwrap_or(effective_at);
         let mut change_times = BTreeMap::new();
@@ -74,5 +83,28 @@ impl Graph {
             effective_at,
             change_times,
         })
+    }
+}
+
+impl Graph {
+    pub(crate) fn restore_publication_clock(
+        &self,
+        prepared: &mut crate::api::batch::PreparedPublication,
+        metadata: PublicationMetadata,
+    ) -> GraphResult<()> {
+        let allocated = self.pool.borrow().statistics();
+        let expected = self.batch_publication_at(
+            &prepared.batch,
+            allocated.node_count,
+            allocated.edge_count,
+            metadata.recorded_at,
+        )?;
+        if expected != metadata {
+            return Err(GraphError::InvalidInput(
+                "Journal publication metadata does not match staged changes".into(),
+            ));
+        }
+        prepared.metadata = metadata;
+        Ok(())
     }
 }

@@ -19,7 +19,8 @@ pub enum ChangeKey {
 
 /// One version's time metadata. Effective times are keyed by logical change;
 /// typed before/after data remain in the version's existing delta.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PublicationMetadata {
     /// Engine-assigned acceptance/publication clock; callers cannot override it.
     pub recorded_at: TimestampMicros,

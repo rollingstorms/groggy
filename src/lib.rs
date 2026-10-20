@@ -176,6 +176,7 @@ pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};
 pub use state::publication::{ChangeKey, PublicationMetadata, TimestampMicros};
 pub use state::{HistoricalView, HistoryForest, ViewSummary};
+pub use storage::journal::DurableGraph;
 pub use types::{
     AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, NumericType, StateId,
 };

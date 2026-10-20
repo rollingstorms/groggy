@@ -5,14 +5,14 @@ use crate::state::publication::{ChangeKey, TimestampMicros};
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId, StateId};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum BatchNodeRef {
     Existing(NodeId),
     /// Zero-based position in `GraphBatch::add_nodes`.
     Added(usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum BatchEdgeRef {
     Existing(EdgeId),
     /// Zero-based position in `GraphBatch::add_edges`.
@@ -20,7 +20,7 @@ pub enum BatchEdgeRef {
 }
 
 /// Reference to the staged operation whose effective time is being overridden.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum BatchChangeRef {
     NodeAdded(BatchNodeRef),
     NodeRemoved(BatchNodeRef),
@@ -32,7 +32,7 @@ pub enum BatchChangeRef {
 
 /// One mixed write. Operations execute in this order: add nodes, add edges,
 /// assign properties, remove explicit edges, then remove nodes and their edges.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct GraphBatch {
     pub add_nodes: usize,
     pub add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
@@ -54,6 +54,11 @@ pub struct BatchResult {
     pub state_id: StateId,
     pub added_nodes: Vec<NodeId>,
     pub added_edges: Vec<EdgeId>,
+}
+
+pub(crate) struct PreparedPublication {
+    pub batch: PreparedBatch,
+    pub metadata: crate::PublicationMetadata,
 }
 
 pub(crate) struct PreparedBatch {

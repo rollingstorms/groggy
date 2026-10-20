@@ -4,6 +4,7 @@
 //! Modularized for better organization and maintainability.
 
 // Graph API FFI bindings - core functionality
+pub mod durable;
 pub mod graph;
 pub mod graph_batch;
 

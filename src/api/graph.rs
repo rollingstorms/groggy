@@ -294,7 +294,14 @@ impl Graph {
     ///
     /// This provides mutable access to the columnar attribute storage
     /// for operations that need to modify the storage directly.
-    pub fn pool_mut(&self) -> std::cell::RefMut<'_, GraphPool> {
+    /// Requires an exclusive graph borrow so read handles cannot bypass publication.
+    ///
+    /// ```compile_fail
+    /// fn bypass(graph: &groggy::Graph) {
+    ///     graph.pool_mut();
+    /// }
+    /// ```
+    pub fn pool_mut(&mut self) -> std::cell::RefMut<'_, GraphPool> {
         self.pool.borrow_mut()
     }
 
@@ -1921,6 +1928,26 @@ impl Graph {
         author: String,
         schema: Option<&GraphSchema>,
     ) -> GraphResult<BatchResult> {
+        let prepared = self.prepare_publication(batch, expected_state, schema)?;
+        self.execute_publication(prepared, message, author)
+    }
+
+    pub(crate) fn prepare_publication(
+        &self,
+        batch: GraphBatch,
+        expected_state: StateId,
+        schema: Option<&GraphSchema>,
+    ) -> GraphResult<crate::api::batch::PreparedPublication> {
+        self.prepare_publication_with_additional_schema(batch, expected_state, schema, None)
+    }
+
+    pub(crate) fn prepare_publication_with_additional_schema(
+        &self,
+        batch: GraphBatch,
+        expected_state: StateId,
+        schema: Option<&GraphSchema>,
+        additional_schema: Option<&GraphSchema>,
+    ) -> GraphResult<crate::api::batch::PreparedPublication> {
         self.validate_write_head(expected_state)?;
 
         let allocated = self.pool.borrow().statistics();
@@ -1942,7 +1969,7 @@ impl Graph {
             return Err(GraphError::InvalidInput(identity_errors.join("; ")));
         }
 
-        if let Some(schema) = schema {
+        for schema in [schema, additional_schema].into_iter().flatten() {
             let violations = schema.validate_proposed(
                 self,
                 &prepared,
@@ -1954,6 +1981,20 @@ impl Graph {
 
         let publication =
             self.batch_publication(&prepared, allocated.node_count, allocated.edge_count)?;
+        Ok(crate::api::batch::PreparedPublication {
+            batch: prepared,
+            metadata: publication,
+        })
+    }
+
+    pub(crate) fn execute_publication(
+        &mut self,
+        publication: crate::api::batch::PreparedPublication,
+        message: String,
+        author: String,
+    ) -> GraphResult<BatchResult> {
+        let prepared = publication.batch;
+        let publication = publication.metadata;
         let added_nodes = if prepared.add_nodes > 0 {
             self.add_nodes(prepared.add_nodes)
         } else {
@@ -2092,6 +2133,11 @@ impl Graph {
         branches
     }
 
+    /// The selected configuration (persisted by the durable journal).
+    pub fn configuration(&self) -> &GraphConfig {
+        &self.config
+    }
+
     /// Read engine-recorded and effective times for an automatically published batch.
     /// Legacy manual commits have no publication record and return None.
     pub fn publication_metadata(
@@ -2099,6 +2145,11 @@ impl Graph {
         state: StateId,
     ) -> GraphResult<Option<crate::PublicationMetadata>> {
         Ok(self.history.get_commit(state)?.publication.clone())
+    }
+
+    /// Read immutable native commit records without synthesizing metadata.
+    pub fn history_records(&self) -> Vec<Arc<crate::state::history::Commit>> {
+        self.history.get_commit_history()
     }
 
     /// Get the commit history

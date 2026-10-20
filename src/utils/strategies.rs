@@ -174,7 +174,8 @@ pub struct StorageCharacteristics {
 ///
 /// DESIGN: This enum allows configuration-driven strategy selection
 /// and provides a type-safe way to specify which strategy to use.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum StorageStrategyType {
     /// Index-based deltas (current implementation)
     /// Stores attribute changes as column index mappings

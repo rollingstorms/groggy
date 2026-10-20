@@ -1366,3 +1366,5 @@ obj.view()
 
 ---
 
+
+Durable checked writes: [binary transaction journal and recovery](durable-storage.md).

@@ -397,7 +397,7 @@ impl HistoryForest {
     /// Get all commits in chronological order
     pub fn get_commit_history(&self) -> Vec<Arc<Commit>> {
         let mut commits: Vec<Arc<Commit>> = self.commits.values().cloned().collect();
-        commits.sort_by_key(|commit| commit.timestamp);
+        commits.sort_by_key(|commit| (commit.timestamp, commit.id));
         commits
     }
 
@@ -406,7 +406,7 @@ impl HistoryForest {
         self.commits
             .values()
             .filter(|commit| commit.timestamp <= timestamp)
-            .max_by_key(|commit| commit.timestamp)
+            .max_by_key(|commit| (commit.timestamp, commit.id))
             .map(|commit| commit.id)
     }
 
@@ -440,7 +440,7 @@ impl HistoryForest {
         }
 
         // 3. Sort by timestamp (most recent first)
-        history.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        history.sort_by_key(|commit| std::cmp::Reverse((commit.timestamp, commit.id)));
         Ok(history)
     }
 
@@ -916,7 +916,18 @@ pub struct Delta {
 
 impl Delta {
     /// Create a delta from a change set
-    pub fn from_changes(changes: ChangeSet) -> Self {
+    pub fn from_changes(mut changes: ChangeSet) -> Self {
+        // Stable hashes/replay must not depend on HashMap iteration seeds.
+        changes.nodes_added.sort_unstable();
+        changes.nodes_removed.sort_unstable();
+        changes.edges_added.sort_unstable_by_key(|(id, _, _)| *id);
+        changes.edges_removed.sort_unstable();
+        changes
+            .node_attr_changes
+            .sort_unstable_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        changes
+            .edge_attr_changes
+            .sort_unstable_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 

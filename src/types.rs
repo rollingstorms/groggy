@@ -93,7 +93,8 @@ Fundamental graph properties that affect behavior across the entire system.
 
 /// Graph directionality - determines edge interpretation throughout the system
 /// DESIGN: This affects adjacency caching, traversal algorithms, and matrix operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum GraphType {
     /// Directed graph - edges have direction (A→B ≠ B→A)
     /// Compatible with NetworkX DiGraph

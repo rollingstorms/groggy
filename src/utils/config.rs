@@ -44,7 +44,8 @@ use crate::utils::strategies::StorageStrategyType;
 /// - History System: Snapshot frequency, retention policies
 /// - Query Engine: Cache settings, timeout limits
 /// - Storage: Compression, persistence, backup settings
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct GraphConfig {
     /*
     === GRAPH STRUCTURE ===
