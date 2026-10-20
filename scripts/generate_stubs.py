@@ -82,6 +82,8 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'set_node_external_id': 'None',
             'set_edge_external_id': 'None',
             'allocated_entity_for_external_id': 'Optional[Tuple[str, int]]',
+            'load_from_path': 'Graph',
+            'save_to_path': 'None',
         },
         'AttrValue': {
             'float_vec': 'AttrValue',

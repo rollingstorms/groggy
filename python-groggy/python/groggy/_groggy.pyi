@@ -5071,6 +5071,22 @@ class Graph:
         """
         ...
 
+    @staticmethod
+    def load_from_path(*args, **kwargs) -> Graph:
+        """
+        Load a typed active graph export or a legacy unversioned JSON graph.
+        """
+        ...
+
+
+    def save_to_path(self, *args, **kwargs) -> None:
+        """
+        Export active topology and typed properties; history/pool recovery is separate.
+        """
+        ...
+
+
+
 
 
 class GraphMatrix:

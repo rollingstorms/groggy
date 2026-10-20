@@ -15,7 +15,8 @@ pub mod edge;
 pub mod matrix;
 pub mod node;
 pub mod pool;
-pub mod table; // BaseTable system // Advanced Matrix System - Foundation Infrastructure
+pub mod table; // BaseTable system
+pub(crate) mod value_codec;
 
 // Re-export components
 pub use adjacency::*;

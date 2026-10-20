@@ -53,4 +53,29 @@ Core equality, hashing and total ordering agree across compact integers, compact
 
 Compressed data decodes to its actual value. Invalid compression metadata raises on Python conversion rather than returning a placeholder. Float compression stores explicit little-endian bytes and preserves bit patterns.
 
-This repair does not complete the property model. Native temporal values and a lossless typed disk codec remain roadmap work. Existing JSON graph export is narrower than the live property model and must not be used as a full-fidelity backup.
+## Typed active graph export
+
+`g.save_to_path(path)` writes a versioned active graph export; `Graph.load_from_path(path)` reads it. Both Python strings and path objects are accepted. Version 2 (`format: "groggy.graph"`) uses explicit logical type tags for all inline values above, including null, empty typed vectors, binary data, structured JSON and entity-ID arrays. Float scalars/vectors use unsigned bit patterns, preserving NaNs, infinities and signed zero. Optimized in-memory forms decode to their logical type; allocation/compression layout is not part of the file contract. Attribute names and entity IDs are emitted in stable order.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import Graph
+
+with TemporaryDirectory() as directory:
+    path = Path(directory) / "graph.json"
+    graph = Graph()
+    node = graph.add_node(binary=b"data", details={"source": [1, None]})
+    graph.save_to_path(path)
+    restored = Graph.load_from_path(path)
+    assert restored.get_node_attr(node, "binary") == b"data"
+    assert restored.get_node_attr(node, "details") == {"source": [1, None]}
+```
+
+Unversioned legacy scalar exports remain readable. Untagged legacy arrays/objects become structured JSON because the old file cannot distinguish vectors, bytes or entity-ID arrays. Invalid records, property tags, payloads, versions, duplicate entity IDs and missing edge endpoints raise errors. Structured JSON payloads must be valid JSON. Old exports cannot recover values that were omitted when originally saved.
+
+Meta-nodes and `SubgraphRef` properties currently reject export because this format does not contain their backing pool contents. Export validation and encoding complete before the destination is opened, so a validation error preserves an existing file. File-write failures can still leave a partial file; atomic replacement and durable synchronization belong to roadmap item 10.
+
+This format contains active topology, typed properties, active external identities and graph direction. It does **not** back up branches, history, inactive entities, old external-ID reservations, discarded allocation counters, subgraph pool contents, indexes or other graph configuration. Entity-ID arrays retain numeric values, not inactive referents. Loading creates an independent graph with ordinary uncommitted creation changes. Durable full-engine storage remains item 10; JSON here is an interchange format, not a commitment to the eventual storage backend.
+
+Native temporal values remain the next property-model slice.

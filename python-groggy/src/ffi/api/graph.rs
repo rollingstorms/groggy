@@ -235,6 +235,24 @@ impl PyGraph {
         })
     }
 
+    /// Export active topology and typed properties; history/pool recovery is separate.
+    fn save_to_path(&self, path: std::path::PathBuf) -> PyResult<()> {
+        self.inner
+            .borrow()
+            .save_to_path(&path)
+            .map_err(graph_error_to_py_err)
+    }
+
+    /// Load a typed active graph export or a legacy unversioned JSON graph.
+    #[staticmethod]
+    fn load_from_path(path: std::path::PathBuf) -> PyResult<Self> {
+        let graph = RustGraph::load_from_path(&path).map_err(graph_error_to_py_err)?;
+        Ok(Self {
+            inner: graph.into_shared(),
+            cached_view: RefCell::new(None),
+        })
+    }
+
     /// Check if this graph is directed
     #[getter]
     fn is_directed(&self) -> bool {
