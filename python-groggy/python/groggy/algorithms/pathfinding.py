@@ -112,11 +112,11 @@ def astar(
     More efficient than Dijkstra when a good heuristic is available.
 
     Args:
-        start_attr: Node attribute marking start nodes
-        goal_attr: Node attribute marking goal nodes
-        heuristic_attr: Optional node attribute with heuristic estimates
-        weight_attr: Optional edge weight attribute
-        output_attr: Attribute name for distances (default: "distance")
+        start_attr: Attribute present on exactly one selected start node
+        goal_attr: Attribute present on exactly one selected goal node
+        heuristic_attr: Finite nonnegative consistent estimates, zero at goal; missing is zero
+        weight_attr: Finite nonnegative numeric edge weights; missing is one
+        output_attr: Attribute for zero-based path order (default: "distance")
 
     Returns:
         Algorithm handle configured for A*

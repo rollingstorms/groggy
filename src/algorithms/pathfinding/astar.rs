@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::pathfinding::utils::collect_edge_weights;
+use crate::algorithms::pathfinding::utils::checked_dijkstra_weights;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -14,8 +14,6 @@ use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions}
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
-
-const EPS: f64 = 1e-9;
 
 #[derive(Clone, Debug)]
 pub struct AStarPathfinding {
@@ -75,7 +73,9 @@ impl AStarPathfinding {
                 },
                 ParameterMetadata {
                     name: "heuristic_attr".to_string(),
-                    description: "Optional heuristic cost per node (Float/Int).".to_string(),
+                    description:
+                        "Optional finite nonnegative consistent heuristic; goal must be zero."
+                            .to_string(),
                     value_type: ParameterType::Text,
                     required: false,
                     default_value: None,
@@ -92,54 +92,64 @@ impl AStarPathfinding {
     }
 
     fn resolve_node(&self, subgraph: &Subgraph, attr: &AttrName) -> Result<NodeId> {
-        subgraph
-            .nodes()
-            .iter()
-            .find(|&&node| {
-                subgraph
-                    .get_node_attribute(node, attr)
-                    .ok()
-                    .flatten()
-                    .is_some()
-            })
-            .copied()
-            .ok_or_else(|| anyhow!("no node in subgraph carries attribute '{attr}'"))
+        let mut found = None;
+        for &node in subgraph.ordered_nodes().iter() {
+            if subgraph.get_node_attribute(node, attr)?.is_some() {
+                if found.is_some() {
+                    return Err(anyhow!(
+                        "multiple nodes carry attribute '{attr}'; expected exactly one"
+                    ));
+                }
+                found = Some(node);
+            }
+        }
+        found.ok_or_else(|| anyhow!("no node in subgraph carries attribute '{attr}'"))
     }
 
-    fn heuristics_map(&self, subgraph: &Subgraph) -> HashMap<NodeId, f64> {
+    fn heuristics_map(&self, subgraph: &Subgraph) -> Result<HashMap<NodeId, f64>> {
+        let mut map = HashMap::new();
         if let Some(attr) = &self.heuristic_attr {
-            let mut map = HashMap::new();
-            for &node in subgraph.nodes() {
-                if let Ok(Some(value)) = subgraph.get_node_attribute(node, attr) {
-                    if let Some(cost) = match value {
-                        AttrValue::Float(f) => Some(f as f64),
-                        AttrValue::Int(i) => Some(i as f64),
-                        _ => None,
-                    } {
-                        map.insert(node, cost);
-                    }
+            for &node in subgraph.ordered_nodes().iter() {
+                let cost = match subgraph.get_node_attribute(node, attr)? {
+                    None => 0.0,
+                    Some(AttrValue::Float(f)) => f as f64,
+                    Some(AttrValue::Int(i)) => i as f64,
+                    Some(AttrValue::SmallInt(i)) => i as f64,
+                    _ => return Err(anyhow!("heuristic at node {node} must be numeric")),
+                };
+                if !cost.is_finite() || cost < 0.0 {
+                    return Err(anyhow!(
+                        "heuristic at node {node} must be finite and nonnegative"
+                    ));
                 }
+                map.insert(node, cost);
             }
-            map
-        } else {
-            HashMap::new()
         }
+        Ok(map)
     }
 
     fn run(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, AttrValue>> {
+        let weight_map = checked_dijkstra_weights(subgraph, self.weight_attr.as_ref())?;
         let start = self.resolve_node(subgraph, &self.start_attr)?;
         let goal = self.resolve_node(subgraph, &self.goal_attr)?;
+        let heuristic_map = self.heuristics_map(subgraph)?;
+        if heuristic_map.get(&goal).copied().unwrap_or(0.0) != 0.0 {
+            return Err(anyhow!("heuristic at goal must be zero"));
+        }
+        for (&(u, v), &weight) in &weight_map {
+            let hu = heuristic_map.get(&u).copied().unwrap_or(0.0);
+            let hv = heuristic_map.get(&v).copied().unwrap_or(0.0);
+            if hu > weight + hv {
+                return Err(anyhow!(
+                    "inconsistent heuristic on selected edge {u} -> {v}"
+                ));
+            }
+        }
         if start == goal {
             let mut map = HashMap::new();
             map.insert(start, AttrValue::Int(0));
             return Ok(map);
         }
-
-        let weight_map = self
-            .weight_attr
-            .as_ref()
-            .map(|attr| collect_edge_weights(subgraph, attr));
-        let heuristic_map = self.heuristics_map(subgraph);
 
         #[derive(Copy, Clone, Debug)]
         struct State {
@@ -150,15 +160,17 @@ impl AStarPathfinding {
         impl Eq for State {}
         impl PartialEq for State {
             fn eq(&self, other: &Self) -> bool {
-                self.node == other.node && (self.estimated - other.estimated).abs() <= EPS
+                self.node == other.node
+                    && self.estimated.total_cmp(&other.estimated).is_eq()
+                    && self.cost.total_cmp(&other.cost).is_eq()
             }
         }
         impl Ord for State {
             fn cmp(&self, other: &Self) -> std::cmp::Ordering {
                 other
                     .estimated
-                    .partial_cmp(&self.estimated)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .total_cmp(&self.estimated)
+                    .then_with(|| other.cost.total_cmp(&self.cost))
                     .then_with(|| self.node.cmp(&other.node))
             }
         }
@@ -188,11 +200,11 @@ impl AStarPathfinding {
             if ctx.is_cancelled() {
                 return Err(anyhow!("astar cancelled"));
             }
+            if cost > g_score.get(&node).copied().unwrap_or(f64::INFINITY) {
+                continue;
+            }
             if node == goal {
                 break;
-            }
-            if cost > g_score.get(&node).copied().unwrap_or(f64::INFINITY) + EPS {
-                continue;
             }
 
             // Try CSR path for optimal performance
@@ -212,13 +224,10 @@ impl AStarPathfinding {
             };
 
             for neighbor in neighbors {
-                let edge_weight = weight_map
-                    .as_ref()
-                    .and_then(|map| map.get(&(node, neighbor)).copied())
-                    .unwrap_or(1.0);
+                let edge_weight = weight_map.get(&(node, neighbor)).copied().unwrap_or(1.0);
                 let tentative = cost + edge_weight;
                 let current_best = g_score.get(&neighbor).copied().unwrap_or(f64::INFINITY);
-                if tentative + EPS < current_best {
+                if tentative < current_best {
                     came_from.insert(neighbor, node);
                     g_score.insert(neighbor, tentative);
                     let heuristic = heuristic_map.get(&neighbor).copied().unwrap_or(0.0);
