@@ -315,6 +315,27 @@ impl PyGraph {
 
 #[pymethods]
 impl PyGraph {
+    /// Compute owned undirected spectral coordinates with sorted node row labels.
+    #[pyo3(signature = (dimensions, normalized=true, eigenvalue_threshold=1e-8, skip_nullspace=true))]
+    fn spectral_embedding(
+        &self,
+        dimensions: usize,
+        normalized: bool,
+        eigenvalue_threshold: f64,
+        skip_nullspace: bool,
+    ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        use groggy::viz::embeddings::{spectral::SpectralEmbeddingBuilder, EmbeddingEngine};
+        let engine = SpectralEmbeddingBuilder::new()
+            .normalized(normalized)
+            .eigenvalue_threshold(eigenvalue_threshold)
+            .skip_constant_eigenvector(skip_nullspace)
+            .build();
+        let inner = engine
+            .compute_embedding(&self.inner.borrow(), dimensions)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(crate::ffi::storage::matrix::PyGraphMatrix { inner })
+    }
+
     #[new]
     #[pyo3(signature = (directed = None, _config = None))]
     fn new(directed: Option<bool>, _config: Option<&PyDict>) -> PyResult<Self> {

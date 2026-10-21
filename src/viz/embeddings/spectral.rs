@@ -41,80 +41,93 @@ impl SpectralEmbedding {
         Self::new(true, 1e-8)
     }
 
-    /// Compute the graph Laplacian matrix
+    /// Build D-A, optionally scaled by D^-1/2 on both sides.
+    /// Degree is the adjacency row sum: loops count once, parallel instances add.
     fn compute_laplacian(&self, graph: &Graph) -> GraphResult<GraphMatrix> {
-        let n = graph.space().node_count();
-        let mut laplacian = GraphMatrix::zeros(n, n);
-
-        // Get node index mapping
-        let mut node_ids: Vec<NodeId> = graph.space().node_ids();
+        let mut node_ids = graph.space().node_ids();
         node_ids.sort_unstable();
+        let n = node_ids.len();
+        n.checked_mul(n)
+            .and_then(|size| size.checked_mul(std::mem::size_of::<f64>()))
+            .ok_or_else(|| {
+                GraphError::InvalidInput("Spectral dense matrix size overflow".into())
+            })?;
         let node_to_idx: HashMap<NodeId, usize> = node_ids
             .iter()
             .enumerate()
-            .map(|(i, &id)| (id, i))
+            .map(|(index, &node)| (node, index))
             .collect();
-
-        // Compute degree matrix and adjacency contributions
-        let mut degrees = vec![0.0; n];
-
-        // Build adjacency matrix and compute degrees
-        for edge_id in graph.space().edge_ids() {
-            if let Some((source, target)) = graph.pool().get_edge_endpoints(edge_id) {
-                let src_idx = node_to_idx[&source];
-                let tgt_idx = node_to_idx[&target];
-                let weight = 1.0; // TODO: get actual edge weight if needed
-
-                // Add to adjacency (negative contribution to Laplacian)
-                laplacian.set(src_idx, tgt_idx, -weight)?;
-                if src_idx != tgt_idx {
-                    laplacian.set(tgt_idx, src_idx, -weight)?;
-                }
-
-                // Accumulate degrees
-                degrees[src_idx] += weight;
-                if src_idx != tgt_idx {
-                    degrees[tgt_idx] += weight;
-                }
+        let mut laplacian = GraphMatrix::zeros(n, n);
+        let mut degrees = vec![0.0_f64; n];
+        for edge in graph.space().edge_ids() {
+            let (source, target) = graph.edge_endpoints(edge)?;
+            let src = node_to_idx.get(&source).copied().ok_or_else(|| {
+                GraphError::InvalidInput(format!(
+                    "Active edge {edge} has inactive endpoint {source}"
+                ))
+            })?;
+            let dst = node_to_idx.get(&target).copied().ok_or_else(|| {
+                GraphError::InvalidInput(format!(
+                    "Active edge {edge} has inactive endpoint {target}"
+                ))
+            })?;
+            laplacian.set(src, dst, laplacian.get_checked(src, dst)? - 1.0)?;
+            degrees[src] += 1.0;
+            if src != dst {
+                laplacian.set(dst, src, laplacian.get_checked(dst, src)? - 1.0)?;
+                degrees[dst] += 1.0;
             }
         }
-
+        for (node, &degree) in degrees.iter().enumerate() {
+            laplacian.set(node, node, laplacian.get_checked(node, node)? + degree)?;
+        }
         if self.normalized {
-            // Normalized Laplacian: L = I - D^{-1/2} A D^{-1/2}
-            // First convert to D^{-1/2} A D^{-1/2}
-            for i in 0..n {
-                let sqrt_deg_i = (degrees[i] as f64).sqrt();
-                if sqrt_deg_i < self.eigenvalue_threshold {
-                    continue; // Skip isolated nodes
-                }
-
-                for j in 0..n {
-                    let sqrt_deg_j = (degrees[j] as f64).sqrt();
-                    if sqrt_deg_j < self.eigenvalue_threshold {
-                        continue;
+            // Zero-degree rows remain zero, including their diagonal. Threshold
+            // controls eigenvalue selection, never degree normalization.
+            let inverse_roots: Vec<_> = degrees
+                .iter()
+                .map(|&degree| {
+                    if degree > 0.0 {
+                        1.0 / degree.sqrt()
+                    } else {
+                        0.0
                     }
-
-                    let current_val = laplacian.get_checked(i, j)?;
-                    let normalized_val = current_val / (sqrt_deg_i * sqrt_deg_j);
-                    laplacian.set(i, j, normalized_val)?;
+                })
+                .collect();
+            for (row, &left) in inverse_roots.iter().enumerate() {
+                for (col, &right) in inverse_roots.iter().enumerate() {
+                    laplacian.set(row, col, laplacian.get_checked(row, col)? * left * right)?;
                 }
-            }
-
-            // Add identity matrix (L = I - D^{-1/2} A D^{-1/2})
-            for i in 0..n {
-                let current_diagonal = laplacian.get_checked(i, i)?;
-                laplacian.set(i, i, 1.0 + current_diagonal)?;
-            }
-        } else {
-            // Unnormalized Laplacian: L = D - A
-            // Add degree matrix (positive diagonal)
-            for i in 0..n {
-                let current_diagonal = laplacian.get_checked(i, i)?;
-                laplacian.set(i, i, degrees[i] + current_diagonal)?;
             }
         }
-
         Ok(laplacian)
+    }
+
+    /// Every component of this positive undirected Laplacian has one zero mode.
+    /// Count support components so a tiny user cutoff cannot retain a numerically
+    /// perturbed null vector. Dense scanning adds O(N²) work and O(N) memory.
+    fn nullity(laplacian: &GraphMatrix) -> GraphResult<usize> {
+        let n = laplacian.shape().0;
+        let mut seen = vec![false; n];
+        let mut stack = Vec::new();
+        let mut components = 0;
+        for start in 0..n {
+            if seen[start] {
+                continue;
+            }
+            components += 1;
+            seen[start] = true;
+            stack.push(start);
+            while let Some(node) = stack.pop() {
+                for (neighbor, visited) in seen.iter_mut().enumerate() {
+                    if !*visited && laplacian.get_checked(node, neighbor)? < 0.0 {
+                        *visited = true;
+                        stack.push(neighbor);
+                    }
+                }
+            }
+        }
+        Ok(components)
     }
 
     /// Compute eigenvectors of the Laplacian
@@ -132,16 +145,15 @@ impl SpectralEmbedding {
             .enumerate()
             .map(|(i, &val)| (val, i))
             .collect();
-        eigen_pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        eigen_pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
 
         // Determine how many eigenvectors to skip
         let skip_count = if self.skip_constant {
-            // Count how many eigenvalues are near zero (constant eigenvectors)
-            eigen_pairs
+            let near_zero = eigen_pairs
                 .iter()
-                .take_while(|(val, _)| val.abs() < self.eigenvalue_threshold)
-                .count()
-                .max(1) // Skip at least one
+                .filter(|(value, _)| value.abs() <= self.eigenvalue_threshold)
+                .count();
+            near_zero.max(Self::nullity(laplacian)?)
         } else {
             0
         };
@@ -178,11 +190,16 @@ impl EmbeddingEngine for SpectralEmbedding {
             ));
         }
 
-        // Check if graph is connected (for meaningful spectral embedding)
-        // TODO: Add connectivity check
-        if false {
-            // Skip connectivity check for now
-            eprintln!("Warning: Graph is not connected. Spectral embedding may not be meaningful.");
+        let n = graph.space().node_count();
+        let maximum = if self.skip_constant {
+            n.saturating_sub(1)
+        } else {
+            n
+        };
+        if dimensions > maximum {
+            return Err(GraphError::InvalidInput(format!(
+                "At most {maximum} spectral dimensions are available, but {dimensions} requested"
+            )));
         }
 
         // Compute Laplacian matrix
@@ -195,6 +212,11 @@ impl EmbeddingEngine for SpectralEmbedding {
         embedding.set_row_labels(Some(
             node_ids.iter().map(|id| format!("node_{id}")).collect(),
         ));
+        embedding.set_column_names(
+            (0..dimensions)
+                .map(|index| format!("spectral_{index}"))
+                .collect(),
+        );
 
         Ok(embedding)
     }
@@ -220,13 +242,21 @@ impl EmbeddingEngine for SpectralEmbedding {
     }
 
     fn validate_graph(&self, graph: &Graph) -> GraphResult<()> {
+        if !self.eigenvalue_threshold.is_finite() || self.eigenvalue_threshold <= 0.0 {
+            return Err(GraphError::InvalidInput(
+                "Spectral eigenvalue threshold must be finite and positive".into(),
+            ));
+        }
+        if graph.is_directed() {
+            return Err(GraphError::InvalidInput("Spectral embedding requires an undirected graph; directed Laplacians are unsupported".into()));
+        }
         if graph.space().node_count() == 0 {
             return Err(GraphError::InvalidInput(
                 "Cannot compute spectral embedding for empty graph".to_string(),
             ));
         }
 
-        if graph.space().node_count() == 1 {
+        if graph.space().node_count() == 1 && self.skip_constant {
             return Err(GraphError::InvalidInput(
                 "Cannot compute meaningful spectral embedding for single node".to_string(),
             ));
@@ -348,6 +378,37 @@ mod tests {
     }
 
     #[test]
+    fn laplacian_entries_accumulate_parallel_loops_and_zero_isolates() {
+        let mut graph = Graph::new();
+        graph.add_nodes(4);
+        for (u, v) in [(0, 1), (0, 1), (0, 0), (0, 0), (1, 2)] {
+            graph.add_edge(u, v).unwrap();
+        }
+        let ordinary = [
+            [2.0, -2.0, 0.0, 0.0],
+            [-2.0, 3.0, -1.0, 0.0],
+            [0.0, -1.0, 1.0, 0.0],
+            [0.0; 4],
+        ];
+        let normalized = [
+            [0.5, -2.0 / 12f64.sqrt(), 0.0, 0.0],
+            [-2.0 / 12f64.sqrt(), 1.0, -1.0 / 3f64.sqrt(), 0.0],
+            [0.0, -1.0 / 3f64.sqrt(), 1.0, 0.0],
+            [0.0; 4],
+        ];
+        for (normalize, expected) in [(false, ordinary), (true, normalized)] {
+            let matrix = SpectralEmbedding::new(normalize, 10.0)
+                .compute_laplacian(&graph)
+                .unwrap();
+            for (row, values) in expected.iter().enumerate() {
+                for (col, &want) in values.iter().enumerate() {
+                    assert!((matrix.get(row, col).unwrap() - want).abs() < 1e-14);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_spectral_embedding_basic() {
         let graph = path_graph(5);
         let engine = SpectralEmbedding::default();
@@ -363,22 +424,15 @@ mod tests {
     fn test_spectral_embedding_preserves_structure() {
         let graph = karate_club();
         let engine = SpectralEmbedding::default();
-
-        let embedding = engine.compute_embedding(&graph, 5).unwrap();
-
-        // Test: embedding should have the right dimensions
-        assert_eq!(embedding.shape(), (graph.space().node_count(), 5));
-
-        // Test: different nodes should have different embeddings
-        // Note: Temporarily disabled - needs matrix.row() API
-        // let first_row = embedding.row(0)?;
-        // let second_row = embedding.row(1)?;
-        //
-        // let distance = first_row.subtract(&second_row)?.norm();
-        // assert!(
-        //     distance > 1e-10,
-        //     "Different nodes should have different embeddings"
-        // );
+        // This fixture connects only nodes 0,1,2,3,7: four positive modes.
+        let embedding = engine.compute_embedding(&graph, 4).unwrap();
+        assert_eq!(embedding.shape(), (graph.space().node_count(), 4));
+        assert!(engine.compute_embedding(&graph, 5).is_err());
+        for row in (4..34).filter(|&node| node != 7) {
+            for col in 0..4 {
+                assert!(embedding.get(row, col).unwrap().abs() < 1e-10);
+            }
+        }
     }
 
     #[test]

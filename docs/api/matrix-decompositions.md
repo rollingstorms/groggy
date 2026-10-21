@@ -36,7 +36,7 @@ u, singular, vt = a.svd()
 assert len(singular) == 2
 ```
 
-PCA's covariance path now receives complete orthogonal eigenvectors. Spectral embeddings use ascending node-ID row order and `node_<id>` row labels; tests verify a path-graph Laplacian and a rotated rank-two PCA plane. Other spectral choices, directed variants, sparse kernels and broader PCA edge cases remain under their own audits.
+The [PCA caller](pca-projection.md) now uses scaled feature scatter with explicit singleton/constants and owned native/Python scores. The [spectral caller](spectral-embedding.md) accumulates parallel/loop incidences, preserves isolate zero modes, handles component nullity and exposes sorted row identity through Rust/Python matrices. Their dedicated tests include NumPy geometry/eigenpair references. Directed spectral variants, sparse kernels and other analytics callers remain outside these supported domains.
 
 Verification: Rust tests check reconstruction, orthogonality, scaling, rank deficiency, empty shapes, f32/f64 factors, invalid domains, and an exhausted iteration budget. Python tests compare random, repeated, rank-deficient and ill-conditioned fixtures with NumPy SVD/eigvalsh through the built extension. `benches/matrix_decomposition_profile.py` records timings and residuals; debug measurements do not establish release throughput.
 

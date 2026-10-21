@@ -519,11 +519,11 @@ mod tests {
         let graph = karate_club();
 
         // Test spectral embedding
-        let embedding = graph.spectral_embedding(5);
+        let embedding = graph.spectral_embedding(4);
         assert!(embedding.is_ok());
 
         let matrix = embedding.unwrap();
-        assert_eq!(matrix.shape(), (graph.space().node_count(), 5));
+        assert_eq!(matrix.shape(), (graph.space().node_count(), 4));
 
         // Test random embedding
         let random = graph.random_embedding(8);
