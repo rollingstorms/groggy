@@ -53,3 +53,60 @@ fn scalar_arithmetic_preserves_degenerate_shapes_and_uses_direct_division() {
         .is_nan());
     assert_eq!(a.scalar_divide(f64::INFINITY).unwrap().get(0, 1), Some(0.));
 }
+
+#[test]
+fn borrowed_and_owned_operators_return_results_and_never_substitute_zero_data() {
+    let mut a = matrix(vec![1., 2., 3., 4.], 2, 2);
+    a.set_row_labels(Some(vec!["left0".into(), "left1".into()]));
+    a.set_column_names(vec!["x".into(), "y".into()]);
+    let mut b = matrix(vec![5., 6., 7., 8.], 2, 2);
+    b.set_column_names(vec!["right0".into(), "right1".into()]);
+    for sum in [(&a + &b).unwrap(), (a.clone() + b.clone()).unwrap()] {
+        assert_eq!(sum.get(0, 0), Some(6.));
+        assert_eq!(sum.get(1, 1), Some(12.));
+        assert_eq!(sum.row_labels(), a.row_labels());
+        assert_eq!(sum.column_names(), a.column_names());
+    }
+    for diff in [(&a - &b).unwrap(), (a.clone() - b.clone()).unwrap()] {
+        for row in 0..2 {
+            for col in 0..2 {
+                assert_eq!(diff.get(row, col), Some(-4.));
+            }
+        }
+    }
+    for product in [(&a * &b).unwrap(), (a.clone() * b.clone()).unwrap()] {
+        for (row, expected) in [[19., 22.], [43., 50.]].iter().enumerate() {
+            for (col, &value) in expected.iter().enumerate() {
+                assert_eq!(product.get(row, col), Some(value));
+            }
+        }
+        assert_eq!(product.row_labels(), a.row_labels());
+        assert_eq!(product.column_names(), b.column_names());
+    }
+    let bad = matrix(vec![9.; 3], 3, 1);
+    assert!((&a + &bad).is_err());
+    assert!((a.clone() + bad.clone()).is_err());
+    assert!((&a - &bad).is_err());
+    assert!((a.clone() - bad.clone()).is_err());
+    assert!((&a * &bad).is_err());
+    assert!((a.clone() * bad).is_err());
+    assert_eq!(a.get(0, 0), Some(1.));
+}
+
+#[test]
+fn zero_inner_dimension_products_keep_shape_and_overflow_is_an_error() {
+    let a = matrix(vec![], 3, 0);
+    let b = matrix(vec![], 0, 2);
+    let product = (&a * &b).unwrap();
+    assert_eq!(product.shape(), (3, 2));
+    for row in 0..3 {
+        for col in 0..2 {
+            assert_eq!(product.get(row, col), Some(0.));
+        }
+    }
+    let huge = matrix(vec![], usize::MAX, 0);
+    assert!((&huge * &b).is_err());
+    // Empty inner dimensions permit cheap inputs whose output byte size cannot fit.
+    let byte_overflow = matrix(vec![], isize::MAX as usize / 8 + 1, 0);
+    assert!(byte_overflow.multiply(&matrix(vec![], 0, 1)).is_err());
+}

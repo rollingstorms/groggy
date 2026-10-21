@@ -104,3 +104,5 @@ Numerical item 29.11 completes the existing NumArray Pearson correlation path wi
 Numerical item 29.12 repairs checked matrix add/subtract and Python arithmetic with native scalar kernels, exact-zero divisor validation and preserved positional labels/empty shapes. Legacy Rust operator result-type migration, broader numerical overflow rules, NumArray expansion and ArrayArray remain open.
 
 Numerical item 29.13 repairs ArrayArray f64 kernels and centralizes legacy attribute projection/multi-aggregation in Rust, preserving named keys. Table scalar floats remain f32; finite narrowing overflow now errors. Exact grouped i64 statistics, lossless f64 table storage, other grouped-table implementations and throughput remain open.
+
+Numerical item 29.14 removes silent fallbacks from borrowed/owned Rust matrix +, - and * by returning GraphResult. Named methods and Python syntax keep their checked APIs. Product output sizing and positional row/column identity are checked; downstream Rust callers must handle the intentionally changed associated Output type. Integer overflow, stable dot products and other matrix operations remain open.

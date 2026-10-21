@@ -44,3 +44,14 @@ def test_scalar_operations_preserve_empty_shapes(shape):
     a = GraphMatrix.zeros(*shape)
     for b in [a + 2., a - 2., a * 2., a / 2., -a]:
         assert b.shape == shape
+
+
+def test_matrix_multiplication_reports_incompatible_shapes_and_keeps_empty_inner_products():
+    a = matrix([[1., 2., 3.], [4., 5., 6.]])
+    b = matrix([[7., 8.], [9., 10.], [11., 12.]])
+    assert values(a * b) == [[58., 64.], [139., 154.]]
+    with pytest.raises(RuntimeError, match='incompatible'):
+        a * GraphMatrix.identity(2)
+    product = GraphMatrix.zeros(3, 0) * GraphMatrix.zeros(0, 2)
+    assert product.shape == (3, 2)
+    assert values(product) == [[0., 0.]] * 3

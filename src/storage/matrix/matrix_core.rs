@@ -899,7 +899,7 @@ impl<T: NumericType> GraphMatrix<T> {
             )));
         }
 
-        let mut result = Self::zeros(self_rows, other_cols);
+        let mut result = Self::arithmetic_zeros(self_rows, other_cols)?;
 
         for i in 0..self_rows {
             for j in 0..other_cols {
@@ -917,6 +917,8 @@ impl<T: NumericType> GraphMatrix<T> {
             }
         }
 
+        result.row_labels = self.row_labels.clone();
+        result.column_names = other.column_names.clone();
         Ok(result)
     }
 
@@ -2885,111 +2887,42 @@ impl<T: NumericType> GraphMatrix<T> {
     }
 }
 
-// === OPERATOR OVERLOADING IMPLEMENTATIONS ===
-
-impl<T: NumericType> std::ops::Add<&GraphMatrix<T>> for &GraphMatrix<T>
-where
-    T: std::ops::Add<Output = T> + Copy,
-{
-    type Output = GraphMatrix<T>;
-
+// === CHECKED OPERATOR OVERLOADING IMPLEMENTATIONS ===
+// Failures return GraphResult instead of substituted zero data.
+impl<T: NumericType> std::ops::Add<&GraphMatrix<T>> for &GraphMatrix<T> {
+    type Output = GraphResult<GraphMatrix<T>>;
     fn add(self, rhs: &GraphMatrix<T>) -> Self::Output {
-        let (self_rows, self_cols) = self.shape();
-        let (rhs_rows, rhs_cols) = rhs.shape();
-
-        if self_rows != rhs_rows || self_cols != rhs_cols {
-            // Return zero matrix on dimension mismatch (could be made more robust)
-            return GraphMatrix::zeros(self_rows, self_cols);
-        }
-
-        let mut result = GraphMatrix::zeros(self_rows, self_cols);
-
-        for i in 0..self_rows {
-            for j in 0..self_cols {
-                let a = self.get(i, j).unwrap_or_else(|| T::zero());
-                let b = rhs.get(i, j).unwrap_or_else(|| T::zero());
-                let sum = a + b;
-                let _ = result.set(i, j, sum);
-            }
-        }
-
-        result
+        GraphMatrix::add(self, rhs)
     }
 }
-
-impl<T: NumericType> std::ops::Add<GraphMatrix<T>> for GraphMatrix<T>
-where
-    T: std::ops::Add<Output = T> + Copy,
-{
-    type Output = GraphMatrix<T>;
-
+impl<T: NumericType> std::ops::Add<GraphMatrix<T>> for GraphMatrix<T> {
+    type Output = GraphResult<GraphMatrix<T>>;
     fn add(self, rhs: GraphMatrix<T>) -> Self::Output {
-        &self + &rhs
+        GraphMatrix::add(&self, &rhs)
     }
 }
-
-impl<T: NumericType> std::ops::Sub<&GraphMatrix<T>> for &GraphMatrix<T>
-where
-    T: std::ops::Sub<Output = T> + Copy,
-{
-    type Output = GraphMatrix<T>;
-
+impl<T: NumericType> std::ops::Sub<&GraphMatrix<T>> for &GraphMatrix<T> {
+    type Output = GraphResult<GraphMatrix<T>>;
     fn sub(self, rhs: &GraphMatrix<T>) -> Self::Output {
-        let (self_rows, self_cols) = self.shape();
-        let (rhs_rows, rhs_cols) = rhs.shape();
-
-        if self_rows != rhs_rows || self_cols != rhs_cols {
-            // Return zero matrix on dimension mismatch
-            return GraphMatrix::zeros(self_rows, self_cols);
-        }
-
-        let mut result = GraphMatrix::zeros(self_rows, self_cols);
-
-        for i in 0..self_rows {
-            for j in 0..self_cols {
-                let a = self.get(i, j).unwrap_or_else(|| T::zero());
-                let b = rhs.get(i, j).unwrap_or_else(|| T::zero());
-                let diff = a - b;
-                let _ = result.set(i, j, diff);
-            }
-        }
-
-        result
+        GraphMatrix::subtract(self, rhs)
     }
 }
-
-impl<T: NumericType> std::ops::Sub<GraphMatrix<T>> for GraphMatrix<T>
-where
-    T: std::ops::Sub<Output = T> + Copy,
-{
-    type Output = GraphMatrix<T>;
-
+impl<T: NumericType> std::ops::Sub<GraphMatrix<T>> for GraphMatrix<T> {
+    type Output = GraphResult<GraphMatrix<T>>;
     fn sub(self, rhs: GraphMatrix<T>) -> Self::Output {
-        &self - &rhs
+        GraphMatrix::subtract(&self, &rhs)
     }
 }
-
-impl<T: NumericType> std::ops::Mul<&GraphMatrix<T>> for &GraphMatrix<T>
-where
-    T: std::ops::Add<Output = T> + std::ops::Mul<Output = T> + Copy,
-{
-    type Output = GraphMatrix<T>;
-
+impl<T: NumericType> std::ops::Mul<&GraphMatrix<T>> for &GraphMatrix<T> {
+    type Output = GraphResult<GraphMatrix<T>>;
     fn mul(self, rhs: &GraphMatrix<T>) -> Self::Output {
-        // Use matrix multiplication (not element-wise)
-        self.multiply(rhs)
-            .unwrap_or_else(|_| GraphMatrix::zeros(self.shape().0, rhs.shape().1))
+        GraphMatrix::multiply(self, rhs)
     }
 }
-
-impl<T: NumericType> std::ops::Mul<GraphMatrix<T>> for GraphMatrix<T>
-where
-    T: std::ops::Add<Output = T> + std::ops::Mul<Output = T> + Copy,
-{
-    type Output = GraphMatrix<T>;
-
+impl<T: NumericType> std::ops::Mul<GraphMatrix<T>> for GraphMatrix<T> {
+    type Output = GraphResult<GraphMatrix<T>>;
     fn mul(self, rhs: GraphMatrix<T>) -> Self::Output {
-        &self * &rhs
+        GraphMatrix::multiply(&self, &rhs)
     }
 }
 
@@ -3016,13 +2949,21 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    // Arithmetic results own storage and retain left positional row/column labels.
-    fn map_arithmetic(&self, operation: impl Fn(T) -> T) -> GraphResult<Self> {
-        let (rows, cols) = self.shape();
+    fn arithmetic_zeros(rows: usize, cols: usize) -> GraphResult<Self> {
+        rows.checked_mul(cols)
+            .and_then(|n| n.checked_mul(std::mem::size_of::<T>()))
+            .filter(|&bytes| bytes <= isize::MAX as usize)
+            .ok_or_else(|| GraphError::InvalidInput("Arithmetic output size overflow".into()))?;
         let storage = UnifiedMatrix::zeros(rows, cols).map_err(|e| {
             GraphError::InvalidInput(format!("Arithmetic allocation failed: {e:?}"))
         })?;
-        let mut result = Self::from_storage(storage);
+        Ok(Self::from_storage(storage))
+    }
+
+    // Arithmetic results own storage and retain left positional row/column labels.
+    fn map_arithmetic(&self, operation: impl Fn(T) -> T) -> GraphResult<Self> {
+        let (rows, cols) = self.shape();
+        let mut result = Self::arithmetic_zeros(rows, cols)?;
         for row in 0..rows {
             for col in 0..cols {
                 result.set(row, col, operation(self.get_checked(row, col)?))?;
@@ -3042,10 +2983,7 @@ impl<T: NumericType> GraphMatrix<T> {
             )));
         }
         let (rows, cols) = self.shape();
-        let storage = UnifiedMatrix::zeros(rows, cols).map_err(|e| {
-            GraphError::InvalidInput(format!("Arithmetic allocation failed: {e:?}"))
-        })?;
-        let mut result = Self::from_storage(storage);
+        let mut result = Self::arithmetic_zeros(rows, cols)?;
         for row in 0..rows {
             for col in 0..cols {
                 result.set(
@@ -3070,10 +3008,7 @@ impl<T: NumericType> GraphMatrix<T> {
     }
 
     /// Add two matrices positionally; mismatched shapes return an error.
-    pub fn add(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>>
-    where
-        for<'a> &'a GraphMatrix<T>: std::ops::Add<Output = GraphMatrix<T>>,
-    {
+    pub fn add(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
         self.zip_arithmetic(other, T::add)
     }
 

@@ -518,3 +518,6 @@ Use GraphResult methods and Python errors for mismatched shapes. Preserve positi
 
 ### Item 29 ArrayArray numeric reductions — 2026-10-21
 Retain zero for empty inner arrays and the existing permissive numeric projection (numbers/bools included, null/text/collections skipped). Apply shared stable f64 kernels and NaN propagation. Move conversion/aggregation out of FFI, preserve named keys and reject output-name collisions. AttrValue scalar floats are f32; preserve that storage format, reject finite narrowing overflow and document remaining rounding/underflow. Exact grouped i64 moments and lossless f64 storage need separate work.
+
+### Item 29 Rust matrix operator results — 2026-10-21
+Choose an explicit source-level Rust operator migration: +, - and * return GraphResult for borrowed and owned matrices, sharing checked named methods rather than returning substitute zeros or panicking. Propagate errors and check output sizes. Product metadata comes from left rows and right columns; operands are positional. Downstream callers use ? or match; Python syntax stays unchanged. NumericType overflow and stable dot-product accumulation remain separate work.
