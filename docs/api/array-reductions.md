@@ -72,8 +72,8 @@ some high-offset cases, so those reference calculations use Fractions explicitly
 
 Sum/mean/variance/std scan in `O(N)` time with constant scratch space; median uses
 `O(N)` scratch and `O(N log N)` sorting. These are complexity descriptions, not
-benchmark results. The additional min/max scope is described below. This does not certify NumArray/ArrayArray/SIMD
-reductions, matrix reductions, arithmetic/broadcasting, GIL release, or throughput.
+benchmark results. The additional min/max scope is described below. NumArray reductions have a separate [shared kernel contract](numarray-reductions.md).
+This does not certify ArrayArray reductions, matrix reductions, arithmetic/broadcasting, GIL release, or throughput.
 Those remain under numerical roadmap items 29.3–29.6.
 
 

@@ -497,3 +497,12 @@ Independent native permutations, exhaustive exact integer-residual variance fixt
 ## Item 29 exact logical-column extrema — 2026-10-21
 
 Extend the shared numeric order to BaseArray min/max: choose original values and preserve first ties without rounding i64 candidates to f64/f32. Reject nonfinite values even in singleton/late positions and retain null skipping and explicit empty errors. Preserve legacy text/compact-text/boolean extrema and reject incompatible mixtures. Native permutation/limit/type/domain fixtures and rebuilt Python comparisons cover the scope; NumArray, other reductions and arithmetic remain separate work. See docs/api/array-reductions.md.
+
+
+## Item 29 shared typed NumArray reductions — 2026-10-21
+
+Remove statistical business logic and per-call f64 column copies from the NumArray Python bridge. Dispatch int32/int64/float32/float64/bool slices to shared Rust sum/mean/extrema/sample variance/std/median kernels; expose Python median. Preserve f64/Option outputs and existing native generic bounds. Integer hints retain exact subtotal/difference/median information before final f64 conversion; output remains f64 rather than an exact i64 return.
+
+Use compensated/rescaled floating totals/means and centered normalized dispersion; compute std before rescaling so a valid std survives variance overflow/underflow. Median uses typed order and safe midpoint; in-place selection uses standard-library partitioning instead of recursively partitioning repeated data. Define empty sum zero, empty other statistics None, finite singleton dispersion zero, NaN propagation, IEEE infinite sum/mean/median behavior, and nonfinite dispersion NaN. Python empty var/std now agree with native None, replacing the inconsistent Python zero. These NumArray IEEE semantics remain distinct from checked logical BaseArray errors.
+
+Historical SIMD/auto entry points now share the reference kernels; no current vectorized speed guarantee is made. The explicit-mean low-level simd_variance retains its caller-centered moment contract. Reintroduce acceleration only with semantic verification and measurements under 29.6. Native typed/extreme/dispatch/nonfinite/repeated-selection tests and rebuilt Python dtype/rational/IEEE checks cover the slice. Percentiles/correlation, ArrayArray, conversions, arithmetic, matrix operations and throughput remain open. See docs/api/numarray-reductions.md.

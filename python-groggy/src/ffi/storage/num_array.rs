@@ -811,69 +811,151 @@ impl PyNumArray {
         }
     }
 
-    // Statistical Methods (work on all numeric types)
-
-    /// Calculate the mean (average)
+    /// Delegate mean to shared typed native kernels.
     fn mean(&self) -> Option<f64> {
-        let values = self.inner.to_float64_vec();
-        if values.is_empty() {
-            None
-        } else {
-            let sum: f64 = values.iter().sum();
-            Some(sum / values.len() as f64)
+        match &self.inner {
+            NumericArrayData::Bool(arr) => {
+                groggy::storage::array::numeric_reductions::mean(arr.as_slice())
+            }
+            NumericArrayData::Int32(arr) => {
+                groggy::storage::array::numeric_reductions::mean(arr.as_slice())
+            }
+            NumericArrayData::Int64(arr) => {
+                groggy::storage::array::numeric_reductions::mean(arr.as_slice())
+            }
+            NumericArrayData::Float32(arr) => {
+                groggy::storage::array::numeric_reductions::mean(arr.as_slice())
+            }
+            NumericArrayData::Float64(arr) => {
+                groggy::storage::array::numeric_reductions::mean(arr.as_slice())
+            }
         }
     }
 
-    /// Calculate the sum
+    /// Delegate sum to shared typed native kernels.
     fn sum(&self) -> f64 {
-        let values = self.inner.to_float64_vec();
-        values.iter().sum()
+        match &self.inner {
+            NumericArrayData::Bool(arr) => {
+                groggy::storage::array::numeric_reductions::sum(arr.as_slice())
+            }
+            NumericArrayData::Int32(arr) => {
+                groggy::storage::array::numeric_reductions::sum(arr.as_slice())
+            }
+            NumericArrayData::Int64(arr) => {
+                groggy::storage::array::numeric_reductions::sum(arr.as_slice())
+            }
+            NumericArrayData::Float32(arr) => {
+                groggy::storage::array::numeric_reductions::sum(arr.as_slice())
+            }
+            NumericArrayData::Float64(arr) => {
+                groggy::storage::array::numeric_reductions::sum(arr.as_slice())
+            }
+        }
     }
 
-    /// Find the minimum value
+    /// Delegate min to shared typed native kernels.
     fn min(&self) -> Option<f64> {
-        let values = self.inner.to_float64_vec();
-        values.iter().copied().fold(None, |acc, x| match acc {
-            None => Some(x),
-            Some(y) => Some(x.min(y)),
-        })
+        match &self.inner {
+            NumericArrayData::Bool(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), true)
+            }
+            NumericArrayData::Int32(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), true)
+            }
+            NumericArrayData::Int64(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), true)
+            }
+            NumericArrayData::Float32(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), true)
+            }
+            NumericArrayData::Float64(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), true)
+            }
+        }
     }
 
-    /// Find the maximum value
+    /// Delegate max to shared typed native kernels.
     fn max(&self) -> Option<f64> {
-        let values = self.inner.to_float64_vec();
-        values.iter().copied().fold(None, |acc, x| match acc {
-            None => Some(x),
-            Some(y) => Some(x.max(y)),
-        })
+        match &self.inner {
+            NumericArrayData::Bool(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), false)
+            }
+            NumericArrayData::Int32(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), false)
+            }
+            NumericArrayData::Int64(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), false)
+            }
+            NumericArrayData::Float32(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), false)
+            }
+            NumericArrayData::Float64(arr) => {
+                groggy::storage::array::numeric_reductions::extremum(arr.as_slice(), false)
+            }
+        }
     }
 
-    /// Calculate standard deviation
+    /// Delegate std to shared typed native kernels.
     fn std(&self) -> Option<f64> {
-        let values = self.inner.to_float64_vec();
-        if values.len() <= 1 {
-            return Some(0.0);
+        match &self.inner {
+            NumericArrayData::Bool(arr) => {
+                groggy::storage::array::numeric_reductions::std_dev(arr.as_slice())
+            }
+            NumericArrayData::Int32(arr) => {
+                groggy::storage::array::numeric_reductions::std_dev(arr.as_slice())
+            }
+            NumericArrayData::Int64(arr) => {
+                groggy::storage::array::numeric_reductions::std_dev(arr.as_slice())
+            }
+            NumericArrayData::Float32(arr) => {
+                groggy::storage::array::numeric_reductions::std_dev(arr.as_slice())
+            }
+            NumericArrayData::Float64(arr) => {
+                groggy::storage::array::numeric_reductions::std_dev(arr.as_slice())
+            }
         }
-
-        let mean = self.mean()?;
-        let variance =
-            values.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
-
-        Some(variance.sqrt())
     }
 
-    /// Calculate variance
+    /// Delegate var to shared typed native kernels.
     fn var(&self) -> Option<f64> {
-        let values = self.inner.to_float64_vec();
-        if values.len() <= 1 {
-            return Some(0.0);
+        match &self.inner {
+            NumericArrayData::Bool(arr) => {
+                groggy::storage::array::numeric_reductions::variance(arr.as_slice())
+            }
+            NumericArrayData::Int32(arr) => {
+                groggy::storage::array::numeric_reductions::variance(arr.as_slice())
+            }
+            NumericArrayData::Int64(arr) => {
+                groggy::storage::array::numeric_reductions::variance(arr.as_slice())
+            }
+            NumericArrayData::Float32(arr) => {
+                groggy::storage::array::numeric_reductions::variance(arr.as_slice())
+            }
+            NumericArrayData::Float64(arr) => {
+                groggy::storage::array::numeric_reductions::variance(arr.as_slice())
+            }
         }
+    }
 
-        let mean = self.mean()?;
-        let variance =
-            values.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
-
-        Some(variance)
+    /// Delegate median to the typed native kernel.
+    fn median(&self) -> Option<f64> {
+        match &self.inner {
+            NumericArrayData::Bool(arr) => {
+                groggy::storage::array::numeric_reductions::median(arr.as_slice())
+            }
+            NumericArrayData::Int32(arr) => {
+                groggy::storage::array::numeric_reductions::median(arr.as_slice())
+            }
+            NumericArrayData::Int64(arr) => {
+                groggy::storage::array::numeric_reductions::median(arr.as_slice())
+            }
+            NumericArrayData::Float32(arr) => {
+                groggy::storage::array::numeric_reductions::median(arr.as_slice())
+            }
+            NumericArrayData::Float64(arr) => {
+                groggy::storage::array::numeric_reductions::median(arr.as_slice())
+            }
+        }
     }
 
     /// Get first element

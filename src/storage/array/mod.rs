@@ -21,6 +21,7 @@ pub mod lazy_iterator;
 pub mod memory_profiler;
 pub mod num_array;
 pub mod numarray_benchmark;
+pub mod numeric_reductions;
 pub mod query;
 mod reductions;
 pub mod simd_optimizations;

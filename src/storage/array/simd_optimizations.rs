@@ -1,244 +1,33 @@
-//! SIMD Optimizations for NumArray Statistical Operations
-//!
-//! This module provides vectorized implementations of statistical operations
-//! for improved performance on numerical data arrays.
-
-use wide::f64x4; // 4-way SIMD for f64
-
-/// SIMD-optimized sum calculation
+//! Compatibility entry points sharing checked reference reductions.
+//! Acceleration is deferred until it preserves these semantics and is measured.
+use super::numeric_reductions as kernels;
+/// Compensated reference sum behind the historical SIMD name.
 pub fn simd_sum(data: &[f64]) -> f64 {
-    if data.len() < 4 {
-        // Fall back to scalar for small arrays
-        return data.iter().sum();
-    }
-
-    let chunks = data.len() / 4;
-    let _remainder = data.len() % 4;
-
-    // Process 4 elements at a time with SIMD
-    let mut simd_sum = f64x4::ZERO;
-
-    for i in 0..chunks {
-        let chunk_start = i * 4;
-        let chunk = f64x4::new([
-            data[chunk_start],
-            data[chunk_start + 1],
-            data[chunk_start + 2],
-            data[chunk_start + 3],
-        ]);
-        simd_sum += chunk;
-    }
-
-    // Sum the SIMD register and add remainder
-    let simd_total = simd_sum.to_array().iter().sum::<f64>();
-    let remainder_sum: f64 = data[(chunks * 4)..].iter().sum();
-
-    simd_total + remainder_sum
+    kernels::sum(data)
 }
-
-/// SIMD-optimized mean calculation  
+/// Shared reference mean.
 pub fn simd_mean(data: &[f64]) -> Option<f64> {
-    if data.is_empty() {
-        return None;
-    }
-
-    Some(simd_sum(data) / data.len() as f64)
+    kernels::mean(data)
 }
-
-/// SIMD-optimized variance calculation
+/// Sample moment around the caller's explicitly supplied center.
 pub fn simd_variance(data: &[f64], mean: f64) -> f64 {
-    if data.len() <= 1 {
-        return 0.0;
-    }
-
-    if data.len() < 4 {
-        // Fall back to scalar for small arrays
-        return data.iter().map(|&x| (x - mean) * (x - mean)).sum::<f64>()
-            / (data.len() - 1) as f64;
-    }
-
-    let chunks = data.len() / 4;
-    let _remainder = data.len() % 4;
-
-    let mean_vec = f64x4::splat(mean);
-    let mut variance_sum = f64x4::ZERO;
-
-    for i in 0..chunks {
-        let chunk_start = i * 4;
-        let chunk = f64x4::new([
-            data[chunk_start],
-            data[chunk_start + 1],
-            data[chunk_start + 2],
-            data[chunk_start + 3],
-        ]);
-
-        let diff = chunk - mean_vec;
-        let squared_diff = diff * diff;
-        variance_sum += squared_diff;
-    }
-
-    // Sum the SIMD register and add remainder
-    let simd_variance = variance_sum.to_array().iter().sum::<f64>();
-    let remainder_variance: f64 = data[(chunks * 4)..]
-        .iter()
-        .map(|&x| (x - mean) * (x - mean))
-        .sum();
-
-    (simd_variance + remainder_variance) / (data.len() - 1) as f64
+    kernels::variance_with_mean(data, mean)
 }
-
-/// SIMD-optimized standard deviation calculation
+/// Shared sample standard deviation.
 pub fn simd_std_dev(data: &[f64]) -> Option<f64> {
-    if data.is_empty() {
-        return None;
-    }
-
-    let mean = simd_mean(data)?;
-    Some(simd_variance(data, mean).sqrt())
+    kernels::std_dev(data)
 }
-
-/// SIMD-optimized min calculation
+/// Shared minimum with NaN propagation.
 pub fn simd_min(data: &[f64]) -> Option<f64> {
-    if data.is_empty() {
-        return None;
-    }
-
-    if data.len() < 4 {
-        return data.iter().cloned().reduce(f64::min);
-    }
-
-    let chunks = data.len() / 4;
-    let _remainder = data.len() % 4;
-
-    // Initialize with first chunk
-    let mut min_vec = f64x4::new([data[0], data[1], data[2], data[3]]);
-
-    // Process remaining chunks
-    for i in 1..chunks {
-        let chunk_start = i * 4;
-        let chunk = f64x4::new([
-            data[chunk_start],
-            data[chunk_start + 1],
-            data[chunk_start + 2],
-            data[chunk_start + 3],
-        ]);
-
-        // Element-wise min
-        min_vec = min_vec.min(chunk);
-    }
-
-    // Find min in the SIMD register
-    let mut min_val = min_vec.to_array().iter().cloned().reduce(f64::min).unwrap();
-
-    // Process remainder
-    for &val in &data[(chunks * 4)..] {
-        min_val = min_val.min(val);
-    }
-
-    Some(min_val)
+    kernels::extremum(data, true)
 }
-
-/// SIMD-optimized max calculation
+/// Shared maximum with NaN propagation.
 pub fn simd_max(data: &[f64]) -> Option<f64> {
-    if data.is_empty() {
-        return None;
-    }
-
-    if data.len() < 4 {
-        return data.iter().cloned().reduce(f64::max);
-    }
-
-    let chunks = data.len() / 4;
-    let _remainder = data.len() % 4;
-
-    // Initialize with first chunk
-    let mut max_vec = f64x4::new([data[0], data[1], data[2], data[3]]);
-
-    // Process remaining chunks
-    for i in 1..chunks {
-        let chunk_start = i * 4;
-        let chunk = f64x4::new([
-            data[chunk_start],
-            data[chunk_start + 1],
-            data[chunk_start + 2],
-            data[chunk_start + 3],
-        ]);
-
-        // Element-wise max
-        max_vec = max_vec.max(chunk);
-    }
-
-    // Find max in the SIMD register
-    let mut max_val = max_vec.to_array().iter().cloned().reduce(f64::max).unwrap();
-
-    // Process remainder
-    for &val in &data[(chunks * 4)..] {
-        max_val = max_val.max(val);
-    }
-
-    Some(max_val)
+    kernels::extremum(data, false)
 }
-
-/// Optimized partial sorting for median calculation
-/// Uses quickselect algorithm which is O(n) average case vs O(n log n) for full sort
+/// In-place selection using bounded-stack partitioning and a safe midpoint.
 pub fn quickselect_median(data: &mut [f64]) -> Option<f64> {
-    if data.is_empty() {
-        return None;
-    }
-
-    let len = data.len();
-
-    if len % 2 == 1 {
-        // Odd length - find middle element
-        let median_idx = len / 2;
-        Some(quickselect(data, median_idx))
-    } else {
-        // Even length - average of two middle elements
-        let mid_high = len / 2;
-        let mid_low = mid_high - 1;
-
-        // Find both middle elements
-        let low_val = quickselect(data, mid_low);
-        let high_val = quickselect(data, mid_high);
-
-        Some((low_val + high_val) / 2.0)
-    }
-}
-
-/// Quickselect implementation for finding kth smallest element
-fn quickselect(data: &mut [f64], k: usize) -> f64 {
-    if data.len() == 1 {
-        return data[0];
-    }
-
-    let pivot_idx = partition(data);
-
-    if k == pivot_idx {
-        data[k]
-    } else if k < pivot_idx {
-        quickselect(&mut data[0..pivot_idx], k)
-    } else {
-        quickselect(&mut data[pivot_idx + 1..], k - pivot_idx - 1)
-    }
-}
-
-/// Partition function for quickselect
-fn partition(data: &mut [f64]) -> usize {
-    let pivot_idx = data.len() / 2;
-    data.swap(pivot_idx, data.len() - 1);
-
-    let pivot = data[data.len() - 1];
-    let mut i = 0;
-
-    for j in 0..data.len() - 1 {
-        if data[j] <= pivot {
-            data.swap(i, j);
-            i += 1;
-        }
-    }
-
-    data.swap(i, data.len() - 1);
-    i
+    kernels::select_median(data)
 }
 
 #[cfg(test)]

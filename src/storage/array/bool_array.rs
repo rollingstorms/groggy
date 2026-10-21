@@ -44,6 +44,11 @@ impl BoolArray {
         self.inner.get(index).copied()
     }
 
+    /// Borrow typed values for native reduction dispatch.
+    pub fn as_slice(&self) -> &[bool] {
+        self.inner.as_slice()
+    }
+
     /// Get an iterator over the boolean values
     pub fn iter(&self) -> impl Iterator<Item = &bool> {
         self.inner.iter()

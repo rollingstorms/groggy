@@ -244,40 +244,6 @@ pub(super) fn median(values: &[AttrValue]) -> GraphResult<f64> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn median_numeric_order_is_transitive_across_integer_limits_and_signed_zero() {
-        let numbers = [
-            Number::Integer(i64::MIN),
-            Number::Integer(i64::MIN + 1),
-            Number::Integer(-1),
-            Number::Integer(0),
-            Number::Integer(1),
-            Number::Integer(i64::MAX),
-            Number::Float(-f64::from(f32::MAX)),
-            Number::Float(-(2.0_f64).powi(63)),
-            Number::Float(-0.5),
-            Number::Float(-0.0),
-            Number::Float(0.0),
-            Number::Float(0.5),
-            Number::Float((2.0_f64).powi(63)),
-            Number::Float(f64::from(f32::MAX)),
-        ];
-        for &a in &numbers {
-            for &b in &numbers {
-                for &c in &numbers {
-                    assert_eq!(a.cmp(b), b.cmp(a).reverse());
-                    if a.cmp(b) != Ordering::Greater && b.cmp(c) != Ordering::Greater {
-                        assert_ne!(a.cmp(c), Ordering::Greater);
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// Select an original numeric scalar using exact mixed ordering; ties keep first.
 pub(super) fn numeric_extremum(values: &[AttrValue], minimum: bool) -> GraphResult<AttrValue> {
     extremum(values, minimum, false)
@@ -315,9 +281,11 @@ fn extremum(values: &[AttrValue], minimum: bool, legacy: bool) -> GraphResult<At
                 (AttrValue::Text(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
                 (AttrValue::CompactText(a), AttrValue::Text(b)) => a.as_str().cmp(b.as_str()),
                 (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
-                _ => return Err(invalid(format!(
+                _ => {
+                    return Err(invalid(format!(
                     "Cannot compare incompatible types for {operation}: {value:?} and {previous:?}"
-                ))),
+                )))
+                }
             },
         };
         if (minimum && order == Ordering::Less) || (!minimum && order == Ordering::Greater) {
@@ -329,4 +297,38 @@ fn extremum(values: &[AttrValue], minimum: bool, legacy: bool) -> GraphResult<At
             "Cannot compute {operation} of empty array (no non-null values)"
         ))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn median_numeric_order_is_transitive_across_integer_limits_and_signed_zero() {
+        let numbers = [
+            Number::Integer(i64::MIN),
+            Number::Integer(i64::MIN + 1),
+            Number::Integer(-1),
+            Number::Integer(0),
+            Number::Integer(1),
+            Number::Integer(i64::MAX),
+            Number::Float(-f64::from(f32::MAX)),
+            Number::Float(-(2.0_f64).powi(63)),
+            Number::Float(-0.5),
+            Number::Float(-0.0),
+            Number::Float(0.0),
+            Number::Float(0.5),
+            Number::Float((2.0_f64).powi(63)),
+            Number::Float(f64::from(f32::MAX)),
+        ];
+        for &a in &numbers {
+            for &b in &numbers {
+                for &c in &numbers {
+                    assert_eq!(a.cmp(b), b.cmp(a).reverse());
+                    if a.cmp(b) != Ordering::Greater && b.cmp(c) != Ordering::Greater {
+                        assert_ne!(a.cmp(c), Ordering::Greater);
+                    }
+                }
+            }
+        }
+    }
 }

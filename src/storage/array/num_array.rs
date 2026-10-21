@@ -39,6 +39,11 @@ impl<T> NumArray<T> {
         self.base.get(index)
     }
 
+    /// Borrow typed contiguous values without converting or copying them.
+    pub fn as_slice(&self) -> &[T] {
+        self.base.as_slice()
+    }
+
     /// Get an iterator over the elements
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.base.iter()
@@ -60,87 +65,39 @@ impl<T> NumArray<T>
 where
     T: Copy + Add<Output = T> + Mul<f64, Output = T> + PartialOrd + Into<f64>,
 {
-    /// Calculate the mean (average) of all elements
+    /// Shared compensated mean; empty=None and nonfinite values propagate.
     pub fn mean(&self) -> Option<f64> {
-        if self.is_empty() {
-            return None;
-        }
-        let sum: f64 = self.iter().map(|&x| x.into()).sum();
-        Some(sum / self.len() as f64)
+        super::numeric_reductions::mean_iter(self.base.as_slice().iter().map(|&x| x.into()))
     }
-
-    /// Calculate the sum of all elements
+    /// Shared numeric sum; empty=0.
     pub fn sum(&self) -> f64 {
-        self.iter().map(|&x| x.into()).sum()
+        super::numeric_reductions::sum_iter(self.base.as_slice().iter().map(|&x| x.into()))
     }
-
-    /// Find the minimum value
+    /// Shared first numeric minimum, propagating any NaN.
     pub fn min(&self) -> Option<f64> {
-        self.iter()
-            .map(|&x| x.into())
-            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        super::numeric_reductions::extremum_iter(
+            self.base.as_slice().iter().map(|&x| x.into()),
+            true,
+        )
     }
-
-    /// Find the maximum value
+    /// Shared first numeric maximum, propagating any NaN.
     pub fn max(&self) -> Option<f64> {
-        self.iter()
-            .map(|&x| x.into())
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        super::numeric_reductions::extremum_iter(
+            self.base.as_slice().iter().map(|&x| x.into()),
+            false,
+        )
     }
-
-    /// Calculate the standard deviation (sample standard deviation)
+    /// Sample standard deviation computed without first overflowing variance.
     pub fn std_dev(&self) -> Option<f64> {
-        let mean = self.mean()?;
-        if self.len() <= 1 {
-            return Some(0.0);
-        }
-
-        let variance = self
-            .iter()
-            .map(|&x| {
-                let diff = x.into() - mean;
-                diff * diff
-            })
-            .sum::<f64>()
-            / (self.len() - 1) as f64;
-
-        Some(variance.sqrt())
+        super::numeric_reductions::std_iter(self.base.as_slice().iter().map(|&x| x.into()))
     }
-
-    /// Calculate the variance (sample variance)
+    /// Sample variance; empty=None, finite singleton=0.
     pub fn variance(&self) -> Option<f64> {
-        let mean = self.mean()?;
-        if self.len() <= 1 {
-            return Some(0.0);
-        }
-
-        let variance = self
-            .iter()
-            .map(|&x| {
-                let diff = x.into() - mean;
-                diff * diff
-            })
-            .sum::<f64>()
-            / (self.len() - 1) as f64;
-
-        Some(variance)
+        super::numeric_reductions::variance_iter(self.base.as_slice().iter().map(|&x| x.into()))
     }
-
-    /// Calculate the median value
+    /// Median with checked ordering and an overflow-safe midpoint.
     pub fn median(&self) -> Option<f64> {
-        if self.is_empty() {
-            return None;
-        }
-
-        let mut sorted: Vec<f64> = self.iter().map(|&x| x.into()).collect();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        let mid = sorted.len() / 2;
-        if sorted.len().is_multiple_of(2) {
-            Some((sorted[mid - 1] + sorted[mid]) / 2.0)
-        } else {
-            Some(sorted[mid])
-        }
+        super::numeric_reductions::median_iter(self.base.as_slice().iter().map(|&x| x.into()))
     }
 
     /// Calculate the percentile (0.0 to 1.0)
@@ -280,38 +237,37 @@ impl<T> From<NumArray<T>> for BaseArray<T> {
 
 // SIMD-optimized implementations specifically for f64 arrays
 impl NumArray<f64> {
-    /// SIMD-optimized sum for f64 arrays
+    /// Reference-kernel compatibility sum for f64 arrays
     pub fn sum_simd(&self) -> f64 {
         simd_optimizations::simd_sum(self.base.as_slice())
     }
 
-    /// SIMD-optimized mean for f64 arrays
+    /// Reference-kernel compatibility mean for f64 arrays
     pub fn mean_simd(&self) -> Option<f64> {
         simd_optimizations::simd_mean(self.base.as_slice())
     }
 
-    /// SIMD-optimized standard deviation for f64 arrays
+    /// Reference-kernel compatibility standard deviation for f64 arrays
     pub fn std_dev_simd(&self) -> Option<f64> {
         simd_optimizations::simd_std_dev(self.base.as_slice())
     }
 
-    /// SIMD-optimized variance for f64 arrays
+    /// Reference-kernel compatibility variance for f64 arrays
     pub fn variance_simd(&self) -> Option<f64> {
-        self.mean_simd()
-            .map(|mean| simd_optimizations::simd_variance(self.base.as_slice(), mean))
+        super::numeric_reductions::variance(self.base.as_slice())
     }
 
-    /// SIMD-optimized min for f64 arrays
+    /// Reference-kernel compatibility min for f64 arrays
     pub fn min_simd(&self) -> Option<f64> {
         simd_optimizations::simd_min(self.base.as_slice())
     }
 
-    /// SIMD-optimized max for f64 arrays
+    /// Reference-kernel compatibility max for f64 arrays
     pub fn max_simd(&self) -> Option<f64> {
         simd_optimizations::simd_max(self.base.as_slice())
     }
 
-    /// Optimized median using quickselect algorithm for f64 arrays
+    /// Median using bounded-stack in-place selection on a copy
     pub fn median_optimized(&self) -> Option<f64> {
         if self.is_empty() {
             return None;
@@ -322,7 +278,7 @@ impl NumArray<f64> {
         simd_optimizations::quickselect_median(&mut data)
     }
 
-    /// Auto-choose between regular and SIMD implementations based on array size
+    /// Retain the historical dispatch API with shared numerical semantics
     pub fn sum_auto(&self) -> f64 {
         if self.len() >= 8 {
             self.sum_simd()
@@ -331,7 +287,7 @@ impl NumArray<f64> {
         }
     }
 
-    /// Auto-choose mean implementation based on array size
+    /// Historical mean dispatch; both paths share the reference kernel
     pub fn mean_auto(&self) -> Option<f64> {
         if self.len() >= 8 {
             self.mean_simd()
@@ -340,7 +296,7 @@ impl NumArray<f64> {
         }
     }
 
-    /// Auto-choose median implementation based on array size
+    /// Dispatch to full sort or in-place selection with the same median contract
     pub fn median_auto(&self) -> Option<f64> {
         if self.len() >= 100 {
             // Use quickselect for larger arrays
