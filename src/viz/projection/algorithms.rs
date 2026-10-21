@@ -151,188 +151,7 @@ impl ProjectionEngine for PCAProjection {
     }
 }
 
-/// t-SNE inspired projection (good for clustering)
-#[derive(Debug)]
-pub struct TSNEProjection {
-    perplexity: f64,
-    iterations: usize,
-    learning_rate: f64,
-    early_exaggeration: f64,
-}
-
-impl TSNEProjection {
-    pub fn new(
-        perplexity: f64,
-        iterations: usize,
-        learning_rate: f64,
-        early_exaggeration: f64,
-    ) -> Self {
-        Self {
-            perplexity,
-            iterations,
-            learning_rate,
-            early_exaggeration,
-        }
-    }
-
-    /// Compute pairwise distances in high-dimensional space
-    fn compute_distances(&self, embedding: &GraphMatrix) -> GraphResult<GraphMatrix> {
-        let (n, _) = embedding.shape();
-        let mut distances = GraphMatrix::<f64>::zeros(n, n);
-
-        for i in 0..n {
-            for j in i + 1..n {
-                let mut dist_sq = 0.0;
-                for k in 0..embedding.shape().1 {
-                    let diff = embedding.get_checked(i, k)? - embedding.get_checked(j, k)?;
-                    dist_sq += diff * diff;
-                }
-                let dist = dist_sq.sqrt();
-                distances.set(i, j, dist)?;
-                distances.set(j, i, dist)?;
-            }
-        }
-
-        Ok(distances)
-    }
-
-    /// Compute probability matrix from distances
-    fn compute_probabilities(&self, distances: &GraphMatrix) -> GraphResult<GraphMatrix> {
-        let (n, _) = distances.shape();
-        let mut probabilities = GraphMatrix::<f64>::zeros(n, n);
-
-        // For simplicity, use a fixed variance based on perplexity
-        // In a full t-SNE implementation, this would be computed per-point
-        let variance = self.perplexity / 3.0;
-
-        for i in 0..n {
-            let mut row_sum = 0.0;
-            for j in 0..n {
-                if i != j {
-                    let dist = distances.get_checked(i, j)?;
-                    let prob = (-dist * dist / (2.0 * variance)).exp();
-                    probabilities.set(i, j, prob)?;
-                    row_sum += prob;
-                }
-            }
-
-            // Normalize row
-            if row_sum > 1e-12 {
-                for j in 0..n {
-                    if i != j {
-                        let prob = probabilities.get_checked(i, j)?;
-                        probabilities.set(i, j, prob / row_sum)?;
-                    }
-                }
-            }
-        }
-
-        Ok(probabilities)
-    }
-
-    /// Optimize 2D embedding using gradient descent
-    fn optimize_embedding(&self, probabilities: &GraphMatrix) -> GraphResult<GraphMatrix> {
-        let (n, _) = probabilities.shape();
-
-        // Initialize random 2D positions
-        let mut positions = GraphMatrix::<f64>::zeros(n, 2);
-        let mut rng = fastrand::Rng::new();
-        for i in 0..n {
-            for j in 0..2 {
-                positions.set(i, j, rng.f64() * 2.0 - 1.0)?;
-            }
-        }
-
-        // Gradient descent optimization (simplified)
-        for iteration in 0..self.iterations {
-            let mut gradients = GraphMatrix::<f64>::zeros(n, 2);
-
-            // Compute gradients
-            for i in 0..n {
-                for j in 0..n {
-                    if i != j {
-                        let pi = positions.get_checked(i, 0)?;
-                        let pj = positions.get_checked(j, 0)?;
-                        let qi = positions.get_checked(i, 1)?;
-                        let qj = positions.get_checked(j, 1)?;
-
-                        let dx = pi - pj;
-                        let dy = qi - qj;
-                        let dist_sq = dx * dx + dy * dy + 1e-12;
-
-                        let q_ij = 1.0 / (1.0 + dist_sq);
-                        let p_ij = probabilities.get_checked(i, j)?;
-
-                        let factor = 4.0 * (p_ij - q_ij) * q_ij;
-
-                        let grad_x = gradients.get_checked(i, 0)? + factor * dx;
-                        let grad_y = gradients.get_checked(i, 1)? + factor * dy;
-                        gradients.set(i, 0, grad_x)?;
-                        gradients.set(i, 1, grad_y)?;
-                    }
-                }
-            }
-
-            // Update positions
-            let current_lr = if iteration < 250 {
-                self.learning_rate * self.early_exaggeration
-            } else {
-                self.learning_rate
-            };
-
-            for i in 0..n {
-                for j in 0..2 {
-                    let pos = positions.get_checked(i, j)?;
-                    let grad = gradients.get_checked(i, j)?;
-                    positions.set(i, j, pos - current_lr * grad)?;
-                }
-            }
-        }
-
-        Ok(positions)
-    }
-}
-
-impl ProjectionEngine for TSNEProjection {
-    fn project_embedding(
-        &self,
-        embedding: &GraphMatrix,
-        _graph: &Graph,
-    ) -> GraphResult<Vec<Position>> {
-        self.validate_embedding(embedding)?;
-
-        // Compute pairwise distances
-        let distances = self.compute_distances(embedding)?;
-
-        // Compute probability matrix
-        let probabilities = self.compute_probabilities(&distances)?;
-
-        // Optimize 2D embedding
-        let projected = self.optimize_embedding(&probabilities)?;
-
-        // Convert to positions
-        let (n_samples, _) = projected.shape();
-        let mut positions = Vec::with_capacity(n_samples);
-
-        for i in 0..n_samples {
-            let x = projected.get_checked(i, 0)?;
-            let y = projected.get_checked(i, 1)?;
-            positions.push(Position { x, y });
-        }
-
-        Ok(positions)
-    }
-
-    fn supports_incremental(&self) -> bool {
-        false
-    }
-    fn supports_interpolation(&self) -> bool {
-        true
-    }
-    fn name(&self) -> &str {
-        "tsne"
-    }
-}
+pub use super::tsne::TSNEProjection;
 
 /// UMAP-inspired projection (balanced global/local preservation)
 #[derive(Debug)]
@@ -780,7 +599,12 @@ mod tests {
     fn test_tsne_projection() {
         let embedding = create_test_embedding();
         let graph = create_test_graph();
-        let engine = TSNEProjection::new(3.0, 100, 100.0, 4.0);
+        // The fifth row is equidistant from all four others: perplexity below
+        // four cannot be calibrated without inventing tie-breaking distances.
+        assert!(TSNEProjection::new(3.0, 100, 100.0, 4.0)
+            .project_embedding(&embedding, &graph)
+            .is_err());
+        let engine = TSNEProjection::new(4.0, 100, 100.0, 4.0);
 
         let positions = engine.project_embedding(&embedding, &graph);
         assert!(positions.is_ok());

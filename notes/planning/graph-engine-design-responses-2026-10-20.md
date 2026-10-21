@@ -440,3 +440,12 @@ Validate finite positive learning rate, finite nonnegative strengths/ideal dista
 Use bounded backtracking (64 halvings) with optional linear rate annealing and actual initial/final energy history, accepting only finite nonincreasing energy. Return explicit errors on overflow or failed line search. Zero gradients/unrepresentable updates stop; a fixed iteration bound is an approximation, not certified convergence. Smoothed coincident points can remain stationary, and disconnected/repulsion-only layouts need not have bounded optima. Custom/stress modes reject even at zero iterations. No Python API, acceleration, GIL, cancellation or scale guarantee is added.
 
 Independent finite differences in multiple dimensions, translation/balanced-force checks, real energy descent, cutoff/topology/parallel/identity/failure fixtures and factory RNG reproducibility cover the repair. Broader analytics 28.15 and certification 28.16 stay open. See docs/api/energy-embedding.md and tests/energy_embedding.rs.
+
+
+## Item 28 dense t-SNE repair — 2026-10-21
+
+Replace fixed-variance conditionals, unnormalized Student-t values and learning-rate exaggeration with entropy-calibrated per-row Gaussian affinities, symmetric joint P of unit mass, globally normalized Q and analytic exact dense objective gradients. A bounded binary search targets log(perplexity); explicit uniform/nearest-tie limits handle boundary cases. Reject unattainable perplexity rather than fabricate distances or silently ignore it. One older smoke fixture has four tied nearest neighbors in a row, so perplexity three now explicitly rejects and four succeeds.
+
+Use phase-specific finite nonincreasing backtracking, with P exaggerated during the first 250 requested updates. Preserve the later phase even if the earlier phase stops. Validate controls/input/shape/finite values and row metadata, use common feature scaling before distances, preserve owned row labels, and propagate factory seed to a local RNG. Keep existing constructor/trait/import path; add native project_matrix/with_seed. No Python API or approximation/convergence/scale/cancellation/GIL claim is added. UMAP-inspired behavior and other analytics remain open.
+
+Known analytic entropy probabilities, an independent normalized Student-t objective, finite differences, actual KL reduction/phase transition, and native public factory/trait/identity/RNG/range/failure tests provide scoped evidence. See docs/api/tsne-projection.md.

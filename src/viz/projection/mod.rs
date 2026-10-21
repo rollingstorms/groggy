@@ -14,7 +14,9 @@ use crate::viz::streaming::data_source::Position;
 pub mod algorithms;
 pub mod honeycomb;
 pub mod interpolation;
+mod neighborhood;
 pub mod quality;
+mod tsne;
 
 /// Core trait for projecting high-dimensional embeddings to 2D coordinates
 pub trait ProjectionEngine: std::fmt::Debug {
@@ -356,12 +358,18 @@ impl ProjectionEngineFactory {
                 iterations,
                 learning_rate,
                 early_exaggeration,
-            } => Ok(Box::new(algorithms::TSNEProjection::new(
-                *perplexity,
-                *iterations,
-                *learning_rate,
-                *early_exaggeration,
-            ))),
+            } => {
+                let mut engine = algorithms::TSNEProjection::new(
+                    *perplexity,
+                    *iterations,
+                    *learning_rate,
+                    *early_exaggeration,
+                );
+                if let Some(seed) = config.seed {
+                    engine = engine.with_seed(seed);
+                }
+                Ok(Box::new(engine))
+            }
 
             ProjectionMethod::UMAP {
                 n_neighbors,
