@@ -81,7 +81,7 @@ impl From<ComponentMode> for ComponentCacheMode {
 
 /// Connected Components algorithm.
 ///
-/// Detects connected components using efficient Union-Find for undirected/weak
+/// Detects connected components using iterative BFS for undirected/weak
 /// connectivity, or Tarjan's algorithm for strongly connected components.
 #[derive(Clone, Debug)]
 pub struct ConnectedComponents {
@@ -114,12 +114,14 @@ impl NodeIndexer {
             return Self::Sparse(FxHashMap::default());
         }
 
-        let min = *nodes.iter().min().unwrap();
-        let max = *nodes.iter().max().unwrap();
-        let span = (max - min) as usize + 1;
+        let min = nodes.iter().copied().min().unwrap_or(0);
+        let max = nodes.iter().copied().max().unwrap_or(0);
+        let span = max.checked_sub(min).and_then(|delta| delta.checked_add(1));
 
         // Dense indexing threshold: span must be reasonable relative to node count
-        if span <= nodes.len() * 3 / 2 {
+        if let Some(span) = span.filter(|&span| {
+            span <= nodes.len().saturating_mul(3) / 2 && nodes.len() < u32::MAX as usize
+        }) {
             let mut indices = vec![u32::MAX; span];
             for (i, &node) in nodes.iter().enumerate() {
                 indices[(node - min) as usize] = i as u32;
@@ -173,7 +175,7 @@ impl NodeIndexer {
 /// - Records per-component statistics for bottleneck analysis
 ///
 /// Returns the total number of components discovered.
-fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> u32 {
+fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Result<u32> {
     let n = csr.node_count();
 
     // Track allocation time
@@ -211,6 +213,9 @@ fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> u32 {
         let mut component_edges = 0;
 
         while idx < queue.len() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("connected components cancelled"));
+            }
             let v = queue[idx];
             idx += 1;
             component_nodes += 1;
@@ -241,7 +246,7 @@ fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> u32 {
     ctx.record_stat("cc.count.nodes_processed", total_nodes_processed as f64);
     ctx.record_stat("cc.count.edges_scanned", total_edges_scanned as f64);
 
-    component
+    Ok(component)
 }
 
 /// Optimized iterative Tarjan's algorithm for strongly connected components with profiling.
@@ -257,7 +262,7 @@ fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> u32 {
 /// - Records nodes/edges processed and stack operations
 ///
 /// Returns components as vectors of node indices (in reverse topological order).
-fn tarjan_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Vec<Vec<usize>> {
+fn tarjan_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Result<Vec<Vec<usize>>> {
     let n = csr.node_count();
 
     // Track allocation time
@@ -300,6 +305,9 @@ fn tarjan_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Vec<Ve
 
         // Iterative DFS with explicit stack
         while let Some(mut frame) = call_stack.pop() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("connected components cancelled"));
+            }
             let v = frame.v as usize;
 
             // Track recursion depth
@@ -353,7 +361,10 @@ fn tarjan_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Vec<Ve
                 let scc_start = Instant::now();
                 let mut component = Vec::new();
                 loop {
-                    let w = stack.pop().expect("Tarjan stack underflow") as usize;
+                    let w = stack
+                        .pop()
+                        .ok_or_else(|| anyhow!("invalid Tarjan stack state"))?
+                        as usize;
                     stack_pops += 1;
                     on_stack[w] = false;
                     labels[w] = component_id;
@@ -385,7 +396,7 @@ fn tarjan_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Vec<Ve
     ctx.record_stat("cc.count.stack_pushes", stack_pushes as f64);
     ctx.record_stat("cc.count.stack_pops", stack_pops as f64);
 
-    components
+    Ok(components)
 }
 
 impl ConnectedComponents {
@@ -400,9 +411,9 @@ impl ConnectedComponents {
             description: "High-performance connected components using CSR graph representation \
                          with optimized BFS (weak/undirected) or iterative Tarjan's algorithm (strong)."
                 .to_string(),
-            version: "0.2.0".to_string(),
+            version: "0.3.0".to_string(),
             cost_hint: CostHint::Linear, // O(V+E) with optimized constants
-            supports_cancellation: false,
+            supports_cancellation: true,
             parameters: vec![
                 ParameterMetadata {
                     name: "mode".to_string(),
@@ -478,12 +489,7 @@ impl ConnectedComponents {
         let edges_timer = Instant::now();
         let edges = subgraph.ordered_edges();
         ctx.record_call("cc.collect_edges", edges_timer.elapsed());
-        let is_directed = {
-            let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            graph_ref.is_directed()
-        };
-        let add_reverse = !is_directed || matches!(self.mode, ComponentMode::Weak);
+        let add_reverse = true; // Both modes ignore orientation, including directed inputs.
 
         let csr_arc = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call("cc.csr_cache_hit", std::time::Duration::from_nanos(0));
@@ -530,7 +536,7 @@ impl ConnectedComponents {
         let mut labels = vec![0u32; nodes.len()];
         ctx.record_call("cc.alloc_labels", start.elapsed());
 
-        let component_count = bfs_components(csr_arc.as_ref(), &mut labels, ctx);
+        let component_count = bfs_components(csr_arc.as_ref(), &mut labels, ctx)?;
 
         // Build component node lists
         let start = Instant::now();
@@ -681,7 +687,8 @@ impl ConnectedComponents {
         let edges_timer = Instant::now();
         let edges = subgraph.ordered_edges();
         ctx.record_call("cc.strong.collect_edges", edges_timer.elapsed());
-        let csr_arc = if let Some(cached) = subgraph.csr_cache_get(false) {
+        let add_reverse = subgraph.graph().borrow().is_undirected();
+        let csr_arc = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call(
                 "cc.strong.csr_cache_hit",
                 std::time::Duration::from_nanos(0),
@@ -707,7 +714,7 @@ impl ConnectedComponents {
                 |node_id| index_by_node.get(node_id),
                 |edge_id| pool_ref.get_edge_endpoints(edge_id),
                 CsrOptions {
-                    add_reverse_edges: false,
+                    add_reverse_edges: add_reverse,
                     sort_neighbors: false,
                 },
             );
@@ -720,7 +727,7 @@ impl ConnectedComponents {
             drop(graph_ref);
 
             let arc = Arc::new(csr);
-            subgraph.csr_cache_store(false, arc.clone());
+            subgraph.csr_cache_store(add_reverse, arc.clone());
             arc
         };
 
@@ -733,7 +740,7 @@ impl ConnectedComponents {
         ctx.record_call("cc.strong.alloc_labels", start.elapsed());
 
         // Run optimized Tarjan's algorithm with profiling
-        let components_idx = tarjan_components(csr_arc.as_ref(), &mut labels, ctx);
+        let components_idx = tarjan_components(csr_arc.as_ref(), &mut labels, ctx)?;
 
         // Convert index-based components to NodeId-based
         let start = Instant::now();
@@ -837,6 +844,15 @@ impl Algorithm for ConnectedComponents {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let start_overall = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("connected components cancelled"));
+        }
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
+        if subgraph.node_set().len() >= u32::MAX as usize {
+            return Err(anyhow!(
+                "connected components requires fewer than u32::MAX nodes"
+            ));
+        }
 
         let nodes_arc: Arc<[NodeId]> =
             ctx.with_counted_timer("cc.collect_nodes", || subgraph.ordered_nodes());
@@ -850,6 +866,9 @@ impl Algorithm for ConnectedComponents {
             ComponentMode::Strong => self.compute_strong(ctx, &subgraph, nodes_slice)?,
         };
 
+        if ctx.is_cancelled() {
+            return Err(anyhow!("connected components cancelled"));
+        }
         let ComponentComputation {
             node_assignments,
             components,

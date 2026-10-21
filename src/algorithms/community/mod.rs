@@ -11,7 +11,7 @@ pub mod modularity;
 mod modularity_levels;
 pub mod utils;
 
-pub use components::ConnectedComponents;
+pub use components::{ComponentMode, ConnectedComponents};
 pub use girvan_newman::GirvanNewman;
 pub use infomap::Infomap;
 pub use leiden::Leiden;

@@ -143,8 +143,10 @@ def connected_components(
     """
     Find connected components in a graph.
 
-    Uses efficient Union-Find for undirected/weak connectivity (O(m α(n))),
-    or Tarjan's algorithm for strongly connected components (O(m + n)).
+    Uses iterative BFS for undirected/weak connectivity, or iterative Tarjan's
+    algorithm for strong connectivity (O(m + n)). Strong mode on an undirected
+    graph returns ordinary connected components. Labels identify components;
+    their numeric values carry no ordering meaning.
 
     Args:
         mode: Connectivity mode (default: "undirected")
