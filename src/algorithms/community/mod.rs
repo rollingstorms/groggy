@@ -3,10 +3,11 @@ mod girvan_newman;
 mod girvan_newman_paths;
 mod infomap;
 mod leiden;
+mod leiden_levels;
 mod louvain;
-mod louvain_levels;
 mod lpa;
 pub mod modularity;
+mod modularity_levels;
 pub mod utils;
 
 pub use components::ConnectedComponents;

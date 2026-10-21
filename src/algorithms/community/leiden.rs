@@ -1,9 +1,9 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::community::modularity::{modularity_delta_with_resolution, ModularityData};
-use crate::algorithms::community::utils::find_connected_components;
+use crate::algorithms::community::leiden_levels::{fast_moves, inherited_partition, refine};
+use crate::algorithms::community::modularity_levels::Level;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -11,20 +11,18 @@ use crate::algorithms::{
 };
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
-use crate::types::{AttrName, AttrValue, NodeId};
+use crate::types::{AttrName, AttrValue};
 
 /// Leiden community detection algorithm.
 ///
-/// Leiden improves on Louvain by:
-/// 1. Guaranteeing connected communities after each move phase
-/// 2. Adding a refinement phase that splits poorly connected communities
-/// 3. Typically converging faster with better quality
+/// Bounded modularity optimization with constrained refinement and aggregation.
 #[derive(Clone, Debug)]
 pub struct Leiden {
     max_iter: usize,
     max_phases: usize,
     resolution: f64,
     seed: Option<u64>,
+    theta: f64,
     output_attr: AttrName,
 }
 
@@ -50,8 +48,18 @@ impl Leiden {
             max_phases,
             resolution,
             seed,
+            theta: 0.01,
             output_attr,
         })
+    }
+
+    /// Set the positive finite refinement temperature in normalized modularity units.
+    pub fn with_theta(mut self, theta: f64) -> Result<Self> {
+        if !theta.is_finite() || theta <= 0.0 {
+            return Err(anyhow!("theta must be finite and positive"));
+        }
+        self.theta = theta;
+        Ok(self)
     }
 
     fn metadata_template() -> AlgorithmMetadata {
@@ -66,14 +74,16 @@ impl Leiden {
             parameters: vec![
                 ParameterMetadata {
                     name: "max_iter".to_string(),
-                    description: "Maximum number of node-move iterations per phase.".to_string(),
+                    description:
+                        "Maximum node visits per level as a multiple of that level's node count."
+                            .to_string(),
                     value_type: ParameterType::Int,
                     required: false,
                     default_value: Some(AlgorithmParamValue::Int(20)),
                 },
                 ParameterMetadata {
                     name: "max_phases".to_string(),
-                    description: "Maximum number of refinement phases.".to_string(),
+                    description: "Maximum fast-move/refinement/aggregation levels.".to_string(),
                     value_type: ParameterType::Int,
                     required: false,
                     default_value: Some(AlgorithmParamValue::Int(10)),
@@ -93,6 +103,15 @@ impl Leiden {
                     default_value: None,
                 },
                 ParameterMetadata {
+                    name: "theta".to_string(),
+                    description:
+                        "Positive finite refinement temperature in normalized modularity units."
+                            .to_string(),
+                    value_type: ParameterType::Float,
+                    required: false,
+                    default_value: Some(AlgorithmParamValue::Float(0.01)),
+                },
+                ParameterMetadata {
                     name: "output_attr".to_string(),
                     description: "Attribute name to store the resulting communities.".to_string(),
                     value_type: ParameterType::Text,
@@ -101,163 +120,6 @@ impl Leiden {
                 },
             ],
         }
-    }
-
-    /// Move nodes to neighboring communities if it improves modularity.
-    fn move_phase(
-        &self,
-        partition: &mut HashMap<NodeId, usize>,
-        _edges: &[(NodeId, NodeId)],
-        data: &ModularityData,
-        adjacency: &HashMap<NodeId, Vec<NodeId>>,
-        ctx: &Context,
-    ) -> Result<bool> {
-        let mut changed = false;
-        let mut nodes: Vec<NodeId> = partition.keys().copied().collect();
-        nodes.sort_unstable();
-        if let Some(seed) = self.seed {
-            let mut rng = fastrand::Rng::with_seed(seed);
-            rng.shuffle(&mut nodes);
-        }
-
-        // ⚡ OPTIMIZATION: Track community degrees incrementally
-        let mut community_degrees: HashMap<usize, f64> = HashMap::new();
-        for (&node, &comm) in partition.iter() {
-            let deg = data.degree(&node);
-            *community_degrees.entry(comm).or_insert(0.0) += deg;
-        }
-
-        for _ in 0..self.max_iter {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("Leiden cancelled"));
-            }
-
-            let mut local_changed = false;
-
-            for &node in &nodes {
-                let current_comm = partition[&node];
-
-                // Find candidate communities (neighbors' communities)
-                let mut candidate_comms: BTreeSet<usize> = BTreeSet::new();
-                candidate_comms.insert(current_comm);
-                if let Some(neighbors) = adjacency.get(&node) {
-                    for &neighbor in neighbors {
-                        if let Some(&comm) = partition.get(&neighbor) {
-                            candidate_comms.insert(comm);
-                        }
-                    }
-                }
-
-                let mut best_comm = current_comm;
-                let mut best_delta = 0.0;
-
-                // ⚡ OPTIMIZATION: Use incremental modularity (same as Louvain!)
-                for &candidate in &candidate_comms {
-                    if candidate == current_comm {
-                        continue;
-                    }
-
-                    // Calculate delta without expensive iteration
-                    let delta = modularity_delta_with_resolution(
-                        node,
-                        current_comm,
-                        candidate,
-                        partition,
-                        adjacency,
-                        data,
-                        &community_degrees,
-                        self.resolution,
-                    );
-                    if !delta.is_finite() {
-                        return Err(anyhow!("Leiden modularity gain is not finite"));
-                    }
-                    let gain = delta;
-
-                    if gain > best_delta {
-                        best_delta = gain;
-                        best_comm = candidate;
-                    }
-                }
-
-                // Apply best move and update community stats incrementally
-                if best_comm != current_comm {
-                    let node_degree = data.degree(&node);
-
-                    // Update old community
-                    if let Some(deg) = community_degrees.get_mut(&current_comm) {
-                        *deg -= node_degree;
-                    }
-
-                    // Update new community
-                    *community_degrees.entry(best_comm).or_insert(0.0) += node_degree;
-
-                    // Move node
-                    partition.insert(node, best_comm);
-                    local_changed = true;
-                    changed = true;
-                }
-            }
-
-            if !local_changed {
-                break;
-            }
-        }
-
-        Ok(changed)
-    }
-
-    /// Refine communities by ensuring connectivity within each community.
-    /// Split communities that are not well-connected.
-    fn refinement_phase(
-        &self,
-        partition: &mut HashMap<NodeId, usize>,
-        adjacency: &HashMap<NodeId, Vec<NodeId>>,
-        ctx: &Context,
-    ) -> Result<bool> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("Leiden cancelled"));
-        }
-
-        // Group nodes by community
-        let mut communities: HashMap<usize, Vec<NodeId>> = HashMap::new();
-        for (&node, &comm) in partition.iter() {
-            communities.entry(comm).or_default().push(node);
-        }
-
-        let mut changed = false;
-        let mut next_comm_id = partition.values().max().copied().unwrap_or(0) + 1;
-
-        let mut communities: Vec<_> = communities.into_iter().collect();
-        communities.sort_unstable_by_key(|(id, _)| *id);
-        for (comm_id, mut nodes) in communities {
-            nodes.sort_unstable();
-            if nodes.len() <= 1 {
-                continue;
-            }
-
-            // Check if community is connected via BFS
-            let components = find_connected_components(&nodes, adjacency);
-
-            if components.len() > 1 {
-                // Community is disconnected - split it
-                changed = true;
-                for (idx, component) in components.into_iter().enumerate() {
-                    let new_comm = if idx == 0 {
-                        comm_id // Keep original ID for first component
-                    } else {
-                        let id = next_comm_id;
-                        next_comm_id += 1;
-                        id
-                    };
-
-                    for node in component {
-                        partition.insert(node, new_comm);
-                    }
-                }
-            }
-        }
-
-        Ok(changed)
     }
 }
 
@@ -280,71 +142,86 @@ impl Algorithm for Leiden {
         crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
 
         let nodes = subgraph.ordered_nodes();
-        if nodes.is_empty() {
-            return Ok(subgraph);
-        }
-
-        // Build edge list and adjacency
-        let mut edges = Vec::new();
-        let graph_ref = subgraph.graph();
-        let graph = graph_ref.borrow();
-        for &edge_id in subgraph.ordered_edges().iter() {
-            let (u, v) = graph.edge_endpoints(edge_id)?;
-            let pair = if u <= v { (u, v) } else { (v, u) };
-            edges.push(pair);
-        }
-        drop(graph);
-
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-        for &(u, v) in &edges {
-            adjacency.entry(u).or_default().push(v);
-            adjacency.entry(v).or_default().push(u);
-        }
-
-        let data = ModularityData::new(&edges);
-
-        // Initialize each node in its own community
-        let mut partition: HashMap<NodeId, usize> = nodes
+        let index: HashMap<_, _> = nodes
             .iter()
             .enumerate()
             .map(|(i, &node)| (node, i))
             .collect();
-
-        // Leiden phases
-        for _phase in 0..self.max_phases {
+        let mut edges = Vec::new();
+        {
+            let graph = subgraph.graph();
+            let graph = graph.borrow();
+            for &edge in subgraph.ordered_edges().iter() {
+                let (u, v) = graph.edge_endpoints(edge)?;
+                edges.push((index[&u], index[&v], 1));
+            }
+        }
+        let mut level = Level::new(nodes.len(), edges)?;
+        let mut membership: Vec<_> = (0..nodes.len()).collect();
+        let mut inherited = level.singleton_labels();
+        let mut final_labels = inherited.clone();
+        let mut rng = fastrand::Rng::with_seed(self.seed.unwrap_or(0));
+        let mut levels = 0;
+        for phase in 0..self.max_phases {
             if ctx.is_cancelled() {
                 return Err(anyhow!("Leiden cancelled"));
             }
-
-            // 1. Move phase: optimize modularity
-            let move_changed = self.move_phase(&mut partition, &edges, &data, &adjacency, ctx)?;
-
-            // 2. Refinement phase: ensure connectivity
-            let refine_changed = self.refinement_phase(&mut partition, &adjacency, ctx)?;
-
-            if !move_changed && !refine_changed {
+            ctx.record_stat(format!("leiden.phase_{phase}.nodes"), level.n as f64);
+            let before = level.modularity(&inherited, self.resolution)?;
+            let parent = fast_moves(
+                &level,
+                &inherited,
+                self.resolution,
+                self.max_iter,
+                &mut rng,
+                ctx,
+            )?;
+            let after = level.modularity(&parent.labels, self.resolution)?;
+            let tolerance = 64. * f64::EPSILON * (1. + before.abs().max(after.abs()));
+            if after < before - tolerance {
+                return Err(anyhow!("Leiden phase decreased modularity"));
+            }
+            final_labels = membership.iter().map(|&u| parent.labels[u]).collect();
+            levels += 1;
+            ctx.record_stat(format!("leiden.phase_{phase}.modularity"), after);
+            ctx.record_stat(
+                format!("leiden.phase_{phase}.communities"),
+                parent.communities as f64,
+            );
+            ctx.record_stat(
+                format!("leiden.phase_{phase}.visits"),
+                parent.iterations as f64,
+            );
+            if parent.communities == level.n {
                 break;
             }
-        }
-
-        // Relabel communities to be contiguous
-        let mut comm_map: HashMap<usize, usize> = HashMap::new();
-        let mut next_id = 0;
-        for node in nodes.iter() {
-            let comm = partition[node];
-            if let std::collections::hash_map::Entry::Vacant(entry) = comm_map.entry(comm) {
-                entry.insert(next_id);
-                next_id += 1;
+            let refined = refine(&level, &parent, self.resolution, self.theta, &mut rng, ctx)?;
+            let next_inherited = inherited_partition(&parent, &refined)?;
+            let coarse = level.aggregate(&refined)?;
+            let projected = coarse.modularity(&next_inherited, self.resolution)?;
+            if (projected - after).abs() > tolerance {
+                return Err(anyhow!("Leiden aggregation changed modularity"));
             }
+            ctx.record_stat(
+                format!("leiden.phase_{phase}.refined_groups"),
+                refined.communities as f64,
+            );
+            for u in &mut membership {
+                *u = refined.labels[*u];
+            }
+            inherited = next_inherited;
+            level = coarse;
+        }
+        ctx.record_stat("leiden.total_phases", levels as f64);
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Leiden cancelled"));
         }
 
         if ctx.persist_results() {
-            let attr_values: Vec<(NodeId, AttrValue)> = partition
+            let attr_values: Vec<_> = nodes
                 .iter()
-                .map(|(&node, &comm)| {
-                    let relabeled = comm_map[&comm];
-                    (node, AttrValue::Int(relabeled as i64))
-                })
+                .zip(final_labels)
+                .map(|(&node, c)| (node, AttrValue::Int(c as i64)))
                 .collect();
 
             ctx.with_scoped_timer("community.leiden.write_attrs", || {
@@ -375,7 +252,9 @@ pub fn register(registry: &Registry) -> Result<()> {
             .get_text("output_attr")
             .unwrap_or("community")
             .to_string();
+        let theta = spec.params.get_float("theta").unwrap_or(0.01);
         Leiden::new(max_iter, max_phases, resolution, seed, output_attr)
+            .and_then(|algo| algo.with_theta(theta))
             .map(|algo| Box::new(algo) as Box<dyn Algorithm>)
     })
 }
@@ -383,7 +262,9 @@ pub fn register(registry: &Registry) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::algorithms::community::utils::find_connected_components;
     use crate::api::graph::Graph;
+    use crate::types::NodeId;
     use std::cell::RefCell;
     use std::collections::HashSet;
     use std::rc::Rc;

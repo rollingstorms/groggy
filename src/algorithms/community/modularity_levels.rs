@@ -9,12 +9,12 @@ use crate::algorithms::Context;
 const MOVE_EPSILON: f64 = 1e-6;
 
 pub(super) struct Level {
-    n: usize,
+    pub(super) n: usize,
     edges: Vec<(usize, usize, u64)>,
     offsets: Vec<usize>,
     neighbors: Vec<(usize, f64)>,
-    degrees: Vec<f64>,
-    mass: u64,
+    pub(super) degrees: Vec<f64>,
+    pub(super) mass: u64,
 }
 
 pub(super) struct Partition {
@@ -30,16 +30,16 @@ impl Level {
         let mut mass = 0_u64;
         for (u, v, weight) in edges {
             if u >= n || v >= n || weight == 0 {
-                return Err(anyhow!("invalid Louvain quotient edge"));
+                return Err(anyhow!("invalid community quotient edge"));
             }
             mass = mass
                 .checked_add(weight)
-                .ok_or_else(|| anyhow!("Louvain edge mass overflow"))?;
+                .ok_or_else(|| anyhow!("community edge mass overflow"))?;
             let pair = if u <= v { (u, v) } else { (v, u) };
             let entry = pairs.entry(pair).or_default();
             *entry = entry
                 .checked_add(weight)
-                .ok_or_else(|| anyhow!("Louvain parallel mass overflow"))?;
+                .ok_or_else(|| anyhow!("community parallel mass overflow"))?;
         }
         let edges: Vec<_> = pairs.into_iter().map(|((u, v), w)| (u, v, w)).collect();
         let mut offsets = vec![0; n + 1];
@@ -75,13 +75,17 @@ impl Level {
         })
     }
 
+    pub fn adjacency(&self, node: usize) -> &[(usize, f64)] {
+        &self.neighbors[self.offsets[node]..self.offsets[node + 1]]
+    }
+
     pub fn singleton_labels(&self) -> Vec<usize> {
         (0..self.n).collect()
     }
 
     pub fn modularity(&self, labels: &[usize], gamma: f64) -> Result<f64> {
         if labels.len() != self.n || labels.iter().any(|&c| c >= self.n) {
-            return Err(anyhow!("invalid Louvain level labels"));
+            return Err(anyhow!("invalid community quotient labels"));
         }
         if self.mass == 0 {
             return Ok(0.);
@@ -103,7 +107,7 @@ impl Level {
             .map(|(&inside, tot)| inside / m - gamma * (tot / (2. * m)).powi(2))
             .sum();
         if !q.is_finite() {
-            return Err(anyhow!("Louvain modularity is not finite"));
+            return Err(anyhow!("community modularity is not finite"));
         }
         Ok(q)
     }
@@ -182,7 +186,7 @@ impl Level {
         if partition.labels.len() != self.n
             || partition.labels.iter().any(|&c| c >= partition.communities)
         {
-            return Err(anyhow!("invalid Louvain aggregation partition"));
+            return Err(anyhow!("invalid community aggregation partition"));
         }
         Self::new(
             partition.communities,

@@ -86,20 +86,22 @@ def leiden(
     max_phases: int = 10,
     seed: Optional[int] = None,
     output_attr: str = "community",
+    theta: float = 0.01,
 ) -> RustAlgorithmHandle:
     """
     Leiden community detection algorithm.
 
-    Runs local modularity moves and splits disconnected communities on
-    undirected unweighted multigraphs. Full Leiden refinement/aggregation
-    remains incomplete. Parallel instances and self-loops are retained.
+    Runs bounded fast moves, constrained randomized refinement and refined
+    aggregation on undirected unweighted multigraphs. Parallel instances and
+    self-loops are retained. The broader partition initializes each coarse graph.
 
     Args:
         resolution: Finite positive gamma applied to the modularity null-model term
-        max_iter: Maximum node-move iterations per phase (default: 20)
-        max_phases: Maximum number of refinement phases (default: 10)
-        seed: Nonnegative local shuffle seed for repeatable node order (optional)
+        max_iter: Node-visit budget per level as a multiple of level size (default: 20)
+        max_phases: Maximum aggregation levels (default: 10)
+        seed: Nonnegative local RNG seed; omitted uses reproducible seed zero
         output_attr: Attribute name for community labels (default: "community")
+        theta: Positive finite refinement temperature in normalized modularity units
 
     Returns:
         Algorithm handle configured for Leiden
@@ -114,6 +116,7 @@ def leiden(
         "max_iter": max_iter,
         "max_phases": max_phases,
         "output_attr": output_attr,
+        "theta": theta,
     }
     if seed is not None:
         params["seed"] = seed

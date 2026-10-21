@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::community::louvain_levels::Level;
+use crate::algorithms::community::modularity_levels::Level;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
