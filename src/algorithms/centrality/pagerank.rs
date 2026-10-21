@@ -6,8 +6,8 @@ use rustc_hash::FxHashMap;
 
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
+    ParameterMetadata, ParameterType,
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
@@ -31,12 +31,14 @@ impl NodeIndexer {
             return Self::Sparse(FxHashMap::default());
         }
 
-        let min = *nodes.iter().min().unwrap();
-        let max = *nodes.iter().max().unwrap();
-        let span = (max - min) as usize + 1;
+        let min = nodes.iter().copied().min().unwrap_or(0);
+        let max = nodes.iter().copied().max().unwrap_or(0);
+        let span = max.checked_sub(min).and_then(|delta| delta.checked_add(1));
 
         // Dense indexing threshold: span must be reasonable relative to node count
-        if span <= nodes.len() * 3 / 2 {
+        if let Some(span) = span.filter(|&span| {
+            span <= nodes.len().saturating_mul(3) / 2 && nodes.len() < u32::MAX as usize
+        }) {
             let mut indices = vec![u32::MAX; span];
             for (i, &node) in nodes.iter().enumerate() {
                 indices[(node - min) as usize] = i as u32;
@@ -95,8 +97,8 @@ impl PageRank {
         if max_iter == 0 {
             return Err(anyhow!("max_iter must be greater than zero"));
         }
-        if tolerance <= 0.0 {
-            return Err(anyhow!("tolerance must be positive"));
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(anyhow!("tolerance must be finite and positive"));
         }
         Ok(Self {
             damping,
@@ -112,7 +114,7 @@ impl PageRank {
             id: "centrality.pagerank".to_string(),
             name: "PageRank".to_string(),
             description: "Power-iteration PageRank centrality.".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             cost_hint: CostHint::Linear,
             supports_cancellation: true,
             parameters: vec![
@@ -168,6 +170,10 @@ impl Algorithm for PageRank {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let start_time = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("pagerank cancelled"));
+        }
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
 
         // === PHASE 1: Collect Nodes ===
         let collect_start = Instant::now();
@@ -177,6 +183,12 @@ impl Algorithm for PageRank {
 
         let n = nodes.len();
         if n == 0 {
+            if !ctx.persist_results() {
+                ctx.add_output(
+                    format!("{}.scores", self.id()),
+                    AlgorithmOutput::NodeScores(Vec::new()),
+                );
+            }
             return Ok(subgraph);
         }
 
@@ -192,8 +204,7 @@ impl Algorithm for PageRank {
         ctx.record_stat("pr.count.input_edges", edges.len() as f64);
 
         // === PHASE 4: Build or Get CSR ===
-        let _is_directed = subgraph.graph().borrow().is_directed();
-        let add_reverse = false; // PageRank uses incoming edges naturally
+        let add_reverse = subgraph.graph().borrow().is_undirected();
 
         let csr = match subgraph.csr_cache_get(add_reverse) {
             Some(cached) => {
@@ -239,34 +250,32 @@ impl Algorithm for PageRank {
         // === PHASE 5: Precompute Personalization Weights ===
         let damping = self.damping;
         let teleport = 1.0 - damping;
-        let teleport_per_node = teleport / n as f64;
-
-        let personalization: Option<Vec<f64>> = if let Some(attr) = &self.personalization_attr {
-            let mut weights = vec![1.0; n];
+        let mut personalization = vec![1.0 / n as f64; n];
+        if let Some(attr) = &self.personalization_attr {
             let mut total = 0.0;
             for (idx, &node) in nodes.iter().enumerate() {
-                let value = subgraph
-                    .get_node_attribute(node, attr)?
-                    .and_then(|v| match v {
-                        AttrValue::Float(f) => Some(f as f64),
-                        AttrValue::Int(ix) => Some(ix as f64),
-                        _ => None,
-                    })
-                    .unwrap_or(1.0);
-                weights[idx] = value;
+                let value = match subgraph.get_node_attribute(node, attr)? {
+                    None => 1.0, // Preserve the established missing-property default.
+                    Some(AttrValue::Float(value)) => value as f64,
+                    Some(AttrValue::Int(value)) => value as f64,
+                    Some(AttrValue::SmallInt(value)) => value as f64,
+                    Some(_) => return Err(anyhow!("node {node}: personalization must be numeric")),
+                };
+                if !value.is_finite() || value < 0.0 {
+                    return Err(anyhow!(
+                        "node {node}: personalization must be finite and nonnegative"
+                    ));
+                }
+                personalization[idx] = value;
                 total += value;
             }
-            if total == 0.0 {
-                None
-            } else {
-                for w in &mut weights {
-                    *w = (*w / total) * teleport;
-                }
-                Some(weights)
+            if !total.is_finite() || total <= 0.0 {
+                return Err(anyhow!("personalization must have a finite positive total"));
             }
-        } else {
-            None
-        };
+            for weight in &mut personalization {
+                *weight /= total;
+            }
+        }
 
         // === PHASE 6: Precompute Out-Degrees from CSR ===
         let mut out_degree: Vec<f64> = Vec::with_capacity(csr.node_count());
@@ -301,10 +310,13 @@ impl Algorithm for PageRank {
                     sink_mass += rank[idx];
                 }
             }
-            let sink_contribution = damping * sink_mass / n as f64;
+            let reset_mass = teleport + damping * sink_mass;
 
             // Distribute rank from non-sink nodes using CSR
             for idx in 0..csr.node_count() {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("pagerank cancelled"));
+                }
                 if out_degree[idx] > 0.0 {
                     let contrib = damping * rank[idx] / out_degree[idx];
                     // CSR.neighbors returns a slice - no allocation
@@ -317,12 +329,13 @@ impl Algorithm for PageRank {
             // Add teleport and sink contributions, compute residual
             let mut max_diff = 0.0;
             for idx in 0..n {
-                let teleport_contrib = if let Some(weights) = &personalization {
-                    weights[idx]
-                } else {
-                    teleport_per_node
-                };
-                let new_rank = teleport_contrib + next_rank[idx] + sink_contribution;
+                let new_rank = reset_mass * personalization[idx] + next_rank[idx];
+                if !new_rank.is_finite() || new_rank < 0.0 {
+                    return Err(anyhow!(
+                        "nonfinite or negative PageRank score at node {}",
+                        nodes[idx]
+                    ));
+                }
                 let diff = (new_rank - rank[idx]).abs();
                 if diff > max_diff {
                     max_diff = diff;
@@ -337,6 +350,7 @@ impl Algorithm for PageRank {
             ctx.record_stat("pr.count.iteration", (iteration + 1) as f64);
             ctx.emit_iteration(iteration, 0);
 
+            ctx.record_stat("pr.max_update", max_diff);
             final_iteration = iteration + 1;
             if max_diff <= self.tolerance {
                 converged = true;
@@ -347,6 +361,18 @@ impl Algorithm for PageRank {
         ctx.record_call("pr.compute", compute_start.elapsed());
         ctx.record_stat("pr.converged", if converged { 1.0 } else { 0.0 });
         ctx.record_stat("pr.iterations_to_converge", final_iteration as f64);
+
+        if ctx.is_cancelled() {
+            return Err(anyhow!("pagerank cancelled"));
+        }
+        let total: f64 = rank.iter().sum();
+        if !total.is_finite() || total <= 0.0 {
+            return Err(anyhow!("invalid PageRank probability mass"));
+        }
+        for value in &mut rank {
+            *value /= total;
+        }
+        ctx.record_stat("pr.mass", rank.iter().sum());
 
         // === PHASE 9: Emit Results ===
         if ctx.persist_results() {
@@ -364,7 +390,10 @@ impl Algorithm for PageRank {
             ctx.record_call("pr.write_attributes", write_start.elapsed());
         } else {
             let store_start = Instant::now();
-            // For non-persistent results, could add to context output if needed
+            ctx.add_output(
+                format!("{}.scores", self.id()),
+                AlgorithmOutput::NodeScores(nodes.iter().copied().zip(rank).collect()),
+            );
             ctx.record_call("pr.store_output", store_start.elapsed());
         }
 
@@ -379,7 +408,10 @@ pub fn register(registry: &Registry) -> Result<()> {
     let id = metadata.id.clone();
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
         let damping = spec.params.get_float("damping").unwrap_or(0.85);
-        let max_iter = spec.params.get_int("max_iter").unwrap_or(50).max(1) as usize;
+        let max_iter = spec.params.get_int("max_iter").unwrap_or(50);
+        if max_iter <= 0 {
+            return Err(anyhow!("max_iter must be positive"));
+        }
         let tolerance = spec.params.get_float("tolerance").unwrap_or(1e-6);
         let personalization_attr = spec
             .params
@@ -392,7 +424,7 @@ pub fn register(registry: &Registry) -> Result<()> {
             .to_string();
         PageRank::new(
             damping,
-            max_iter,
+            max_iter as usize,
             tolerance,
             personalization_attr.map(AttrName::from),
             output_attr.into(),

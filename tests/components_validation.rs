@@ -133,7 +133,10 @@ fn empty_singleton_closed_selection_and_nonpersistent_outputs() {
             let AlgorithmOutput::Components(mut groups) = ctx
                 .take_outputs()
                 .remove("community.connected_components.components")
-                .unwrap();
+                .unwrap()
+            else {
+                panic!("expected component output")
+            };
             groups.sort();
             assert_eq!(groups, (0..n).map(|v| vec![v]).collect::<Vec<_>>());
             assert!(g.borrow().node_ids().iter().all(|&id| g
@@ -174,6 +177,9 @@ fn long_directed_path_uses_an_explicit_stack() {
     let AlgorithmOutput::Components(groups) = ctx
         .take_outputs()
         .remove("community.connected_components.components")
-        .unwrap();
+        .unwrap()
+    else {
+        panic!("expected component output")
+    };
     assert_eq!(groups.len(), 10_000);
 }

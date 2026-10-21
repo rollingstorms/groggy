@@ -250,6 +250,9 @@ pub fn py_run_pipeline(
     let py_outputs = PyDict::new(py);
     for (key, output) in outputs {
         match output {
+            groggy::algorithms::AlgorithmOutput::NodeScores(scores) => {
+                py_outputs.set_item(key, scores)?;
+            }
             groggy::algorithms::AlgorithmOutput::Components(components) => {
                 let py_components = PyList::empty(py);
                 for component in components {

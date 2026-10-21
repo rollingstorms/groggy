@@ -126,7 +126,7 @@ def test_get_algorithm_metadata():
     assert metadata["id"].value == "centrality.pagerank"
     assert metadata["name"].value == "PageRank"
     assert "description" in metadata
-    assert metadata["version"].value == "0.1.0"
+    assert metadata["version"].value == "0.2.0"
     assert "supports_cancellation" in metadata
     assert "cost_hint" in metadata
 

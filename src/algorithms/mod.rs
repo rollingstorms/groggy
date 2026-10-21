@@ -816,6 +816,8 @@ pub struct IterationEvent {
 #[derive(Clone, Debug)]
 pub enum AlgorithmOutput {
     Components(Vec<Vec<NodeId>>),
+    /// Owned full-precision node scores for nonpersistent algorithm execution.
+    NodeScores(Vec<(NodeId, f64)>),
 }
 
 /// Trait implemented by all core algorithms.

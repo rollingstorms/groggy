@@ -145,7 +145,10 @@ fn nonpersistent_empty_and_edgeless_outputs_retain_node_identity() {
         let AlgorithmOutput::Components(groups) = ctx
             .take_outputs()
             .remove("community.lpa.components")
-            .unwrap();
+            .unwrap()
+        else {
+            panic!("expected component output")
+        };
         assert_eq!(groups, (0..n).map(|v| vec![v]).collect::<Vec<_>>());
         for node in 0..n {
             assert!(g

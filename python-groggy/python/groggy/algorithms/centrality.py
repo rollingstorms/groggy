@@ -21,13 +21,18 @@ def pagerank(
     PageRank centrality algorithm.
 
     Computes the PageRank score for each node, representing its importance
-    based on the graph's link structure.
+    based on the graph's link structure. Undirected edges are traversed in both
+    directions. Dangling mass follows the normalized personalization vector.
+    A bounded run can return an approximation: inspect pr.converged in the
+    execution profile. Nonpersistent runs return full-precision scores under
+    profile["outputs"]["centrality.pagerank.scores"].
 
     Args:
-        damping: Damping factor (default: 0.85)
+        damping: Finite link-following probability in [0, 1) (default: 0.85)
         max_iter: Maximum iterations (default: 100)
-        tolerance: Convergence tolerance (default: 1e-6)
-        personalization_attr: Optional node attribute for personalized PageRank
+        tolerance: Finite positive maximum-coordinate update threshold (default: 1e-6)
+        personalization_attr: Optional finite nonnegative numeric node weights;
+            missing values are one, and their total must be positive
         output_attr: Attribute name for results (default: "pagerank")
 
     Returns:
