@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::pathfinding::utils::dijkstra;
+use crate::algorithms::pathfinding::utils::{checked_dijkstra_weights, dijkstra};
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -82,36 +82,23 @@ impl DijkstraShortestPath {
 
     fn run(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, AttrValue>> {
         let source = self.resolve_source(subgraph)?;
-        let weights = self.weight_attr.clone();
-        let graph_ref = subgraph.graph();
-        let graph = graph_ref.borrow();
-
-        let mut weight_map: HashMap<(NodeId, NodeId), f64> = HashMap::new();
-        if let Some(attr_name) = &weights {
-            for &edge_id in subgraph.edge_set() {
-                if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                    if let Ok(Some(value)) = graph.get_edge_attr(edge_id, attr_name) {
-                        if let Some(weight) = match value {
-                            AttrValue::Float(f) => Some(f as f64),
-                            AttrValue::Int(i) => Some(i as f64),
-                            _ => None,
-                        } {
-                            weight_map.insert((u, v), weight);
-                        }
-                    }
-                }
-            }
-        }
+        let weight_map = checked_dijkstra_weights(subgraph, self.weight_attr.as_ref())?;
 
         let dist = dijkstra(subgraph, source, |u, v| {
             weight_map.get(&(u, v)).copied().unwrap_or(1.0)
         });
 
         ctx.emit_iteration(0, dist.len());
-        Ok(dist
-            .into_iter()
-            .map(|(node, cost)| (node, AttrValue::Float(cost as f32)))
-            .collect())
+        dist.into_iter()
+            .map(|(node, cost)| {
+                if !cost.is_finite() || cost > f32::MAX as f64 {
+                    return Err(anyhow!(
+                        "Dijkstra distance for node {node} cannot be represented in f32 properties"
+                    ));
+                }
+                Ok((node, AttrValue::Float(cost as f32)))
+            })
+            .collect::<Result<_>>()
     }
 }
 

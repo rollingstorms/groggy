@@ -11,7 +11,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
-use crate::algorithms::pathfinding::utils::{bfs_layers, dijkstra};
+use crate::algorithms::pathfinding::utils::{bfs_layers, checked_dijkstra_weights, dijkstra};
 use crate::algorithms::{AlgorithmParamValue, Context};
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
@@ -112,7 +112,7 @@ impl Step for ShortestPathMapStep {
         let subgraph = scope.subgraph();
 
         // Validate source exists in subgraph
-        if !subgraph.nodes().contains(&source) {
+        if !subgraph.nodes().contains(&source) || !subgraph.graph().borrow().has_node(source) {
             return Err(anyhow!("source node {} not in subgraph", source));
         }
 
@@ -129,24 +129,7 @@ impl Step for ShortestPathMapStep {
                 let weight_map = ctx.with_scoped_timer(
                     "step.shortest_path_map.collect_weights",
                     || -> Result<HashMap<(NodeId, NodeId), f64>> {
-                        let graph_ref = subgraph.graph();
-                        let graph = graph_ref.borrow();
-                        let mut map: HashMap<(NodeId, NodeId), f64> = HashMap::new();
-
-                        for &edge_id in subgraph.edge_set() {
-                            if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                                if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
-                                    if let Some(weight) = match value {
-                                        AttrValue::Float(f) => Some(f as f64),
-                                        AttrValue::Int(i) => Some(i as f64),
-                                        _ => None,
-                                    } {
-                                        map.insert((u, v), weight);
-                                    }
-                                }
-                            }
-                        }
-                        Ok(map)
+                        Ok(checked_dijkstra_weights(subgraph, Some(weight_attr))?)
                     },
                 )?;
 

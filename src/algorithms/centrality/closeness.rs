@@ -5,7 +5,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
-use crate::algorithms::pathfinding::utils::{bfs_layers_csr, collect_edge_weights, dijkstra};
+use crate::algorithms::pathfinding::utils::{bfs_layers_csr, checked_dijkstra_weights, dijkstra};
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -134,7 +134,8 @@ impl ClosenessCentrality {
         let weight_map = self
             .weight_attr
             .as_ref()
-            .map(|attr| collect_edge_weights(subgraph, attr));
+            .map(|attr| checked_dijkstra_weights(subgraph, Some(attr)))
+            .transpose()?;
 
         let mut scores: Vec<f64> = vec![0.0; n];
 

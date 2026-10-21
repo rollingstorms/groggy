@@ -10,11 +10,11 @@
 //! - Modular: Each algorithm implements common traits for consistency
 //! - Configurable: Support filtering, early termination, and custom constraints
 
-use crate::errors::GraphResult;
+use crate::errors::{GraphError, GraphResult};
 use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
 use crate::state::space::GraphSpace;
 use crate::storage::pool::GraphPool;
-use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
+use crate::types::{AttrName, EdgeId, NodeId};
 use ahash::AHashMap;
 use bitvec::vec::BitVec;
 use std::cmp::Ordering;
@@ -123,6 +123,9 @@ impl TraversalEngine {
         start: NodeId,
         options: TraversalOptions,
     ) -> GraphResult<TraversalResult> {
+        if !space.contains_node(start) {
+            return Err(GraphError::node_not_found(start, "traverse from start"));
+        }
         let start_time = std::time::Instant::now();
 
         // Get fresh snapshot with guaranteed consistent adjacency data
@@ -221,6 +224,9 @@ impl TraversalEngine {
         start: NodeId,
         options: TraversalOptions,
     ) -> GraphResult<TraversalResult> {
+        if !space.contains_node(start) {
+            return Err(GraphError::node_not_found(start, "traverse from start"));
+        }
         let start_time = std::time::Instant::now();
 
         // Get fresh snapshot with guaranteed consistent adjacency data
@@ -330,6 +336,40 @@ impl TraversalEngine {
         end: NodeId,
         options: PathFindingOptions,
     ) -> GraphResult<Option<Path>> {
+        if !space.contains_node(start) {
+            return Err(GraphError::node_not_found(start, "traverse from start"));
+        }
+        if !space.contains_node(end) {
+            return Err(GraphError::node_not_found(end, "traverse to end"));
+        }
+        // Validate the whole selected weighted graph before early target exit.
+        let mut weights = HashMap::new();
+        if let Some(name) = &options.weight_attribute {
+            let mut edges = space.edge_ids();
+            edges.sort_unstable();
+            let mut errors = Vec::new();
+            for edge in edges {
+                let value = space
+                    .get_edge_attr_index(edge, name)
+                    .map(|index| {
+                        pool.get_attr_by_index(name, index, false).ok_or_else(|| {
+                            GraphError::InvalidInput(format!(
+                                "Missing stored weight for edge {edge}"
+                            ))
+                        })
+                    })
+                    .transpose()?;
+                match super::weights::dijkstra_weight(value, edge) {
+                    Ok(weight) => {
+                        weights.insert(edge, weight);
+                    }
+                    Err(error) => errors.push(error.to_string()),
+                }
+            }
+            if !errors.is_empty() {
+                return Err(GraphError::InvalidInput(errors.join("; ")));
+            }
+        }
         let start_time = std::time::Instant::now();
 
         let mut state = self.state_pool.get_state();
@@ -386,8 +426,7 @@ impl TraversalEngine {
                 }
 
                 // Calculate edge weight
-                let edge_weight =
-                    self.get_edge_weight(pool, space, edge_id, &options.weight_attribute);
+                let edge_weight = weights.get(&edge_id).copied().unwrap_or(1.0);
                 let new_distance = distance + edge_weight;
 
                 // Update if we found a shorter path
@@ -424,6 +463,12 @@ impl TraversalEngine {
         end: NodeId,
         max_length: usize,
     ) -> GraphResult<Vec<Path>> {
+        if !space.contains_node(start) {
+            return Err(GraphError::node_not_found(start, "traverse from start"));
+        }
+        if !space.contains_node(end) {
+            return Err(GraphError::node_not_found(end, "traverse to end"));
+        }
         let start_time = std::time::Instant::now();
 
         let mut all_paths = Vec::new();
@@ -895,33 +940,6 @@ impl TraversalEngine {
     }
 
     /// Get edge weight for pathfinding algorithms
-    fn get_edge_weight(
-        &self,
-        pool: &GraphPool,
-        space: &GraphSpace,
-        edge_id: EdgeId,
-        weight_attr: &Option<AttrName>,
-    ) -> f64 {
-        if let Some(attr_name) = weight_attr {
-            // Try to get edge attribute value (using space since pool doesn't have this method)
-            if let Some(index) = space.get_edge_attr_index(edge_id, attr_name) {
-                if let Some(attr_value) = pool.get_attr_by_index(attr_name, index, false) {
-                    match attr_value {
-                        AttrValue::Float(f) => *f as f64,
-                        AttrValue::Int(i) => *i as f64,
-                        _ => 1.0, // Default weight
-                    }
-                } else {
-                    1.0
-                }
-            } else {
-                1.0
-            }
-        } else {
-            1.0 // Default unit weight
-        }
-    }
-
     /// Reconstruct path from predecessor information
     fn reconstruct_path(
         &self,
@@ -991,10 +1009,7 @@ impl TraversalEngine {
 
         if current == target {
             // Found a path - convert to Path structure
-            let total_weight = path_edges
-                .iter()
-                .map(|&edge_id| self.get_edge_weight(pool, space, edge_id, &None))
-                .sum();
+            let total_weight = path_edges.len() as f64;
 
             all_paths.push(Path {
                 nodes: path.clone(),

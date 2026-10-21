@@ -126,7 +126,7 @@ impl Eq for State {}
 
 impl PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
-        self.node == other.node && (self.cost - other.cost).abs() <= f64::EPSILON
+        self.node == other.node && self.cost.total_cmp(&other.cost).is_eq()
     }
 }
 
@@ -134,8 +134,7 @@ impl Ord for State {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         other
             .cost
-            .partial_cmp(&self.cost)
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .total_cmp(&self.cost)
             .then_with(|| self.node.cmp(&other.node))
     }
 }
@@ -169,7 +168,7 @@ where
             });
 
             while let Some(DijkstraState { cost, node_idx: u }) = heap.pop() {
-                if cost > distances[u] + f64::EPSILON {
+                if cost > distances[u] {
                     continue;
                 }
 
@@ -179,7 +178,7 @@ where
                     let weight = weight_fn(u_id, v_id);
                     let next_cost = cost + weight;
 
-                    if next_cost + f64::EPSILON < distances[v] {
+                    if next_cost < distances[v] {
                         distances[v] = next_cost;
                         heap.push(DijkstraState {
                             cost: next_cost,
@@ -211,7 +210,7 @@ where
     });
 
     while let Some(State { cost, node }) = heap.pop() {
-        if cost > dist[&node] + f64::EPSILON {
+        if cost > dist[&node] {
             continue;
         }
         if let Ok(neighbors) = subgraph.neighbors(node) {
@@ -219,7 +218,7 @@ where
                 let weight = weight_fn(node, neighbor);
                 let next = cost + weight;
                 let best = dist.get(&neighbor).copied().unwrap_or(f64::INFINITY);
-                if next + f64::EPSILON < best {
+                if next < best {
                     dist.insert(neighbor, next);
                     heap.push(State {
                         cost: next,
@@ -231,6 +230,51 @@ where
     }
 
     dist
+}
+
+/// Validate selected entities and build minimum weights per traversable pair.
+/// Distance-only kernels can collapse parallel weights without losing the minimum.
+pub(crate) fn checked_dijkstra_weights(
+    subgraph: &Subgraph,
+    attr: Option<&AttrName>,
+) -> crate::GraphResult<HashMap<(NodeId, NodeId), f64>> {
+    let reference = subgraph.graph();
+    let graph = reference.borrow();
+    for &node in subgraph.node_set() {
+        if !graph.has_node(node) {
+            return Err(crate::GraphError::node_not_found(
+                node,
+                "Dijkstra selected subgraph",
+            ));
+        }
+    }
+    let mut edges: Vec<_> = subgraph.edge_set().iter().copied().collect();
+    edges.sort_unstable();
+    let mut weights: HashMap<(NodeId, NodeId), f64> = HashMap::new();
+    for edge in edges {
+        let (u, v) = graph.edge_endpoints(edge)?;
+        if !subgraph.node_set().contains(&u) || !subgraph.node_set().contains(&v) {
+            return Err(crate::GraphError::InvalidInput(format!(
+                "edge {edge} has an endpoint outside the selected subgraph"
+            )));
+        }
+        let value = attr
+            .map(|name| graph.get_edge_attr(edge, name))
+            .transpose()?
+            .flatten();
+        let weight = crate::query::weights::dijkstra_weight(value.as_ref(), edge)?;
+        weights
+            .entry((u, v))
+            .and_modify(|old| *old = old.min(weight))
+            .or_insert(weight);
+        if graph.is_undirected() {
+            weights
+                .entry((v, u))
+                .and_modify(|old| *old = old.min(weight))
+                .or_insert(weight);
+        }
+    }
+    Ok(weights)
 }
 
 pub fn collect_edge_weights(
@@ -311,7 +355,7 @@ impl Eq for DijkstraState {}
 
 impl PartialEq for DijkstraState {
     fn eq(&self, other: &Self) -> bool {
-        self.node_idx == other.node_idx && (self.cost - other.cost).abs() <= f64::EPSILON
+        self.node_idx == other.node_idx && self.cost.total_cmp(&other.cost).is_eq()
     }
 }
 
@@ -319,8 +363,7 @@ impl Ord for DijkstraState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         other
             .cost
-            .partial_cmp(&self.cost)
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .total_cmp(&self.cost)
             .then_with(|| self.node_idx.cmp(&other.node_idx))
     }
 }
@@ -369,7 +412,7 @@ pub fn dijkstra_csr(
 
     // Dijkstra traversal
     while let Some(DijkstraState { cost, node_idx: u }) = heap.pop() {
-        if cost > distances[u] + f64::EPSILON {
+        if cost > distances[u] {
             continue;
         }
 
@@ -385,7 +428,7 @@ pub fn dijkstra_csr(
             };
 
             let next_cost = cost + weight;
-            if next_cost + f64::EPSILON < distances[v] {
+            if next_cost < distances[v] {
                 distances[v] = next_cost;
                 heap.push(DijkstraState {
                     cost: next_cost,
