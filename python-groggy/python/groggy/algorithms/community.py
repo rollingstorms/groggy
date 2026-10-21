@@ -11,17 +11,26 @@ from groggy.algorithms.base import RustAlgorithmHandle
 
 
 def lpa(
-    max_iter: int = 100, seed: Optional[int] = None, output_attr: str = "community"
+    max_iter: int = 100,
+    seed: Optional[int] = None,
+    output_attr: str = "community",
+    tolerance: float = 0.01,
+    seed_attr: Optional[str] = None,
 ) -> RustAlgorithmHandle:
     """
     Label Propagation Algorithm for community detection.
 
     Detects communities by propagating labels through the network. Each node
-    adopts the most common label among its neighbors.
+    adopts the most common label among its outgoing neighbors (both directions
+    for undirected graphs). Parallel edges vote separately; a self-loop votes
+    once. Ties retain the current label if tied, otherwise the first label in
+    ascending node-ID initialization order. Results are bounded by max_iter.
 
     Args:
         max_iter: Maximum iterations (default: 100)
-        seed: Random seed for reproducibility (optional)
+        seed: Nonnegative local shuffle seed; None visits ascending node IDs
+        tolerance: Finite fraction in [0, 1]; stop when changes are at most this
+        seed_attr: Initial labels property; equal values identify one label
         output_attr: Attribute name for community labels (default: "community")
 
     Returns:
@@ -34,11 +43,14 @@ def lpa(
     """
     params = {
         "max_iter": max_iter,
+        "tolerance": tolerance,
         "output_attr": output_attr,
     }
     if seed is not None:
         params["seed"] = seed
 
+    if seed_attr is not None:
+        params["seed_attr"] = seed_attr
     return RustAlgorithmHandle("community.lpa", params)
 
 

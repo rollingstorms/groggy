@@ -6,8 +6,8 @@ use rustc_hash::FxHashMap;
 
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
+    ParameterMetadata, ParameterType,
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
@@ -31,12 +31,14 @@ impl NodeIndexer {
             return Self::Sparse(FxHashMap::default());
         }
 
-        let min = *nodes.iter().min().unwrap();
-        let max = *nodes.iter().max().unwrap();
-        let span = (max - min) as usize + 1;
+        let min = nodes.iter().copied().min().unwrap_or(0);
+        let max = nodes.iter().copied().max().unwrap_or(0);
+        let span = max.checked_sub(min).and_then(|delta| delta.checked_add(1));
 
         // Dense indexing threshold: span must be reasonable relative to node count
-        if span <= nodes.len() * 3 / 2 {
+        if let Some(span) = span.filter(|&span| {
+            span <= nodes.len().saturating_mul(3) / 2 && nodes.len() < u32::MAX as usize
+        }) {
             let mut indices = vec![u32::MAX; span];
             for (i, &node) in nodes.iter().enumerate() {
                 indices[(node - min) as usize] = i as u32;
@@ -78,6 +80,7 @@ pub struct LabelPropagation {
     tolerance: f64,
     output_attr: AttrName,
     seed_attr: Option<AttrName>,
+    seed: Option<u64>,
 }
 
 #[derive(Clone)]
@@ -115,15 +118,22 @@ impl LabelPropagation {
         if max_iter == 0 {
             return Err(anyhow!("max_iter must be greater than zero"));
         }
-        if tolerance < 0.0 {
-            return Err(anyhow!("tolerance must be non-negative"));
+        if !(0.0..=1.0).contains(&tolerance) {
+            return Err(anyhow!("tolerance must be finite and between zero and one"));
         }
         Ok(Self {
             max_iter,
             tolerance,
             output_attr,
             seed_attr,
+            seed: None,
         })
+    }
+
+    /// Shuffle node visitation using a local RNG; None preserves ascending-ID order.
+    pub fn with_seed(mut self, seed: Option<u64>) -> Self {
+        self.seed = seed;
+        self
     }
 
     fn metadata_template() -> AlgorithmMetadata {
@@ -131,10 +141,19 @@ impl LabelPropagation {
             id: "community.lpa".to_string(),
             name: "Label Propagation".to_string(),
             description: "Asynchronous label propagation for community detection.".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             cost_hint: CostHint::Linear,
             supports_cancellation: true,
             parameters: vec![
+                ParameterMetadata {
+                    name: "seed".to_string(),
+                    description:
+                        "Optional nonnegative local shuffle seed; absent uses ascending IDs."
+                            .to_string(),
+                    value_type: ParameterType::Int,
+                    required: false,
+                    default_value: None,
+                },
                 ParameterMetadata {
                     name: "max_iter".to_string(),
                     description: "Maximum number of propagation iterations.".to_string(),
@@ -190,39 +209,26 @@ impl LabelPropagation {
     }
 
     fn dominant_label(
-        &self,
-        neighbor_slice: &[usize],
-        labels: &[AttrValue],
-        current_idx: usize,
-        counts: &mut FxHashMap<usize, usize>, // Index → count
+        neighbor_labels: &[usize],
+        current: usize,
+        counts: &mut FxHashMap<usize, usize>,
     ) -> usize {
-        if neighbor_slice.is_empty() {
-            return current_idx;
-        }
-
         counts.clear();
-        counts.insert(current_idx, 1);
-
-        // Count neighbor labels by index (much faster than AttrValue)
-        for &neighbor_idx in neighbor_slice {
-            if neighbor_idx < labels.len() {
-                *counts.entry(neighbor_idx).or_insert(0) += 1;
-            }
+        for &label in neighbor_labels {
+            *counts.entry(label).or_insert(0) += 1;
         }
-
-        // Find most common label
-        let mut best_idx = current_idx;
-        let mut best_count = 1;
-
-        for (&idx, &count) in counts.iter() {
-            // Break ties by smallest index (deterministic)
-            if count > best_count || (count == best_count && idx < best_idx) {
-                best_idx = idx;
-                best_count = count;
-            }
+        let maximum = counts.values().copied().max().unwrap_or(0);
+        // Isolates retain their label. On a tied maximum retain the current
+        // label when possible; otherwise use the first interned label.
+        if maximum == 0 || counts.get(&current).copied() == Some(maximum) {
+            return current;
         }
-
-        best_idx
+        counts
+            .iter()
+            .filter(|(_, count)| **count == maximum)
+            .map(|(&label, _)| label)
+            .min()
+            .unwrap_or(current)
     }
 
     fn run_iterations(
@@ -244,7 +250,22 @@ impl LabelPropagation {
         let mut neighbor_label_indices = Vec::with_capacity(100); // Reusable buffer
 
         // Track which label index each node currently has
-        let mut label_indices: Vec<usize> = (0..total).collect();
+        // The dictionary never changes. Equal seed values identify one label;
+        // mutable node assignments must never be used as label representatives.
+        let mut interned = FxHashMap::default();
+        let mut dictionary = Vec::new();
+        let mut label_indices = Vec::with_capacity(total);
+        for label in &state.labels {
+            let next = dictionary.len();
+            let id = *interned.entry(label.clone()).or_insert_with(|| {
+                dictionary.push(label.clone());
+                next
+            });
+            label_indices.push(id);
+        }
+        let mut order: Vec<usize> = (0..total).collect();
+        let mut rng = self.seed.map(fastrand::Rng::with_seed);
+        ctx.record_stat("lpa.converged", 0.0);
 
         for iteration in 0..self.max_iter {
             if ctx.is_cancelled() {
@@ -254,7 +275,13 @@ impl LabelPropagation {
             let iter_start = Instant::now();
             let mut updates = 0usize;
 
-            for idx in 0..total {
+            if let Some(rng) = &mut rng {
+                rng.shuffle(&mut order);
+            }
+            for &idx in &order {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("label propagation cancelled"));
+                }
                 let current_label_idx = label_indices[idx];
 
                 // Get neighbors from CSR and build their label indices
@@ -265,20 +292,13 @@ impl LabelPropagation {
                     }
                 }
 
-                let new_label_idx = self.dominant_label(
-                    &neighbor_label_indices,
-                    &state.labels,
-                    current_label_idx,
-                    &mut counts,
-                );
+                let new_label_idx =
+                    Self::dominant_label(&neighbor_label_indices, current_label_idx, &mut counts);
 
                 if new_label_idx != current_label_idx {
                     updates += 1;
                     label_indices[idx] = new_label_idx;
-                    // Asynchronous update: apply immediately so subsequent nodes see it
-                    if new_label_idx < state.labels.len() {
-                        state.labels[idx] = state.labels[new_label_idx].clone();
-                    }
+                    // Asynchronous assignments are visible to subsequent nodes.
                 }
             }
 
@@ -295,6 +315,9 @@ impl LabelPropagation {
             }
         }
 
+        for (label, id) in state.labels.iter_mut().zip(label_indices) {
+            *label = dictionary[id].clone();
+        }
         Ok(state)
     }
 }
@@ -310,6 +333,10 @@ impl Algorithm for LabelPropagation {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let start_time = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("label propagation cancelled"));
+        }
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
 
         // === PHASE 1: Collect Nodes ===
         let collect_start = Instant::now();
@@ -318,6 +345,12 @@ impl Algorithm for LabelPropagation {
         ctx.record_stat("lpa.count.input_nodes", nodes.len() as f64);
 
         if nodes.is_empty() {
+            if !ctx.persist_results() {
+                ctx.add_output(
+                    format!("{}.components", self.id()),
+                    AlgorithmOutput::Components(Vec::new()),
+                );
+            }
             return Ok(subgraph);
         }
 
@@ -387,6 +420,9 @@ impl Algorithm for LabelPropagation {
         let state = self.run_iterations(ctx, &subgraph, &indexer, &csr, state)?;
         ctx.record_call("lpa.compute", compute_start.elapsed());
 
+        if ctx.is_cancelled() {
+            return Err(anyhow!("label propagation cancelled"));
+        }
         // === PHASE 7: Emit Results ===
         if ctx.persist_results() {
             let write_start = Instant::now();
@@ -397,7 +433,16 @@ impl Algorithm for LabelPropagation {
             ctx.record_call("lpa.write_attributes", write_start.elapsed());
         } else {
             let store_start = Instant::now();
-            // For non-persistent results, could add to context output if needed
+            let mut groups: FxHashMap<AttrValue, Vec<NodeId>> = FxHashMap::default();
+            for (node, label) in state.into_pairs() {
+                groups.entry(label).or_default().push(node);
+            }
+            let mut components: Vec<_> = groups.into_values().collect();
+            components.sort_by_key(|members| members[0]);
+            ctx.add_output(
+                format!("{}.components", self.id()),
+                AlgorithmOutput::Components(components),
+            );
             ctx.record_call("lpa.store_output", store_start.elapsed());
         }
 
@@ -411,7 +456,14 @@ pub fn register(registry: &Registry) -> Result<()> {
     let metadata = LabelPropagation::metadata_template();
     let id = metadata.id.clone();
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
-        let max_iter = spec.params.get_int("max_iter").unwrap_or(20).max(1) as usize;
+        let max_iter = spec.params.get_int("max_iter").unwrap_or(20);
+        if max_iter <= 0 {
+            return Err(anyhow!("max_iter must be positive"));
+        }
+        let seed = spec.params.get_int("seed");
+        if seed.is_some_and(|value| value < 0) {
+            return Err(anyhow!("seed must be nonnegative"));
+        }
         let tolerance = spec.params.get_float("tolerance").unwrap_or(0.01);
         let output_attr = spec
             .params
@@ -419,8 +471,9 @@ pub fn register(registry: &Registry) -> Result<()> {
             .unwrap_or("community")
             .to_string();
         let seed_attr = spec.params.get_text("seed_attr").map(|s| s.to_string());
-        LabelPropagation::new(max_iter, tolerance, output_attr, seed_attr)
-            .map(|algo| Box::new(algo) as Box<dyn Algorithm>)
+        LabelPropagation::new(max_iter as usize, tolerance, output_attr, seed_attr).map(|algo| {
+            Box::new(algo.with_seed(seed.map(|value| value as u64))) as Box<dyn Algorithm>
+        })
     })
 }
 
