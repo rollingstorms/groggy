@@ -37,13 +37,31 @@ control-message acknowledgement behavior is unchanged.
 
 ## State and scope
 
-A flat-preprocessing failure stops projection recomputation before replacing
-positions, updating projection timing/last-update metadata or broadcasting its
-success envelope. Existing coordinates remain available. This does not establish
-transactional rollback for all control commands: layout-change controller/config
-bookkeeping occurs before recomputation and needs a separate atomicity audit.
-Other layout controls, centering, visual error panels, recovery policies and
-display-coordinate ownership are outside this repair.
+Layout-change requests now prepare their embedding, projection, derived controls,
+finite coordinates, and publication timestamp before updating engine state. A
+failed request leaves the prior controller/view and drag policies, configuration,
+layout/parameter caches, cached embedding, animation, positions, timing metadata,
+pending parameter deltas and synchronization queues unchanged. A freshly computed
+embedding is cached only after the whole layout succeeds. Failures emit no engine
+layout/view/position success updates; the server still returns the failure ack.
+
+On success, publish the accepted settings/coordinates, reset interpolation, switch
+the controller and emit one envelope containing matching layout parameters,
+positions and any controller view. Retain preexisting pending parameter deltas in
+that envelope. Validate centering output as well as raw coordinates before
+publication. Honeycomb derived cell size updates the effective configuration and
+accepted parameter cache together. Empty incoming parameters continue to restore
+the last accepted cache for that layout.
+
+Only coalesced position deltas are superseded by a successful layout. Attribute
+and structural updates remain queued; the previous implementation discarded
+coalesced property updates along with motion. Failed requests discard neither.
+
+This guarantee covers recoverable errors in layout-change requests. Other control
+commands (embedding/projection/quality changes), coordinate identity across all
+layouts, crash recovery, concurrent-reader isolation, visual error panels and
+network delivery/retry semantics still need their own audit. Transport failure
+after successful application does not undo an accepted layout.
 
 ## Evidence
 
@@ -60,3 +78,11 @@ that unavailable engines reject, and that completion acknowledgements reflect
 valid layout, unknown-name and flat-preprocessing failures. These are in-process
 engine/channel checks; this slice does not certify browser rendering or real
 network disconnect/retry behavior.
+
+Layout-publication tests snapshot configuration, controllers/views/policies,
+positions, cached embeddings/parameters, animation/timing, pending settings and
+queues before cached/uncached preprocessing failures, late projection errors,
+embedding failures and nonfinite candidates. Successful retry checks a single
+coherent envelope, accepted-cache restoration, discarded motion and retained
+property/structural updates. No full control-command or concurrent transaction
+certification is implied.

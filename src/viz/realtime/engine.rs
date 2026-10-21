@@ -12,7 +12,7 @@ use crate::storage::advanced_matrix::numeric_type::NumericType;
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::embeddings::flat_embedding::{compute_flat_embedding_matrix, FlatEmbedConfig};
 use crate::viz::embeddings::{EmbeddingMethod, GraphEmbeddingExt};
-use crate::viz::projection::GraphProjectionExt;
+use crate::viz::projection::{GraphProjectionExt, ProjectionConfig};
 use crate::viz::realtime::accessor::{
     EngineSnapshot, EngineUpdate, PositionsPayload, UpdateEnvelope,
 };
@@ -90,6 +90,20 @@ fn prepare_flat_embedding(
         seed: layout_parameter(params, "flat_embed.seed", default.seed)?,
     };
     compute_flat_embedding_matrix(embedding, graph, &config).map(Some)
+}
+
+/// Computed coordinates and derived controls, still unpublished.
+struct PreparedLayout {
+    positions: Vec<Position>,
+    cell_size: Option<f64>,
+}
+
+fn envelope_timestamp_ms() -> GraphResult<u64> {
+    let elapsed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| GraphError::InvalidInput(format!("system time error: {error}")))?;
+    u64::try_from(elapsed.as_millis())
+        .map_err(|_| GraphError::InvalidInput("Envelope timestamp overflow".into()))
 }
 
 /// Main real-time visualization engine
@@ -872,9 +886,30 @@ impl RealTimeVizEngine {
             (state.current_layout, state.current_layout_params.clone())
         };
 
+        let prepared = self.prepare_layout_algorithm(
+            embedding,
+            layout_kind,
+            &params,
+            &self.config.projection_config,
+        )?;
+        if let Some(cell_size) = prepared.cell_size {
+            self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
+        }
+        Ok(prepared.positions)
+    }
+
+    /// Compute a candidate without changing configuration, caches or published state.
+    fn prepare_layout_algorithm(
+        &self,
+        embedding: &GraphMatrix,
+        layout_kind: LayoutKind,
+        params: &HashMap<String, String>,
+        projection_config: &ProjectionConfig,
+    ) -> GraphResult<PreparedLayout> {
+        let mut derived_cell_size = None;
         let mut positions = match layout_kind {
             LayoutKind::Honeycomb => {
-                let mut config = self.config.projection_config.clone();
+                let mut config = projection_config.clone();
 
                 let flat_embedding_matrix = {
                     let graph = self.graph.lock().map_err(|_| {
@@ -882,7 +917,7 @@ impl RealTimeVizEngine {
                             "Cannot prepare flat layout: graph lock is poisoned".into(),
                         )
                     })?;
-                    prepare_flat_embedding(embedding, &graph, &params)?
+                    prepare_flat_embedding(embedding, &graph, params)?
                 };
                 let embedding_to_use = flat_embedding_matrix.as_ref().unwrap_or(embedding);
 
@@ -895,7 +930,7 @@ impl RealTimeVizEngine {
 
                 if let Some(cell_size) = explicit_cell_size {
                     config.honeycomb_config.cell_size = cell_size;
-                    self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
+                    derived_cell_size = Some(cell_size);
                 } else {
                     // Apply bin density calculation as per fix plan
                     let target_bins = params
@@ -907,7 +942,7 @@ impl RealTimeVizEngine {
                         self.calculate_honeycomb_cell_size_from_bins(embedding_to_use, target_bins)
                     {
                         config.honeycomb_config.cell_size = cell_size;
-                        self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
+                        derived_cell_size = Some(cell_size);
                         eprintln!(
                             "🔶 DEBUG: Auto-scaled honeycomb cell size to {:.2} for {} target bins",
                             cell_size, target_bins
@@ -916,7 +951,7 @@ impl RealTimeVizEngine {
                         self.auto_scale_honeycomb_cell_size(embedding_to_use)
                     {
                         config.honeycomb_config.cell_size = cell_size;
-                        self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
+                        derived_cell_size = Some(cell_size);
                     }
                 }
 
@@ -926,24 +961,42 @@ impl RealTimeVizEngine {
             LayoutKind::ForceDirected => {
                 // Using force-directed layout
                 let graph = self.graph.lock().unwrap();
-                self.apply_force_directed_layout(&graph, embedding, &params)?
+                self.apply_force_directed_layout(&graph, embedding, params)?
             }
             LayoutKind::Circular => {
                 // Using circular layout
                 let graph = self.graph.lock().unwrap();
-                self.apply_circular_layout(&graph, embedding, &params)?
+                self.apply_circular_layout(&graph, embedding, params)?
             }
             LayoutKind::Grid => {
                 // Using grid layout
                 let graph = self.graph.lock().unwrap();
-                self.apply_grid_layout(&graph, embedding, &params)?
+                self.apply_grid_layout(&graph, embedding, params)?
             }
         };
 
-        // Center & fit to a sensible radius (~350 px)
+        if positions
+            .iter()
+            .any(|p| !p.x.is_finite() || !p.y.is_finite())
+        {
+            return Err(GraphError::InvalidInput(
+                "Layout produced nonfinite coordinates".into(),
+            ));
+        }
         positions = Self::center_and_fit_positions(positions, Some(350.0));
+        if positions
+            .iter()
+            .any(|p| !p.x.is_finite() || !p.y.is_finite())
+        {
+            return Err(GraphError::InvalidInput(
+                "Layout centering overflowed".into(),
+            ));
+        }
 
-        Ok(positions)
+        Ok(PreparedLayout {
+            positions,
+            cell_size: derived_cell_size,
+        })
     }
 
     /// Apply force-directed layout algorithm with parameters
@@ -1835,111 +1888,111 @@ impl RealTimeVizEngine {
         layout_kind: LayoutKind,
         mut incoming_params: HashMap<String, String>,
     ) -> GraphResult<()> {
-        eprintln!(
-            "📐 DEBUG: Applying layout change to {} with params {:?}",
-            layout_kind, incoming_params
-        );
-
-        if incoming_params.is_empty() {
-            if let Some(cached) = {
-                let state = self.state.lock().unwrap();
-                state.layout_param_cache.get(&layout_kind).cloned()
-            } {
-                eprintln!(
-                    "📐 DEBUG: Restoring cached params for {}: {:?}",
-                    layout_kind, cached
-                );
-                incoming_params = cached;
+        // Resolve the request and optional cached embedding without mutating either.
+        let cached_embedding = {
+            let state = self
+                .state
+                .lock()
+                .map_err(|_| GraphError::InvalidInput("Layout state lock is poisoned".into()))?;
+            if incoming_params.is_empty() {
+                if let Some(cached) = state.layout_param_cache.get(&layout_kind) {
+                    incoming_params = cached.clone();
+                }
             }
+            state.embedding.clone()
+        };
+        let embedding = match cached_embedding {
+            Some(embedding) => embedding,
+            None => {
+                let graph = self.graph.lock().map_err(|_| {
+                    GraphError::InvalidInput("Layout graph lock is poisoned".into())
+                })?;
+                graph.compute_embedding(&self.config.embedding_config)?
+            }
+        };
+        let mut projection_config = self.config.projection_config.clone();
+        if layout_kind == LayoutKind::Honeycomb {
+            projection_config.honeycomb_config = crate::viz::projection::HoneycombConfig::default();
         }
+        let started = Instant::now();
+        let prepared = self.prepare_layout_algorithm(
+            &embedding,
+            layout_kind,
+            &incoming_params,
+            &projection_config,
+        )?;
+        let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let timestamp_ms = envelope_timestamp_ms()?;
+        if let Some(cell_size) = prepared.cell_size {
+            projection_config.honeycomb_config.cell_size = cell_size;
+            incoming_params.insert("honeycomb.cell_size".into(), format!("{cell_size:.6}"));
+        }
+        let params_changed = HashMap::from([(
+            "layout".into(),
+            json!({
+                "algorithm": layout_kind.to_string(), "params": incoming_params,
+            }),
+        )]);
 
-        self.configure_controller_for_layout(layout_kind);
-        self.broadcast_view_state().await?;
-
-        self.cancel_interpolation();
-        self.reset_layout_config_for(layout_kind);
-
+        // All recoverable computation/clock/lock failures precede publication.
         {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|_| GraphError::InvalidInput("Layout state lock is poisoned".into()))?;
             let previous_layout = state.current_layout;
-            let previous_snapshot = state.current_layout_params.clone();
+            let previous_params = state.current_layout_params.clone();
             state
                 .layout_param_cache
-                .insert(previous_layout, previous_snapshot);
+                .insert(previous_layout, previous_params);
             state.current_layout = layout_kind;
             state.current_layout_params = incoming_params.clone();
             state
                 .layout_param_cache
-                .insert(layout_kind, incoming_params.clone());
+                .insert(layout_kind, incoming_params);
+            state.embedding = Some(embedding);
+            state.positions = prepared.positions;
+            state.animation_state = AnimationState::default();
+            state.performance.last_projection_time_ms = elapsed_ms;
+            state.last_update = Instant::now();
         }
-
-        {
-            let map = self.pending_params_changed.get_or_insert_with(HashMap::new);
-            map.insert(
-                "layout.algorithm".to_string(),
-                json!(layout_kind.to_string()),
-            );
+        self.config.projection_config = projection_config;
+        // A new layout supersedes position deltas, never attribute/structural updates.
+        self.sync_manager.discard_coalesced_positions();
+        let pending = self.pending_params_changed.get_or_insert_with(HashMap::new);
+        pending.insert("layout.algorithm".into(), json!(layout_kind.to_string()));
+        if let Some(cell_size) = prepared.cell_size {
+            pending.insert("honeycomb.cell_size".into(), json!(cell_size));
         }
-
-        let flushed_updates = self.sync_manager.flush_all_coalesced().await?;
-        if !flushed_updates.is_empty() {
-            eprintln!(
-                "🚨 DEBUG: Discarded {} coalesced updates prior to layout recompute",
-                flushed_updates.len()
-            );
-        }
-
-        self.trigger_projection_recomputation().await?;
-
+        self.configure_controller_for_layout(layout_kind);
+        let view_changed = self.current_view_json();
+        self.broadcast_envelope_at(timestamp_ms, Some(params_changed), None, view_changed, true);
         Ok(())
     }
 
-    fn cancel_interpolation(&mut self) {
-        let mut state = self.state.lock().unwrap();
-        if state.animation_state.is_animating {
-            // Cancelling active interpolation before layout switch
-        }
-        state.animation_state = AnimationState::default();
-    }
-
-    fn reset_layout_config_for(&mut self, layout_kind: LayoutKind) {
-        if let LayoutKind::Honeycomb = layout_kind {
-            // Resetting honeycomb projection config to defaults
-            self.config.projection_config.honeycomb_config =
-                crate::viz::projection::HoneycombConfig::default();
+    fn current_view_json(&self) -> Option<serde_json::Value> {
+        if let Some(view) = self.active_controller.view_3d() {
+            Some(json!({"view_3d": {
+                "center": view.center, "distance": view.distance, "quat": view.quat,
+            }}))
+        } else {
+            self.active_controller.view_2d().map(|view| {
+                json!({"view_2d": {
+                    "x": view.x, "y": view.y, "zoom": view.zoom, "rotation": view.rotation,
+                }})
+            })
         }
     }
 
     async fn broadcast_view_state(&mut self) -> GraphResult<()> {
-        if let Some(view) = self.active_controller.view_3d() {
-            let view_json = json!({
-                "view_3d": {
-                    "center": view.center,
-                    "distance": view.distance,
-                    "quat": view.quat,
-                }
-            });
-
-            // For 3D controllers, re-project embedding with view transform to show visible orbiting
-            if self.active_controller.name() == "globe-3d" {
-                // Trigger view-aware projection that applies 3D transform before 2D projection
-                self.trigger_view_aware_projection(view.clone()).await?;
-            } else {
-                // For non-globe 3D controllers, just broadcast view state
-                self.broadcast_envelope(None, None, Some(view_json), false)?;
+        if self.active_controller.name() == "globe-3d" {
+            if let Some(view) = self.active_controller.view_3d() {
+                return self.trigger_view_aware_projection(view.clone()).await;
             }
-        } else if let Some(view) = self.active_controller.view_2d() {
-            let view_json = json!({
-                "view_2d": {
-                    "x": view.x,
-                    "y": view.y,
-                    "zoom": view.zoom,
-                    "rotation": view.rotation,
-                }
-            });
+        }
+        if let Some(view_json) = self.current_view_json() {
             self.broadcast_envelope(None, None, Some(view_json), false)?;
         }
-
         Ok(())
     }
 
@@ -2201,15 +2254,31 @@ impl RealTimeVizEngine {
     /// Build and broadcast a unified UpdateEnvelope (positions + optional patch/params)
     fn broadcast_envelope(
         &mut self,
-        mut params_changed: Option<HashMap<String, serde_json::Value>>,
+        params_changed: Option<HashMap<String, serde_json::Value>>,
         graph_patch: Option<GraphPatch>,
         view_changed: Option<serde_json::Value>,
         include_positions: bool,
     ) -> GraphResult<()> {
-        let timestamp_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|e| GraphError::InvalidInput(format!("system time error: {}", e)))?
-            .as_millis() as u64;
+        let timestamp_ms = envelope_timestamp_ms()?;
+        self.broadcast_envelope_at(
+            timestamp_ms,
+            params_changed,
+            graph_patch,
+            view_changed,
+            include_positions,
+        );
+        Ok(())
+    }
+
+    /// Publish after all fallible preparation, using a prevalidated timestamp.
+    fn broadcast_envelope_at(
+        &mut self,
+        timestamp_ms: u64,
+        mut params_changed: Option<HashMap<String, serde_json::Value>>,
+        graph_patch: Option<GraphPatch>,
+        view_changed: Option<serde_json::Value>,
+        include_positions: bool,
+    ) {
         let frame_id = FRAME_ID_SEQ.fetch_add(1, Ordering::Relaxed);
 
         if let Some(pending) = self.pending_params_changed.take() {
@@ -2281,8 +2350,6 @@ impl RealTimeVizEngine {
                 .update_broadcaster
                 .send(EngineUpdate::PositionsBatch(positions_vec));
         }
-
-        Ok(())
     }
 
     /// Subscribe to engine-generated updates
@@ -2603,6 +2670,298 @@ mod tests {
         assert_eq!(
             engine.state.lock().unwrap().current_layout,
             LayoutKind::Honeycomb
+        );
+    }
+
+    fn staged_layout_fixture(cached: bool) -> RealTimeVizEngine {
+        let (graph, input) = flat_fixture();
+        let mut config = RealTimeVizConfig::default();
+        config.embedding_config.method = EmbeddingMethod::RandomND {
+            distribution: crate::viz::embeddings::RandomDistribution::Uniform {
+                min: -1.0,
+                max: 1.0,
+            },
+            normalize: false,
+        };
+        config.embedding_config.dimensions = 3;
+        config.embedding_config.seed = Some(17);
+        config.projection_config.honeycomb_config.cell_size = 77.0;
+        let mut engine = RealTimeVizEngine::new(graph, config);
+        engine.active_controller = Box::new(GlobeController::new());
+        engine.node_drag_policy = NodeDragPolicy::Disabled;
+        engine.canvas_drag_policy = CanvasDragPolicy::Trackball3D;
+        engine.pending_params_changed = Some(HashMap::from([("prior".into(), json!(42))]));
+        {
+            let mut state = engine.state.lock().unwrap();
+            if cached {
+                state.embedding = Some(input);
+            }
+            state.node_index = HashMap::from([(3, 0), (0, 1), (2, 2)]);
+            state.positions = vec![Position { x: 7.0, y: 9.0 }; 3];
+            state.current_layout = LayoutKind::Grid;
+            state.current_layout_params = HashMap::from([("spacing".into(), "37".into())]);
+            state.layout_param_cache.insert(
+                LayoutKind::Circular,
+                HashMap::from([("radius".into(), "91".into())]),
+            );
+            state.animation_state.is_animating = true;
+            state.animation_state.progress = 0.375;
+            state.animation_state.source_positions = state.positions.clone();
+            state.animation_state.target_positions = vec![Position { x: -1.0, y: 2.0 }; 3];
+            state.performance.last_projection_time_ms = 123.0;
+        }
+        engine
+    }
+
+    fn layout_signature(engine: &RealTimeVizEngine) -> serde_json::Value {
+        let state = engine.state.lock().unwrap();
+        json!({
+            "config": engine.config,
+            "layout": state.current_layout, "params": state.current_layout_params,
+            "cache": state.layout_param_cache, "positions": state.positions,
+            "embedding": state.embedding.as_ref().map(|matrix| (matrix.to_vec().unwrap(), matrix.shape(), matrix.row_labels(), matrix.column_names())),
+            "animation": format!("{:?}", state.animation_state),
+            "performance": state.performance, "last_update": format!("{:?}", state.last_update),
+            "controller": engine.active_controller.name(), "view": engine.current_view_json(),
+            "node_drag": format!("{:?}", engine.node_drag_policy),
+            "canvas_drag": format!("{:?}", engine.canvas_drag_policy),
+            "pending": engine.pending_params_changed, "sync": engine.sync_manager.get_stats(),
+        })
+    }
+
+    async fn queue_layout_updates(engine: &mut RealTimeVizEngine) {
+        engine.sync_manager.set_coalescing_window(Duration::ZERO);
+        engine
+            .sync_manager
+            .queue_update(
+                EngineUpdate::PositionDelta {
+                    node_id: 3,
+                    delta: vec![1.0, 2.0],
+                },
+                1,
+            )
+            .await
+            .unwrap();
+        engine
+            .sync_manager
+            .queue_update(
+                EngineUpdate::NodeChanged {
+                    id: 3,
+                    attributes: HashMap::from([(
+                        "name".into(),
+                        crate::AttrValue::Text("retained".into()),
+                    )]),
+                },
+                2,
+            )
+            .await
+            .unwrap();
+        engine
+            .sync_manager
+            .queue_update(EngineUpdate::NodeRemoved(99), 3)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn failed_layout_requests_preserve_config_controller_animation_caches_and_queues() {
+        for cached in [false, true] {
+            let mut engine = staged_layout_fixture(cached);
+            queue_layout_updates(&mut engine).await;
+            let mut messages = engine.subscribe();
+            let before = layout_signature(&engine);
+            let error = engine
+                .apply(EngineUpdate::LayoutChanged {
+                    algorithm: "honeycomb".into(),
+                    params: HashMap::from([
+                        ("flat_embed".into(), "true".into()),
+                        ("flat_embed.learning_rate".into(), "-1".into()),
+                    ]),
+                })
+                .await
+                .unwrap_err();
+            assert!(error.to_string().contains("learning_rate"));
+            assert_eq!(layout_signature(&engine), before);
+            assert!(matches!(
+                messages.try_recv(),
+                Err(broadcast::error::TryRecvError::Empty)
+            ));
+            let retained = engine.sync_manager.get_ready_updates().await.unwrap();
+            assert_eq!(retained.len(), 3);
+            assert!(retained.iter().any(|update| matches!(update,EngineUpdate::PositionDelta { node_id:3, delta } if delta == &[1.0,2.0])));
+            assert!(retained.iter().any(|update| matches!(update,EngineUpdate::NodeChanged { id:3, attributes } if attributes.get("name") == Some(&crate::AttrValue::Text("retained".into())))));
+            assert!(retained
+                .iter()
+                .any(|update| matches!(update, EngineUpdate::NodeRemoved(99))));
+        }
+    }
+
+    #[tokio::test]
+    async fn late_projection_and_embedding_failures_do_not_publish_derived_controls() {
+        let mut engine = staged_layout_fixture(true);
+        engine.config.projection_config.method = crate::viz::projection::ProjectionMethod::TSNE {
+            perplexity: 100.0,
+            iterations: 1,
+            learning_rate: 1.0,
+            early_exaggeration: 1.0,
+        };
+        let mut messages = engine.subscribe();
+        let before = layout_signature(&engine);
+        assert!(engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "honeycomb".into(),
+                params: HashMap::from([("honeycomb.cell_size".into(), "0.25".into())]),
+            })
+            .await
+            .is_err());
+        assert_eq!(layout_signature(&engine), before);
+        assert!(matches!(
+            messages.try_recv(),
+            Err(broadcast::error::TryRecvError::Empty)
+        ));
+
+        let mut engine = staged_layout_fixture(false);
+        engine.config.embedding_config.method = EmbeddingMethod::EnergyND {
+            iterations: 0,
+            learning_rate: 0.0,
+            annealing: false,
+        };
+        let before = layout_signature(&engine);
+        assert!(engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "grid".into(),
+                params: HashMap::new()
+            })
+            .await
+            .is_err());
+        assert_eq!(layout_signature(&engine), before);
+
+        let mut engine = staged_layout_fixture(true);
+        engine
+            .state
+            .lock()
+            .unwrap()
+            .embedding
+            .as_mut()
+            .unwrap()
+            .set(0, 0, f64::NAN)
+            .unwrap();
+        let before = layout_signature(&engine);
+        let error = engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "force".into(),
+                params: HashMap::new(),
+            })
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("nonfinite"));
+        assert_eq!(layout_signature(&engine), before);
+    }
+
+    #[tokio::test]
+    async fn successful_retry_publishes_one_coherent_layout_and_retains_nonmotion_updates() {
+        let mut engine = staged_layout_fixture(true);
+        queue_layout_updates(&mut engine).await;
+        let mut messages = engine.subscribe();
+        assert!(engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "honeycomb".into(),
+                params: HashMap::from([("flat_embed".into(), "bad".into())]),
+            })
+            .await
+            .is_err());
+        assert!(matches!(
+            messages.try_recv(),
+            Err(broadcast::error::TryRecvError::Empty)
+        ));
+        let params = HashMap::from([
+            ("flat_embed".into(), "true".into()),
+            ("flat_embed.iterations".into(), "0".into()),
+            ("honeycomb.cell_size".into(), "0.25".into()),
+        ]);
+        engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "honeycomb".into(),
+                params,
+            })
+            .await
+            .unwrap();
+        {
+            let state = engine.state.lock().unwrap();
+            assert_eq!(state.current_layout, LayoutKind::Honeycomb);
+            assert_eq!(
+                state.current_layout_params["honeycomb.cell_size"],
+                "0.250000"
+            );
+            assert_eq!(state.layout_param_cache[&LayoutKind::Grid]["spacing"], "37");
+            assert_eq!(
+                state.layout_param_cache[&LayoutKind::Honeycomb],
+                state.current_layout_params
+            );
+            assert!(!state.animation_state.is_animating);
+            assert_eq!(state.positions.len(), 3);
+            assert!(state
+                .positions
+                .iter()
+                .all(|p| p.x.is_finite() && p.y.is_finite()));
+        }
+        assert_eq!(engine.active_controller.name(), "honeycomb-nd");
+        assert_eq!(
+            engine.config.projection_config.honeycomb_config.cell_size,
+            0.25
+        );
+        assert!(engine.pending_params_changed.is_none());
+        let mut envelopes = Vec::new();
+        while let Ok(message) = messages.try_recv() {
+            if let EngineUpdate::UpdateEnvelope(envelope) = message {
+                envelopes.push(envelope);
+            }
+        }
+        assert_eq!(envelopes.len(), 1);
+        let envelope = &envelopes[0];
+        let changed = envelope.params_changed.as_ref().unwrap();
+        assert_eq!(changed["layout"]["algorithm"], json!("honeycomb"));
+        assert_eq!(
+            changed["layout"]["params"]["honeycomb.cell_size"],
+            json!("0.250000")
+        );
+        assert_eq!(changed["prior"], json!(42));
+        assert_eq!(changed["layout.algorithm"], json!("honeycomb"));
+        assert_eq!(envelope.view_changed, engine.current_view_json());
+        assert_eq!(
+            envelope.positions.as_ref().unwrap().layout.as_deref(),
+            Some("honeycomb")
+        );
+        let retained = engine.sync_manager.get_ready_updates().await.unwrap();
+        assert_eq!(retained.len(), 2);
+        assert!(retained
+            .iter()
+            .any(|update| matches!(update, EngineUpdate::NodeChanged { id: 3, .. })));
+        assert!(retained
+            .iter()
+            .any(|update| matches!(update, EngineUpdate::NodeRemoved(99))));
+        // Switching back with no explicit controls restores only accepted cached settings.
+        engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "grid".into(),
+                params: HashMap::new(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            engine.state.lock().unwrap().current_layout_params["spacing"],
+            "37"
+        );
+        engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "honeycomb".into(),
+                params: HashMap::new(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            engine.state.lock().unwrap().current_layout_params["flat_embed"],
+            "true"
         );
     }
 

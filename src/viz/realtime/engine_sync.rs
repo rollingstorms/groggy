@@ -313,6 +313,11 @@ impl EngineSyncManager {
         Ok(())
     }
 
+    /// Drop obsolete motion after a successful layout; retain properties and structure.
+    pub(crate) fn discard_coalesced_positions(&mut self) {
+        self.position_coalescing.clear();
+    }
+
     /// Force flush all coalesced updates immediately
     pub async fn flush_all_coalesced(&mut self) -> GraphResult<Vec<EngineUpdate>> {
         let mut updates = Vec::new();
