@@ -24,9 +24,48 @@ The checked Dijkstra algorithm and weighted ShortestPathMap pipeline step share 
 
 `pathfinding.astar` now uses the same selected-state and weight preflight, including unit defaults, compact integers, zero weights, reverse undirected traversal and minimum parallel-edge costs. It stores zero-based **node path order**, not distances or chosen edge IDs. Each marker attribute must be present on exactly one selected node (the marker's value does not select it). Missing/ambiguous markers reject. An unreachable goal returns an error. Only the selected path's output rows are written; unrelated pre-existing output values are not cleared.
 
-An omitted heuristic is zero. For an explicit heuristic attribute, missing values are zero; present values must be finite nonnegative scalar numbers. The goal estimate must equal zero, and every selected oriented pair must satisfy `h(u) <= w(u,v) + h(v)`. Undirected graphs check both orientations; parallel edges use the minimum weight. This sufficient consistency requirement certifies early goal termination; admissible but inconsistent heuristics are currently rejected. Comparisons use the stored numeric values without an absolute epsilon. Invalid input rejects before result-column writes, including start-equals-goal. CSR cache construction may still occur before validation.
+An omitted heuristic is zero. For an explicit heuristic attribute, missing values are zero; present values must be finite nonnegative scalar numbers. The goal estimate must equal zero, and every selected oriented pair must satisfy `h(u) <= w(u,v) + h(v)`. Undirected graphs check both orientations; parallel edges use the minimum weight. This sufficient consistency requirement certifies early goal termination; admissible but inconsistent heuristics are currently rejected. Comparisons use the stored numeric values without an absolute epsilon. Invalid input rejects before result-column writes, including start-equals-goal. Selected-state and weight preflight now run before cache access; marker/heuristic checks may still follow CSR construction.
 
 A* heap equality/order now agree and relaxation preserves tiny cost improvements. Path ties are not promised a canonical selection, and the output remains a node sequence, so callers needing selected edge identity should use the direct shortest-path API. Tests: `tests/astar_validation.rs` and `tests/test_astar_validation.py`.
+
+### A* nonpersistent output and cancellation
+
+A nonpersistent run returns owned `(original_node_id, i64_path_index)` rows in
+path order under `profile["outputs"]["pathfinding.astar.path"]`, using the existing
+NodeIntegers bridge. `profile["stats"]["astar.path_cost"]` reports the f64 total
+cost; `astar.count.path_nodes` reports path size. Persistent runs retain integer
+path-index properties, so even a cost above f32 range is valid when its indices
+fit i64. Start-equals-goal returns one row and zero cost.
+
+```python
+from groggy.pipeline import apply
+from groggy import algorithms
+
+result, profile = apply(
+    selection,
+    algorithms.pathfinding.astar("start", "goal", weight_attr="length"),
+    persist=False, return_profile=True,
+)
+path_rows = profile["outputs"]["pathfinding.astar.path"]
+```
+
+Cancellation is checked before work, during heap traversal and before final
+property/output publication, including trivial paths. Finite accumulated costs
+and priorities are checked; path-index conversion rejects overflow. Unreachable
+paths still raise without returning output rows. No fixed cancellation latency
+is promised for every setup/high-degree scan. Existing node-to-CSR lookup may
+scan selected IDs for each expansion; no throughput or scale improvement is
+claimed. This operation retains the existing bulk mutation boundary and does
+not complete state-pinned historical inputs.
+
+`tests/astar_output.rs` compares all 512 three-node edge sets in both graph
+directions and every source/goal pair, including zero-weight parallel instances,
+against independent Floyd-Warshall costs. It checks actual cache reuse, path
+adjacency/order, nonpersistent ownership, unreachable goals, cancelled trivial
+paths, stale/open selections, sparse IDs and large f64 costs. Rebuilt Python
+checks are in `tests/test_astar_output.py`. These supplement the earlier
+heuristic/input tests without claiming external-backend or production-scale
+certification.
 
 ## Checked node betweenness
 

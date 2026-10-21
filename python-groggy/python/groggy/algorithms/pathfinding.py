@@ -115,8 +115,9 @@ def astar(
     """
     A* pathfinding algorithm.
 
-    Finds shortest paths using A* search with optional heuristic.
-    More efficient than Dijkstra when a good heuristic is available.
+    Finds a shortest node path with an optional consistent heuristic.
+    Nonpersistent output returns (node_id, zero_based_path_index) rows under
+    pathfinding.astar.path; astar.path_cost in the profile reports f64 cost.
 
     Args:
         start_attr: Attribute present on exactly one selected start node

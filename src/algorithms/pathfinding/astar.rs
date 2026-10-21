@@ -7,8 +7,8 @@ use anyhow::{anyhow, Result};
 use crate::algorithms::pathfinding::utils::checked_dijkstra_weights;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
+    ParameterMetadata, ParameterType,
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
@@ -46,7 +46,7 @@ impl AStarPathfinding {
             id: "pathfinding.astar".to_string(),
             name: "A* Pathfinding".to_string(),
             description: "A* search with optional edge weights and heuristics.".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             cost_hint: CostHint::Linearithmic,
             supports_cancellation: true,
             parameters: vec![
@@ -128,15 +128,19 @@ impl AStarPathfinding {
         Ok(map)
     }
 
-    fn run(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, AttrValue>> {
-        let weight_map = checked_dijkstra_weights(subgraph, self.weight_attr.as_ref())?;
+    fn run(
+        &self,
+        ctx: &mut Context,
+        subgraph: &Subgraph,
+        weight_map: &HashMap<(NodeId, NodeId), f64>,
+    ) -> Result<Vec<(NodeId, i64)>> {
         let start = self.resolve_node(subgraph, &self.start_attr)?;
         let goal = self.resolve_node(subgraph, &self.goal_attr)?;
         let heuristic_map = self.heuristics_map(subgraph)?;
         if heuristic_map.get(&goal).copied().unwrap_or(0.0) != 0.0 {
             return Err(anyhow!("heuristic at goal must be zero"));
         }
-        for (&(u, v), &weight) in &weight_map {
+        for (&(u, v), &weight) in weight_map {
             let hu = heuristic_map.get(&u).copied().unwrap_or(0.0);
             let hv = heuristic_map.get(&v).copied().unwrap_or(0.0);
             if hu > weight + hv {
@@ -146,9 +150,8 @@ impl AStarPathfinding {
             }
         }
         if start == goal {
-            let mut map = HashMap::new();
-            map.insert(start, AttrValue::Int(0));
-            return Ok(map);
+            ctx.record_stat("astar.path_cost", 0.0);
+            return Ok(vec![(start, 0)]);
         }
 
         #[derive(Copy, Clone, Debug)]
@@ -226,13 +229,20 @@ impl AStarPathfinding {
             for neighbor in neighbors {
                 let edge_weight = weight_map.get(&(node, neighbor)).copied().unwrap_or(1.0);
                 let tentative = cost + edge_weight;
+                if !tentative.is_finite() {
+                    return Err(anyhow!("nonfinite A* distance"));
+                }
                 let current_best = g_score.get(&neighbor).copied().unwrap_or(f64::INFINITY);
                 if tentative < current_best {
                     came_from.insert(neighbor, node);
                     g_score.insert(neighbor, tentative);
                     let heuristic = heuristic_map.get(&neighbor).copied().unwrap_or(0.0);
+                    let estimated = tentative + heuristic;
+                    if !estimated.is_finite() {
+                        return Err(anyhow!("nonfinite A* priority"));
+                    }
                     open.push(State {
-                        estimated: tentative + heuristic,
+                        estimated,
                         cost: tentative,
                         node: neighbor,
                     });
@@ -256,12 +266,15 @@ impl AStarPathfinding {
         }
         path.reverse();
 
-        let mut output = HashMap::new();
-        for (idx, node) in path.iter().enumerate() {
-            output.insert(*node, AttrValue::Int(idx as i64));
-        }
-
-        Ok(output)
+        let path_cost = g_score
+            .get(&goal)
+            .copied()
+            .ok_or_else(|| anyhow!("missing A* goal distance"))?;
+        ctx.record_stat("astar.path_cost", path_cost);
+        path.into_iter()
+            .enumerate()
+            .map(|(index, node)| Ok((node, i64::try_from(index)?)))
+            .collect()
     }
 }
 
@@ -276,6 +289,10 @@ impl Algorithm for AStarPathfinding {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let t0 = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("astar cancelled"));
+        }
+        let weights = checked_dijkstra_weights(&subgraph, self.weight_attr.as_ref())?;
 
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
@@ -321,19 +338,28 @@ impl Algorithm for AStarPathfinding {
         }
 
         // Phase 3: Execute A* (will use cached CSR automatically)
-        let path_attr = self.run(ctx, &subgraph)?;
+        let path = self.run(ctx, &subgraph, &weights)?;
+        ctx.record_stat("astar.count.path_nodes", path.len() as f64);
+        if ctx.is_cancelled() {
+            return Err(anyhow!("astar cancelled"));
+        }
 
         // Phase 4: Write results
         if ctx.persist_results() {
-            let attr_values: Vec<(NodeId, AttrValue)> = path_attr
+            let attr_values: Vec<(NodeId, AttrValue)> = path
                 .iter()
-                .map(|(&node, value)| (node, value.clone()))
+                .map(|&(node, index)| (node, AttrValue::Int(index)))
                 .collect();
 
             ctx.with_scoped_timer("astar.write_attributes", || {
                 subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
             })
             .map_err(|err| anyhow!("failed to persist astar path: {err}"))?;
+        } else {
+            ctx.add_output(
+                "pathfinding.astar.path",
+                AlgorithmOutput::NodeIntegers(path),
+            );
         }
 
         ctx.record_duration("astar.total_execution", t0.elapsed());
