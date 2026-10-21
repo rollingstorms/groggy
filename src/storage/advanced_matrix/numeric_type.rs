@@ -226,7 +226,7 @@ impl NumericType for f32 {
     }
 
     fn from_f64(val: f64) -> Option<Self> {
-        if val.is_finite() && val >= f32::MIN as f64 && val <= f32::MAX as f64 {
+        if !val.is_finite() || (val >= f32::MIN as f64 && val <= f32::MAX as f64) {
             Some(val as f32)
         } else {
             None

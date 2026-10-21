@@ -224,7 +224,8 @@ impl<T: NumericType> UnifiedMatrix<T> {
 
     /// Create a matrix from existing data
     pub fn from_data(data: Vec<T>, rows: usize, cols: usize) -> MatrixResult<Self> {
-        if data.len() != rows * cols {
+        let size = rows.checked_mul(cols).ok_or(MemoryError::InvalidSize)?;
+        if data.len() != size {
             return Err(MatrixError::DimensionMismatch {
                 expected: (rows, cols),
                 got: (data.len(), 1),

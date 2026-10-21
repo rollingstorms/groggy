@@ -1,0 +1,36 @@
+{
+  "shape": [
+    1024,
+    384
+  ],
+  "dtype": "f64",
+  "ddof": 1,
+  "axis_0": "one result per row",
+  "axis_1": "one result per column",
+  "timings": {
+    "0": {
+      "median_ms": 16.579125,
+      "samples_ms": [
+        16.75120799999999,
+        16.827917,
+        16.551750000000006,
+        16.579125,
+        16.452042
+      ]
+    },
+    "1": {
+      "median_ms": 16.809500000000032,
+      "samples_ms": [
+        17.054291,
+        16.764374999999998,
+        16.809500000000032,
+        16.775082999999967,
+        16.885333999999975
+      ]
+    }
+  },
+  "process_peak_rss_bytes": 43483136,
+  "build_profile": "debug",
+  "implementation": "Welford with one dense read guard per reduction",
+  "platform": "macOS arm64"
+}

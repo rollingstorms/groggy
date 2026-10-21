@@ -177,14 +177,14 @@ impl PyGraphMatrix {
         Py::new(py, Self { inner: matrix })
     }
 
-    /// Create matrix from nested Python lists (API consistency)
+    /// Create a matrix from column vectors supplied as nested Python lists.
     ///
-    /// This is a classmethod wrapper around the `groggy.matrix()` function
-    /// for API consistency with other matrix libraries.
+    /// Delegates to the existing column-oriented groggy.matrix() factory.
+    /// Use from_flattened for explicitly shaped row-major input.
     ///
     /// Examples:
     ///   groggy.GraphMatrix.from_data([[1, 2], [3, 4]])  # 2×2 matrix
-    ///   groggy.GraphMatrix.from_data([[1, 2, 3]])       # 1×3 matrix
+    ///   groggy.GraphMatrix.from_data([[1, 2, 3]])       # 3×1 matrix (one column)
     #[classmethod]
     fn from_data(_cls: &PyType, py: Python, data: PyObject) -> PyResult<Py<Self>> {
         // Delegate to the existing matrix() function which handles nested lists perfectly

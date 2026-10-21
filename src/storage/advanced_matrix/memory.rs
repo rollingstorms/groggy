@@ -91,11 +91,12 @@ impl<T: NumericType> std::fmt::Debug for AlignedBuffer<T> {
 impl<T: NumericType> AlignedBuffer<T> {
     /// Allocate aligned memory for the given number of elements
     fn new(capacity: usize) -> MemoryResult<Self> {
-        if capacity == 0 {
-            return Err(MemoryError::InvalidSize);
-        }
-
-        let size = capacity * std::mem::size_of::<T>();
+        // Keep a valid SIMD-aligned allocation even for a logically empty
+        // buffer. Its exposed slices still have length zero.
+        let size = capacity
+            .max(1)
+            .checked_mul(std::mem::size_of::<T>())
+            .ok_or(MemoryError::InvalidSize)?;
         let align = get_simd_alignment::<T>();
 
         let layout =
@@ -232,7 +233,7 @@ impl<T: NumericType> SharedBuffer<T> {
     /// Create a new shared buffer with the given shape and layout
     pub fn new(shape: (usize, usize), layout: MatrixLayout) -> MemoryResult<Self> {
         let (rows, cols) = shape;
-        let capacity = rows * cols;
+        let capacity = rows.checked_mul(cols).ok_or(MemoryError::InvalidSize)?;
 
         let buffer = AlignedBuffer::new(capacity)?;
 
@@ -252,6 +253,13 @@ impl<T: NumericType> SharedBuffer<T> {
         shape: (usize, usize),
         layout: MatrixLayout,
     ) -> MemoryResult<Self> {
+        let size = shape
+            .0
+            .checked_mul(shape.1)
+            .ok_or(MemoryError::InvalidSize)?;
+        if data.len() != size {
+            return Err(MemoryError::InvalidSize);
+        }
         let buffer = Self::new(shape, layout)?;
 
         // Copy data into the aligned buffer

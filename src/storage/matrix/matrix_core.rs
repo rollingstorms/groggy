@@ -166,10 +166,9 @@ impl<T: NumericType> GraphMatrix<T> {
         shape.rows == 0 || shape.cols == 0
     }
 
-    /// Create identity matrix (using ones as placeholder until eye is implemented)
+    /// Create a square identity matrix.
     pub fn eye(size: usize) -> Self {
-        // TODO: Implement proper identity matrix in UnifiedMatrix
-        let storage = UnifiedMatrix::ones(size, size)
+        let storage = UnifiedMatrix::identity(size)
             .unwrap_or_else(|_| UnifiedMatrix::new(1, 1).expect("Failed to create minimal matrix"));
         Self::from_storage(storage)
     }
@@ -772,11 +771,11 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Create an identity matrix of given size
     pub fn identity(size: usize) -> GraphResult<Self> {
-        let mut matrix = Self::zeros(size, size);
-        for i in 0..size {
-            matrix.set(i, i, T::one())?;
-        }
-        Ok(matrix)
+        UnifiedMatrix::identity(size)
+            .map(Self::from_storage)
+            .map_err(|error| {
+                GraphError::InvalidInput(format!("Identity matrix creation failed: {error:?}"))
+            })
     }
 
     /// Get element at specific row and column
@@ -1056,70 +1055,91 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(sums.into_iter().map(|sum| T::div(sum, count_t)).collect())
     }
 
-    /// Calculate standard deviation along an axis
+    /// Sample standard deviation (ddof=1), preserving the result element type.
+    /// Axis::Rows reduces each row; Axis::Columns reduces each column.
+    /// Empty and finite singleton reductions return zero, matching var_axis.
     pub fn std_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
     where
         T: std::ops::Add<Output = T> + Copy,
     {
-        // This is a simplified implementation - for now just return the sum_axis
-        // TODO: Implement proper standard deviation calculation
-        self.sum_axis(axis)
+        self.sample_variances(axis)?
+            .into_iter()
+            .map(|variance| Self::statistic_value(variance.sqrt()))
+            .collect()
     }
 
-    /// Calculate variance along an axis
+    /// Sample variance (ddof=1), using f64 intermediate accumulators.
+    /// Results retain T; integer matrices retain their existing conversion rules.
     pub fn var_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
     where
         T: std::ops::Add<Output = T> + std::ops::Sub<Output = T> + std::ops::Mul<Output = T> + Copy,
     {
-        let means = self.mean_axis(axis)?;
-        let (rows, cols) = self.shape();
+        self.sample_variances(axis)?
+            .into_iter()
+            .map(Self::statistic_value)
+            .collect()
+    }
 
-        match axis {
-            Axis::Rows => {
-                // Variance of each row across columns
-                let mut result = Vec::with_capacity(rows);
-                for row in 0..rows {
-                    let row_mean = T::from_f64(means[row].to_f64()).unwrap_or_else(|| T::zero());
-                    let mut sum_sq_diff = T::zero();
-                    for col in 0..cols {
-                        if let Some(value) = self.get(row, col) {
-                            let diff = value - row_mean;
-                            sum_sq_diff = sum_sq_diff + (diff * diff);
-                        }
-                    }
-                    let variance = if cols > 1 {
-                        T::from_f64(sum_sq_diff.to_f64() / (cols - 1) as f64)
-                            .unwrap_or_else(|| T::zero())
-                    } else {
-                        T::zero()
-                    };
-                    result.push(variance);
-                }
-                Ok(result)
+    fn statistic_value(value: f64) -> GraphResult<T> {
+        T::from_f64(value).ok_or_else(|| {
+            GraphError::InvalidInput(format!(
+                "Statistical result {value} cannot be represented as {:?}",
+                T::DTYPE
+            ))
+        })
+    }
+
+    fn sample_variances(&self, axis: Axis) -> GraphResult<Vec<f64>> {
+        let (rows, cols) = self.shape();
+        let (outputs, samples) = match axis {
+            Axis::Rows => (rows, cols),
+            Axis::Columns => (cols, rows),
+        };
+        let mut means = vec![0.0; outputs];
+        let mut squares = vec![0.0; outputs];
+        let dense = match &self.storage.storage {
+            crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Dense(buffer) => {
+                Some(buffer.data().map_err(|error| {
+                    GraphError::InvalidInput(format!("Cannot read dense matrix: {error}"))
+                })?)
             }
-            Axis::Columns => {
-                // Variance of each column across rows
-                let mut result = Vec::with_capacity(cols);
-                for col in 0..cols {
-                    let col_mean = T::from_f64(means[col].to_f64()).unwrap_or_else(|| T::zero());
-                    let mut sum_sq_diff = T::zero();
-                    for row in 0..rows {
-                        if let Some(value) = self.get(row, col) {
-                            let diff = value - col_mean;
-                            sum_sq_diff = sum_sq_diff + (diff * diff);
-                        }
-                    }
-                    let variance = if rows > 1 {
-                        T::from_f64(sum_sq_diff.to_f64() / (rows - 1) as f64)
-                            .unwrap_or_else(|| T::zero())
-                    } else {
-                        T::zero()
-                    };
-                    result.push(variance);
+            _ => None,
+        };
+        // Welford updates in row-major traversal avoid whole-matrix temporaries
+        // and the unstable E[x*x] - E[x]^2 formula.
+        for row in 0..rows {
+            for col in 0..cols {
+                let value = if let Some(buffer) = &dense {
+                    buffer
+                        .as_slice()
+                        .get(self.storage.strides.index(row, col))
+                        .copied()
+                } else {
+                    self.get(row, col)
                 }
-                Ok(result)
+                .ok_or_else(|| {
+                    GraphError::InvalidInput(format!("Missing matrix value at ({row}, {col})"))
+                })?
+                .to_f64();
+                let (index, count) = match axis {
+                    Axis::Rows => (row, col + 1),
+                    Axis::Columns => (col, row + 1),
+                };
+                let delta = value - means[index];
+                means[index] += delta / count as f64;
+                squares[index] += delta * (value - means[index]);
             }
         }
+        Ok(squares
+            .into_iter()
+            .map(|sum| {
+                if samples > 1 {
+                    sum / (samples - 1) as f64
+                } else {
+                    sum
+                }
+            })
+            .collect())
     }
 
     /// Calculate minimum along an axis
