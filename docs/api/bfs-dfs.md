@@ -77,7 +77,7 @@ exact nonpersistent integers, marker semantics and persistent results.
 The closeness alternating-direction fixture also now carries returned selections
 between executions, so its cache-isolation assertion exercises populated caches.
 Direct Graph traversal APIs and lower-level utility/step callers have separate
-contracts; this slice does not certify every such caller. Dijkstra's wrapper
-source selection, cancellation and nonpersistent result path still need a
-follow-up despite its previously repaired weight/distance semantics. External
+contracts; this slice does not certify every such caller. The [Dijkstra wrapper](dijkstra.md) now has its own unique-source, cancellation
+and nonpersistent-output follow-up; lower-level/step callers retain separate
+audit requirements. External
 backend, scale and state-pinned-input certification remain open under item 28.

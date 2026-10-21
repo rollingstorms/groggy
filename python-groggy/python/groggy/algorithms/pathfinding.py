@@ -16,12 +16,14 @@ def dijkstra(
     """
     Dijkstra's shortest path algorithm.
 
-    Computes shortest paths from source nodes to all other nodes.
-    Supports weighted graphs via the weight_attr parameter.
+    Computes distances from exactly one marked selected node. Directed graphs
+    follow outgoing edges. Nonpersistent profile output returns original node
+    IDs and f64 distances under pathfinding.dijkstra.distances.
 
     Args:
-        start_attr: Node attribute marking start nodes (truthy values)
-        weight_attr: Optional edge weight attribute
+        start_attr: Attribute present on exactly one selected source node;
+            the value is ignored, including False, zero and explicit null
+        weight_attr: Finite nonnegative numeric edge lengths; missing is one
         output_attr: Attribute name for distances (default: "distance")
 
     Returns:

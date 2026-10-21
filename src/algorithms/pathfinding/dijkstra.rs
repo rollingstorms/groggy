@@ -1,14 +1,14 @@
-use std::collections::HashMap;
+use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::pathfinding::utils::{checked_dijkstra_weights, dijkstra};
+use crate::algorithms::pathfinding::utils::{checked_dijkstra_weights, DijkstraState};
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
+    ParameterMetadata, ParameterType,
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
@@ -36,13 +36,15 @@ impl DijkstraShortestPath {
             id: "pathfinding.dijkstra".to_string(),
             name: "Dijkstra Shortest Path".to_string(),
             description: "Single-source Dijkstra shortest-path distances.".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             cost_hint: CostHint::Linearithmic,
             supports_cancellation: true,
             parameters: vec![
                 ParameterMetadata {
                     name: "start_attr".to_string(),
-                    description: "Node attribute containing source node id.".to_string(),
+                    description:
+                        "Attribute present on exactly one selected start node; value is ignored."
+                            .to_string(),
                     value_type: ParameterType::Text,
                     required: true,
                     default_value: None,
@@ -65,40 +67,71 @@ impl DijkstraShortestPath {
         }
     }
 
-    fn resolve_source(&self, subgraph: &Subgraph) -> Result<NodeId> {
-        subgraph
-            .nodes()
-            .iter()
-            .find(|&&node| {
-                subgraph
-                    .get_node_attribute(node, &self.start_attr)
-                    .ok()
-                    .flatten()
-                    .is_some()
-            })
-            .copied()
-            .ok_or_else(|| anyhow!("no node in subgraph carries start attribute"))
+    fn resolve_source(&self, subgraph: &Subgraph, nodes: &[NodeId]) -> Result<usize> {
+        let mut sources = Vec::new();
+        for (index, &node) in nodes.iter().enumerate() {
+            if subgraph
+                .get_node_attribute(node, &self.start_attr)?
+                .is_some()
+            {
+                sources.push(index);
+            }
+        }
+        if sources.len() != 1 {
+            return Err(anyhow!("dijkstra requires exactly one selected node carrying start attribute {:?}; found {}", self.start_attr, sources.len()));
+        }
+        Ok(sources[0])
     }
 
-    fn run(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, AttrValue>> {
-        let source = self.resolve_source(subgraph)?;
-        let weight_map = checked_dijkstra_weights(subgraph, self.weight_attr.as_ref())?;
-
-        let dist = dijkstra(subgraph, source, |u, v| {
-            weight_map.get(&(u, v)).copied().unwrap_or(1.0)
+    fn run(
+        &self,
+        ctx: &mut Context,
+        csr: &Csr,
+        nodes: &[NodeId],
+        source: usize,
+        weights: &HashMap<(NodeId, NodeId), f64>,
+    ) -> Result<Vec<(NodeId, f64)>> {
+        let mut distances = vec![f64::INFINITY; nodes.len()];
+        let mut heap = BinaryHeap::new();
+        distances[source] = 0.0;
+        heap.push(DijkstraState {
+            cost: 0.0,
+            node_idx: source,
         });
-
-        ctx.emit_iteration(0, dist.len());
-        dist.into_iter()
-            .map(|(node, cost)| {
-                if !cost.is_finite() || cost > f32::MAX as f64 {
-                    return Err(anyhow!(
-                        "Dijkstra distance for node {node} cannot be represented in f32 properties"
-                    ));
+        while let Some(DijkstraState { cost, node_idx: u }) = heap.pop() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("dijkstra cancelled"));
+            }
+            if cost > distances[u] {
+                continue;
+            }
+            for &v in csr.neighbors(u) {
+                let pair = (nodes[u], nodes[v]);
+                let weight = weights
+                    .get(&pair)
+                    .copied()
+                    .ok_or_else(|| anyhow!("missing checked Dijkstra weight for {pair:?}"))?;
+                let candidate = cost + weight;
+                if !candidate.is_finite() {
+                    return Err(anyhow!("Dijkstra distance overflow"));
                 }
-                Ok((node, AttrValue::Float(cost as f32)))
-            })
-            .collect::<Result<_>>()
+                if candidate < distances[v] {
+                    distances[v] = candidate;
+                    heap.push(DijkstraState {
+                        cost: candidate,
+                        node_idx: v,
+                    });
+                }
+            }
+        }
+        let rows: Vec<_> = nodes
+            .iter()
+            .copied()
+            .zip(distances)
+            .filter(|(_, distance)| distance.is_finite())
+            .collect();
+        ctx.emit_iteration(0, rows.len());
+        Ok(rows)
     }
 }
 
@@ -113,12 +146,17 @@ impl Algorithm for DijkstraShortestPath {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let t0 = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("dijkstra cancelled"));
+        }
+        let weights = checked_dijkstra_weights(&subgraph, self.weight_attr.as_ref())?;
 
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
         let nodes = subgraph.ordered_nodes();
         ctx.record_call("dijkstra.collect_nodes", nodes_start.elapsed());
         ctx.record_stat("dijkstra.count.input_nodes", nodes.len() as f64);
+        let source = self.resolve_source(&subgraph, &nodes)?;
 
         // Phase 2: Build indexer
         let idx_start = Instant::now();
@@ -131,8 +169,9 @@ impl Algorithm for DijkstraShortestPath {
 
         // Phase 3: Build or retrieve CSR
         let add_reverse = subgraph.graph().borrow().is_undirected();
-        if subgraph.csr_cache_get(add_reverse).is_some() {
+        let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call("dijkstra.csr_cache_hit", std::time::Duration::from_nanos(0));
+            cached
         } else {
             let csr_start = Instant::now();
 
@@ -154,23 +193,41 @@ impl Algorithm for DijkstraShortestPath {
             );
             ctx.record_call("dijkstra.csr_cache_miss", csr_start.elapsed());
             ctx.record_call("dijkstra.build_csr", csr_time);
-            subgraph.csr_cache_store(add_reverse, Arc::new(csr));
-        }
+            let csr = Arc::new(csr);
+            subgraph.csr_cache_store(add_reverse, csr.clone());
+            csr
+        };
 
         // Phase 3: Execute Dijkstra (will use cached CSR automatically)
-        let distances = self.run(ctx, &subgraph)?;
+        let compute_start = Instant::now();
+        let distances = self.run(ctx, &csr, &nodes, source, &weights)?;
+        ctx.record_call("dijkstra.compute", compute_start.elapsed());
+        ctx.record_stat("dijkstra.count.reached_nodes", distances.len() as f64);
+        if ctx.is_cancelled() {
+            return Err(anyhow!("dijkstra cancelled"));
+        }
 
         // Phase 4: Write results
         if ctx.persist_results() {
             let attr_values: Vec<(NodeId, AttrValue)> = distances
                 .iter()
-                .map(|(&node, value)| (node, value.clone()))
-                .collect();
+                .map(|&(node, cost)| {
+                    if cost > f32::MAX as f64 {
+                        return Err(anyhow!("Dijkstra distance for node {node} cannot be represented in f32 properties"));
+                    }
+                    Ok((node, AttrValue::Float(cost as f32)))
+                })
+                .collect::<Result<_>>()?;
 
             ctx.with_scoped_timer("dijkstra.write_attributes", || {
                 subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
             })
             .map_err(|err| anyhow!("failed to persist dijkstra distances: {err}"))?;
+        } else {
+            ctx.add_output(
+                "pathfinding.dijkstra.distances",
+                AlgorithmOutput::NodeScores(distances),
+            );
         }
 
         ctx.record_duration("dijkstra.total_execution", t0.elapsed());
