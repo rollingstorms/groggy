@@ -102,3 +102,5 @@ Numerical item 29.10 completes the existing NumArray linear percentile path usin
 Numerical item 29.11 completes the existing NumArray Pearson correlation path with typed centering, independent scaling and compensated normalized moments. It uses two O(N) scratch columns; benchmarking and other correlation surfaces remain open. ArrayArray and arithmetic operators are next under 29.3.
 
 Numerical item 29.12 repairs checked matrix add/subtract and Python arithmetic with native scalar kernels, exact-zero divisor validation and preserved positional labels/empty shapes. Legacy Rust operator result-type migration, broader numerical overflow rules, NumArray expansion and ArrayArray remain open.
+
+Numerical item 29.13 repairs ArrayArray f64 kernels and centralizes legacy attribute projection/multi-aggregation in Rust, preserving named keys. Table scalar floats remain f32; finite narrowing overflow now errors. Exact grouped i64 statistics, lossless f64 table storage, other grouped-table implementations and throughput remain open.

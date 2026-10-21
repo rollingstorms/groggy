@@ -115,6 +115,41 @@ where
     }
 }
 
+impl ArrayArray<crate::types::AttrValue> {
+    /// Legacy numeric projection: retain scalar numbers/bools, skip null/text/collections.
+    /// Retains keys and their column name. Integer values convert
+    /// to f64 here; this projection does not promise exact i64 statistics.
+    pub fn numeric_arrays(&self) -> Result<ArrayArray<f64>, GraphError> {
+        use crate::types::AttrValue;
+        let arrays = self
+            .arrays
+            .iter()
+            .map(|array| {
+                BaseArray::new(
+                    array
+                        .iter()
+                        .filter_map(|value| match value {
+                            AttrValue::Float(v) => Some(f64::from(*v)),
+                            AttrValue::Int(v) => Some(*v as f64),
+                            AttrValue::SmallInt(v) => Some(f64::from(*v)),
+                            AttrValue::Bool(v) => Some(if *v { 1.0 } else { 0.0 }),
+                            _ => None,
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
+        match &self.keys {
+            Some(keys) => ArrayArray::with_named_keys(
+                arrays,
+                keys.clone(),
+                self.key_name.as_deref().unwrap_or("group_key"),
+            ),
+            None => Ok(ArrayArray::new(arrays)),
+        }
+    }
+}
+
 impl ArrayArray<f64> {
     /// Calculate mean of each array
     ///
@@ -123,73 +158,39 @@ impl ArrayArray<f64> {
     pub fn mean(&self) -> Vec<f64> {
         self.arrays
             .iter()
-            .map(|arr| {
-                if arr.is_empty() {
-                    0.0
-                } else {
-                    arr.iter().sum::<f64>() / arr.len() as f64
-                }
-            })
+            .map(|a| super::numeric_reductions::mean(a.as_slice()).unwrap_or(0.0))
             .collect()
     }
 
-    /// Calculate sum of each array
+    /// Sum each array with shared compensated/scaled kernels; empty=0.
     pub fn sum(&self) -> Vec<f64> {
-        self.arrays.iter().map(|arr| arr.iter().sum()).collect()
+        self.arrays
+            .iter()
+            .map(|a| super::numeric_reductions::sum(a.as_slice()))
+            .collect()
     }
 
-    /// Calculate minimum of each array
-    ///
-    /// Returns a vector where each element is the minimum of the corresponding array.
-    /// Empty arrays return 0.0.
+    /// Minimum of each array; empty=0, NaNs propagate.
     pub fn min(&self) -> Vec<f64> {
         self.arrays
             .iter()
-            .map(|arr| {
-                if arr.is_empty() {
-                    0.0
-                } else {
-                    arr.iter().cloned().fold(f64::INFINITY, |a, b| a.min(b))
-                }
-            })
+            .map(|a| super::numeric_reductions::extremum(a.as_slice(), true).unwrap_or(0.0))
             .collect()
     }
 
-    /// Calculate maximum of each array
-    ///
-    /// Returns a vector where each element is the maximum of the corresponding array.
-    /// Empty arrays return 0.0.
+    /// Maximum of each array; empty=0, NaNs propagate.
     pub fn max(&self) -> Vec<f64> {
         self.arrays
             .iter()
-            .map(|arr| {
-                if arr.is_empty() {
-                    0.0
-                } else {
-                    arr.iter().cloned().fold(f64::NEG_INFINITY, |a, b| a.max(b))
-                }
-            })
+            .map(|a| super::numeric_reductions::extremum(a.as_slice(), false).unwrap_or(0.0))
             .collect()
     }
 
-    /// Calculate standard deviation of each array
-    ///
-    /// Uses sample standard deviation (n-1 denominator).
-    /// Arrays with < 2 elements return 0.0.
+    /// Sample standard deviation; empty/finite singleton=0, nonfinite=NaN.
     pub fn std(&self) -> Vec<f64> {
         self.arrays
             .iter()
-            .map(|arr| {
-                if arr.len() < 2 {
-                    return 0.0;
-                }
-
-                let mean = arr.iter().sum::<f64>() / arr.len() as f64;
-                let variance =
-                    arr.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (arr.len() - 1) as f64;
-
-                variance.sqrt()
-            })
+            .map(|a| super::numeric_reductions::std_dev(a.as_slice()).unwrap_or(0.0))
             .collect()
     }
 
@@ -216,8 +217,6 @@ impl ArrayArray<f64> {
         agg_name: &str,
         values: Vec<f64>,
     ) -> Result<BaseTable, GraphError> {
-        use crate::types::AttrValue;
-
         if self.len() != values.len() {
             return Err(GraphError::InvalidInput(format!(
                 "Number of values ({}) must match number of arrays ({})",
@@ -226,24 +225,77 @@ impl ArrayArray<f64> {
             )));
         }
 
-        let mut columns = std::collections::HashMap::new();
-
-        if let Some(keys) = &self.keys {
-            // Create table with group keys
-            let key_col: Vec<AttrValue> = keys.iter().map(|s| AttrValue::Text(s.clone())).collect();
-            let name = self
-                .key_name
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| "group_key".to_string());
-            columns.insert(name, BaseArray::from_attr_values(key_col));
+        let mut columns = self.key_columns();
+        if columns.contains_key(agg_name) {
+            return Err(GraphError::InvalidInput(format!(
+                "Aggregation column conflicts with group key: {agg_name}"
+            )));
         }
+        columns.insert(agg_name.to_string(), Self::stored_aggregation(values)?);
 
-        // Add aggregation column
-        let value_col: Vec<AttrValue> =
-            values.iter().map(|&v| AttrValue::Float(v as f32)).collect();
-        columns.insert(agg_name.to_string(), BaseArray::from_attr_values(value_col));
+        BaseTable::from_columns(columns)
+    }
+    // Table AttrValue floats are f32: reject finite overflow rather than create infinity.
+    fn stored_aggregation(
+        values: Vec<f64>,
+    ) -> Result<BaseArray<crate::types::AttrValue>, GraphError> {
+        let values = values
+            .into_iter()
+            .map(|value| {
+                let stored = value as f32;
+                if value.is_finite() && !stored.is_finite() {
+                    Err(GraphError::InvalidInput(
+                        "Finite aggregation result exceeds f32 table storage".into(),
+                    ))
+                } else {
+                    Ok(crate::types::AttrValue::Float(stored))
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(BaseArray::from_attr_values(values))
+    }
 
+    fn key_columns(&self) -> std::collections::HashMap<String, BaseArray<crate::types::AttrValue>> {
+        let mut columns = std::collections::HashMap::new();
+        if let Some(keys) = &self.keys {
+            columns.insert(
+                self.key_name.as_deref().unwrap_or("group_key").to_string(),
+                BaseArray::from_attr_values(
+                    keys.iter()
+                        .cloned()
+                        .map(crate::types::AttrValue::Text)
+                        .collect(),
+                ),
+            );
+        }
+        columns
+    }
+
+    /// Materialize named numeric aggregations, retaining keys and checked f32 table results.
+    /// Reject unknown functions and duplicate/key-conflicting output names.
+    pub fn aggregate(&self, spec: &[(String, String)]) -> Result<BaseTable, GraphError> {
+        let mut columns = self.key_columns();
+        for (name, function) in spec {
+            if columns.contains_key(name) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Duplicate or group-key-conflicting aggregation column: {name}"
+                )));
+            }
+            let values = match function.as_str() {
+                "mean" => self.mean(),
+                "sum" => self.sum(),
+                "min" => self.min(),
+                "max" => self.max(),
+                "std" => self.std(),
+                "count" => self.count().into_iter().map(|n| n as f64).collect(),
+                _ => {
+                    return Err(GraphError::InvalidInput(format!(
+                        "Unknown aggregation function: {function}"
+                    )))
+                }
+            };
+            columns.insert(name.clone(), Self::stored_aggregation(values)?);
+        }
         BaseTable::from_columns(columns)
     }
 }

@@ -38,35 +38,11 @@ impl PyArrayArray {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
-    /// Helper: Convert AttrValue arrays to numeric f64 arrays for aggregations
-    /// Converts: Int, SmallInt, Float, Bool (1.0/0.0)
-    /// Skips: Text, Null, and other non-numeric types
-    fn to_numeric_array_array(&self) -> ArrayArray<f64> {
-        // Access the inner arrays by iterating through the ArrayArray
-        // We need to collect all arrays and convert each one
-        let mut numeric_arrays = Vec::new();
-
-        for i in 0..self.inner.len() {
-            if let Some(arr) = self.inner.get(i) {
-                let numeric_values: Vec<f64> = arr
-                    .iter()
-                    .filter_map(|val| match val {
-                        AttrValue::Float(f) => Some(*f as f64),
-                        AttrValue::Int(i) => Some(*i as f64),
-                        AttrValue::SmallInt(i) => Some(*i as f64),
-                        AttrValue::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
-                        _ => None,
-                    })
-                    .collect();
-                numeric_arrays.push(BaseArray::from(numeric_values));
-            }
-        }
-
-        if let Some(keys) = self.inner.keys() {
-            ArrayArray::with_keys(numeric_arrays, keys.to_vec()).unwrap()
-        } else {
-            ArrayArray::new(numeric_arrays)
-        }
+    /// Delegate legacy numeric projection and key preservation to Rust.
+    fn to_numeric_array_array(&self) -> PyResult<ArrayArray<f64>> {
+        self.inner
+            .numeric_arrays()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -134,7 +110,7 @@ impl PyArrayArray {
     /// means = arr_arr.mean()  # [2.0, 5.0]
     /// ```
     fn mean(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array();
+        let numeric_arrays = self.to_numeric_array_array()?;
         let means = numeric_arrays.mean();
 
         Python::with_gil(|py| {
@@ -153,7 +129,7 @@ impl PyArrayArray {
 
     /// Calculate sum of each array
     fn sum(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array();
+        let numeric_arrays = self.to_numeric_array_array()?;
         let sums = numeric_arrays.sum();
 
         Python::with_gil(|py| {
@@ -170,7 +146,7 @@ impl PyArrayArray {
 
     /// Calculate minimum of each array
     fn min(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array();
+        let numeric_arrays = self.to_numeric_array_array()?;
         let mins = numeric_arrays.min();
 
         Python::with_gil(|py| {
@@ -187,7 +163,7 @@ impl PyArrayArray {
 
     /// Calculate maximum of each array
     fn max(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array();
+        let numeric_arrays = self.to_numeric_array_array()?;
         let maxs = numeric_arrays.max();
 
         Python::with_gil(|py| {
@@ -204,7 +180,7 @@ impl PyArrayArray {
 
     /// Calculate standard deviation of each array
     fn std(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array();
+        let numeric_arrays = self.to_numeric_array_array()?;
         let stds = numeric_arrays.std();
 
         Python::with_gil(|py| {
@@ -221,7 +197,7 @@ impl PyArrayArray {
 
     /// Count elements in each array
     fn count(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array();
+        let numeric_arrays = self.to_numeric_array_array()?;
         let counts = numeric_arrays.count();
 
         Python::with_gil(|py| {
@@ -252,50 +228,14 @@ impl PyArrayArray {
     /// # Returns table with columns: [group_key, mean, std, count]
     /// ```
     fn agg(&self, spec: &PyDict) -> PyResult<PyBaseTable> {
-        use groggy::storage::array::BaseArray;
-        use groggy::types::AttrValue;
-
-        let mut columns = std::collections::HashMap::new();
-
-        // Add group keys if present
-        if let Some(keys) = self.inner.keys() {
-            let key_col: Vec<AttrValue> = keys.iter().map(|s| AttrValue::Text(s.clone())).collect();
-            columns.insert(
-                "group_key".to_string(),
-                BaseArray::from_attr_values(key_col),
-            );
-        }
-
-        // Apply each aggregation
-        let numeric_arrays = self.to_numeric_array_array();
-
-        for (col_name, agg_func) in spec.iter() {
-            let col_name_str: String = col_name.extract()?;
-            let agg_func_str: String = agg_func.extract()?;
-
-            let values: Vec<f64> = match agg_func_str.as_str() {
-                "mean" => numeric_arrays.mean(),
-                "sum" => numeric_arrays.sum(),
-                "min" => numeric_arrays.min(),
-                "max" => numeric_arrays.max(),
-                "std" => numeric_arrays.std(),
-                "count" => numeric_arrays.count().iter().map(|&c| c as f64).collect(),
-                _ => {
-                    return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                        "Unknown aggregation function: {}",
-                        agg_func_str
-                    )))
-                }
-            };
-
-            let value_col: Vec<AttrValue> =
-                values.iter().map(|&v| AttrValue::Float(v as f32)).collect();
-            columns.insert(col_name_str, BaseArray::from_attr_values(value_col));
-        }
-
-        groggy::storage::table::BaseTable::from_columns(columns)
+        let spec: PyResult<Vec<(String, String)>> = spec
+            .iter()
+            .map(|(name, function)| Ok((name.extract()?, function.extract()?)))
+            .collect();
+        self.to_numeric_array_array()?
+            .aggregate(&spec?)
             .map(PyBaseTable::from_table)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     /// Get keys if available
@@ -320,7 +260,7 @@ impl PyArrayArray {
         match dtype {
             "float64" | "f64" | "numeric" => {
                 // Convert to numeric and flatten into a single NumArray
-                let numeric_arrays = self.to_numeric_array_array();
+                let numeric_arrays = self.to_numeric_array_array()?;
 
                 // Flatten all arrays into a single vector
                 let mut all_values = Vec::new();
@@ -423,7 +363,7 @@ mod tests {
         let arr_arr = PyArrayArray::new(arrays);
 
         // Test aggregations work through numeric conversion
-        let numeric = arr_arr.to_numeric_array_array();
+        let numeric = arr_arr.to_numeric_array_array().unwrap();
         assert_eq!(numeric.mean(), vec![2.0, 5.0]);
         assert_eq!(numeric.sum(), vec![6.0, 15.0]);
     }

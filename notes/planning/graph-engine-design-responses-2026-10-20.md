@@ -515,3 +515,6 @@ Retain Option and Pearson paired semantics. Mismatched/short/finite constant inp
 
 ### Item 29 checked matrix arithmetic — 2026-10-21
 Use GraphResult methods and Python errors for mismatched shapes. Preserve positional identity on owned arithmetic results; no label join/reordering or inherited gradient tape. Scalar division rejects signed zero exactly, computes direct quotients and retains other IEEE behavior. Keep the source-compatible Rust trait operators visible as remaining debt pending result-type migration.
+
+### Item 29 ArrayArray numeric reductions — 2026-10-21
+Retain zero for empty inner arrays and the existing permissive numeric projection (numbers/bools included, null/text/collections skipped). Apply shared stable f64 kernels and NaN propagation. Move conversion/aggregation out of FFI, preserve named keys and reject output-name collisions. AttrValue scalar floats are f32; preserve that storage format, reject finite narrowing overflow and document remaining rounding/underflow. Exact grouped i64 moments and lossless f64 storage need separate work.
