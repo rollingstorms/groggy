@@ -636,7 +636,10 @@ impl WsBridge {
         }
 
         // Layout completion is acknowledged by the server after engine execution.
-        if !matches!(control_msg, ControlMsg::ChangeLayout { .. }) {
+        if !matches!(
+            control_msg,
+            ControlMsg::ChangeLayout { .. } | ControlMsg::ChangeEmbedding { .. }
+        ) {
             Self::send_control_ack_static(client_id, true, "Control message processed", clients)
                 .await;
         }
@@ -686,6 +689,27 @@ mod layout_ack_tests {
         assert!(matches!(
             control_rx.try_recv(),
             Ok((7, ControlMsg::ChangeLayout { .. }))
+        ));
+        assert!(matches!(
+            client_rx.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        let request_embedding = ControlMsg::ChangeEmbedding {
+            method: "random".into(),
+            k: 2,
+            params: HashMap::new(),
+        };
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        WsBridge::handle_control_message_static(
+            7,
+            request_embedding,
+            Some(sender),
+            clients.clone(),
+        )
+        .await;
+        assert!(matches!(
+            receiver.try_recv(),
+            Ok((7, ControlMsg::ChangeEmbedding { .. }))
         ));
         assert!(matches!(
             client_rx.try_recv(),

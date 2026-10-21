@@ -480,23 +480,27 @@ impl RealTimeVizEngine {
     async fn process_control_command(&mut self, command: ControlCommand) -> GraphResult<()> {
         match command {
             ControlCommand::UpdateEmbeddingParams { method, dimensions } => {
-                self.config.embedding_config.method = method;
-                self.config.embedding_config.dimensions = dimensions;
-                self.trigger_full_recomputation().await?;
+                let mut candidate = self.config.clone();
+                candidate.embedding_config.method = method;
+                candidate.embedding_config.dimensions = dimensions;
+                self.apply_visual_config_change(candidate, true)?;
             }
 
             ControlCommand::UpdateProjectionParams {
                 method,
                 honeycomb_config,
             } => {
-                self.config.projection_config.method = method;
-                self.config.projection_config.honeycomb_config = honeycomb_config;
-                self.trigger_projection_recomputation().await?;
+                let mut candidate = self.config.clone();
+                candidate.projection_config.method = method;
+                candidate.projection_config.honeycomb_config = honeycomb_config;
+                self.apply_visual_config_change(candidate, false)?;
             }
 
-            ControlCommand::UpdateQualitySettings { config } => {
-                self.config.projection_config.quality_config = config;
-                self.trigger_quality_recomputation().await?;
+            ControlCommand::UpdateQualitySettings { .. } => {
+                return Err(GraphError::NotImplemented {
+                    feature: "Realtime quality-only recomputation".into(),
+                    tracking_issue: None,
+                });
             }
 
             ControlCommand::ApplyFilter {
@@ -1186,9 +1190,6 @@ impl RealTimeVizEngine {
     }
 
     // Placeholder methods for incremental updates and other features
-    async fn trigger_full_recomputation(&mut self) -> GraphResult<()> {
-        self.compute_initial_layout().await
-    }
 
     async fn trigger_projection_recomputation(&mut self) -> GraphResult<()> {
         // Check if we have a cached embedding to reuse
@@ -1535,11 +1536,6 @@ impl RealTimeVizEngine {
         Ok(())
     }
 
-    async fn trigger_quality_recomputation(&mut self) -> GraphResult<()> {
-        // TODO: Implement quality-only recomputation
-        Ok(())
-    }
-
     async fn apply_realtime_filter(
         &mut self,
         _filter_type: FilterType,
@@ -1685,6 +1681,7 @@ impl RealTimeVizEngine {
         // Apply control-style updates immediately (do NOT enqueue)
         match &update {
             EngineUpdate::LayoutChanged { .. }
+            | EngineUpdate::EmbeddingChanged { .. }
             | EngineUpdate::PositionsBatch(_)  // Position updates should be broadcast immediately
             // Add other non-structural/visual control updates you want to bypass ordering for:
             // | EngineUpdate::UpdateQuality { .. }
@@ -1825,41 +1822,28 @@ impl RealTimeVizEngine {
                         },
                         normalize: true,
                     },
-                    "energy" => EmbeddingMethod::EnergyND {
+                    "energy" | "energy_nd" => EmbeddingMethod::EnergyND {
                         iterations: 1000,
                         learning_rate: 0.01,
                         annealing: true,
                     },
-                    "force_directed" => EmbeddingMethod::ForceDirectedND {
+                    "force_directed" | "force_directed_nd" => EmbeddingMethod::ForceDirectedND {
                         spring_constant: 1.0,
                         repulsion_strength: 100.0,
                         iterations: 1000,
                     },
-                    // Fallback to spectral for unknown methods
                     _ => {
-                        eprintln!(
-                            "⚠️  WARNING: Unknown embedding method '{}', falling back to spectral",
-                            method
-                        );
-                        EmbeddingMethod::Spectral {
-                            normalized: true,
-                            eigenvalue_threshold: 1e-6,
-                        }
+                        return Err(GraphError::InvalidInput(format!(
+                            "Unknown embedding method {method:?}"
+                        )))
                     }
                 };
-
-                // Update the current embedding configuration in state
-                self.config.embedding_config.dimensions = dimensions;
-                self.config.embedding_config.method = embedding_method;
-
-                eprintln!(
-                    "🧠 DEBUG: Mapped method '{}' to enum variant, updated config",
-                    method
-                );
-
-                // Trigger full recomputation (embedding + projection)
-                self.trigger_full_recomputation().await?;
+                let mut candidate = self.config.clone();
+                candidate.embedding_config.dimensions = dimensions;
+                candidate.embedding_config.method = embedding_method;
+                self.apply_visual_config_change(candidate, true)?;
             }
+
             EngineUpdate::UpdateEnvelope(envelope) => {
                 eprintln!(
                     "📦 DEBUG: Engine received UpdateEnvelope frame {} ({} params_changed)",
@@ -1880,6 +1864,87 @@ impl RealTimeVizEngine {
         // Broadcast the update to subscribers
         let _ = self.update_broadcaster.send(update_for_broadcast);
 
+        Ok(())
+    }
+
+    /// Prepare embedding/projection configuration changes without publishing on failure.
+    fn apply_visual_config_change(
+        &mut self,
+        mut candidate: RealTimeVizConfig,
+        recompute_embedding: bool,
+    ) -> GraphResult<()> {
+        let (layout, mut params, cached) = {
+            let state = self
+                .state
+                .lock()
+                .map_err(|_| GraphError::InvalidInput("Visual state lock is poisoned".into()))?;
+            (
+                state.current_layout,
+                state.current_layout_params.clone(),
+                state.embedding.clone(),
+            )
+        };
+        let started = Instant::now();
+        let needs_embedding = recompute_embedding || cached.is_none();
+        let embedding = if needs_embedding {
+            let graph = self
+                .graph
+                .lock()
+                .map_err(|_| GraphError::InvalidInput("Visual graph lock is poisoned".into()))?;
+            graph.compute_embedding(&candidate.embedding_config)?
+        } else {
+            cached.ok_or_else(|| GraphError::InvalidInput("Missing prepared embedding".into()))?
+        };
+        let embedding_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let embedding_dimensions = embedding.shape().1;
+        let started = Instant::now();
+        let prepared = self.prepare_layout_algorithm(
+            &embedding,
+            layout,
+            &params,
+            &candidate.projection_config,
+        )?;
+        let projection_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let timestamp = envelope_timestamp_ms()?;
+        if let Some(size) = prepared.cell_size {
+            params.insert("honeycomb.cell_size".into(), format!("{size:.6}"));
+            candidate.projection_config.honeycomb_config.cell_size = size;
+        }
+        let mut changed = HashMap::from([
+            (
+                "layout".into(),
+                json!({"algorithm":layout.to_string(),"params":params}),
+            ),
+            ("projection".into(), json!(candidate.projection_config)),
+        ]);
+        if recompute_embedding {
+            changed.insert("embedding".into(), json!(candidate.embedding_config));
+        }
+        {
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|_| GraphError::InvalidInput("Visual state lock is poisoned".into()))?;
+            state.embedding = Some(embedding);
+            state.positions = prepared.positions;
+            state.current_layout_params = params.clone();
+            state.layout_param_cache.insert(layout, params);
+            state.animation_state = AnimationState::default();
+            if needs_embedding {
+                state.performance.last_embedding_time_ms = embedding_ms;
+            }
+            state.performance.last_projection_time_ms = projection_ms;
+            state.last_update = Instant::now();
+        }
+        self.config = candidate;
+        self.sync_manager.discard_coalesced_positions();
+        if needs_embedding {
+            let _ = self
+                .active_controller
+                .on_activate(Some(embedding_dimensions));
+        }
+        let view = self.current_view_json();
+        self.broadcast_envelope_at(timestamp, Some(changed), None, view, true);
         Ok(())
     }
 
@@ -2962,6 +3027,135 @@ mod tests {
         assert_eq!(
             engine.state.lock().unwrap().current_layout_params["flat_embed"],
             "true"
+        );
+    }
+
+    #[tokio::test]
+    async fn visual_config_failures_preserve_all_prior_state_and_queues() {
+        for cached in [true, false] {
+            let mut engine = staged_layout_fixture(cached);
+            engine.state.lock().unwrap().current_layout = LayoutKind::Honeycomb;
+            queue_layout_updates(&mut engine).await;
+            let mut messages = engine.subscribe();
+            let before = layout_signature(&engine);
+            let invalid = ControlCommand::UpdateProjectionParams {
+                method: crate::viz::projection::ProjectionMethod::TSNE {
+                    perplexity: 100.0,
+                    iterations: 1,
+                    learning_rate: 1.0,
+                    early_exaggeration: 1.0,
+                },
+                honeycomb_config: crate::viz::projection::HoneycombConfig::default(),
+            };
+            assert!(engine.handle_control_command(invalid).await.is_err());
+            assert_eq!(layout_signature(&engine), before);
+            assert!(engine
+                .handle_control_command(ControlCommand::UpdateEmbeddingParams {
+                    method: EmbeddingMethod::EnergyND {
+                        iterations: 0,
+                        learning_rate: 0.0,
+                        annealing: false
+                    },
+                    dimensions: 3,
+                })
+                .await
+                .is_err());
+            assert_eq!(layout_signature(&engine), before);
+            assert!(engine
+                .handle_control_command(ControlCommand::UpdateQualitySettings {
+                    config: crate::viz::projection::QualityConfig::default(),
+                })
+                .await
+                .is_err());
+            assert_eq!(layout_signature(&engine), before);
+            assert!(engine
+                .apply(EngineUpdate::EmbeddingChanged {
+                    method: "unknown".into(),
+                    dimensions: 3
+                })
+                .await
+                .is_err());
+            assert_eq!(layout_signature(&engine), before);
+            assert!(matches!(
+                messages.try_recv(),
+                Err(broadcast::error::TryRecvError::Empty)
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn accepted_embedding_and_projection_configs_publish_coherent_envelopes() {
+        let mut engine = staged_layout_fixture(true);
+        engine.state.lock().unwrap().current_layout = LayoutKind::Honeycomb;
+        let controller = engine.active_controller.name().to_string();
+        let view = engine.current_view_json();
+        let mut messages = engine.subscribe();
+        engine
+            .apply(EngineUpdate::EmbeddingChanged {
+                method: "random".into(),
+                dimensions: 4,
+            })
+            .await
+            .unwrap();
+        assert_eq!(engine.config.embedding_config.dimensions, 4);
+        assert_eq!(
+            engine
+                .state
+                .lock()
+                .unwrap()
+                .embedding
+                .as_ref()
+                .unwrap()
+                .shape(),
+            (3, 4)
+        );
+        assert_eq!(engine.active_controller.name(), controller);
+        assert_eq!(engine.current_view_json(), view);
+        let mut envelopes = Vec::new();
+        while let Ok(update) = messages.try_recv() {
+            if let EngineUpdate::UpdateEnvelope(env) = update {
+                envelopes.push(env);
+            }
+        }
+        assert_eq!(envelopes.len(), 1);
+        assert_eq!(
+            envelopes[0].params_changed.as_ref().unwrap()["embedding"]["dimensions"],
+            json!(4)
+        );
+        let saved = engine
+            .state
+            .lock()
+            .unwrap()
+            .embedding
+            .as_ref()
+            .unwrap()
+            .to_vec()
+            .unwrap();
+        engine
+            .handle_control_command(ControlCommand::UpdateProjectionParams {
+                method: crate::viz::projection::ProjectionMethod::PCA {
+                    center: false,
+                    standardize: false,
+                },
+                honeycomb_config: crate::viz::projection::HoneycombConfig::default(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            engine
+                .state
+                .lock()
+                .unwrap()
+                .embedding
+                .as_ref()
+                .unwrap()
+                .to_vec()
+                .unwrap(),
+            saved
+        );
+        let env = messages.try_recv().unwrap();
+        assert!(
+            matches!(env,EngineUpdate::UpdateEnvelope(ref env) if env.params_changed.as_ref().unwrap().contains_key("projection"))
         );
     }
 

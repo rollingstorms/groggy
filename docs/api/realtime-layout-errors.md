@@ -57,10 +57,10 @@ Only coalesced position deltas are superseded by a successful layout. Attribute
 and structural updates remain queued; the previous implementation discarded
 coalesced property updates along with motion. Failed requests discard neither.
 
-This guarantee covers recoverable errors in layout-change requests. Other control
-commands (embedding/projection/quality changes), coordinate identity across all
-layouts, crash recovery, concurrent-reader isolation, visual error panels and
-network delivery/retry semantics still need their own audit. Transport failure
+This guarantee covers recoverable errors in layout-change requests. Other control commands, coordinate identity across all layouts, crash recovery,
+concurrent-reader isolation, visual error panels and network delivery/retry
+semantics still need their own audit. Embedding/projection configuration updates
+are covered by the additional scope below. Transport failure
 after successful application does not undo an accepted layout.
 
 ## Evidence
@@ -86,3 +86,41 @@ embedding failures and nonfinite candidates. Successful retry checks a single
 coherent envelope, accepted-cache restoration, discarded motion and retained
 property/structural updates. No full control-command or concurrent transaction
 certification is implied.
+
+
+## Embedding and projection configuration updates
+
+Typed embedding and projection controls now prepare candidate configuration,
+embedding/coordinates, derived layout settings and timestamp before publication.
+Embedding changes compute a fresh embedding; projection changes reuse an existing
+one when available. A missing embedding is cached only after projection succeeds.
+Existing explicit layout parameters retain precedence over projection defaults.
+Recoverable failures leave configuration, caches, animation, controllers/views,
+coordinates/timing, pending settings and queues unchanged and emit no success.
+
+Accepted changes publish a coherent envelope containing projection configuration,
+layout parameters/positions and, for embedding changes, embedding configuration.
+The controller remains selected; fresh embeddings update its dimension-dependent
+activation after successful publication. Successful recomputation supersedes only
+coalesced motion and preserves property/structural updates.
+
+String embedding requests reject unknown methods rather than substituting spectral.
+Legacy `energy`/`force_directed` names and native `_nd` aliases are accepted alongside
+`spectral` and `random`. They execute immediately, rather than entering a structural
+update queue and being acknowledged before execution. Both server paths return
+actual embedding completion/failure acknowledgements. Nonempty string-control
+parameter maps now reject explicitly; use typed native configuration for those
+controls instead of relying on previously ignored values. The bridge defers
+embedding acknowledgements just as it does layout acknowledgements.
+
+`UpdateQualitySettings` now returns `NotImplemented` without changing configuration.
+The former quality-only recomputation was a no-op. This repair makes that boundary
+explicit; it does not implement or certify the quality evaluator/optimizer. Empty
+graphs requiring a new embedding reject via the native engine instead of treating
+old display coordinates as the requested embedding.
+
+Native tests compare full prior-state signatures for cached/uncached projection,
+embedding and unsupported quality failures, verify coherent successful embedding
+and projection updates, and exercise immediate string request validation and
+server/bridge acknowledgements. Other realtime controls and broader visualization
+correctness remain open.

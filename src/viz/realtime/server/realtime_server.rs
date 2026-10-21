@@ -54,6 +54,45 @@ async fn layout_control_result(
     }
 }
 
+async fn embedding_control_result(
+    engine: Option<&mut RealTimeVizEngine>,
+    method: &str,
+    dimensions: usize,
+    params: &std::collections::HashMap<String, String>,
+) -> WsMessage {
+    let result = if !params.is_empty() {
+        Err(GraphError::InvalidInput(
+            "Embedding control params are unsupported; use the typed native configuration".into(),
+        ))
+    } else {
+        match engine {
+            Some(engine) => {
+                engine
+                    .apply(EngineUpdate::EmbeddingChanged {
+                        method: method.into(),
+                        dimensions,
+                    })
+                    .await
+            }
+            None => Err(GraphError::InvalidInput(
+                "Embedding engine is not connected".into(),
+            )),
+        }
+    };
+    match result {
+        Ok(()) => WsMessage::ControlAck {
+            version: 1,
+            success: true,
+            message: "Embedding applied".into(),
+        },
+        Err(error) => WsMessage::ControlAck {
+            version: 1,
+            success: false,
+            message: error.to_string(),
+        },
+    }
+}
+
 /// Handle for controlling a background realtime server
 pub struct RealtimeServerHandle {
     /// Server port
@@ -284,20 +323,19 @@ impl RealtimeServer {
                             continue;
                         }
 
+                        if let ControlMsg::ChangeEmbedding { method, k, params } = &control_msg {
+                            let ack = embedding_control_result(self.engine.as_mut(), method, *k, params).await;
+                            if let Err(error) = self.ws_bridge.send_to_client(client_id, ack).await {
+                                eprintln!("Failed to send embedding result to client {client_id}: {error}");
+                            }
+                            continue;
+                        }
+
                         // Engine-directed controls - apply ALL control messages to engine
                         if let Some(ref mut engine) = self.engine {
                             match &control_msg {
-                                ControlMsg::ChangeEmbedding { method, k, .. } => {
-                                    // 🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}
-                                    if let Err(_e) = engine
-                                        .apply(EngineUpdate::EmbeddingChanged {
-                                            method: method.clone(),
-                                            dimensions: *k,
-                                        })
-                                        .await
-                                    {
-                                        // ❌ DEBUG: Engine failed to apply EmbeddingChanged: {}
-                                    }
+                                ControlMsg::ChangeEmbedding { .. } => {
+                                    // Handled above with a completion acknowledgement.
                                 }
                                 ControlMsg::ChangeLayout { .. } => {
                                     // Handled above, with a completion acknowledgement.
@@ -988,20 +1026,19 @@ impl RealtimeServer {
                             continue;
                         }
 
+                        if let ControlMsg::ChangeEmbedding { method, k, params } = &control_msg {
+                            let ack = embedding_control_result(self.engine.as_mut(), method, *k, params).await;
+                            if let Err(error) = self.ws_bridge.send_to_client(client_id, ack).await {
+                                eprintln!("Failed to send embedding result to client {client_id}: {error}");
+                            }
+                            continue;
+                        }
+
                         // Engine-directed controls - apply ALL control messages to engine
                         if let Some(ref mut engine) = self.engine {
                             match &control_msg {
-                                ControlMsg::ChangeEmbedding { method, k, .. } => {
-                                    // 🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}
-                                    if let Err(_e) = engine
-                                        .apply(EngineUpdate::EmbeddingChanged {
-                                            method: method.clone(),
-                                            dimensions: *k,
-                                        })
-                                        .await
-                                    {
-                                        // ❌ DEBUG: Engine failed to apply EmbeddingChanged: {}
-                                    }
+                                ControlMsg::ChangeEmbedding { .. } => {
+                                    // Handled above with a completion acknowledgement.
                                 }
                                 ControlMsg::ChangeLayout { .. } => {
                                     // Handled above, with a completion acknowledgement.
@@ -1284,5 +1321,33 @@ mod layout_result_tests {
         assert!(
             matches!(flat, WsMessage::ControlAck { success: false, message, .. } if message.contains("learning_rate"))
         );
+    }
+}
+
+#[cfg(test)]
+mod embedding_result_tests {
+    use super::*;
+    #[tokio::test]
+    async fn embedding_ack_reports_actual_failure_without_queue_acceptance() {
+        let mut engine = RealTimeVizEngine::new(crate::Graph::new(), RealTimeVizConfig::default());
+        let missing = embedding_control_result(None, "random", 2, &Default::default()).await;
+        assert!(matches!(
+            missing,
+            WsMessage::ControlAck { success: false, .. }
+        ));
+        let invalid =
+            embedding_control_result(Some(&mut engine), "unknown", 2, &Default::default()).await;
+        assert!(
+            matches!(invalid,WsMessage::ControlAck {success:false,message,..} if message.contains("Unknown embedding"))
+        );
+        let params = std::collections::HashMap::from([("ignored".into(), "1".into())]);
+        assert!(matches!(
+            embedding_control_result(Some(&mut engine), "random", 2, &params).await,
+            WsMessage::ControlAck { success: false, .. }
+        ));
+        engine.graph().lock().unwrap().add_nodes(4);
+        let valid =
+            embedding_control_result(Some(&mut engine), "random", 2, &Default::default()).await;
+        assert!(matches!(valid, WsMessage::ControlAck { success: true, .. }));
     }
 }
