@@ -608,72 +608,14 @@ impl BaseArray<AttrValue> {
         super::reductions::variance(self.inner.as_slice())
     }
 
-    /// Find minimum value in the array (numeric only)
-    pub fn min(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut min_val: Option<(AttrValue, f64)> = None;
-
-        for val in self.inner.iter() {
-            if matches!(val, AttrValue::Null) {
-                continue;
-            }
-
-            let numeric = match Self::extract_numeric(val) {
-                Some(value) => value,
-                None => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute min of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            };
-
-            match &mut min_val {
-                Some((_current_attr, current_numeric)) if numeric >= *current_numeric => {}
-                _ => {
-                    min_val = Some((val.clone(), numeric));
-                }
-            }
-        }
-
-        min_val.map(|(value, _)| value).ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput(
-                "Cannot find minimum of empty array".to_string(),
-            )
-        })
+    /// Select the first numeric minimum without rounding integers to floats.
+    pub fn min(&self) -> GraphResult<AttrValue> {
+        super::reductions::numeric_extremum(self.inner.as_slice(), true)
     }
 
-    /// Find maximum value in the array (numeric only)
-    pub fn max(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut max_val: Option<(AttrValue, f64)> = None;
-
-        for val in self.inner.iter() {
-            if matches!(val, AttrValue::Null) {
-                continue;
-            }
-
-            let numeric = match Self::extract_numeric(val) {
-                Some(value) => value,
-                None => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute max of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            };
-
-            match &mut max_val {
-                Some((_current_attr, current_numeric)) if numeric <= *current_numeric => {}
-                _ => {
-                    max_val = Some((val.clone(), numeric));
-                }
-            }
-        }
-
-        max_val.map(|(value, _)| value).ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput(
-                "Cannot find maximum of empty array".to_string(),
-            )
-        })
+    /// Select the first numeric maximum; reject nonfinite and nonnumeric values.
+    pub fn max(&self) -> GraphResult<AttrValue> {
+        super::reductions::numeric_extremum(self.inner.as_slice(), false)
     }
 
     /// Count non-null values in the array
@@ -693,16 +635,6 @@ impl BaseArray<AttrValue> {
             }
         }
         seen.len()
-    }
-
-    /// Extract a numeric value for comparison-based operations
-    fn extract_numeric(value: &AttrValue) -> Option<f64> {
-        match value {
-            AttrValue::Int(i) => Some(*i as f64),
-            AttrValue::SmallInt(i) => Some(*i as f64),
-            AttrValue::Float(f) => Some(*f as f64),
-            _ => None,
-        }
     }
 
     /// Detect missing/null values in the array

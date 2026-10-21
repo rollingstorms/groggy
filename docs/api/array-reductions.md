@@ -72,6 +72,20 @@ some high-offset cases, so those reference calculations use Fractions explicitly
 
 Sum/mean/variance/std scan in `O(N)` time with constant scratch space; median uses
 `O(N)` scratch and `O(N log N)` sorting. These are complexity descriptions, not
-benchmark results. This slice does not certify min/max, NumArray/ArrayArray/SIMD
+benchmark results. The additional min/max scope is described below. This does not certify NumArray/ArrayArray/SIMD
 reductions, matrix reductions, arithmetic/broadcasting, GIL release, or throughput.
 Those remain under numerical roadmap items 29.3–29.6.
+
+
+## Exact min/max selection
+
+Generic BaseArray min/max now use the same exact mixed numeric ordering as median,
+without converting candidate integers to f64/f32 before comparing them. Return an
+original scalar, including its type, and retain the first occurrence on numeric
+ties. Skip nulls; reject empty/all-null, nonnumeric and nonfinite input, including
+invalid singleton values. Signed zero ties retain the first scalar and its sign.
+The legacy BaseArray preserves its existing text/compact-text and boolean extrema,
+while sharing exact numeric order and finite validation. Mixed incompatible legacy
+domains reject. Selection is a read-only linear scan with constant scratch space.
+Native permutation/boundary/type/domain fixtures and rebuilt Python references
+cover the repair; no min/max performance claim is added.

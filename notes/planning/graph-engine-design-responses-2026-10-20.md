@@ -492,3 +492,8 @@ Begin the arithmetic/reductions audit with the five BaseArray logical-column sta
 Use checked i128 integer subtotal accumulation so intermediate i64 overflow may later cancel, plus compensated f64 float accumulation with integer conversion residuals. Center exact integer differences before f64 conversion for two-pass sample variance. Sort copied median values by coherent mixed numeric order, treating floating signed zeros as equivalent to integer zero; add even integer pairs in i128 before conversion and retain cancellation in mixed pairs. Input data and graph/history are unchanged.
 
 Independent native permutations, exhaustive exact integer-residual variance fixtures, numeric comparator laws, source/domain/range cases and Python Fraction references cover the slice. Bundled Python 3.9's direct large-integer variance also collapses small differences; use explicit rational references rather than treating that result as authoritative. No arbitrary-precision/correct-rounding/throughput guarantee is added. NumArray, ArrayArray, SIMD, min/max, matrix reductions and arithmetic operators remain for subsequent slices of 29.3/29.4. See docs/api/array-reductions.md.
+
+
+## Item 29 exact logical-column extrema — 2026-10-21
+
+Extend the shared numeric order to BaseArray min/max: choose original values and preserve first ties without rounding i64 candidates to f64/f32. Reject nonfinite values even in singleton/late positions and retain null skipping and explicit empty errors. Preserve legacy text/compact-text/boolean extrema and reject incompatible mixtures. Native permutation/limit/type/domain fixtures and rebuilt Python comparisons cover the scope; NumArray, other reductions and arithmetic remain separate work. See docs/api/array-reductions.md.

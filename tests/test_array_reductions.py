@@ -100,3 +100,32 @@ def test_median_preserves_negative_zero_without_breaking_mixed_zero_ordering():
     assert math.copysign(1.0, BaseArray([-0.0, -0.0]).median()) == -1.0
     for values in permutations([0, -0.0, 0.0]):
         assert BaseArray(list(values)).median() == 0.0
+
+@pytest.mark.parametrize("values", [
+    [2**63-2,2**63-1,None],[-2**63+1,-2**63,None],
+    [2**63-1,float(2**63)], [16777217,16777216.0],
+    [None,-0.5,0,0.5], [1.0,1],
+])
+def test_extrema_match_exact_python_mixed_numeric_order(values):
+    for order in permutations(values):
+        array=BaseArray(list(order))
+        reference=[x for x in stored(order) if x is not None]
+        for operation in ["min","max"]:
+            expected = min(reference) if operation == "min" else max(reference)
+            actual = getattr(array,operation)()
+            assert actual == expected
+            assert type(actual) is type(expected)
+
+
+@pytest.mark.parametrize("values", [[],[None],[True],["x"],
+    [float("nan")],[0,float("inf")],[-float("inf"),0]])
+@pytest.mark.parametrize("operation", ["min","max"])
+def test_extrema_reject_invalid_domains_including_singletons(values,operation):
+    with pytest.raises(ValueError): getattr(BaseArray(values),operation)()
+
+
+def test_extrema_keep_first_tied_scalar_and_signed_zero():
+    for operation in ["min","max"]:
+        result=getattr(BaseArray([-0.0,0,0.0]),operation)()
+        assert type(result) is float
+        assert math.copysign(1.0,result)==-1.0

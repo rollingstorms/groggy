@@ -145,3 +145,91 @@ fn null_empty_nonnumeric_and_nonfinite_domains_are_explicit() {
     assert!(one.var().is_err());
     assert!(one.std().is_err());
 }
+
+#[test]
+fn extrema_retain_exact_selected_value_type_and_first_tie() {
+    for values in permutations(&[V::Int(i64::MAX - 1), V::Int(i64::MAX), V::Null]) {
+        let array = BaseArray::new(values.clone());
+        assert_eq!(array.min().unwrap(), V::Int(i64::MAX - 1));
+        assert_eq!(array.max().unwrap(), V::Int(i64::MAX));
+        let legacy = LegacyArray::new(values, AttrValueType::Int);
+        assert_eq!(legacy.min().unwrap(), array.min().unwrap());
+        assert_eq!(legacy.max().unwrap(), array.max().unwrap());
+    }
+    for values in [
+        vec![V::Int(i64::MAX), V::Float((2.0_f32).powi(63))],
+        vec![V::Int(16_777_217), V::Float(16_777_216.0)],
+    ] {
+        for order in permutations(&values) {
+            let expected_min = if matches!(values[0], V::Int(i64::MAX)) {
+                values[0].clone()
+            } else {
+                values[1].clone()
+            };
+            let expected_max = if matches!(values[0], V::Int(i64::MAX)) {
+                values[1].clone()
+            } else {
+                values[0].clone()
+            };
+            let array = BaseArray::new(order.clone());
+            let legacy = LegacyArray::new(order, AttrValueType::Float);
+            assert_eq!(array.min().unwrap(), expected_min);
+            assert_eq!(legacy.min().unwrap(), expected_min);
+            assert_eq!(array.max().unwrap(), expected_max);
+            assert_eq!(legacy.max().unwrap(), expected_max);
+        }
+    }
+    let tied = BaseArray::new(vec![V::Float(-0.0), V::SmallInt(0), V::Float(0.0)]);
+    assert!(matches!(tied.min().unwrap(),V::Float(v) if v.is_sign_negative()));
+    assert!(matches!(tied.max().unwrap(),V::Float(v) if v.is_sign_negative()));
+}
+#[test]
+fn extrema_validate_every_element_and_keep_legacy_text_bool_domains() {
+    for value in [
+        V::Float(f32::NAN),
+        V::Float(f32::INFINITY),
+        V::Float(f32::NEG_INFINITY),
+    ] {
+        for values in [
+            vec![value.clone()],
+            vec![V::Int(0), value.clone()],
+            vec![value, V::Int(0)],
+        ] {
+            let array = BaseArray::new(values.clone());
+            let legacy = LegacyArray::new(values, AttrValueType::Float);
+            assert!(array.min().is_err());
+            assert!(array.max().is_err());
+            assert!(legacy.min().is_err());
+            assert!(legacy.max().is_err());
+        }
+    }
+    for values in [
+        vec![],
+        vec![V::Null],
+        vec![V::Bool(true)],
+        vec![V::Text("a".into())],
+    ] {
+        let array = BaseArray::new(values);
+        assert!(array.min().is_err());
+        assert!(array.max().is_err());
+    }
+    let legacy = LegacyArray::new(
+        vec![
+            V::Text("z".into()),
+            V::Null,
+            V::CompactText(groggy::types::CompactString::new("a")),
+        ],
+        AttrValueType::Text,
+    );
+    assert_eq!(
+        legacy.min().unwrap(),
+        V::CompactText(groggy::types::CompactString::new("a"))
+    );
+    assert_eq!(legacy.max().unwrap(), V::Text("z".into()));
+    let legacy = LegacyArray::new(vec![V::Bool(true), V::Bool(false)], AttrValueType::Bool);
+    assert_eq!(legacy.min().unwrap(), V::Bool(false));
+    assert_eq!(legacy.max().unwrap(), V::Bool(true));
+    let mixed = LegacyArray::new(vec![V::Int(0), V::Text("x".into())], AttrValueType::Int);
+    assert!(mixed.min().is_err());
+    assert!(mixed.max().is_err());
+}

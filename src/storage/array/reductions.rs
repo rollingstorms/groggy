@@ -277,3 +277,56 @@ mod tests {
         }
     }
 }
+
+/// Select an original numeric scalar using exact mixed ordering; ties keep first.
+pub(super) fn numeric_extremum(values: &[AttrValue], minimum: bool) -> GraphResult<AttrValue> {
+    extremum(values, minimum, false)
+}
+/// Preserve legacy text/boolean extrema alongside the shared numeric domain.
+pub(super) fn legacy_extremum(values: &[AttrValue], minimum: bool) -> GraphResult<AttrValue> {
+    extremum(values, minimum, true)
+}
+fn extremum(values: &[AttrValue], minimum: bool, legacy: bool) -> GraphResult<AttrValue> {
+    let operation = if minimum { "min" } else { "max" };
+    let mut selected: Option<&AttrValue> = None;
+    for (index, value) in values.iter().enumerate() {
+        if matches!(value, AttrValue::Null) {
+            continue;
+        }
+        match Number::from_attr(value) {
+            Some(Number::Float(v)) if !v.is_finite() => return Err(invalid(format!(
+                "Cannot compute {operation} of nonfinite value at index {index}",
+            ))),
+            Some(_) => {},
+            None if legacy && matches!(value, AttrValue::Text(_) | AttrValue::CompactText(_) | AttrValue::Bool(_)) => {},
+            None => return Err(invalid(format!("Cannot compute {operation} of non-numeric or unsupported value at index {index}: {value:?}"))),
+        }
+        let Some(previous) = selected else {
+            selected = Some(value);
+            continue;
+        };
+        let order = match (Number::from_attr(value), Number::from_attr(previous)) {
+            (Some(a), Some(b)) => a.cmp(b),
+            _ => match (value, previous) {
+                (AttrValue::Text(a), AttrValue::Text(b)) => a.cmp(b),
+                (AttrValue::CompactText(a), AttrValue::CompactText(b)) => {
+                    a.as_str().cmp(b.as_str())
+                }
+                (AttrValue::Text(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
+                (AttrValue::CompactText(a), AttrValue::Text(b)) => a.as_str().cmp(b.as_str()),
+                (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
+                _ => return Err(invalid(format!(
+                    "Cannot compare incompatible types for {operation}: {value:?} and {previous:?}"
+                ))),
+            },
+        };
+        if (minimum && order == Ordering::Less) || (!minimum && order == Ordering::Greater) {
+            selected = Some(value);
+        }
+    }
+    selected.cloned().ok_or_else(|| {
+        invalid(format!(
+            "Cannot compute {operation} of empty array (no non-null values)"
+        ))
+    })
+}

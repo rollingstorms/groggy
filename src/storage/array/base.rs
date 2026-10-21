@@ -356,54 +356,14 @@ impl BaseArray {
         super::reductions::mean(&self.data)
     }
 
-    /// Find minimum value in the array
+    /// First minimum with exact numeric ordering; retain legacy text/bool support.
     pub fn min(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut min_val: Option<AttrValue> = None;
-
-        for val in &self.data {
-            match val {
-                AttrValue::Null => continue, // Skip null values
-                _ => match &min_val {
-                    None => min_val = Some(val.clone()),
-                    Some(current_min) => {
-                        if Self::compare_values(val, current_min)? < 0 {
-                            min_val = Some(val.clone());
-                        }
-                    }
-                },
-            }
-        }
-
-        min_val.ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput(
-                "Cannot find minimum of empty array".to_string(),
-            )
-        })
+        super::reductions::legacy_extremum(&self.data, true)
     }
 
-    /// Find maximum value in the array
+    /// First maximum with exact numeric ordering; retain legacy text/bool support.
     pub fn max(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut max_val: Option<AttrValue> = None;
-
-        for val in &self.data {
-            match val {
-                AttrValue::Null => continue, // Skip null values
-                _ => match &max_val {
-                    None => max_val = Some(val.clone()),
-                    Some(current_max) => {
-                        if Self::compare_values(val, current_max)? > 0 {
-                            max_val = Some(val.clone());
-                        }
-                    }
-                },
-            }
-        }
-
-        max_val.ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput(
-                "Cannot find maximum of empty array".to_string(),
-            )
-        })
+        super::reductions::legacy_extremum(&self.data, false)
     }
 
     /// Count non-null values in the array
@@ -423,59 +383,6 @@ impl BaseArray {
             }
         }
         seen.len()
-    }
-
-    /// Helper function to compare two AttrValues for ordering
-    fn compare_values(a: &AttrValue, b: &AttrValue) -> crate::errors::GraphResult<i32> {
-        use std::cmp::Ordering;
-
-        let ordering = match (a, b) {
-            // Numeric comparisons
-            (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
-            (AttrValue::SmallInt(a), AttrValue::SmallInt(b)) => a.cmp(b),
-            (AttrValue::Float(a), AttrValue::Float(b)) => {
-                a.partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-
-            // Mixed numeric comparisons
-            (AttrValue::Int(a), AttrValue::SmallInt(b)) => (*a).cmp(&(*b as i64)),
-            (AttrValue::SmallInt(a), AttrValue::Int(b)) => (*a as i64).cmp(b),
-            (AttrValue::Int(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::Int(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::SmallInt(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::SmallInt(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
-            }
-
-            // String comparisons
-            (AttrValue::Text(a), AttrValue::Text(b)) => a.cmp(b),
-            (AttrValue::CompactText(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
-            (AttrValue::Text(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
-            (AttrValue::CompactText(a), AttrValue::Text(b)) => a.as_str().cmp(b.as_str()),
-
-            // Boolean comparisons
-            (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
-
-            // Incompatible types
-            _ => {
-                return Err(crate::errors::GraphError::InvalidInput(format!(
-                    "Cannot compare incompatible types: {:?} and {:?}",
-                    a, b
-                )));
-            }
-        };
-
-        Ok(match ordering {
-            Ordering::Less => -1,
-            Ordering::Equal => 0,
-            Ordering::Greater => 1,
-        })
     }
 
     /// Calculate basic statistics for numeric data
