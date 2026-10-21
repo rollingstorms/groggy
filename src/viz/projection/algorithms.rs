@@ -6,7 +6,7 @@ use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;
 
-/// PCA-based projection (fastest, linear)
+/// Two-component PCA projection using a scaled feature-space scatter matrix.
 #[derive(Debug)]
 pub struct PCAProjection {
     center: bool,
@@ -21,66 +21,100 @@ impl PCAProjection {
         }
     }
 
-    /// Compute PCA projection of embedding matrix
-    fn compute_pca(&self, embedding: &GraphMatrix) -> GraphResult<GraphMatrix> {
-        let (n_samples, n_features) = embedding.shape();
-
-        // Center the data if requested
-        let centered = if self.center {
-            let means = embedding.column_means()?;
-            let mut centered = embedding.clone();
-            for i in 0..n_samples {
-                for j in 0..n_features {
-                    let val = centered.get_checked(i, j)?;
-                    let mean = means[j];
-                    centered.set(i, j, val - mean)?;
+    /// Return owned two-component scores in input row order, retaining row labels.
+    /// Standardization uses population deviation; constant features use scale one.
+    pub fn project_matrix(&self, embedding: &GraphMatrix) -> GraphResult<GraphMatrix> {
+        self.validate_embedding(embedding)?;
+        let (rows, cols) = embedding.shape();
+        let mut prepared = GraphMatrix::zeros(rows, cols);
+        for col in 0..cols {
+            let mut scale = 0.0_f64;
+            for row in 0..rows {
+                let value = embedding.get_checked(row, col)?;
+                if !value.is_finite() {
+                    return Err(GraphError::InvalidInput(
+                        "PCA requires finite input values".into(),
+                    ));
                 }
+                scale = scale.max(value.abs());
             }
-            centered
-        } else {
-            embedding.clone()
-        };
-
-        // Standardize if requested
-        let standardized = if self.standardize {
-            let variances = centered.column_variances()?;
-            let mut standardized = centered;
-            for i in 0..n_samples {
-                for j in 0..n_features {
-                    let val = standardized.get_checked(i, j)?;
-                    let std_dev = (variances[j]).sqrt().max(1e-12);
-                    standardized.set(i, j, val / std_dev)?;
+            if scale == 0.0 {
+                continue;
+            }
+            // Normalized columns keep mean/deviation arithmetic bounded even
+            // when the original values would overflow a sum or square.
+            let mut mean = 0.0;
+            for row in 0..rows {
+                let value = embedding.get_checked(row, col)? / scale;
+                mean += (value - mean) / (row + 1) as f64;
+            }
+            let mut variance = 0.0;
+            if self.standardize {
+                for row in 0..rows {
+                    let difference = embedding.get_checked(row, col)? / scale - mean;
+                    variance += difference * difference;
                 }
+                variance /= rows as f64;
             }
-            standardized
-        } else {
-            centered
-        };
-
-        // Compute covariance matrix
-        let transposed = standardized.transpose()?;
-        let covariance = transposed.multiply(&standardized)?;
-        let scale = 1.0 / (n_samples - 1) as f64;
-        let covariance = covariance.scalar_multiply(scale)?;
-
-        // Compute eigendecomposition
-        let (eigenvalues, eigenvectors) = covariance.eigenvalue_decomposition()?;
-
-        // Sort eigenvalues in descending order and get top 2 components
-        let mut eigen_pairs: Vec<(f64, usize)> = eigenvalues
-            .iter()
-            .enumerate()
-            .map(|(i, &val)| (val, i))
-            .collect();
-        eigen_pairs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-
-        // Select top 2 principal components
-        let pc_indices = vec![eigen_pairs[0].1, eigen_pairs[1].1];
-        let principal_components = eigenvectors.select_columns(&pc_indices)?;
-
-        // Project data onto principal components
-        let projected = standardized.multiply(&principal_components)?;
-
+            let deviation = variance.sqrt();
+            for row in 0..rows {
+                let normalized = embedding.get_checked(row, col)? / scale;
+                let value = if self.center {
+                    normalized - mean
+                } else {
+                    normalized
+                };
+                let prepared_value = if self.standardize && deviation > 0.0 {
+                    value / deviation
+                } else {
+                    // A constant feature is unchanged by scaling alone.
+                    value * scale
+                };
+                if !prepared_value.is_finite() {
+                    return Err(GraphError::InvalidInput(
+                        "PCA preprocessing exceeds finite f64 range".into(),
+                    ));
+                }
+                prepared.set(row, col, prepared_value)?;
+            }
+        }
+        let mut scaling = 0.0_f64;
+        for row in 0..rows {
+            for col in 0..cols {
+                scaling = scaling.max(prepared.get_checked(row, col)?.abs());
+            }
+        }
+        if scaling == 0.0 {
+            scaling = 1.0;
+        }
+        for row in 0..rows {
+            for col in 0..cols {
+                prepared.set(row, col, prepared.get_checked(row, col)? / scaling)?;
+            }
+        }
+        // Common positive scaling leaves the principal directions unchanged.
+        // Use mean scatter rather than dividing by rows-1: singleton projection
+        // is well-defined and scores do not depend on covariance normalization.
+        let scatter = prepared
+            .transpose()?
+            .multiply(&prepared)?
+            .scalar_multiply(1.0 / rows as f64)?;
+        let (_, vectors) = scatter.eigenvalue_decomposition()?; // descending
+        let axes = vectors.select_columns(&[0, 1])?;
+        let mut projected = prepared.multiply(&axes)?;
+        for row in 0..rows {
+            for col in 0..2 {
+                let value = projected.get_checked(row, col)? * scaling;
+                if !value.is_finite() {
+                    return Err(GraphError::InvalidInput(
+                        "PCA scores exceed finite f64 range".into(),
+                    ));
+                }
+                projected.set(row, col, value)?;
+            }
+        }
+        projected.set_row_labels(embedding.row_labels().map(<[String]>::to_vec));
+        projected.set_column_names(vec!["pc_1".into(), "pc_2".into()]);
         Ok(projected)
     }
 }
@@ -91,10 +125,7 @@ impl ProjectionEngine for PCAProjection {
         embedding: &GraphMatrix,
         _graph: &Graph,
     ) -> GraphResult<Vec<Position>> {
-        self.validate_embedding(embedding)?;
-
-        // Compute PCA projection
-        let projected = self.compute_pca(embedding)?;
+        let projected = self.project_matrix(embedding)?;
 
         // Convert to positions
         let (n_samples, _) = projected.shape();

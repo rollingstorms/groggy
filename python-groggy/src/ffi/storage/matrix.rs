@@ -109,6 +109,21 @@ impl PyGraphMatrix {
         Ok(Self { inner: matrix })
     }
 
+    /// A copy of optional row identity labels, in matrix row order.
+    #[getter]
+    fn row_labels(&self) -> Option<Vec<String>> {
+        self.inner.row_labels().map(<[String]>::to_vec)
+    }
+
+    /// Return owned two-component PCA scores, retaining input row labels.
+    #[pyo3(signature = (center=true, standardize=false))]
+    fn pca_projection(&self, center: bool, standardize: bool) -> PyResult<Self> {
+        let inner = groggy::viz::projection::algorithms::PCAProjection::new(center, standardize)
+            .project_matrix(&self.inner)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(Self { inner })
+    }
+
     /// Check whether the matrix contains any rows or columns
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
