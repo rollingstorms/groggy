@@ -17,6 +17,7 @@ pub mod interpolation;
 mod neighborhood;
 pub mod quality;
 mod tsne;
+mod umap;
 
 /// Core trait for projecting high-dimensional embeddings to 2D coordinates
 pub trait ProjectionEngine: std::fmt::Debug {
@@ -376,12 +377,18 @@ impl ProjectionEngineFactory {
                 min_dist,
                 n_epochs,
                 negative_sample_rate,
-            } => Ok(Box::new(algorithms::UMAPProjection::new(
-                *n_neighbors,
-                *min_dist,
-                *n_epochs,
-                *negative_sample_rate,
-            ))),
+            } => {
+                let mut engine = algorithms::UMAPProjection::new(
+                    *n_neighbors,
+                    *min_dist,
+                    *n_epochs,
+                    *negative_sample_rate,
+                );
+                if let Some(seed) = config.seed {
+                    engine = engine.with_seed(seed);
+                }
+                Ok(Box::new(engine))
+            }
 
             ProjectionMethod::MultiScale {
                 global_method,

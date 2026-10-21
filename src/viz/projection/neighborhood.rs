@@ -7,19 +7,13 @@ pub(super) fn invalid(message: &str) -> GraphError {
 }
 
 /// Scale all features together before squaring, retaining Euclidean neighbor order.
-pub(super) fn squared_distances(input: &GraphMatrix) -> GraphResult<Vec<f64>> {
+pub(super) fn scaled_features(input: &GraphMatrix) -> GraphResult<Vec<f64>> {
     let (rows, cols) = input.shape();
     if rows == 0 || cols < 2 {
         return Err(invalid(
             "Neighborhood projection requires nonempty input with at least two features",
         ));
     }
-    let count = rows
-        .checked_mul(rows)
-        .and_then(|n| n.checked_mul(std::mem::size_of::<f64>()))
-        .filter(|&bytes| bytes <= isize::MAX as usize)
-        .ok_or_else(|| invalid("Neighborhood pair matrix size overflow"))?
-        / std::mem::size_of::<f64>();
     if input
         .row_labels()
         .is_some_and(|labels| labels.len() != rows)
@@ -27,6 +21,12 @@ pub(super) fn squared_distances(input: &GraphMatrix) -> GraphResult<Vec<f64>> {
         return Err(invalid("Projection row-label count must match input rows"));
     }
     let mut scale: f64 = 0.0;
+    let mut data = Vec::new();
+    let count = rows
+        .checked_mul(cols)
+        .ok_or_else(|| invalid("Projection feature count overflow"))?;
+    data.try_reserve_exact(count)
+        .map_err(|_| invalid("Cannot allocate projection features"))?;
     for row in 0..rows {
         for col in 0..cols {
             let value = input.get_checked(row, col)?;
@@ -34,23 +34,47 @@ pub(super) fn squared_distances(input: &GraphMatrix) -> GraphResult<Vec<f64>> {
                 return Err(invalid("Projection input must be finite"));
             }
             scale = scale.max(value.abs());
+            data.push(value);
         }
     }
-    if scale == 0.0 {
-        scale = 1.0;
+    if scale != 0.0 {
+        for value in &mut data {
+            *value /= scale;
+        }
     }
+    Ok(data)
+}
+
+pub(super) fn squared_distance(
+    features: &[f64],
+    cols: usize,
+    i: usize,
+    j: usize,
+) -> GraphResult<f64> {
+    let mut squared = 0.0;
+    for col in 0..cols {
+        let difference = features[i * cols + col] - features[j * cols + col];
+        squared += difference * difference;
+    }
+    if !squared.is_finite() {
+        return Err(invalid("Projection distance overflow"));
+    }
+    Ok(squared)
+}
+
+pub(super) fn squared_distances(input: &GraphMatrix) -> GraphResult<Vec<f64>> {
+    let features = scaled_features(input)?;
+    let (rows, cols) = input.shape();
+    let count = rows
+        .checked_mul(rows)
+        .and_then(|n| n.checked_mul(std::mem::size_of::<f64>()))
+        .filter(|&bytes| bytes <= isize::MAX as usize)
+        .ok_or_else(|| invalid("Neighborhood pair matrix size overflow"))?
+        / std::mem::size_of::<f64>();
     let mut result = vec![0.0; count];
     for i in 0..rows {
         for j in i + 1..rows {
-            let mut squared = 0.0;
-            for col in 0..cols {
-                let difference =
-                    input.get_checked(i, col)? / scale - input.get_checked(j, col)? / scale;
-                squared += difference * difference;
-            }
-            if !squared.is_finite() {
-                return Err(invalid("Projection distance overflow"));
-            }
+            let squared = squared_distance(&features, cols, i, j)?;
             result[i * rows + j] = squared;
             result[j * rows + i] = squared;
         }
