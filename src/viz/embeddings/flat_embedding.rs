@@ -1,43 +1,24 @@
-//! Flat embedding energy solver with gradient-based optimization.
-//!
-//! This module implements a PyTorch-style energy optimization for projecting
-//! high-dimensional embeddings to a flat 2D circle, solving quantization issues
-//! by using continuous gradient descent instead of discrete grid mapping.
-//!
-//! The energy function combines:
-//! - Edge cohesion: keeps connected nodes close
-//! - Repulsion: pushes all nodes apart for separation
-//! - Spread maximization: encourages orthogonal axes (maximizes covariance determinant)
+//! Bounded graph layout in a disk, with explicit native objective gradients.
 
+use super::row_node_ids;
 use crate::api::graph::Graph;
-use crate::errors::GraphResult;
-use crate::storage::advanced_matrix::{
-    neural::autodiff::AutoDiffTensor, operations::MatrixOperations, unified_matrix::UnifiedMatrix,
-};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;
+use std::collections::HashMap;
 
-/// Configuration for the flat embedding optimization.
+/// Parameters for a seeded projected-gradient graph layout.
 #[derive(Debug, Clone)]
 pub struct FlatEmbedConfig {
-    /// Number of optimization iterations (default: 800)
     pub iterations: usize,
-    /// Learning rate (default: 0.03)
     pub learning_rate: f64,
-    /// Edge cohesion weight (default: 1.0)
     pub edge_cohesion_weight: f64,
-    /// Repulsion weight - pushes all nodes apart (default: 0.1)
     pub repulsion_weight: f64,
-    /// Repulsion power/exponent (default: 1.5)
     pub repulsion_power: f64,
-    /// Spread weight - maximizes covariance determinant (default: 0.05)
     pub spread_weight: f64,
-    /// Radius for clipping to unit circle (default: 0.98)
     pub radius_clip: f64,
-    /// Random seed for initialization (default: 0)
     pub seed: u64,
 }
-
 impl Default for FlatEmbedConfig {
     fn default() -> Self {
         Self {
@@ -52,581 +33,314 @@ impl Default for FlatEmbedConfig {
         }
     }
 }
+fn invalid(message: impl Into<String>) -> GraphError {
+    GraphError::InvalidInput(message.into())
+}
+impl FlatEmbedConfig {
+    fn validate(&self) -> GraphResult<()> {
+        for (name, value) in [
+            ("learning_rate", self.learning_rate),
+            ("repulsion_power", self.repulsion_power),
+            ("radius_clip", self.radius_clip),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(invalid(format!("Flat {name} must be finite and positive")));
+            }
+        }
+        for (name, value) in [
+            ("edge_cohesion_weight", self.edge_cohesion_weight),
+            ("repulsion_weight", self.repulsion_weight),
+            ("spread_weight", self.spread_weight),
+        ] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(invalid(format!(
+                    "Flat {name} must be finite and nonnegative"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
 
-/// Compute flat embedding using gradient-based energy optimization.
-///
-/// This function implements the energy optimization approach from the Python script,
-/// using automatic differentiation for gradient computation.
+/// Layout rows against actual active graph topology; unlabeled rows use ascending IDs.
+/// Feature values do not enter this graph-layout objective. The matrix supplies
+/// row identity/shape, not a promise to preserve high-dimensional distances.
 pub fn compute_flat_embedding(
     embedding: &GraphMatrix,
     graph: &Graph,
     config: &FlatEmbedConfig,
 ) -> GraphResult<Vec<Position>> {
-    let (n_nodes, _n_dims) = embedding.shape();
-
-    if n_nodes == 0 {
-        return Ok(Vec::new());
+    config.validate()?;
+    let nodes = row_node_ids(embedding, graph)?;
+    let index: HashMap<_, _> = nodes
+        .iter()
+        .enumerate()
+        .map(|(i, &node)| (node, i))
+        .collect();
+    let mut ids = graph.space().edge_ids();
+    ids.sort_unstable();
+    let mut edges = Vec::with_capacity(ids.len());
+    for edge in ids {
+        let (u, v) = graph.edge_endpoints(edge)?;
+        let u = index
+            .get(&u)
+            .copied()
+            .ok_or_else(|| invalid(format!("Edge {edge} endpoint outside embedding")))?;
+        let v = index
+            .get(&v)
+            .copied()
+            .ok_or_else(|| invalid(format!("Edge {edge} endpoint outside embedding")))?;
+        edges.push((u, v)); // Each real instance, including loops; never truncate.
     }
-
-    // Get edges from the graph
-    let edges = extract_edges_from_graph(graph)?;
-
-    // Convert GraphMatrix to UnifiedMatrix for autodiff
-    let embedding_data = embedding.to_vec()?;
-    let _unified_embedding =
-        UnifiedMatrix::from_data(embedding_data, n_nodes, embedding.shape().1)?;
-
-    // Initialize 2D positions randomly
-    let mut rng = fastrand::Rng::with_seed(config.seed);
-    let mut initial_positions = Vec::with_capacity(n_nodes * 2);
-    for _ in 0..(n_nodes * 2) {
-        initial_positions.push(rng.f64() * 0.3 - 0.15); // Small initial spread
-    }
-
-    let positions_tensor = AutoDiffTensor::from_data(initial_positions, (n_nodes, 2), true)?;
-
-    // Run optimization loop
-    let optimized_positions = optimize_flat_positions(positions_tensor, &edges, config)?;
-
-    // Convert result to Position vector
-    let result_data = optimized_positions.data.to_vec()?;
-    let mut positions = Vec::with_capacity(n_nodes);
-
-    for i in 0..n_nodes {
-        let x = result_data[i * 2];
-        let y = result_data[i * 2 + 1];
-        positions.push(Position { x, y });
-    }
-
-    Ok(positions)
+    layout(nodes.len(), &edges, config)
 }
 
-/// Extract edges from graph as (u, v) pairs
-fn extract_edges_from_graph(graph: &Graph) -> GraphResult<Vec<(usize, usize)>> {
-    let mut edges = Vec::new();
-
-    // Get all edges from the graph using the proper API
-    // For now, create some dummy edges based on node count
-    let node_count = graph.node_ids().len();
-
-    if node_count < 2 {
-        return Ok(edges);
-    }
-
-    // Create a simple connected graph structure for testing
-    // In a real implementation, we'd need to properly extract edges from the graph
-    for i in 0..(node_count - 1) {
-        edges.push((i, i + 1));
-    }
-
-    // Add some random connections for more interesting structure
-    if node_count >= 3 {
-        edges.push((0, node_count - 1)); // Close the loop
-    }
-    if node_count >= 4 {
-        edges.push((1, node_count - 2)); // Cross connection
-    }
-
-    // Limit edges for computational efficiency
-    edges.truncate(100);
-
-    Ok(edges)
-}
-
-/// Core optimization loop using automatic differentiation
-fn optimize_flat_positions(
-    mut positions: AutoDiffTensor<f64>,
-    edges: &[(usize, usize)],
+/// Owned graph-aware matrix result in input row order, with validated ID labels.
+pub fn compute_flat_embedding_matrix(
+    embedding: &GraphMatrix,
+    graph: &Graph,
     config: &FlatEmbedConfig,
-) -> GraphResult<AutoDiffTensor<f64>> {
-    // Skip optimization if there are no edges (single node or disconnected graph)
-    if edges.is_empty() {
-        return Ok(positions);
-    }
-
-    for iteration in 0..config.iterations {
-        // Apply radial clipping to keep positions within unit circle
-        positions = clip_to_circle(positions, config.radius_clip)?;
-
-        // Compute energy and gradients
-        let energy = compute_flat_energy(&positions, edges, config)?;
-
-        // Backward pass to compute gradients
-        if let Err(e) = energy.backward() {
-            // If gradient computation fails (e.g., due to slicing issues),
-            // just return the current positions
-            eprintln!(
-                "Warning: Gradient computation failed at iteration {}: {:?}",
-                iteration, e
-            );
-            return Ok(positions);
-        }
-
-        // Get gradients
-        let grad = match positions.grad() {
-            Some(g) => g,
-            None => {
-                // No gradient computed, return current positions
-                return Ok(positions);
-            }
-        };
-
-        // Update positions (gradient descent step)
-        let grad_tensor = positions.like_new(grad, false);
-        let step_size_tensor = positions.like_from_data(
-            vec![config.learning_rate; positions.data.len()],
-            (positions.data.rows(), positions.data.cols()),
-            false,
-        )?;
-
-        let step = grad_tensor.multiply(&step_size_tensor)?;
-        positions = positions.subtract(&step)?;
-
-        // Print progress occasionally
-        if iteration % 200 == 0 {
-            // Progress logging for flat embedding iteration
-        }
-    }
-
-    Ok(positions)
+) -> GraphResult<GraphMatrix> {
+    let nodes = row_node_ids(embedding, graph)?;
+    let positions = compute_flat_embedding(embedding, graph, config)?;
+    let mut matrix = positions_matrix(positions)?;
+    matrix.set_row_labels(Some(
+        nodes.iter().map(|node| format!("node_{node}")).collect(),
+    ));
+    Ok(matrix)
 }
 
-/// Compute the flat embedding energy function
-fn compute_flat_energy(
-    positions: &AutoDiffTensor<f64>,
-    edges: &[(usize, usize)],
-    config: &FlatEmbedConfig,
-) -> GraphResult<AutoDiffTensor<f64>> {
-    let n_nodes = positions.data.rows();
-
-    // 1. Edge cohesion: keeps connected nodes close (Laplacian smoothness)
-    let mut edge_energy = positions.like_from_data(vec![0.0], (1, 1), false)?;
-
-    for &(u, v) in edges {
-        if u < n_nodes && v < n_nodes {
-            // Get positions of nodes u and v
-            let pos_u = positions.data.slice(u, u + 1, 0, 2)?;
-            let pos_v = positions.data.slice(v, v + 1, 0, 2)?;
-
-            let pos_u_tensor = positions.like_new(pos_u, true); // Need grad!
-            let pos_v_tensor = positions.like_new(pos_v, true); // Need grad!
-
-            // Compute difference: pos_u - pos_v
-            let diff = pos_u_tensor.subtract(&pos_v_tensor)?;
-
-            // Squared distance: ||pos_u - pos_v||^2
-            let diff_sq = diff.multiply(&diff)?; // Element-wise square
-            let dist_sq = diff_sq.sum(Some(1))?; // Sum over dimensions
-
-            edge_energy = edge_energy.add(&dist_sq)?;
-        }
-    }
-
-    // Apply mean over edges for stability
-    if !edges.is_empty() {
-        let edge_count_tensor =
-            positions.like_from_data(vec![edges.len() as f64], (1, 1), false)?;
-        edge_energy = edge_energy.multiply(&edge_count_tensor)?; // Normalize by edge count
-    }
-
-    // Scale by edge cohesion weight
-    let cohesion_weight_tensor =
-        positions.like_from_data(vec![config.edge_cohesion_weight], (1, 1), false)?;
-    let cohesion_term = edge_energy.multiply(&cohesion_weight_tensor)?;
-
-    // 2. Repulsion: pushes all nodes apart (simplified O(N^2) version)
-    let mut repulsion_energy = positions.like_from_data(vec![0.0], (1, 1), false)?;
-
-    // Sample pairs for repulsion to keep computation tractable
-    let max_pairs = std::cmp::min(n_nodes * n_nodes / 4, 1000); // Limit repulsion pairs
-    let mut pair_count = 0;
-
-    for i in 0..n_nodes {
-        for j in (i + 1)..n_nodes {
-            if pair_count >= max_pairs {
-                break;
-            }
-
-            let pos_i = positions.data.slice(i, i + 1, 0, 2)?;
-            let pos_j = positions.data.slice(j, j + 1, 0, 2)?;
-
-            let pos_i_tensor = positions.like_new(pos_i, false);
-            let pos_j_tensor = positions.like_new(pos_j, false);
-
-            // Distance between i and j
-            let diff = pos_i_tensor.subtract(&pos_j_tensor)?;
-            let diff_sq = diff.multiply(&diff)?;
-            let dist_sq = diff_sq.sum(Some(1))?;
-
-            // Add small epsilon to prevent division by zero
-            let epsilon_tensor = positions.like_from_data(vec![1e-6], (1, 1), false)?;
-            let _dist_sq_safe = dist_sq.add(&epsilon_tensor)?;
-
-            // Repulsion term: 1/||pos_i - pos_j||^p (approximated as 1/dist_sq for now)
-            // In full implementation, this would use the power operation
-            let inv_dist = positions.like_from_data(vec![1.0], (1, 1), false)?; // Placeholder
-
-            repulsion_energy = repulsion_energy.add(&inv_dist)?;
-            pair_count += 1;
-        }
-        if pair_count >= max_pairs {
-            break;
-        }
-    }
-
-    // Scale by repulsion weight
-    let repulsion_weight_tensor =
-        positions.like_from_data(vec![config.repulsion_weight], (1, 1), false)?;
-    let repulsion_term = repulsion_energy.multiply(&repulsion_weight_tensor)?;
-
-    // 3. Spread: maximize variance to encourage full use of space
-    // For simplicity, skip the spread term for now as it requires more complex operations
-    let spread_term = positions.like_from_data(vec![0.0], (1, 1), false)?;
-
-    // Combine all energy terms
-    let total_energy = cohesion_term.add(&repulsion_term)?.add(&spread_term)?;
-
-    Ok(total_energy)
-}
-
-/// Clip positions to unit circle (radial projection)
-fn clip_to_circle(
-    positions: AutoDiffTensor<f64>,
-    _radius: f64,
-) -> GraphResult<AutoDiffTensor<f64>> {
-    // For now, return positions unchanged
-    // In full implementation, this would compute norms and clip
-    // This requires more sophisticated tensor operations
-    Ok(positions)
-}
-
-/// Convert from GraphMatrix format (convenience wrapper)
+/// Graph-free layout requires cohesion to be disabled; a matrix cannot supply edges.
 pub fn compute_flat_embedding_from_matrix(
     embedding: &GraphMatrix,
     config: &FlatEmbedConfig,
 ) -> GraphResult<GraphMatrix> {
-    // Create a dummy graph for now - in practice this should come from the caller
-    let mut dummy_graph = Graph::new();
-    let n_nodes = embedding.shape().0;
-
-    // Add nodes to dummy graph
-    for _ in 0..n_nodes {
-        dummy_graph.add_node();
+    config.validate()?;
+    if embedding.shape().0 > 1 && config.edge_cohesion_weight != 0.0 {
+        return Err(invalid("Matrix-only flat layout has no topology; pass a graph or explicitly set edge_cohesion_weight=0"));
     }
+    let mut result = positions_matrix(layout(embedding.shape().0, &[], config)?)?;
+    result.set_row_labels(embedding.row_labels().map(<[String]>::to_vec));
+    Ok(result)
+}
+fn positions_matrix(positions: Vec<Position>) -> GraphResult<GraphMatrix> {
+    let rows = positions.len();
+    let mut result = GraphMatrix::from_row_major_data(
+        positions.into_iter().flat_map(|p| [p.x, p.y]).collect(),
+        rows,
+        2,
+        None,
+    )?;
+    result.set_column_names(vec!["flat_x".into(), "flat_y".into()]);
+    Ok(result)
+}
 
-    // Add some dummy edges (in practice these would come from the actual graph)
-    for i in 0..(n_nodes - 1) {
-        if dummy_graph.add_edge(i, i + 1).is_err() {
-            break;
+fn clip(positions: &mut [[f64; 2]], radius: f64) {
+    for point in positions {
+        let scale = point[0].abs().max(point[1].abs());
+        if scale == 0.0 {
+            continue;
+        }
+        let norm = (point[0] / scale).hypot(point[1] / scale);
+        if scale > radius / norm {
+            point[0] = (point[0] / scale) / norm * radius;
+            point[1] = (point[1] / scale) / norm * radius;
         }
     }
+}
 
-    let positions = compute_flat_embedding(embedding, &dummy_graph, config)?;
-
-    // Convert back to GraphMatrix
-    let mut result_data = Vec::with_capacity(positions.len() * 2);
-    for pos in positions {
-        result_data.push(pos.x);
-        result_data.push(pos.y);
+/// E = wc*mean_edges(||u-v||²) + wr*mean_pairs((||i-j||²+1e-6)^(-p/2))
+///     - ws*det(population covariance). Loops contribute zero to the edge mean.
+fn energy_gradient(
+    points: &[[f64; 2]],
+    edges: &[(usize, usize)],
+    config: &FlatEmbedConfig,
+) -> GraphResult<(f64, Vec<[f64; 2]>)> {
+    let n = points.len();
+    let mut gradient = vec![[0.0; 2]; n];
+    let mut energy = 0.0;
+    let cohesion = if edges.is_empty() {
+        0.0
+    } else {
+        config.edge_cohesion_weight / edges.len() as f64
+    };
+    for &(u, v) in edges {
+        if u >= n || v >= n {
+            return Err(invalid("Flat edge index outside position rows"));
+        }
+        if cohesion == 0.0 || u == v {
+            continue;
+        }
+        for axis in 0..2 {
+            let delta = points[u][axis] - points[v][axis];
+            energy += cohesion * delta * delta;
+            gradient[u][axis] += 2.0 * cohesion * delta;
+            gradient[v][axis] -= 2.0 * cohesion * delta;
+        }
     }
+    if config.repulsion_weight > 0.0 && n > 1 {
+        let pairs = n
+            .checked_mul(n - 1)
+            .map(|p| p / 2)
+            .ok_or_else(|| invalid("Flat pair count overflow"))?;
+        let weight = config.repulsion_weight / pairs as f64;
+        for u in 0..n {
+            for v in u + 1..n {
+                let dx = points[u][0] - points[v][0];
+                let dy = points[u][1] - points[v][1];
+                let squared = dx * dx + dy * dy + 1e-6;
+                let term = weight * squared.powf(-config.repulsion_power / 2.0);
+                energy += term;
+                let factor = -config.repulsion_power * term / squared;
+                for (axis, delta) in [dx, dy].into_iter().enumerate() {
+                    gradient[u][axis] += factor * delta;
+                    gradient[v][axis] -= factor * delta;
+                }
+            }
+        }
+    }
+    if config.spread_weight > 0.0 && n > 0 {
+        let mut mean = [0.0; 2];
+        for (i, point) in points.iter().enumerate() {
+            for axis in 0..2 {
+                mean[axis] += (point[axis] - mean[axis]) / (i + 1) as f64;
+            }
+        }
+        let mut xx = 0.0;
+        let mut yy = 0.0;
+        let mut xy = 0.0;
+        for point in points {
+            let x = point[0] - mean[0];
+            let y = point[1] - mean[1];
+            xx += x * x / n as f64;
+            yy += y * y / n as f64;
+            xy += x * y / n as f64;
+        }
+        energy -= config.spread_weight * (xx * yy - xy * xy);
+        let factor = -2.0 * config.spread_weight / n as f64;
+        for (point, grad) in points.iter().zip(&mut gradient) {
+            let x = point[0] - mean[0];
+            let y = point[1] - mean[1];
+            grad[0] += factor * (yy * x - xy * y);
+            grad[1] += factor * (xx * y - xy * x);
+        }
+    }
+    if !energy.is_finite() || gradient.iter().flatten().any(|x| !x.is_finite()) {
+        return Err(invalid("Flat objective/gradient exceeds finite f64 range"));
+    }
+    Ok((energy, gradient))
+}
 
-    GraphMatrix::from_row_major_data(result_data, n_nodes, 2, None)
+fn layout(
+    n: usize,
+    edges: &[(usize, usize)],
+    config: &FlatEmbedConfig,
+) -> GraphResult<Vec<Position>> {
+    n.checked_mul(2)
+        .and_then(|count| count.checked_mul(std::mem::size_of::<f64>()))
+        .ok_or_else(|| invalid("Flat position size overflow"))?;
+    let mut rng = fastrand::Rng::with_seed(config.seed);
+    let mut points: Vec<_> = (0..n)
+        .map(|_| [rng.f64() * 0.3 - 0.15, rng.f64() * 0.3 - 0.15])
+        .collect();
+    clip(&mut points, config.radius_clip);
+    for iteration in 0..config.iterations {
+        let (energy, gradient) = energy_gradient(&points, edges, config)?;
+        if gradient.iter().flatten().all(|&g| g == 0.0) {
+            break;
+        }
+        let mut step = config.learning_rate;
+        let mut accepted = None;
+        for _ in 0..32 {
+            let mut candidate: Vec<_> = points
+                .iter()
+                .zip(&gradient)
+                .map(|(p, g)| [p[0] - step * g[0], p[1] - step * g[1]])
+                .collect();
+            if candidate.iter().flatten().all(|x| x.is_finite()) {
+                clip(&mut candidate, config.radius_clip);
+                if let Ok((next_energy, _)) = energy_gradient(&candidate, edges, config) {
+                    if next_energy <= energy {
+                        accepted = Some(candidate);
+                        break;
+                    }
+                }
+            }
+            step *= 0.5;
+        }
+        let next = accepted.ok_or_else(|| {
+            invalid(format!(
+                "Flat layout failed to find descent at iteration {iteration}"
+            ))
+        })?;
+        if next == points {
+            break;
+        }
+        points = next;
+    }
+    Ok(points.into_iter().map(|[x, y]| Position { x, y }).collect())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::matrix::GraphMatrix;
-
     #[test]
-    fn test_flat_embed_config_creation() {
-        let config = FlatEmbedConfig::default();
-
-        assert_eq!(config.iterations, 800);
-        assert_eq!(config.learning_rate, 0.03);
-        assert_eq!(config.edge_cohesion_weight, 1.0);
-        assert_eq!(config.repulsion_weight, 0.1);
-        assert_eq!(config.repulsion_power, 1.5);
-        assert_eq!(config.spread_weight, 0.05);
-        assert_eq!(config.radius_clip, 0.98);
-        assert_eq!(config.seed, 0);
-    }
-
-    #[test]
-    fn test_flat_embed_config_custom() {
-        let config = FlatEmbedConfig {
-            iterations: 100,
-            learning_rate: 0.01,
-            edge_cohesion_weight: 2.0,
-            repulsion_weight: 0.2,
-            repulsion_power: 2.0,
-            spread_weight: 0.1,
-            radius_clip: 0.9,
-            seed: 42,
-        };
-
-        assert_eq!(config.iterations, 100);
-        assert_eq!(config.learning_rate, 0.01);
-        assert_eq!(config.seed, 42);
-    }
-
-    #[test]
-    fn test_extract_edges_basic() {
-        let mut graph = Graph::new();
-        let node_a = graph.add_node();
-        let node_b = graph.add_node();
-        let _edge = graph.add_edge(node_a, node_b);
-
-        let edges = extract_edges_from_graph(&graph);
-        assert!(edges.is_ok());
-
-        let edge_list = edges.unwrap();
-        // Current implementation returns dummy edges, so just check it doesn't panic
-        assert!(!edge_list.is_empty());
-    }
-
-    #[test]
-    fn test_compute_flat_embedding_empty() {
-        // For a truly empty graph (0 nodes), we can't create a valid matrix
-        // Just test that compute_flat_embedding handles an empty vector correctly
-        let graph = Graph::new();
-
-        // Since we can't create a 0x3 matrix, let's just verify the early return logic
-        // by directly calling with a minimal valid matrix or skipping matrix creation
-        // For now, we'll test with a minimal 1-node case that gets filtered to 0
-
-        let empty_embedding =
-            GraphMatrix::from_row_major_data(vec![0.0, 0.0, 0.0], 1, 3, None).unwrap();
-        let config = FlatEmbedConfig::default();
-
-        // With no nodes added to graph, this should handle gracefully
-        let result = compute_flat_embedding(&empty_embedding, &graph, &config);
-        assert!(result.is_ok());
-
-        let positions = result.unwrap();
-        // Should return 1 position since embedding has 1 row
-        assert_eq!(positions.len(), 1);
-    }
-
-    #[test]
-    fn test_compute_flat_embedding_single_node() {
-        let embedding_data = vec![1.0, 2.0, 3.0]; // Single node, 3D embedding
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, 1, 3, None).unwrap();
-
-        let mut graph = Graph::new();
-        let _node = graph.add_node();
-
-        let config = FlatEmbedConfig {
-            iterations: 10, // Small number for test speed
-            ..FlatEmbedConfig::default()
-        };
-
-        let result = compute_flat_embedding(&embedding, &graph, &config);
-        if let Err(ref e) = result {
-            eprintln!("Error in test_compute_flat_embedding_single_node: {:?}", e);
-        }
-        assert!(result.is_ok());
-
-        let positions = result.unwrap();
-        assert_eq!(positions.len(), 1);
-
-        let pos = &positions[0];
-        assert!(pos.x.is_finite());
-        assert!(pos.y.is_finite());
-    }
-
-    #[test]
-    fn test_compute_flat_embedding_simple_graph() {
-        // Create a simple 2-node graph with 2D embedding
-        let embedding_data = vec![
-            1.0, 0.0, // Node 0: (1, 0)
-            0.0, 1.0, // Node 1: (0, 1)
-        ];
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, 2, 2, None).unwrap();
-
-        let mut graph = Graph::new();
-        let node_a = graph.add_node();
-        let node_b = graph.add_node();
-        let _edge = graph.add_edge(node_a, node_b).unwrap();
-
-        let config = FlatEmbedConfig {
-            iterations: 20, // Small number for test speed
-            learning_rate: 0.1,
-            ..FlatEmbedConfig::default()
-        };
-
-        let result = compute_flat_embedding(&embedding, &graph, &config);
-        if let Err(ref e) = result {
-            eprintln!("Error in test_compute_flat_embedding_simple_graph: {:?}", e);
-        }
-        assert!(result.is_ok());
-
-        let positions = result.unwrap();
-        assert_eq!(positions.len(), 2);
-
-        // Check that positions are finite and reasonable
-        for pos in &positions {
-            assert!(pos.x.is_finite());
-            assert!(pos.y.is_finite());
-            assert!(pos.x.abs() < 10.0); // Reasonable bounds
-            assert!(pos.y.abs() < 10.0);
-        }
-    }
-
-    #[test]
-    fn test_energy_function_shapes() {
-        // Test that energy function can handle different matrix shapes
-        let positions_data = vec![
-            0.0, 0.0, // Node 0: (0, 0)
-            1.0, 0.0, // Node 1: (1, 0)
-            0.5, 0.5, // Node 2: (0.5, 0.5)
-        ];
-        let positions_tensor = AutoDiffTensor::from_data(positions_data, (3, 2), true).unwrap();
-
-        let edges = vec![(0, 1), (1, 2), (0, 2)]; // Triangle graph
-        let config = FlatEmbedConfig::default();
-
-        let result = compute_flat_energy(&positions_tensor, &edges, &config);
-        assert!(result.is_ok());
-
-        let energy = result.unwrap();
-        assert_eq!(energy.data.shape().rows, 1);
-        assert_eq!(energy.data.shape().cols, 1);
-
-        let energy_val = energy.data.to_vec().unwrap()[0];
-        assert!(energy_val.is_finite());
-    }
-
-    #[test]
-    fn test_optimization_loop_stability() {
-        // Test that the optimization loop doesn't explode or produce NaN
-        let positions = AutoDiffTensor::from_data(
-            vec![0.1, 0.1, -0.1, 0.1, 0.0, -0.1], // 3 nodes
-            (3, 2),
-            true,
-        )
-        .unwrap();
-
-        let edges = vec![(0, 1), (1, 2)]; // Simple chain
-        let config = FlatEmbedConfig {
-            iterations: 5,       // Very few iterations to test stability
-            learning_rate: 0.01, // Small learning rate
-            ..FlatEmbedConfig::default()
-        };
-
-        let result = optimize_flat_positions(positions, &edges, &config);
-        assert!(result.is_ok());
-
-        let final_positions = result.unwrap();
-        let final_data = final_positions.data.to_vec().unwrap();
-
-        // Check that no values are NaN or infinite
-        for &val in &final_data {
-            assert!(val.is_finite(), "Position value is not finite: {}", val);
-            assert!(!val.is_nan(), "Position value is NaN");
-        }
-    }
-
-    #[test]
-    fn test_clip_to_circle_no_panic() {
-        // Test that circle clipping doesn't panic
-        let large_positions = AutoDiffTensor::from_data(
-            vec![10.0, 10.0, -5.0, 8.0], // Large positions outside unit circle
-            (2, 2),
-            true,
-        )
-        .unwrap();
-
-        let result = clip_to_circle(large_positions, 1.0);
-        assert!(result.is_ok());
-
-        // For now this just returns the input unchanged, but shouldn't panic
-        let clipped = result.unwrap();
-        assert_eq!(clipped.data.shape().rows, 2);
-        assert_eq!(clipped.data.shape().cols, 2);
-    }
-
-    #[test]
-    fn test_flat_embedding_matrix_wrapper() {
-        // Test the convenience wrapper function
-        let embedding_data = vec![1.0, 0.0, 0.0, 1.0]; // 2 nodes, 2D
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, 2, 2, None).unwrap();
-
-        let config = FlatEmbedConfig {
-            iterations: 10,
-            ..FlatEmbedConfig::default()
-        };
-
-        let result = compute_flat_embedding_from_matrix(&embedding, &config);
-        assert!(result.is_ok());
-
-        let result_matrix = result.unwrap();
-        assert_eq!(result_matrix.shape().0, 2); // 2 nodes
-        assert_eq!(result_matrix.shape().1, 2); // 2D output
-
-        let result_data = result_matrix.to_vec().unwrap();
-        for &val in &result_data {
-            assert!(val.is_finite());
-        }
-    }
-
-    #[test]
-    fn test_flat_embedding_larger_graph() {
-        // Test with a slightly larger graph to check scalability
-        let n_nodes = 5;
-        let n_dims = 3;
-
-        // Create random-like embedding data
-        let mut embedding_data = Vec::new();
-        for i in 0..n_nodes {
-            for j in 0..n_dims {
-                embedding_data.push((i as f64 + j as f64 * 0.1) * 0.3); // Deterministic "random"
+    fn analytic_gradients_match_independent_finite_differences() {
+        let points = [[0.15, -0.1], [-0.2, 0.25], [0.35, 0.3]];
+        let edges = [(0, 1), (0, 1), (2, 2), (1, 2)];
+        for (cohesion, repulsion, spread) in [
+            (1.0, 0.0, 0.0),
+            (0.0, 0.4, 0.0),
+            (0.0, 0.0, 0.8),
+            (1.0, 0.4, 0.8),
+        ] {
+            let config = FlatEmbedConfig {
+                edge_cohesion_weight: cohesion,
+                repulsion_weight: repulsion,
+                spread_weight: spread,
+                ..Default::default()
+            };
+            let reference = |p: &[[f64; 2]]| {
+                let cohesion = edges
+                    .iter()
+                    .map(|&(u, v)| (p[u][0] - p[v][0]).powi(2) + (p[u][1] - p[v][1]).powi(2))
+                    .sum::<f64>()
+                    / edges.len() as f64;
+                let repulsion = (0..3)
+                    .flat_map(|u| (u + 1..3).map(move |v| (u, v)))
+                    .map(|(u, v)| {
+                        ((p[u][0] - p[v][0]).powi(2) + (p[u][1] - p[v][1]).powi(2) + 1e-6)
+                            .powf(-config.repulsion_power / 2.0)
+                    })
+                    .sum::<f64>()
+                    / 3.0;
+                let mx = p.iter().map(|v| v[0]).sum::<f64>() / 3.0;
+                let my = p.iter().map(|v| v[1]).sum::<f64>() / 3.0;
+                let xx = p.iter().map(|v| (v[0] - mx).powi(2)).sum::<f64>() / 3.0;
+                let yy = p.iter().map(|v| (v[1] - my).powi(2)).sum::<f64>() / 3.0;
+                let xy = p.iter().map(|v| (v[0] - mx) * (v[1] - my)).sum::<f64>() / 3.0;
+                config.edge_cohesion_weight * cohesion + config.repulsion_weight * repulsion
+                    - config.spread_weight * (xx * yy - xy * xy)
+            };
+            let (energy, gradient) = energy_gradient(&points, &edges, &config).unwrap();
+            assert!((energy - reference(&points)).abs() < 1e-12);
+            for (row, grad) in gradient.iter().enumerate() {
+                for (axis, &got) in grad.iter().enumerate() {
+                    let mut plus = points;
+                    let mut minus = points;
+                    plus[row][axis] += 1e-6;
+                    minus[row][axis] -= 1e-6;
+                    let want = (reference(&plus) - reference(&minus)) / 2e-6;
+                    assert!((got - want).abs() < 1e-5);
+                }
             }
         }
-        let embedding =
-            GraphMatrix::from_row_major_data(embedding_data, n_nodes, n_dims, None).unwrap();
-
-        // Create a connected graph
-        let mut graph = Graph::new();
-        let mut nodes = Vec::new();
-        for _ in 0..n_nodes {
-            nodes.push(graph.add_node());
-        }
-
-        // Connect nodes in a ring
-        for i in 0..n_nodes {
-            let next = (i + 1) % n_nodes;
-            graph.add_edge(nodes[i], nodes[next]).unwrap();
-        }
-
-        let config = FlatEmbedConfig {
-            iterations: 15,
-            learning_rate: 0.05,
-            ..FlatEmbedConfig::default()
-        };
-
-        let result = compute_flat_embedding(&embedding, &graph, &config);
-        assert!(result.is_ok());
-
-        let positions = result.unwrap();
-        assert_eq!(positions.len(), n_nodes);
-
-        // Check that all positions are reasonable
-        for (i, pos) in positions.iter().enumerate() {
-            assert!(pos.x.is_finite(), "Node {} x-position is not finite", i);
-            assert!(pos.y.is_finite(), "Node {} y-position is not finite", i);
-            assert!(
-                pos.x.abs() < 100.0,
-                "Node {} x-position too large: {}",
-                i,
-                pos.x
-            );
-            assert!(
-                pos.y.abs() < 100.0,
-                "Node {} y-position too large: {}",
-                i,
-                pos.y
-            );
-        }
+    }
+    #[test]
+    fn circle_projection_handles_extreme_finite_coordinates() {
+        let mut points = [[f64::MAX, f64::MAX], [0.0, 0.0]];
+        clip(&mut points, 0.1);
+        assert!((points[0][0].hypot(points[0][1]) - 0.1).abs() < 1e-15);
+        assert_eq!(points[1], [0.0, 0.0]);
     }
 }

@@ -86,5 +86,5 @@ or production-scale capacity is claimed. Eigenvalue accuracy near numerical
 resolution and overly aggressive threshold choices remain caller-visible limits.
 
 The broader analytics audit remains open: other visualization/energy/composite
-callers, fabricated topology in flat embedding, t-SNE/UMAP-inspired scope, and
-pipeline/history/backend/scale verification are separate work under item 28.15.
+callers, t-SNE/UMAP-inspired scope, realtime failure fallbacks, and
+pipeline/history/backend/scale verification are separate work under item 28.15. The [flat-layout topology and solver repair](flat-embedding.md) has its own supported scope.

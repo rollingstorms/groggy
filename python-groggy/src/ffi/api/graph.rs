@@ -315,6 +315,39 @@ impl PyGraph {
 
 #[pymethods]
 impl PyGraph {
+    /// Compute an owned bounded graph layout aligned with embedding row identity.
+    #[pyo3(signature = (embedding, iterations=800, learning_rate=0.03, edge_cohesion_weight=1.0, repulsion_weight=0.1, repulsion_power=1.5, spread_weight=0.05, radius_clip=0.98, seed=0))]
+    #[allow(clippy::too_many_arguments)]
+    fn flat_embedding(
+        &self,
+        embedding: &crate::ffi::storage::matrix::PyGraphMatrix,
+        iterations: usize,
+        learning_rate: f64,
+        edge_cohesion_weight: f64,
+        repulsion_weight: f64,
+        repulsion_power: f64,
+        spread_weight: f64,
+        radius_clip: f64,
+        seed: u64,
+    ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        use groggy::viz::embeddings::flat_embedding::{
+            compute_flat_embedding_matrix, FlatEmbedConfig,
+        };
+        let config = FlatEmbedConfig {
+            iterations,
+            learning_rate,
+            edge_cohesion_weight,
+            repulsion_weight,
+            repulsion_power,
+            spread_weight,
+            radius_clip,
+            seed,
+        };
+        let inner = compute_flat_embedding_matrix(&embedding.inner, &self.inner.borrow(), &config)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(crate::ffi::storage::matrix::PyGraphMatrix { inner })
+    }
+
     /// Compute owned undirected spectral coordinates with sorted node row labels.
     #[pyo3(signature = (dimensions, normalized=true, eigenvalue_threshold=1e-8, skip_nullspace=true))]
     fn spectral_embedding(

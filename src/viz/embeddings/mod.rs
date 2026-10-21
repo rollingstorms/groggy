@@ -4,7 +4,7 @@
 //! high-dimensional space, integrated with the existing matrix ecosystem.
 
 use crate::api::graph::Graph;
-use crate::errors::GraphResult;
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 
 pub mod debug;
@@ -12,6 +12,43 @@ pub mod energy;
 pub mod flat_embedding;
 pub mod random;
 pub mod spectral;
+
+/// Resolve a full embedding's rows to active IDs without guessing labeled order.
+pub(super) fn row_node_ids(matrix: &GraphMatrix, graph: &Graph) -> GraphResult<Vec<crate::NodeId>> {
+    let mut active = graph.space().node_ids();
+    active.sort_unstable();
+    if matrix.shape().0 != active.len() {
+        return Err(GraphError::InvalidInput(format!(
+            "Embedding has {} rows but graph has {} active nodes",
+            matrix.shape().0,
+            active.len()
+        )));
+    }
+    let Some(labels) = matrix.row_labels() else {
+        return Ok(active);
+    };
+    if labels.len() != active.len() {
+        return Err(GraphError::InvalidInput(
+            "Embedding row-label count does not match rows".into(),
+        ));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut order = Vec::with_capacity(labels.len());
+    for label in labels {
+        let id = label
+            .strip_prefix("node_")
+            .and_then(|text| text.parse::<crate::NodeId>().ok())
+            .filter(|id| label == &format!("node_{id}"))
+            .ok_or_else(|| GraphError::InvalidInput(format!("Invalid node row label {label:?}")))?;
+        if !graph.has_node(id) || !seen.insert(id) {
+            return Err(GraphError::InvalidInput(format!(
+                "Inactive or duplicate embedding row ID {id}"
+            )));
+        }
+        order.push(id);
+    }
+    Ok(order)
+}
 
 /// Core trait for computing high-dimensional node embeddings
 pub trait EmbeddingEngine: std::fmt::Debug {
