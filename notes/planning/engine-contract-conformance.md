@@ -59,3 +59,6 @@ Item 28 traversal inputs: Graph BFS/DFS reject inactive/unknown starts; shortest
 
 
 Item 28 A*: shared selected-state/weight validation now covers A*. Presence markers must each identify one selected node. Explicit heuristic values must be finite, nonnegative, zero at goal and consistent for every selected orientation (missing values zero). Invalid input rejects before writing results, including trivial paths. Heap ordering/equality agree and tiny improvements survive. Output is node path order, without edge-instance IDs; only path rows are written. Tests: tests/astar_validation.rs and tests/test_astar_validation.py. Weighted betweenness/community and broader algorithm audits remain open.
+
+
+Item 28 node betweenness: finite strictly positive weighted lengths (missing one), live selection validation, exact computed f64 ties, minimum parallel lengths with retained equal edge-instance multiplicity, correct directed raw scaling and normalized factors. Local weighted CSR does not overwrite shared topology. Numerical failures preserve prior outputs. Tests: tests/betweenness_validation.rs (independent exhaustive edge-path reference and failure cases), tests/test_betweenness_validation.py. Girvan–Newman/community audit remains open.

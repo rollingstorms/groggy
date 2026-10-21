@@ -5,7 +5,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
-use crate::algorithms::pathfinding::utils::collect_edge_weights;
+use crate::algorithms::pathfinding::utils::checked_dijkstra_weights;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -15,8 +15,6 @@ use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions}
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
-
-const EPS: f64 = 1e-9;
 
 /// Efficient NodeId → dense index mapper
 enum NodeIndexer {
@@ -97,15 +95,16 @@ impl BetweennessCentrality {
             parameters: vec![
                 ParameterMetadata {
                     name: "normalized".to_string(),
-                    description: "Normalize scores by 2/((n-1)(n-2)).".to_string(),
+                    description: "Normalize ordered-pair scores by 1/((n-1)(n-2)).".to_string(),
                     value_type: ParameterType::Bool,
                     required: false,
                     default_value: Some(AlgorithmParamValue::Bool(true)),
                 },
                 ParameterMetadata {
                     name: "weight_attr".to_string(),
-                    description: "Optional edge weight attribute for weighted betweenness."
-                        .to_string(),
+                    description:
+                        "Optional strictly positive finite numeric edge lengths; missing is one."
+                            .to_string(),
                     value_type: ParameterType::Text,
                     required: false,
                     default_value: None,
@@ -162,15 +161,14 @@ impl BetweennessCentrality {
             impl Eq for State {}
             impl PartialEq for State {
                 fn eq(&self, other: &Self) -> bool {
-                    self.node == other.node && (self.cost - other.cost).abs() <= EPS
+                    self.node == other.node && self.cost.total_cmp(&other.cost).is_eq()
                 }
             }
             impl Ord for State {
                 fn cmp(&self, other: &Self) -> std::cmp::Ordering {
                     other
                         .cost
-                        .partial_cmp(&self.cost)
-                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .total_cmp(&self.cost)
                         .then_with(|| self.node.cmp(&other.node))
                 }
             }
@@ -190,7 +188,7 @@ impl BetweennessCentrality {
 
             while let Some(State { cost, node }) = heap.pop() {
                 let node_idx = indexer.get(node).unwrap();
-                if cost > distance[node_idx] + EPS {
+                if cost > distance[node_idx] {
                     continue;
                 }
                 order.push(node);
@@ -201,11 +199,17 @@ impl BetweennessCentrality {
                         continue;
                     }
                     let neighbor = nodes[neighbor_idx];
+                    if neighbor == node {
+                        continue; // Positive self-loops cannot participate in a shortest path.
+                    }
                     let weight = weights.get(&(node, neighbor)).copied().unwrap_or(1.0);
                     let next = cost + weight;
+                    if !next.is_finite() || next <= cost {
+                        return Err(anyhow!("weighted betweenness distance cannot advance in f64 on {node} -> {neighbor}"));
+                    }
                     let current = distance[neighbor_idx];
 
-                    if next + EPS < current {
+                    if next < current {
                         distance[neighbor_idx] = next;
                         sigma[neighbor_idx] = sigma[node_idx];
                         predecessors[neighbor_idx].clear();
@@ -214,9 +218,12 @@ impl BetweennessCentrality {
                             cost: next,
                             node: neighbor,
                         });
-                    } else if (next - current).abs() <= EPS {
+                    } else if next == current {
                         sigma[neighbor_idx] += sigma[node_idx];
                         predecessors[neighbor_idx].push(node);
+                    }
+                    if !sigma[neighbor_idx].is_finite() {
+                        return Err(anyhow!("betweenness shortest-path count exceeds f64 range"));
                     }
                 }
             }
@@ -247,9 +254,14 @@ impl BetweennessCentrality {
                         queue.push_back(w);
                     }
 
-                    if (distance[w_idx] - (v_dist + 1.0)).abs() < EPS {
+                    if distance[w_idx] == v_dist + 1.0 {
                         sigma[w_idx] += sigma[v_idx];
                         predecessors[w_idx].push(v);
+                        if !sigma[w_idx].is_finite() {
+                            return Err(anyhow!(
+                                "betweenness shortest-path count exceeds f64 range"
+                            ));
+                        }
                     }
                 }
             }
@@ -260,6 +272,16 @@ impl BetweennessCentrality {
 
     fn compute(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, f64>> {
         let compute_start = Instant::now();
+        // Validate even empty/trivial selections before early returns or CSR cache use.
+        let weight_start = Instant::now();
+        let checked_weights = checked_dijkstra_weights(subgraph, self.weight_attr.as_ref())?;
+        if self.weight_attr.is_some() && checked_weights.values().any(|&w| w <= 0.0) {
+            return Err(anyhow!(
+                "weighted betweenness requires strictly positive edge weights"
+            ));
+        }
+        let weight_map = self.weight_attr.as_ref().map(|_| checked_weights);
+        ctx.record_call("betweenness.collect_weights", weight_start.elapsed());
 
         // === PHASE 1: Collect Nodes ===
         let collect_start = Instant::now();
@@ -280,6 +302,22 @@ impl BetweennessCentrality {
         // === PHASE 3: Collect Edges ===
         let edges_start = Instant::now();
         let edges = subgraph.ordered_edges();
+        // Keep each minimum-length edge instance. Equal parallel edges contribute
+        // distinct paths; more expensive parallel edges cannot be shortest.
+        let mut shortest_edges = Vec::new();
+        if let (Some(attr), Some(weights)) = (&self.weight_attr, &weight_map) {
+            shortest_edges.reserve(edges.len());
+            let graph = subgraph.graph();
+            let graph = graph.borrow();
+            for &edge in edges.iter() {
+                let pair = graph.edge_endpoints(edge)?;
+                let value = graph.get_edge_attr(edge, attr)?;
+                let weight = crate::query::weights::dijkstra_weight(value.as_ref(), edge)?;
+                if weights.get(&pair) == Some(&weight) {
+                    shortest_edges.push(edge);
+                }
+            }
+        }
         ctx.record_call("betweenness.collect_edges", edges_start.elapsed());
         ctx.record_stat("betweenness.count.input_edges", edges.len() as f64);
 
@@ -287,7 +325,13 @@ impl BetweennessCentrality {
         let is_directed = subgraph.graph().borrow().is_directed();
         let add_reverse = !is_directed; // Betweenness needs bidirectional
 
-        let csr = match subgraph.csr_cache_get(add_reverse) {
+        // A weighted CSR is local: the shared topology cache includes all edges.
+        let cached = if weight_map.is_none() {
+            subgraph.csr_cache_get(add_reverse)
+        } else {
+            None
+        };
+        let csr = match cached {
             Some(cached) => {
                 ctx.record_call(
                     "betweenness.csr_cache_hit",
@@ -307,7 +351,13 @@ impl BetweennessCentrality {
                 let endpoint_duration = build_csr_from_edges_with_scratch(
                     &mut csr,
                     nodes.len(),
-                    edges.iter().copied(),
+                    if weight_map.is_some() {
+                        shortest_edges.as_slice()
+                    } else {
+                        edges.as_ref()
+                    }
+                    .iter()
+                    .copied(),
                     |nid| indexer.get(nid),
                     |eid| pool_ref.get_edge_endpoints(eid),
                     CsrOptions {
@@ -323,23 +373,15 @@ impl BetweennessCentrality {
                 ctx.record_call("betweenness.build_csr", core_build);
 
                 let csr_arc = Arc::new(csr);
-                subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+                if weight_map.is_none() {
+                    subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+                }
                 csr_arc
             }
         };
 
         ctx.record_stat("betweenness.count.csr_nodes", csr.node_count() as f64);
         ctx.record_stat("betweenness.count.csr_edges", csr.neighbors.len() as f64);
-
-        // === PHASE 5: Collect Weights (if weighted) ===
-        let weight_map = if let Some(attr) = &self.weight_attr {
-            let weight_start = Instant::now();
-            let map = collect_edge_weights(subgraph, attr);
-            ctx.record_call("betweenness.collect_weights", weight_start.elapsed());
-            Some(map)
-        } else {
-            None
-        };
 
         // === PHASE 6: Pre-allocate Arrays ===
         let alloc_start = Instant::now();
@@ -410,13 +452,16 @@ impl BetweennessCentrality {
         let post_start = Instant::now();
 
         // Divide by 2 (undirected graphs count edges twice)
-        for value in centrality.iter_mut() {
-            *value /= 2.0;
+        if !is_directed {
+            for value in centrality.iter_mut() {
+                *value /= 2.0;
+            }
         }
 
         // Normalization
         if self.normalized && n > 2 {
-            let scale = 2.0 / ((n as f64 - 1.0) * (n as f64 - 2.0));
+            let scale =
+                (if is_directed { 1.0 } else { 2.0 }) / ((n as f64 - 1.0) * (n as f64 - 2.0));
             for value in centrality.iter_mut() {
                 *value *= scale;
             }
@@ -449,6 +494,13 @@ impl Algorithm for BetweennessCentrality {
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let start_time = Instant::now();
         let scores = self.compute(ctx, &subgraph)?;
+
+        if scores
+            .values()
+            .any(|&score| !score.is_finite() || score.abs() > f32::MAX as f64)
+        {
+            return Err(anyhow!("betweenness score exceeds finite f32 output range"));
+        }
 
         // === Persist Results ===
         if ctx.persist_results() {

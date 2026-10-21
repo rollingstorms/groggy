@@ -1,4 +1,4 @@
-# Checked traversal and Dijkstra inputs
+# Checked traversal and weighted algorithms
 
 Core Graph BFS/DFS require an active starting node. Shortest path and all-path enumeration require active start and end nodes, including the start-equals-end case. Unknown or deactivated IDs raise instead of appearing as phantom traversal results.
 
@@ -28,8 +28,18 @@ An omitted heuristic is zero. For an explicit heuristic attribute, missing value
 
 A* heap equality/order now agree and relaxation preserves tiny cost improvements. Path ties are not promised a canonical selection, and the output remains a node sequence, so callers needing selected edge identity should use the direct shortest-path API. Tests: `tests/astar_validation.rs` and `tests/test_astar_validation.py`.
 
+## Checked node betweenness
+
+`centrality.betweenness` validates selected active entities in both unit and weighted modes. A supplied length property must be finite, numeric and **strictly positive**; missing lengths are one. Zero is rejected because this Brandes implementation requires distances to advance along its predecessor DAG. Positive self-loops cannot be shortest paths and have no contribution. Unit mode ignores unused weight properties.
+
+Paths count distinct edge instances. Equal minimum-length parallel edges contribute separate shortest paths; more expensive parallel edges are excluded. Weighted CSR is built locally and never replaces the shared all-edge topology cache. Unweighted CSR retains parallel instances. Directed raw scores count ordered source/target pairs; undirected raw scores divide by two. Normalized scores divide the ordered-pair accumulation by `(n-1)*(n-2)`, including isolates in `n`.
+
+Weighted distance/tie comparisons use exact computed f64 values, without an absolute tolerance. A positive step that rounds away in f64 rejects, as do nonfinite path counts or results outside the persisted f32 score range. Failures preserve existing output properties. This is not arbitrary precision shortest-path counting; rational/decimal mathematical ties can differ after floating arithmetic. Validation adds O(E) work, and weighted execution needs local O(E) CSR storage. No speedup is claimed.
+
+Checks include an independent exhaustive simple edge-path enumerator for directed/undirected, normalized/raw, weighted/unit multigraphs with loops and an isolate; cache reuse, tiny lengths, invalid weights, stale selections, rounded-away distances and path-count overflow are covered. See `tests/betweenness_validation.rs` and `tests/test_betweenness_validation.py`.
+
 ## Remaining audit
 
-These fixes do not complete all graph algorithms. Other weighted callers such as betweenness and community methods still use the older weight collector and need their own domain/identity audits. Low-level callback-based Dijkstra utilities retain their existing signatures and require callers to supply valid nonnegative finite weights. Broader max-path/heuristic options, filters, cancellation, pinned view ownership, and algorithm-specific directed/weight definitions remain items 21/26/28/30. Algorithm persistence remains the legacy manual-grouping API, not a newly durable mutation boundary.
+These fixes do not complete all graph algorithms. Other weighted callers such as Girvan–Newman still use the older weight collector and need their own domain/identity audits. Low-level callback-based Dijkstra utilities retain their existing signatures and require callers to supply valid nonnegative finite weights. Broader max-path/heuristic options, filters, cancellation, pinned view ownership, and algorithm-specific directed/weight definitions remain items 21/26/28/30. Algorithm persistence remains the legacy manual-grouping API, not a newly durable mutation boundary.
 
 Tests cover live/dead endpoints, invalid/missing/zero/compact weights, reverse traversal, parallel minima, tiny-cost improvements, output range rejection, and direct distances compared with an independent Floyd-Warshall fixture. Python tests exercise the same public graph entry points. NetworkX was not available in the current test environment; no external graph backend comparison is claimed by this slice.

@@ -59,11 +59,13 @@ def betweenness(
     Betweenness centrality algorithm.
 
     Computes betweenness centrality for each node, measuring how often a node
-    appears on shortest paths between other nodes.
+    appears on shortest paths between other nodes. Equal-cost parallel edge
+    instances count as distinct paths. Directed raw scores count ordered pairs;
+    undirected raw scores count unordered pairs.
 
     Args:
         normalized: Whether to normalize scores (default: True)
-        weight_attr: Optional edge weight attribute
+        weight_attr: Optional strictly positive finite numeric edge lengths; missing is one
         output_attr: Attribute name for results (default: "betweenness")
 
     Returns:
