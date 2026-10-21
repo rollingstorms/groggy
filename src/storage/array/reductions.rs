@@ -1,0 +1,279 @@
+//! Checked reductions for logical AttrValue columns, shared by both BaseArray APIs.
+use crate::{AttrValue, GraphError, GraphResult};
+use std::cmp::Ordering;
+
+#[derive(Clone, Copy)]
+enum Number {
+    Integer(i64),
+    Float(f64),
+}
+impl Number {
+    fn from_attr(value: &AttrValue) -> Option<Self> {
+        match value {
+            AttrValue::Int(v) => Some(Self::Integer(*v)),
+            AttrValue::SmallInt(v) => Some(Self::Integer(i64::from(*v))),
+            AttrValue::Float(v) => Some(Self::Float(f64::from(*v))),
+            _ => None,
+        }
+    }
+    /// Two-part representation retains integer bits lost by conversion to f64.
+    fn parts(self) -> (f64, f64) {
+        match self {
+            Self::Integer(v) => {
+                let hi = v as f64;
+                (hi, (i128::from(v) - hi as i128) as f64)
+            }
+            Self::Float(v) => (v, 0.0),
+        }
+    }
+    fn offset(self, origin: Self) -> f64 {
+        if let (Self::Integer(a), Self::Integer(b)) = (self, origin) {
+            return (i128::from(a) - i128::from(b)) as f64;
+        }
+        let (hi, lo) = self.parts();
+        let (origin_hi, origin_lo) = origin.parts();
+        (hi - origin_hi) + (lo - origin_lo)
+    }
+    fn cmp(self, other: Self) -> Ordering {
+        match (self, other) {
+            (Self::Integer(a), Self::Integer(b)) => a.cmp(&b),
+            (Self::Float(a), Self::Float(b)) => {
+                // Signed zeros must compare equal across floats and integer zero.
+                if a == b {
+                    Ordering::Equal
+                } else {
+                    a.total_cmp(&b)
+                }
+            }
+            (Self::Integer(a), Self::Float(b)) => compare_int_float(a, b),
+            (Self::Float(a), Self::Integer(b)) => compare_int_float(b, a).reverse(),
+        }
+    }
+}
+fn compare_int_float(integer: i64, float: f64) -> Ordering {
+    if float < i64::MIN as f64 {
+        return Ordering::Greater;
+    }
+    // i64::MAX rounds up to 2^63 in f64, which is greater than every i64.
+    if float >= -(i64::MIN as f64) {
+        return Ordering::Less;
+    }
+    let truncated = float as i64;
+    match integer.cmp(&truncated) {
+        Ordering::Equal => {
+            if (truncated as f64) < float {
+                Ordering::Less
+            } else if (truncated as f64) > float {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }
+        order => order,
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+struct Compensated {
+    sum: f64,
+    correction: f64,
+}
+impl Compensated {
+    fn add(&mut self, value: f64) {
+        let next = self.sum + value;
+        self.correction += if self.sum.abs() >= value.abs() {
+            (self.sum - next) + value
+        } else {
+            (value - next) + self.sum
+        };
+        self.sum = next;
+    }
+    fn total(self) -> f64 {
+        self.sum + self.correction
+    }
+    fn add_integer(&mut self, integer: i128) {
+        let hi = integer as f64;
+        self.add(hi);
+        self.add((integer - hi as i128) as f64);
+    }
+}
+
+struct Input<'a> {
+    values: &'a [AttrValue],
+    count: usize,
+    origin: Number,
+    integer_sum: i128,
+    floats: Compensated,
+    has_float: bool,
+}
+impl<'a> Input<'a> {
+    fn new(values: &'a [AttrValue], operation: &str) -> GraphResult<Self> {
+        let mut origin = None;
+        let mut count = 0;
+        let mut integer_sum = 0_i128;
+        let mut floats = Compensated::default();
+        let mut has_float = false;
+        for (index, value) in values.iter().enumerate() {
+            if matches!(value, AttrValue::Null) {
+                continue;
+            }
+            let number = Number::from_attr(value).ok_or_else(|| {
+                invalid(format!(
+                    "Cannot compute {operation} of non-numeric value at index {index}: {value:?}",
+                ))
+            })?;
+            match number {
+                Number::Integer(v) => {
+                    integer_sum = integer_sum
+                        .checked_add(i128::from(v))
+                        .ok_or_else(|| invalid("Integer reduction accumulator overflow"))?;
+                }
+                Number::Float(v) => {
+                    if !v.is_finite() {
+                        return Err(invalid(format!(
+                            "Cannot compute {operation} of nonfinite value at index {index}",
+                        )));
+                    }
+                    floats.add(v);
+                    has_float = true;
+                }
+            }
+            if origin.is_none() {
+                origin = Some(number);
+            }
+            count += 1;
+        }
+        let origin = origin.ok_or_else(|| {
+            invalid(format!(
+                "Cannot compute {operation} of empty array (no non-null values)"
+            ))
+        })?;
+        Ok(Self {
+            values,
+            count,
+            origin,
+            integer_sum,
+            floats,
+            has_float,
+        })
+    }
+    fn numbers(&self) -> impl Iterator<Item = Number> + '_ {
+        self.values.iter().filter_map(Number::from_attr)
+    }
+    fn total(&self) -> f64 {
+        let mut total = self.floats;
+        total.add_integer(self.integer_sum);
+        total.total()
+    }
+}
+fn invalid(message: impl Into<String>) -> GraphError {
+    GraphError::InvalidInput(message.into())
+}
+fn checked(value: f64, operation: &str) -> GraphResult<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(invalid(format!("{operation} result is not finite")))
+    }
+}
+
+pub(super) fn sum(values: &[AttrValue]) -> GraphResult<AttrValue> {
+    let input = Input::new(values, "sum")?;
+    if !input.has_float {
+        let value = i64::try_from(input.integer_sum)
+            .map_err(|_| invalid("Integer sum exceeds i64 output range"))?;
+        return Ok(AttrValue::Int(value));
+    }
+    let value = input.total() as f32;
+    if !value.is_finite() {
+        return Err(invalid("Float sum exceeds finite f32 output range"));
+    }
+    Ok(AttrValue::Float(value))
+}
+pub(super) fn mean(values: &[AttrValue]) -> GraphResult<f64> {
+    let input = Input::new(values, "mean")?;
+    checked(input.total() / input.count as f64, "Mean")
+}
+pub(super) fn variance(values: &[AttrValue]) -> GraphResult<f64> {
+    let input = Input::new(values, "variance")?;
+    if input.count < 2 {
+        return Err(invalid(
+            "Cannot compute variance with less than 2 non-null values",
+        ));
+    }
+    // Center exact integer differences before float conversion, then use a
+    // compensated two-pass sample variance. This avoids high-offset collapse.
+    let mut centered = Compensated::default();
+    for number in input.numbers() {
+        centered.add(number.offset(input.origin));
+    }
+    let mean_offset = centered.total() / input.count as f64;
+    let mut squared = Compensated::default();
+    for number in input.numbers() {
+        let difference = number.offset(input.origin) - mean_offset;
+        squared.add(difference * difference);
+    }
+    checked(squared.total() / (input.count - 1) as f64, "Variance")
+}
+pub(super) fn median(values: &[AttrValue]) -> GraphResult<f64> {
+    let input = Input::new(values, "median")?;
+    let mut numbers: Vec<_> = input.numbers().collect();
+    numbers.sort_by(|a, b| a.cmp(*b));
+    let middle = numbers.len() / 2;
+    let number = numbers[middle];
+    if numbers.len().is_multiple_of(2) {
+        let before = numbers[middle - 1];
+        if let (Number::Integer(a), Number::Integer(b)) = (before, number) {
+            return Ok((i128::from(a) + i128::from(b)) as f64 / 2.0);
+        }
+        if before.parts().0 == 0.0 && number.parts().0 == 0.0 {
+            return Ok((before.parts().0 + number.parts().0) / 2.0);
+        }
+        let mut total = Compensated::default();
+        for item in [before, number] {
+            let (hi, lo) = item.parts();
+            total.add(hi);
+            total.add(lo);
+        }
+        checked(total.total() / 2.0, "Median")
+    } else {
+        match number {
+            Number::Integer(v) => Ok(v as f64),
+            Number::Float(v) => Ok(v),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn median_numeric_order_is_transitive_across_integer_limits_and_signed_zero() {
+        let numbers = [
+            Number::Integer(i64::MIN),
+            Number::Integer(i64::MIN + 1),
+            Number::Integer(-1),
+            Number::Integer(0),
+            Number::Integer(1),
+            Number::Integer(i64::MAX),
+            Number::Float(-f64::from(f32::MAX)),
+            Number::Float(-(2.0_f64).powi(63)),
+            Number::Float(-0.5),
+            Number::Float(-0.0),
+            Number::Float(0.0),
+            Number::Float(0.5),
+            Number::Float((2.0_f64).powi(63)),
+            Number::Float(f64::from(f32::MAX)),
+        ];
+        for &a in &numbers {
+            for &b in &numbers {
+                for &c in &numbers {
+                    assert_eq!(a.cmp(b), b.cmp(a).reverse());
+                    if a.cmp(b) != Ordering::Greater && b.cmp(c) != Ordering::Greater {
+                        assert_ne!(a.cmp(c), Ordering::Greater);
+                    }
+                }
+            }
+        }
+    }
+}

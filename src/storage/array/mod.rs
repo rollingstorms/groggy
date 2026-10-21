@@ -22,6 +22,7 @@ pub mod memory_profiler;
 pub mod num_array;
 pub mod numarray_benchmark;
 pub mod query;
+mod reductions;
 pub mod simd_optimizations;
 pub mod specialized;
 pub mod traits;

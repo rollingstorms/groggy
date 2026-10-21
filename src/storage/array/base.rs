@@ -346,100 +346,14 @@ impl BaseArray {
         counts
     }
 
-    /// Calculate sum of numeric values in the array
+    /// Checked finite numeric sum shared with the public generic BaseArray.
     pub fn sum(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut sum_int: i64 = 0;
-        let mut sum_float: f64 = 0.0;
-        let mut has_float = false;
-        let mut count = 0;
-
-        for val in &self.data {
-            match val {
-                AttrValue::Int(i) => {
-                    if has_float {
-                        sum_float += *i as f64;
-                    } else {
-                        sum_int += i;
-                    }
-                    count += 1;
-                }
-                AttrValue::SmallInt(i) => {
-                    if has_float {
-                        sum_float += *i as f64;
-                    } else {
-                        sum_int += *i as i64;
-                    }
-                    count += 1;
-                }
-                AttrValue::Float(f) => {
-                    if !has_float {
-                        // Convert previous int sum to float
-                        sum_float = sum_int as f64 + *f as f64;
-                        has_float = true;
-                    } else {
-                        sum_float += *f as f64;
-                    }
-                    count += 1;
-                }
-                AttrValue::Null => {} // Skip null values
-                _ => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute sum of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            }
-        }
-
-        if count == 0 {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Cannot compute sum of empty array".to_string(),
-            ));
-        }
-
-        if has_float {
-            Ok(AttrValue::Float(sum_float as f32))
-        } else {
-            Ok(AttrValue::Int(sum_int))
-        }
+        super::reductions::sum(&self.data)
     }
 
-    /// Calculate mean of numeric values in the array
+    /// Compensated finite numeric mean shared with the public generic BaseArray.
     pub fn mean(&self) -> crate::errors::GraphResult<f64> {
-        let mut sum: f64 = 0.0;
-        let mut count = 0;
-
-        for val in &self.data {
-            match val {
-                AttrValue::Int(i) => {
-                    sum += *i as f64;
-                    count += 1;
-                }
-                AttrValue::SmallInt(i) => {
-                    sum += *i as f64;
-                    count += 1;
-                }
-                AttrValue::Float(f) => {
-                    sum += *f as f64;
-                    count += 1;
-                }
-                AttrValue::Null => {} // Skip null values
-                _ => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute mean of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            }
-        }
-
-        if count == 0 {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Cannot compute mean of empty array".to_string(),
-            ));
-        }
-
-        Ok(sum / count as f64)
+        super::reductions::mean(&self.data)
     }
 
     /// Find minimum value in the array

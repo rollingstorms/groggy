@@ -582,188 +582,30 @@ impl BaseArray<AttrValue> {
         Ok(sampled)
     }
 
-    /// Calculate sum of numeric values in the array
-    pub fn sum(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut sum_int: i64 = 0;
-        let mut sum_float: f64 = 0.0;
-        let mut has_float = false;
-        let mut count = 0;
-
-        for val in self.inner.iter() {
-            match val {
-                AttrValue::Int(i) => {
-                    if has_float {
-                        sum_float += *i as f64;
-                    } else {
-                        sum_int += i;
-                    }
-                    count += 1;
-                }
-                AttrValue::SmallInt(i) => {
-                    if has_float {
-                        sum_float += *i as f64;
-                    } else {
-                        sum_int += *i as i64;
-                    }
-                    count += 1;
-                }
-                AttrValue::Float(f) => {
-                    if !has_float {
-                        // Convert previous int sum to float
-                        sum_float = sum_int as f64 + *f as f64;
-                        has_float = true;
-                    } else {
-                        sum_float += *f as f64;
-                    }
-                    count += 1;
-                }
-                AttrValue::Null => {} // Skip null values
-                _ => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute sum of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            }
-        }
-
-        if count == 0 {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Cannot compute sum of empty array".to_string(),
-            ));
-        }
-
-        if has_float {
-            Ok(AttrValue::Float(sum_float as f32))
-        } else {
-            Ok(AttrValue::Int(sum_int))
-        }
+    /// Sum finite numeric values, skipping nulls. Keep i64/f32 output types;
+    /// reject out-of-range results rather than wrapping or returning infinity.
+    pub fn sum(&self) -> GraphResult<AttrValue> {
+        super::reductions::sum(self.inner.as_slice())
     }
 
-    /// Calculate mean of numeric values in the array
-    pub fn mean(&self) -> crate::errors::GraphResult<f64> {
-        let mut sum: f64 = 0.0;
-        let mut count = 0;
-
-        for val in self.inner.iter() {
-            match val {
-                AttrValue::Int(i) => {
-                    sum += *i as f64;
-                    count += 1;
-                }
-                AttrValue::SmallInt(i) => {
-                    sum += *i as f64;
-                    count += 1;
-                }
-                AttrValue::Float(f) => {
-                    sum += *f as f64;
-                    count += 1;
-                }
-                AttrValue::Null => {} // Skip null values
-                _ => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute mean of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            }
-        }
-
-        if count == 0 {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Cannot compute mean of empty array".to_string(),
-            ));
-        }
-
-        Ok(sum / count as f64)
+    /// Compensated finite numeric mean, skipping nulls; empty/all-null input errors.
+    pub fn mean(&self) -> GraphResult<f64> {
+        super::reductions::mean(self.inner.as_slice())
     }
 
-    /// Calculate median of numeric values in the array
-    pub fn median(&self) -> crate::errors::GraphResult<f64> {
-        let mut numeric_values: Vec<f64> = Vec::new();
-
-        for val in self.inner.iter() {
-            match val {
-                AttrValue::Int(i) => numeric_values.push(*i as f64),
-                AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
-                AttrValue::Float(f) => numeric_values.push(*f as f64),
-                AttrValue::Null => {} // Skip null values
-                _ => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute median of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            }
-        }
-
-        if numeric_values.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Cannot compute median of empty array".to_string(),
-            ));
-        }
-
-        numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        let len = numeric_values.len();
-        if len.is_multiple_of(2) {
-            // Even number of values - average of middle two
-            let mid1 = numeric_values[len / 2 - 1];
-            let mid2 = numeric_values[len / 2];
-            Ok((mid1 + mid2) / 2.0)
-        } else {
-            // Odd number of values - middle value
-            Ok(numeric_values[len / 2])
-        }
+    /// Numeric median with exact integer ordering before conversion to f64.
+    pub fn median(&self) -> GraphResult<f64> {
+        super::reductions::median(self.inner.as_slice())
     }
 
-    /// Calculate standard deviation of numeric values in the array
-    pub fn std(&self) -> crate::errors::GraphResult<f64> {
-        let variance = self.var()?;
-        Ok(variance.sqrt())
+    /// Sample standard deviation; require at least two finite non-null numbers.
+    pub fn std(&self) -> GraphResult<f64> {
+        Ok(self.var()?.sqrt())
     }
 
-    /// Calculate variance of numeric values in the array
-    pub fn var(&self) -> crate::errors::GraphResult<f64> {
-        let mean = self.mean()?;
-        let mut sum_squared_diff: f64 = 0.0;
-        let mut count = 0;
-
-        for val in self.inner.iter() {
-            match val {
-                AttrValue::Int(i) => {
-                    let diff = (*i as f64) - mean;
-                    sum_squared_diff += diff * diff;
-                    count += 1;
-                }
-                AttrValue::SmallInt(i) => {
-                    let diff = (*i as f64) - mean;
-                    sum_squared_diff += diff * diff;
-                    count += 1;
-                }
-                AttrValue::Float(f) => {
-                    let diff = (*f as f64) - mean;
-                    sum_squared_diff += diff * diff;
-                    count += 1;
-                }
-                AttrValue::Null => {} // Skip null values
-                _ => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Cannot compute variance of non-numeric data type: {:?}",
-                        val
-                    )));
-                }
-            }
-        }
-
-        if count <= 1 {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Cannot compute variance with less than 2 values".to_string(),
-            ));
-        }
-
-        // Sample variance (n-1 denominator)
-        Ok(sum_squared_diff / (count - 1) as f64)
+    /// Compensated sample variance, retaining small differences near i64 boundaries.
+    pub fn var(&self) -> GraphResult<f64> {
+        super::reductions::variance(self.inner.as_slice())
     }
 
     /// Find minimum value in the array (numeric only)
