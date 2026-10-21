@@ -2022,7 +2022,7 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(minor)
     }
 
-    /// Matrix inverse calculation (for square matrices)
+    /// Floating dense inverse using a direct solve against identity.
     pub fn inverse(&self) -> GraphResult<GraphMatrix<T>>
     where
         T: std::ops::Add<Output = T>
@@ -2033,147 +2033,23 @@ impl<T: NumericType> GraphMatrix<T> {
     {
         let (rows, cols) = self.shape();
         if rows != cols {
-            return Err(GraphError::InvalidInput(format!(
-                "Matrix inverse requires square matrix, got {}x{}",
-                rows, cols
-            )));
-        }
-
-        let det = self.determinant()?;
-        if det.abs() < 1e-10 {
             return Err(GraphError::InvalidInput(
-                "Matrix is singular (determinant near zero), cannot compute inverse".into(),
+                "Matrix inverse requires square input".into(),
             ));
         }
-
-        if rows == 1 {
-            // 1x1 inverse: 1/a
-            let a = self
-                .get(0, 0)
-                .ok_or_else(|| GraphError::InvalidInput("Invalid matrix element".into()))?;
-            let inv_val = T::from_f64(1.0 / a.to_f64()).unwrap_or_else(|| T::one());
-            let mut result = GraphMatrix::zeros(1, 1);
-            let _ = result.set(0, 0, inv_val);
-            return Ok(result);
+        let mut identity = Self::arithmetic_zeros(rows, rows)?;
+        for i in 0..rows {
+            identity.set(i, i, T::one())?;
         }
-
-        if rows == 2 {
-            // 2x2 inverse: (1/det) * [[d, -b], [-c, a]]
-            let a = self.get(0, 0).unwrap().to_f64();
-            let b = self.get(0, 1).unwrap().to_f64();
-            let c = self.get(1, 0).unwrap().to_f64();
-            let d = self.get(1, 1).unwrap().to_f64();
-
-            let inv_det = 1.0 / det;
-            let mut result = GraphMatrix::zeros(2, 2);
-
-            let _ = result.set(0, 0, T::from_f64(d * inv_det).unwrap_or_else(|| T::zero()));
-            let _ = result.set(0, 1, T::from_f64(-b * inv_det).unwrap_or_else(|| T::zero()));
-            let _ = result.set(1, 0, T::from_f64(-c * inv_det).unwrap_or_else(|| T::zero()));
-            let _ = result.set(1, 1, T::from_f64(a * inv_det).unwrap_or_else(|| T::zero()));
-
-            return Ok(result);
-        }
-
-        // For larger matrices, use Gaussian elimination with partial pivoting
-        self.inverse_gaussian_elimination()
+        identity.column_names = self
+            .row_labels
+            .clone()
+            .unwrap_or_else(|| identity.column_names.clone());
+        self.solve(&identity)
     }
 
-    /// Gaussian elimination method for matrix inverse
-    fn inverse_gaussian_elimination(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: std::ops::Add<Output = T>
-            + std::ops::Sub<Output = T>
-            + std::ops::Mul<Output = T>
-            + std::ops::Div<Output = T>
-            + Copy,
-    {
-        let n = self.shape().0;
-
-        // Create augmented matrix [A | I]
-        let mut augmented = GraphMatrix::zeros(n, 2 * n);
-
-        // Fill left side with original matrix
-        for i in 0..n {
-            for j in 0..n {
-                if let Some(value) = self.get(i, j) {
-                    let _ = augmented.set(i, j, value);
-                }
-            }
-        }
-
-        // Fill right side with identity matrix
-        for i in 0..n {
-            let _ = augmented.set(i, n + i, T::one());
-        }
-
-        // Forward elimination
-        for i in 0..n {
-            // Find pivot
-            let mut pivot_row = i;
-            let mut max_val = augmented.get(i, i).unwrap_or(T::zero()).to_f64().abs();
-
-            for k in (i + 1)..n {
-                let val = augmented.get(k, i).unwrap_or(T::zero()).to_f64().abs();
-                if val > max_val {
-                    max_val = val;
-                    pivot_row = k;
-                }
-            }
-
-            // Swap rows if needed
-            if pivot_row != i {
-                for j in 0..(2 * n) {
-                    let temp = augmented.get(i, j).unwrap_or(T::zero());
-                    let pivot_val = augmented.get(pivot_row, j).unwrap_or(T::zero());
-                    let _ = augmented.set(i, j, pivot_val);
-                    let _ = augmented.set(pivot_row, j, temp);
-                }
-            }
-
-            // Make diagonal element 1
-            let pivot = augmented.get(i, i).unwrap_or(T::zero());
-            if pivot.to_f64().abs() < 1e-10 {
-                return Err(GraphError::InvalidInput("Matrix is singular".into()));
-            }
-
-            for j in 0..(2 * n) {
-                let val = augmented.get(i, j).unwrap_or(T::zero());
-                let scaled =
-                    T::from_f64(val.to_f64() / pivot.to_f64()).unwrap_or_else(|| T::zero());
-                let _ = augmented.set(i, j, scaled);
-            }
-
-            // Eliminate column
-            for k in 0..n {
-                if k != i {
-                    let factor = augmented.get(k, i).unwrap_or(T::zero());
-                    for j in 0..(2 * n) {
-                        let aug_val = augmented.get(k, j).unwrap_or(T::zero());
-                        let pivot_val = augmented.get(i, j).unwrap_or(T::zero());
-                        let new_val =
-                            T::from_f64(aug_val.to_f64() - factor.to_f64() * pivot_val.to_f64())
-                                .unwrap_or_else(|| T::zero());
-                        let _ = augmented.set(k, j, new_val);
-                    }
-                }
-            }
-        }
-
-        // Extract inverse matrix from right side
-        let mut inverse = GraphMatrix::zeros(n, n);
-        for i in 0..n {
-            for j in 0..n {
-                if let Some(value) = augmented.get(i, n + j) {
-                    let _ = inverse.set(i, j, value);
-                }
-            }
-        }
-
-        Ok(inverse)
-    }
-
-    /// Solve linear system Ax = b using LU decomposition
+    /// Floating dense direct solve with row equilibration and partial pivoting.
+    /// Reject singular/nonfinite/unrepresentable input rather than guessing output.
     pub fn solve(&self, b: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>>
     where
         T: std::ops::Add<Output = T>
@@ -2183,32 +2059,35 @@ impl<T: NumericType> GraphMatrix<T> {
             + Copy,
     {
         let (rows, cols) = self.shape();
-        let (b_rows, _b_cols) = b.shape();
-
-        if rows != cols {
-            return Err(GraphError::InvalidInput(format!(
-                "Linear system requires square coefficient matrix, got {}x{}",
-                rows, cols
-            )));
+        let (b_rows, b_cols) = b.shape();
+        if rows != cols || b_rows != rows {
+            return Err(GraphError::InvalidInput(
+                "Linear solve requires square coefficients and matching RHS rows".into(),
+            ));
         }
-
-        if b_rows != rows {
-            return Err(GraphError::InvalidInput(format!(
-                "Right-hand side must have same number of rows as coefficient matrix: {} vs {}",
-                b_rows, rows
-            )));
+        let values = super::linear_system::solve(
+            self.decomposition_input()?,
+            b.decomposition_input()?,
+            rows,
+            b_cols,
+        )?;
+        let mut result = Self::arithmetic_zeros(rows, b_cols)?;
+        for row in 0..rows {
+            for col in 0..b_cols {
+                let value = values[row * b_cols + col];
+                let converted = T::from_f64(value)
+                    .filter(|v| v.is_finite())
+                    .ok_or_else(|| {
+                        GraphError::InvalidInput(
+                            "Linear solve output exceeds its element dtype".into(),
+                        )
+                    })?;
+                result.set(row, col, converted)?;
+            }
         }
-
-        // For small systems, use direct methods
-        if rows <= 3 {
-            let inv = self.inverse()?;
-            return inv.multiply(b);
-        }
-
-        // For larger systems, would implement LU decomposition
-        // For now, fall back to inverse method
-        let inv = self.inverse()?;
-        inv.multiply(b)
+        result.row_labels = Some(self.column_names.clone());
+        result.column_names = b.column_names.clone();
+        Ok(result)
     }
 
     /// SVD decomposition: A = U * Σ * V^T

@@ -524,3 +524,6 @@ Choose an explicit source-level Rust operator migration: +, - and * return Graph
 
 ### Item 29 floating dot products — 2026-10-21
 Use an in-house fixed-bin reference accumulator to avoid intermediate floating overflow, underflow and cancellation loss in GraphMatrix products. Preserve IEEE input behavior and round finite f64 dots once. f32 still narrows through f64. Record the measured cost before optimizing; do not claim the lower-level numerical backends are covered.
+
+### Item 29 direct solve and inverse — 2026-10-21
+Use direct row-equilibrated partial-pivot elimination and the same kernel for inverse(identity). Reject exact zero pivots, nonfinite inputs, lost normalization terms and unrepresentable ranges; remove fixed absolute singularity thresholds and guessed values. Restrict to floating matrices explicitly. Preserve unknown/RHS coordinate identity; label matching is positional. Conditioning and iterative refinement are separate requirements, not implied by a finite solution.
