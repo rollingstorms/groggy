@@ -486,10 +486,11 @@ pub fn py_validate_algorithm_params(algorithm_id: &str, params: &PyAny) -> PyRes
     for param_meta in &metadata.parameters {
         if let Some(value) = params.get(&param_meta.name) {
             use groggy::algorithms::{AlgorithmParamValue as Param, ParameterType as Kind};
+            // Match Rust AlgorithmParams::get_float numeric widening; bool stays distinct.
             let type_matches = matches!(
                 (&param_meta.value_type, value),
                 (Kind::Int, Param::Int(_))
-                    | (Kind::Float, Param::Float(_))
+                    | (Kind::Float, Param::Float(_) | Param::Int(_))
                     | (Kind::Bool, Param::Bool(_))
                     | (Kind::Text, Param::Text(_))
                     | (Kind::IntList, Param::IntList(_))

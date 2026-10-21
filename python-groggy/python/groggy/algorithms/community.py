@@ -189,3 +189,39 @@ def girvan_newman(
     if weight_attr is not None:
         params["weight_attr"] = weight_attr
     return RustAlgorithmHandle("community.girvan_newman", params)
+
+
+def infomap(
+    teleportation: float = 0.15,
+    num_trials: int = 10,
+    max_iter: int = 100,
+    seed: Optional[int] = None,
+    output_attr: str = "community",
+    flow_max_iter: int = 10000,
+) -> RustAlgorithmHandle:
+    """Minimize the two-level map equation using bounded greedy trials.
+
+    Uses recorded uniform-node teleportation on directed or undirected unit-edge
+    graphs. Dangling rows jump uniformly, including when teleportation is zero.
+    Loops and parallel edge multiplicity affect the walk. This is not hierarchical
+    Infomap or an assertion of parity with another implementation's flow model.
+
+    Args:
+        teleportation: Finite recorded jump probability in [0, 1].
+        num_trials: Positive number of independently ordered greedy trials.
+        max_iter: Positive maximum optimization sweeps per trial.
+        seed: Nonnegative local RNG seed; omitted uses reproducible seed zero.
+        output_attr: Node attribute for final community labels.
+        flow_max_iter: Positive stationary-flow budget; failure to reach the
+            fixed 1e-12 L1 residual rejects before labels are written.
+    """
+    params = {
+        "teleportation": teleportation,
+        "num_trials": num_trials,
+        "max_iter": max_iter,
+        "output_attr": output_attr,
+        "flow_max_iter": flow_max_iter,
+    }
+    if seed is not None:
+        params["seed"] = seed
+    return RustAlgorithmHandle("community.infomap", params)

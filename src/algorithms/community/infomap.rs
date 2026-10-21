@@ -1,82 +1,27 @@
-use std::sync::Arc;
 use std::time::Instant;
 
+use super::map_equation::Walk;
 use anyhow::{anyhow, Result};
-use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata, ParameterType,
 };
-use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
-/// Efficient NodeId → dense index mapper
-enum NodeIndexer {
-    Dense { min_id: NodeId, indices: Vec<u32> },
-    Sparse(FxHashMap<NodeId, usize>),
-}
-
-impl NodeIndexer {
-    fn new(nodes: &[NodeId]) -> Self {
-        if nodes.is_empty() {
-            return Self::Sparse(FxHashMap::default());
-        }
-
-        let min = *nodes.iter().min().unwrap();
-        let max = *nodes.iter().max().unwrap();
-        let span = (max - min) as usize + 1;
-
-        if span <= nodes.len() * 3 / 2 {
-            let mut indices = vec![u32::MAX; span];
-            for (i, &node) in nodes.iter().enumerate() {
-                indices[(node - min) as usize] = i as u32;
-            }
-            Self::Dense {
-                min_id: min,
-                indices,
-            }
-        } else {
-            let mut map = FxHashMap::default();
-            map.reserve(nodes.len());
-            for (i, &node) in nodes.iter().enumerate() {
-                map.insert(node, i);
-            }
-            Self::Sparse(map)
-        }
-    }
-
-    fn get(&self, node: NodeId) -> Option<usize> {
-        match self {
-            Self::Dense { min_id, indices } => {
-                let offset = node.checked_sub(*min_id)? as usize;
-                indices.get(offset).and_then(|&idx| {
-                    if idx == u32::MAX {
-                        None
-                    } else {
-                        Some(idx as usize)
-                    }
-                })
-            }
-            Self::Sparse(map) => map.get(&node).copied(),
-        }
-    }
-}
-
 /// Infomap community detection algorithm.
 ///
 /// Uses the map equation to minimize the description length of random walks on the graph.
-/// Excellent for detecting flow-based communities and naturally handles directed graphs.
-#[allow(dead_code)]
+/// Bounded two-level greedy trials with recorded uniform-node teleportation.
 #[derive(Clone, Debug)]
 pub struct Infomap {
-    #[allow(dead_code)]
     teleportation: f64,
-    #[allow(dead_code)]
     num_trials: usize,
     max_iter: usize,
+    flow_max_iter: usize,
     seed: Option<u64>,
     output_attr: AttrName,
 }
@@ -102,9 +47,19 @@ impl Infomap {
             teleportation,
             num_trials,
             max_iter,
+            flow_max_iter: 10_000,
             seed,
             output_attr,
         })
+    }
+
+    /// Bound stationary-flow iterations independently of optimization sweeps.
+    pub fn with_flow_budget(mut self, iterations: usize) -> Result<Self> {
+        if iterations == 0 {
+            return Err(anyhow!("flow_max_iter must be positive"));
+        }
+        self.flow_max_iter = iterations;
+        Ok(self)
     }
 
     fn metadata_template() -> AlgorithmMetadata {
@@ -119,7 +74,7 @@ impl Infomap {
             parameters: vec![
                 ParameterMetadata {
                     name: "teleportation".to_string(),
-                    description: "Probability of random jump (similar to PageRank damping)."
+                    description: "Recorded uniform-node teleportation probability; dangling rows jump uniformly."
                         .to_string(),
                     value_type: ParameterType::Float,
                     required: false,
@@ -135,6 +90,13 @@ impl Infomap {
                 ParameterMetadata {
                     name: "max_iter".to_string(),
                     description: "Maximum iterations per trial.".to_string(),
+                    value_type: ParameterType::Int,
+                    required: false,
+                    default_value: None,
+                },
+                ParameterMetadata {
+                    name: "flow_max_iter".to_string(),
+                    description: "Stationary-flow iteration budget; nonconvergence rejects before writing labels.".to_string(),
                     value_type: ParameterType::Int,
                     required: false,
                     default_value: None,
@@ -170,146 +132,35 @@ impl Algorithm for Infomap {
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let t0 = Instant::now();
 
-        // Seed random if specified
-        if let Some(seed) = self.seed {
-            fastrand::seed(seed);
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Infomap cancelled"));
         }
-
-        // Phase 1: Collect nodes
-        let nodes_start = Instant::now();
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
         let nodes = subgraph.ordered_nodes();
-        ctx.record_call("infomap.collect_nodes", nodes_start.elapsed());
-        ctx.record_stat("infomap.count.input_nodes", nodes.len() as f64);
-
-        if nodes.is_empty() {
-            return Ok(subgraph);
-        }
-
-        let n = nodes.len();
-
-        // Phase 2: Build indexer
-        let idx_start = Instant::now();
-        let indexer = NodeIndexer::new(&nodes);
-        ctx.record_call("infomap.build_indexer", idx_start.elapsed());
-
-        // Phase 3: Build or get CSR
-        let csr_start = Instant::now();
-        let edges = subgraph.ordered_edges();
-        let add_reverse = !subgraph.graph().borrow().is_directed();
-
-        let csr = match subgraph.csr_cache_get(add_reverse) {
-            Some(cached) => {
-                ctx.record_call("infomap.csr_cache_hit", std::time::Duration::from_nanos(0));
-                cached
-            }
-            None => {
-                let graph_ref = subgraph.graph();
-                let graph_borrow = graph_ref.borrow();
-
-                let mut csr = Csr::default();
-                let csr_time = build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| indexer.get(nid),
-                    |eid| graph_borrow.edge_endpoints(eid).ok(),
-                    CsrOptions {
-                        add_reverse_edges: add_reverse,
-                        sort_neighbors: false,
-                    },
-                );
-                drop(graph_borrow);
-
-                ctx.record_call("infomap.csr_cache_miss", csr_start.elapsed());
-                ctx.record_call("infomap.build_csr", csr_time);
-
-                let csr_arc = Arc::new(csr);
-                subgraph.csr_cache_store(add_reverse, csr_arc.clone());
-                csr_arc
-            }
-        };
-
-        ctx.record_stat("infomap.count.csr_edges", csr.neighbors.len() as f64);
-
-        // Phase 4: Initialize partition (each node in own community)
-        let init_start = Instant::now();
-        let mut partition: Vec<usize> = (0..n).collect();
-        ctx.record_call("infomap.initialize_partition", init_start.elapsed());
-
-        // Phase 5: Pre-allocate buffers
-        let mut comm_counts: FxHashMap<usize, usize> = FxHashMap::default();
-        comm_counts.reserve(n / 10);
-        let mut node_order: Vec<usize> = (0..n).collect();
-
-        // Phase 6: Iterative optimization
-        let compute_start = Instant::now();
-        for iteration in 0..self.max_iter {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("Infomap cancelled"));
-            }
-
-            let iter_start = Instant::now();
-            let mut changed = false;
-
-            // Shuffle node order for this iteration
-            fastrand::shuffle(&mut node_order);
-
-            for &node_idx in &node_order {
-                let current_comm = partition[node_idx];
-
-                // Get neighbors from CSR
-                let neighbors = csr.neighbors(node_idx);
-                if neighbors.is_empty() {
-                    continue;
-                }
-
-                // Count neighbor communities
-                comm_counts.clear();
-                for &neighbor_idx in neighbors {
-                    if neighbor_idx < n {
-                        *comm_counts.entry(partition[neighbor_idx]).or_insert(0) += 1;
-                    }
-                }
-
-                // Find most common neighbor community
-                if let Some((&best_comm, _)) = comm_counts.iter().max_by_key(|(_, &count)| count) {
-                    if best_comm != current_comm {
-                        partition[node_idx] = best_comm;
-                        changed = true;
-                    }
-                }
-            }
-
-            ctx.record_call(
-                format!("infomap.iteration_{}", iteration),
-                iter_start.elapsed(),
-            );
-            ctx.record_stat(
-                format!("infomap.iteration_{}.changed", iteration),
-                if changed { 1.0 } else { 0.0 },
-            );
-
-            if !changed {
-                ctx.record_stat("infomap.converged_at_iteration", iteration as f64);
-                break;
+        let index: HashMap<_, _> = nodes.iter().enumerate().map(|(i, &n)| (n, i)).collect();
+        let mut edges = Vec::new();
+        let directed = subgraph.graph().borrow().is_directed();
+        {
+            let graph = subgraph.graph();
+            let graph = graph.borrow();
+            for &edge in subgraph.ordered_edges().iter() {
+                let (u, v) = graph.edge_endpoints(edge)?;
+                edges.push((index[&u], index[&v]));
             }
         }
-        ctx.record_call("infomap.compute", compute_start.elapsed());
-
-        // Phase 7: Renumber communities to be contiguous
-        let renumber_start = Instant::now();
-        let mut comm_map: FxHashMap<usize, usize> = FxHashMap::default();
-        let mut next_comm = 0;
-        for comm in partition.iter_mut() {
-            let mapped = *comm_map.entry(*comm).or_insert_with(|| {
-                let c = next_comm;
-                next_comm += 1;
-                c
-            });
-            *comm = mapped;
+        let walk = Walk::new(nodes.len(), edges, directed)?;
+        let flow = walk.solve(self.teleportation, self.flow_max_iter, ctx)?;
+        ctx.record_stat("infomap.flow.iterations", flow.iterations as f64);
+        ctx.record_stat("infomap.flow.residual", flow.residual);
+        let mut rng = fastrand::Rng::with_seed(self.seed.unwrap_or(0));
+        let partition = flow.optimize(self.num_trials, self.max_iter, &mut rng, ctx)?;
+        ctx.record_stat(
+            "infomap.count.communities",
+            partition.iter().copied().max().map_or(0, |n| n + 1) as f64,
+        );
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Infomap cancelled"));
         }
-        ctx.record_call("infomap.renumber_communities", renumber_start.elapsed());
-        ctx.record_stat("infomap.count.communities", next_comm as f64);
 
         // Phase 8: Write results
         if ctx.persist_results() {
@@ -317,7 +168,7 @@ impl Algorithm for Infomap {
             let attr_values: Vec<(NodeId, AttrValue)> = nodes
                 .iter()
                 .enumerate()
-                .map(|(idx, &node)| (node, AttrValue::Int(partition[idx].try_into().unwrap_or(0))))
+                .map(|(idx, &node)| (node, AttrValue::Int(partition[idx] as i64)))
                 .collect();
 
             subgraph
@@ -337,16 +188,25 @@ pub fn register(registry: &Registry) -> Result<()> {
     let id = metadata.id.clone();
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
         let teleportation = spec.params.get_float("teleportation").unwrap_or(0.15);
-        let num_trials = spec.params.get_int("num_trials").unwrap_or(10).max(1) as usize;
-        let max_iter = spec.params.get_int("max_iter").unwrap_or(100).max(1) as usize;
-        let seed = spec.params.get_int("seed").map(|s| s as u64);
+        let num_trials = usize::try_from(spec.params.get_int("num_trials").unwrap_or(10))
+            .map_err(|_| anyhow!("num_trials must be positive and fit usize"))?;
+        let max_iter = usize::try_from(spec.params.get_int("max_iter").unwrap_or(100))
+            .map_err(|_| anyhow!("max_iter must be positive and fit usize"))?;
+        let seed = spec
+            .params
+            .get_int("seed")
+            .map(|s| u64::try_from(s).map_err(|_| anyhow!("seed must be nonnegative")))
+            .transpose()?;
         let output_attr = spec
             .params
             .get_text("output_attr")
             .unwrap_or("community")
             .to_string();
 
+        let flow_max_iter = usize::try_from(spec.params.get_int("flow_max_iter").unwrap_or(10_000))
+            .map_err(|_| anyhow!("flow_max_iter must be positive and fit usize"))?;
         Infomap::new(teleportation, num_trials, max_iter, seed, output_attr)
+            .and_then(|algo| algo.with_flow_budget(flow_max_iter))
             .map(|algo| Box::new(algo) as Box<dyn Algorithm>)
     })
 }

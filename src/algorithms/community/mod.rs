@@ -6,6 +6,7 @@ mod leiden;
 mod leiden_levels;
 mod louvain;
 mod lpa;
+mod map_equation;
 pub mod modularity;
 mod modularity_levels;
 pub mod utils;
