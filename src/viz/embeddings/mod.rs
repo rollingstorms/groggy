@@ -7,6 +7,9 @@ use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 
+mod composite;
+pub use composite::combine_embedding_matrices;
+use composite::CompositeEmbedding;
 pub mod debug;
 pub mod energy;
 pub mod flat_embedding;
@@ -86,7 +89,8 @@ pub struct EmbeddingConfig {
     /// Embedding method to use
     pub method: EmbeddingMethod,
 
-    /// Number of dimensions in the embedding space
+    /// Requested dimensions; composites pass this width to each child.
+    /// Concatenation/interleaving add actual child widths; averaging keeps one.
     pub dimensions: usize,
 
     /// Optional energy function for energy-based methods
@@ -153,7 +157,7 @@ pub enum EmbeddingMethod {
 
     /// Composite embedding combining multiple methods
     Composite {
-        /// List of methods to combine
+        /// Methods with finite nonnegative weights, used by weighted averaging.
         methods: Vec<(EmbeddingMethod, f64)>, // (method, weight)
         /// How to combine the embeddings
         combination_strategy: CombinationStrategy,
@@ -230,7 +234,7 @@ pub enum CombinationStrategy {
     Concatenate,
     /// Weighted average of embeddings
     WeightedAverage,
-    /// Take first N dimensions from each embedding
+    /// Alternate column chunks until every child column has been included
     Interleave { chunk_size: usize },
 }
 
@@ -377,92 +381,6 @@ impl EmbeddingEngine for CustomMatrixEmbedding {
     }
     fn name(&self) -> &str {
         "custom_matrix"
-    }
-}
-
-/// Composite embedding that combines multiple methods
-#[derive(Debug)]
-struct CompositeEmbedding {
-    methods: Vec<(EmbeddingMethod, f64)>,
-    combination_strategy: CombinationStrategy,
-}
-
-impl CompositeEmbedding {
-    fn new(methods: Vec<(EmbeddingMethod, f64)>, strategy: CombinationStrategy) -> Self {
-        Self {
-            methods,
-            combination_strategy: strategy,
-        }
-    }
-}
-
-impl EmbeddingEngine for CompositeEmbedding {
-    fn compute_embedding(&self, graph: &Graph, dimensions: usize) -> GraphResult<GraphMatrix> {
-        self.validate_graph(graph)?;
-
-        // Compute embeddings for each method
-        let mut embeddings = Vec::new();
-        let mut total_weight = 0.0;
-
-        for (method, weight) in &self.methods {
-            let config = EmbeddingConfig {
-                method: method.clone(),
-                dimensions,
-                ..Default::default()
-            };
-
-            let engine = EmbeddingEngineFactory::create_engine(&config)?;
-            let embedding = engine.compute_embedding(graph, dimensions)?;
-
-            embeddings.push((embedding, *weight));
-            total_weight += weight;
-        }
-
-        // Combine embeddings according to strategy
-        match &self.combination_strategy {
-            CombinationStrategy::Concatenate => {
-                let matrices: Vec<_> = embeddings.into_iter().map(|(m, _)| m).collect();
-                GraphMatrix::concatenate_columns(matrices)
-            }
-
-            CombinationStrategy::WeightedAverage => {
-                let mut result = embeddings[0].0.clone();
-                result = result.scalar_multiply(embeddings[0].1 / total_weight)?;
-
-                for (embedding, weight) in embeddings.into_iter().skip(1) {
-                    let weighted = embedding.scalar_multiply(weight / total_weight)?;
-                    result = result.add(&weighted)?;
-                }
-
-                Ok(result)
-            }
-
-            CombinationStrategy::Interleave { chunk_size: _ } => {
-                // TODO: Implement interleaving strategy
-                todo!("Interleave combination strategy not yet implemented")
-            }
-        }
-    }
-
-    fn supports_incremental(&self) -> bool {
-        // Only if all constituent methods support incremental updates
-        self.methods.iter().all(|(_method, _)| {
-            // This is simplified - would need to check each method properly
-            false
-        })
-    }
-
-    fn supports_streaming(&self) -> bool {
-        false
-    }
-
-    fn name(&self) -> &str {
-        "composite"
-    }
-
-    fn default_dimensions(&self) -> usize {
-        // Use the max default dimensions of constituent methods
-        self.methods.iter().map(|(_, _)| 10).max().unwrap_or(10)
     }
 }
 

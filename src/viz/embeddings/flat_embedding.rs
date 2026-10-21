@@ -10,13 +10,21 @@ use std::collections::HashMap;
 /// Parameters for a seeded projected-gradient graph layout.
 #[derive(Debug, Clone)]
 pub struct FlatEmbedConfig {
+    /// Maximum optimization steps; zero returns projected seeded initialization.
     pub iterations: usize,
+    /// Positive initial step size, reduced by backtracking when necessary.
     pub learning_rate: f64,
+    /// Nonnegative coefficient of mean squared edge-instance distance.
     pub edge_cohesion_weight: f64,
+    /// Nonnegative coefficient of regularized mean all-pair repulsion.
     pub repulsion_weight: f64,
+    /// Positive distance exponent of the regularized repulsion term.
     pub repulsion_power: f64,
+    /// Nonnegative coefficient for maximizing population covariance determinant.
     pub spread_weight: f64,
+    /// Positive disk radius enforced by each projected step.
     pub radius_clip: f64,
+    /// Local initialization seed; never modifies global random state.
     pub seed: u64,
 }
 impl Default for FlatEmbedConfig {

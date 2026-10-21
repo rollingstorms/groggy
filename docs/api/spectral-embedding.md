@@ -85,6 +85,5 @@ acceleration, incremental update, cancellation, safe GIL release, directed varia
 or production-scale capacity is claimed. Eigenvalue accuracy near numerical
 resolution and overly aggressive threshold choices remain caller-visible limits.
 
-The broader analytics audit remains open: other visualization/energy/composite
-callers, t-SNE/UMAP-inspired scope, realtime failure fallbacks, and
-pipeline/history/backend/scale verification are separate work under item 28.15. The [flat-layout topology and solver repair](flat-embedding.md) has its own supported scope.
+The broader analytics audit remains open: other visualization/energy callers, t-SNE/UMAP-inspired scope, realtime failure fallbacks, and
+pipeline/history/backend/scale verification are separate work under item 28.15. The [flat-layout repair](flat-embedding.md) and [composite composition](composite-embedding.md) have their own supported scopes.

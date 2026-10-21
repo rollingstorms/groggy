@@ -420,3 +420,12 @@ Fixing edge extraction alone would have left topology ineffective: sliced autodi
 Use all real active edge IDs, checked endpoints and validated row identities, retaining parallel/loop instances without truncation. A shared embedding row-ID helper supports canonical unlabeled rows and explicit labeled permutations. The graph-free wrapper no longer invents a graph: multirow cohesion requires explicit graph input or zero cohesion. Expose an owned graph-aware matrix helper and translation-only Python method. Feature values are not in this topology-based loss; no high-dimensional distance-preservation claim is made.
 
 Independent derivative/topology/identity/bounds/failure tests replace previous placeholder shape/no-panic tests. Native/Python checks cover edge influence after the former cutoff and disappearance on removal. All-pair work and bounded line-search costs are documented; no speedup, global convergence, GIL-release, cancellation or production-scale promise is added. Realtime caller fallback policy and broader analytics remain open.
+
+
+## Item 28 composite interleaving and checked aggregation — 2026-10-21
+
+Replace the public interleave TODO panic with round-robin complete column chunks, retaining final/ragged tails and every child column. Preserve existing concatenation per-child dimension semantics; weighted averages require equal actual widths. Move composition into one cohesive native module shared by the existing factory and translation-only Python combine_embeddings. Resolve row identity using the flat-layout helper, align children by active IDs, and label owned output canonically instead of silently averaging misaligned rows.
+
+Preflight empty children, zero requested dimensions/chunks, malformed identities/shapes, finite values and finite nonnegative weights; avoid the neighboring weighted-average empty-index/zero-total failures. Normalize weights by their maximum and scale/compensate per-cell accumulation to keep convex averages within finite input range even at f64 extremes. Preserve feature provenance for concatenation/interleaving and positional-column semantics. Handle missing source feature names without indexing panics.
+
+Independent column-round ordering, factory, identity, invalid-input and extreme-value fixtures cover Rust and rebuilt Python. Child algorithm/seed propagation, general transforms, gradients, safe GIL release, cancellation and production-scale behavior remain outside this slice. The broader analytics audit remains partial after both requested defect fixes.

@@ -315,6 +315,29 @@ impl PyGraph {
 
 #[pymethods]
 impl PyGraph {
+    /// Combine embedding matrices by checked node identity and column strategy.
+    #[pyo3(signature = (matrices, strategy="interleave", chunk_size=1, weights=None))]
+    fn combine_embeddings(
+        &self,
+        matrices: Vec<PyRef<'_, crate::ffi::storage::matrix::PyGraphMatrix>>,
+        strategy: &str,
+        chunk_size: usize,
+        weights: Option<Vec<f64>>,
+    ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        use groggy::viz::embeddings::{combine_embedding_matrices, CombinationStrategy};
+        let strategy = CombinationStrategy::from_name(strategy, chunk_size)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let matrices: Vec<_> = matrices.iter().map(|matrix| matrix.inner.clone()).collect();
+        let inner = combine_embedding_matrices(
+            &self.inner.borrow(),
+            &matrices,
+            weights.as_deref(),
+            &strategy,
+        )
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(crate::ffi::storage::matrix::PyGraphMatrix { inner })
+    }
+
     /// Compute an owned bounded graph layout aligned with embedding row identity.
     #[pyo3(signature = (embedding, iterations=800, learning_rate=0.03, edge_cohesion_weight=1.0, repulsion_weight=0.1, repulsion_power=1.5, spread_weight=0.05, radius_clip=0.98, seed=0))]
     #[allow(clippy::too_many_arguments)]
