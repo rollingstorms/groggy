@@ -70,3 +70,6 @@ Item 5 zero-count allocation: Graph::add_nodes(0) and GraphPool::add_nodes_bulk(
 
 
 Item 28 Louvain/Leiden local modularity: actual resolution-dependent objective and move gain; loops/parallel instances retained, active selected undirected domain, positive finite gamma and positive budgets, explicit singleton labels for edgeless Louvain selections. Ordered local choices and local Leiden RNG produce repeatable seeded labels without global RNG changes. Tests: tests/community_resolution.rs (independent full objective/move enumeration), tests/test_community_resolution.py. Full aggregation/refinement and remaining community algorithm audits remain open; see docs/api/community-modularity.md.
+
+
+Item 28 Louvain multilevel: bounded local moves/aggregation now run, coarse edge mass and loops preserve original modularity, and final labels project to original IDs. Finite/objective/mass checks precede final bulk writes; source topology/cache remain unchanged. Registry/Python default allows ten levels; explicit one-level and existing first three Python positional arguments remain supported. Tests: private louvain_levels unit references, tests/louvain_multilevel.rs, tests/test_louvain_multilevel.py. Full Leiden and remaining algorithm audits stay open; see docs/api/community-modularity.md and the bounded debug benchmark note.

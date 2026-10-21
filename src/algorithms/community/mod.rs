@@ -4,6 +4,7 @@ mod girvan_newman_paths;
 mod infomap;
 mod leiden;
 mod louvain;
+mod louvain_levels;
 mod lpa;
 pub mod modularity;
 pub mod utils;

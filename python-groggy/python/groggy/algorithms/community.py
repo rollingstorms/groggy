@@ -43,19 +43,23 @@ def lpa(
 
 
 def louvain(
-    resolution: float = 1.0, max_iter: int = 100, output_attr: str = "community"
+    resolution: float = 1.0,
+    max_iter: int = 100,
+    output_attr: str = "community",
+    max_phases: int = 10,
 ) -> RustAlgorithmHandle:
     """
     Louvain modularity optimization for community detection.
 
     Finds communities by optimizing modularity, a measure of network
     structure quality. Supports undirected unweighted multigraphs, retaining
-    parallel instances and self-loops. This currently runs local node moves;
-    graph aggregation and multilevel optimization remain incomplete.
+    parallel instances and self-loops. Local moves alternate with aggregation;
+    internal coarse-edge multiplicities preserve the original objective.
 
     Args:
         resolution: Finite positive gamma applied to the modularity null-model term
-        max_iter: Maximum iterations (default: 100)
+        max_iter: Maximum node-move sweeps per level (default: 100)
+        max_phases: Maximum levels (default: 10); one requests local moves only
         output_attr: Attribute name for community labels (default: "community")
 
     Returns:
@@ -69,6 +73,7 @@ def louvain(
     params = {
         "resolution": resolution,
         "max_iter": max_iter,
+        "max_phases": max_phases,
         "output_attr": output_attr,
     }
 
