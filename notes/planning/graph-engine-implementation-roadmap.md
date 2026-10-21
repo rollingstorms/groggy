@@ -100,3 +100,5 @@ The near-term milestone is a coherent Groggy core: reliable writes, temporal rec
 Numerical item 29.10 completes the existing NumArray linear percentile path using shared typed kernels and explicit IEEE/rank behavior. Correlation is repaired in 29.11; arithmetic, ArrayArray and measured acceleration remain open.
 
 Numerical item 29.11 completes the existing NumArray Pearson correlation path with typed centering, independent scaling and compensated normalized moments. It uses two O(N) scratch columns; benchmarking and other correlation surfaces remain open. ArrayArray and arithmetic operators are next under 29.3.
+
+Numerical item 29.12 repairs checked matrix add/subtract and Python arithmetic with native scalar kernels, exact-zero divisor validation and preserved positional labels/empty shapes. Legacy Rust operator result-type migration, broader numerical overflow rules, NumArray expansion and ArrayArray remain open.

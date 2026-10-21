@@ -456,6 +456,24 @@ impl<T: NumericType> GraphMatrix<T> {
 
 // Backward compatibility for f64 GraphMatrix
 impl GraphMatrix<f64> {
+    /// Broadcast a scalar addition without constructing a second matrix.
+    pub fn scalar_add(&self, scalar: f64) -> GraphResult<Self> {
+        self.map_arithmetic(|value| value + scalar)
+    }
+
+    /// Broadcast a scalar subtraction without constructing a second matrix.
+    pub fn scalar_subtract(&self, scalar: f64) -> GraphResult<Self> {
+        self.map_arithmetic(|value| value - scalar)
+    }
+
+    /// Divide values directly; reject either signed zero, allow other IEEE values.
+    pub fn scalar_divide(&self, scalar: f64) -> GraphResult<Self> {
+        if scalar == 0.0 {
+            return Err(GraphError::InvalidInput("Division by zero".into()));
+        }
+        self.map_arithmetic(|value| value / scalar)
+    }
+
     /// Create zeros matrix with f64 type (backward compatibility)
     pub fn zeros_f64(rows: usize, cols: usize) -> Self {
         Self::zeros(rows, cols)
@@ -902,34 +920,9 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    /// Matrix subtraction
+    /// Positional matrix subtraction with checked shape and cell access.
     pub fn subtract(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        let (self_rows, self_cols) = self.shape();
-        let (other_rows, other_cols) = other.shape();
-
-        if self_rows != other_rows || self_cols != other_cols {
-            return Err(GraphError::InvalidInput(format!(
-                "Matrix dimensions must match for subtraction: {}x{} - {}x{}",
-                self_rows, self_cols, other_rows, other_cols
-            )));
-        }
-
-        let mut result = Self::zeros(self_rows, self_cols);
-
-        for i in 0..self_rows {
-            for j in 0..self_cols {
-                let a = self.get(i, j).ok_or_else(|| {
-                    GraphError::InvalidInput(format!("Invalid cell at ({}, {})", i, j))
-                })?;
-                let b = other.get(i, j).ok_or_else(|| {
-                    GraphError::InvalidInput(format!("Invalid cell at ({}, {})", i, j))
-                })?;
-                let result_val = T::sub(a, b);
-                result.set(i, j, result_val)?;
-            }
-        }
-
-        Ok(result)
+        self.zip_arithmetic(other, T::sub)
     }
 
     /// Element-wise multiplication (Hadamard product)
@@ -3023,32 +3016,65 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    /// Multiply matrix by scalar
+    // Arithmetic results own storage and retain left positional row/column labels.
+    fn map_arithmetic(&self, operation: impl Fn(T) -> T) -> GraphResult<Self> {
+        let (rows, cols) = self.shape();
+        let storage = UnifiedMatrix::zeros(rows, cols).map_err(|e| {
+            GraphError::InvalidInput(format!("Arithmetic allocation failed: {e:?}"))
+        })?;
+        let mut result = Self::from_storage(storage);
+        for row in 0..rows {
+            for col in 0..cols {
+                result.set(row, col, operation(self.get_checked(row, col)?))?;
+            }
+        }
+        result.column_names = self.column_names.clone();
+        result.row_labels = self.row_labels.clone();
+        Ok(result)
+    }
+
+    fn zip_arithmetic(&self, other: &Self, operation: impl Fn(T, T) -> T) -> GraphResult<Self> {
+        if self.shape() != other.shape() {
+            return Err(GraphError::InvalidInput(format!(
+                "Matrix dimensions must match for element-wise arithmetic: {:?} vs {:?}",
+                self.shape(),
+                other.shape()
+            )));
+        }
+        let (rows, cols) = self.shape();
+        let storage = UnifiedMatrix::zeros(rows, cols).map_err(|e| {
+            GraphError::InvalidInput(format!("Arithmetic allocation failed: {e:?}"))
+        })?;
+        let mut result = Self::from_storage(storage);
+        for row in 0..rows {
+            for col in 0..cols {
+                result.set(
+                    row,
+                    col,
+                    operation(self.get_checked(row, col)?, other.get_checked(row, col)?),
+                )?;
+            }
+        }
+        result.column_names = self.column_names.clone();
+        result.row_labels = self.row_labels.clone();
+        Ok(result)
+    }
+
+    /// Multiply each value by a scalar, preserving shape and positional labels.
     pub fn scalar_multiply(&self, scalar: f64) -> GraphResult<GraphMatrix<T>>
     where
         T: std::ops::Mul<Output = T> + From<f64>,
     {
-        let (rows, cols) = self.shape();
-        let mut result = GraphMatrix::zeros(rows, cols);
-        let scalar_t = T::from(scalar);
-
-        for i in 0..rows {
-            for j in 0..cols {
-                if let Ok(value) = self.get_checked(i, j) {
-                    result.set(i, j, value * scalar_t)?;
-                }
-            }
-        }
-
-        Ok(result)
+        let scalar = T::from(scalar);
+        self.map_arithmetic(|value| value * scalar)
     }
 
-    /// Add two matrices element-wise (method wrapper for + operator)
+    /// Add two matrices positionally; mismatched shapes return an error.
     pub fn add(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>>
     where
         for<'a> &'a GraphMatrix<T>: std::ops::Add<Output = GraphMatrix<T>>,
     {
-        Ok(self + other)
+        self.zip_arithmetic(other, T::add)
     }
 
     /// Compute variance of each column

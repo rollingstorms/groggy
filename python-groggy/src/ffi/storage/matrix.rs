@@ -1167,64 +1167,33 @@ impl PyGraphMatrix {
     /// Matrix addition operator (+)
     /// Implements: matrix1 + matrix2 and matrix + scalar (broadcasting)
     fn __add__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        // Try scalar addition first (broadcasting)
-        if let Ok(scalar) = other.extract::<f64>() {
-            let (rows, cols) = self.inner.shape();
-
-            // Create arrays with scalar values
-            let mut arrays = Vec::new();
-            for _ in 0..cols {
-                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
-            }
-
-            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
-                .map_err(|e| PyRuntimeError::new_err(format!("Scalar addition failed: {:?}", e)))?;
-
-            let result = &self.inner + &scalar_matrix;
-            return Py::new(py, PyGraphMatrix { inner: result });
+        let result = if let Ok(scalar) = other.extract::<f64>() {
+            self.inner.scalar_add(scalar)
+        } else if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
+            self.inner.add(&other_matrix.inner)
+        } else {
+            return Err(PyTypeError::new_err(
+                "Unsupported operand type for matrix addition",
+            ));
         }
-
-        // Try matrix addition
-        if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
-            let result = &self.inner + &other_matrix.inner;
-            return Py::new(py, PyGraphMatrix { inner: result });
-        }
-
-        Err(PyTypeError::new_err(
-            "Unsupported operand type for matrix addition",
-        ))
+        .map_err(|e| PyRuntimeError::new_err(format!("Matrix addition failed: {e}")))?;
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Matrix subtraction operator (-)
     /// Implements: matrix1 - matrix2 and matrix - scalar (broadcasting)
     fn __sub__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        // Try scalar subtraction first (broadcasting)
-        if let Ok(scalar) = other.extract::<f64>() {
-            let (rows, cols) = self.inner.shape();
-
-            // Create arrays with scalar values
-            let mut arrays = Vec::new();
-            for _ in 0..cols {
-                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
-            }
-
-            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays).map_err(|e| {
-                PyRuntimeError::new_err(format!("Scalar subtraction failed: {:?}", e))
-            })?;
-
-            let result = &self.inner - &scalar_matrix;
-            return Py::new(py, PyGraphMatrix { inner: result });
+        let result = if let Ok(scalar) = other.extract::<f64>() {
+            self.inner.scalar_subtract(scalar)
+        } else if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
+            self.inner.subtract(&other_matrix.inner)
+        } else {
+            return Err(PyTypeError::new_err(
+                "Unsupported operand type for matrix subtraction",
+            ));
         }
-
-        // Try matrix subtraction
-        if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
-            let result = &self.inner - &other_matrix.inner;
-            return Py::new(py, PyGraphMatrix { inner: result });
-        }
-
-        Err(PyTypeError::new_err(
-            "Unsupported operand type for matrix subtraction",
-        ))
+        .map_err(|e| PyRuntimeError::new_err(format!("Matrix subtraction failed: {e}")))?;
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Matrix power operator (**)
@@ -1247,67 +1216,22 @@ impl PyGraphMatrix {
     /// Matrix division operator (/)
     /// Implements: matrix / scalar (element-wise division)
     fn __truediv__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        if let Ok(scalar) = other.extract::<f64>() {
-            if scalar.abs() < 1e-10 {
-                return Err(PyRuntimeError::new_err("Division by zero"));
-            }
-
-            let (rows, cols) = self.inner.shape();
-
-            // Create arrays with scalar values for division
-            let mut arrays = Vec::new();
-            for _ in 0..cols {
-                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
-            }
-
-            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
-                .map_err(|e| PyRuntimeError::new_err(format!("Scalar division failed: {:?}", e)))?;
-
-            // Element-wise division using multiplication with reciprocal
-            let reciprocal = 1.0 / scalar;
-            let mut reciprocal_arrays = Vec::new();
-            for _ in 0..cols {
-                reciprocal_arrays.push(groggy::storage::array::NumArray::new(vec![
-                    reciprocal;
-                    rows
-                ]));
-            }
-
-            let reciprocal_matrix = groggy::storage::GraphMatrix::from_arrays(reciprocal_arrays)
-                .map_err(|e| PyRuntimeError::new_err(format!("Scalar division failed: {:?}", e)))?;
-
-            let result = self
-                .inner
-                .elementwise_multiply(&reciprocal_matrix)
-                .map_err(|e| PyRuntimeError::new_err(format!("Division failed: {:?}", e)))?;
-
-            return Py::new(py, PyGraphMatrix { inner: result });
-        }
-
-        Err(PyTypeError::new_err(
-            "Matrix division only supports scalar divisor",
-        ))
-    }
-
-    /// Unary negation operator (-)
-    /// Implements: -matrix (element-wise negation)
-    fn __neg__(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        // Multiply by -1 to negate all elements
-        let (rows, cols) = self.inner.shape();
-
-        let mut arrays = Vec::new();
-        for _ in 0..cols {
-            arrays.push(groggy::storage::array::NumArray::new(vec![-1.0; rows]));
-        }
-
-        let neg_one_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
-            .map_err(|e| PyRuntimeError::new_err(format!("Negation failed: {:?}", e)))?;
-
+        let scalar = other
+            .extract::<f64>()
+            .map_err(|_| PyTypeError::new_err("Matrix division only supports scalar divisor"))?;
         let result = self
             .inner
-            .elementwise_multiply(&neg_one_matrix)
-            .map_err(|e| PyRuntimeError::new_err(format!("Negation failed: {:?}", e)))?;
+            .scalar_divide(scalar)
+            .map_err(|e| PyRuntimeError::new_err(format!("Division failed: {e}")))?;
+        Py::new(py, PyGraphMatrix { inner: result })
+    }
 
+    /// Unary negation delegates to the native scalar kernel.
+    fn __neg__(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        let result = self
+            .inner
+            .scalar_multiply(-1.0)
+            .map_err(|e| PyRuntimeError::new_err(format!("Negation failed: {e}")))?;
         Py::new(py, PyGraphMatrix { inner: result })
     }
 

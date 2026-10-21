@@ -512,3 +512,6 @@ Retain linear rank p*(N-1), Option output and current generic bounds. Reject inv
 
 ### Item 29 Pearson correlation — 2026-10-21
 Retain Option and Pearson paired semantics. Mismatched/short/finite constant input returns None; nonfinite matching inputs of length at least two produce NaN. No implicit pair dropping. Preserve integer differences before final f64 moments and independently scale both columns. Accept explicit O(N) scratch pending measured optimization; no new FFI API or external backend is introduced.
+
+### Item 29 checked matrix arithmetic — 2026-10-21
+Use GraphResult methods and Python errors for mismatched shapes. Preserve positional identity on owned arithmetic results; no label join/reordering or inherited gradient tape. Scalar division rejects signed zero exactly, computes direct quotients and retains other IEEE behavior. Keep the source-compatible Rust trait operators visible as remaining debt pending result-type migration.
