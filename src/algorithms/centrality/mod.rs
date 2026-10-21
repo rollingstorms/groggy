@@ -4,7 +4,7 @@ mod pagerank;
 mod traversal_utils;
 
 pub use betweenness::BetweennessCentrality;
-pub use closeness::ClosenessCentrality;
+pub use closeness::{ClosenessCentrality, ClosenessDirection};
 pub use pagerank::PageRank;
 
 use crate::algorithms::registry::Registry;

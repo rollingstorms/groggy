@@ -346,7 +346,7 @@ pub fn bfs_layers_csr(
 }
 
 #[derive(Copy, Clone, Debug)]
-struct DijkstraState {
+pub(crate) struct DijkstraState {
     pub cost: f64,
     pub node_idx: usize,
 }

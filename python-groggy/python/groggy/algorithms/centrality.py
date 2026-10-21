@@ -5,7 +5,7 @@ This module provides access to centrality algorithms like PageRank, Betweenness,
 and Closeness centrality.
 """
 
-from typing import Optional
+from typing import Literal, Optional
 
 from groggy.algorithms.base import RustAlgorithmHandle
 
@@ -92,16 +92,25 @@ def betweenness(
 
 
 def closeness(
-    weight_attr: Optional[str] = None, output_attr: str = "closeness"
+    weight_attr: Optional[str] = None,
+    output_attr: str = "closeness",
+    harmonic: bool = True,
+    direction: Literal["outgoing", "incoming"] = "outgoing",
+    normalized: bool = False,
 ) -> RustAlgorithmHandle:
     """
     Closeness centrality algorithm.
 
-    Computes closeness centrality for each node, measuring the average
-    distance from the node to all other reachable nodes.
+    Defaults to raw harmonic scores using outgoing distances. Classic scores
+    use reachable_count / distance_sum. Normalization divides harmonic scores
+    by n-1, or scales classic scores by the reachable fraction. Disconnected
+    isolates score zero. Weighted lengths must be finite and strictly positive.
 
     Args:
-        weight_attr: Optional edge weight attribute
+        weight_attr: Optional strictly positive numeric edge lengths; missing is one
+        harmonic: Sum reciprocal distances (default: True); False selects classic
+        direction: Outgoing distances by default; incoming reverses directed paths
+        normalized: Divide harmonic scores by n-1 or apply classic reachability correction
         output_attr: Attribute name for results (default: "closeness")
 
     Returns:
@@ -114,6 +123,9 @@ def closeness(
     """
     params = {
         "output_attr": output_attr,
+        "harmonic": harmonic,
+        "direction": direction,
+        "normalized": normalized,
     }
     if weight_attr is not None:
         params["weight_attr"] = weight_attr

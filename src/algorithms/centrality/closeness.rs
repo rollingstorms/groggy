@@ -1,15 +1,15 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
-use crate::algorithms::pathfinding::utils::{bfs_layers_csr, checked_dijkstra_weights, dijkstra};
+use crate::algorithms::pathfinding::utils::{checked_dijkstra_weights, DijkstraState};
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
+    ParameterMetadata, ParameterType,
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
@@ -28,11 +28,13 @@ impl NodeIndexer {
             return Self::Sparse(FxHashMap::default());
         }
 
-        let min = *nodes.iter().min().unwrap();
-        let max = *nodes.iter().max().unwrap();
-        let span = (max - min) as usize + 1;
+        let min = nodes.iter().copied().min().unwrap_or(0);
+        let max = nodes.iter().copied().max().unwrap_or(0);
+        let span = max.checked_sub(min).and_then(|delta| delta.checked_add(1));
 
-        if span <= nodes.len() * 3 / 2 {
+        if let Some(span) = span.filter(|&span| {
+            span <= nodes.len().saturating_mul(3) / 2 && nodes.len() < u32::MAX as usize
+        }) {
             let mut indices = vec![u32::MAX; span];
             for (i, &node) in nodes.iter().enumerate() {
                 indices[(node - min) as usize] = i as u32;
@@ -68,9 +70,18 @@ impl NodeIndexer {
     }
 }
 
+/// Direction of distances on a directed graph; undirected scores are identical.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClosenessDirection {
+    Outgoing,
+    Incoming,
+}
+
 #[derive(Clone, Debug)]
 pub struct ClosenessCentrality {
     harmonic: bool,
+    direction: ClosenessDirection,
+    normalized: bool,
     weight_attr: Option<AttrName>,
     output_attr: AttrName,
 }
@@ -79,9 +90,24 @@ impl ClosenessCentrality {
     pub fn new(harmonic: bool, weight_attr: Option<AttrName>, output_attr: AttrName) -> Self {
         Self {
             harmonic,
+            direction: ClosenessDirection::Outgoing,
+            normalized: false,
             weight_attr,
             output_attr,
         }
+    }
+
+    /// Select outgoing (default) or incoming distances on directed graphs.
+    pub fn with_direction(mut self, direction: ClosenessDirection) -> Self {
+        self.direction = direction;
+        self
+    }
+
+    /// Normalize harmonic scores by n-1, or apply the reachable-fraction
+    /// correction to classic scores. Defaults to false for compatibility.
+    pub fn with_normalization(mut self, normalized: bool) -> Self {
+        self.normalized = normalized;
+        self
     }
 
     fn metadata_template() -> AlgorithmMetadata {
@@ -89,10 +115,27 @@ impl ClosenessCentrality {
             id: "centrality.closeness".to_string(),
             name: "Closeness Centrality".to_string(),
             description: "Closeness (classic or harmonic) centrality via BFS/Dijkstra.".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             cost_hint: CostHint::Quadratic,
             supports_cancellation: true,
             parameters: vec![
+                ParameterMetadata {
+                    name: "direction".into(),
+                    description: "Distances from nodes ('outgoing') or to nodes ('incoming')."
+                        .into(),
+                    value_type: ParameterType::Text,
+                    required: false,
+                    default_value: Some(AlgorithmParamValue::Text("outgoing".into())),
+                },
+                ParameterMetadata {
+                    name: "normalized".into(),
+                    description:
+                        "Normalize harmonic scores by n-1, or classic scores by reachable fraction."
+                            .into(),
+                    value_type: ParameterType::Bool,
+                    required: false,
+                    default_value: Some(AlgorithmParamValue::Bool(false)),
+                },
                 ParameterMetadata {
                     name: "harmonic".to_string(),
                     description: "Use harmonic closeness (sum of reciprocal distances)."
@@ -122,94 +165,110 @@ impl ClosenessCentrality {
     fn compute(
         &self,
         ctx: &mut Context,
-        subgraph: &Subgraph,
         csr: &Csr,
         nodes: &[NodeId],
-    ) -> Result<HashMap<NodeId, f64>> {
+        weights: Option<&HashMap<(NodeId, NodeId), f64>>,
+        reverse_weights: bool,
+    ) -> Result<Vec<(NodeId, f64)>> {
         let n = nodes.len();
-        if n == 0 {
-            return Ok(HashMap::new());
-        }
-
-        let weight_map = self
-            .weight_attr
-            .as_ref()
-            .map(|attr| checked_dijkstra_weights(subgraph, Some(attr)))
-            .transpose()?;
-
-        let mut scores: Vec<f64> = vec![0.0; n];
-
-        // Pre-allocate buffers for BFS (reused across all sources!)
-        let mut distance_buf = vec![usize::MAX; n];
-        let mut queue_buf = VecDeque::with_capacity(n);
-
-        for (idx, &source) in nodes.iter().enumerate() {
+        let mut scores = Vec::with_capacity(n);
+        let mut distances = vec![f64::INFINITY; n];
+        let mut queue = VecDeque::with_capacity(n);
+        let mut heap = BinaryHeap::new();
+        for (source, &node) in nodes.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("closeness cancelled"));
             }
-
-            let mut sum = 0.0;
-            let mut reachable = 0;
-
-            if let Some(ref weights) = weight_map {
-                // Weighted case: use smart dijkstra() utility (auto-detects CSR)
-                let dist = dijkstra(subgraph, source, |u, v| {
-                    weights.get(&(u, v)).copied().unwrap_or(1.0)
+            distances.fill(f64::INFINITY);
+            distances[source] = 0.0;
+            if let Some(weights) = weights {
+                heap.clear();
+                heap.push(DijkstraState {
+                    cost: 0.0,
+                    node_idx: source,
                 });
-
-                for (&target, &d) in &dist {
-                    if target == source {
+                while let Some(DijkstraState { cost, node_idx: u }) = heap.pop() {
+                    if ctx.is_cancelled() {
+                        return Err(anyhow!("closeness cancelled"));
+                    }
+                    if cost > distances[u] {
                         continue;
                     }
-                    if self.harmonic {
-                        if d > 0.0 {
-                            sum += 1.0 / d;
+                    for &v in csr.neighbors(u) {
+                        let pair = if reverse_weights {
+                            (nodes[v], nodes[u])
+                        } else {
+                            (nodes[u], nodes[v])
+                        };
+                        let weight = weights.get(&pair).copied().ok_or_else(|| {
+                            anyhow!("missing checked closeness weight for {pair:?}")
+                        })?;
+                        let candidate = cost + weight;
+                        if !candidate.is_finite() {
+                            return Err(anyhow!("closeness distance overflow"));
                         }
-                    } else {
-                        sum += d;
-                        reachable += 1;
+                        if candidate < distances[v] {
+                            distances[v] = candidate;
+                            heap.push(DijkstraState {
+                                cost: candidate,
+                                node_idx: v,
+                            });
+                        }
                     }
                 }
             } else {
-                // Unweighted case: use CSR-optimized BFS
-                bfs_layers_csr(csr, nodes, idx, &mut distance_buf, &mut queue_buf);
-
-                // Sum distances from distance array
-                for i in 0..n {
-                    if i == idx {
-                        continue;
+                queue.clear();
+                queue.push_back(source);
+                while let Some(u) = queue.pop_front() {
+                    if ctx.is_cancelled() {
+                        return Err(anyhow!("closeness cancelled"));
                     }
-                    let d = distance_buf[i];
-                    if d < usize::MAX {
-                        if self.harmonic {
-                            sum += 1.0 / (d as f64);
-                        } else {
-                            sum += d as f64;
-                            reachable += 1;
+                    for &v in csr.neighbors(u) {
+                        if distances[v].is_infinite() {
+                            distances[v] = distances[u] + 1.0;
+                            queue.push_back(v);
                         }
                     }
                 }
             }
-
-            let score = if self.harmonic {
+            let mut reachable = 0;
+            let mut sum = 0.0;
+            for (target, &distance) in distances.iter().enumerate() {
+                if target != source && distance.is_finite() {
+                    if distance <= 0.0 {
+                        return Err(anyhow!(
+                            "closeness requires strictly positive distances between distinct nodes"
+                        ));
+                    }
+                    sum += if self.harmonic {
+                        1.0 / distance
+                    } else {
+                        distance
+                    };
+                    reachable += 1;
+                }
+            }
+            let mut score = if self.harmonic {
                 sum
             } else if reachable > 0 {
-                (reachable as f64) / sum
+                reachable as f64 / sum
             } else {
                 0.0
             };
-            scores[idx] = score;
-            ctx.emit_iteration(idx, 0);
+            if self.normalized && n > 1 {
+                score *= if self.harmonic {
+                    1.0 / (n - 1) as f64
+                } else {
+                    reachable as f64 / (n - 1) as f64
+                };
+            }
+            if !sum.is_finite() || !score.is_finite() || score < 0.0 {
+                return Err(anyhow!("nonfinite closeness score for node {node}"));
+            }
+            scores.push((node, score));
+            ctx.emit_iteration(source, 0);
         }
-
-        // Convert Vec → HashMap for result
-        let result: HashMap<NodeId, f64> = nodes
-            .iter()
-            .enumerate()
-            .map(|(i, &node)| (node, scores[i]))
-            .collect();
-
-        Ok(result)
+        Ok(scores)
     }
 }
 
@@ -224,6 +283,13 @@ impl Algorithm for ClosenessCentrality {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let t0 = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("closeness cancelled"));
+        }
+        let weights = checked_dijkstra_weights(&subgraph, self.weight_attr.as_ref())?;
+        if weights.values().any(|&weight| weight <= 0.0) {
+            return Err(anyhow!("closeness edge lengths must be strictly positive"));
+        }
 
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
@@ -233,6 +299,12 @@ impl Algorithm for ClosenessCentrality {
 
         let n = nodes.len();
         if n == 0 {
+            if !ctx.persist_results() {
+                ctx.add_output(
+                    format!("{}.scores", self.id()),
+                    AlgorithmOutput::NodeScores(Vec::new()),
+                );
+            }
             return Ok(subgraph);
         }
 
@@ -242,7 +314,7 @@ impl Algorithm for ClosenessCentrality {
         ctx.record_call("closeness.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = false;
+        let add_reverse = subgraph.graph().borrow().is_undirected();
         let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call(
                 "closeness.csr_cache_hit",
@@ -280,20 +352,59 @@ impl Algorithm for ClosenessCentrality {
 
         // Phase 4: Compute closeness (uses CSR-optimized BFS/Dijkstra)
         let compute_start = Instant::now();
-        let scores = self.compute(ctx, &subgraph, &csr, &nodes)?;
+        let incoming = !add_reverse && self.direction == ClosenessDirection::Incoming;
+        // Incoming adjacency is private: the shared false cache always means
+        // outgoing directed adjacency for other algorithms.
+        let transposed = if incoming {
+            let mut rows = vec![Vec::new(); n];
+            for u in 0..n {
+                for &v in csr.neighbors(u) {
+                    rows[v].push(u);
+                }
+            }
+            let mut transposed = Csr::default();
+            transposed.offsets.push(0);
+            for row in rows {
+                transposed.neighbors.extend(row);
+                transposed.offsets.push(transposed.neighbors.len());
+            }
+            Some(transposed)
+        } else {
+            None
+        };
+        let scores = self.compute(
+            ctx,
+            transposed.as_ref().unwrap_or(&csr),
+            &nodes,
+            self.weight_attr.as_ref().map(|_| &weights),
+            incoming,
+        )?;
         ctx.record_call("closeness.compute", compute_start.elapsed());
 
         // Phase 5: Write results
+        if ctx.is_cancelled() {
+            return Err(anyhow!("closeness cancelled"));
+        }
         if ctx.persist_results() {
             let attr_values: Vec<(NodeId, AttrValue)> = scores
                 .iter()
-                .map(|(&node, score)| (node, AttrValue::Float(*score as f32)))
-                .collect();
+                .map(|&(node, score)| {
+                    if score > f32::MAX as f64 {
+                        return Err(anyhow!("closeness score for node {node} cannot be represented in f32 properties"));
+                    }
+                    Ok((node, AttrValue::Float(score as f32)))
+                })
+                .collect::<Result<_>>()?;
 
             ctx.with_scoped_timer("closeness.write_attributes", || {
                 subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
             })
             .map_err(|err| anyhow!("failed to persist closeness scores: {err}"))?;
+        } else {
+            ctx.add_output(
+                format!("{}.scores", self.id()),
+                AlgorithmOutput::NodeScores(scores),
+            );
         }
 
         ctx.record_duration("closeness.total_execution", t0.elapsed());
@@ -306,6 +417,16 @@ pub fn register(registry: &Registry) -> Result<()> {
     let id = metadata.id.clone();
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
         let harmonic = spec.params.get_bool("harmonic").unwrap_or(true);
+        let normalized = spec.params.get_bool("normalized").unwrap_or(false);
+        let direction = match spec.params.get_text("direction").unwrap_or("outgoing") {
+            "outgoing" => ClosenessDirection::Outgoing,
+            "incoming" => ClosenessDirection::Incoming,
+            other => {
+                return Err(anyhow!(
+                    "invalid closeness direction {other:?}; use outgoing or incoming"
+                ))
+            }
+        };
         let weight_attr = spec
             .params
             .get_text("weight_attr")
@@ -315,11 +436,11 @@ pub fn register(registry: &Registry) -> Result<()> {
             .get_text("output_attr")
             .unwrap_or("closeness")
             .to_string();
-        Ok(Box::new(ClosenessCentrality::new(
-            harmonic,
-            weight_attr,
-            output_attr.into(),
-        )) as Box<dyn Algorithm>)
+        Ok(Box::new(
+            ClosenessCentrality::new(harmonic, weight_attr, output_attr.into())
+                .with_direction(direction)
+                .with_normalization(normalized),
+        ) as Box<dyn Algorithm>)
     })
 }
 
