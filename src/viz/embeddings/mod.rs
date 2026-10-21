@@ -285,12 +285,18 @@ impl EmbeddingEngineFactory {
                 iterations,
                 learning_rate,
                 annealing,
-            } => Ok(Box::new(energy::EnergyEmbedding::new(
-                *iterations,
-                *learning_rate,
-                *annealing,
-                config.energy_function.clone(),
-            ))),
+            } => {
+                let mut engine = energy::EnergyEmbedding::new(
+                    *iterations,
+                    *learning_rate,
+                    *annealing,
+                    config.energy_function.clone(),
+                );
+                if let Some(seed) = config.seed {
+                    engine = engine.with_seed(seed);
+                }
+                Ok(Box::new(engine))
+            }
 
             EmbeddingMethod::RandomND {
                 distribution,
@@ -305,11 +311,17 @@ impl EmbeddingEngineFactory {
                 spring_constant,
                 repulsion_strength,
                 iterations,
-            } => Ok(Box::new(energy::ForceDirectedEmbedding::new(
-                *spring_constant,
-                *repulsion_strength,
-                *iterations,
-            ))),
+            } => {
+                let mut engine = energy::ForceDirectedEmbedding::new(
+                    *spring_constant,
+                    *repulsion_strength,
+                    *iterations,
+                );
+                if let Some(seed) = config.seed {
+                    engine = engine.with_seed(seed);
+                }
+                Ok(Box::new(engine))
+            }
 
             EmbeddingMethod::CustomMatrix { matrix } => {
                 Ok(Box::new(CustomMatrixEmbedding::new((**matrix).clone())))
