@@ -706,15 +706,7 @@ pub trait SubgraphOperations: GraphEntity {
         // Handle original nodes based on node strategy AFTER all processing is complete
         match edge_config.node_strategy {
             NodeStrategy::Extract => {
-                // Extract: Mark original nodes as absorbed but keep them in graph (current behavior)
-                let entity_type_attrs = self
-                    .node_set()
-                    .iter()
-                    .map(|&node_id| (node_id, AttrValue::Text("base".to_string())))
-                    .collect();
-                let mut bulk_attrs = std::collections::HashMap::new();
-                bulk_attrs.insert("entity_type".into(), entity_type_attrs);
-                self.set_node_attrs(bulk_attrs)?;
+                // Preserve original base/meta identity; extraction does not change it.
             }
             NodeStrategy::Collapse => {
                 // Collapse: Remove original nodes from the graph completely

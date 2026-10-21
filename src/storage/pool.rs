@@ -35,7 +35,7 @@ This separation allows:
 - Easier testing and reasoning
 */
 
-use crate::errors::GraphResult;
+use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId};
 use std::collections::HashMap;
 
@@ -412,13 +412,6 @@ impl GraphPool {
         if node_id >= self.next_node_id {
             self.next_node_id = node_id + 1;
         }
-    }
-
-    /// Preserve allocated IDs when rebuilding an earlier working state. Historical
-    /// branches may still refer to IDs absent from the selected snapshot.
-    pub(crate) fn reserve_id_counters(&mut self, next_node_id: NodeId, next_edge_id: EdgeId) {
-        self.next_node_id = self.next_node_id.max(next_node_id);
-        self.next_edge_id = self.next_edge_id.max(next_edge_id);
     }
 
     /// Ensure internal edge vectors can address the requested edge slot
@@ -886,7 +879,8 @@ impl GraphPool {
         Ok(incident_edges)
     }
 
-    /// Store subgraph data in GraphPool (placeholder for now)
+    /// Store immutable subgraph membership. Equal selections share a reference.
+    /// Removing an entity from a working state does not rewrite retained selections.
     pub fn store_subgraph(
         &mut self,
         nodes: std::collections::HashSet<NodeId>,
@@ -909,9 +903,18 @@ impl GraphPool {
         subgraph_type.hash(&mut hasher);
         let subgraph_id = (hasher.finish() as usize) as crate::types::SubgraphId;
 
-        // Store the subgraph data
-        self.stored_subgraphs
-            .insert(subgraph_id, (nodes, edges, subgraph_type));
+        let content = (nodes, edges, subgraph_type);
+        match self.stored_subgraphs.entry(subgraph_id) {
+            std::collections::hash_map::Entry::Vacant(slot) => {
+                slot.insert(content);
+            }
+            std::collections::hash_map::Entry::Occupied(slot) if slot.get() == &content => {}
+            std::collections::hash_map::Entry::Occupied(_) => {
+                return Err(GraphError::InvalidInput(
+                    "Stored subgraph reference collision; retained content was not replaced".into(),
+                ));
+            }
+        }
 
         Ok(subgraph_id)
     }
@@ -959,21 +962,17 @@ impl GraphPool {
         Ok(())
     }
 
-    /// Update all stored subgraphs to remove a deleted edge (maintains consistency)
-    pub fn update_stored_subgraphs_remove_edge(&mut self, removed_edge: EdgeId) {
-        // Update all stored subgraphs that contain the removed edge
-        for (_subgraph_id, (_nodes, edges, _subgraph_type)) in self.stored_subgraphs.iter_mut() {
-            edges.remove(&removed_edge);
-        }
-    }
+    /// Compatibility no-op: working-edge deletion cannot alter retained selections.
+    #[deprecated(
+        note = "Deactivate edges through Graph; retained subgraph membership is immutable"
+    )]
+    pub fn update_stored_subgraphs_remove_edge(&mut self, _removed_edge: EdgeId) {}
 
-    /// Update all stored subgraphs to remove a deleted node (maintains consistency)
-    pub fn update_stored_subgraphs_remove_node(&mut self, removed_node: NodeId) {
-        // Update all stored subgraphs that contain the removed node
-        for (_subgraph_id, (nodes, _edges, _subgraph_type)) in self.stored_subgraphs.iter_mut() {
-            nodes.remove(&removed_node);
-        }
-    }
+    /// Compatibility no-op: working-node deletion cannot alter retained selections.
+    #[deprecated(
+        note = "Deactivate nodes through Graph; retained subgraph membership is immutable"
+    )]
+    pub fn update_stored_subgraphs_remove_node(&mut self, _removed_node: NodeId) {}
 }
 
 /// Statistics about the current state of the graph store

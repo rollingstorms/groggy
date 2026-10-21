@@ -645,11 +645,6 @@ impl Graph {
         self.change_tracker.record_node_removal(node);
         self.space.deactivate_node(node);
 
-        // CONSISTENCY FIX: Update stored subgraphs to remove the deleted node
-        self.pool
-            .borrow_mut()
-            .update_stored_subgraphs_remove_node(node);
-
         Ok(())
     }
 
@@ -666,11 +661,6 @@ impl Graph {
         self.change_tracker.record_edge_removal(edge);
         self.space.deactivate_edge(edge);
 
-        // CONSISTENCY FIX: Update stored subgraphs to remove the deleted edge
-        self.pool
-            .borrow_mut()
-            .update_stored_subgraphs_remove_edge(edge);
-
         Ok(())
     }
 
@@ -679,11 +669,6 @@ impl Graph {
         if self.space.contains_edge(edge) {
             self.change_tracker.record_edge_removal(edge);
             self.space.deactivate_edge(edge);
-
-            // CONSISTENCY FIX: Update stored subgraphs to remove the deleted edge
-            self.pool
-                .borrow_mut()
-                .update_stored_subgraphs_remove_edge(edge);
         }
         Ok(())
     }
@@ -1129,8 +1114,8 @@ impl Graph {
 
         // REQUIREMENT 2: Must have contains_subgraph reference
         match self.get_node_attr(node_id, &"contains_subgraph".into())? {
-            Some(AttrValue::SubgraphRef(_subgraph_id)) => {
-                // TODO: Validate subgraph exists in pool
+            Some(AttrValue::SubgraphRef(subgraph_id)) => {
+                self.pool.borrow().get_subgraph(subgraph_id)?;
                 Ok(())
             }
             _ => Err(GraphError::InvalidInput(format!(
@@ -1157,6 +1142,8 @@ impl Graph {
     /// SAFE: Create a meta-node atomically with required attributes
     /// SAFETY: All-or-nothing creation with validation
     pub fn create_meta_node(&mut self, subgraph_id: SubgraphId) -> Result<NodeId, GraphError> {
+        // Reject a dangling reference before allocating or recording any change.
+        self.pool.borrow().get_subgraph(subgraph_id)?;
         // Step 1: Create and activate the node ID
         let node_id = self.pool.borrow_mut().add_node();
         self.space.activate_node(node_id);
@@ -2413,11 +2400,21 @@ impl Graph {
         snapshot: crate::state::state::GraphSnapshot,
     ) -> Result<(), GraphError> {
         let identity_bindings = self.snapshot_identity_bindings(&snapshot)?;
-        let allocated = self.pool.borrow().statistics();
-        // 1. Clear current state
-        self.pool = Rc::new(RefCell::new(
-            crate::storage::pool::GraphPool::new_with_type(snapshot.graph_type),
-        ));
+        // A standalone snapshot must not manufacture a dangling pooled reference.
+        // State switches on this graph can resolve references in its retained pool.
+        for attrs in snapshot
+            .node_attributes
+            .values()
+            .chain(snapshot.edge_attributes.values())
+        {
+            for value in attrs.values() {
+                if let AttrValue::SubgraphRef(id) = value {
+                    self.pool.borrow().get_subgraph(*id)?;
+                }
+            }
+        }
+        // Reset selected membership and column mappings, not the retained pool.
+        // Older branches, stored subgraphs and column indices still own data here.
         self.space = crate::state::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
         self.config.graph_type = snapshot.graph_type;
 
@@ -2464,11 +2461,6 @@ impl Graph {
                 }
             }
         }
-
-        // Switching branches must not recycle IDs held by the branch we left.
-        self.pool
-            .borrow_mut()
-            .reserve_id_counters(allocated.node_count, allocated.edge_count);
 
         self.retain_snapshot_identity_bindings(identity_bindings);
         Ok(())
