@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
-use crate::algorithms::community::modularity::{modularity_delta, ModularityData};
+use crate::algorithms::community::modularity::{modularity_delta_with_resolution, ModularityData};
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -72,7 +72,6 @@ impl NodeIndexer {
 pub struct Louvain {
     max_iter: usize,
     max_phases: usize,
-    #[allow(dead_code)]
     resolution: f64,
     output_attr: AttrName,
 }
@@ -90,8 +89,8 @@ impl Louvain {
         if max_phases == 0 {
             return Err(anyhow!("max_phases must be greater than zero"));
         }
-        if resolution <= 0.0 {
-            return Err(anyhow!("resolution must be positive"));
+        if !resolution.is_finite() || resolution <= 0.0 {
+            return Err(anyhow!("resolution must be finite and positive"));
         }
         Ok(Self {
             max_iter,
@@ -119,14 +118,14 @@ impl Louvain {
                 },
                 ParameterMetadata {
                     name: "max_phases".to_string(),
-                    description: "Maximum number of coarse-graining phases.".to_string(),
+                    description: "Reserved phase bound; currently performs one local-move phase.".to_string(),
                     value_type: ParameterType::Int,
                     required: false,
                     default_value: Some(AlgorithmParamValue::Int(1)),
                 },
                 ParameterMetadata {
                     name: "resolution".to_string(),
-                    description: "Resolution parameter (currently informational).".to_string(),
+                    description: "Positive finite modularity resolution (gamma); smaller favors larger communities.".to_string(),
                     value_type: ParameterType::Float,
                     required: false,
                     default_value: Some(AlgorithmParamValue::Float(1.0)),
@@ -154,6 +153,13 @@ impl Algorithm for Louvain {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let start_time = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("community detection cancelled"));
+        }
+        if subgraph.graph().borrow().is_directed() {
+            return Err(anyhow!("louvain currently requires an undirected graph"));
+        }
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
 
         // === PHASE 1: Collect Nodes ===
         let collect_start = Instant::now();
@@ -175,10 +181,6 @@ impl Algorithm for Louvain {
         let edges = subgraph.ordered_edges();
         ctx.record_call("louvain.collect_edges", edges_start.elapsed());
         ctx.record_stat("louvain.count.input_edges", edges.len() as f64);
-
-        if edges.is_empty() {
-            return Ok(subgraph);
-        }
 
         // === PHASE 4: Build or Get CSR ===
         let is_directed = subgraph.graph().borrow().is_directed();
@@ -237,10 +239,8 @@ impl Algorithm for Louvain {
             let mut list = Vec::new();
             for &edge_id in edges.iter() {
                 if let Some((u, v)) = pool_ref.get_edge_endpoints(edge_id) {
-                    if u != v {
-                        let pair = if u <= v { (u, v) } else { (v, u) };
-                        list.push(pair);
-                    }
+                    let pair = if u <= v { (u, v) } else { (v, u) };
+                    list.push(pair);
                 }
             }
             list
@@ -261,13 +261,11 @@ impl Algorithm for Louvain {
 
         // Track community degrees and internal edges incrementally
         let mut community_degrees: HashMap<usize, f64> = HashMap::new();
-        let mut community_internal: HashMap<usize, f64> = HashMap::new();
 
         // Initialize community stats (each node starts in its own community)
         for (&node, &comm) in &partition {
             let deg = modularity_data.degree(&node);
             *community_degrees.entry(comm).or_insert(0.0) += deg;
-            *community_internal.entry(comm).or_insert(0.0) += 0.0;
         }
 
         let epsilon = 1e-6;
@@ -295,7 +293,7 @@ impl Algorithm for Louvain {
                     let current_comm = partition[&node];
 
                     // Find candidate communities using CSR neighbors
-                    let mut candidate_comms: HashSet<usize> = HashSet::new();
+                    let mut candidate_comms: BTreeSet<usize> = BTreeSet::new();
                     candidate_comms.insert(current_comm);
 
                     for &neighbor_idx in csr.neighbors(node_idx) {
@@ -326,7 +324,7 @@ impl Algorithm for Louvain {
                             continue;
                         }
 
-                        let delta = modularity_delta(
+                        let delta = modularity_delta_with_resolution(
                             node,
                             current_comm,
                             candidate,
@@ -334,8 +332,11 @@ impl Algorithm for Louvain {
                             &node_adjacency,
                             &modularity_data,
                             &community_degrees,
-                            &community_internal,
+                            self.resolution,
                         );
+                        if !delta.is_finite() {
+                            return Err(anyhow!("Louvain modularity gain is not finite"));
+                        }
 
                         if delta > best_delta + epsilon {
                             best_delta = delta;
@@ -429,8 +430,10 @@ pub fn register(registry: &Registry) -> Result<()> {
     let metadata = Louvain::metadata_template();
     let id = metadata.id.clone();
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
-        let max_iter = spec.params.get_int("max_iter").unwrap_or(20).max(1) as usize;
-        let max_phases = spec.params.get_int("max_phases").unwrap_or(1).max(1) as usize;
+        let max_iter = usize::try_from(spec.params.get_int("max_iter").unwrap_or(20))
+            .map_err(|_| anyhow!("max_iter must be positive and fit usize"))?;
+        let max_phases = usize::try_from(spec.params.get_int("max_phases").unwrap_or(1))
+            .map_err(|_| anyhow!("max_phases must be positive and fit usize"))?;
         let resolution = spec.params.get_float("resolution").unwrap_or(1.0);
         let output_attr = spec
             .params

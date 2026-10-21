@@ -49,10 +49,12 @@ def louvain(
     Louvain modularity optimization for community detection.
 
     Finds communities by optimizing modularity, a measure of network
-    structure quality. Tends to find more cohesive communities than LPA.
+    structure quality. Supports undirected unweighted multigraphs, retaining
+    parallel instances and self-loops. This currently runs local node moves;
+    graph aggregation and multilevel optimization remain incomplete.
 
     Args:
-        resolution: Resolution parameter (default: 1.0)
+        resolution: Finite positive gamma applied to the modularity null-model term
         max_iter: Maximum iterations (default: 100)
         output_attr: Attribute name for community labels (default: "community")
 
@@ -83,15 +85,15 @@ def leiden(
     """
     Leiden community detection algorithm.
 
-    An improvement over Louvain that guarantees connected communities and
-    typically converges faster with better quality. Adds a refinement phase
-    that splits poorly connected communities.
+    Runs local modularity moves and splits disconnected communities on
+    undirected unweighted multigraphs. Full Leiden refinement/aggregation
+    remains incomplete. Parallel instances and self-loops are retained.
 
     Args:
-        resolution: Resolution parameter for modularity (default: 1.0)
+        resolution: Finite positive gamma applied to the modularity null-model term
         max_iter: Maximum node-move iterations per phase (default: 20)
         max_phases: Maximum number of refinement phases (default: 10)
-        seed: Random seed for reproducibility (optional)
+        seed: Nonnegative local shuffle seed for repeatable node order (optional)
         output_attr: Attribute name for community labels (default: "community")
 
     Returns:

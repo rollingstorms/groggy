@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::community::modularity::{modularity_delta, ModularityData};
+use crate::algorithms::community::modularity::{modularity_delta_with_resolution, ModularityData};
 use crate::algorithms::community::utils::find_connected_components;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
@@ -42,8 +42,8 @@ impl Leiden {
         if max_phases == 0 {
             return Err(anyhow!("max_phases must be greater than zero"));
         }
-        if resolution <= 0.0 {
-            return Err(anyhow!("resolution must be positive"));
+        if !resolution.is_finite() || resolution <= 0.0 {
+            return Err(anyhow!("resolution must be finite and positive"));
         }
         Ok(Self {
             max_iter,
@@ -113,7 +113,12 @@ impl Leiden {
         ctx: &Context,
     ) -> Result<bool> {
         let mut changed = false;
-        let nodes: Vec<NodeId> = partition.keys().copied().collect();
+        let mut nodes: Vec<NodeId> = partition.keys().copied().collect();
+        nodes.sort_unstable();
+        if let Some(seed) = self.seed {
+            let mut rng = fastrand::Rng::with_seed(seed);
+            rng.shuffle(&mut nodes);
+        }
 
         // ⚡ OPTIMIZATION: Track community degrees incrementally
         let mut community_degrees: HashMap<usize, f64> = HashMap::new();
@@ -121,9 +126,6 @@ impl Leiden {
             let deg = data.degree(&node);
             *community_degrees.entry(comm).or_insert(0.0) += deg;
         }
-
-        // Track community internal edges (unused but needed for modularity_delta signature)
-        let community_internal: HashMap<usize, f64> = HashMap::new();
 
         for _ in 0..self.max_iter {
             if ctx.is_cancelled() {
@@ -136,7 +138,7 @@ impl Leiden {
                 let current_comm = partition[&node];
 
                 // Find candidate communities (neighbors' communities)
-                let mut candidate_comms: HashSet<usize> = HashSet::new();
+                let mut candidate_comms: BTreeSet<usize> = BTreeSet::new();
                 candidate_comms.insert(current_comm);
                 if let Some(neighbors) = adjacency.get(&node) {
                     for &neighbor in neighbors {
@@ -156,7 +158,7 @@ impl Leiden {
                     }
 
                     // Calculate delta without expensive iteration
-                    let delta = modularity_delta(
+                    let delta = modularity_delta_with_resolution(
                         node,
                         current_comm,
                         candidate,
@@ -164,11 +166,12 @@ impl Leiden {
                         adjacency,
                         data,
                         &community_degrees,
-                        &community_internal,
+                        self.resolution,
                     );
-
-                    // Apply resolution parameter
-                    let gain = delta * self.resolution;
+                    if !delta.is_finite() {
+                        return Err(anyhow!("Leiden modularity gain is not finite"));
+                    }
+                    let gain = delta;
 
                     if gain > best_delta {
                         best_delta = gain;
@@ -224,7 +227,10 @@ impl Leiden {
         let mut changed = false;
         let mut next_comm_id = partition.values().max().copied().unwrap_or(0) + 1;
 
-        for (comm_id, nodes) in communities {
+        let mut communities: Vec<_> = communities.into_iter().collect();
+        communities.sort_unstable_by_key(|(id, _)| *id);
+        for (comm_id, mut nodes) in communities {
+            nodes.sort_unstable();
             if nodes.len() <= 1 {
                 continue;
             }
@@ -265,30 +271,29 @@ impl Algorithm for Leiden {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        if let Some(seed) = self.seed {
-            fastrand::seed(seed);
+        if ctx.is_cancelled() {
+            return Err(anyhow!("community detection cancelled"));
         }
+        if subgraph.graph().borrow().is_directed() {
+            return Err(anyhow!("leiden currently requires an undirected graph"));
+        }
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
 
-        let nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
+        let nodes = subgraph.ordered_nodes();
         if nodes.is_empty() {
             return Ok(subgraph);
         }
 
         // Build edge list and adjacency
-        let mut edge_set: HashSet<(NodeId, NodeId)> = HashSet::new();
+        let mut edges = Vec::new();
         let graph_ref = subgraph.graph();
         let graph = graph_ref.borrow();
-        for &edge_id in subgraph.edge_set() {
+        for &edge_id in subgraph.ordered_edges().iter() {
             let (u, v) = graph.edge_endpoints(edge_id)?;
-            if u == v {
-                continue;
-            }
             let pair = if u <= v { (u, v) } else { (v, u) };
-            edge_set.insert(pair);
+            edges.push(pair);
         }
         drop(graph);
-
-        let edges: Vec<(NodeId, NodeId)> = edge_set.into_iter().collect();
 
         let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
         for &(u, v) in &edges {
@@ -325,9 +330,10 @@ impl Algorithm for Leiden {
         // Relabel communities to be contiguous
         let mut comm_map: HashMap<usize, usize> = HashMap::new();
         let mut next_id = 0;
-        for comm in partition.values() {
-            if !comm_map.contains_key(comm) {
-                comm_map.insert(*comm, next_id);
+        for node in nodes.iter() {
+            let comm = partition[node];
+            if let std::collections::hash_map::Entry::Vacant(entry) = comm_map.entry(comm) {
+                entry.insert(next_id);
                 next_id += 1;
             }
         }
@@ -354,10 +360,16 @@ pub fn register(registry: &Registry) -> Result<()> {
     let metadata = Leiden::metadata_template();
     let id = metadata.id.clone();
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
-        let max_iter = spec.params.get_int("max_iter").unwrap_or(20).max(1) as usize;
-        let max_phases = spec.params.get_int("max_phases").unwrap_or(10).max(1) as usize;
+        let max_iter = usize::try_from(spec.params.get_int("max_iter").unwrap_or(20))
+            .map_err(|_| anyhow!("max_iter must be positive and fit usize"))?;
+        let max_phases = usize::try_from(spec.params.get_int("max_phases").unwrap_or(10))
+            .map_err(|_| anyhow!("max_phases must be positive and fit usize"))?;
         let resolution = spec.params.get_float("resolution").unwrap_or(1.0);
-        let seed = spec.params.get_int("seed").map(|s| s as u64);
+        let seed = spec
+            .params
+            .get_int("seed")
+            .map(|s| u64::try_from(s).map_err(|_| anyhow!("seed must be nonnegative")))
+            .transpose()?;
         let output_attr = spec
             .params
             .get_text("output_attr")
@@ -373,6 +385,7 @@ mod tests {
     use super::*;
     use crate::api::graph::Graph;
     use std::cell::RefCell;
+    use std::collections::HashSet;
     use std::rc::Rc;
 
     fn make_two_cliques() -> (Graph, Vec<NodeId>) {

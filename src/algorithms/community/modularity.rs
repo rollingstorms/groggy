@@ -42,6 +42,18 @@ pub fn modularity(
     edges: &[(NodeId, NodeId)],
     data: &ModularityData,
 ) -> f64 {
+    modularity_with_resolution(partition, edges, data, 1.0)
+}
+
+/// Undirected modularity Q = sum_C [L_C/m - resolution * (K_C/(2m))^2].
+/// Parallel edge instances and loops are retained; each loop contributes degree two.
+/// Callers must provide a finite positive resolution and consistent complete data.
+pub fn modularity_with_resolution(
+    partition: &HashMap<NodeId, usize>,
+    edges: &[(NodeId, NodeId)],
+    data: &ModularityData,
+    resolution: f64,
+) -> f64 {
     let m = data.total_edges();
     if m == 0.0 {
         return 0.0;
@@ -63,11 +75,14 @@ pub fn modularity(
     }
 
     let mut q = 0.0;
-    for (&community, &tot) in &sum_tot {
+    let mut communities: Vec<_> = sum_tot.keys().copied().collect();
+    communities.sort_unstable();
+    for community in communities {
+        let tot = sum_tot[&community];
         let in_weight = sum_in.get(&community).copied().unwrap_or(0.0);
         let term_in = in_weight / m;
         let term_tot = (tot / (2.0 * m)).powi(2);
-        q += term_in - term_tot;
+        q += term_in - resolution * term_tot;
     }
 
     q
@@ -96,6 +111,32 @@ pub fn modularity_delta(
     data: &ModularityData,
     community_degrees: &HashMap<usize, f64>,
     _community_internal: &HashMap<usize, f64>,
+) -> f64 {
+    modularity_delta_with_resolution(
+        node,
+        old_comm,
+        new_comm,
+        partition,
+        adjacency,
+        data,
+        community_degrees,
+        1.0,
+    )
+}
+
+/// Full move gain at the requested resolution. Adjacency retains edge multiplicity;
+/// self-neighbors are ignored because loops remain internal before and after a move.
+/// Community degrees include the moving node in its old community.
+/// Callers must provide a finite positive resolution and consistent complete data.
+pub fn modularity_delta_with_resolution(
+    node: NodeId,
+    old_comm: usize,
+    new_comm: usize,
+    partition: &HashMap<NodeId, usize>,
+    adjacency: &HashMap<NodeId, Vec<NodeId>>,
+    data: &ModularityData,
+    community_degrees: &HashMap<usize, f64>,
+    resolution: f64,
 ) -> f64 {
     if old_comm == new_comm {
         return 0.0;
@@ -135,12 +176,6 @@ pub fn modularity_delta(
     let sum_tot_new = community_degrees.get(&new_comm).copied().unwrap_or(0.0);
     let sum_tot_old = community_degrees.get(&old_comm).copied().unwrap_or(0.0);
 
-    // Modularity delta when moving from old to new
-    // Remove contribution from old community
-    let delta_old = -k_i_in_old / m + (sum_tot_old * k_i) / (2.0 * m * m);
-
-    // Add contribution to new community
-    let delta_new = k_i_in_new / m - ((sum_tot_new + k_i) * k_i) / (2.0 * m * m);
-
-    delta_old + delta_new
+    (k_i_in_new - k_i_in_old) / m
+        + resolution * ((k_i / (2.0 * m)) * ((sum_tot_old - sum_tot_new - k_i) / m))
 }
