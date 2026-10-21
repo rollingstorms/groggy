@@ -903,15 +903,24 @@ impl<T: NumericType> GraphMatrix<T> {
 
         for i in 0..self_rows {
             for j in 0..other_cols {
+                let floating = T::DTYPE.is_float();
+                let mut dot = super::dot_product::Dot::new();
                 let mut sum = T::zero();
                 for k in 0..self_cols {
-                    let a = self.get(i, k).ok_or_else(|| {
-                        GraphError::InvalidInput(format!("Invalid cell at ({}, {})", i, k))
+                    let a = self.get_checked(i, k)?;
+                    let b = other.get_checked(k, j)?;
+                    if floating {
+                        dot.add(a.to_f64(), b.to_f64());
+                    } else {
+                        sum = T::add(sum, T::mul(a, b));
+                    }
+                }
+                if floating {
+                    sum = T::from_f64(dot.total()).ok_or_else(|| {
+                        GraphError::InvalidInput(
+                            "Dot product cannot be represented in output dtype".into(),
+                        )
                     })?;
-                    let b = other.get(k, j).ok_or_else(|| {
-                        GraphError::InvalidInput(format!("Invalid cell at ({}, {})", k, j))
-                    })?;
-                    sum = T::add(sum, T::mul(a, b));
                 }
                 result.set(i, j, sum)?;
             }

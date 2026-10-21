@@ -521,3 +521,6 @@ Retain zero for empty inner arrays and the existing permissive numeric projectio
 
 ### Item 29 Rust matrix operator results — 2026-10-21
 Choose an explicit source-level Rust operator migration: +, - and * return GraphResult for borrowed and owned matrices, sharing checked named methods rather than returning substitute zeros or panicking. Propagate errors and check output sizes. Product metadata comes from left rows and right columns; operands are positional. Downstream callers use ? or match; Python syntax stays unchanged. NumericType overflow and stable dot-product accumulation remain separate work.
+
+### Item 29 floating dot products — 2026-10-21
+Use an in-house fixed-bin reference accumulator to avoid intermediate floating overflow, underflow and cancellation loss in GraphMatrix products. Preserve IEEE input behavior and round finite f64 dots once. f32 still narrows through f64. Record the measured cost before optimizing; do not claim the lower-level numerical backends are covered.
