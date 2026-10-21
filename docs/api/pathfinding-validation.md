@@ -38,8 +38,33 @@ Weighted distance/tie comparisons use exact computed f64 values, without an abso
 
 Checks include an independent exhaustive simple edge-path enumerator for directed/undirected, normalized/raw, weighted/unit multigraphs with loops and an isolate; cache reuse, tiny lengths, invalid weights, stale selections, rounded-away distances and path-count overflow are covered. See `tests/betweenness_validation.rs` and `tests/test_betweenness_validation.py`.
 
+## Checked Girvan–Newman
+
+`algorithms.community.girvan_newman(...)` exposes the existing Rust algorithm through a thin Python handle factory. It accepts undirected selected graphs and rejects directed input explicitly. All selected IDs and lengths are validated even with zero removal budget or a trivial graph. Weighted lengths are strictly positive finite numeric scalars, including compact integers, with missing values one. Unit mode ignores unused weight properties. Numerical limits match checked Brandes: exact computed f64 ties, advancing distances, finite path counts/dependencies; invalid input leaves previous output properties intact.
+
+The local CSR stores edge-instance indices in both orientations. Equal-cost parallel edges contribute distinct shortest paths. Each iteration removes only one edge instance, recalculates scores, and permits more expensive surviving parallels to become shortest paths. Equal removal scores choose the lowest edge ID. Self-loops do not connect components or participate in removals/shortest paths; they remain in original-graph modularity, contributing twice to degree. The source graph's edges and shared topology cache are unchanged.
+
+`num_levels` is a maximum number of individual non-loop edge removals. Zero returns initial components. The initial partition and every visited partition **after** removal are scored, including after the final permitted removal. Scoring always uses all original selected edge instances and degrees, rather than the progressively cut graph. Modularity is unweighted; supplied lengths do not mean connection strength. Equal computed partition scores retain the earlier partition. Community labels are assigned by component traversal in sorted node-ID order.
+
+The default modularity stopping threshold is 0.0001. An explicit threshold must be finite and nonnegative; execution stops when the visited score falls below the best by more than that amount. Negative level budgets reject before unsigned conversion. The result is the best visited partition under this stopping rule, not a global modularity optimum or an exported dendrogram. Empty graphs, one-node graphs, isolates and disconnected selections are valid. Cancellation is checked before work and within shortest-path processing.
+
+```python
+from groggy import Graph, algorithms
+
+graph = Graph()
+nodes = [graph.add_node() for _ in range(6)]
+for u, v in [(0, 1), (1, 2), (2, 0), (2, 3), (3, 4), (4, 5), (5, 3)]:
+    graph.add_edge(nodes[u], nodes[v])
+graph.induced_subgraph(nodes).apply(
+    algorithms.community.girvan_newman(num_levels=1)
+)
+assert graph.get_node_attr(nodes[0], "community") != graph.get_node_attr(nodes[3], "community")
+```
+
+The edge-instance CSR and work buffers use O(V+E) additional memory. Recomputing all-source betweenness after each removal is expensive; this remains a small-graph algorithm and no throughput improvement is claimed. Tests include an independent exhaustive edge-path score reference before/after removals, parallel bridges, original-graph modularity, reversed stored orientations, loops, isolates, empty/singleton graphs, invalid input, numerical failures and cancellation. See `src/algorithms/community/girvan_newman_paths.rs`, `tests/girvan_newman_validation.rs` and `tests/test_girvan_newman_validation.py`.
+
 ## Remaining audit
 
-These fixes do not complete all graph algorithms. Other weighted callers such as Girvan–Newman still use the older weight collector and need their own domain/identity audits. Low-level callback-based Dijkstra utilities retain their existing signatures and require callers to supply valid nonnegative finite weights. Broader max-path/heuristic options, filters, cancellation, pinned view ownership, and algorithm-specific directed/weight definitions remain items 21/26/28/30. Algorithm persistence remains the legacy manual-grouping API, not a newly durable mutation boundary.
+These fixes do not complete all graph algorithms. Girvan–Newman now has an explicit supported domain, but other community algorithms and their own weight/direction definitions still need auditing. Low-level callback-based Dijkstra utilities retain their existing signatures and require callers to supply valid nonnegative finite weights. Broader max-path/heuristic options, filters, cancellation, pinned view ownership, and algorithm-specific directed/weight definitions remain items 21/26/28/30. Algorithm persistence remains the legacy manual-grouping API, not a newly durable mutation boundary.
 
 Tests cover live/dead endpoints, invalid/missing/zero/compact weights, reverse traversal, parallel minima, tiny-cost improvements, output range rejection, and direct distances compared with an independent Floyd-Warshall fixture. Python tests exercise the same public graph entry points. NetworkX was not available in the current test environment; no external graph backend comparison is claimed by this slice.

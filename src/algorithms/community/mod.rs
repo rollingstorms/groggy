@@ -1,5 +1,6 @@
 mod components;
 mod girvan_newman;
+mod girvan_newman_paths;
 mod infomap;
 mod leiden;
 mod louvain;

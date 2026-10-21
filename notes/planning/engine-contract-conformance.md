@@ -62,3 +62,8 @@ Item 28 A*: shared selected-state/weight validation now covers A*. Presence mark
 
 
 Item 28 node betweenness: finite strictly positive weighted lengths (missing one), live selection validation, exact computed f64 ties, minimum parallel lengths with retained equal edge-instance multiplicity, correct directed raw scaling and normalized factors. Local weighted CSR does not overwrite shared topology. Numerical failures preserve prior outputs. Tests: tests/betweenness_validation.rs (independent exhaustive edge-path reference and failure cases), tests/test_betweenness_validation.py. Girvan–Newman/community audit remains open.
+
+
+Item 28 Girvan–Newman: explicit undirected input domain, live selection and positive finite lengths, one-edge-instance removals with symmetric local CSR, minimum-ID removal ties, and original-graph unweighted modularity for initial and all visited post-removal partitions. Zero budget, loops, isolates and empty/singleton inputs have defined behavior. Negative budgets, invalid thresholds, stale selections and numerical failures reject before writing labels; traversal supports cancellation. Tests: src/algorithms/community/girvan_newman_paths.rs (exhaustive edge-path score reference), tests/girvan_newman_validation.rs, tests/test_girvan_newman_validation.py. Other community algorithms and wider item 28 contracts remain open.
+
+Item 5 zero-count allocation: Graph::add_nodes(0) and GraphPool::add_nodes_bulk(0) return no allocated IDs without advancing the counter; pool empty range endpoints are documented. Tests: tests/zero_bulk_allocation.rs. Found by the item 28 empty-graph fixture and committed separately as a121fc0b.

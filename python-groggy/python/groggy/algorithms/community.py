@@ -145,3 +145,37 @@ def connected_components(
     }
 
     return RustAlgorithmHandle("community.connected_components", params)
+
+
+def girvan_newman(
+    num_levels: Optional[int] = None,
+    modularity_threshold: Optional[float] = None,
+    weight_attr: Optional[str] = None,
+    output_attr: str = "community",
+) -> RustAlgorithmHandle:
+    """Find a partition of an undirected graph by edge betweenness removal.
+
+    Removes individual edge instances locally and returns the best visited
+    partition under unweighted modularity of the original selected graph.
+    Equal removal scores choose the lowest edge ID; equal partition scores
+    retain the earlier partition. Graph topology is not changed.
+
+    Args:
+        num_levels: Maximum individual non-loop edge removals; zero returns
+            initial components. Default is all non-loop edges, subject to stopping.
+        modularity_threshold: Stop when modularity falls below the best by more
+            than this finite nonnegative amount (default: 0.0001).
+        weight_attr: Optional strictly positive finite numeric edge lengths;
+            missing values are one. Lengths do not weight modularity.
+        output_attr: Node attribute for community labels.
+
+    Intended for small graphs. Directed graphs are currently unsupported.
+    """
+    params = {"output_attr": output_attr}
+    if num_levels is not None:
+        params["num_levels"] = num_levels
+    if modularity_threshold is not None:
+        params["modularity_threshold"] = modularity_threshold
+    if weight_attr is not None:
+        params["weight_attr"] = weight_attr
+    return RustAlgorithmHandle("community.girvan_newman", params)
