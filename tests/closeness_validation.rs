@@ -188,17 +188,17 @@ fn empty_singleton_sparse_parallel_and_cached_direction_cases() {
     graph.add_edge(2, 3).unwrap();
     graph.add_edge(2, 2).unwrap();
     let g = Rc::new(RefCell::new(graph));
-    let sub = selected(&g);
+    let mut sub = selected(&g);
     for incoming in [true, false, true, false] {
         let mut ctx = Context::new();
         ctx.set_persist_results(false);
-        ClosenessCentrality::new(true, Some("w".into()), "c".into())
+        sub = ClosenessCentrality::new(true, Some("w".into()), "c".into())
             .with_direction(if incoming {
                 ClosenessDirection::Incoming
             } else {
                 ClosenessDirection::Outgoing
             })
-            .execute(&mut ctx, sub.clone())
+            .execute(&mut ctx, sub)
             .unwrap();
         let AlgorithmOutput::NodeScores(values) = ctx
             .take_outputs()

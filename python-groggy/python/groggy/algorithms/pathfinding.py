@@ -49,11 +49,13 @@ def bfs(start_attr: str, output_attr: str = "distance") -> RustAlgorithmHandle:
     """
     Breadth-First Search for unweighted shortest paths.
 
-    Computes shortest path distances using BFS from source nodes.
-    Faster than Dijkstra for unweighted graphs.
+    Computes unweighted shortest distances from exactly one marked selected node.
+    Directed graphs follow outgoing edges; undirected edges traverse both ways.
+    Nonpersistent profile output uses pathfinding.bfs.distances (node, integer).
 
     Args:
-        start_attr: Node attribute marking start nodes
+        start_attr: Attribute present on exactly one selected start node;
+            the value is ignored, including False, zero and explicit null
         output_attr: Attribute name for distances (default: "distance")
 
     Returns:
@@ -76,10 +78,13 @@ def dfs(start_attr: str, output_attr: str = "discovery_time") -> RustAlgorithmHa
     """
     Depth-First Search traversal.
 
-    Performs DFS from source nodes, recording discovery times.
+    Records zero-based preorder indices from exactly one marked selected node.
+    Neighbors are visited in ascending node-ID order, independent of cached CSR
+    order. Nonpersistent output uses pathfinding.dfs.order (node, integer).
 
     Args:
-        start_attr: Node attribute marking start nodes
+        start_attr: Attribute present on exactly one selected start node;
+            the value is ignored, including False, zero and explicit null
         output_attr: Attribute name for discovery times (default: "discovery_time")
 
     Returns:

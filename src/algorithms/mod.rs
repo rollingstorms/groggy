@@ -818,6 +818,8 @@ pub enum AlgorithmOutput {
     Components(Vec<Vec<NodeId>>),
     /// Owned full-precision node scores for nonpersistent algorithm execution.
     NodeScores(Vec<(NodeId, f64)>),
+    /// Exact owned integer distances or traversal indices without property writes.
+    NodeIntegers(Vec<(NodeId, i64)>),
 }
 
 /// Trait implemented by all core algorithms.

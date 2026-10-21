@@ -1,69 +1,201 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
+use rustc_hash::FxHashMap;
 
-use crate::algorithms::pathfinding::utils::bfs_layers;
+use crate::algorithms::pathfinding::utils::checked_dijkstra_weights;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
+    ParameterMetadata, ParameterType,
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
-fn visit_order_dfs(subgraph: &Subgraph, start: NodeId) -> Result<Vec<NodeId>> {
-    // Try CSR path first for optimal performance
-    let add_reverse = subgraph.graph().borrow().is_undirected();
-    if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
-        let nodes = subgraph.ordered_nodes();
-        let n = nodes.len();
+#[derive(Clone, Copy)]
+enum TraversalKind {
+    Bfs,
+    Dfs,
+}
 
-        if let Some(start_idx) = nodes.iter().position(|&n| n == start) {
-            let mut visited = vec![false; n];
-            let mut stack = vec![start_idx];
-            let mut order = Vec::new();
-
-            while let Some(u) = stack.pop() {
-                if !visited[u] {
-                    visited[u] = true;
-                    order.push(nodes[u]);
-
-                    // Add neighbors in reverse order to maintain DFS semantics
-                    let neighbors = csr.neighbors(u);
-                    for &v in neighbors.iter().rev() {
-                        if !visited[v] {
-                            stack.push(v);
-                        }
-                    }
-                }
-            }
-
-            return Ok(order);
+impl TraversalKind {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Bfs => "bfs",
+            Self::Dfs => "dfs",
         }
     }
+    fn output_key(self) -> &'static str {
+        match self {
+            Self::Bfs => "pathfinding.bfs.distances",
+            Self::Dfs => "pathfinding.dfs.order",
+        }
+    }
+}
 
-    // Fallback to trait-based implementation
-    let mut visited = HashSet::new();
-    let mut stack = vec![start];
-    let mut order = Vec::new();
-
-    while let Some(node) = stack.pop() {
-        if visited.insert(node) {
-            order.push(node);
-            if let Ok(mut neighbors) = subgraph.neighbors(node) {
-                neighbors.reverse();
-                for neighbor in neighbors {
-                    stack.push(neighbor);
-                }
+fn bfs_distances(
+    ctx: &Context,
+    csr: &Csr,
+    nodes: &[NodeId],
+    source: usize,
+) -> Result<Vec<(NodeId, i64)>> {
+    let mut distances = vec![None; nodes.len()];
+    let mut queue = VecDeque::new();
+    distances[source] = Some(0usize);
+    queue.push_back((source, 0usize));
+    while let Some((u, depth)) = queue.pop_front() {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("bfs cancelled"));
+        }
+        for &v in csr.neighbors(u) {
+            if distances[v].is_none() {
+                let next = depth
+                    .checked_add(1)
+                    .ok_or_else(|| anyhow!("BFS distance overflow"))?;
+                distances[v] = Some(next);
+                queue.push_back((v, next));
             }
         }
     }
+    nodes
+        .iter()
+        .copied()
+        .zip(distances)
+        .filter_map(|(node, distance)| distance.map(|d| (node, d)))
+        .map(|(node, distance)| Ok((node, i64::try_from(distance)?)))
+        .collect()
+}
 
+fn dfs_order(
+    ctx: &Context,
+    csr: &Csr,
+    nodes: &[NodeId],
+    source: usize,
+) -> Result<Vec<(NodeId, i64)>> {
+    // Sort only a private copy. Shared CSR ordering may come from another caller.
+    let mut sorted = csr.clone();
+    for u in 0..sorted.node_count() {
+        sorted.neighbors[sorted.offsets[u]..sorted.offsets[u + 1]].sort_unstable();
+    }
+    let mut visited = vec![false; nodes.len()];
+    let mut order = vec![(nodes[source], 0)];
+    visited[source] = true;
+    // Explicit recursive-DFS frames: at most one frame per visited node.
+    let mut stack = vec![(source, 0usize)];
+    while let Some((u, next)) = stack.last_mut() {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("dfs cancelled"));
+        }
+        let row = sorted.neighbors(*u);
+        if *next == row.len() {
+            stack.pop();
+            continue;
+        }
+        let v = row[*next];
+        *next += 1;
+        if !visited[v] {
+            visited[v] = true;
+            order.push((nodes[v], i64::try_from(order.len())?));
+            stack.push((v, 0));
+        }
+    }
     Ok(order)
+}
+
+fn execute_traversal(
+    ctx: &mut Context,
+    subgraph: Subgraph,
+    start_attr: &AttrName,
+    output_attr: &AttrName,
+    kind: TraversalKind,
+) -> Result<Subgraph> {
+    let start = Instant::now();
+    let prefix = kind.prefix();
+    if ctx.is_cancelled() {
+        return Err(anyhow!("{prefix} cancelled"));
+    }
+    checked_dijkstra_weights(&subgraph, None)?;
+    let collect_start = Instant::now();
+    let nodes = subgraph.ordered_nodes();
+    ctx.record_call(format!("{prefix}.collect_nodes"), collect_start.elapsed());
+    ctx.record_stat(format!("{prefix}.count.input_nodes"), nodes.len() as f64);
+    let mut sources = Vec::new();
+    for (index, &node) in nodes.iter().enumerate() {
+        if subgraph.get_node_attribute(node, start_attr)?.is_some() {
+            sources.push(index);
+        }
+    }
+    if sources.len() != 1 {
+        return Err(anyhow!("{prefix} requires exactly one selected node carrying start attribute {start_attr:?}; found {}", sources.len()));
+    }
+    let source = sources[0];
+    let add_reverse = subgraph.graph().borrow().is_undirected();
+    let csr = if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
+        ctx.record_call(format!("{prefix}.csr_cache_hit"), std::time::Duration::ZERO);
+        csr
+    } else {
+        let index_start = Instant::now();
+        let index: FxHashMap<_, _> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+        ctx.record_call(format!("{prefix}.build_indexer"), index_start.elapsed());
+        let edges = subgraph.ordered_edges();
+        let graph = subgraph.graph();
+        let graph = graph.borrow();
+        let mut csr = Csr::default();
+        let build_start = Instant::now();
+        let endpoints_time = build_csr_from_edges_with_scratch(
+            &mut csr,
+            nodes.len(),
+            edges.iter().copied(),
+            |node| index.get(&node).copied(),
+            |edge| graph.edge_endpoints(edge).ok(),
+            CsrOptions {
+                add_reverse_edges: add_reverse,
+                sort_neighbors: false,
+            },
+        );
+        ctx.record_call(format!("{prefix}.csr_cache_miss"), build_start.elapsed());
+        ctx.record_call(format!("{prefix}.collect_edge_endpoints"), endpoints_time);
+        ctx.record_call(
+            format!("{prefix}.build_csr"),
+            build_start.elapsed().saturating_sub(endpoints_time),
+        );
+        let csr = Arc::new(csr);
+        subgraph.csr_cache_store(add_reverse, csr.clone());
+        csr
+    };
+    let compute_start = Instant::now();
+    let rows = match kind {
+        TraversalKind::Bfs => bfs_distances(ctx, &csr, &nodes, source)?,
+        TraversalKind::Dfs => dfs_order(ctx, &csr, &nodes, source)?,
+    };
+    ctx.record_call(format!("{prefix}.compute"), compute_start.elapsed());
+    ctx.record_stat(format!("{prefix}.count.reached_nodes"), rows.len() as f64);
+    ctx.emit_iteration(0, rows.len());
+    if ctx.is_cancelled() {
+        return Err(anyhow!("{prefix} cancelled"));
+    }
+    if ctx.persist_results() {
+        let values = rows
+            .into_iter()
+            .map(|(node, value)| (node, AttrValue::Int(value)))
+            .collect();
+        ctx.with_scoped_timer(format!("{prefix}.write_attributes"), || {
+            subgraph.set_node_attr_column(output_attr.clone(), values)
+        })
+        .map_err(|err| anyhow!("failed to persist {prefix} results: {err}"))?;
+    } else {
+        ctx.add_output(kind.output_key(), AlgorithmOutput::NodeIntegers(rows));
+    }
+    ctx.record_duration(format!("{prefix}.total_execution"), start.elapsed());
+    Ok(subgraph)
 }
 
 #[derive(Clone, Debug)]
@@ -79,19 +211,20 @@ impl BfsTraversal {
             output_attr,
         }
     }
-
     fn metadata_template() -> AlgorithmMetadata {
         AlgorithmMetadata {
             id: "pathfinding.bfs".to_string(),
             name: "Breadth-First Search".to_string(),
             description: "BFS traversal order and distances.".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             cost_hint: CostHint::Linear,
             supports_cancellation: true,
             parameters: vec![
                 ParameterMetadata {
                     name: "start_attr".to_string(),
-                    description: "Node attribute containing BFS start node (id).".to_string(),
+                    description:
+                        "Attribute present on exactly one selected start node; value is ignored."
+                            .to_string(),
                     value_type: ParameterType::Text,
                     required: true,
                     default_value: None,
@@ -106,107 +239,23 @@ impl BfsTraversal {
             ],
         }
     }
-
-    fn execute_impl(
-        &self,
-        ctx: &mut Context,
-        subgraph: &Subgraph,
-    ) -> Result<HashMap<NodeId, AttrValue>> {
-        let start_node = subgraph
-            .nodes()
-            .iter()
-            .find(|&&node| {
-                subgraph
-                    .get_node_attribute(node, &self.start_attr)
-                    .ok()
-                    .flatten()
-                    .is_some()
-            })
-            .ok_or_else(|| anyhow!("no node in subgraph carries start attribute"))?;
-
-        let distances = bfs_layers(subgraph, *start_node);
-        let mut outputs = HashMap::new();
-        for (&node, &dist) in &distances {
-            outputs.insert(node, AttrValue::Int(dist as i64));
-        }
-        ctx.emit_iteration(0, distances.len());
-        Ok(outputs)
-    }
 }
 
 impl Algorithm for BfsTraversal {
     fn id(&self) -> &'static str {
         "pathfinding.bfs"
     }
-
     fn metadata(&self) -> AlgorithmMetadata {
         Self::metadata_template()
     }
-
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let t0 = Instant::now();
-
-        // Phase 1: Collect nodes
-        let nodes_start = Instant::now();
-        let nodes = subgraph.ordered_nodes();
-        ctx.record_call("bfs.collect_nodes", nodes_start.elapsed());
-        ctx.record_stat("bfs.count.input_nodes", nodes.len() as f64);
-
-        // Phase 2: Build indexer
-        let idx_start = Instant::now();
-        let mut node_to_index = rustc_hash::FxHashMap::default();
-        node_to_index.reserve(nodes.len());
-        for (i, &node) in nodes.iter().enumerate() {
-            node_to_index.insert(node, i);
-        }
-        ctx.record_call("bfs.build_indexer", idx_start.elapsed());
-
-        // Phase 3: Build or retrieve CSR
-        let add_reverse = subgraph.graph().borrow().is_undirected();
-        if subgraph.csr_cache_get(add_reverse).is_some() {
-            ctx.record_call("bfs.csr_cache_hit", std::time::Duration::from_nanos(0));
-        } else {
-            let csr_start = Instant::now();
-
-            let edges = subgraph.ordered_edges();
-            let graph_ref = subgraph.graph();
-            let graph_borrow = graph_ref.borrow();
-
-            let mut csr = Csr::default();
-            let csr_time = build_csr_from_edges_with_scratch(
-                &mut csr,
-                nodes.len(),
-                edges.iter().copied(),
-                |nid| node_to_index.get(&nid).copied(),
-                |eid| graph_borrow.edge_endpoints(eid).ok(),
-                CsrOptions {
-                    add_reverse_edges: add_reverse,
-                    sort_neighbors: false,
-                },
-            );
-            ctx.record_call("bfs.csr_cache_miss", csr_start.elapsed());
-            ctx.record_call("bfs.build_csr", csr_time);
-            subgraph.csr_cache_store(add_reverse, Arc::new(csr));
-        }
-
-        // Phase 3: Execute BFS (will use cached CSR automatically)
-        let distances = self.execute_impl(ctx, &subgraph)?;
-
-        // Phase 4: Write results
-        if ctx.persist_results() {
-            let attr_values: Vec<(NodeId, AttrValue)> = distances
-                .iter()
-                .map(|(&node, value)| (node, value.clone()))
-                .collect();
-
-            ctx.with_scoped_timer("bfs.write_attributes", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
-            .map_err(|err| anyhow!("failed to persist bfs results: {err}"))?;
-        }
-
-        ctx.record_duration("bfs.total_execution", t0.elapsed());
-        Ok(subgraph)
+        execute_traversal(
+            ctx,
+            subgraph,
+            &self.start_attr,
+            &self.output_attr,
+            TraversalKind::Bfs,
+        )
     }
 }
 
@@ -223,19 +272,20 @@ impl DfsTraversal {
             output_attr,
         }
     }
-
     fn metadata_template() -> AlgorithmMetadata {
         AlgorithmMetadata {
             id: "pathfinding.dfs".to_string(),
             name: "Depth-First Search".to_string(),
             description: "DFS traversal ordering.".to_string(),
-            version: "0.1.0".to_string(),
+            version: "0.2.0".to_string(),
             cost_hint: CostHint::Linear,
             supports_cancellation: true,
             parameters: vec![
                 ParameterMetadata {
                     name: "start_attr".to_string(),
-                    description: "Node attribute containing DFS start node (id).".to_string(),
+                    description:
+                        "Attribute present on exactly one selected start node; value is ignored."
+                            .to_string(),
                     value_type: ParameterType::Text,
                     required: true,
                     default_value: None,
@@ -250,107 +300,23 @@ impl DfsTraversal {
             ],
         }
     }
-
-    fn execute_impl(
-        &self,
-        ctx: &mut Context,
-        subgraph: &Subgraph,
-    ) -> Result<HashMap<NodeId, AttrValue>> {
-        let start_node = subgraph
-            .nodes()
-            .iter()
-            .find(|&&node| {
-                subgraph
-                    .get_node_attribute(node, &self.start_attr)
-                    .ok()
-                    .flatten()
-                    .is_some()
-            })
-            .ok_or_else(|| anyhow!("no node in subgraph carries start attribute"))?;
-
-        let order = visit_order_dfs(subgraph, *start_node)?;
-        let mut outputs = HashMap::new();
-        for (idx, node) in order.iter().enumerate() {
-            outputs.insert(*node, AttrValue::Int(idx as i64));
-        }
-        ctx.emit_iteration(0, order.len());
-        Ok(outputs)
-    }
 }
 
 impl Algorithm for DfsTraversal {
     fn id(&self) -> &'static str {
         "pathfinding.dfs"
     }
-
     fn metadata(&self) -> AlgorithmMetadata {
         Self::metadata_template()
     }
-
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let t0 = Instant::now();
-
-        // Phase 1: Collect nodes
-        let nodes_start = Instant::now();
-        let nodes = subgraph.ordered_nodes();
-        ctx.record_call("dfs.collect_nodes", nodes_start.elapsed());
-        ctx.record_stat("dfs.count.input_nodes", nodes.len() as f64);
-
-        // Phase 2: Build indexer
-        let idx_start = Instant::now();
-        let mut node_to_index = rustc_hash::FxHashMap::default();
-        node_to_index.reserve(nodes.len());
-        for (i, &node) in nodes.iter().enumerate() {
-            node_to_index.insert(node, i);
-        }
-        ctx.record_call("dfs.build_indexer", idx_start.elapsed());
-
-        // Phase 3: Build or retrieve CSR
-        let add_reverse = subgraph.graph().borrow().is_undirected();
-        if subgraph.csr_cache_get(add_reverse).is_some() {
-            ctx.record_call("dfs.csr_cache_hit", std::time::Duration::from_nanos(0));
-        } else {
-            let csr_start = Instant::now();
-
-            let edges = subgraph.ordered_edges();
-            let graph_ref = subgraph.graph();
-            let graph_borrow = graph_ref.borrow();
-
-            let mut csr = Csr::default();
-            let csr_time = build_csr_from_edges_with_scratch(
-                &mut csr,
-                nodes.len(),
-                edges.iter().copied(),
-                |nid| node_to_index.get(&nid).copied(),
-                |eid| graph_borrow.edge_endpoints(eid).ok(),
-                CsrOptions {
-                    add_reverse_edges: add_reverse,
-                    sort_neighbors: false,
-                },
-            );
-            ctx.record_call("dfs.csr_cache_miss", csr_start.elapsed());
-            ctx.record_call("dfs.build_csr", csr_time);
-            subgraph.csr_cache_store(add_reverse, Arc::new(csr));
-        }
-
-        // Phase 3: Execute DFS (will use cached CSR automatically)
-        let order = self.execute_impl(ctx, &subgraph)?;
-
-        // Phase 4: Write results
-        if ctx.persist_results() {
-            let attr_values: Vec<(NodeId, AttrValue)> = order
-                .iter()
-                .map(|(&node, value)| (node, value.clone()))
-                .collect();
-
-            ctx.with_scoped_timer("dfs.write_attributes", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
-            .map_err(|err| anyhow!("failed to persist dfs results: {err}"))?;
-        }
-
-        ctx.record_duration("dfs.total_execution", t0.elapsed());
-        Ok(subgraph)
+        execute_traversal(
+            ctx,
+            subgraph,
+            &self.start_attr,
+            &self.output_attr,
+            TraversalKind::Dfs,
+        )
     }
 }
 
