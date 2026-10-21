@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyNone};
+use pyo3::types::{PyDict, PyFloat, PyList, PyNone};
 
 use crate::ffi::types::PyAttrValue;
 
@@ -50,6 +50,50 @@ fn next_id() -> usize {
     current
 }
 
+// Algorithm configuration floats are f64. Explicit AttrValue inputs retain
+// their property-storage precision; do not narrow raw Python floats first.
+fn algorithm_params_from_python(
+    input: &PyAny,
+) -> PyResult<HashMap<String, groggy::algorithms::AlgorithmParamValue>> {
+    use groggy::algorithms::AlgorithmParamValue as Param;
+    use groggy::types::AttrValue as Attr;
+    let mut params = HashMap::new();
+    if input.is_none() {
+        return Ok(params);
+    }
+    for (key, raw) in input.downcast::<PyDict>()?.iter() {
+        let key: String = key.extract()?;
+        if raw.is_instance_of::<PyFloat>() {
+            params.insert(key, Param::Float(raw.extract::<f64>()?));
+            continue;
+        }
+        let value: PyAttrValue = raw.extract()?;
+        let param = match value.inner {
+            Attr::Int(v) => Param::Int(v),
+            Attr::SmallInt(v) => Param::Int(v as i64),
+            Attr::Float(v) => Param::Float(v as f64),
+            Attr::Bool(v) => Param::Bool(v),
+            Attr::Text(v) => Param::Text(v),
+            Attr::CompactText(v) => Param::Text(v.as_str().to_string()),
+            Attr::CompressedText(v) => v.decompress_text().map(Param::Text).unwrap_or(Param::None),
+            Attr::IntVec(v) => Param::IntList(v),
+            Attr::FloatVec(v) => Param::FloatList(v.into_iter().map(|x| x as f64).collect()),
+            Attr::CompressedFloatVec(v) => v
+                .decompress_float_vec()
+                .map(|values| Param::FloatList(values.into_iter().map(|x| x as f64).collect()))
+                .unwrap_or(Param::None),
+            Attr::BoolVec(v) => Param::BoolList(v),
+            Attr::TextVec(v) => Param::TextList(v),
+            Attr::Json(v) => serde_json::from_str(&v)
+                .map(Param::Json)
+                .unwrap_or(Param::None),
+            _ => Param::None,
+        };
+        params.insert(key, param);
+    }
+    Ok(params)
+}
+
 #[pyfunction]
 #[pyo3(name = "build_pipeline")]
 pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle> {
@@ -63,81 +107,10 @@ pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle>
         let params_any = item
             .get_item("params")
             .unwrap_or_else(|_| PyNone::get(py).into());
-        let params_dict: HashMap<String, PyAttrValue> = if params_any.is_none() {
-            HashMap::new()
-        } else {
-            params_any.extract()?
-        };
+        let params_dict = algorithm_params_from_python(params_any)?;
         builder = builder.with_algorithm(id, |params| {
             for (key, value) in &params_dict {
-                // Convert PyAttrValue (wrapping AttrValue) to AlgorithmParamValue
-                let param_value = match &value.inner {
-                    groggy::types::AttrValue::Int(i) => {
-                        groggy::algorithms::AlgorithmParamValue::Int(*i)
-                    }
-                    groggy::types::AttrValue::SmallInt(i) => {
-                        groggy::algorithms::AlgorithmParamValue::Int(*i as i64)
-                    }
-                    groggy::types::AttrValue::Float(f) => {
-                        groggy::algorithms::AlgorithmParamValue::Float(*f as f64)
-                    }
-                    groggy::types::AttrValue::Bool(b) => {
-                        groggy::algorithms::AlgorithmParamValue::Bool(*b)
-                    }
-                    groggy::types::AttrValue::Text(s) => {
-                        groggy::algorithms::AlgorithmParamValue::Text(s.clone())
-                    }
-                    groggy::types::AttrValue::CompactText(s) => {
-                        groggy::algorithms::AlgorithmParamValue::Text(s.as_str().to_string())
-                    }
-                    groggy::types::AttrValue::CompressedText(data) => {
-                        // Decompress and convert
-                        if let Ok(text) = data.decompress_text() {
-                            groggy::algorithms::AlgorithmParamValue::Text(text)
-                        } else {
-                            continue; // Skip decompression errors
-                        }
-                    }
-                    groggy::types::AttrValue::IntVec(v) => {
-                        groggy::algorithms::AlgorithmParamValue::IntList(v.clone())
-                    }
-                    groggy::types::AttrValue::FloatVec(v) => {
-                        groggy::algorithms::AlgorithmParamValue::FloatList(
-                            v.iter().map(|&f| f as f64).collect(),
-                        )
-                    }
-                    groggy::types::AttrValue::CompressedFloatVec(data) => {
-                        // Decompress float vec
-                        if let Ok(floats) = data.decompress_float_vec() {
-                            groggy::algorithms::AlgorithmParamValue::FloatList(
-                                floats.iter().map(|&f| f as f64).collect(),
-                            )
-                        } else {
-                            continue; // Skip decompression errors
-                        }
-                    }
-                    groggy::types::AttrValue::BoolVec(v) => {
-                        groggy::algorithms::AlgorithmParamValue::BoolList(v.clone())
-                    }
-                    groggy::types::AttrValue::TextVec(v) => {
-                        groggy::algorithms::AlgorithmParamValue::TextList(v.clone())
-                    }
-                    groggy::types::AttrValue::Json(json_str) => {
-                        match serde_json::from_str::<serde_json::Value>(json_str) {
-                            Ok(value) => groggy::algorithms::AlgorithmParamValue::Json(value),
-                            Err(_) => continue,
-                        }
-                    }
-                    // Skip types that don't have algorithm param equivalents
-                    groggy::types::AttrValue::Bytes(_)
-                    | groggy::types::AttrValue::Null
-                    | groggy::types::AttrValue::SubgraphRef(_)
-                    | groggy::types::AttrValue::NodeArray(_)
-                    | groggy::types::AttrValue::EdgeArray(_) => {
-                        continue;
-                    }
-                };
-                params.insert(key.clone(), param_value);
+                params.insert(key.clone(), value.clone());
             }
         });
     }
@@ -169,82 +142,16 @@ pub fn py_build_sample_pipeline(py: Python, spec: &PyAny) -> PyResult<PySamplePi
     let params_any = spec
         .get_item("params")
         .unwrap_or_else(|_| PyNone::get(py).into());
-    let params_dict: HashMap<String, PyAttrValue> = if params_any.is_none() {
-        HashMap::new()
-    } else {
-        params_any.extract()?
-    };
-
+    let values = algorithm_params_from_python(params_any)?;
     let mut params = groggy::algorithms::AlgorithmParams::new();
-    for (key, value) in &params_dict {
-        let param_value = match &value.inner {
-            groggy::types::AttrValue::Int(i) => groggy::algorithms::AlgorithmParamValue::Int(*i),
-            groggy::types::AttrValue::SmallInt(i) => {
-                groggy::algorithms::AlgorithmParamValue::Int(*i as i64)
-            }
-            groggy::types::AttrValue::Float(f) => {
-                groggy::algorithms::AlgorithmParamValue::Float(*f as f64)
-            }
-            groggy::types::AttrValue::Bool(b) => groggy::algorithms::AlgorithmParamValue::Bool(*b),
-            groggy::types::AttrValue::Text(s) => {
-                groggy::algorithms::AlgorithmParamValue::Text(s.clone())
-            }
-            groggy::types::AttrValue::CompactText(s) => {
-                groggy::algorithms::AlgorithmParamValue::Text(s.as_str().to_string())
-            }
-            groggy::types::AttrValue::CompressedText(data) => {
-                if let Ok(text) = data.decompress_text() {
-                    groggy::algorithms::AlgorithmParamValue::Text(text)
-                } else {
-                    continue;
-                }
-            }
-            groggy::types::AttrValue::IntVec(v) => {
-                groggy::algorithms::AlgorithmParamValue::IntList(v.clone())
-            }
-            groggy::types::AttrValue::FloatVec(v) => {
-                groggy::algorithms::AlgorithmParamValue::FloatList(
-                    v.iter().map(|&f| f as f64).collect(),
-                )
-            }
-            groggy::types::AttrValue::CompressedFloatVec(data) => {
-                if let Ok(floats) = data.decompress_float_vec() {
-                    groggy::algorithms::AlgorithmParamValue::FloatList(
-                        floats.iter().map(|&f| f as f64).collect(),
-                    )
-                } else {
-                    continue;
-                }
-            }
-            groggy::types::AttrValue::BoolVec(v) => {
-                groggy::algorithms::AlgorithmParamValue::BoolList(v.clone())
-            }
-            groggy::types::AttrValue::TextVec(v) => {
-                groggy::algorithms::AlgorithmParamValue::TextList(v.clone())
-            }
-            groggy::types::AttrValue::Json(json_str) => {
-                match serde_json::from_str::<serde_json::Value>(json_str) {
-                    Ok(value) => groggy::algorithms::AlgorithmParamValue::Json(value),
-                    Err(_) => continue,
-                }
-            }
-            groggy::types::AttrValue::Bytes(_)
-            | groggy::types::AttrValue::Null
-            | groggy::types::AttrValue::SubgraphRef(_)
-            | groggy::types::AttrValue::NodeArray(_)
-            | groggy::types::AttrValue::EdgeArray(_) => {
-                continue;
-            }
-        };
-        params.insert(key, param_value);
+    for (key, value) in values {
+        params.insert(key, value);
     }
 
     let spec = groggy::algorithms::AlgorithmSpec { id, params };
     let build_start = Instant::now();
-    let pipeline =
-        groggy::algorithms::builder::StepSamplePipeline::try_from_spec(&spec).map_err(|e| {
-            PyRuntimeError::new_err(format!("failed to build sample pipeline: {e}"))
-        })?;
+    let pipeline = groggy::algorithms::builder::StepSamplePipeline::try_from_spec(&spec)
+        .map_err(|e| PyRuntimeError::new_err(format!("failed to build sample pipeline: {e}")))?;
     let build_time_seconds = build_start.elapsed().as_secs_f64();
 
     let handle_id = next_id();
@@ -544,10 +451,8 @@ pub fn py_get_algorithm_metadata(algorithm_id: &str) -> PyResult<HashMap<String,
 
 #[pyfunction]
 #[pyo3(name = "validate_algorithm_params")]
-pub fn py_validate_algorithm_params(
-    algorithm_id: &str,
-    params: HashMap<String, PyAttrValue>,
-) -> PyResult<Vec<String>> {
+pub fn py_validate_algorithm_params(algorithm_id: &str, params: &PyAny) -> PyResult<Vec<String>> {
+    let params = algorithm_params_from_python(params)?;
     groggy::algorithms::ensure_algorithms_registered();
     let registry = groggy::algorithms::global_registry();
 
@@ -580,50 +485,36 @@ pub fn py_validate_algorithm_params(
     // Type validation (basic)
     for param_meta in &metadata.parameters {
         if let Some(value) = params.get(&param_meta.name) {
+            use groggy::algorithms::{AlgorithmParamValue as Param, ParameterType as Kind};
             let type_matches = matches!(
-                (&param_meta.value_type, &value.inner),
-                (
-                    groggy::algorithms::ParameterType::Int,
-                    groggy::types::AttrValue::Int(_)
-                ) | (
-                    groggy::algorithms::ParameterType::Int,
-                    groggy::types::AttrValue::SmallInt(_)
-                ) | (
-                    groggy::algorithms::ParameterType::Float,
-                    groggy::types::AttrValue::Float(_)
-                ) | (
-                    groggy::algorithms::ParameterType::Bool,
-                    groggy::types::AttrValue::Bool(_)
-                ) | (
-                    groggy::algorithms::ParameterType::Text,
-                    groggy::types::AttrValue::Text(_)
-                ) | (
-                    groggy::algorithms::ParameterType::Text,
-                    groggy::types::AttrValue::CompactText(_)
-                ) | (
-                    groggy::algorithms::ParameterType::IntList,
-                    groggy::types::AttrValue::IntVec(_)
-                ) | (
-                    groggy::algorithms::ParameterType::FloatList,
-                    groggy::types::AttrValue::FloatVec(_)
-                ) | (
-                    groggy::algorithms::ParameterType::BoolList,
-                    groggy::types::AttrValue::BoolVec(_)
-                ) | (
-                    groggy::algorithms::ParameterType::TextList,
-                    groggy::types::AttrValue::TextVec(_)
-                ) | (
-                    groggy::algorithms::ParameterType::Json,
-                    groggy::types::AttrValue::Json(_)
-                )
+                (&param_meta.value_type, value),
+                (Kind::Int, Param::Int(_))
+                    | (Kind::Float, Param::Float(_))
+                    | (Kind::Bool, Param::Bool(_))
+                    | (Kind::Text, Param::Text(_))
+                    | (Kind::IntList, Param::IntList(_))
+                    | (Kind::FloatList, Param::FloatList(_))
+                    | (Kind::BoolList, Param::BoolList(_))
+                    | (Kind::TextList, Param::TextList(_))
+                    | (Kind::Json, Param::Json(_))
             );
+            let actual_kind = match value {
+                Param::Int(_) => "Int",
+                Param::Float(_) => "Float",
+                Param::Bool(_) => "Bool",
+                Param::Text(_) => "Text",
+                Param::IntList(_) => "IntList",
+                Param::FloatList(_) => "FloatList",
+                Param::BoolList(_) => "BoolList",
+                Param::TextList(_) => "TextList",
+                Param::Json(_) => "Json",
+                Param::None => "None",
+            };
 
             if !type_matches {
                 errors.push(format!(
                     "Parameter '{}' has wrong type: expected {:?}, got {:?}",
-                    param_meta.name,
-                    param_meta.value_type,
-                    value.inner.type_name()
+                    param_meta.name, param_meta.value_type, actual_kind
                 ));
             }
         }

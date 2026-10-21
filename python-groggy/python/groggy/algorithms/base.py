@@ -76,10 +76,13 @@ class RustAlgorithmHandle(AlgorithmHandle):
         Returns:
             True if valid, raises ValueError if invalid
         """
-        # Convert params to AttrValues for validation
+        # Preserve scalar configuration floats; wrap other legacy inputs.
         attr_params = {}
         for key, value in self._params.items():
-            if not isinstance(value, _groggy.AttrValue):
+            if isinstance(value, float):
+                # Algorithm scalar configuration uses f64, unlike property AttrValue.
+                attr_params[key] = value
+            elif not isinstance(value, _groggy.AttrValue):
                 # Auto-wrap common types
                 attr_params[key] = _groggy.AttrValue(value)
             else:
@@ -92,10 +95,12 @@ class RustAlgorithmHandle(AlgorithmHandle):
 
     def to_spec(self) -> Dict[str, Any]:
         """Convert to pipeline spec entry."""
-        # Ensure parameters are wrapped in AttrValue
+        # Preserve f64 scalar configuration; keep explicit AttrValue compatibility.
         wrapped_params = {}
         for key, value in self._params.items():
-            if not isinstance(value, _groggy.AttrValue):
+            if isinstance(value, float):
+                wrapped_params[key] = value
+            elif not isinstance(value, _groggy.AttrValue):
                 wrapped_params[key] = _groggy.AttrValue(value)
             else:
                 wrapped_params[key] = value
