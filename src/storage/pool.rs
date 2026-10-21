@@ -391,9 +391,14 @@ impl GraphPool {
     /// Create multiple nodes with single ID allocation (BULK OPTIMIZED)
     ///
     /// PERFORMANCE: O(1) instead of O(n) for ID allocation
-    /// Returns (start_id, end_id) range and individual node IDs
+    /// Returns an inclusive (start_id, end_id) range and individual node IDs.
+    /// For zero count, both endpoints equal the next ID and the ID list is empty;
+    /// the endpoints do not describe an allocated range in that case.
     pub fn add_nodes_bulk(&mut self, count: usize) -> (NodeId, NodeId, Vec<NodeId>) {
         let start_id = self.next_node_id;
+        if count == 0 {
+            return (start_id, start_id, Vec::new());
+        }
         let end_id = start_id + count - 1;
 
         // Single ID counter update

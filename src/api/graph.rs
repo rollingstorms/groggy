@@ -358,6 +358,9 @@ impl Graph {
     /// Add multiple nodes efficiently
     /// OPTIMIZED: True bulk operation using vectorized pool operations
     pub fn add_nodes(&mut self, count: usize) -> Vec<NodeId> {
+        if count == 0 {
+            return Vec::new();
+        }
         // Use optimized bulk pool operation
         let (_start_id, _end_id, node_ids) = self.pool.borrow_mut().add_nodes_bulk(count);
 
