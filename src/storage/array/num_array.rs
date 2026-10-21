@@ -108,31 +108,12 @@ where
         )
     }
 
-    /// Calculate correlation with another NumArray
+    /// Pearson correlation; short/mismatched/constant=None, nonfinite=NaN.
     pub fn correlate(&self, other: &Self) -> Option<f64> {
-        if self.len() != other.len() || self.is_empty() {
-            return None;
-        }
-
-        let self_mean = self.mean()?;
-        let other_mean = other.mean()?;
-
-        let numerator: f64 = self
-            .iter()
-            .zip(other.iter())
-            .map(|(&x, &y)| (x.into() - self_mean) * (y.into() - other_mean))
-            .sum();
-
-        let self_var: f64 = self.iter().map(|&x| (x.into() - self_mean).powi(2)).sum();
-
-        let other_var: f64 = other.iter().map(|&y| (y.into() - other_mean).powi(2)).sum();
-
-        let denominator = (self_var * other_var).sqrt();
-        if denominator == 0.0 {
-            None
-        } else {
-            Some(numerator / denominator)
-        }
+        super::numeric_reductions::correlate_iter(
+            self.base.as_slice().iter().map(|&x| x.into()),
+            other.base.as_slice().iter().map(|&x| x.into()),
+        )
     }
 
     /// Element-wise addition with another NumArray

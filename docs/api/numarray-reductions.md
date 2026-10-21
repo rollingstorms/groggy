@@ -91,7 +91,7 @@ explicit.
 Scalar reductions scan in linear time with constant scratch; full-sort median uses
 linear scratch and sorting, and NumArray selection median partitions a copy.
 These are structural descriptions, not benchmark results. No acceleration,
-throughput, GIL-release, percentile/correlation, ArrayArray, matrix reduction,
+throughput, GIL-release, ArrayArray, matrix reduction,
 dtype-conversion or general arithmetic certification is added.
 
 ## Linear percentiles (29.10)
@@ -108,3 +108,28 @@ an arbitrary-precision interpolation guarantee. Existing generic NumArray bounds
 remain; this slice adds no Python percentile method. `describe()` uses the repair.
 Evidence: `tests/numarray_percentiles.rs`, analytic arithmetic-progression ranks,
 integer/extreme floating midpoints, IEEE domains and source preservation.
+
+## Pearson correlation (29.11)
+
+`NumArray.correlate(other)` delegates to a shared native typed slice kernel.
+The slice API accepts different scalar types for its two inputs; existing generic
+NumArray bounds remain unchanged. This slice adds no Python correlation method.
+
+Mismatched lengths, fewer than two pairs, or a finite constant input return None.
+For matching lengths of at least two, any NaN/infinity returns Some(NaN), even if
+the other input is constant. No pairs are silently dropped. Results are Pearson
+correlations, without sample-size weighting or significance estimates.
+
+Center integer differences before f64 conversion. Normalize each column's offsets
+independently, using scaled inputs if subtraction would overflow, then center and
+rescale residuals. Compensated dot products and separately square-rooted norms
+avoid the old unscaled covariance/variance-product overflow and underflow. Clamp
+final rounding excursions into [-1,1]. This does not promise arbitrary precision:
+normalized values can still lose extreme mixed-scale contributions. Sources stay
+unchanged. Work is linear; two owned f64 scratch columns use O(N) memory. No
+throughput or allocation improvement is claimed.
+
+Evidence: `tests/numarray_correlation.rs` uses a hand-calculated correlation,
+affine sign/scale invariance, huge/tiny finite scales, opposite f64 extremes,
+high-offset i64/f64 differences, orthogonal data, bool/mixed scalar inputs,
+undefined/nonfinite precedence and source preservation.

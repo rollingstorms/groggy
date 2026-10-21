@@ -365,3 +365,87 @@ pub(crate) fn percentile_iter<S: Scalar, I: Iterator<Item = S>>(data: I, p: f64)
         a * (1.0 - weight) + b * weight
     })
 }
+
+/// Pearson correlation; mismatched/short/constant input=None, nonfinite=NaN.
+/// Independent normalization avoids overflow/underflow of squared magnitudes.
+pub fn correlate<X: Scalar, Y: Scalar>(x: &[X], y: &[Y]) -> Option<f64> {
+    correlate_iter(x.iter().copied(), y.iter().copied())
+}
+fn centered<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(data: I) -> Vec<f64> {
+    let Some(origin) = data.clone().next() else {
+        return Vec::new();
+    };
+    let difference = |x: S| match (x.integer(), origin.integer()) {
+        (Some(a), Some(b)) => a
+            .checked_sub(b)
+            .map_or_else(|| x.as_f64() - origin.as_f64(), |d| d as f64),
+        _ => x.as_f64() - origin.as_f64(),
+    };
+    let overflow = data.clone().any(|x| !difference(x).is_finite());
+    let scale = data
+        .clone()
+        .map(|x| {
+            if overflow {
+                x.as_f64().abs()
+            } else {
+                difference(x).abs()
+            }
+        })
+        .fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return vec![0.0; data.len()];
+    }
+    let mut values: Vec<f64> = data
+        .map(|x| {
+            if overflow {
+                x.as_f64() / scale - origin.as_f64() / scale
+            } else {
+                difference(x) / scale
+            }
+        })
+        .collect();
+    let mut total = Sum::default();
+    for &x in &values {
+        total.add(x);
+    }
+    let mean = total.total() / values.len() as f64;
+    let mut residual_scale = 0.0_f64;
+    for x in &mut values {
+        *x -= mean;
+        residual_scale = residual_scale.max(x.abs());
+    }
+    if residual_scale != 0.0 {
+        for x in &mut values {
+            *x /= residual_scale;
+        }
+    }
+    values
+}
+pub(crate) fn correlate_iter<
+    X: Scalar,
+    Y: Scalar,
+    I: ExactSizeIterator<Item = X> + Clone,
+    J: ExactSizeIterator<Item = Y> + Clone,
+>(
+    x: I,
+    y: J,
+) -> Option<f64> {
+    if x.len() != y.len() || x.len() < 2 {
+        return None;
+    }
+    if x.clone().any(|v| !v.as_f64().is_finite()) || y.clone().any(|v| !v.as_f64().is_finite()) {
+        return Some(f64::NAN);
+    }
+    let (x, y) = (centered(x), centered(y));
+    let (mut xy, mut xx, mut yy) = (Sum::default(), Sum::default(), Sum::default());
+    for (&a, &b) in x.iter().zip(&y) {
+        xy.add(a * b);
+        xx.add(a * a);
+        yy.add(b * b);
+    }
+    let (xx, yy) = (xx.total(), yy.total());
+    if xx == 0.0 || yy == 0.0 {
+        return None;
+    }
+    Some((xy.total() / xx.sqrt() / yy.sqrt()).clamp(-1.0, 1.0))
+}

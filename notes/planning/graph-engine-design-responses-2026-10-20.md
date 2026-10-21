@@ -509,3 +509,6 @@ Historical SIMD/auto entry points now share the reference kernels; no current ve
 
 ### Item 29 linear percentiles — 2026-10-21
 Retain linear rank p*(N-1), Option output and current generic bounds. Reject invalid probabilities with None; propagate observation NaNs, including endpoint requests. Safe midpoint/interpolation retains finite representable extremes; f64 output remains approximate. No new Python API is required for this native repair.
+
+### Item 29 Pearson correlation — 2026-10-21
+Retain Option and Pearson paired semantics. Mismatched/short/finite constant input returns None; nonfinite matching inputs of length at least two produce NaN. No implicit pair dropping. Preserve integer differences before final f64 moments and independently scale both columns. Accept explicit O(N) scratch pending measured optimization; no new FFI API or external backend is introduced.

@@ -97,4 +97,6 @@ Prove compatibility and reliability at realistic scale, then document actual cap
 
 The near-term milestone is a coherent Groggy core: reliable writes, temporal reconstruction, immutable connected views and tables, native graph queries, corrected graph algorithms, and capable vector/matrix libraries, with persistence, reference-result comparisons, and failure testing. After that, items 20 and 22–25 provide Graphiti ingest, retrieval, and backing-database milestones. The remaining operations and scale work establishes production readiness.
 
-Numerical item 29.10 completes the existing NumArray linear percentile path using shared typed kernels and explicit IEEE/rank behavior. Correlation, arithmetic, ArrayArray and measured acceleration remain open.
+Numerical item 29.10 completes the existing NumArray linear percentile path using shared typed kernels and explicit IEEE/rank behavior. Correlation is repaired in 29.11; arithmetic, ArrayArray and measured acceleration remain open.
+
+Numerical item 29.11 completes the existing NumArray Pearson correlation path with typed centering, independent scaling and compensated normalized moments. It uses two O(N) scratch columns; benchmarking and other correlation surfaces remain open. ArrayArray and arithmetic operators are next under 29.3.
