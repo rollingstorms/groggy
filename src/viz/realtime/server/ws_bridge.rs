@@ -635,8 +635,11 @@ impl WsBridge {
             return;
         }
 
-        // Send immediate ack (real response will come from engine)
-        Self::send_control_ack_static(client_id, true, "Control message processed", clients).await;
+        // Layout completion is acknowledged by the server after engine execution.
+        if !matches!(control_msg, ControlMsg::ChangeLayout { .. }) {
+            Self::send_control_ack_static(client_id, true, "Control message processed", clients)
+                .await;
+        }
     }
 
     /// Send control acknowledgment to client (static version)
@@ -658,5 +661,40 @@ impl WsBridge {
                 // Debug message
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod layout_ack_tests {
+    use super::*;
+    #[tokio::test]
+    async fn queued_layout_has_no_premature_success_ack_and_missing_engine_rejects() {
+        let (client_tx, mut client_rx) = mpsc::unbounded_channel();
+        let clients = Arc::new(Mutex::new(HashMap::from([(7, client_tx)])));
+        let (control_tx, mut control_rx) = mpsc::unbounded_channel();
+        let request = ControlMsg::ChangeLayout {
+            algorithm: "honeycomb".into(),
+            params: HashMap::new(),
+        };
+        WsBridge::handle_control_message_static(
+            7,
+            request.clone(),
+            Some(control_tx),
+            clients.clone(),
+        )
+        .await;
+        assert!(matches!(
+            control_rx.try_recv(),
+            Ok((7, ControlMsg::ChangeLayout { .. }))
+        ));
+        assert!(matches!(
+            client_rx.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        WsBridge::handle_control_message_static(7, request, None, clients).await;
+        assert!(matches!(
+            client_rx.try_recv(),
+            Ok(WsMessage::ControlAck { success: false, .. })
+        ));
     }
 }

@@ -10,7 +10,7 @@ use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::numeric_type::NumericType;
 use crate::storage::matrix::GraphMatrix;
-use crate::viz::embeddings::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
+use crate::viz::embeddings::flat_embedding::{compute_flat_embedding_matrix, FlatEmbedConfig};
 use crate::viz::embeddings::{EmbeddingMethod, GraphEmbeddingExt};
 use crate::viz::projection::GraphProjectionExt;
 use crate::viz::realtime::accessor::{
@@ -30,6 +30,67 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::interval;
+
+/// Absent controls use defaults; malformed supplied controls are never ignored.
+fn layout_parameter<T: std::str::FromStr>(
+    params: &HashMap<String, String>,
+    key: &str,
+    default: T,
+) -> GraphResult<T> {
+    match params.get(key) {
+        Some(value) => value.trim().parse().map_err(|_| {
+            GraphError::InvalidInput(format!("Invalid layout parameter {key}: {value:?}"))
+        }),
+        None => Ok(default),
+    }
+}
+
+/// Return None only when preprocessing is explicitly disabled or not requested.
+fn prepare_flat_embedding(
+    embedding: &GraphMatrix,
+    graph: &Graph,
+    params: &HashMap<String, String>,
+) -> GraphResult<Option<GraphMatrix>> {
+    let enabled = match params.get("flat_embed") {
+        None => false,
+        Some(value) => match value.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" => true,
+            "false" | "0" => false,
+            _ => {
+                return Err(GraphError::InvalidInput(format!(
+                    "Invalid layout parameter flat_embed: {value:?}; expected true, false, 1 or 0",
+                )))
+            }
+        },
+    };
+    if !enabled {
+        return Ok(None);
+    }
+    let default = FlatEmbedConfig::default();
+    let config = FlatEmbedConfig {
+        iterations: layout_parameter(params, "flat_embed.iterations", default.iterations)?,
+        learning_rate: layout_parameter(params, "flat_embed.learning_rate", default.learning_rate)?,
+        edge_cohesion_weight: layout_parameter(
+            params,
+            "flat_embed.edge_cohesion_weight",
+            default.edge_cohesion_weight,
+        )?,
+        repulsion_weight: layout_parameter(
+            params,
+            "flat_embed.repulsion_weight",
+            default.repulsion_weight,
+        )?,
+        repulsion_power: layout_parameter(
+            params,
+            "flat_embed.repulsion_power",
+            default.repulsion_power,
+        )?,
+        spread_weight: layout_parameter(params, "flat_embed.spread_weight", default.spread_weight)?,
+        radius_clip: layout_parameter(params, "flat_embed.radius_clip", default.radius_clip)?,
+        seed: layout_parameter(params, "flat_embed.seed", default.seed)?,
+    };
+    compute_flat_embedding_matrix(embedding, graph, &config).map(Some)
+}
 
 /// Main real-time visualization engine
 pub struct RealTimeVizEngine {
@@ -815,75 +876,15 @@ impl RealTimeVizEngine {
             LayoutKind::Honeycomb => {
                 let mut config = self.config.projection_config.clone();
 
-                // Check for flat embedding flag
-                let use_flat_embed = params
-                    .get("flat_embed")
-                    .map(|s| s == "true" || s == "1")
-                    .unwrap_or(false);
-
-                // Apply flat embedding preprocessing if requested
-                let flat_embedding_matrix;
-                let embedding_to_use = if use_flat_embed {
-                    // Applying flat embedding preprocessing
-
-                    // Create flat embedding configuration
-                    let flat_config = FlatEmbedConfig {
-                        iterations: params
-                            .get("flat_embed.iterations")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(800),
-                        learning_rate: params
-                            .get("flat_embed.learning_rate")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.03),
-                        edge_cohesion_weight: params
-                            .get("flat_embed.edge_cohesion_weight")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(1.0),
-                        repulsion_weight: params
-                            .get("flat_embed.repulsion_weight")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.1),
-                        spread_weight: params
-                            .get("flat_embed.spread_weight")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.05),
-                        ..FlatEmbedConfig::default()
-                    };
-
-                    match compute_flat_embedding(
-                        embedding,
-                        &self.graph.lock().unwrap(),
-                        &flat_config,
-                    ) {
-                        Ok(flat_positions) => {
-                            // Flat embedding computed successfully
-
-                            // Convert positions back to GraphMatrix for honeycomb projection
-                            let flat_data: Vec<f64> = flat_positions
-                                .iter()
-                                .flat_map(|pos| vec![pos.x, pos.y])
-                                .collect();
-
-                            match crate::storage::advanced_matrix::unified_matrix::UnifiedMatrix::from_data(flat_data, flat_positions.len(), 2) {
-                                Ok(unified) => {
-                                    flat_embedding_matrix = crate::storage::matrix::GraphMatrix::from_storage(unified);
-                                    &flat_embedding_matrix
-                                }
-                                Err(_e) => {
-                                    // Failed to create matrix from flat positions, using original embedding
-                                    embedding
-                                }
-                            }
-                        }
-                        Err(_e) => {
-                            // Flat embedding failed, using original embedding
-                            embedding
-                        }
-                    }
-                } else {
-                    embedding
+                let flat_embedding_matrix = {
+                    let graph = self.graph.lock().map_err(|_| {
+                        GraphError::InvalidInput(
+                            "Cannot prepare flat layout: graph lock is poisoned".into(),
+                        )
+                    })?;
+                    prepare_flat_embedding(embedding, &graph, &params)?
                 };
+                let embedding_to_use = flat_embedding_matrix.as_ref().unwrap_or(embedding);
 
                 // Check for explicit cell size first
                 let explicit_cell_size = params
@@ -1752,17 +1753,10 @@ impl RealTimeVizEngine {
                 // This is just a synchronization marker
             }
             EngineUpdate::LayoutChanged { algorithm, params } => {
-                match algorithm.parse::<LayoutKind>() {
-                    Ok(layout_kind) => {
-                        self.apply_layout_change(layout_kind, params).await?;
-                    }
-                    Err(err) => {
-                        eprintln!(
-                            "⚠️  WARNING: {} – ignoring layout change and keeping current layout",
-                            err
-                        );
-                    }
-                }
+                let layout_kind = algorithm
+                    .parse::<LayoutKind>()
+                    .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+                self.apply_layout_change(layout_kind, params).await?;
             }
             EngineUpdate::EmbeddingChanged { method, dimensions } => {
                 // Map method string to EmbeddingMethod enum
@@ -2431,6 +2425,186 @@ pub enum AnimationType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn flat_fixture() -> (Graph, GraphMatrix) {
+        let mut graph = Graph::new();
+        graph.add_nodes(4);
+        graph.remove_node(1).unwrap();
+        graph.add_edge(0, 3).unwrap();
+        let mut input = GraphMatrix::from_row_major_data(vec![1.0; 9], 3, 3, None).unwrap();
+        input.set_row_labels(Some(vec![
+            "node_3".into(),
+            "node_0".into(),
+            "node_2".into(),
+        ]));
+        (graph, input)
+    }
+
+    #[test]
+    fn flat_preprocessing_preserves_owned_row_identity_and_all_typed_controls() {
+        let (graph, input) = flat_fixture();
+        let before = input.to_vec().unwrap();
+        let config = FlatEmbedConfig {
+            iterations: 5,
+            learning_rate: 0.02,
+            edge_cohesion_weight: 0.8,
+            repulsion_weight: 0.03,
+            repulsion_power: 2.0,
+            spread_weight: 0.1,
+            radius_clip: 0.2,
+            seed: 19,
+        };
+        let params = HashMap::from([
+            ("flat_embed".into(), "true".into()),
+            ("flat_embed.iterations".into(), "5".into()),
+            ("flat_embed.learning_rate".into(), "0.02".into()),
+            ("flat_embed.edge_cohesion_weight".into(), "0.8".into()),
+            ("flat_embed.repulsion_weight".into(), "0.03".into()),
+            ("flat_embed.repulsion_power".into(), "2".into()),
+            ("flat_embed.spread_weight".into(), "0.1".into()),
+            ("flat_embed.radius_clip".into(), "0.2".into()),
+            ("flat_embed.seed".into(), "19".into()),
+        ]);
+        let output = prepare_flat_embedding(&input, &graph, &params)
+            .unwrap()
+            .unwrap();
+        let expected = compute_flat_embedding_matrix(&input, &graph, &config).unwrap();
+        assert_eq!(output.to_vec().unwrap(), expected.to_vec().unwrap());
+        assert_eq!(output.row_labels(), input.row_labels());
+        assert_eq!(output.column_names(), ["flat_x", "flat_y"]);
+        assert_eq!(input.to_vec().unwrap(), before);
+        assert_eq!(graph.edge_count(), 1);
+        let defaults = prepare_flat_embedding(
+            &input,
+            &graph,
+            &HashMap::from([("flat_embed".into(), "1".into())]),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            defaults.to_vec().unwrap(),
+            compute_flat_embedding_matrix(&input, &graph, &FlatEmbedConfig::default())
+                .unwrap()
+                .to_vec()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn requested_flat_failures_and_malformed_parameters_never_become_defaults() {
+        let (graph, input) = flat_fixture();
+        for (key, value) in [
+            ("flat_embed", "maybe"),
+            ("flat_embed.iterations", "oops"),
+            ("flat_embed.iterations", "-1"),
+            ("flat_embed.seed", "bad"),
+            ("flat_embed.learning_rate", "oops"),
+            ("flat_embed.edge_cohesion_weight", "oops"),
+            ("flat_embed.repulsion_weight", "oops"),
+            ("flat_embed.repulsion_power", "oops"),
+            ("flat_embed.spread_weight", "oops"),
+            ("flat_embed.radius_clip", "oops"),
+        ] {
+            let mut params = HashMap::from([("flat_embed".into(), "true".into())]);
+            params.insert(key.into(), value.into());
+            let error = prepare_flat_embedding(&input, &graph, &params)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(key), "{error}");
+        }
+        for (key, value) in [
+            ("learning_rate", "0"),
+            ("learning_rate", "NaN"),
+            ("edge_cohesion_weight", "-1"),
+            ("repulsion_weight", "inf"),
+            ("repulsion_power", "0"),
+            ("spread_weight", "-1"),
+            ("radius_clip", "0"),
+        ] {
+            let params = HashMap::from([
+                ("flat_embed".into(), "true".into()),
+                (format!("flat_embed.{key}"), value.into()),
+            ]);
+            let error = prepare_flat_embedding(&input, &graph, &params)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(key), "{error}");
+        }
+        let params = HashMap::from([("flat_embed".into(), "true".into())]);
+        assert!(prepare_flat_embedding(&GraphMatrix::zeros(2, 3), &graph, &params).is_err());
+        let mut bad = input.clone();
+        bad.set_row_labels(Some(vec![
+            "node_0".into(),
+            "node_0".into(),
+            "node_3".into(),
+        ]));
+        assert!(prepare_flat_embedding(&bad, &graph, &params).is_err());
+        // Disabled preprocessing does not consume otherwise unused flat controls.
+        for flag in ["false", "0", " FALSE "] {
+            let params = HashMap::from([
+                ("flat_embed".into(), flag.into()),
+                ("flat_embed.iterations".into(), "bad".into()),
+            ]);
+            assert!(prepare_flat_embedding(&input, &graph, &params)
+                .unwrap()
+                .is_none());
+        }
+        assert!(prepare_flat_embedding(&input, &graph, &HashMap::new())
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn flat_recomputation_errors_preserve_positions_and_emit_no_success() {
+        let (graph, input) = flat_fixture();
+        let mut engine = RealTimeVizEngine::new(graph, RealTimeVizConfig::default());
+        let mut updates = engine.subscribe();
+        let last_update;
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.embedding = Some(input);
+            state.positions = vec![Position { x: 7.0, y: 9.0 }; 3];
+            state.current_layout_params = HashMap::from([
+                ("flat_embed".into(), "true".into()),
+                ("flat_embed.learning_rate".into(), "-1".into()),
+            ]);
+            last_update = state.last_update;
+        }
+        let error = engine.trigger_projection_recomputation().await.unwrap_err();
+        assert!(error.to_string().contains("learning_rate"));
+        let state = engine.state.lock().unwrap();
+        assert!(state
+            .positions
+            .iter()
+            .all(|position| position.x == 7.0 && position.y == 9.0));
+        assert_eq!(state.last_update, last_update);
+        assert!(matches!(
+            updates.try_recv(),
+            Err(broadcast::error::TryRecvError::Empty)
+        ));
+    }
+
+    #[tokio::test]
+    async fn unknown_layout_request_returns_error_without_broadcasting_success() {
+        let mut engine = RealTimeVizEngine::new(Graph::new(), RealTimeVizConfig::default());
+        let mut updates = engine.subscribe();
+        let error = engine
+            .apply(EngineUpdate::LayoutChanged {
+                algorithm: "not-a-layout".into(),
+                params: HashMap::new(),
+            })
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("unknown layout algorithm"));
+        assert!(matches!(
+            updates.try_recv(),
+            Err(broadcast::error::TryRecvError::Empty)
+        ));
+        assert_eq!(
+            engine.state.lock().unwrap().current_layout,
+            LayoutKind::Honeycomb
+        );
+    }
 
     #[test]
     fn test_engine_creation() {

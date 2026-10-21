@@ -24,6 +24,36 @@ const INDEX_HTML: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/web/
 const APP_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/web/app.js"));
 const STYLES_CSS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/web/styles.css"));
 
+/// Acknowledge layout completion, including an unavailable engine or native failure.
+async fn layout_control_result(
+    engine: Option<&mut RealTimeVizEngine>,
+    algorithm: &str,
+    params: std::collections::HashMap<String, String>,
+) -> WsMessage {
+    let result = match engine {
+        Some(engine) => {
+            engine
+                .apply(EngineUpdate::LayoutChanged {
+                    algorithm: algorithm.into(),
+                    params,
+                })
+                .await
+        }
+        None => Err(GraphError::InvalidInput(
+            "Layout engine is not connected".into(),
+        )),
+    };
+    let (success, message) = match result {
+        Ok(()) => (true, "Layout applied".to_string()),
+        Err(error) => (false, error.to_string()),
+    };
+    WsMessage::ControlAck {
+        version: 1,
+        success,
+        message,
+    }
+}
+
 /// Handle for controlling a background realtime server
 pub struct RealtimeServerHandle {
     /// Server port
@@ -246,6 +276,14 @@ impl RealtimeServer {
                             }
                         }
 
+                        if let ControlMsg::ChangeLayout { algorithm, params } = &control_msg {
+                            let ack = layout_control_result(self.engine.as_mut(), algorithm, params.clone()).await;
+                            if let Err(error) = self.ws_bridge.send_to_client(client_id, ack).await {
+                                eprintln!("Failed to send layout result to client {client_id}: {error}");
+                            }
+                            continue;
+                        }
+
                         // Engine-directed controls - apply ALL control messages to engine
                         if let Some(ref mut engine) = self.engine {
                             match &control_msg {
@@ -261,17 +299,8 @@ impl RealtimeServer {
                                         // ❌ DEBUG: Engine failed to apply EmbeddingChanged: {}
                                     }
                                 }
-                                ControlMsg::ChangeLayout { algorithm, params } => {
-                                    // 📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}
-                                    if let Err(_e) = engine
-                                        .apply(EngineUpdate::LayoutChanged {
-                                            algorithm: algorithm.clone(),
-                                            params: params.clone(),
-                                        })
-                                        .await
-                                    {
-                                        // ❌ DEBUG: Engine failed to apply LayoutChanged: {}
-                                    }
+                                ControlMsg::ChangeLayout { .. } => {
+                                    // Handled above, with a completion acknowledgement.
                                 }
                                 ControlMsg::SetInteractionController { mode } => {
                                     // 🎮 DEBUG: Switching interaction controller to {}
@@ -951,6 +980,14 @@ impl RealtimeServer {
                                 // ❌ DEBUG: Accessor failed to process control message: {}
                             }
                         }
+                        if let ControlMsg::ChangeLayout { algorithm, params } = &control_msg {
+                            let ack = layout_control_result(self.engine.as_mut(), algorithm, params.clone()).await;
+                            if let Err(error) = self.ws_bridge.send_to_client(client_id, ack).await {
+                                eprintln!("Failed to send layout result to client {client_id}: {error}");
+                            }
+                            continue;
+                        }
+
                         // Engine-directed controls - apply ALL control messages to engine
                         if let Some(ref mut engine) = self.engine {
                             match &control_msg {
@@ -966,17 +1003,8 @@ impl RealtimeServer {
                                         // ❌ DEBUG: Engine failed to apply EmbeddingChanged: {}
                                     }
                                 }
-                                ControlMsg::ChangeLayout { algorithm, params } => {
-                                    // 📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}
-                                    if let Err(_e) = engine
-                                        .apply(EngineUpdate::LayoutChanged {
-                                            algorithm: algorithm.clone(),
-                                            params: params.clone(),
-                                        })
-                                        .await
-                                    {
-                                        // ❌ DEBUG: Engine failed to apply LayoutChanged: {}
-                                    }
+                                ControlMsg::ChangeLayout { .. } => {
+                                    // Handled above, with a completion acknowledgement.
                                 }
                                 ControlMsg::SetInteractionController { mode } => {
                                     // 🎮 DEBUG: Switching interaction controller to {}
@@ -1211,4 +1239,50 @@ pub fn start_realtime_background(
         cancel,
         thread: Some(thread),
     })
+}
+
+#[cfg(test)]
+mod layout_result_tests {
+    use super::*;
+    #[tokio::test]
+    async fn acknowledgement_reflects_actual_layout_result_including_flat_failure() {
+        use crate::viz::embeddings::{EmbeddingMethod, RandomDistribution};
+        use std::collections::HashMap;
+        let missing = layout_control_result(None, "honeycomb", HashMap::new()).await;
+        assert!(matches!(
+            missing,
+            WsMessage::ControlAck { success: false, .. }
+        ));
+        let mut graph = crate::Graph::new();
+        graph.add_nodes(3);
+        let mut config = RealTimeVizConfig::default();
+        config.embedding_config.method = EmbeddingMethod::RandomND {
+            distribution: RandomDistribution::Uniform {
+                min: -1.0,
+                max: 1.0,
+            },
+            normalize: false,
+        };
+        config.embedding_config.dimensions = 2;
+        config.embedding_config.seed = Some(4);
+        let mut engine = RealTimeVizEngine::new(graph, config);
+        let valid = layout_control_result(Some(&mut engine), "grid", HashMap::new()).await;
+        assert!(matches!(valid, WsMessage::ControlAck { success: true, .. }));
+        let invalid = layout_control_result(Some(&mut engine), "unknown", HashMap::new()).await;
+        assert!(
+            matches!(invalid, WsMessage::ControlAck { success: false, message, .. } if message.contains("unknown layout"))
+        );
+        let flat = layout_control_result(
+            Some(&mut engine),
+            "honeycomb",
+            HashMap::from([
+                ("flat_embed".into(), "true".into()),
+                ("flat_embed.learning_rate".into(), "-1".into()),
+            ]),
+        )
+        .await;
+        assert!(
+            matches!(flat, WsMessage::ControlAck { success: false, message, .. } if message.contains("learning_rate"))
+        );
+    }
 }

@@ -354,7 +354,11 @@ export class RealtimeViz {
                     break;
 
                 case 'control_ack':
-                    console.log('✅ Control ack:', message);
+                    if (message.success) {
+                        console.log('Control ack:', message.message);
+                    } else {
+                        console.error('Control rejected:', message.message);
+                    }
                     break;
 
                 default:
