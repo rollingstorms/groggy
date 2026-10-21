@@ -5846,8 +5846,8 @@ class GraphMatrix:
 
     def svd(self, *args, **kwargs) -> Any:
         """
-        SVD decomposition: A = U * Σ * V^T
-        Returns tuple of (U, singular_values, V_transpose)
+        Real SVD: A = U * Sigma * V^T, using bounded one-sided Jacobi sweeps.
+        Returns full U, min(rows, cols) descending values, and full V_transpose.
         """
         ...
 

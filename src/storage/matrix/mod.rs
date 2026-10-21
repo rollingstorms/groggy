@@ -8,6 +8,7 @@
 //! - Full backward compatibility
 
 pub mod conversions;
+mod decomposition;
 pub mod matrix_core;
 pub mod slicing;
 

@@ -1947,8 +1947,8 @@ impl PyGraphMatrix {
         Py::new(py, matrix)
     }
 
-    /// SVD decomposition: A = U * Σ * V^T
-    /// Returns tuple of (U, singular_values, V_transpose)
+    /// Real SVD: A = U * Sigma * V^T, using bounded one-sided Jacobi sweeps.
+    /// Returns full U, min(rows, cols) descending values, and full V_transpose.
     fn svd(&self, py: Python) -> PyResult<(Py<Self>, PyObject, Py<Self>)> {
         let (u_matrix, singular_values, vt_matrix) = self
             .inner

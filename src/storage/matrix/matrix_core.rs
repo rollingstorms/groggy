@@ -2221,78 +2221,14 @@ impl<T: NumericType> GraphMatrix<T> {
             + std::ops::Sub<Output = T>
             + std::ops::Mul<Output = T>
             + std::ops::Div<Output = T>,
-        f64: From<T>,
     {
         let (rows, cols) = self.shape();
-
-        // For simplicity, implement via eigenvalue decomposition of A^T * A
-        // This gives us V and Σ^2, then compute U = A * V * Σ^(-1)
-        let a_transpose = self.transpose()?;
-        let ata = a_transpose.multiply(self)?;
-
-        // Compute eigenvalues and eigenvectors of A^T * A using simplified power iteration
-        let (eigenvalues, eigenvectors) = ata.eigendecomposition()?;
-
-        // Sort eigenvalues and eigenvectors in descending order
-        let mut eigen_pairs: Vec<(f64, Vec<T>)> =
-            eigenvalues.into_iter().zip(eigenvectors).collect();
-        eigen_pairs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Extract sorted eigenvalues and eigenvectors
-        let sorted_eigenvalues: Vec<f64> = eigen_pairs.iter().map(|(val, _)| *val).collect();
-        let sorted_eigenvectors: Vec<Vec<T>> =
-            eigen_pairs.into_iter().map(|(_, vec)| vec).collect();
-
-        // Singular values are square roots of eigenvalues
-        let singular_values: Vec<f64> = sorted_eigenvalues
-            .into_iter()
-            .map(|val| val.max(0.0).sqrt())
-            .collect();
-
-        // V matrix (right singular vectors) - transpose of eigenvector matrix
-        let mut v_arrays = Vec::new();
-        for i in 0..cols {
-            if i < sorted_eigenvectors.len() {
-                v_arrays.push(NumArray::new(sorted_eigenvectors[i].clone()));
-            } else {
-                // Fill with zeros if we don't have enough eigenvectors
-                v_arrays.push(NumArray::new(vec![T::default(); cols]));
-            }
-        }
-        let v_matrix = GraphMatrix::from_arrays(v_arrays)?;
-
-        // Compute U = A * V * Σ^(-1)
-        let mut u_arrays = Vec::new();
-        let min_dim = std::cmp::min(rows, cols);
-
-        for j in 0..min_dim {
-            let mut u_column = Vec::new();
-            for i in 0..rows {
-                let mut sum = T::default();
-                for k in 0..cols {
-                    if let (Some(a_val), Some(v_val)) = (self.get(i, k), v_matrix.get(k, j)) {
-                        let sigma_inv = if j < singular_values.len() && singular_values[j] > 1e-10 {
-                            T::from_f64(1.0 / singular_values[j]).unwrap_or_else(|| T::default())
-                        } else {
-                            T::default()
-                        };
-                        sum = sum + a_val * v_val * sigma_inv;
-                    }
-                }
-                u_column.push(sum);
-            }
-            u_arrays.push(NumArray::new(u_column));
-        }
-
-        // Fill remaining columns with orthogonal vectors if needed
-        while u_arrays.len() < rows {
-            u_arrays.push(NumArray::new(vec![T::default(); rows]));
-        }
-
-        let u_matrix = GraphMatrix::from_arrays(u_arrays)?;
-        let vt_matrix = v_matrix.transpose()?;
-
-        Ok((u_matrix, singular_values, vt_matrix))
+        let result = super::decomposition::svd(self.decomposition_input()?, rows, cols)?;
+        Ok((
+            Self::decomposition_matrix(result.u, rows, rows)?,
+            result.singular,
+            Self::decomposition_matrix(result.vt, cols, cols)?,
+        ))
     }
 
     /// QR decomposition: A = Q * R
@@ -2614,8 +2550,8 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(l_matrix)
     }
 
-    /// Eigenvalue decomposition using QR algorithm
-    /// Returns (eigenvalues, eigenvectors) where A * V = V * Λ
+    /// Real symmetric eigendecomposition with descending eigenvalues.
+    /// Eigenvectors are orthonormal columns; other domains reject explicitly.
     pub fn eigenvalue_decomposition(&self) -> GraphResult<(Vec<f64>, GraphMatrix<T>)>
     where
         T: Clone
@@ -2628,8 +2564,6 @@ impl<T: NumericType> GraphMatrix<T> {
             + std::ops::Sub<Output = T>
             + std::ops::Mul<Output = T>
             + std::ops::Div<Output = T>,
-        f64: From<T>,
-        T: From<f64>,
     {
         let (rows, cols) = self.shape();
         if rows != cols {
@@ -2637,179 +2571,49 @@ impl<T: NumericType> GraphMatrix<T> {
                 "Eigendecomposition requires square matrix".into(),
             ));
         }
-
-        let n = rows;
-
-        // Use simplified power iteration method for dominant eigenvalue/eigenvector
-        // For a more complete implementation, would use QR algorithm with shifts
-        let mut eigenvalues = Vec::new();
-        let mut eigenvector_columns = Vec::new();
-
-        // Create working copy of matrix
-        let mut a = Vec::new();
-        for i in 0..n {
-            let mut row = Vec::new();
-            for j in 0..n {
-                let val = self.get(i, j).unwrap_or_else(|| T::default());
-                row.push(f64::from(val));
-            }
-            a.push(row);
-        }
-
-        // Find dominant eigenvalue using power iteration
-        let mut v = vec![1.0; n];
-        let mut eigenvalue = 0.0;
-
-        // Normalize initial vector
-        let norm = v.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm > 1e-10 {
-            for val in &mut v {
-                *val /= norm;
-            }
-        }
-
-        // Power iteration
-        for _iter in 0..100 {
-            let mut av = vec![0.0; n];
-
-            // Compute A * v
-            for i in 0..n {
-                for j in 0..n {
-                    av[i] += a[i][j] * v[j];
-                }
-            }
-
-            // Compute Rayleigh quotient: λ = v^T * A * v / (v^T * v)
-            let mut numerator = 0.0;
-            let mut denominator = 0.0;
-            for i in 0..n {
-                numerator += v[i] * av[i];
-                denominator += v[i] * v[i];
-            }
-
-            if denominator > 1e-10 {
-                eigenvalue = numerator / denominator;
-            }
-
-            // Normalize Av for next iteration
-            let av_norm = av.iter().map(|x| x * x).sum::<f64>().sqrt();
-            if av_norm > 1e-10 {
-                for i in 0..n {
-                    v[i] = av[i] / av_norm;
-                }
-            }
-        }
-
-        eigenvalues.push(eigenvalue);
-
-        // Create eigenvector column
-        let eigenvector_col: Vec<T> = v.into_iter().map(|x| T::from(x)).collect();
-        eigenvector_columns.push(NumArray::new(eigenvector_col));
-
-        // For simplicity, fill remaining eigenvalues with approximations
-        // In a complete implementation, would use deflation or QR algorithm
-        for i in 1..n {
-            // Add approximate eigenvalues (diagonal elements as rough estimates)
-            let diag_val = f64::from(self.get(i, i).unwrap_or_else(|| T::default()));
-            eigenvalues.push(diag_val);
-
-            // Create identity-like eigenvectors for remaining values
-            let mut identity_col = vec![T::default(); n];
-            if i < n {
-                identity_col[i] = T::from(1.0);
-            }
-            eigenvector_columns.push(NumArray::new(identity_col));
-        }
-
-        // Build eigenvector matrix
-        let eigenvector_matrix = GraphMatrix::from_arrays(eigenvector_columns)?;
-
-        Ok((eigenvalues, eigenvector_matrix))
+        let (values, vectors) =
+            super::decomposition::symmetric_eigen(self.decomposition_input()?, rows)?;
+        Ok((values, Self::decomposition_matrix(vectors, rows, rows)?))
     }
 
-    /// Simple eigenvalue decomposition using power iteration method
-    /// Returns (eigenvalues, eigenvectors) - simplified implementation for SVD
-    fn eigendecomposition(&self) -> GraphResult<(Vec<f64>, Vec<Vec<T>>)>
-    where
-        T: Clone
-            + Copy
-            + Default
-            + std::fmt::Debug
-            + PartialEq
-            + PartialOrd
-            + std::ops::Add<Output = T>
-            + std::ops::Sub<Output = T>
-            + std::ops::Mul<Output = T>
-            + std::ops::Div<Output = T>,
-        f64: From<T>,
-    {
-        let (rows, cols) = self.shape();
-        if rows != cols {
+    fn decomposition_input(&self) -> GraphResult<Vec<f64>> {
+        use crate::storage::advanced_matrix::DType;
+        if !matches!(T::DTYPE, DType::Float32 | DType::Float64) {
             return Err(GraphError::InvalidInput(
-                "Eigendecomposition requires square matrix".into(),
+                "Decomposition requires floating-point matrix elements".into(),
             ));
         }
-
-        let mut eigenvalues = Vec::new();
-        let mut eigenvectors = Vec::new();
-
-        // For simplicity, just compute the dominant eigenvalue/eigenvector using power iteration
-        // In a full implementation, you'd use more sophisticated methods like QR algorithm
-
-        // Start with random vector
-        let mut v = vec![1.0f64; rows];
-        let iterations = 100;
-
-        for _ in 0..iterations {
-            let mut new_v = vec![0.0; rows];
-
-            // Multiply matrix by vector: new_v = A * v
-            for i in 0..rows {
-                for j in 0..cols {
-                    if let Some(a_val) = self.get(i, j) {
-                        new_v[i] += f64::from(a_val) * v[j];
-                    }
-                }
-            }
-
-            // Normalize
-            let norm = new_v.iter().map(|x| x * x).sum::<f64>().sqrt();
-            if norm > 1e-10 {
-                for val in &mut new_v {
-                    *val /= norm;
-                }
-            }
-            v = new_v;
-        }
-
-        // Compute eigenvalue: λ = v^T * A * v (Rayleigh quotient)
-        let mut lambda = 0.0;
-        for i in 0..rows {
-            for j in 0..cols {
-                if let Some(a_val) = self.get(i, j) {
-                    lambda += v[i] * f64::from(a_val) * v[j];
-                }
-            }
-        }
-
-        eigenvalues.push(lambda);
-        eigenvectors.push(
-            v.into_iter()
-                .map(|x| T::from_f64(x).unwrap_or_else(|| T::default()))
-                .collect(),
+        let (rows, cols) = self.shape();
+        let mut data = Vec::with_capacity(
+            rows.checked_mul(cols)
+                .ok_or_else(|| GraphError::InvalidInput("Matrix dimensions overflow".into()))?,
         );
-
-        // For completeness, add remaining eigenvalues as zeros with identity eigenvectors
-        for i in 1..rows {
-            eigenvalues.push(0.0);
-            let mut ev = vec![T::default(); rows];
-            if i < rows {
-                ev[i] = T::from_f64(1.0).unwrap_or_else(|| T::default());
+        for row in 0..rows {
+            for col in 0..cols {
+                data.push(
+                    self.get(row, col)
+                        .ok_or_else(|| {
+                            GraphError::InvalidInput("Missing decomposition input value".into())
+                        })?
+                        .to_f64(),
+                );
             }
-            eigenvectors.push(ev);
         }
+        Ok(data)
+    }
 
-        Ok((eigenvalues, eigenvectors))
+    fn decomposition_matrix(values: Vec<f64>, rows: usize, cols: usize) -> GraphResult<Self> {
+        let values = values
+            .into_iter()
+            .map(|value| {
+                T::from_f64(value).ok_or_else(|| {
+                    GraphError::InvalidInput(
+                        "Decomposition output is not representable in its element type".into(),
+                    )
+                })
+            })
+            .collect::<GraphResult<_>>()?;
+        Self::from_row_major_data(values, rows, cols, None)
     }
 
     /// Matrix rank - number of linearly independent rows/columns

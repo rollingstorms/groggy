@@ -47,7 +47,8 @@ impl SpectralEmbedding {
         let mut laplacian = GraphMatrix::zeros(n, n);
 
         // Get node index mapping
-        let node_ids: Vec<NodeId> = graph.space().node_ids();
+        let mut node_ids: Vec<NodeId> = graph.space().node_ids();
+        node_ids.sort_unstable();
         let node_to_idx: HashMap<NodeId, usize> = node_ids
             .iter()
             .enumerate()
@@ -188,7 +189,12 @@ impl EmbeddingEngine for SpectralEmbedding {
         let laplacian = self.compute_laplacian(graph)?;
 
         // Compute eigenvectors
-        let embedding = self.compute_eigenvectors(&laplacian, dimensions)?;
+        let mut embedding = self.compute_eigenvectors(&laplacian, dimensions)?;
+        let mut node_ids = graph.space().node_ids();
+        node_ids.sort_unstable();
+        embedding.set_row_labels(Some(
+            node_ids.iter().map(|id| format!("node_{id}")).collect(),
+        ));
 
         Ok(embedding)
     }
