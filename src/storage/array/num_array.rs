@@ -100,32 +100,12 @@ where
         super::numeric_reductions::median_iter(self.base.as_slice().iter().map(|&x| x.into()))
     }
 
-    /// Calculate the percentile (0.0 to 1.0)
+    /// Linearly interpolated percentile; invalid probability/empty=None, NaNs propagate.
     pub fn percentile(&self, p: f64) -> Option<f64> {
-        if self.is_empty() || !(0.0..=1.0).contains(&p) {
-            return None;
-        }
-
-        let mut sorted: Vec<f64> = self.iter().map(|&x| x.into()).collect();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        if p == 0.0 {
-            return Some(sorted[0]);
-        }
-        if p == 1.0 {
-            return Some(sorted[sorted.len() - 1]);
-        }
-
-        let index = p * (sorted.len() - 1) as f64;
-        let lower = index.floor() as usize;
-        let upper = index.ceil() as usize;
-
-        if lower == upper {
-            Some(sorted[lower])
-        } else {
-            let weight = index - lower as f64;
-            Some(sorted[lower] * (1.0 - weight) + sorted[upper] * weight)
-        }
+        super::numeric_reductions::percentile_iter(
+            self.base.as_slice().iter().map(|&x| x.into()),
+            p,
+        )
     }
 
     /// Calculate correlation with another NumArray

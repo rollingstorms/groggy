@@ -93,3 +93,18 @@ linear scratch and sorting, and NumArray selection median partitions a copy.
 These are structural descriptions, not benchmark results. No acceleration,
 throughput, GIL-release, percentile/correlation, ArrayArray, matrix reduction,
 dtype-conversion or general arithmetic certification is added.
+
+## Linear percentiles (29.10)
+
+`NumArray.percentile(p)` retains rank `p*(N-1)` and linear interpolation.
+The shared native typed slice kernel preserves ordering until interpolation;
+`p=0.5` uses the safe typed median midpoint. Empty input or a probability outside
+[0,1] (including NaN/infinity) returns None. Any input NaN propagates, including
+at endpoint probabilities. Exact ranks return the selected scalar; interpolated
+finite/infinite pairs return that infinity, opposed infinities return NaN.
+Finite interpolation avoids overflowing endpoint differences. Input stays unchanged;
+sorting uses O(N) scratch and O(N log N) work. Output is approximate f64, without
+an arbitrary-precision interpolation guarantee. Existing generic NumArray bounds
+remain; this slice adds no Python percentile method. `describe()` uses the repair.
+Evidence: `tests/numarray_percentiles.rs`, analytic arithmetic-progression ranks,
+integer/extreme floating midpoints, IEEE domains and source preservation.

@@ -323,3 +323,45 @@ pub fn select_median(data: &mut [f64]) -> Option<f64> {
         Some(midpoint(low, high))
     }
 }
+
+/// Linear percentile at rank p*(N-1); invalid p/empty=None, NaNs propagate.
+/// Source values are not modified. Output remains approximate f64.
+pub fn percentile<S: Scalar>(data: &[S], p: f64) -> Option<f64> {
+    percentile_iter(data.iter().copied(), p)
+}
+pub(crate) fn percentile_iter<S: Scalar, I: Iterator<Item = S>>(data: I, p: f64) -> Option<f64> {
+    if !(0.0..=1.0).contains(&p) {
+        return None;
+    }
+    let mut sorted: Vec<S> = data.collect();
+    if sorted.is_empty() {
+        return None;
+    }
+    if sorted.iter().any(|x| x.as_f64().is_nan()) {
+        return Some(f64::NAN);
+    }
+    sorted.sort_by(|a, b| a.numeric_cmp(*b));
+    let rank = p * (sorted.len() - 1) as f64;
+    // Bound indices even when usize->f64 rounding puts the last rank above N-1.
+    let low = (rank.floor() as usize).min(sorted.len() - 1);
+    let high = (rank.ceil() as usize).min(sorted.len() - 1);
+    let a = sorted[low];
+    let b = sorted[high];
+    if low == high {
+        return Some(a.as_f64());
+    }
+    let weight = rank - low as f64;
+    if weight == 0.5 {
+        return Some(midpoint(a, b));
+    }
+    let (a, b) = (a.as_f64(), b.as_f64());
+    Some(if a == b {
+        a
+    } else if !a.is_finite() || !b.is_finite() {
+        a * (1.0 - weight) + b * weight
+    } else if a.is_sign_negative() == b.is_sign_negative() {
+        a + (b - a) * weight
+    } else {
+        a * (1.0 - weight) + b * weight
+    })
+}

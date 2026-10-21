@@ -96,3 +96,5 @@ Prove compatibility and reliability at realistic scale, then document actual cap
 34. **Publish an honest capability matrix.** Mark features implemented only when their Rust API, Python API, persistence, and correctness tests meet the contract. Update old roadmap completion claims accordingly.
 
 The near-term milestone is a coherent Groggy core: reliable writes, temporal reconstruction, immutable connected views and tables, native graph queries, corrected graph algorithms, and capable vector/matrix libraries, with persistence, reference-result comparisons, and failure testing. After that, items 20 and 22–25 provide Graphiti ingest, retrieval, and backing-database milestones. The remaining operations and scale work establishes production readiness.
+
+Numerical item 29.10 completes the existing NumArray linear percentile path using shared typed kernels and explicit IEEE/rank behavior. Correlation, arithmetic, ArrayArray and measured acceleration remain open.
