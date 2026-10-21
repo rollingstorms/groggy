@@ -1,0 +1,131 @@
+# Groggy implementation checklist
+
+Updated 2026-10-21 on `groggy-roadmap-2026-10-20`.
+
+One flat list of concrete work, using the stable item numbers from the
+[roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
+checkable slices; AR entries track the architecture work. `[x]` means the stated
+slice has implementation and focused evidence on this branch, within its stated
+limits. `[ ]` means unfinished, deferred, or not yet verified; it does **not** mean
+the existing engine has no implementation. No checkmark certifies production
+readiness. **Partial**, **Open**, **Review**, and **Deferred** distinguish why a
+box is unchecked. The decision record and API documents define the contracts.
+The [open-questions appendix](open-questions-appendix-2026-10-20.md) remains the
+place for unresolved owner choices; this checklist does not answer those choices.
+
+Graphiti integration and retrieval remain deferred until the core. “Record a
+change” means accepting a mutation and its delta, with an explicit effective time
+or batch clock default. It does not mean computing a read records new history.
+An explicit snapshot/checkpoint and a reconstructed effective-time view are
+separate operations. Ordinary connected views still need migration to the
+accepted pinned-state model.
+
+- [x] **01.1 — Established graph baseline.** Verify empty construction, undirected default, explicit directed creation, and the one-node/no-edge minimum in Rust and Python. Evidence: `engine_contract` suites.
+- [ ] **01.2 — Review: extend conformance with each repaired surface.** Cover the established contract across history, properties, views, queries, tables, algorithms, and persistence; keep baseline checks distinct from full conformance.
+- [x] **02.1 — Live read authority.** Graph/entity/subgraph reads check GraphSpace membership; allocated pool slots do not imply active entities. Removed-entity Rust/Python regressions pass.
+- [ ] **02.2 — Partial: finish the wider liveness audit.** Apply the same rule to remaining algorithms, secondary indexes, historical readers, and migrated views. Preserve explicit retained-history inspection until purge.
+- [x] **03.1 — Core direction semantics.** Repair lookup/filtering, Graph BFS/DFS, shortest/all paths, adjacency matrices, and pathfinding CSR reversal for directed versus undirected graphs.
+- [ ] **03.2 — Partial: unify every adjacency caller.** Verify algorithm-specific directed definitions and share an internal endpoint/edge-ID interface rather than allowing policies to drift between callers.
+- [x] **04.1 — Edge-instance identity.** Preserve distinct IDs for parallel edges and loops; return the actual selected shortest-path edge; enumerate parallel simple-path instances; retain identity in recorded snapshots.
+- [ ] **04.2 — Open: explicit endpoint changes.** Define and implement rewiring as a typed change with before/after endpoints, history, validation, index updates, and restore behavior. See 13.3.
+- [x] **05.1 — Whole-input mutation validation.** Parse before allocation; aggregate decodable conversion and semantic errors with original row/column positions; reject invalid/inactive/duplicate targets before writes.
+- [x] **05.2 — Empty allocation.** Zero-count node allocation returns no IDs and leaves counters and active membership unchanged.
+- [ ] **05.3 — Partial: carry rejection guarantees to every new mutation.** Keep bulk/vectorized writes; test no changed values or consumed IDs on rejected input. Revisit duplicate policy only through an explicit contract change.
+- [x] **06.1 — Managed external identities.** Node/edge upserts preserve IDs, make identical payloads a no-op, reject conflicting rows, and use one namespace across kinds/groups/retained branches within a graph instance.
+- [x] **06.2 — Reservations and rename.** Retain aliases/reservations across rename, deactivation, and state switching; distinguish active lookup from allocation lookup; reject ambiguous legacy UID mappings.
+- [ ] **06.3 — Partial: complete identity lifecycle.** Keep identity lossless through remaining imports, pooled persistence, history retention, and explicit purge. UUID normalization belongs to the deferred adapter.
+- [x] **07.1 — Logical property bridge.** Preserve existing scalar, binary, typed-vector, and structured values across Rust/Python reads, columns, table cells, and recorded snapshots; repair equality/hash/order and corrupt-value errors.
+- [x] **07.2 — Typed active export.** Versioned active export preserves inline logical types and float bits, accepts legacy reads, and rejects unsupported pooled references explicitly.
+- [ ] **07.3 — Partial: complete intended property types.** Add native temporal types and settle/verify numeric widths beyond current i64/f32 properties; support pooled/meta references portably across history and storage.
+- [ ] **07.4 — Partial: finish value-change semantics.** Verify null versus absence, unset versus removal, type changes, structured/vector changes, and all logical values through every history/storage path. Decide large-value deduplication rather than assume it exists.
+- [x] **08.1 — Semantic kinds.** Version multiple node labels independently of base/meta identity and support optional edge relationship types; validate shapes before checked writes.
+- [x] **08.2 — Schema auditing and checked enforcement.** Audit required/nullable/type rules; validate the complete proposed checked-batch result; support an installed durable schema policy and schema revisions.
+- [ ] **08.3 — Partial: finish schema evolution.** Define ontology migration, schema policy history, and compatible enforcement for remaining legacy/manual mutation paths.
+- [x] **09.1 — Mixed atomic input batches.** GraphBatch validates insertion, updates, and removal together before allocation and publishes one in-memory state on acceptance.
+- [x] **09.2 — Checked writer and change clocks.** Rust/Python checked direct/bulk writes use batches, expected-state checks, typed deltas, engine-recorded batch time, batch effective-time defaults, and per-change overrides.
+- [x] **09.3 — Durable checked publication.** Journal sync precedes memory publication; schema and managed identity changes participate; injected write/sync/rollback/publication failures have coverage.
+- [ ] **09.4 — Partial: finish mutation migration.** Reconcile legacy direct/manual-commit APIs with automatically published states; include pooled/meta writes without changing established APIs accidentally.
+- [ ] **09.5 — Open: service transaction/concurrency contract.** Define reader snapshots, writer serialization/conflicts, multi-user boundaries, and episode/meta-node grouping before calling the embedded checked writer a multi-client database.
+- [x] **10.1 — Recoverable checked journal.** Versioned checksummed CBOR preserves supported inline checked writes, IDs/reservations, schema/configuration, branches, typed history, and original clocks; restart/corruption/truncation/subprocess tests exist.
+- [x] **10.2 — Verified full-journal backup.** Sync and verify a temporary backup, publish without overwriting, and restore through ordinary recovery. Active graph export remains a separate narrower format.
+- [ ] **10.3 — Partial: persist all retained contents.** Add backing pool/subgraph/meta contents and importing existing graphs; retain inactive entities and referenced values as required by history.
+- [ ] **10.4 — Open: bounded storage lifecycle.** Implement checkpoints, compaction, storage-format upgrades/migrations, crash-safe replacement, and bounded recovery cost.
+- [x] **11.1 — Typed recorded property states.** Historical recorded snapshots resolve typed node/edge values and typed before/after changes instead of placeholder representations.
+- [ ] **11.2 — Partial: complete property history.** Finish coalescing, deletion/unset/null distinctions, effective versus recorded ordering, all value types, and retained value references. Do not confuse property changes with deltas of the encoded value itself.
+- [x] **12.1 — Recorded state switching foundations.** Preserve direction, ID allocation, retained membership/endpoints, and backing column references through branch switches/reset; reject missing referents.
+- [ ] **12.2 — Partial: exact portable snapshots.** Restore all configuration and pinned referents; bound repeated-switch column allocation and verify reads independently of the working head.
+- [ ] **12.3 — Open: explicit checkpoint semantics.** Make an explicit commit/snapshot checkpoint the current published state through a compatible migration. Automatic deltas remain available between checkpoints.
+- [x] **13.1 — Hard reset foundations.** Restore the recorded state while preserving allocated-ID reservations and retained pool references.
+- [x] **13.2 — State-based diffs.** Compare reconstructed states in either direction with deterministic typed property and topology changes in Rust/Python.
+- [ ] **13.3 — Open: complete reversals and rewiring.** Implement revert and endpoint changes, define destructive versus tracked operations, and cover dirty working-state examples and data preservation.
+- [ ] **14.1 — Partial: finish branch lifecycle.** Verify existing branch switching, retained identities, durable replay, and branch-scoped reads against the completed state contract.
+- [ ] **14.2 — Open: three-way merge.** Detect node/edge/property conflicts, accept caller resolution policies, and explicitly support preserving parallel facts where requested.
+- [ ] **15.1 — Open: destructive retention policy.** Define explicit branch deletion/pruning, shared-referent reachability, audit retention, and when inactive identities/attributes may finally be purged.
+- [ ] **15.2 — Open: real garbage collection.** Replace no-op gc_history/optimize behavior with tested reachability, compaction, and crash-safe reclamation; preserve every retained snapshot/provenance reference.
+- [x] **16.1 — Effective-time write metadata.** Checked changes accept explicit effective timestamps or batch defaults; the engine separately records acceptance time.
+- [ ] **16.2 — Open: reconstructed effective-time graph.** Resolve branch-scoped state at T using the published head pinned at view creation, including topology and property changes between checkpoints. Existing whole-second commit timestamp selection is insufficient.
+- [ ] **16.3 — Open: optional recorded cutoff.** Apply recorded_by=U only when explicitly requested; propagate state/time pins into derived subgraphs and tables. Verify one property value per effective timestamp and correction ordering.
+- [ ] **17.1 — Open: first-class provenance.** Represent episodes/meta nodes, repeated evidence for a fact, retained raw content, and links among sources/entities/facts.
+- [ ] **17.2 — Open: evidence correction and withdrawal.** Record corrections/invalidation as historical changes without erasing retained evidence; define how provenance participates in recovery and pruning.
+- [x] **18.1 — Managed identity index.** Index allocation-lifetime external IDs with active/group checks; persist reservations for supported durable writes. Historical identity lookup currently scans pinned properties.
+- [ ] **18.2 — Open: remaining indexes.** Implement/verify global label, relationship type, endpoint, property equality/range, group, and time-window selection with the chosen explicit index lifecycle.
+- [ ] **18.3 — Open: index consistency.** Specify delta-driven maintenance versus explicit rebuild; test updates, deactivation, branch switches, historical reads, failed publication, and recovery. Avoid hidden rebuild semantics.
+- [x] **19.1 — Python coverage for repaired slices.** Rebuild and test property conversion, identity, checked batches/writer, schema, supported durability/history, and repaired numerical/graph algorithms across the bridge.
+- [ ] **19.2 — Partial: one complete Python contract.** Finish temporal/query/view/table APIs, consistent errors/types, view-versus-copy documentation, API compatibility rules, and safe GIL release where supported by ownership.
+- [ ] **20.1 — Deferred: Graphiti ingest adapter.** After core completion, select a compatibility release and round-trip episodes/entities/facts, IDs/groups, attributes, embeddings, time fields, and provenance losslessly.
+- [ ] **20.2 — Deferred: ingest idempotency and corrections.** Re-ingest without duplicate facts/IDs; retain invalidated facts and evidence; verify against real Graphiti operation payloads.
+- [ ] **21.1 — Partial: audit and complete native selection.** Inventory existing query/filter APIs, preserve their design, and finish indexed node/edge filters, direction, bounded patterns/traversals, ordering, and pagination.
+- [ ] **21.2 — Open: pinned temporal query results.** Apply active/state/time rules consistently and define query outputs independently of physical column layout; reject unsupported features explicitly.
+- [ ] **22.1 — Deferred: lexical retrieval.** Index retained names/summaries/fact/episode text with ranked keyword results and group filters; define tokenization/ranking and delta-driven updates. Phrase/prefix search is not currently required.
+- [ ] **23.1 — Deferred: exact vector retrieval first.** Support exact nearest-neighbor search using corrected native vector/matrix primitives; retain dimensions/model metadata and multiple embeddings in separate attributes.
+- [ ] **23.2 — Deferred: vector index lifecycle.** Keep search consistent with property changes, branch/time selection, persistence, and explicit rebuild policy. Add approximation only after a measured need and an explicit contract.
+- [ ] **24.1 — Deferred: combined retrieval.** Chain graph, temporal, keyword, and vector signals; define inspectable normalization/fusion and evaluate relevance on a small documented corpus.
+- [ ] **25.1 — Deferred: Graphiti operation driver.** Implement required native operation/session/transaction/index/search interfaces, explicitly reject unsupported behavior, and maintain a documented upstream compatibility target.
+- [ ] **25.2 — Deferred: end-to-end Graphiti proof.** Run ingest/correction/retrieval flows against Groggy after the adapter and core are ready; do not infer driver compatibility from storing embeddings alone.
+- [ ] **26.1 — Partial: immutable connected graph views.** Audit existing Subgraph live-parent reads and migrate to state-pinned properties/topology. An older view must remain unchanged after a parent write.
+- [ ] **26.2 — Open: mutation through pinned views.** Check the expected state and return a new view or conflict; define explicit live retrieval, materialized copies, and cache invalidation without ambiguous mutability.
+- [ ] **27.1 — Review: graph/table identity.** Audit current graph tables, projections, joins, and copies; preserve source identity and pins through selections and joins unless the caller explicitly materializes a new graph.
+- [ ] **27.2 — Open: connected table updates.** Complete columnar filters/aggregations/conversions and checked bulk edits that generate typed deltas. Table joins remain views unless explicitly persisted; coordinate this with item 26.
+- [x] **28.01 — Core traversal validation.** Graph BFS/DFS/path methods reject unknown/inactive starts and endpoints and honor graph direction.
+- [x] **28.02 — Checked Dijkstra.** Validate active selections and nonnegative finite numeric weights, decode compact integers, handle reverse/parallel minimum distances, preserve tiny improvements, and reject result overflow before persistence.
+- [x] **28.03 — Checked A*.** Share selection/weight checks, require unambiguous markers and valid consistent heuristics, and preserve small improvements and prior outputs on failure.
+- [x] **28.04 — Node betweenness.** Correct directed scaling, positive-length validation, equal shortest edge-instance multiplicity, normalization, and numerical failure handling; test against exhaustive path references.
+- [x] **28.05 — Girvan–Newman.** Remove actual edge instances, score original-topology modularity after every permitted removal, and validate its undirected positive-length domain and controls.
+- [x] **28.06 — Louvain.** Use actual resolution-dependent modularity, loops/parallel edge mass, bounded local moves and multilevel aggregation, original-ID projection, and objective-preservation checks.
+- [x] **28.07 — Leiden bounded implementation.** Perform fast moves, constrained stochastic refinement, inherited-partition aggregation, connected projection, and local seeded randomness with explicit budgets. This is not an unbounded convergence certificate.
+- [x] **28.08 — Infomap two-level implementation.** Evaluate the map equation with recorded uniform-node teleportation, dangling flow, bounded stationary iterations, genuine trials, and direct entropy/move checks.
+- [ ] **28.09 — Open: remaining Infomap scope.** Implement hierarchical optimization/acceleration where required and verify documented differences from external implementations; current two-level bounded behavior stays explicit.
+- [x] **28.10 — Label propagation repair.** Intern equal initial values into an immutable dictionary, apply asynchronous neighbor votes without a phantom self-vote, define ties/direction/loops, honor the local random seed, and validate controls/live selections. Exhaustive small-graph and rebuilt Python tests cover the slice.
+- [x] **28.11 — Connected components repair.** Weak/undirected mode ignores orientation; strong mode honors graph direction, including undirected reverse adjacency; validate before cache reads, support cancellation, and test iterative traversal against exhaustive reachability.
+- [ ] **28.12 — Review: PageRank.** Dedicated audit of directed transitions, dangling nodes, teleportation, normalization, convergence controls, supported weights, cancellation, and failure-before-write behavior.
+- [ ] **28.13 — Partial: closeness.** Shared selected-weight checks exist; finish directed distance definitions, disconnected normalization, supported options, numerical failure behavior, and independent-reference tests.
+- [ ] **28.14 — Review: BFS/DFS algorithm wrappers.** Verify registry/Python/pipeline options, selected-state boundaries, output ordering, persistence, and cancellation beyond the repaired direct Graph methods.
+- [ ] **28.15 — Review: analytics outside the registry.** Audit PCA/spectral/domain assumptions and duplicate step/kernel callers; verify that corrected primitives are actually used and unsupported cases reject.
+- [ ] **28.16 — Open: complete algorithm certification.** Finish per-option/domain checks, pinned-history inputs, consistent result ownership, external reference comparisons, and representative scale/cancellation tests. Item 28 remains partial.
+- [x] **29.1 — Matrix identity and axis statistics.** Repair eye construction, axis sample variance/std, stable accumulation, and empty/invalid shape behavior, with Rust/Python reference checks.
+- [x] **29.2 — Real SVD and symmetric eigendecomposition.** Implement bounded in-house Jacobi kernels with reconstruction, orthogonality/residual checks, and NumPy comparisons; reject unsupported nonsymmetric eigen inputs explicitly.
+- [ ] **29.3 — Partial: vector/array arithmetic and reductions.** Audit all existing operators, shapes/broadcasting where promised, null/empty/nonfinite cases, dtype/precision/output rules, and columnar interoperation using Groggy's API design.
+- [ ] **29.4 — Partial: matrix operations.** Verify multiplication, indexing/layout, dense/sparse storage, reductions, solves, conditioning, and PCA/spectral consumers; retain and document actual supported sparse behavior.
+- [ ] **29.5 — Open: remaining decompositions.** Finish intended general nonsymmetric/complex eigen and other decomposition/gradient paths where promised; bound work and reject unsupported domains rather than return placeholders.
+- [ ] **29.6 — Open: numerical throughput evidence.** Measure allocations, memory, and throughput against representative workloads after correctness; optimize in-house kernels without silently changing precision or API promises.
+- [ ] **30.1 — Partial: pipeline builder.** Inventory existing builder/step capabilities and finish typed graph/table intermediates, naming/caching, repeatability, cancellation, and pinned historical inputs.
+- [ ] **30.2 — Open: pipeline history policy.** Decide whether runs/intermediate outputs themselves become retained graph history; avoid conflating compute diagnostics with mutation deltas.
+- [x] **31.1 — Supported durability failure tests.** Exercise checked journal restart, truncation/corruption, process exit, and injected I/O/publication failures in the current storage domain.
+- [x] **31.2 — Focused independent computation references.** Repaired slices include direct mathematical/path/reachability references and numerical comparisons; these are narrower than a full external-backend suite.
+- [ ] **31.3 — Open: Neo4j/NetworkX comparisons.** Use shared fixtures with explicit direction, weight, loop, parallel-edge, history, and query semantics; report divergence rather than claim untested parity.
+- [ ] **31.4 — Open: extend failure injection.** Cover secondary indexes, pooled/meta writes, checkpoints/compaction/migrations, concurrent conflicts, and later adapter/driver workflows.
+- [ ] **32.1 — Partial: representative benchmark corpus.** Existing bounded debug profiles are evidence for their fixtures only. Define sizes, degree distributions, property payloads, history depth, latency targets, and memory budgets.
+- [ ] **32.2 — Open: ingestion/query/history scale.** Measure bulk writes, indexed lookups, temporal reconstruction, neighborhoods, recovery, and retained-state growth, including million/billion-scale goals where feasible.
+- [ ] **32.3 — Open: analytics scale.** Measure vector/dense/sparse operations and graph kernels with repeatable allocation/memory/time reports; optimize measured bottlenecks. Embeddings do not replace all retained text or remove memory budgeting.
+- [ ] **32.4 — Deferred: retrieval benchmarks.** Measure lexical/vector/hybrid relevance and latency after those features exist; no zero-latency guarantee is assumed.
+- [x] **33.1 — Supported backup/restore.** Verified synced full-journal backup and recovery exist for the documented inline checked-write storage domain.
+- [ ] **33.2 — Partial: integrity and operational visibility.** Add complete integrity scans, actionable metrics/errors, storage/version checks, and documented size/recovery/concurrent-writer limits.
+- [ ] **33.3 — Open: service deployment.** Complete the embedded-to-multi-user path, isolation/access boundaries, writer coordination, operational migration, and observability after the concurrency contract is decided.
+- [ ] **34.1 — Partial: capability matrix.** Publish scope, Rust/Python support, persistence, tests, limits, and remaining work per feature; a method existing is not proof that the contract is complete.
+- [ ] **34.2 — Partial: release documentation.** Synchronize examples/API docs/roadmap with tested behavior, remove obsolete completion claims, and keep deferred original-vision work visible. Preserve the owner's workbook answers and appendix.
+- [ ] **AR1 — Partial: one liveness authority.** Finish routing public live readers, algorithms, indexes, and views through GraphSpace while retaining GraphPool history; covered in part by 02, 18, 26, and 28.
+- [ ] **AR2 — Partial: one adjacency policy.** Consolidate endpoint/edge-instance/direction rules behind a narrow efficient internal interface; keep algorithm-specific definitions explicit and benchmark structural changes.
+- [ ] **AR3 — Partial: one mutation coordinator.** Extend the typed checked publication path to every supported mutation; make diff/reset/revert/reconstruction consume actual coordinated changes rather than inferred storage offsets.
+- [ ] **AR4 — Open: explicit view ownership.** Finish immutable state/time pins, checked view writes, and graph-table ownership across 12 and 26–27; ordinary current Subgraph values are not yet pinned snapshots.
+- [ ] **AR5 — Partial: smaller Graph coordinator.** Preserve public APIs while extracting cohesive mutation/topology/history/table responsibilities, keeping Rust business logic, thin FFI translation, and a separate deferred Graphiti adapter.
+- [ ] **AR6 — Partial: complete persistence boundary.** Retain the documented distinction between active export and recoverable checked journal storage; complete pooled contents, lifecycle, concurrency, and compatibility before claiming a durable multi-user Graphiti system of record.
