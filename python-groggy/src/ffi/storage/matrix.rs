@@ -2016,6 +2016,17 @@ impl PyGraphMatrix {
         })
     }
 
+    /// Economy SVD: m x k U, k singular values, and k x n Vt.
+    fn svd_thin(&self, py: Python) -> PyResult<(Py<Self>, PyObject, Py<Self>)> {
+        let (u, s, vt) = computation::run(py, [&self.inner], |[a]| a.svd_thin())
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((
+            Py::new(py, Self { inner: u })?,
+            s.into_py(py),
+            Py::new(py, Self { inner: vt })?,
+        ))
+    }
+
     /// Thin matrix-valued SVD outputs, including k x 1 singular values for gradients.
     fn svd_tracked(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>, Py<Self>)> {
         let (u, s, vt) = computation::run(py, [&self.inner], |[a]| a.svd_tracked())

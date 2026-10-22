@@ -86,11 +86,11 @@ struct Thin {
 }
 fn thin(mut a: Vec<f64>, m: usize, n: usize) -> GraphResult<Thin> {
     let alpha = normalize(&mut a)?;
-    let factor = super::decomposition::svd(a, m, n)?;
+    let factor = super::decomposition::svd_economy(a, m, n)?;
     let k = m.min(n);
     separated(&factor.singular, m.max(n), true)?;
-    let u = thin_columns(&factor.u, m, m, k)?;
-    let v = thin_columns(&transpose(&factor.vt, n, n)?, n, n, k)?;
+    let u = factor.u;
+    let v = transpose(&factor.vt, k, n)?;
     Ok(Thin {
         u,
         v,

@@ -44,3 +44,5 @@ preserved separately.
 - 29.48: checked attribute/ID/fancy-index bridges and BaseArray numeric conversion; 357 Python regressions.
 
 - 29.49: checked logarithmic matrix powers and corrected noncommuting explicit/automatic derivatives.
+
+- 29.50: actual economy SVD, thin tracked/gradient/spectrum/least-squares consumers and 25-case release receipts.

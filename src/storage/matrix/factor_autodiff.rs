@@ -4,17 +4,11 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Economy SVD with matrix-valued singular values (k x 1) for tape seeding.
     /// All three outputs own data and can independently backpropagate to this input.
     pub fn svd_tracked(&self) -> GraphResult<(Self, Self, Self)> {
-        let (m, n) = self.shape();
-        let k = m.min(n);
-        let factors =
-            crate::storage::matrix::decomposition::svd(self.decomposition_input()?, m, n)?;
-        let u = (0..m)
-            .flat_map(|row| factors.u[row * m..row * m + k].iter().copied())
-            .collect();
-        let vt = factors.vt[..k * n].to_vec();
-        let u = Self::factor_matrix(u, m, k)?;
-        let s = Self::factor_matrix(factors.singular, k, 1)?;
-        let vt = Self::factor_matrix(vt, k, n)?;
+        let (u, values, vt) = self.thin_svd_parts()?;
+        let k = values.len();
+        let mut s = Self::factor_matrix(values, k, 1)?;
+        s.row_labels = Some(u.column_names.clone());
+        s.column_names = vec!["singular_value".into()];
         Ok((
             self.track_factor(
                 u,
@@ -35,6 +29,47 @@ impl<T: NumericType> GraphMatrix<T> {
                 },
             )?,
         ))
+    }
+    /// Economy SVD with owned singular-value list and tracked U/Vt when enabled.
+    pub fn svd_thin(&self) -> GraphResult<(Self, Vec<f64>, Self)> {
+        let (u, singular, vt) = self.thin_svd_parts()?;
+        let u = self.track_factor(
+            u,
+            Operation::FactorOutput {
+                part: FactorOutput::SvdU,
+            },
+        )?;
+        let vt = self.track_factor(
+            vt,
+            Operation::FactorOutput {
+                part: FactorOutput::SvdVt,
+            },
+        )?;
+        Ok((u, singular, vt))
+    }
+    fn thin_svd_parts(&self) -> GraphResult<(Self, Vec<f64>, Self)> {
+        let (m, n) = self.shape();
+        let k = m.min(n);
+        if self.column_names.len() != n
+            || self
+                .row_labels
+                .as_ref()
+                .is_some_and(|labels| labels.len() != m)
+        {
+            return Err(GraphError::InvalidInput(
+                "SVD labels do not match shape".into(),
+            ));
+        }
+        let factors =
+            crate::storage::matrix::decomposition::svd_economy(self.decomposition_input()?, m, n)?;
+        let mut u = Self::factor_matrix(factors.u, m, k)?;
+        let mut vt = Self::factor_matrix(factors.vt, k, n)?;
+        let basis: Vec<_> = (0..k).map(|i| format!("svd_{i}")).collect();
+        u.row_labels = self.row_labels.clone();
+        u.column_names = basis.clone();
+        vt.row_labels = Some(basis);
+        vt.column_names = self.column_names.clone();
+        Ok((u, factors.singular, vt))
     }
     /// Symmetric eigenpairs with matrix-valued eigenvalues (n x 1) for tape seeding.
     pub fn eigen_tracked(&self) -> GraphResult<(Self, Self)> {

@@ -150,31 +150,49 @@ pub(super) struct Svd {
 
 /// Full orthogonal U and Vt; min(rows,cols) descending singular values.
 pub(super) fn svd(input: Vec<f64>, rows: usize, cols: usize) -> GraphResult<Svd> {
-    // Check full output dimensions even when an empty rectangular input is cheap.
-    for dimension in [rows, cols] {
-        dimension
-            .checked_mul(dimension)
+    svd_with_mode(input, rows, cols, true)
+}
+/// Economy factors U(m*k), S(k), Vt(k*n); no arbitrary full null-basis allocation.
+pub(super) fn svd_economy(input: Vec<f64>, rows: usize, cols: usize) -> GraphResult<Svd> {
+    svd_with_mode(input, rows, cols, false)
+}
+fn svd_with_mode(input: Vec<f64>, rows: usize, cols: usize, full: bool) -> GraphResult<Svd> {
+    if rows.checked_mul(cols) != Some(input.len()) {
+        return Err(invalid("SVD input shape mismatch or overflow"));
+    }
+    let k = rows.min(cols);
+    for (rows, cols) in [
+        (rows, if full { rows } else { k }),
+        (if full { cols } else { k }, cols),
+    ] {
+        rows.checked_mul(cols)
             .and_then(|n| n.checked_mul(std::mem::size_of::<f64>()))
             .filter(|bytes| *bytes <= isize::MAX as usize)
-            .ok_or_else(|| invalid("Full SVD output dimensions overflow"))?;
+            .ok_or_else(|| invalid("SVD output dimensions overflow"))?;
     }
     scale(&input)?;
     if rows < cols {
-        let result = tall_svd(transpose(&input, rows, cols), cols, rows, SWEEPS)?;
+        let result = tall_svd(transpose(&input, rows, cols), cols, rows, SWEEPS, full)?;
         return Ok(Svd {
             u: transpose(&result.vt, rows, rows),
             singular: result.singular,
-            vt: transpose(&result.u, cols, cols),
+            vt: transpose(&result.u, cols, if full { cols } else { k }),
         });
     }
-    tall_svd(input, rows, cols, SWEEPS)
+    tall_svd(input, rows, cols, SWEEPS, full)
 }
 
 fn column_norm(a: &[f64], rows: usize, cols: usize, col: usize) -> f64 {
     (0..rows).fold(0.0_f64, |norm, row| norm.hypot(a[row * cols + col]))
 }
 
-fn tall_svd(input: Vec<f64>, rows: usize, cols: usize, sweeps: usize) -> GraphResult<Svd> {
+fn tall_svd(
+    input: Vec<f64>,
+    rows: usize,
+    cols: usize,
+    sweeps: usize,
+    full: bool,
+) -> GraphResult<Svd> {
     let scaling = scale(&input)?;
     let mut a: Vec<_> = input.iter().map(|x| x / scaling).collect();
     let mut v = identity(cols);
@@ -222,7 +240,8 @@ fn tall_svd(input: Vec<f64>, rows: usize, cols: usize, sweeps: usize) -> GraphRe
     let mut order: Vec<_> = (0..cols).collect();
     order.sort_by(|&i, &j| norms[j].total_cmp(&norms[i]).then(i.cmp(&j)));
     let mut singular = Vec::with_capacity(cols);
-    let mut u = vec![0.0; rows * rows];
+    let u_columns = if full { rows } else { cols };
+    let mut u = vec![0.0; rows * u_columns];
     let mut vt = vec![0.0; cols * cols];
     let mut rank = 0;
     for (col, &old) in order.iter().enumerate() {
@@ -236,24 +255,24 @@ fn tall_svd(input: Vec<f64>, rows: usize, cols: usize, sweeps: usize) -> GraphRe
         }
         if sigma > 0.0 {
             let mut vector: Vec<_> = (0..rows).map(|r| a[r * cols + old] / norms[old]).collect();
-            orthogonalize(&mut vector, &u, rows, col)?;
+            orthogonalize(&mut vector, &u, rows, u_columns, col)?;
             for row in 0..rows {
-                u[row * rows + col] = vector[row];
+                u[row * u_columns + col] = vector[row];
             }
             rank += 1;
         }
     }
-    // Complete the left null space, including rank-deficient and zero matrices.
+    // Complete only requested columns, including rank-deficient and zero matrices.
     let mut candidate = 0;
-    for col in rank..rows {
+    for col in rank..u_columns {
         let mut accepted = false;
         while candidate < rows {
             let mut vector = vec![0.0; rows];
             vector[candidate] = 1.0;
             candidate += 1;
-            if orthogonalize(&mut vector, &u, rows, col).is_ok() {
+            if orthogonalize(&mut vector, &u, rows, u_columns, col).is_ok() {
                 for row in 0..rows {
-                    u[row * rows + col] = vector[row];
+                    u[row * u_columns + col] = vector[row];
                 }
                 accepted = true;
                 break;
@@ -270,13 +289,14 @@ fn orthogonalize(
     vector: &mut [f64],
     basis: &[f64],
     rows: usize,
+    stride: usize,
     columns: usize,
 ) -> GraphResult<()> {
     for _ in 0..2 {
         for col in 0..columns {
-            let dot: f64 = (0..rows).map(|r| vector[r] * basis[r * rows + col]).sum();
+            let dot: f64 = (0..rows).map(|r| vector[r] * basis[r * stride + col]).sum();
             for row in 0..rows {
-                vector[row] -= dot * basis[row * rows + col];
+                vector[row] -= dot * basis[row * stride + col];
             }
         }
     }
@@ -296,7 +316,7 @@ mod tests {
     #[test]
     fn exhausted_sweep_budget_returns_errors_without_partial_answers() {
         assert!(symmetric_eigen_with_limit(vec![2., 1., 1., 2.], 2, 0).is_err());
-        assert!(tall_svd(vec![1., 2., 3., 4.], 2, 2, 0).is_err());
+        assert!(tall_svd(vec![1., 2., 3., 4.], 2, 2, 0, true).is_err());
         assert!(svd(vec![], usize::MAX, 0).is_err());
     }
 }

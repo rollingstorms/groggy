@@ -184,6 +184,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[256, 256],
         || MatrixStats::std(&low).map_err(|e| groggy::GraphError::InvalidInput(e.to_string())),
     )?);
+    let rectangular = GraphMatrix::from_row_major_data(
+        (0..512 * 4)
+            .map(|i| ((i * 31 % 127) as f64 - 63.) / 71.)
+            .collect(),
+        512,
+        4,
+        None,
+    )?;
+    cases.push(measure("rectangular_full_svd", &[512, 4], || {
+        Ok(rectangular.svd()?.1.iter().sum())
+    })?);
+    cases.push(measure("rectangular_thin_svd", &[512, 4], || {
+        Ok(rectangular.svd_thin()?.1.iter().sum())
+    })?);
+    let tall = GraphMatrix::from_row_major_data(
+        (0..10000 * 4)
+            .map(|i| ((i * 31 % 127) as f64 - 63.) / 71.)
+            .collect(),
+        10000,
+        4,
+        None,
+    )?;
+    cases.push(measure("large_tall_thin_svd", &[10000, 4], || {
+        Ok(tall.svd_thin()?.1.iter().sum())
+    })?);
+    cases.push(measure("large_tall_rank", &[10000, 4], || {
+        Ok(tall.rank()? as f64)
+    })?);
+    let rhs = GraphMatrix::ones(10000, 1);
+    cases.push(measure("large_tall_least_squares", &[10000, 4, 1], || {
+        tall.least_squares(&rhs, None)?.sum()
+    })?);
     let report = json!({"profile":"release","arch":std::env::consts::ARCH,"os":std::env::consts::OS,"samples_per_case":7,"allocation_scope":"process-wide System allocation/reallocation requests; additional live-byte peak during operation; excludes fixture setup; includes output creation/drop; not RSS","cases":cases});
     let output = std::env::var("GROGGY_NUMERICAL_PROFILE")
         .unwrap_or_else(|_| "/tmp/groggy-numerical-profile.json".into());

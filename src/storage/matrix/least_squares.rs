@@ -28,7 +28,7 @@ pub(super) fn solve(
         }
         *value = scaled;
     }
-    let factor = super::decomposition::svd(a, rows, cols)?;
+    let factor = super::decomposition::svd_economy(a, rows, cols)?;
     let largest = factor.singular.first().copied().unwrap_or(0.);
     let k = rows.min(cols);
     let mut coefficients = super::factorization::zeros(k, rhs)?;
@@ -40,7 +40,7 @@ pub(super) fn solve(
         for col in 0..rhs {
             let mut dot = super::dot_product::Dot::new();
             for row in 0..rows {
-                dot.add(factor.u[row * rows + component], b[row * rhs + col]);
+                dot.add(factor.u[row * k + component], b[row * rhs + col]);
             }
             let coefficient = dot.total() / sigma;
             if !coefficient.is_finite() {

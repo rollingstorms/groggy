@@ -191,3 +191,5 @@ accepted pinned-state model.
 - [x] **29.48 — Attribute/ID/index conversion boundaries.** Native attribute promotion, checked BaseArray conversion, exact fancy positions, i64::MIN inference and unsigned ID range handling. Full native suites and 357 rebuilt Python numerical/array compatibility tests pass. See docs/api/numarray-arithmetic.md.
 
 - [x] **29.49 — Matrix powers and noncommuting derivatives.** Logarithmic checked forward powers, recursive JVP/VJP and corrected automatic pullbacks with sparse/empty/label behavior. Native full/focused suites and 364 rebuilt Python regressions pass. See docs/api/matrix-powers.md.
+
+- [x] **29.50 — True economy SVD.** Thin factors avoid full square null bases; tracked/derivative/rank/condition/least-squares consumers use thin indexing and positional identity. Native full suites and 376 rebuilt Python regressions pass; 25-case release corpus records allocation/time evidence. See docs/api/matrix-economy-svd.md.

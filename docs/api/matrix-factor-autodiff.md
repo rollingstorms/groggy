@@ -36,3 +36,5 @@ route, malformed seeds, empty shapes and unsupported domains. Python
 `tests/test_matrix_factor_autodiff.py` includes independent weighted eigenvalue
 and singular-value finite differences, rectangular factors, explicit-kernel
 agreement, repeat calls and mutation behavior.
+
+The SVD routes now use [actual economy storage](matrix-economy-svd.md); `svd_thin()` also exposes owned value-list economy results.

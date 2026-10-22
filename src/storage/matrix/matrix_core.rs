@@ -2540,7 +2540,7 @@ impl<T: NumericType> GraphMatrix<T> {
                 *value /= scale;
             }
         }
-        Ok(super::decomposition::svd(values, rows, cols)?.singular)
+        Ok(super::decomposition::svd_economy(values, rows, cols)?.singular)
     }
 
     /// Tile (repeat) the matrix a specified number of times along each axis
