@@ -50,6 +50,82 @@ pub fn from_scalar<T: NumericType>(value: T) -> NumericInput {
 pub fn inputs<T: NumericType>(values: &[T]) -> Vec<NumericInput> {
     values.iter().copied().map(from_scalar).collect()
 }
+/// Native inference for the legacy numeric attribute bridge (bool/small ints ->
+/// int32, larger ints -> int64, any float -> float64). Null is not numeric zero.
+pub fn attribute_inputs(
+    values: &[crate::types::AttrValue],
+) -> GraphResult<(DType, Vec<NumericInput>)> {
+    use crate::types::AttrValue;
+    let mut floating = false;
+    let mut wide = false;
+    let inputs = values
+        .iter()
+        .map(|value| {
+            Ok(match value {
+                AttrValue::Bool(value) => NumericInput::Bool(*value),
+                AttrValue::SmallInt(value) => NumericInput::Integer(i128::from(*value)),
+                AttrValue::Int(value) => {
+                    wide |= i32::try_from(*value).is_err();
+                    NumericInput::Integer(i128::from(*value))
+                }
+                AttrValue::Float(value) => {
+                    floating = true;
+                    NumericInput::Float(f64::from(*value))
+                }
+                _ => return Err(invalid("NumArray can only contain numerical values")),
+            })
+        })
+        .collect::<GraphResult<Vec<_>>>()?;
+    Ok((
+        if floating {
+            DType::Float64
+        } else if wide {
+            DType::Int64
+        } else {
+            DType::Int32
+        },
+        inputs,
+    ))
+}
+/// BaseArray promotion keeps bool-only arrays, widens integers to int64 and
+/// floating/mixed arrays to float64. Missing values require explicit handling.
+pub fn promoted_attribute_inputs(
+    values: &[crate::types::AttrValue],
+) -> GraphResult<(DType, Vec<NumericInput>)> {
+    let (dtype, inputs) = attribute_inputs(values)?;
+    let dtype = if inputs.is_empty() || dtype == DType::Float64 {
+        DType::Float64
+    } else if inputs
+        .iter()
+        .all(|value| matches!(value, NumericInput::Bool(_)))
+    {
+        DType::Bool
+    } else {
+        DType::Int64
+    };
+    Ok((dtype, inputs))
+}
+/// Exact integer positions: fractional/nonfinite/out-of-range indices error.
+pub fn integer_indices<T: NumericType>(values: &[T]) -> GraphResult<Vec<i64>> {
+    values
+        .iter()
+        .copied()
+        .map(|value| convert(from_scalar(value), ConversionPolicy::Exact))
+        .collect()
+}
+impl NumArray<i64> {
+    /// Preserve native unsigned IDs or error when the signed array cannot represent them.
+    pub fn from_usize_ids(values: &[usize]) -> GraphResult<Self> {
+        values
+            .iter()
+            .map(|value| {
+                i64::try_from(*value)
+                    .map_err(|_| invalid("Native ID exceeds signed int64 NumArray range"))
+            })
+            .collect::<GraphResult<Vec<_>>>()
+            .map(Self::new)
+    }
+}
 pub fn convert<T: NumericType>(input: NumericInput, policy: ConversionPolicy) -> GraphResult<T> {
     let fail = || invalid("Numeric conversion loses precision or exceeds dtype range");
     if T::DTYPE == DType::Bool {

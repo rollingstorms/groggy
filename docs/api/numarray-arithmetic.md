@@ -47,3 +47,26 @@ Outputs own immutable backing values; no graph binding or gradient tape is
 inherited. Tests cover integer limits/cancellation/order, dtypes/shapes, scalar
 broadcast, empty/nonfinite/signed-zero cases, conversion rules and independent
 float norm references. Release performance remains part of the completion pass.
+
+## Attribute and indexing boundaries (29.48)
+
+The legacy attribute-to-NumArray bridge now performs inference in Rust without
+`abs(i64::MIN)`. It keeps compact integer inference for existing table paths;
+`BaseArray.to_num_array()` retains bool-only arrays, int64 integer arrays,
+float64 mixed/floating arrays and an empty float64 result for empty input.
+Null/non-numeric values reject conversion: filter or replace them explicitly
+rather than interpreting a missing value as zero or losing array length.
+
+`BaseArray.to_type('int64'/'float64', exact=False)` now shares native checked
+conversions. Its existing default nearest-integer rounding remains; finite
+range errors and NaN/infinity-to-integer conversions reject. `exact=True`
+rejects fractional/precision loss. The i64/f64 aliases remain available.
+Mixed float/integer promotion to float64 still rounds integers under the default
+policy; request exact conversion when that loss is unacceptable.
+
+Fancy indices supplied as numeric NumArrays must be exactly representable i64
+positions. Integral floats remain accepted, fractional/nonfinite/out-of-range
+positions reject, and bool dtype retains mask semantics. Native unsigned graph
+IDs also reject if a signed int64 NumArray cannot represent them, instead of
+wrapping. Tests: `numarray_bridge_boundaries.rs` and
+`test_numarray_bridge_boundaries.py`, plus existing array compatibility suites.

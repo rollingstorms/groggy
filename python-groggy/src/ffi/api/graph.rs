@@ -855,7 +855,7 @@ impl PyGraph {
     #[getter]
     fn node_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
         let node_ids = self.inner.borrow_mut().node_ids();
-        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids);
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids)?;
         Py::new(py, py_int_array)
     }
 
@@ -869,7 +869,7 @@ impl PyGraph {
     #[getter]
     fn edge_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
         let edge_ids = self.inner.borrow_mut().edge_ids();
-        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids);
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids)?;
         Py::new(py, py_int_array)
     }
 

@@ -199,7 +199,7 @@ impl PySubgraph {
     #[getter]
     fn node_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
         let node_ids: Vec<usize> = self.inner.node_set().iter().copied().collect();
-        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids);
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids)?;
         Py::new(py, py_int_array)
     }
 
@@ -207,7 +207,7 @@ impl PySubgraph {
     #[getter]
     fn edge_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
         let edge_ids: Vec<usize> = self.inner.edge_set().iter().copied().collect();
-        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids);
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids)?;
         Py::new(py, py_int_array)
     }
 

@@ -147,17 +147,16 @@ impl NumericArrayData {
         }
     }
 
-    /// Convert to int64 vector
-    fn to_int64_vec(&self) -> Vec<i64> {
+    /// Exact signed integer positions; no implicit truncation or saturation.
+    fn to_int64_vec(&self) -> PyResult<Vec<i64>> {
         match self {
-            NumericArrayData::Bool(arr) => {
-                arr.iter().map(|&b| if b { 1i64 } else { 0i64 }).collect()
-            }
-            NumericArrayData::Int32(arr) => arr.iter().map(|&x| x as i64).collect(),
-            NumericArrayData::Int64(arr) => arr.iter().copied().collect(),
-            NumericArrayData::Float32(arr) => arr.iter().map(|&x| x as i64).collect(),
-            NumericArrayData::Float64(arr) => arr.iter().map(|&x| x as i64).collect(),
+            Self::Bool(a) => numeric::integer_indices(a.as_slice()),
+            Self::Int32(a) => numeric::integer_indices(a.as_slice()),
+            Self::Int64(a) => numeric::integer_indices(a.as_slice()),
+            Self::Float32(a) => numeric::integer_indices(a.as_slice()),
+            Self::Float64(a) => numeric::integer_indices(a.as_slice()),
         }
+        .map_err(numeric_error)
     }
 
     /// Convert to bool vector
@@ -305,74 +304,44 @@ impl PyNumArray {
 
     /// Create from AttrValues with type inference
     pub fn from_attr_values(attr_values: Vec<AttrValue>) -> PyResult<Self> {
-        // Convert AttrValues to determine best internal type
-        let mut has_float = false;
-        let mut has_large_int = false;
+        let (dtype, values) = numeric::attribute_inputs(&attr_values)
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
+        let dtype = match dtype {
+            groggy::storage::advanced_matrix::DType::Float64 => "float64",
+            groggy::storage::advanced_matrix::DType::Int64 => "int64",
+            _ => "int32",
+        };
+        NumericArrayData::converted(&values, dtype, ConversionPolicy::Round)
+            .map(|inner| Self { inner })
+    }
 
-        for attr in &attr_values {
-            match attr {
-                AttrValue::Float(_) => has_float = true,
-                AttrValue::Int(i) if i.abs() > i32::MAX as i64 => has_large_int = true,
-                _ => {}
-            }
-        }
-
-        if has_float {
-            // Use float64 for any float data
-            let mut float_values = Vec::new();
-            for attr in attr_values {
-                match attr {
-                    AttrValue::Int(i) => float_values.push(i as f64),
-                    AttrValue::SmallInt(i) => float_values.push(i as f64),
-                    AttrValue::Float(f) => float_values.push(f as f64),
-                    AttrValue::Bool(b) => float_values.push(if b { 1.0 } else { 0.0 }),
-                    _ => {
-                        return Err(pyo3::exceptions::PyTypeError::new_err(
-                            "NumArray can only contain numerical values",
-                        ))
-                    }
-                }
-            }
-            Ok(PyNumArray {
-                inner: NumericArrayData::Float64(NumArray::new(float_values)),
-            })
-        } else if has_large_int {
-            // Use int64 for large integers
-            let mut int_values = Vec::new();
-            for attr in attr_values {
-                match attr {
-                    AttrValue::Int(i) => int_values.push(i),
-                    AttrValue::SmallInt(i) => int_values.push(i as i64),
-                    AttrValue::Bool(b) => int_values.push(if b { 1 } else { 0 }),
-                    _ => {
-                        return Err(pyo3::exceptions::PyTypeError::new_err(
-                            "NumArray can only contain numerical values",
-                        ))
-                    }
-                }
-            }
-            Ok(PyNumArray {
-                inner: NumericArrayData::Int64(NumArray::new(int_values)),
-            })
-        } else {
-            // Use int32 for small integers
-            let mut int_values = Vec::new();
-            for attr in attr_values {
-                match attr {
-                    AttrValue::Int(i) => int_values.push(i as i32),
-                    AttrValue::SmallInt(i) => int_values.push(i),
-                    AttrValue::Bool(b) => int_values.push(if b { 1 } else { 0 }),
-                    _ => {
-                        return Err(pyo3::exceptions::PyTypeError::new_err(
-                            "NumArray can only contain numerical values",
-                        ))
-                    }
-                }
-            }
-            Ok(PyNumArray {
-                inner: NumericArrayData::Int32(NumArray::new(int_values)),
-            })
-        }
+    pub fn from_base_attributes(values: &[AttrValue]) -> PyResult<Self> {
+        let (dtype, values) = numeric::promoted_attribute_inputs(values)
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(format!("BaseArray contains non-numeric or missing data and cannot be converted to numeric array: {e}")))?;
+        let dtype = match dtype {
+            groggy::storage::advanced_matrix::DType::Bool => "bool",
+            groggy::storage::advanced_matrix::DType::Int64 => "int64",
+            _ => "float64",
+        };
+        NumericArrayData::converted(&values, dtype, ConversionPolicy::Round)
+            .map(|inner| Self { inner })
+    }
+    pub fn from_attributes_with_dtype(
+        values: &[AttrValue],
+        dtype: &str,
+        exact: bool,
+    ) -> PyResult<Self> {
+        let (_, values) = numeric::attribute_inputs(values).map_err(numeric_error)?;
+        NumericArrayData::converted(
+            &values,
+            dtype,
+            if exact {
+                ConversionPolicy::Exact
+            } else {
+                ConversionPolicy::Round
+            },
+        )
+        .map(|inner| Self { inner })
     }
 
     /// Create a NumArray optimized for boolean operations
@@ -402,9 +371,12 @@ impl PyNumArray {
     }
 
     /// Create from node IDs (backward compatibility for PyIntArray::from_node_ids)
-    pub fn from_node_ids(node_ids: Vec<usize>) -> Self {
-        let values: Vec<i64> = node_ids.into_iter().map(|id| id as i64).collect();
-        Self::new_int64(values)
+    pub fn from_node_ids(node_ids: Vec<usize>) -> PyResult<Self> {
+        NumArray::<i64>::from_usize_ids(&node_ids)
+            .map(|values| Self {
+                inner: NumericArrayData::Int64(values),
+            })
+            .map_err(numeric_error)
     }
 
     /// Get access to the underlying data for backward compatibility
@@ -463,7 +435,7 @@ impl PyNumArray {
     }
 
     /// Convert to int64 vector (public method for indexing)
-    pub fn to_int64_vec(&self) -> Vec<i64> {
+    pub fn to_int64_vec(&self) -> PyResult<Vec<i64>> {
         self.inner.to_int64_vec()
     }
 

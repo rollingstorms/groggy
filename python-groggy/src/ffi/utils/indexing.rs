@@ -76,7 +76,7 @@ pub fn python_index_to_slice_index(_py: Python, index: &PyAny) -> PyResult<Slice
             return Ok(SliceIndex::BoolArray(bool_array));
         } else {
             // Handle NumArray with numeric dtype for fancy indexing
-            let int_values = num_array.to_int64_vec();
+            let int_values = num_array.to_int64_vec()?;
             return Ok(SliceIndex::List(int_values));
         }
     }

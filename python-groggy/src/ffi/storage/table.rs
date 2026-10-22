@@ -3281,9 +3281,7 @@ impl PyNodesTable {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
         // Return as IntArray to preserve integer type
-        Ok(crate::ffi::storage::num_array::PyIntArray::from_node_ids(
-            node_ids,
-        ))
+        crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids)
     }
 
     /// Add node attributes - flexible input format

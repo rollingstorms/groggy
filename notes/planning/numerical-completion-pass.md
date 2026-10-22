@@ -40,3 +40,5 @@ preserved separately.
 - 29.46: owned numerical transfer and GIL release for untracked heavy calls; copy overhead, reductions/backward and release performance remain explicit.
 
 - 29.47: 20-case release corpus, heap allocation/peak receipts and measured bulk-product/norm/reduction improvements; broad size/SIMD gates remain open.
+
+- 29.48: checked attribute/ID/fancy-index bridges and BaseArray numeric conversion; 357 Python regressions.

@@ -187,3 +187,5 @@ accepted pinned-state model.
 - [x] **29.46 — Owned numerical GIL boundary.** Checked Send snapshots/CSR/labels, thin ownership marshalling and GIL release for untracked heavy kernels; tracked tapes preserved. Native full suites and 324 rebuilt Python numerical tests pass, including worker-progress checks. Copy/performance and broader GIL gates remain explicit. See docs/api/matrix-numerical-threads.md.
 
 - [x] **29.47 — Release numerical corpus and measured bulk kernels.** Twenty release cases, allocation/peak-heap receipts, matched checksums and measured product/norm/materialization improvements with memory/timing limits. Native full suites and 324 rebuilt Python tests pass; broad production gates remain open. See notes/benchmarks/numerical-completion-2026-10-22.md.
+
+- [x] **29.48 — Attribute/ID/index conversion boundaries.** Native attribute promotion, checked BaseArray conversion, exact fancy positions, i64::MIN inference and unsigned ID range handling. Full native suites and 357 rebuilt Python numerical/array compatibility tests pass. See docs/api/numarray-arithmetic.md.

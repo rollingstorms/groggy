@@ -732,9 +732,7 @@ impl PyNodesAccessor {
         };
 
         // Return as IntArray to preserve integer type for node IDs
-        Ok(crate::ffi::storage::num_array::PyIntArray::from_node_ids(
-            node_ids,
-        ))
+        crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids)
     }
 
     /// Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
