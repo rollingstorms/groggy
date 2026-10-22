@@ -15,6 +15,7 @@ pub mod edge;
 pub mod journal;
 pub mod matrix;
 pub mod node;
+pub mod numeric;
 pub mod pool;
 pub mod table; // BaseTable system
 pub(crate) mod value_codec;

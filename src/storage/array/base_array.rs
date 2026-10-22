@@ -19,6 +19,14 @@ impl<T> BaseArray<T> {
         }
     }
 
+    /// Explicit copy-on-write access; other owned array snapshots keep their values.
+    pub fn data_mut(&mut self) -> &mut Vec<T>
+    where
+        T: Clone,
+    {
+        Arc::make_mut(&mut self.inner)
+    }
+
     /// Get the number of elements in the array
     pub fn len(&self) -> usize {
         self.inner.len()
@@ -148,9 +156,9 @@ impl BaseArray<AttrValue> {
 
     /// Create a slice of the array (for table operations)
     pub fn slice(&self, start: usize, length: usize) -> Self {
-        let end = (start + length).min(self.len());
-        let sliced_data = self.inner[start..end].to_vec();
-        Self::new(sliced_data)
+        let start = start.min(self.len());
+        let end = start.saturating_add(length).min(self.len());
+        Self::new(self.inner[start..end].to_vec())
     }
 
     /// Get sorted indices (for table sorting)
@@ -170,32 +178,56 @@ impl BaseArray<AttrValue> {
     }
 
     /// Take values at specified indices (for table operations)
-    pub fn take_indices(&self, indices: &[usize]) -> Result<Self, crate::errors::GraphError> {
-        let selected_data: Vec<AttrValue> = indices
-            .iter()
-            .filter_map(|&i| self.inner.get(i).cloned())
-            .collect();
-        Ok(Self::new(selected_data))
+    pub fn take_indices(&self, indices: &[usize]) -> GraphResult<Self> {
+        if let Some(&index) = indices.iter().find(|&&index| index >= self.len()) {
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Index {index} out of bounds for array of length {}",
+                self.len()
+            )));
+        }
+        Ok(Self::new(
+            indices
+                .iter()
+                .map(|&index| self.inner[index].clone())
+                .collect(),
+        ))
     }
 
-    /// Filter by boolean mask (for table operations)
-    pub fn filter_by_mask(&self, mask: &[bool]) -> Result<Self, crate::errors::GraphError> {
-        let filtered_data: Vec<AttrValue> = self
-            .inner
-            .iter()
-            .zip(mask.iter())
-            .filter_map(|(value, &keep)| if keep { Some(value.clone()) } else { None })
-            .collect();
-        Ok(Self::new(filtered_data))
+    /// Filter by a full-length boolean mask; mismatches are errors.
+    pub fn filter_by_mask(&self, mask: &[bool]) -> GraphResult<Self> {
+        if mask.len() != self.len() {
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Mask length {} does not match array length {}",
+                mask.len(),
+                self.len()
+            )));
+        }
+        Ok(Self::new(
+            self.inner
+                .iter()
+                .zip(mask)
+                .filter_map(|(value, &keep)| if keep {Some(value.clone())} else {None})
+                .collect(),
+        ))
     }
 
     /// Create BaseArray from NodeIds (specialized for nodes table)
-    pub fn from_node_ids(node_ids: Vec<crate::types::NodeId>) -> Self {
-        let values: Vec<AttrValue> = node_ids
-            .into_iter()
-            .map(|id| AttrValue::Int(id as i64))
-            .collect();
-        Self::new(values)
+    pub fn try_from_node_ids(ids: Vec<crate::types::NodeId>) -> GraphResult<Self> {
+        let values = super::NumArray::<i64>::from_usize_ids(&ids)?;
+        Ok(Self::new(
+            values
+                .as_slice()
+                .iter()
+                .copied()
+                .map(AttrValue::Int)
+                .collect(),
+        ))
+    }
+    /// Legacy infallible wrapper; use the checked constructor for external IDs.
+    pub fn from_node_ids(ids: Vec<crate::types::NodeId>) -> Self {
+        Self::try_from_node_ids(ids).unwrap_or_else(|error| {
+            panic!("BaseArray ID construction failed: {error}; use try_from_node_ids")
+        })
     }
 
     /// Convert to NodeIds (specialized for nodes table)
@@ -205,8 +237,8 @@ impl BaseArray<AttrValue> {
         for value in self.inner.iter() {
             match value {
                 AttrValue::Int(id) => {
-                    if *id >= 0 {
-                        node_ids.push(*id as crate::types::NodeId);
+                    if let Ok(id) = usize::try_from(*id) {
+                        node_ids.push(id);
                     } else {
                         return Err(crate::errors::GraphError::InvalidInput(format!(
                             "Invalid node ID: {}",
@@ -233,8 +265,8 @@ impl BaseArray<AttrValue> {
 
         for (idx, value) in self.inner.iter().enumerate() {
             if let AttrValue::Int(id) = value {
-                if *id >= 0 {
-                    node_ids.push(*id as crate::types::NodeId);
+                if let Ok(id) = usize::try_from(*id) {
+                    node_ids.push(id);
                     valid_indices.push(idx);
                 }
             }
@@ -259,12 +291,22 @@ impl BaseArray<AttrValue> {
     }
 
     /// Create BaseArray from EdgeIds (specialized for edges table)
-    pub fn from_edge_ids(edge_ids: Vec<crate::types::EdgeId>) -> Self {
-        let values: Vec<AttrValue> = edge_ids
-            .into_iter()
-            .map(|id| AttrValue::Int(id as i64))
-            .collect();
-        Self::new(values)
+    pub fn try_from_edge_ids(ids: Vec<crate::types::EdgeId>) -> GraphResult<Self> {
+        let values = super::NumArray::<i64>::from_usize_ids(&ids)?;
+        Ok(Self::new(
+            values
+                .as_slice()
+                .iter()
+                .copied()
+                .map(AttrValue::Int)
+                .collect(),
+        ))
+    }
+    /// Legacy infallible wrapper; use the checked constructor for external IDs.
+    pub fn from_edge_ids(ids: Vec<crate::types::EdgeId>) -> Self {
+        Self::try_from_edge_ids(ids).unwrap_or_else(|error| {
+            panic!("BaseArray ID construction failed: {error}; use try_from_edge_ids")
+        })
     }
 
     /// Convert to EdgeIds with filtering (specialized for edges table)
@@ -275,8 +317,8 @@ impl BaseArray<AttrValue> {
 
         for (idx, value) in self.inner.iter().enumerate() {
             if let AttrValue::Int(id) = value {
-                if *id >= 0 {
-                    edge_ids.push(*id as crate::types::EdgeId);
+                if let Ok(id) = usize::try_from(*id) {
+                    edge_ids.push(id);
                     valid_indices.push(idx);
                 }
             }

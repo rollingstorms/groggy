@@ -1,8 +1,8 @@
 # Module consolidation review — 2026-10-22
 
 Status: reviewed and now tracked as AR7.1–AR7.11 in the flat checklist at the
-user's request. The inventory and AR7.2 matrix move are complete; remaining consolidation tasks
-are open. The finish-priority plan schedules array/numeric foundations next. Existing functionality and public imports should remain supported
+user's request. The inventory, AR7.2 matrix move and AR7.3 array/numeric foundation are complete.
+Remaining consolidation tasks are open; numerical closeout precedes entity/view work. Existing functionality and public imports should remain supported
 through compatibility re-exports during migration.
 
 ## First: one matrix module

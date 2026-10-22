@@ -242,5 +242,5 @@ pub(super) fn slogdet(factor: &Lu, n: usize) -> (f64, f64) {
         sign *= pivot.signum();
         logs.push(pivot.abs().ln());
     }
-    (sign, crate::storage::array::numeric_reductions::sum(&logs))
+    (sign, crate::storage::numeric::reductions::sum(&logs))
 }

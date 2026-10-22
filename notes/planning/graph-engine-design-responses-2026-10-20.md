@@ -686,3 +686,18 @@ existing sort/match categories) and 455 rebuilt Python regressions passed. Rebui
 25-case release corpus and idle rerun agree with every prior workload checksum at
 1e-13 tolerance. Receipt: benches/numerical_matrix_consolidation_2026-10-22.json.
 This is an ownership migration, not a new speedup or broad numerical completion.
+
+### AR7.3 — Canonical array storage and shared numeric foundation completed
+
+Make legacy BaseArray a dtype/name compatibility adapter over the generic shared
+column, with explicit copy-on-write bridges and common selection/ID/reduction
+paths. Shared storage::numeric owns scalar dtypes, conversion/comparison/norm
+policies, reductions and accurate/checked accumulation, independent of array or
+matrix ownership. Old paths remain aliases; matrix error adapters preserve errors.
+Repair dropped invalid selection positions, truncated masks, slice overflow and
+ID narrowing while preserving valid input and legacy slice conventions. Full
+locked offline native suites, compatibility fixtures, focused Clippy (excluding
+existing sort/match categories) and 455 rebuilt Python regressions passed. All 25
+optimized idle-run workload checksums match the pre-migration receipt at 1e-13;
+raw receipt is benches/numerical_array_foundation_2026-10-22.json. Broader numerical
+performance gates and remaining module/view tasks stay open.

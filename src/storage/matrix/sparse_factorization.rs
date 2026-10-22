@@ -316,5 +316,5 @@ pub(super) fn slogdet<T: NumericType>(a: &SparseMatrix<T>) -> GraphResult<(f64, 
         sign *= pivot.signum();
         logs.push(pivot.abs().ln());
     }
-    Ok((sign, crate::storage::array::numeric_reductions::sum(&logs)))
+    Ok((sign, crate::storage::numeric::reductions::sum(&logs)))
 }

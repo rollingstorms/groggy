@@ -38,12 +38,12 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 6 | Finish presentation/API consolidation, differential/failure/scale evidence, operational tooling and core release documentation. | AR5, AR7.6, AR7.11; 01.2, 09.5, 19.2, 31.3–31.4, 32.1–32.3, 33.2–33.3, 34.1–34.2 | Tests/docs run throughout. Service/scale commitments require A15; complete embedded and multi-user milestones separately. |
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
-**Immediate next task:** AR7.2, using the existing numerical tests and 25-case
-release receipt as the before-move baseline. Preserve public imports with
-compatibility re-exports. Then AR7.3 and a finite 29 closeout finding list; do not
-turn every potential enhancement into a new prerequisite. A finding is resolved
-by implementation/evidence or an explicit owner-approved deferral, not by
-silently weakening a promised capability.
+**Immediate next task:** numerical closeout after completed AR7.2/AR7.3: a finite
+supported-surface finding list, wider size/fill/dispatch measurements, public API
+and strict lint review. Then AR7.4/entity handles and AR7.5/pinned ownership.
+Preserve current APIs and compatibility re-exports. A finding is resolved by
+implementation/evidence or an explicit owner-approved deferral, not by silently
+weakening a promised capability or adding every optional enhancement as a blocker.
 
 ## Flat implementation checklist
 
@@ -208,7 +208,7 @@ silently weakening a promised capability.
 - [ ] **AR7 — Open: consolidate modules around authoritative ownership.** Keep the original 34 workstreams; this is architecture work supporting them. Preserve functioning APIs and separate concepts through internal modules/types. Track implementation and caller migration below; the review itself is not a completed refactor.
 - [x] **AR7.1 — Consolidation inventory and proposal.** Identify matrix/advanced_matrix/adjacency dependency cycles, two BaseArray implementations, parallel entity wrappers, overlapping view ownership/display systems and query/execution/state/table boundaries. Evidence: `module-consolidation-review-2026-10-22.md`; implementation tasks remain unchecked.
 - [x] **AR7.2 — One matrix module.** Move matrix/advanced_matrix and adjacency helpers behind one canonical matrix module with explicit storage/layout, kernels/linalg, graph operators, autodiff and backend/buffer responsibilities. Keep the public matrix/storage/owned-transfer distinctions; preserve old public import paths through compatibility re-exports. Separate generic autodiff from layer-specific neural functionality. Verified legacy/canonical type identity and import paths, full native suites, 455 rebuilt Python regressions and all 25 before/after release checksums. See `docs/api/matrix-module.md` and `benches/numerical_matrix_consolidation_2026-10-22.json`. Source and compatibility gates for this move are complete; remaining AR7 moves stay open.
-- [ ] **AR7.3 — One array foundation and shared numeric primitives.** Migrate the nongeneric/generic BaseArray overlap to one canonical column representation while retaining NumArray/BoolArray roles and required metadata. Give dtype, conversion, checked scalar arithmetic and accurate accumulation a shared owner so arrays do not depend on matrix facade internals. Verify dtype/precision/null/ownership and public conversion compatibility.
+- [x] **AR7.3 — One array foundation and shared numeric primitives.** Migrate the nongeneric/generic BaseArray overlap to one canonical column representation while retaining NumArray/BoolArray roles and required metadata. Give dtype, conversion, checked scalar arithmetic and accurate accumulation a shared owner so arrays do not depend on matrix facade internals. Verified shared scalar/trait type identity, copy-on-write metadata/selection/ID compatibility, full native suites, focused Clippy (excluding existing sort/match categories), 455 rebuilt Python regressions and all 25 release checksums. Reject invalid indices/mask lengths and ID narrowing consistently. See `docs/api/array-numeric-foundation.md`.
 - [ ] **AR7.4 — One entity-handle family.** Consolidate EntityNode/EntityEdge and Node/Edge graph-backed wrappers under entities; preserve ID/trait/mutation/history behavior and compatibility names. Keep pooled value storage separate from entity handles; migrate every actual caller.
 - [ ] **AR7.5 — Shared view state and membership ownership.** Consolidate common membership, state/time pins, cache validity and adjacency scope across subgraph variants. Retain filter/component/neighborhood metadata and efficient specialized algorithms. Complete AR4/26 contracts rather than treating code movement as proof that a view is immutable.
 - [ ] **AR7.6 — One display foundation.** Consolidate display/viz-display configuration, data formatting and truncation; use thin Python/interactive adapters. Preserve intentional presentation differences and examples. Move presentation responsibilities out of misleading core compatibility exports after callers migrate.

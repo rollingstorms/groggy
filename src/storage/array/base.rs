@@ -1,14 +1,15 @@
-//! BaseArray - Foundation columnar array with chaining support
+//! Legacy typed/name metadata adapter over the canonical BaseArray<AttrValue>.
 
+use super::base_array::BaseArray as Column;
 use crate::storage::array::{ArrayIterator, ArrayOps};
 use crate::types::{AttrValue, AttrValueType};
 
-/// BaseArray - Foundation columnar storage with statistical operations and chaining
+/// Compatibility metadata adapter; values use the canonical shared column.
 /// This replaces and extends the current PyGraphArray functionality
 #[derive(Clone)]
 pub struct BaseArray {
     /// Columnar data storage - optimized for AttrValue collections  
-    data: Vec<AttrValue>,
+    values: Column<AttrValue>,
     /// Data type for type consistency and optimization
     dtype: AttrValueType,
     /// Optional column name for debugging and display
@@ -16,10 +17,27 @@ pub struct BaseArray {
 }
 
 impl BaseArray {
+    /// Wrap an existing canonical column without copying its values.
+    pub fn from_column(values: Column<AttrValue>, dtype: AttrValueType) -> Self {
+        Self {
+            values,
+            dtype,
+            name: None,
+        }
+    }
+    /// Access canonical immutable column storage.
+    pub fn as_column(&self) -> &Column<AttrValue> {
+        &self.values
+    }
+    /// Consume the metadata adapter and return its canonical column.
+    pub fn into_column(self) -> Column<AttrValue> {
+        self.values
+    }
+
     /// Create a new BaseArray from AttrValue vector
     pub fn new(data: Vec<AttrValue>, dtype: AttrValueType) -> Self {
         Self {
-            data,
+            values: Column::new(data),
             dtype,
             name: None,
         }
@@ -28,7 +46,7 @@ impl BaseArray {
     /// Create a new BaseArray with a name
     pub fn with_name(data: Vec<AttrValue>, dtype: AttrValueType, name: String) -> Self {
         Self {
-            data,
+            values: Column::new(data),
             dtype,
             name: Some(name),
         }
@@ -54,21 +72,25 @@ impl BaseArray {
     // =================================================================
 
     /// Create BaseArray from NodeId vector
-    pub fn from_node_ids(node_ids: Vec<crate::types::NodeId>) -> Self {
-        let data = node_ids
-            .into_iter()
-            .map(|id| AttrValue::Int(id as i64))
-            .collect();
-        Self::new(data, AttrValueType::Int)
+    pub fn try_from_node_ids(ids: Vec<crate::types::NodeId>) -> crate::errors::GraphResult<Self> {
+        Column::try_from_node_ids(ids).map(|values| Self::from_column(values, AttrValueType::Int))
+    }
+    /// Legacy infallible ID constructor; use try_from_node_ids for errors.
+    pub fn from_node_ids(ids: Vec<crate::types::NodeId>) -> Self {
+        Self::try_from_node_ids(ids).unwrap_or_else(|error| {
+            panic!("Legacy BaseArray ID construction failed: {error}; use try_from_node_ids")
+        })
     }
 
     /// Create BaseArray from EdgeId vector
-    pub fn from_edge_ids(edge_ids: Vec<crate::types::EdgeId>) -> Self {
-        let data = edge_ids
-            .into_iter()
-            .map(|id| AttrValue::Int(id as i64))
-            .collect();
-        Self::new(data, AttrValueType::Int)
+    pub fn try_from_edge_ids(ids: Vec<crate::types::EdgeId>) -> crate::errors::GraphResult<Self> {
+        Column::try_from_edge_ids(ids).map(|values| Self::from_column(values, AttrValueType::Int))
+    }
+    /// Legacy infallible ID constructor; use try_from_edge_ids for errors.
+    pub fn from_edge_ids(ids: Vec<crate::types::EdgeId>) -> Self {
+        Self::try_from_edge_ids(ids).unwrap_or_else(|error| {
+            panic!("Legacy BaseArray ID construction failed: {error}; use try_from_edge_ids")
+        })
     }
 
     /// Create BaseArray from AttrValue vector
@@ -94,60 +116,22 @@ impl BaseArray {
 
     /// Extract as NodeId vector (assumes Int type)
     pub fn as_node_ids(&self) -> crate::errors::GraphResult<Vec<crate::types::NodeId>> {
-        self.data
-            .iter()
-            .map(|val| match val {
-                AttrValue::Int(i) => Ok(*i as crate::types::NodeId),
-                _ => Err(crate::errors::GraphError::InvalidInput(
-                    "Cannot convert non-integer to NodeId".to_string(),
-                )),
-            })
-            .collect()
+        self.values.as_node_ids()
     }
 
     /// Extract as EdgeId vector (assumes Int type)
     pub fn as_edge_ids(&self) -> crate::errors::GraphResult<Vec<crate::types::EdgeId>> {
-        self.data
-            .iter()
-            .map(|val| match val {
-                AttrValue::Int(i) => Ok(*i as crate::types::EdgeId),
-                _ => Err(crate::errors::GraphError::InvalidInput(
-                    "Cannot convert non-integer to EdgeId".to_string(),
-                )),
-            })
-            .collect()
+        self.values.as_node_ids()
     }
 
     /// Extract as NodeId vector, filtering out rows with invalid values
     pub fn as_node_ids_filtered(&self) -> (Vec<crate::types::NodeId>, Vec<usize>) {
-        let mut node_ids = Vec::new();
-        let mut valid_indices = Vec::new();
-
-        for (index, val) in self.data.iter().enumerate() {
-            // Skip invalid values
-            if let AttrValue::Int(i) = val {
-                node_ids.push(*i as crate::types::NodeId);
-                valid_indices.push(index);
-            }
-        }
-
-        (node_ids, valid_indices)
+        self.values.as_node_ids_filtered()
     }
 
     /// Extract as EdgeId vector, filtering out rows with invalid values  
     pub fn as_edge_ids_filtered(&self) -> (Vec<crate::types::EdgeId>, Vec<usize>) {
-        let mut edge_ids = Vec::new();
-        let mut valid_indices = Vec::new();
-
-        for (index, val) in self.data.iter().enumerate() {
-            // Skip invalid values
-            if let AttrValue::Int(i) = val {
-                edge_ids.push(*i as crate::types::EdgeId);
-                valid_indices.push(index);
-            }
-        }
-
-        (edge_ids, valid_indices)
+        self.values.as_edge_ids_filtered()
     }
 
     // =================================================================
@@ -156,41 +140,14 @@ impl BaseArray {
 
     /// Get sort indices for this array
     pub fn sort_indices(&self, ascending: bool) -> Vec<usize> {
-        let mut indices: Vec<usize> = (0..self.data.len()).collect();
-
-        if ascending {
-            indices.sort_by(|&a, &b| {
-                self.data[a]
-                    .partial_cmp(&self.data[b])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        } else {
-            indices.sort_by(|&a, &b| {
-                self.data[b]
-                    .partial_cmp(&self.data[a])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        }
-
-        indices
+        self.values.sort_indices(ascending)
     }
 
     /// Take values at specified indices
     pub fn take_indices(&self, indices: &[usize]) -> crate::errors::GraphResult<Self> {
-        let mut new_data = Vec::with_capacity(indices.len());
-
-        for &idx in indices {
-            if idx >= self.data.len() {
-                return Err(crate::errors::GraphError::InvalidInput(format!(
-                    "Index {} out of bounds for array of length {}",
-                    idx,
-                    self.data.len()
-                )));
-            }
-            new_data.push(self.data[idx].clone());
-        }
-
-        Ok(Self::new(new_data, self.dtype))
+        self.values
+            .take_indices(indices)
+            .map(|values| Self::from_column(values, self.dtype))
     }
 
     // =================================================================
@@ -199,7 +156,8 @@ impl BaseArray {
 
     /// Create equality mask for string comparison
     pub fn eq_string(&self, value: &str) -> Vec<bool> {
-        self.data
+        self.values
+            .data()
             .iter()
             .map(|val| match val {
                 AttrValue::Text(s) => s == value,
@@ -210,31 +168,16 @@ impl BaseArray {
 
     /// Filter by boolean mask
     pub fn filter_by_mask(&self, mask: &[bool]) -> crate::errors::GraphResult<Self> {
-        if mask.len() != self.data.len() {
-            return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Mask length {} doesn't match array length {}",
-                mask.len(),
-                self.data.len()
-            )));
-        }
-
-        let filtered_data: Vec<AttrValue> = self
-            .data
-            .iter()
-            .zip(mask.iter())
-            .filter_map(|(val, &keep)| if keep { Some(val.clone()) } else { None })
-            .collect();
-
-        Ok(Self::new(filtered_data, self.dtype))
+        self.values
+            .filter_by_mask(mask)
+            .map(|values| Self::from_column(values, self.dtype))
     }
 
     /// Slice this array
     pub fn slice(&self, start: usize, end: usize) -> Self {
-        let end = std::cmp::min(end, self.data.len());
-        let start = std::cmp::min(start, end);
-
-        let sliced_data = self.data[start..end].to_vec();
-        Self::new(sliced_data, self.dtype)
+        let end = end.min(self.values.len());
+        let start = start.min(end);
+        Self::from_column(self.values.slice(start, end - start), self.dtype)
     }
 
     // =================================================================
@@ -243,60 +186,50 @@ impl BaseArray {
 
     /// Get unique values in this array
     pub fn unique_values(&self) -> crate::errors::GraphResult<Vec<AttrValue>> {
-        let mut unique_set = std::collections::HashSet::new();
-        let mut unique_list = Vec::new();
-
-        for val in &self.data {
-            if unique_set.insert(val.clone()) {
-                unique_list.push(val.clone());
-            }
-        }
-
-        Ok(unique_list)
+        self.values.unique_values()
     }
 
     /// Get a reference to the underlying data
     pub fn data(&self) -> &Vec<AttrValue> {
-        &self.data
+        self.values.data()
     }
 }
 
 impl BaseArray {
     /// Set a value at a specific index
     pub fn set(&mut self, index: usize, value: AttrValue) -> crate::errors::GraphResult<()> {
-        if index >= self.data.len() {
+        if index >= self.values.data().len() {
             return Err(crate::errors::GraphError::InvalidInput(format!(
                 "Index {} out of bounds for array with length {}",
                 index,
-                self.data.len()
+                self.values.data().len()
             )));
         }
 
-        self.data[index] = value;
-        Ok(())
+        self.values.set(index, value)
     }
 
     /// Get mutable access to the data for batch operations
     pub fn data_mut(&mut self) -> &mut Vec<AttrValue> {
-        &mut self.data
+        self.values.data_mut()
     }
 }
 
 // Continue with ArrayOps implementation - remaining methods
 impl ArrayOps<AttrValue> for BaseArray {
     fn len(&self) -> usize {
-        self.data.len()
+        self.values.data().len()
     }
 
     fn get(&self, index: usize) -> Option<&AttrValue> {
-        self.data.get(index)
+        self.values.data().get(index)
     }
 
     fn iter(&self) -> ArrayIterator<AttrValue>
     where
         AttrValue: Clone + 'static,
     {
-        ArrayIterator::new(self.data.clone())
+        ArrayIterator::new(self.values.data().clone())
     }
 }
 
@@ -307,19 +240,20 @@ impl ArrayOps<AttrValue> for BaseArray {
 impl BaseArray {
     /// Get the first n elements (head operation)
     pub fn head(&self, n: usize) -> BaseArray {
-        let head_data: Vec<AttrValue> = self.data.iter().take(n).cloned().collect();
+        let head_data: Vec<AttrValue> = self.values.data().iter().take(n).cloned().collect();
 
         BaseArray::new(head_data, self.dtype)
     }
 
     /// Get the last n elements (tail operation)
     pub fn tail(&self, n: usize) -> BaseArray {
-        let start_idx = if self.data.len() > n {
-            self.data.len() - n
+        let start_idx = if self.values.data().len() > n {
+            self.values.data().len() - n
         } else {
             0
         };
-        let tail_data: Vec<AttrValue> = self.data.iter().skip(start_idx).cloned().collect();
+        let tail_data: Vec<AttrValue> =
+            self.values.data().iter().skip(start_idx).cloned().collect();
 
         BaseArray::new(tail_data, self.dtype)
     }
@@ -328,7 +262,8 @@ impl BaseArray {
     pub fn unique(&self) -> BaseArray {
         let mut seen = std::collections::HashSet::new();
         let unique_data: Vec<AttrValue> = self
-            .data
+            .values
+            .data()
             .iter()
             .filter(|item| seen.insert((*item).clone()))
             .cloned()
@@ -340,7 +275,7 @@ impl BaseArray {
     /// Count occurrences of each value
     pub fn value_counts(&self) -> std::collections::HashMap<AttrValue, usize> {
         let mut counts = std::collections::HashMap::new();
-        for value in &self.data {
+        for value in self.values.data() {
             *counts.entry(value.clone()).or_insert(0) += 1;
         }
         counts
@@ -348,41 +283,32 @@ impl BaseArray {
 
     /// Checked finite numeric sum shared with the public generic BaseArray.
     pub fn sum(&self) -> crate::errors::GraphResult<AttrValue> {
-        super::reductions::sum(&self.data)
+        self.values.sum()
     }
 
     /// Compensated finite numeric mean shared with the public generic BaseArray.
     pub fn mean(&self) -> crate::errors::GraphResult<f64> {
-        super::reductions::mean(&self.data)
+        self.values.mean()
     }
 
     /// First minimum with exact numeric ordering; retain legacy text/bool support.
     pub fn min(&self) -> crate::errors::GraphResult<AttrValue> {
-        super::reductions::legacy_extremum(&self.data, true)
+        super::reductions::legacy_extremum(self.values.data(), true)
     }
 
     /// First maximum with exact numeric ordering; retain legacy text/bool support.
     pub fn max(&self) -> crate::errors::GraphResult<AttrValue> {
-        super::reductions::legacy_extremum(&self.data, false)
+        super::reductions::legacy_extremum(self.values.data(), false)
     }
 
     /// Count non-null values in the array
     pub fn count(&self) -> usize {
-        self.data
-            .iter()
-            .filter(|val| !matches!(val, AttrValue::Null))
-            .count()
+        self.values.count()
     }
 
     /// Count unique non-null values in the array
     pub fn nunique(&self) -> usize {
-        let mut seen = std::collections::HashSet::new();
-        for val in &self.data {
-            if !matches!(val, AttrValue::Null) {
-                seen.insert(val);
-            }
-        }
-        seen.len()
+        self.values.nunique()
     }
 
     /// Calculate basic statistics for numeric data
@@ -391,7 +317,8 @@ impl BaseArray {
 
         // Convert to numbers where possible
         let numbers: Vec<f64> = self
-            .data
+            .values
+            .data()
             .iter()
             .filter_map(|val| match val {
                 AttrValue::Int(i) => Some(*i as f64),
@@ -453,9 +380,9 @@ impl BaseArray {
         // Create a set for efficient lookup - use direct AttrValue comparison
         let value_set: std::collections::HashSet<&AttrValue> = values.iter().collect();
 
-        let mut mask_data = Vec::with_capacity(self.data.len());
+        let mut mask_data = Vec::with_capacity(self.values.data().len());
 
-        for attr_val in &self.data {
+        for attr_val in self.values.data() {
             let matches = value_set.contains(attr_val);
             mask_data.push(AttrValue::Bool(matches));
         }
@@ -473,16 +400,16 @@ impl std::fmt::Display for BaseArray {
         let name_str = self.name.as_deref().unwrap_or("BaseArray");
         write!(f, "{}[{}] (dtype: {:?})", name_str, self.len(), self.dtype)?;
 
-        if !self.data.is_empty() {
+        if !self.values.data().is_empty() {
             write!(f, "\nFirst 5 elements: [")?;
-            for (i, item) in self.data.iter().take(5).enumerate() {
+            for (i, item) in self.values.data().iter().take(5).enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
                 }
                 write!(f, "{:?}", item)?;
             }
-            if self.data.len() > 5 {
-                write!(f, ", ... ({} more)", self.data.len() - 5)?;
+            if self.values.data().len() > 5 {
+                write!(f, ", ... ({} more)", self.values.data().len() - 5)?;
             }
             write!(f, "]")?;
         }
@@ -497,7 +424,10 @@ impl std::fmt::Debug for BaseArray {
             .field("len", &self.len())
             .field("dtype", &self.dtype)
             .field("name", &self.name)
-            .field("data_sample", &self.data.iter().take(3).collect::<Vec<_>>())
+            .field(
+                "data_sample",
+                &self.values.data().iter().take(3).collect::<Vec<_>>(),
+            )
             .finish()
     }
 }

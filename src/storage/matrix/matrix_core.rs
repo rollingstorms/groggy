@@ -737,15 +737,15 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Cast matrix to different numeric type
     pub fn cast<U: NumericType>(&self) -> GraphResult<GraphMatrix<U>> {
-        self.cast_with_policy(crate::storage::array::numeric_arithmetic::ConversionPolicy::Exact)
+        self.cast_with_policy(crate::storage::numeric::scalar::ConversionPolicy::Exact)
     }
 
     /// Owned matrix cast with an explicit conversion policy, retaining coordinate identity.
     pub fn cast_with_policy<U: NumericType>(
         &self,
-        policy: crate::storage::array::numeric_arithmetic::ConversionPolicy,
+        policy: crate::storage::numeric::scalar::ConversionPolicy,
     ) -> GraphResult<GraphMatrix<U>> {
-        use crate::storage::array::numeric_arithmetic::{convert, from_scalar};
+        use crate::storage::numeric::scalar::{convert, from_scalar};
         let storage = self
             .storage
             .try_map_into(|value| {
@@ -1096,7 +1096,7 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Convert owned logical values to attributes with explicit precision policy.
     pub fn to_attribute_array(
         &self,
-        policy: crate::storage::array::numeric_arithmetic::ConversionPolicy,
+        policy: crate::storage::numeric::scalar::ConversionPolicy,
     ) -> GraphResult<crate::storage::array::BaseArray<AttrValue>> {
         let values = crate::storage::array::NumArray::new(self.to_vec()?)
             .to_attributes_with_policy(policy)?;
@@ -1279,7 +1279,7 @@ impl<T: NumericType> GraphMatrix<T> {
             .storage
             .reduction_values()
             .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
-        Ok(crate::storage::array::numeric_arithmetic::norm(&values))
+        Ok(crate::storage::numeric::scalar::norm(&values))
     }
 
     /// Entrywise L1 norm: sum of absolute values (not an induced matrix norm).
@@ -2431,10 +2431,10 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Owned boolean comparison mask; preserves exact mixed numeric ordering.
     pub fn comparison_mask(
         &self,
-        scalar: crate::storage::array::numeric_arithmetic::NumericInput,
-        op: crate::storage::array::numeric_arithmetic::NumericComparison,
+        scalar: crate::storage::numeric::scalar::NumericInput,
+        op: crate::storage::numeric::scalar::NumericComparison,
     ) -> GraphResult<GraphMatrix<bool>> {
-        use crate::storage::array::numeric_arithmetic::{comparison, from_scalar};
+        use crate::storage::numeric::scalar::{comparison, from_scalar};
         let storage = self
             .storage
             .try_map_into(|value| Ok(comparison(from_scalar(value), scalar, op)))
@@ -2591,7 +2591,7 @@ impl<T: NumericType> GraphMatrix<T> {
         }))
     }
     fn arithmetic_scalar(scalar: f64) -> GraphResult<T> {
-        use crate::storage::array::numeric_arithmetic::{convert, ConversionPolicy, NumericInput};
+        use crate::storage::numeric::scalar::{convert, ConversionPolicy, NumericInput};
         convert(
             NumericInput::Float(scalar),
             if T::DTYPE.is_float() {
