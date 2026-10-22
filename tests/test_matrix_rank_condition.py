@@ -31,3 +31,13 @@ def test_trailing_columns_explicit_cutoffs_and_invalid_domains():
             a.rank_with_tolerance(cutoff)
     with pytest.raises(RuntimeError):
         GraphMatrix.zeros(0, 3).condition_number()
+
+
+@pytest.mark.parametrize('tiny', [1e-20, 1e-100, 1e-300])
+def test_explicit_rank_cutoff_does_not_inherit_svd_basis_truncation(tiny):
+    a = core(np.diag([1., tiny]))
+    assert a.rank() == 1
+    assert a.rank_with_tolerance(0.) == 2
+    assert a.condition_number() == pytest.approx(1 / tiny, rel=1e-14)
+    _, values, _ = a.svd()
+    assert list(values) == [1., tiny]

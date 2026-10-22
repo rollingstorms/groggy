@@ -5,7 +5,7 @@ with a shared normalized real singular spectrum. Native/Python rank() uses
 relative cutoff epsilon(input dtype)*max(rows,cols,1); count singular values whose
 ratio to the largest is strictly above that cutoff. rank_with_tolerance(relative)
 accepts an explicit finite nonnegative relative cutoff. This is numerical rank,
-not a proof of exact mathematical rank. Cutoff zero can count floating residuals.
+not a proof of exact mathematical rank. Cutoff zero can count floating residuals. The SVD preserves computed nonzero singular values, including diagonal values far below machine epsilon; basis completion no longer silently imposes an additional rank cutoff. Finite-precision rotations may still lose unresolved directions or fail explicitly.
 
 Normalize finite floating inputs before the existing bounded in-house SVD, so common
 matrix scale and singular-value output overflow do not change the ratio calculation.

@@ -567,3 +567,8 @@ The caller selected a dedicated complex eigendecomposition result exposing real/
 Add owned native SolveReport and thin Python tuple without changing solve/inverse. Report a normwise backward-error estimate against original coefficients using exact-dot rounded residuals and log norms; it is not a forward-error/certified guarantee. Bound correction attempts to 16 and accept only strict improvement after output-dtype rounding, preserving coordinate identity and explicit range failures. Repeated dense refactorization is deliberate initial scope; factor reuse, sparse refinement and performance remain open. See docs/api/matrix-solve-refined.md.
 
 29.31 verification: full locked offline native suites passed; rebuilt Python numerical suite: 194 passed, including independent Fraction residual checks and an overflowing denominator fixture. Focused Clippy passes with only the existing sort/match categories excluded.
+
+### Item 29.32 — Remove hidden SVD truncation, 2026-10-21
+Follow-up inspection found a spectral floor in the underlying SVD that overrode the explicit numerical-rank cutoff and could report infinite condition for a diagonal matrix with a resolved tiny singular value. Rotate nonzero columns and retain computed nonzero norms instead. Preserve bounded convergence/basis errors rather than invent missing directions. Add diagonal tests through 1e-300 alongside existing decomposition references. Finite-precision rank uncertainty remains explicit.
+
+29.32 verification: full locked offline native suites passed; rebuilt Python numerical suite: 197 passed. Focused Clippy passed with the same existing sort/match categories excluded.

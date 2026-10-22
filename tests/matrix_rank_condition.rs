@@ -35,3 +35,16 @@ fn conditioning_and_tolerance_domains_are_explicit() {
     assert_eq!(a.rank().unwrap(), 1);
     assert_eq!(a.condition_number().unwrap(), 1.);
 }
+
+#[test]
+fn explicit_cutoffs_and_condition_retain_small_resolved_singular_values() {
+    for tiny in [1e-20, 1e-100, 1e-300] {
+        let a =
+            GraphMatrix::<f64>::from_row_major_data(vec![1., 0., 0., tiny], 2, 2, None).unwrap();
+        assert_eq!(a.rank().unwrap(), 1);
+        assert_eq!(a.rank_with_tolerance(0.).unwrap(), 2);
+        assert!((a.condition_number().unwrap() * tiny - 1.).abs() < 1e-14);
+        let (_, singular, _) = a.svd().unwrap();
+        assert_eq!(singular, vec![1., tiny]);
+    }
+}

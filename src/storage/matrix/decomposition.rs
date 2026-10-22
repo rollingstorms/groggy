@@ -178,9 +178,7 @@ fn tall_svd(input: Vec<f64>, rows: usize, cols: usize, sweeps: usize) -> GraphRe
     let scaling = scale(&input)?;
     let mut a: Vec<_> = input.iter().map(|x| x / scaling).collect();
     let mut v = identity(cols);
-    let norm = a.iter().fold(0.0_f64, |norm, x| norm.hypot(*x));
     let dimension = rows.max(cols).max(1) as f64;
-    let floor = f64::EPSILON * dimension * norm;
     let tolerance = 8.0 * f64::EPSILON * dimension;
     let mut converged = false;
     for _ in 0..sweeps {
@@ -189,7 +187,7 @@ fn tall_svd(input: Vec<f64>, rows: usize, cols: usize, sweeps: usize) -> GraphRe
             for q in p + 1..cols {
                 let np = column_norm(&a, rows, cols, p);
                 let nq = column_norm(&a, rows, cols, q);
-                if np <= floor || nq <= floor {
+                if np == 0. || nq == 0. {
                     continue;
                 }
                 let correlation: f64 = (0..rows)
@@ -228,11 +226,7 @@ fn tall_svd(input: Vec<f64>, rows: usize, cols: usize, sweeps: usize) -> GraphRe
     let mut vt = vec![0.0; cols * cols];
     let mut rank = 0;
     for (col, &old) in order.iter().enumerate() {
-        let sigma = if norms[old] > floor {
-            norms[old] * scaling
-        } else {
-            0.0
-        };
+        let sigma = norms[old] * scaling;
         if !sigma.is_finite() {
             return Err(invalid("Singular value exceeds finite f64 range"));
         }
