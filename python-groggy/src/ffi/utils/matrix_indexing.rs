@@ -4,8 +4,7 @@
 
 use groggy::storage::matrix::{MatrixIndex, MatrixSlice};
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PySlice, PyTuple};
-use std::os::raw::c_long;
+use pyo3::types::{PyBool, PyList, PySlice, PyTuple};
 // PyBoolArray functionality integrated into unified NumArray
 
 /// Convert a single Python index to MatrixIndex
@@ -17,28 +16,20 @@ pub fn python_to_matrix_index(py: Python, index: &PyAny) -> PyResult<MatrixIndex
 
     // Handle Python slice object
     if let Ok(slice) = index.downcast::<PySlice>() {
-        let indices = slice.indices(c_long::MAX)?;
         return Ok(MatrixIndex::Range {
-            start: if indices.start == 0 && indices.stop == c_long::MAX as isize {
-                None
-            } else {
-                Some(indices.start as i64)
-            },
-            stop: if indices.stop == c_long::MAX as isize {
-                None
-            } else {
-                Some(indices.stop as i64)
-            },
-            step: if indices.step == 1 {
-                None
-            } else {
-                Some(indices.step as i64)
-            },
+            start: slice.getattr("start")?.extract()?,
+            stop: slice.getattr("stop")?.extract()?,
+            step: slice.getattr("step")?.extract()?,
         });
     }
 
     // Handle list of integers
     if let Ok(list) = index.downcast::<PyList>() {
+        if !list.is_empty() && list.iter().all(|item| item.is_instance_of::<PyBool>()) {
+            return Ok(MatrixIndex::BoolArray(groggy::storage::BoolArray::new(
+                list.extract()?,
+            )));
+        }
         let mut int_indices = Vec::new();
         for item in list.iter() {
             if let Ok(int_val) = item.extract::<i64>() {
@@ -72,26 +63,6 @@ pub fn python_to_matrix_index(py: Python, index: &PyAny) -> PyResult<MatrixIndex
         if num_array.get_dtype() == "bool" {
             // Extract bool data from unified NumArray
             let bool_values: Vec<bool> = num_array.get_list(py)?.extract(py)?;
-            let bool_array = groggy::storage::BoolArray::new(bool_values);
-            return Ok(MatrixIndex::BoolArray(bool_array));
-        }
-    }
-
-    // Handle Python list of booleans
-    if let Ok(list) = index.downcast::<PyList>() {
-        let mut all_bool = true;
-        let mut bool_values = Vec::new();
-
-        for item in list.iter() {
-            if let Ok(bool_val) = item.extract::<bool>() {
-                bool_values.push(bool_val);
-            } else {
-                all_bool = false;
-                break;
-            }
-        }
-
-        if all_bool {
             let bool_array = groggy::storage::BoolArray::new(bool_values);
             return Ok(MatrixIndex::BoolArray(bool_array));
         }

@@ -114,3 +114,5 @@ Numerical item 29.16 repairs dense floating solve/inverse using direct row-equil
 Numerical item 29.17 checks built-in integer GraphMatrix add/subtract/Hadamard overflow and matrix-product i128 accumulation/output conversion. Arbitrary precision, other integer backends, exact grouped integer reductions and remaining matrix/sparse/decomposition/conditioning work remain open.
 
 Numerical item 29.18 repairs integer-only ArrayArray sum/mean/std precision through typed native reductions for both single and multi aggregation. Explicit float projection, mixed-type working limits and f32 materialization remain documented; other grouped-table paths and storage widening are separate.
+
+Numerical item 29.19 repairs owned column/2D selection, raw Python slicing/masks, logical reshape and transpose with explicit validation, identity and empty-shape behavior. Remaining reductions, lower-level views/lazy/sparse paths and general decomposition/performance work remain open.

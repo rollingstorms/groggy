@@ -114,49 +114,7 @@ impl MatrixSlicing for GraphMatrix {
         let row_indices = slice.row_index.resolve_indices(rows)?;
         let col_indices = slice.col_index.resolve_indices(cols)?;
 
-        if row_indices.is_empty() || col_indices.is_empty() {
-            return Err(GraphError::InvalidInput(
-                "Cannot create matrix with zero rows or columns".to_string(),
-            ));
-        }
-
-        // Extract the submatrix data
-        let mut new_columns = Vec::new();
-        let mut new_column_names = Vec::new();
-
-        for &col_idx in &col_indices {
-            if col_idx >= cols {
-                return Err(GraphError::InvalidInput(format!(
-                    "Column index {} out of bounds",
-                    col_idx
-                )));
-            }
-
-            // Get the full column
-            let column = self.get_column_internal(col_idx)?;
-
-            // Extract only the requested rows
-            let mut row_data = Vec::new();
-            for &row_idx in &row_indices {
-                if row_idx >= rows {
-                    return Err(GraphError::InvalidInput(format!(
-                        "Row index {} out of bounds",
-                        row_idx
-                    )));
-                }
-                row_data.push(*column.get(row_idx).ok_or_else(|| {
-                    GraphError::InvalidInput(format!("Row {} not found in column", row_idx))
-                })?);
-            }
-
-            new_columns.push(NumArray::new(row_data));
-            new_column_names.push(self.get_column_name(col_idx));
-        }
-
-        // Create new matrix
-        let mut result = GraphMatrix::from_arrays(new_columns)?;
-        result.set_column_names(new_column_names);
-        Ok(result)
+        self.select_indices(&row_indices, &col_indices)
     }
 
     fn get_row(&self, row_idx: usize) -> GraphResult<NumArray<f64>> {
@@ -195,7 +153,16 @@ impl MatrixSlicing for GraphMatrix {
 
     fn get_rows(&self, row_indices: &[usize]) -> GraphResult<GraphMatrix> {
         let slice = MatrixSlice::new(
-            MatrixIndex::List(row_indices.iter().map(|&i| i as i64).collect()),
+            MatrixIndex::List(
+                row_indices
+                    .iter()
+                    .map(|&i| {
+                        i64::try_from(i).map_err(|_| {
+                            GraphError::InvalidInput("Row index exceeds signed range".into())
+                        })
+                    })
+                    .collect::<GraphResult<_>>()?,
+            ),
             MatrixIndex::All,
         );
         self.get_submatrix(&slice)
@@ -204,7 +171,16 @@ impl MatrixSlicing for GraphMatrix {
     fn get_columns(&self, col_indices: &[usize]) -> GraphResult<GraphMatrix> {
         let slice = MatrixSlice::new(
             MatrixIndex::All,
-            MatrixIndex::List(col_indices.iter().map(|&i| i as i64).collect()),
+            MatrixIndex::List(
+                col_indices
+                    .iter()
+                    .map(|&i| {
+                        i64::try_from(i).map_err(|_| {
+                            GraphError::InvalidInput("Column index exceeds signed range".into())
+                        })
+                    })
+                    .collect::<GraphResult<_>>()?,
+            ),
         );
         self.get_submatrix(&slice)
     }

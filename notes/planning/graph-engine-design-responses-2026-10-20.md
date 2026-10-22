@@ -533,3 +533,6 @@ Reject integer overflow rather than debug panic/release wrap. Keep output dtype 
 
 ### Item 29 typed grouped integer statistics — 2026-10-21
 Preserve original i64 scalars for statistical reductions rather than materialize f64 first. Share single/multi aggregation and generic result-table validation. Keep numeric inclusion/empty/count rules and f32 stored outputs explicit; widening storage and exact mixed arithmetic are separate work.
+
+### Item 29 matrix selections and transforms — 2026-10-21
+Keep selections owned with positional identity, including duplicates and empty axes. Validate indices before reading or allocating. Resolve raw Python slices in the Rust core at actual dimensions. Reshape follows logical row order and resets labels only when the coordinate shape changes; transpose exchanges axis identity. Lower-level views and graph bindings are separate contracts.

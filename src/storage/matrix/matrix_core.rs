@@ -315,14 +315,6 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(column)
     }
 
-    /// Get column name by index - needed by slicing module  
-    pub(crate) fn get_column_name(&self, col_idx: usize) -> String {
-        self.column_names
-            .get(col_idx)
-            .map(|s| s.clone())
-            .unwrap_or_else(|| format!("col_{}", col_idx))
-    }
-
     /// Set column names
     pub fn set_column_names(&mut self, names: Vec<String>) {
         let (_, cols) = self.shape();
@@ -869,21 +861,21 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Transpose the matrix
     pub fn transpose(&self) -> GraphResult<GraphMatrix<T>> {
         let (rows, cols) = self.shape();
-        let mut result = Self::zeros(cols, rows);
-
-        for i in 0..rows {
-            for j in 0..cols {
-                if let Some(value) = self.get(i, j) {
-                    result.set(j, i, value)?;
-                } else {
-                    return Err(GraphError::InvalidInput(format!(
-                        "Invalid cell at ({}, {})",
-                        i, j
-                    )));
-                }
+        let mut result = Self::arithmetic_zeros(cols, rows)?;
+        for row in 0..rows {
+            for col in 0..cols {
+                result.set(col, row, self.get_checked(row, col)?)?;
             }
         }
-
+        result.row_labels = Some(self.column_names.clone());
+        if let Some(labels) = &self.row_labels {
+            if labels.len() != rows {
+                return Err(GraphError::InvalidInput(
+                    "Row label count does not match shape".into(),
+                ));
+            }
+            result.column_names = labels.clone();
+        }
         Ok(result)
     }
 
@@ -1381,14 +1373,31 @@ impl<T: NumericType> GraphMatrix<T> {
     /// # Errors
     /// Returns error if new_rows * new_cols != current total elements
     pub fn reshape(&self, new_rows: usize, new_cols: usize) -> GraphResult<GraphMatrix<T>> {
-        use crate::storage::advanced_matrix::operations::MatrixOperations;
-
-        let reshaped_storage = self
-            .storage
-            .reshape(new_rows, new_cols)
-            .map_err(|e| GraphError::InvalidInput(format!("Reshape failed: {:?}", e)))?;
-
-        Ok(Self::from_storage(reshaped_storage))
+        let (rows, cols) = self.shape();
+        let count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| GraphError::InvalidInput("Input shape overflow".into()))?;
+        if new_rows.checked_mul(new_cols) != Some(count) {
+            return Err(GraphError::InvalidInput(
+                "Reshape element counts must match without overflow".into(),
+            ));
+        }
+        let mut result = Self::arithmetic_zeros(new_rows, new_cols)?;
+        for row in 0..rows {
+            for col in 0..cols {
+                let index = row * cols + col;
+                result.set(
+                    index / new_cols,
+                    index % new_cols,
+                    self.get_checked(row, col)?,
+                )?;
+            }
+        }
+        if (rows, cols) == (new_rows, new_cols) {
+            result.column_names = self.column_names.clone();
+            result.row_labels = self.row_labels.clone();
+        }
+        Ok(result)
     }
 
     /// Global sum of all elements in the matrix
@@ -2823,19 +2832,52 @@ impl<T: NumericType> Default for GraphMatrix<T> {
 }
 
 impl<T: NumericType> GraphMatrix<T> {
-    /// Select specific columns by indices
-    pub fn select_columns(&self, indices: &[usize]) -> GraphResult<GraphMatrix<T>> {
-        let (rows, _) = self.shape();
-        let mut result = GraphMatrix::zeros(rows, indices.len());
-
-        for (new_col, &old_col) in indices.iter().enumerate() {
-            if let Some(column_data) = self.get_column(old_col) {
-                for (row, &value) in column_data.iter().enumerate() {
-                    result.set(row, new_col, value)?;
-                }
+    /// Owned positional selection, preserving duplicates/order and rejecting invalid indices.
+    pub fn select_indices(&self, rows: &[usize], cols: &[usize]) -> GraphResult<Self> {
+        self.gather_indices(Some(rows), cols)
+    }
+    /// Owned column selection with unchanged row identity.
+    pub fn select_columns(&self, indices: &[usize]) -> GraphResult<Self> {
+        self.gather_indices(None, indices)
+    }
+    fn gather_indices(
+        &self,
+        selected_rows: Option<&[usize]>,
+        selected_cols: &[usize],
+    ) -> GraphResult<Self> {
+        let (rows, cols) = self.shape();
+        if selected_rows.is_some_and(|indices| indices.iter().any(|&i| i >= rows))
+            || selected_cols.iter().any(|&i| i >= cols)
+        {
+            return Err(GraphError::InvalidInput(
+                "Matrix selection index out of bounds".into(),
+            ));
+        }
+        if self
+            .row_labels
+            .as_ref()
+            .is_some_and(|labels| labels.len() != rows)
+        {
+            return Err(GraphError::InvalidInput(
+                "Row label count does not match shape".into(),
+            ));
+        }
+        let result_rows = selected_rows.map_or(rows, |r| r.len());
+        let mut result = Self::arithmetic_zeros(result_rows, selected_cols.len())?;
+        for (col, &source_col) in selected_cols.iter().enumerate() {
+            for row in 0..result_rows {
+                let source_row = selected_rows.map_or(row, |r| r[row]);
+                result.set(row, col, self.get_checked(source_row, source_col)?)?;
             }
         }
-
+        result.column_names = selected_cols
+            .iter()
+            .map(|&i| self.column_names[i].clone())
+            .collect();
+        result.row_labels = self.row_labels.as_ref().map(|labels| match selected_rows {
+            Some(indices) => indices.iter().map(|&i| labels[i].clone()).collect(),
+            None => labels.clone(),
+        });
         Ok(result)
     }
 
