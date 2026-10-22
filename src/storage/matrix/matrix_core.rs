@@ -1040,79 +1040,29 @@ impl<T: NumericType> GraphMatrix<T> {
         self.zip_arithmetic(other, T::checked_mul)
     }
 
-    /// Matrix power operation (repeated multiplication)
-    pub fn power(&self, n: u32) -> GraphResult<GraphMatrix<T>> {
-        if !self.is_square() {
-            return Err(GraphError::InvalidInput(
-                "Matrix must be square for power operation".into(),
-            ));
-        }
-
-        // Handle computation graph if gradients are required
-        if self.requires_grad {
-            if let Some(ref graph) = self.computation_graph {
-                if let Some(input_node_id) = self.current_node_id {
-                    // Create power operation node in computation graph
-                    let mut graph_mut = graph.clone(); // We need mutable access
-                    let result_shape = (self.shape().0, self.shape().1);
-
-                    // Create the operation node
-                    let output_node_id = graph_mut
-                        .create_operation(
-                            crate::storage::advanced_matrix::neural::autodiff::Operation::Power {
-                                exponent: n,
-                            },
-                            vec![input_node_id],
-                            crate::storage::advanced_matrix::unified_matrix::Shape::new(
-                                result_shape.0,
-                                result_shape.1,
-                            ),
-                            true, // requires_grad
-                        )
-                        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
-
-                    // Compute the actual result
-                    let result_storage = if n == 0 {
-                        let (size, _) = self.shape();
-                        Self::identity(size)?.storage
-                    } else {
-                        let mut result_storage = self.storage.clone();
-                        for _ in 1..n {
-                            result_storage = result_storage
-                                .matmul(&self.storage)
-                                .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
-                        }
-                        result_storage
-                    };
-
-                    // Set the computed value in the graph node
-                    if let Some(node_arc) = graph_mut.get_node(output_node_id) {
-                        let mut node = node_arc.lock().unwrap();
-                        node.value = Some(result_storage.clone());
-                    }
-
-                    // Create result matrix with computation graph
-                    let mut result = Self::from_storage(result_storage);
-                    result.requires_grad = true;
-                    result.computation_graph = Some(graph_mut);
-                    result.current_node_id = Some(output_node_id);
-
-                    return Ok(result);
-                }
-            }
-        }
-
-        // Fallback: regular computation without gradients
-        if n == 0 {
-            let (size, _) = self.shape();
-            return Self::identity(size);
-        }
-
-        let mut result = self.clone();
-        for _ in 1..n {
-            result = result.multiply(self)?;
-        }
-
+    /// Nonnegative integer matrix power by exponentiation by squaring.
+    pub fn power(&self, n: u32) -> GraphResult<Self> {
+        let storage = super::matrix_power::forward(&self.storage, n)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = Self::from_storage(storage);
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
+        self.track_factor(result, Operation::Power { exponent: n })
+    }
+    /// Frechet directional derivative of A^n; matrices need not commute.
+    pub fn power_jvp(&self, n: u32, tangent: &Self) -> GraphResult<Self> {
+        self.power_derivative(n, tangent, false)
+    }
+    /// Frobenius pullback of A^n for a caller-supplied output cotangent.
+    pub fn power_vjp(&self, n: u32, cotangent: &Self) -> GraphResult<Self> {
+        self.power_derivative(n, cotangent, true)
+    }
+    fn power_derivative(&self, n: u32, direction: &Self, reverse: bool) -> GraphResult<Self> {
+        let storage = super::matrix_power::apply(&self.storage, n, &direction.storage, reverse)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = Self::from_storage(storage);
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
         Ok(result)
     }
 

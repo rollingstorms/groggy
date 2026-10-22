@@ -189,3 +189,5 @@ accepted pinned-state model.
 - [x] **29.47 — Release numerical corpus and measured bulk kernels.** Twenty release cases, allocation/peak-heap receipts, matched checksums and measured product/norm/materialization improvements with memory/timing limits. Native full suites and 324 rebuilt Python tests pass; broad production gates remain open. See notes/benchmarks/numerical-completion-2026-10-22.md.
 
 - [x] **29.48 — Attribute/ID/index conversion boundaries.** Native attribute promotion, checked BaseArray conversion, exact fancy positions, i64::MIN inference and unsigned ID range handling. Full native suites and 357 rebuilt Python numerical/array compatibility tests pass. See docs/api/numarray-arithmetic.md.
+
+- [x] **29.49 — Matrix powers and noncommuting derivatives.** Logarithmic checked forward powers, recursive JVP/VJP and corrected automatic pullbacks with sparse/empty/label behavior. Native full/focused suites and 364 rebuilt Python regressions pass. See docs/api/matrix-powers.md.

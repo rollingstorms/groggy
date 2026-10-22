@@ -17,6 +17,7 @@ mod factorization;
 mod least_squares;
 mod linear_system;
 pub mod matrix_core;
+pub(crate) mod matrix_power;
 mod reductions;
 pub mod slicing;
 mod sparse_factorization;

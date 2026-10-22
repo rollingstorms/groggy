@@ -593,9 +593,7 @@ impl PyGraphMatrix {
     /// Matrix power - raise matrix to integer power
     /// Returns: new GraphMatrix that is self^n
     fn power(&self, py: Python, n: u32) -> PyResult<Py<PyGraphMatrix>> {
-        let result_matrix = self
-            .inner
-            .power(n)
+        let result_matrix = computation::run(py, [&self.inner], move |[a]| a.power(n))
             .map_err(|e| PyRuntimeError::new_err(format!("Matrix power failed: {:?}", e)))?;
 
         let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
@@ -2095,6 +2093,23 @@ impl PyGraphMatrix {
             })?;
 
         Py::new(py, PyGraphMatrix { inner: l_matrix })
+    }
+
+    /// Directional derivative of a nonnegative matrix power.
+    fn power_jvp(&self, py: Python, n: u32, tangent: &Self) -> PyResult<Py<Self>> {
+        let inner = computation::run(py, [&self.inner, &tangent.inner], move |[a, b]| {
+            a.power_jvp(n, b)
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+    /// Frobenius pullback of a nonnegative matrix power.
+    fn power_vjp(&self, py: Python, n: u32, cotangent: &Self) -> PyResult<Py<Self>> {
+        let inner = computation::run(py, [&self.inner, &cotangent.inner], move |[a, b]| {
+            a.power_vjp(n, b)
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
     }
 
     /// Cholesky directional derivative for a symmetric input tangent.

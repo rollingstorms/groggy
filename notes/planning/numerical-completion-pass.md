@@ -42,3 +42,5 @@ preserved separately.
 - 29.47: 20-case release corpus, heap allocation/peak receipts and measured bulk-product/norm/reduction improvements; broad size/SIMD gates remain open.
 
 - 29.48: checked attribute/ID/fancy-index bridges and BaseArray numeric conversion; 357 Python regressions.
+
+- 29.49: checked logarithmic matrix powers and corrected noncommuting explicit/automatic derivatives.

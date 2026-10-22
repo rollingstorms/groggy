@@ -362,6 +362,16 @@ impl<T: NumericType> ComputationGraph<T> {
                     .map_err(|e| MatrixError::ComputationError(e.to_string()))
             }
 
+            Operation::Power { exponent } => {
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Matrix power requires one input".into(),
+                    ));
+                }
+                crate::storage::matrix::matrix_power::forward(&inputs[0], *exponent)
+            }
+
             Operation::Cholesky => {
                 let inputs = self.get_input_values(&node.inputs)?;
                 if inputs.len() != 1 {
@@ -596,21 +606,6 @@ impl<T: NumericType> ComputationGraph<T> {
         Ok(())
     }
 
-    fn elementwise_pow_u32(
-        &self,
-        base: &UnifiedMatrix<T>,
-        exp: u32,
-    ) -> MatrixResult<UnifiedMatrix<T>> {
-        if exp == 0 {
-            return UnifiedMatrix::ones(base.shape().rows, base.shape().cols);
-        }
-        let mut out = base.clone();
-        for _ in 1..exp {
-            out = out.elementwise_multiply(base)?;
-        }
-        Ok(out)
-    }
-
     /// Compute backward pass for a single node
     fn compute_backward_operation(
         &self,
@@ -718,41 +713,22 @@ impl<T: NumericType> ComputationGraph<T> {
             }
 
             Operation::Power { exponent } => {
-                if node.inputs.len() == 1 {
-                    if let Some(input_arc) = self.nodes.get(&node.inputs[0]) {
-                        let mut input_node = input_arc.lock().unwrap();
-                        if input_node.requires_grad {
-                            let a = input_node.value.as_ref().ok_or_else(|| {
-                                MatrixError::ComputationError(
-                                    "Missing forward value for Power input".to_string(),
-                                )
-                            })?;
-                            match *exponent {
-                                0 => {
-                                    // d(1)/da = 0
-                                    let z = UnifiedMatrix::zeros(
-                                        grad_output.shape().rows,
-                                        grad_output.shape().cols,
-                                    )?;
-                                    input_node.accumulate_gradient(z)?;
-                                }
-                                1 => {
-                                    // d(a)/da = 1
-                                    input_node.accumulate_gradient(grad_output.clone())?;
-                                }
-                                n => {
-                                    // d(a^n)/da = n * a^(n-1) * grad_out
-                                    let a_pow = self.elementwise_pow_u32(a, n - 1)?;
-                                    let n_scalar = T::from_f64(n as f64).unwrap();
-                                    let da = a_pow.scale(n_scalar)?; // n * a^(n-1)
-                                    let g = grad_output.elementwise_multiply(&da)?; // chain rule
-                                    input_node.accumulate_gradient(g)?;
-                                }
-                            }
-                        }
-                    }
+                if node.inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Matrix power backward requires one input".into(),
+                    ));
                 }
-                Ok(())
+                let input_id = node.inputs[0];
+                let exponent = *exponent;
+                let seed = grad_output.clone();
+                drop(node);
+                let inputs = self.get_input_values(&[input_id])?;
+                let input = inputs.first().ok_or_else(|| {
+                    MatrixError::ComputationError("Missing matrix power input".into())
+                })?;
+                let gradient =
+                    crate::storage::matrix::matrix_power::apply(input, exponent, &seed, true)?;
+                self.accumulate_per_input(&[input_id], vec![gradient])
             }
 
             Operation::MatMul => {
