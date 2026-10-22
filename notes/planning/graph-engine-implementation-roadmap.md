@@ -219,3 +219,12 @@ Add checked zero/one/identity/storage wrappers including label allocation, remov
 
 ### Item 29.59 — Replay scalar primals and deterministic tape execution
 Store scalar shifts/divisors as actual forward operations rather than derivative-only identity/reciprocal nodes. Pull scalar division gradients back by direct division so representable results survive reciprocal overflow. Use deterministic node-ID topological ordering, reject missing dependencies before publishing operation nodes and route matrix-product contributions through shared repeated-input accumulation. Full locked offline native suites, focused Clippy (excluding existing sort/match categories) and 455 rebuilt Python regressions passed. Native replay/ordering/dependency and native/Python subnormal-cotangent fixtures cover the repairs. See docs/api/matrix-arithmetic-autodiff.md.
+
+### Proposed module consolidation — 2026-10-22
+
+User proposes one matrix module replacing the matrix/advanced_matrix split.
+The review identifies arrays, entity handles, graph-view ownership, display,
+query/execution, shared state/change records and table boundaries as related
+candidates, with distinct concepts retained. See
+`module-consolidation-review-2026-10-22.md` for evidence and migration order.
+This is a proposal, not a completed refactor or approval of every candidate.

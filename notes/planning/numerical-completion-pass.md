@@ -68,3 +68,12 @@ preserved separately.
 - 29.58: checked matrix constructors and shared matrix/array conversion; 454 Python regressions.
 
 - 29.59: faithful scalar tape replay, deterministic execution and direct-division gradients; 455 Python regressions.
+
+## Current checkpoint and proposed consolidation
+
+After 29.59, all native suites and 455 rebuilt Python numerical/array tests pass.
+The existing 25-case release corpus was rebuilt and rerun idle; see
+`notes/benchmarks/numerical-current-2026-10-22.md`. Larger size/fill/SIMD and final
+strict gates remain open. The user's matrix/advanced_matrix consolidation request
+and related candidate review are recorded separately in
+`module-consolidation-review-2026-10-22.md`; module moves are not yet implemented.
