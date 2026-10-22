@@ -3,7 +3,7 @@
 const LIMBS: usize = 136;
 const MASK: u128 = (1_u128 << 32) - 1;
 
-pub(super) struct Dot {
+pub(crate) struct Dot {
     integer: Option<i128>,
     positive: [u128; LIMBS],
     negative: [u128; LIMBS],
@@ -12,7 +12,7 @@ pub(super) struct Dot {
     negative_infinity: bool,
 }
 impl Dot {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             integer: Some(0),
             positive: [0; LIMBS],
@@ -22,7 +22,7 @@ impl Dot {
             negative_infinity: false,
         }
     }
-    pub(super) fn add(&mut self, a: f64, b: f64) {
+    pub(crate) fn add(&mut self, a: f64, b: f64) {
         if !a.is_finite() || !b.is_finite() {
             let product = a * b;
             self.nan |= product.is_nan();
@@ -87,7 +87,7 @@ impl Dot {
             limb += 1;
         }
     }
-    pub(super) fn total(mut self) -> f64 {
+    pub(crate) fn total(mut self) -> f64 {
         if self.nan || (self.positive_infinity && self.negative_infinity) {
             return f64::NAN;
         }

@@ -197,6 +197,28 @@ pub trait ComputeBackend: Send + Sync + Debug {
     ) -> BackendResult<()>;
 }
 
+// A safe NumericType implementation need not have the memory representation
+// denoted by its dtype. Only built-in concrete types may cross the raw ABI.
+fn checked_raw_type<T: NumericType>() -> BackendResult<()> {
+    use std::any::TypeId;
+    let id = TypeId::of::<T>();
+    if [
+        TypeId::of::<f64>(),
+        TypeId::of::<f32>(),
+        TypeId::of::<i64>(),
+        TypeId::of::<i32>(),
+        TypeId::of::<bool>(),
+    ]
+    .contains(&id)
+    {
+        Ok(())
+    } else {
+        Err(BackendError::InvalidInput(
+            "Concrete numeric type is unsupported by the raw backend ABI".into(),
+        ))
+    }
+}
+
 /// Extension trait with safe generic methods
 pub trait ComputeBackendExt: ComputeBackend {
     /// Safe wrapper for GEMM
@@ -211,6 +233,23 @@ pub trait ComputeBackendExt: ComputeBackend {
         alpha: T,
         beta: T,
     ) -> BackendResult<()> {
+        checked_raw_type::<T>()?;
+        let count = |shape: (usize, usize)| {
+            shape.0.checked_mul(shape.1).filter(|v| {
+                v.checked_mul(T::BYTE_SIZE)
+                    .is_some_and(|b| b <= isize::MAX as usize)
+            })
+        };
+        if a_shape.1 != b_shape.0
+            || c_shape != (a_shape.0, b_shape.1)
+            || count(a_shape) != Some(a.len())
+            || count(b_shape) != Some(b.len())
+            || count(c_shape) != Some(c.len())
+        {
+            return Err(BackendError::InvalidInput(
+                "GEMM slice lengths or dimensions are inconsistent".into(),
+            ));
+        }
         unsafe {
             self.gemm_raw(
                 T::DTYPE,
@@ -233,6 +272,12 @@ pub trait ComputeBackendExt: ComputeBackend {
         b: &[T],
         result: &mut [T],
     ) -> BackendResult<()> {
+        checked_raw_type::<T>()?;
+        if a.len() != b.len() || a.len() != result.len() {
+            return Err(BackendError::InvalidInput(
+                "Element-wise slice lengths differ".into(),
+            ));
+        }
         unsafe {
             self.elementwise_add_raw(
                 T::DTYPE,
@@ -251,6 +296,12 @@ pub trait ComputeBackendExt: ComputeBackend {
         b: &[T],
         result: &mut [T],
     ) -> BackendResult<()> {
+        checked_raw_type::<T>()?;
+        if a.len() != b.len() || a.len() != result.len() {
+            return Err(BackendError::InvalidInput(
+                "Element-wise slice lengths differ".into(),
+            ));
+        }
         unsafe {
             self.elementwise_mul_raw(
                 T::DTYPE,
@@ -264,6 +315,7 @@ pub trait ComputeBackendExt: ComputeBackend {
 
     /// Safe wrapper for sum reduction
     fn reduce_sum<T: NumericType>(&self, data: &[T]) -> BackendResult<T::Accumulator> {
+        checked_raw_type::<T>()?;
         let mut result = T::Accumulator::zero();
         unsafe {
             self.reduce_sum_raw(
@@ -278,6 +330,7 @@ pub trait ComputeBackendExt: ComputeBackend {
 
     /// Safe wrapper for max reduction
     fn reduce_max<T: NumericType>(&self, data: &[T]) -> BackendResult<T> {
+        checked_raw_type::<T>()?;
         if data.is_empty() {
             return Err(BackendError::InvalidInput(
                 "Empty data for reduction".to_string(),
@@ -297,6 +350,7 @@ pub trait ComputeBackendExt: ComputeBackend {
 
     /// Safe wrapper for min reduction
     fn reduce_min<T: NumericType>(&self, data: &[T]) -> BackendResult<T> {
+        checked_raw_type::<T>()?;
         if data.is_empty() {
             return Err(BackendError::InvalidInput(
                 "Empty data for reduction".to_string(),
@@ -537,37 +591,50 @@ impl NativeBackend {
         alpha: *const u8,
         beta: *const u8,
     ) -> BackendResult<()> {
-        let a = std::slice::from_raw_parts(a as *const T, a_shape.0 * a_shape.1);
-        let b = std::slice::from_raw_parts(b as *const T, b_shape.0 * b_shape.1);
-        let c = std::slice::from_raw_parts_mut(c as *mut T, c_shape.0 * c_shape.1);
-        let alpha = *(alpha as *const T);
-        let beta = *(beta as *const T);
-
         let (m, k) = a_shape;
         let (k2, n) = b_shape;
-        let (m2, n2) = c_shape;
-
-        if k != k2 || m != m2 || n != n2 {
-            return Err(BackendError::IncompatibleDimensions {
-                expected: (m, n),
-                got: (m2, n2),
-            });
+        if k != k2 || c_shape != (m, n) {
+            return Err(BackendError::InvalidInput("GEMM dimensions differ".into()));
         }
-
-        // Native implementation of C = alpha * A * B + beta * C
+        let count = |rows: usize, cols: usize| {
+            rows.checked_mul(cols)
+                .filter(|v| {
+                    v.checked_mul(T::BYTE_SIZE)
+                        .is_some_and(|b| b <= isize::MAX as usize)
+                })
+                .ok_or_else(|| BackendError::InvalidInput("GEMM dimensions overflow".into()))
+        };
+        let a = std::slice::from_raw_parts(a as *const T, count(m, k)?);
+        let b = std::slice::from_raw_parts(b as *const T, count(k, n)?);
+        let c = std::slice::from_raw_parts_mut(c as *mut T, count(m, n)?);
+        let alpha = *(alpha as *const T);
+        let beta = *(beta as *const T);
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(c.len())
+            .map_err(|_| BackendError::MemoryAllocationFailed)?;
+        let map =
+            |e: super::unified_matrix::MatrixError| BackendError::ComputationFailed(e.to_string());
+        if m == 0 || n == 0 {
+            return Ok(());
+        }
         for i in 0..m {
             for j in 0..n {
-                let mut sum = T::zero();
-                for l in 0..k {
-                    let a_val = a[i * k + l];
-                    let b_val = b[l * n + j];
-                    sum = sum.add(a_val.mul(b_val));
+                let mut result = super::checked_kernels::Product::<T>::new();
+                if alpha != T::zero() {
+                    let mut dot = super::checked_kernels::Product::<T>::new();
+                    for l in 0..k {
+                        dot.add(a[i * k + l], b[l * n + j]).map_err(map)?;
+                    }
+                    result.add(alpha, dot.total().map_err(map)?).map_err(map)?;
                 }
-                let c_idx = i * n + j;
-                c[c_idx] = alpha.mul(sum).add(beta.mul(c[c_idx]));
+                if beta != T::zero() {
+                    result.add(beta, c[i * n + j]).map_err(map)?;
+                }
+                output.push(result.total().map_err(map)?);
             }
         }
-
+        c.copy_from_slice(&output);
         Ok(())
     }
 
@@ -582,22 +649,7 @@ impl NativeBackend {
         beta: *const u8,
     ) -> BackendResult<()> {
         let (m, n) = matrix_shape;
-        let matrix = std::slice::from_raw_parts(matrix as *const T, m * n);
-        let vector = std::slice::from_raw_parts(vector as *const T, n);
-        let result = std::slice::from_raw_parts_mut(result as *mut T, m);
-        let alpha = *(alpha as *const T);
-        let beta = *(beta as *const T);
-
-        // y = alpha * A * x + beta * y
-        for i in 0..m {
-            let mut sum = T::zero();
-            for j in 0..n {
-                sum = sum.add(matrix[i * n + j].mul(vector[j]));
-            }
-            result[i] = alpha.mul(sum).add(beta.mul(result[i]));
-        }
-
-        Ok(())
+        self.gemm_typed::<T>(matrix, (m, n), vector, (n, 1), result, (m, 1), alpha, beta)
     }
 
     /// Type-safe element-wise addition
@@ -612,7 +664,16 @@ impl NativeBackend {
         let b = std::slice::from_raw_parts(b as *const T, len);
         let result = std::slice::from_raw_parts_mut(result as *mut T, len);
 
-        T::simd_add(a, b, result);
+        let output = a
+            .iter()
+            .zip(b)
+            .map(|(&a, &b)| {
+                a.checked_add(b).ok_or_else(|| {
+                    BackendError::ComputationFailed("Integer addition overflow".into())
+                })
+            })
+            .collect::<BackendResult<Vec<_>>>()?;
+        result.copy_from_slice(&output);
         Ok(())
     }
 
@@ -628,7 +689,16 @@ impl NativeBackend {
         let b = std::slice::from_raw_parts(b as *const T, len);
         let result = std::slice::from_raw_parts_mut(result as *mut T, len);
 
-        T::simd_mul(a, b, result);
+        let output = a
+            .iter()
+            .zip(b)
+            .map(|(&a, &b)| {
+                a.checked_mul(b).ok_or_else(|| {
+                    BackendError::ComputationFailed("Integer multiplication overflow".into())
+                })
+            })
+            .collect::<BackendResult<Vec<_>>>()?;
+        result.copy_from_slice(&output);
         Ok(())
     }
 
@@ -642,7 +712,8 @@ impl NativeBackend {
         let data = std::slice::from_raw_parts(data as *const T, len);
         let result = &mut *(result as *mut T::Accumulator);
 
-        *result = T::simd_reduce_sum(data);
+        *result = super::checked_kernels::sum(data)
+            .map_err(|e| BackendError::ComputationFailed(e.to_string()))?;
         Ok(())
     }
 
@@ -662,7 +733,8 @@ impl NativeBackend {
         let data = std::slice::from_raw_parts(data as *const T, len);
         let result = &mut *(result as *mut T);
 
-        *result = T::simd_reduce_max(data);
+        *result = super::checked_kernels::extrema(data, false)
+            .map_err(|e| BackendError::ComputationFailed(e.to_string()))?;
         Ok(())
     }
 
@@ -682,7 +754,8 @@ impl NativeBackend {
         let data = std::slice::from_raw_parts(data as *const T, len);
         let result = &mut *(result as *mut T);
 
-        *result = T::simd_reduce_min(data);
+        *result = super::checked_kernels::extrema(data, true)
+            .map_err(|e| BackendError::ComputationFailed(e.to_string()))?;
         Ok(())
     }
 }

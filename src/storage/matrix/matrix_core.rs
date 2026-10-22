@@ -12,7 +12,7 @@
 
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{
-    AdvancedMemoryPool, BackendSelector, ComputationGraph, NumericType, UnifiedMatrix,
+    AdvancedMemoryPool, ComputationGraph, NumericType, UnifiedMatrix,
 };
 use crate::storage::array::NumArray;
 use crate::storage::table::BaseTable;
@@ -118,8 +118,6 @@ pub struct GraphMatrix<T: NumericType = f64> {
     computation_graph: Option<ComputationGraph<T>>,
     current_node_id: Option<NodeId>,
 
-    /// Backend optimization
-    backend_selector: Arc<BackendSelector>,
     #[allow(dead_code)]
     memory_pool: Arc<AdvancedMemoryPool<T>>,
 
@@ -158,7 +156,6 @@ impl<T: NumericType> GraphMatrix<T> {
             requires_grad: false,
             computation_graph: None,
             current_node_id: None,
-            backend_selector: Arc::new(BackendSelector::new()),
             memory_pool: Arc::new(AdvancedMemoryPool::new()),
             properties: None,
             graph: None,
@@ -238,7 +235,6 @@ impl<T: NumericType> GraphMatrix<T> {
             requires_grad: false,
             computation_graph: None,
             current_node_id: None,
-            backend_selector: Arc::new(BackendSelector::new()),
             memory_pool: Arc::new(AdvancedMemoryPool::new()),
             properties: None,
             graph: None,
@@ -556,23 +552,7 @@ impl GraphMatrix<f64> {
 impl<T: NumericType> GraphMatrix<T> {
     /// Matrix multiplication with backend optimization
     pub fn matmul(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        use crate::storage::advanced_matrix::backend::{BackendHint, OperationType};
-
-        let (rows, cols) = self.shape();
-        let size = rows * cols;
-
-        let _backend = self.backend_selector.select_backend(
-            OperationType::GEMM,
-            size,
-            T::DTYPE,
-            BackendHint::PreferSpeed,
-        );
-
-        // For now, use UnifiedMatrix's built-in matmul until backend integration is complete
-        let result_storage = self.storage.matmul(&other.storage).map_err(|e| {
-            GraphError::InvalidInput(format!("Matrix multiplication failed: {:?}", e))
-        })?;
-        Ok(Self::from_storage(result_storage))
+        self.multiply(other)
     }
 
     /// ReLU activation function
@@ -593,14 +573,9 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Extract data as a Vec<T> in row-major order
     pub fn to_vec(&self) -> GraphResult<Vec<T>> {
-        let (rows, cols) = self.shape();
-        let mut data = Vec::with_capacity(rows * cols);
-        for i in 0..rows {
-            for j in 0..cols {
-                data.push(self.get(i, j).unwrap_or_else(|| T::zero()));
-            }
-        }
-        Ok(data)
+        self.storage
+            .to_vec()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
     }
 
     /// Leaky ReLU activation function
@@ -948,52 +923,24 @@ impl<T: NumericType> GraphMatrix<T> {
 
         let mut result = Self::arithmetic_zeros(self_rows, other_cols)?;
 
+        result.row_labels = self.row_labels.clone();
+        result.column_names = other.column_names.clone();
+        if self_rows == 0 || other_cols == 0 || self_cols == 0 {
+            return Ok(result);
+        }
+
         for i in 0..self_rows {
             for j in 0..other_cols {
-                let floating = T::DTYPE.is_float();
-                let mut dot = super::dot_product::Dot::new();
-                let mut sum = T::zero();
-                let mut integer_sum = 0_i128;
+                let mut product =
+                    crate::storage::advanced_matrix::checked_kernels::Product::<T>::new();
                 for k in 0..self_cols {
-                    let a = self.get_checked(i, k)?;
-                    let b = other.get_checked(k, j)?;
-                    if floating {
-                        dot.add(a.to_f64(), b.to_f64());
-                    } else if T::DTYPE.is_integer() {
-                        integer_sum = a
-                            .to_i128()
-                            .zip(b.to_i128())
-                            .and_then(|(a, b)| a.checked_mul(b))
-                            .and_then(|product| integer_sum.checked_add(product))
-                            .ok_or_else(|| {
-                                GraphError::InvalidInput(
-                                    "Integer dot accumulator overflow or unsupported integer type"
-                                        .into(),
-                                )
-                            })?;
-                    } else {
-                        sum = a
-                            .checked_mul(b)
-                            .and_then(|v| sum.checked_add(v))
-                            .ok_or_else(|| {
-                                GraphError::InvalidInput("Dot arithmetic overflow".into())
-                            })?;
-                    }
+                    product
+                        .add(self.get_checked(i, k)?, other.get_checked(k, j)?)
+                        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
                 }
-                if floating {
-                    sum = T::from_f64(dot.total()).ok_or_else(|| {
-                        GraphError::InvalidInput(
-                            "Dot product cannot be represented in output dtype".into(),
-                        )
-                    })?;
-                }
-                if T::DTYPE.is_integer() {
-                    sum = T::from_i128(integer_sum).ok_or_else(|| {
-                        GraphError::InvalidInput(
-                            "Integer dot output exceeds its element dtype".into(),
-                        )
-                    })?;
-                }
+                let sum = product
+                    .total()
+                    .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
                 result.set(i, j, sum)?;
             }
         }

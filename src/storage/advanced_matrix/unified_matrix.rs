@@ -4,7 +4,7 @@
 //! for all matrix operations in the advanced matrix system.
 
 use crate::storage::advanced_matrix::{
-    backend::{BackendHint, BackendSelector, ComputeBackendExt, OperationType},
+    backend::{BackendHint, BackendSelector},
     memory::{MatrixLayout, MemoryError, SharedBuffer},
     numeric_type::NumericType,
 };
@@ -351,8 +351,16 @@ impl<T: NumericType> UnifiedMatrix<T> {
         match &self.storage {
             MatrixStorage::Dense(buffer) => {
                 let data = buffer.data()?;
-                let idx = self.strides.index(row, col);
-                Ok(data.as_slice()[idx])
+                let idx = row
+                    .checked_mul(self.strides.row_stride)
+                    .and_then(|x| {
+                        col.checked_mul(self.strides.col_stride)
+                            .and_then(|y| x.checked_add(y))
+                    })
+                    .ok_or_else(|| MatrixError::InvalidInput("Matrix stride overflow".into()))?;
+                data.as_slice().get(idx).copied().ok_or_else(|| {
+                    MatrixError::InvalidInput("Matrix strides exceed storage".into())
+                })
             }
             MatrixStorage::Sparse(sparse) => {
                 if sparse.shape != self.shape {
@@ -384,8 +392,16 @@ impl<T: NumericType> UnifiedMatrix<T> {
         match &mut self.storage {
             MatrixStorage::Dense(buffer) => {
                 let mut data = buffer.data_mut()?;
-                let idx = self.strides.index(row, col);
-                data.as_slice_mut()[idx] = value;
+                let idx = row
+                    .checked_mul(self.strides.row_stride)
+                    .and_then(|x| {
+                        col.checked_mul(self.strides.col_stride)
+                            .and_then(|y| x.checked_add(y))
+                    })
+                    .ok_or_else(|| MatrixError::InvalidInput("Matrix stride overflow".into()))?;
+                *data.as_slice_mut().get_mut(idx).ok_or_else(|| {
+                    MatrixError::InvalidInput("Matrix strides exceed storage".into())
+                })? = value;
                 Ok(())
             }
             MatrixStorage::Sparse(sparse) => {
@@ -419,217 +435,70 @@ impl<T: NumericType> UnifiedMatrix<T> {
 
     /// Matrix multiplication (GEMM)
     pub fn matmul(&self, other: &Self) -> MatrixResult<Self> {
-        // Check dimensions
-        if self.shape.cols != other.shape.rows {
+        if self.cols() != other.rows() {
             return Err(MatrixError::DimensionMismatch {
-                expected: (self.shape.rows, other.shape.cols),
-                got: (self.shape.rows, self.shape.cols),
+                expected: (self.rows(), self.cols()),
+                got: (other.rows(), other.cols()),
             });
         }
-
-        // Create result matrix
-        let result = Self::new(self.shape.rows, other.shape.cols)?;
-
-        // Select backend for computation
-        let backend = self.backend_selector.select_backend(
-            OperationType::GEMM,
-            self.len() + other.len(),
-            T::DTYPE,
-            self.backend_hint.clone(),
-        );
-
-        // Perform computation based on storage types
-        match (&self.storage, &other.storage, &result.storage) {
-            (
-                MatrixStorage::Dense(a_buf),
-                MatrixStorage::Dense(b_buf),
-                MatrixStorage::Dense(c_buf),
-            ) => {
-                let a_data = a_buf.data()?;
-                let b_data = b_buf.data()?;
-                let mut c_data = c_buf.data_mut()?;
-
-                backend
-                    .gemm(
-                        a_data.as_slice(),
-                        self.shape.as_tuple(),
-                        b_data.as_slice(),
-                        other.shape.as_tuple(),
-                        c_data.as_slice_mut(),
-                        result.shape.as_tuple(),
-                        T::one(),  // alpha
-                        T::zero(), // beta
-                    )
-                    .map_err(|e| MatrixError::ComputationError(e.to_string()))?;
-            }
-            _ => {
-                return Err(MatrixError::UnsupportedOperation(
-                    "Matrix multiplication for non-dense matrices not implemented".to_string(),
-                ));
+        let a = self.to_vec()?;
+        let b = other.to_vec()?;
+        let mut out = Self::new(self.rows(), other.cols())?;
+        if self.rows() == 0 || other.cols() == 0 || self.cols() == 0 {
+            return Ok(out);
+        }
+        for i in 0..self.rows() {
+            for j in 0..other.cols() {
+                let mut product = super::checked_kernels::Product::<T>::new();
+                for k in 0..self.cols() {
+                    product.add(a[i * self.cols() + k], b[k * other.cols() + j])?;
+                }
+                out.set(i, j, product.total()?)?;
             }
         }
-
-        Ok(result)
+        Ok(out)
     }
-
-    /// Element-wise addition
+    fn checked_zip(&self, other: &Self, op: fn(T, T) -> Option<T>) -> MatrixResult<Self> {
+        if self.shape != other.shape {
+            return Err(MatrixError::DimensionMismatch {
+                expected: self.shape.as_tuple(),
+                got: other.shape.as_tuple(),
+            });
+        }
+        let values = self
+            .to_vec()?
+            .into_iter()
+            .zip(other.to_vec()?)
+            .map(|(a, b)| {
+                op(a, b)
+                    .ok_or_else(|| MatrixError::InvalidInput("Element arithmetic overflow".into()))
+            })
+            .collect::<MatrixResult<Vec<_>>>()?;
+        Self::from_data(values, self.rows(), self.cols())
+    }
+    /// Checked logical element-wise addition, independent of physical layout.
     pub fn add(&self, other: &Self) -> MatrixResult<Self> {
-        if self.shape != other.shape {
-            return Err(MatrixError::DimensionMismatch {
-                expected: self.shape.as_tuple(),
-                got: other.shape.as_tuple(),
-            });
-        }
-
-        let mut result = Self::new(self.shape.rows, self.shape.cols)?;
-
-        let backend = self.backend_selector.select_backend(
-            OperationType::ElementwiseAdd,
-            self.len(),
-            T::DTYPE,
-            self.backend_hint.clone(),
-        );
-
-        match (&self.storage, &other.storage, &mut result.storage) {
-            (
-                MatrixStorage::Dense(a_buf),
-                MatrixStorage::Dense(b_buf),
-                MatrixStorage::Dense(c_buf),
-            ) => {
-                let a_data = a_buf.data()?;
-                let b_data = b_buf.data()?;
-                let mut c_data = c_buf.data_mut()?;
-
-                backend
-                    .elementwise_add(a_data.as_slice(), b_data.as_slice(), c_data.as_slice_mut())
-                    .map_err(|e| MatrixError::ComputationError(e.to_string()))?;
-            }
-            _ => {
-                return Err(MatrixError::UnsupportedOperation(
-                    "Element-wise addition for non-dense matrices not implemented".to_string(),
-                ));
-            }
-        }
-
-        Ok(result)
+        self.checked_zip(other, T::checked_add)
     }
-
-    /// Element-wise subtraction
+    /// Checked logical element-wise subtraction.
     pub fn subtract(&self, other: &Self) -> MatrixResult<Self> {
-        if self.shape != other.shape {
-            return Err(MatrixError::DimensionMismatch {
-                expected: self.shape.as_tuple(),
-                got: other.shape.as_tuple(),
-            });
-        }
-
-        let mut result = Self::new(self.shape.rows, self.shape.cols)?;
-
-        let _backend = self.backend_selector.select_backend(
-            OperationType::ElementwiseSub,
-            self.len(),
-            T::DTYPE,
-            self.backend_hint.clone(),
-        );
-
-        match (&self.storage, &other.storage, &mut result.storage) {
-            (
-                MatrixStorage::Dense(a_buf),
-                MatrixStorage::Dense(b_buf),
-                MatrixStorage::Dense(c_buf),
-            ) => {
-                let a_data = a_buf.data()?;
-                let b_data = b_buf.data()?;
-                let mut c_data = c_buf.data_mut()?;
-
-                // If backend doesn't have subtraction, do it manually
-                let a_slice = a_data.as_slice();
-                let b_slice = b_data.as_slice();
-                let c_slice = c_data.as_slice_mut();
-
-                for ((a_val, b_val), c_val) in
-                    a_slice.iter().zip(b_slice.iter()).zip(c_slice.iter_mut())
-                {
-                    *c_val = a_val.sub(*b_val);
-                }
-            }
-            _ => {
-                return Err(MatrixError::UnsupportedOperation(
-                    "Element-wise subtraction for non-dense matrices not implemented".to_string(),
-                ));
-            }
-        }
-
-        Ok(result)
+        self.checked_zip(other, T::checked_sub)
     }
-
-    /// Element-wise multiplication
+    /// Checked logical Hadamard product.
     pub fn mul(&self, other: &Self) -> MatrixResult<Self> {
-        if self.shape != other.shape {
-            return Err(MatrixError::DimensionMismatch {
-                expected: self.shape.as_tuple(),
-                got: other.shape.as_tuple(),
-            });
-        }
-
-        let mut result = Self::new(self.shape.rows, self.shape.cols)?;
-
-        let backend = self.backend_selector.select_backend(
-            OperationType::ElementwiseMul,
-            self.len(),
-            T::DTYPE,
-            self.backend_hint.clone(),
-        );
-
-        match (&self.storage, &other.storage, &mut result.storage) {
-            (
-                MatrixStorage::Dense(a_buf),
-                MatrixStorage::Dense(b_buf),
-                MatrixStorage::Dense(c_buf),
-            ) => {
-                let a_data = a_buf.data()?;
-                let b_data = b_buf.data()?;
-                let mut c_data = c_buf.data_mut()?;
-
-                backend
-                    .elementwise_mul(a_data.as_slice(), b_data.as_slice(), c_data.as_slice_mut())
-                    .map_err(|e| MatrixError::ComputationError(e.to_string()))?;
-            }
-            _ => {
-                return Err(MatrixError::UnsupportedOperation(
-                    "Element-wise multiplication for non-dense matrices not implemented"
-                        .to_string(),
-                ));
-            }
-        }
-
-        Ok(result)
+        self.checked_zip(other, T::checked_mul)
     }
-
-    /// Scalar multiplication
+    /// Checked logical scalar multiplication.
     pub fn scale(&self, scalar: T) -> MatrixResult<Self> {
-        let mut result = Self::new(self.shape.rows, self.shape.cols)?;
-
-        match (&self.storage, &mut result.storage) {
-            (MatrixStorage::Dense(a_buf), MatrixStorage::Dense(c_buf)) => {
-                let a_data = a_buf.data()?;
-                let mut c_data = c_buf.data_mut()?;
-
-                let a_slice = a_data.as_slice();
-                let c_slice = c_data.as_slice_mut();
-
-                for (a_val, c_val) in a_slice.iter().zip(c_slice.iter_mut()) {
-                    *c_val = a_val.mul(scalar);
-                }
-            }
-            _ => {
-                return Err(MatrixError::UnsupportedOperation(
-                    "Scalar multiplication for non-dense matrices not implemented".to_string(),
-                ));
-            }
-        }
-
-        Ok(result)
+        let values = self
+            .to_vec()?
+            .into_iter()
+            .map(|v| {
+                v.checked_mul(scalar)
+                    .ok_or_else(|| MatrixError::InvalidInput("Scalar arithmetic overflow".into()))
+            })
+            .collect::<MatrixResult<Vec<_>>>()?;
+        Self::from_data(values, self.rows(), self.cols())
     }
 
     /// Alias for scale - scalar multiplication (for autodiff compatibility)
@@ -639,104 +508,61 @@ impl<T: NumericType> UnifiedMatrix<T> {
 
     /// Sum all elements
     pub fn sum(&self) -> MatrixResult<T::Accumulator> {
-        let backend = self.backend_selector.select_backend(
-            OperationType::Sum,
-            self.len(),
-            T::DTYPE,
-            self.backend_hint.clone(),
-        );
-
-        match &self.storage {
-            MatrixStorage::Dense(buffer) => {
-                let data = buffer.data()?;
-                backend
-                    .reduce_sum(data.as_slice())
-                    .map_err(|e| MatrixError::ComputationError(e.to_string()))
-            }
-            _ => Err(MatrixError::UnsupportedOperation(
-                "Sum reduction for non-dense matrices not implemented".to_string(),
-            )),
-        }
+        super::checked_kernels::sum(&self.to_vec()?)
     }
-
-    /// Find maximum element
+    /// Maximum logical value with first-tie and NaN propagation.
     pub fn max(&self) -> MatrixResult<T> {
-        let backend = self.backend_selector.select_backend(
-            OperationType::Max,
-            self.len(),
-            T::DTYPE,
-            self.backend_hint.clone(),
-        );
-
-        match &self.storage {
-            MatrixStorage::Dense(buffer) => {
-                let data = buffer.data()?;
-                backend
-                    .reduce_max(data.as_slice())
-                    .map_err(|e| MatrixError::ComputationError(e.to_string()))
-            }
-            _ => Err(MatrixError::UnsupportedOperation(
-                "Max reduction for non-dense matrices not implemented".to_string(),
-            )),
-        }
+        super::checked_kernels::extrema(&self.to_vec()?, false)
     }
-
-    /// Find minimum element
+    /// Minimum logical value with first-tie and NaN propagation.
     pub fn min(&self) -> MatrixResult<T> {
-        let backend = self.backend_selector.select_backend(
-            OperationType::Min,
-            self.len(),
-            T::DTYPE,
-            self.backend_hint.clone(),
-        );
-
-        match &self.storage {
-            MatrixStorage::Dense(buffer) => {
-                let data = buffer.data()?;
-                backend
-                    .reduce_min(data.as_slice())
-                    .map_err(|e| MatrixError::ComputationError(e.to_string()))
-            }
-            _ => Err(MatrixError::UnsupportedOperation(
-                "Min reduction for non-dense matrices not implemented".to_string(),
-            )),
-        }
+        super::checked_kernels::extrema(&self.to_vec()?, true)
     }
-
-    /// Transpose the matrix
+    /// Owned logical transpose.
     pub fn transpose(&self) -> MatrixResult<Self> {
-        let mut result = Self::new(self.shape.cols, self.shape.rows)?;
-
-        match (&self.storage, &mut result.storage) {
-            (MatrixStorage::Dense(a_buf), MatrixStorage::Dense(c_buf)) => {
-                let a_data = a_buf.data()?;
-                let mut c_data = c_buf.data_mut()?;
-
-                let a_slice = a_data.as_slice();
-                let c_slice = c_data.as_slice_mut();
-
-                for i in 0..self.shape.rows {
-                    for j in 0..self.shape.cols {
-                        let src_idx = self.strides.index(i, j);
-                        let dst_idx = result.strides.index(j, i);
-                        c_slice[dst_idx] = a_slice[src_idx];
-                    }
-                }
-            }
-            _ => {
-                return Err(MatrixError::UnsupportedOperation(
-                    "Transpose for non-dense matrices not implemented".to_string(),
-                ));
+        let mut out = Self::new(self.cols(), self.rows())?;
+        for i in 0..self.rows() {
+            for j in 0..self.cols() {
+                out.set(j, i, self.get(i, j)?)?;
             }
         }
-
-        Ok(result)
+        Ok(out)
     }
 
     /// Convert to a vector (flatten)
     pub fn to_vec(&self) -> MatrixResult<Vec<T>> {
         match &self.storage {
-            MatrixStorage::Dense(buffer) => buffer.to_vec().map_err(MatrixError::from),
+            MatrixStorage::Dense(buffer) => {
+                let data = buffer.data()?;
+                let values = data.as_slice();
+                let mut out = Vec::new();
+                let count = self
+                    .rows()
+                    .checked_mul(self.cols())
+                    .ok_or_else(|| MatrixError::InvalidInput("Matrix shape overflow".into()))?;
+                if count == 0 {
+                    return Ok(out);
+                }
+                out.try_reserve_exact(count)
+                    .map_err(|_| MatrixError::InvalidInput("Matrix allocation failed".into()))?;
+                for i in 0..self.rows() {
+                    for j in 0..self.cols() {
+                        let index = i
+                            .checked_mul(self.strides.row_stride)
+                            .and_then(|x| {
+                                j.checked_mul(self.strides.col_stride)
+                                    .and_then(|y| x.checked_add(y))
+                            })
+                            .ok_or_else(|| {
+                                MatrixError::InvalidInput("Matrix stride overflow".into())
+                            })?;
+                        out.push(*values.get(index).ok_or_else(|| {
+                            MatrixError::InvalidInput("Matrix strides exceed storage".into())
+                        })?);
+                    }
+                }
+                Ok(out)
+            }
             MatrixStorage::Sparse(sparse) => {
                 if sparse.shape != self.shape {
                     return Err(MatrixError::InvalidInput(
@@ -753,25 +579,7 @@ impl<T: NumericType> UnifiedMatrix<T> {
 
     /// Element-wise multiplication with another matrix
     pub fn elementwise_multiply(&self, other: &Self) -> MatrixResult<Self> {
-        if self.shape != other.shape {
-            return Err(MatrixError::DimensionMismatch {
-                expected: (self.shape.rows, self.shape.cols),
-                got: (other.shape.rows, other.shape.cols),
-            });
-        }
-
-        let mut result = Self::new(self.shape.rows, self.shape.cols)?;
-
-        // Element-wise multiplication: C[i,j] = A[i,j] * B[i,j]
-        for i in 0..self.shape.rows {
-            for j in 0..self.shape.cols {
-                let a_val = self.get(i, j)?;
-                let b_val = other.get(i, j)?;
-                result.set(i, j, a_val.mul(b_val))?;
-            }
-        }
-
-        Ok(result)
+        self.mul(other)
     }
 
     // === PLACEHOLDER FOR ENHANCED OPERATIONS ===

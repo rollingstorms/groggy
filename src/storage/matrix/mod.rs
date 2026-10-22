@@ -12,7 +12,7 @@ pub mod conversions;
 mod decomposition;
 mod decomposition_derivatives;
 mod derivative_linalg;
-mod dot_product;
+pub(crate) mod dot_product;
 mod factorization;
 mod least_squares;
 mod linear_system;

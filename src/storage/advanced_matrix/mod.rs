@@ -8,6 +8,7 @@
 pub mod backend;
 pub mod backends;
 pub mod benchmarks;
+pub(crate) mod checked_kernels;
 mod csr;
 pub mod memory;
 pub mod neural;
