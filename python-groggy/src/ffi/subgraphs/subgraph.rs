@@ -17,7 +17,6 @@ use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use pyo3::{Py, PyCell, PyObject};
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -1647,14 +1646,7 @@ impl PySubgraph {
                 .map_err(crate::ffi::utils::graph_error_to_py_err)?
         };
 
-        let temp_graph = PyGraph {
-            inner: graph_ref.clone(),
-            cached_view: RefCell::new(None),
-        };
-        let graph_matrix = temp_graph.adjacency_matrix_to_graph_matrix(adjacency_matrix)?;
-        Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(
-            graph_matrix,
-        ))
+        Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(adjacency_matrix))
     }
 
     /// Get adjacency matrix (alias for adjacency_matrix)

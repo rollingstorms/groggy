@@ -48,3 +48,20 @@ preserved separately.
 - 29.50: actual economy SVD, thin tracked/gradient/spectrum/least-squares consumers and 25-case release receipts.
 
 - 29.51: shared typed maps and checked public math/scalar/comparison/tile/repeat routes.
+
+- 29.52: checked graph-matrix degree/normalization/transition operators and identity-preserving graph bridge; 424 Python tests.
+
+## Concrete remaining audit work
+
+- Array Range normalization: negative start/stop values and extreme step addition
+  still need native normalization and raw Python slice marshalling.
+- Graph adjacency construction: true CSR graph export/storage-format selection,
+  parallel/loop weight accumulation, deterministic coordinate order and failure
+  propagation still need a shared checked builder.
+- General matrix arithmetic tape composition: avoid silent detachment and
+  cloned-tape node collisions; factor output routes are complete in their stated
+  supported domains (29.24), while broad composition remains open.
+- Remaining lower fill/layout and explicit attribute-converter range checks;
+  inspect supported numerical consumers before parent closure.
+- Explicit sparse/dense spectral materialization policy, broader production
+  size/fill/SIMD and final regression/lint/API/documentation gates remain open.

@@ -74,7 +74,7 @@ impl AdjacencyMatrixBuilder {
         edges: &[(NodeId, NodeId)],
     ) -> GraphResult<GraphMatrix> {
         let adjacency = Self::from_edges(nodes, edges)?;
-        adjacency.to_normalized_laplacian(0.5, 1)
+        adjacency.normalized_laplacian()
     }
 }
 

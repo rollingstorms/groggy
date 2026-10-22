@@ -12,6 +12,8 @@
 
 #[path = "factor_autodiff.rs"]
 mod factor_autodiff;
+#[path = "graph_transforms.rs"]
+mod graph_transforms;
 #[path = "numerical_data.rs"]
 mod numerical_data;
 use crate::storage::advanced_matrix::neural::autodiff::{FactorOutput, Operation};
@@ -1369,120 +1371,26 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(laplacian)
     }
 
-    /// Convert adjacency matrix to normalized Laplacian matrix
-    /// Enhanced version: (D^eps @ A @ D^eps)^k
-    ///
-    /// # Arguments
-    /// * `eps` - Exponent for degree matrix (default: -0.5 for standard normalization)
-    /// * `k` - Power to raise the result to (default: 1)
-    ///
-    /// # Standard Usage
-    /// - `eps = -0.5, k = 1`: Standard normalized Laplacian L = D^(-1/2) @ A @ D^(-1/2)
-    /// - `eps = -1.0, k = 1`: Random walk Laplacian L = D^(-1) @ A
-    /// - `eps = 0.5, k = 1`: Symmetric scaling L = D^(1/2) @ A @ D^(1/2)
-    pub fn to_normalized_laplacian(&self, eps: f64, k: u32) -> GraphResult<GraphMatrix<T>>
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        let (rows, cols) = self.shape();
-        if rows != cols {
-            return Err(GraphError::InvalidInput(format!(
-                "Normalized Laplacian requires square matrix, got {}x{}",
-                rows, cols
-            )));
-        }
-
-        // Step 1: Calculate degree matrix D
-        let degree_matrix = self.to_degree_matrix()?;
-
-        // Step 2: Calculate D^eps
-        let mut d_eps = GraphMatrix::zeros(rows, cols);
-        for i in 0..rows {
-            if let Some(degree) = degree_matrix.get(i, i) {
-                let degree_f64 = degree.to_f64();
-                if degree_f64 > 0.0 {
-                    let powered_degree = degree_f64.powf(eps);
-                    let powered_t = T::from_f64(powered_degree).unwrap_or_else(|| T::zero());
-                    let _ = d_eps.set(i, i, powered_t);
-                }
-            }
-        }
-
-        // Step 3: Calculate D^eps @ A @ D^eps
-        let temp_result = d_eps.multiply(self)?; // D^eps @ A
-        let mut normalized_result = temp_result.multiply(&d_eps)?; // @ D^eps
-
-        // Step 4: Raise to power k if k != 1
-        if k > 1 {
-            for _ in 1..k {
-                normalized_result = normalized_result.multiply(&normalized_result)?;
-            }
-        }
-
-        Ok(normalized_result)
+    /// Legacy normalized-adjacency transform (D^eps A D^eps)^k.
+    /// Use normalized_laplacian() for the actual Laplacian operator.
+    pub fn to_normalized_laplacian(&self, eps: f64, k: u32) -> GraphResult<Self> {
+        self.normalized_adjacency(eps, k)
     }
-
-    /// Convert adjacency matrix to standard normalized Laplacian
-    /// Convenience method for standard L = D^(-1/2) @ A @ D^(-1/2)
-    pub fn to_normalized_laplacian_standard(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        self.to_normalized_laplacian(-0.5, 1)
+    /// Standard normalized Laplacian, with zero isolate rows.
+    pub fn to_normalized_laplacian_standard(&self) -> GraphResult<Self> {
+        self.normalized_laplacian()
     }
 
     /// Check if this matrix represents a valid adjacency matrix
     pub fn is_adjacency_matrix(&self) -> bool {
-        // Check if matrix is square
         if !self.is_square() {
             return false;
         }
-
-        // Check for non-negative values
-        let (rows, cols) = self.shape();
-        for i in 0..rows {
-            for j in 0..cols {
-                if let Some(val) = self.get(i, j) {
-                    if val.to_f64() < 0.0 {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            }
-        }
-
-        true
-    }
-
-    /// Get degree matrix from adjacency matrix
-    pub fn to_degree_matrix(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        let (rows, cols) = self.shape();
-        if rows != cols {
-            return Err(GraphError::InvalidInput(format!(
-                "Degree matrix requires square adjacency matrix, got {}x{}",
-                rows, cols
-            )));
-        }
-
-        let mut degree_matrix = GraphMatrix::zeros(rows, cols);
-
-        // Calculate degree for each node (sum of row in adjacency matrix)
-        for i in 0..rows {
-            let mut degree_sum = T::zero();
-            for j in 0..cols {
-                if let Some(value) = self.get(i, j) {
-                    degree_sum = degree_sum + value;
-                }
-            }
-            // Set degree on diagonal
-            let _ = degree_matrix.set(i, i, degree_sum);
-        }
-
-        Ok(degree_matrix)
+        self.storage.reduction_values().is_ok_and(|values| {
+            values
+                .iter()
+                .all(|value| value.is_finite() && *value >= T::zero())
+        })
     }
 
     // === ADVANCED RESHAPING OPERATIONS ===

@@ -3017,10 +3017,15 @@ impl Graph {
     pub fn laplacian_matrix(&mut self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
         let adj = self.adjacency_matrix()?;
         if normalized {
-            adj.to_normalized_laplacian(0.5, 1)
+            adj.normalized_laplacian()
         } else {
             adj.to_laplacian()
         }
+    }
+
+    /// Generate a row-stochastic transition matrix; dangling rows remain zero.
+    pub fn transition_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
+        self.adjacency_matrix()?.transition_matrix()
     }
 
     /// Generate adjacency matrix for a subgraph with specific nodes
@@ -3069,16 +3074,12 @@ impl Graph {
             MatrixType::Adjacency => Ok(base_matrix),
             MatrixType::Laplacian { normalized } => {
                 if normalized {
-                    base_matrix.to_normalized_laplacian(0.5, 1)
+                    base_matrix.normalized_laplacian()
                 } else {
                     base_matrix.to_laplacian()
                 }
             }
-            MatrixType::Transition => {
-                // TODO: Implement transition matrix transformation
-                // For now, return adjacency matrix
-                Ok(base_matrix)
-            }
+            MatrixType::Transition => base_matrix.transition_matrix(),
         }
     }
 

@@ -1694,10 +1694,30 @@ impl PyGraphMatrix {
         Py::new(py, matrix)
     }
 
-    /// Get normalized Laplacian matrix with enhanced parameterization
+    /// Explicit normalized adjacency (D^eps A D^eps)^k.
+    #[pyo3(signature=(eps=-0.5,k=1))]
+    fn normalized_adjacency(&self, py: Python, eps: f64, k: u32) -> PyResult<Py<Self>> {
+        let inner = computation::run(py, [&self.inner], move |[a]| a.normalized_adjacency(eps, k))
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+    /// True normalized Laplacian, with zero isolate rows.
+    fn normalized_laplacian(&self, py: Python) -> PyResult<Py<Self>> {
+        let inner = computation::run(py, [&self.inner], |[a]| a.normalized_laplacian())
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+    /// Row-stochastic operator, with zero dangling rows.
+    fn transition_matrix(&self, py: Python) -> PyResult<Py<Self>> {
+        let inner = computation::run(py, [&self.inner], |[a]| a.transition_matrix())
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+
+    /// Legacy parameterized normalized adjacency transform
     ///
     /// Args:
-    ///     eps: Exponent for degree matrix (default 0.5 for standard normalization)
+    ///     eps: Exponent for degree scaling (legacy default 0.5)
     ///     k: Power to raise the result to (default 1)
     ///
     /// Formula: (D^eps @ A @ D^eps)^k
@@ -1707,7 +1727,7 @@ impl PyGraphMatrix {
         eps: Option<f64>,
         k: Option<u32>,
     ) -> PyResult<Py<Self>> {
-        let eps_val = eps.unwrap_or(0.5); // Standard normalization uses 0.5
+        let eps_val = eps.unwrap_or(0.5); // Preserve the legacy scaling default
         let k_val = k.unwrap_or(1); // Standard result uses power 1
 
         let normalized_laplacian =

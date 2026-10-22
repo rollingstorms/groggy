@@ -40,22 +40,19 @@ impl PyGraphMatrixHelper {
             result
         }?;
 
-        // Convert AdjacencyMatrix to GraphMatrix
-        let graph_ref = self.graph.borrow(py);
-        let graph_matrix = graph_ref.adjacency_matrix_to_graph_matrix(matrix)?;
-        Py::new(
-            py,
-            PyGraphMatrix {
-                inner: graph_matrix,
-            },
-        )
+        Py::new(py, PyGraphMatrix { inner: matrix })
     }
 
-    /// Generate transition matrix - MISSING FROM CORE (needs implementation)
-    pub fn transition_matrix(&mut self, _py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "transition_matrix needs to be implemented in core first",
-        ))
+    /// Generate transition matrix through the native graph transform.
+    pub fn transition_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        let inner = self
+            .graph
+            .borrow(py)
+            .inner
+            .borrow_mut()
+            .transition_matrix()
+            .map_err(graph_error_to_py_err)?;
+        Py::new(py, PyGraphMatrix { inner })
     }
 
     /// Convert graph to attribute matrix - PURE DELEGATION to core
