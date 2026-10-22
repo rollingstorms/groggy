@@ -67,3 +67,11 @@ storage/node and storage/edge are re-export facades. Source callers have moved.
 Preserve constructor validation differences and historical specialized trait
 behavior explicitly; see `entity-handle-consolidation-2026-10-22.md`. AR7.5 pinned
 view ownership remains a separate behavioral migration.
+
+## AR7.5a shared read-state foundation
+
+Current captures and historical TemporalSnapshot now share immutable state/value/
+membership/adjacency ownership. Ordinary graph/table view migration remains open:
+`pinned-read-state-foundation-2026-10-22.md`. Measured fresh capture cost requires
+related views to share a pin; property writes do not advance topology version, so
+that version cannot identify cached property state.

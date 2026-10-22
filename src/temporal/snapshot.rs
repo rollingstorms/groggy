@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -9,36 +9,10 @@ use crate::errors::GraphError;
 use crate::state::history::{Commit, HistoryForest};
 use crate::state::state::GraphSnapshot;
 use crate::subgraphs::Subgraph;
-use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId, StateId};
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId, StateId};
 
-/// Convenience index for checking whether nodes/edges existed at a snapshot.
-#[derive(Debug, Clone)]
-pub struct ExistenceIndex {
-    nodes: HashSet<NodeId>,
-    edges: HashSet<EdgeId>,
-}
-
-impl ExistenceIndex {
-    pub fn new(nodes: HashSet<NodeId>, edges: HashSet<EdgeId>) -> Self {
-        Self { nodes, edges }
-    }
-
-    pub fn contains_node(&self, node_id: NodeId) -> bool {
-        self.nodes.contains(&node_id)
-    }
-
-    pub fn contains_edge(&self, edge_id: EdgeId) -> bool {
-        self.edges.contains(&edge_id)
-    }
-
-    pub fn nodes(&self) -> &HashSet<NodeId> {
-        &self.nodes
-    }
-
-    pub fn edges(&self) -> &HashSet<EdgeId> {
-        &self.edges
-    }
-}
+pub use crate::state::read_state::ExistenceIndex;
+use crate::state::PinnedReadState;
 
 /// Metadata describing the lineage of a commit.
 #[derive(Debug, Clone)]
@@ -54,11 +28,7 @@ pub struct LineageMetadata {
 #[derive(Debug, Clone)]
 pub struct TemporalSnapshot {
     lineage: LineageMetadata,
-    existence: ExistenceIndex,
-    node_attributes: HashMap<NodeId, HashMap<AttrName, AttrValue>>,
-    edge_attributes: HashMap<EdgeId, HashMap<AttrName, AttrValue>>,
-    adjacency: HashMap<NodeId, Vec<NodeId>>,
-    snapshot: GraphSnapshot,
+    state: PinnedReadState,
 }
 
 impl TemporalSnapshot {
@@ -66,7 +36,7 @@ impl TemporalSnapshot {
     pub fn at_commit(history: &HistoryForest, commit_id: StateId) -> Result<Self, GraphError> {
         let commit = history.get_commit(commit_id)?;
         let graph_snapshot = history.reconstruct_state_at(commit_id)?;
-        Ok(Self::from_components(commit, graph_snapshot))
+        Self::from_components(commit, graph_snapshot)
     }
 
     /// Build a snapshot for the latest commit at or before the timestamp.
@@ -81,25 +51,7 @@ impl TemporalSnapshot {
         }
     }
 
-    fn from_components(commit: Arc<Commit>, snapshot: GraphSnapshot) -> Self {
-        let nodes: HashSet<NodeId> = snapshot.active_nodes.iter().copied().collect();
-        let edges: HashSet<EdgeId> = snapshot.edges.keys().copied().collect();
-
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-        for &node in &snapshot.active_nodes {
-            adjacency.entry(node).or_default();
-        }
-        for &(source, target) in snapshot.edges.values() {
-            adjacency.entry(source).or_default().push(target);
-            adjacency.entry(target).or_default();
-            if snapshot.graph_type == GraphType::Undirected && source != target {
-                adjacency.entry(target).or_default().push(source);
-            }
-        }
-        for neighbors in adjacency.values_mut() {
-            neighbors.sort_unstable();
-        }
-
+    fn from_components(commit: Arc<Commit>, snapshot: GraphSnapshot) -> Result<Self, GraphError> {
         let lineage = LineageMetadata {
             commit_id: commit.id,
             parent_commits: commit.parents.clone(),
@@ -108,14 +60,10 @@ impl TemporalSnapshot {
             timestamp: commit.timestamp,
         };
 
-        Self {
+        Ok(Self {
             lineage,
-            existence: ExistenceIndex::new(nodes, edges),
-            node_attributes: snapshot.node_attributes.clone(),
-            edge_attributes: snapshot.edge_attributes.clone(),
-            adjacency,
-            snapshot,
-        }
+            state: PinnedReadState::from_snapshot(snapshot)?,
+        })
     }
 
     pub fn lineage(&self) -> &LineageMetadata {
@@ -123,31 +71,39 @@ impl TemporalSnapshot {
     }
 
     pub fn existence(&self) -> &ExistenceIndex {
-        &self.existence
+        self.state.existence()
     }
 
     pub fn node_exists(&self, node_id: NodeId) -> bool {
-        self.existence.contains_node(node_id)
+        self.state.existence().contains_node(node_id)
     }
 
     pub fn edge_exists(&self, edge_id: EdgeId) -> bool {
-        self.existence.contains_edge(edge_id)
+        self.state.existence().contains_edge(edge_id)
     }
 
     /// Find a node by its external identity in this immutable state (a snapshot scan).
     pub fn node_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<NodeId> {
-        self.node_attributes.iter().find_map(|(&id, attrs)| {
-            (self.node_exists(id) && Self::identity_matches(attrs, external_id, group_id))
-                .then_some(id)
-        })
+        self.state
+            .snapshot()
+            .node_attributes
+            .iter()
+            .find_map(|(&id, attrs)| {
+                (self.node_exists(id) && Self::identity_matches(attrs, external_id, group_id))
+                    .then_some(id)
+            })
     }
 
     /// Find an edge by its external identity in this immutable state (a snapshot scan).
     pub fn edge_by_external_id(&self, external_id: &str, group_id: Option<&str>) -> Option<EdgeId> {
-        self.edge_attributes.iter().find_map(|(&id, attrs)| {
-            (self.edge_exists(id) && Self::identity_matches(attrs, external_id, group_id))
-                .then_some(id)
-        })
+        self.state
+            .snapshot()
+            .edge_attributes
+            .iter()
+            .find_map(|(&id, attrs)| {
+                (self.edge_exists(id) && Self::identity_matches(attrs, external_id, group_id))
+                    .then_some(id)
+            })
     }
 
     fn identity_matches(
@@ -170,19 +126,17 @@ impl TemporalSnapshot {
     }
 
     pub fn node_attr(&self, node_id: NodeId, attr: &AttrName) -> Option<AttrValue> {
-        self.node_attributes
-            .get(&node_id)
-            .and_then(|attrs| attrs.get(attr).cloned())
+        self.state.node_attr(node_id, attr)
     }
-
     pub fn edge_attr(&self, edge_id: EdgeId, attr: &AttrName) -> Option<AttrValue> {
-        self.edge_attributes
-            .get(&edge_id)
-            .and_then(|attrs| attrs.get(attr).cloned())
+        self.state.edge_attr(edge_id, attr)
     }
-
     pub fn neighbors(&self, node_id: NodeId) -> Option<&Vec<NodeId>> {
-        self.adjacency.get(&node_id)
+        self.state.neighbors(node_id)
+    }
+    /// Shared immutable state underlying the temporal facade.
+    pub fn read_state(&self) -> &PinnedReadState {
+        &self.state
     }
 
     pub fn neighbors_bulk(&self, nodes: &[NodeId]) -> HashMap<NodeId, Vec<NodeId>> {
@@ -193,10 +147,10 @@ impl TemporalSnapshot {
     }
 
     pub fn as_subgraph(&self) -> Result<Subgraph, GraphError> {
-        let graph = Graph::from_snapshot(self.snapshot.clone())?;
+        let graph = Graph::from_snapshot(self.state.snapshot().clone())?;
         let rc = Rc::new(std::cell::RefCell::new(graph));
-        let nodes = self.existence.nodes().clone();
-        let edges = self.existence.edges().clone();
+        let nodes = self.state.existence().nodes().clone();
+        let edges = self.state.existence().edges().clone();
         Ok(Subgraph::new(rc, nodes, edges, "TemporalSnapshot".into()))
     }
 }

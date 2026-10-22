@@ -414,3 +414,12 @@ signatures/trait overrides remain intact; property writes/history/liveness are
 preserved. Native ownership/mutation/restoration/inactive-reference fixtures and
 rebuilt Python live/history/topology gates are recorded in
 `entity-handle-consolidation-2026-10-22.md`. This does not freeze graph views.
+
+### AR7.5a — Shared immutable read payload and current capture
+
+Graph current captures and TemporalSnapshot share Arc-owned read state with exact
+current values, membership and indexed adjacency. Capture includes dirty changes
+without a checkpoint/delta and rejects dangling referents. Clone/read-worker
+transfer retains frozen values. Do not use checkpoint ID/topology version as a
+property-sensitive read cache key. Ordinary graph/table view read/write ownership
+remains open; see `pinned-read-state-foundation-2026-10-22.md`.

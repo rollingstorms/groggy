@@ -12,6 +12,7 @@ pub mod change_tracker;
 pub mod delta;
 pub mod history;
 pub mod publication;
+pub mod read_state;
 pub mod ref_manager;
 pub mod space;
 pub mod state;
@@ -30,3 +31,5 @@ pub use history::{
 
 // Re-export state items (including the canonical AttributeChange and EntityType)
 pub use state::*;
+
+pub use read_state::PinnedReadState;

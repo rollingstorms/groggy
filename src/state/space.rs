@@ -758,6 +758,65 @@ impl GraphSpace {
         (edge_ids, sources, targets)
     }
 
+    /// Materialize current active values in attribute-first order for an immutable read pin.
+    /// This captures uncheckpointed edits and never changes history or pool values.
+    pub(crate) fn capture_read_snapshot(
+        &self,
+        pool: &GraphPool,
+        checkpoint: StateId,
+    ) -> crate::GraphResult<super::state::GraphSnapshot> {
+        let mut snapshot =
+            super::state::GraphSnapshot::empty_with_type(checkpoint, pool.graph_type());
+        snapshot.active_nodes = self.active_nodes.iter().copied().collect();
+        snapshot.active_nodes.sort_unstable();
+        for &edge in &self.active_edges {
+            let endpoints = pool.get_edge_endpoints(edge).ok_or_else(|| {
+                crate::GraphError::InvalidInput("Active edge has no retained endpoints".into())
+            })?;
+            if !self.active_nodes.contains(&endpoints.0)
+                || !self.active_nodes.contains(&endpoints.1)
+            {
+                return Err(crate::GraphError::InvalidInput(
+                    "Active edge has an inactive endpoint".into(),
+                ));
+            }
+            snapshot.edges.insert(edge, endpoints);
+        }
+        for (columns, active, output, node_values) in [
+            (
+                &self.node_attribute_indices,
+                &self.active_nodes,
+                &mut snapshot.node_attributes,
+                true,
+            ),
+            (
+                &self.edge_attribute_indices,
+                &self.active_edges,
+                &mut snapshot.edge_attributes,
+                false,
+            ),
+        ] {
+            for (name, indices) in columns {
+                for (&id, &index) in indices {
+                    if active.contains(&id) {
+                        let value = pool
+                            .get_attr_by_index(name, index, node_values)
+                            .ok_or_else(|| {
+                                crate::GraphError::InvalidInput(format!(
+                                    "Missing retained value for read snapshot attribute {name}"
+                                ))
+                            })?;
+                        output
+                            .entry(id)
+                            .or_default()
+                            .insert(name.clone(), value.clone());
+                    }
+                }
+            }
+        }
+        Ok(snapshot)
+    }
+
     /// Get current version (for debugging/monitoring)
     pub fn get_version(&self) -> u64 {
         self.version

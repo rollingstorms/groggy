@@ -2470,6 +2470,15 @@ impl Graph {
         Ok(())
     }
 
+    /// Capture immutable current read state, including uncheckpointed property edits.
+    /// No commit/delta is created; clones of the result share its frozen values.
+    pub fn pin_current_state(&self) -> GraphResult<crate::state::PinnedReadState> {
+        let snapshot = self
+            .space
+            .capture_read_snapshot(&self.pool.borrow(), self.current_commit)?;
+        crate::state::PinnedReadState::from_snapshot(snapshot)
+    }
+
     /// Construct a fresh graph from a historical snapshot.
     pub fn from_snapshot(snapshot: crate::state::state::GraphSnapshot) -> Result<Self, GraphError> {
         let mut graph = Graph::new_with_type(snapshot.graph_type);
