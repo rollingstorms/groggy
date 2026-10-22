@@ -122,6 +122,27 @@ pub trait NumericType:
     fn mul(self, other: Self) -> Self;
     fn div(self, other: Self) -> Self;
 
+    /// Checked scalar arithmetic; custom types retain their own arithmetic contract.
+    fn checked_add(self, other: Self) -> Option<Self> {
+        Some(Self::add(self, other))
+    }
+    /// Checked subtraction; built-in integers reject overflow.
+    fn checked_sub(self, other: Self) -> Option<Self> {
+        Some(Self::sub(self, other))
+    }
+    /// Checked multiplication; built-in integers reject overflow.
+    fn checked_mul(self, other: Self) -> Option<Self> {
+        Some(Self::mul(self, other))
+    }
+    /// Exact integer hint for checked matrix dot accumulation.
+    fn to_i128(self) -> Option<i128> {
+        None
+    }
+    /// Convert a checked integer dot total to the output type.
+    fn from_i128(_value: i128) -> Option<Self> {
+        None
+    }
+
     /// Fused multiply-add operation (a * b + c)
     fn fma(a: Self, b: Self, c: Self) -> Self {
         Self::add(Self::mul(a, b), c)
@@ -274,6 +295,22 @@ impl NumericType for f32 {
 }
 
 impl NumericType for i64 {
+    fn checked_add(self, other: Self) -> Option<Self> {
+        i64::checked_add(self, other)
+    }
+    fn checked_sub(self, other: Self) -> Option<Self> {
+        i64::checked_sub(self, other)
+    }
+    fn checked_mul(self, other: Self) -> Option<Self> {
+        i64::checked_mul(self, other)
+    }
+    fn to_i128(self) -> Option<i128> {
+        Some(self as i128)
+    }
+    fn from_i128(value: i128) -> Option<Self> {
+        Self::try_from(value).ok()
+    }
+
     type Accumulator = i128; // Prevent overflow in reductions
     type Wide = f64; // Use f64 for division operations
     const DTYPE: DType = DType::Int64;
@@ -335,6 +372,22 @@ impl NumericType for i64 {
 }
 
 impl NumericType for i32 {
+    fn checked_add(self, other: Self) -> Option<Self> {
+        i32::checked_add(self, other)
+    }
+    fn checked_sub(self, other: Self) -> Option<Self> {
+        i32::checked_sub(self, other)
+    }
+    fn checked_mul(self, other: Self) -> Option<Self> {
+        i32::checked_mul(self, other)
+    }
+    fn to_i128(self) -> Option<i128> {
+        Some(self as i128)
+    }
+    fn from_i128(value: i128) -> Option<Self> {
+        Self::try_from(value).ok()
+    }
+
     type Accumulator = i64; // Prevent overflow in reductions
     type Wide = f64; // Use f64 for division operations
     const DTYPE: DType = DType::Int32;
@@ -457,6 +510,22 @@ impl NumericType for bool {
 }
 
 impl NumericType for i128 {
+    fn checked_add(self, other: Self) -> Option<Self> {
+        i128::checked_add(self, other)
+    }
+    fn checked_sub(self, other: Self) -> Option<Self> {
+        i128::checked_sub(self, other)
+    }
+    fn checked_mul(self, other: Self) -> Option<Self> {
+        i128::checked_mul(self, other)
+    }
+    fn to_i128(self) -> Option<i128> {
+        Some(self as i128)
+    }
+    fn from_i128(value: i128) -> Option<Self> {
+        Some(value)
+    }
+
     type Accumulator = i128; // i128 is large enough for its own accumulation
     type Wide = f64; // Use f64 for division operations
     const DTYPE: DType = DType::Int64; // Map to Int64 for compatibility

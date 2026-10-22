@@ -527,3 +527,6 @@ Use an in-house fixed-bin reference accumulator to avoid intermediate floating o
 
 ### Item 29 direct solve and inverse — 2026-10-21
 Use direct row-equilibrated partial-pivot elimination and the same kernel for inverse(identity). Reject exact zero pivots, nonfinite inputs, lost normalization terms and unrepresentable ranges; remove fixed absolute singularity thresholds and guessed values. Restrict to floating matrices explicitly. Preserve unknown/RHS coordinate identity; label matching is positional. Conditioning and iterative refinement are separate requirements, not implied by a finite solution.
+
+### Item 29 integer matrix arithmetic — 2026-10-21
+Reject integer overflow rather than debug panic/release wrap. Keep output dtype stable; use checked i128 products/subtotals and one final narrowing for built-in integer matmul. This allows output-range cancellation but rejects accumulator overflow explicitly. Retain bool OR/AND semantics. Custom NumericType hooks have compatible defaults and own their arithmetic contract.

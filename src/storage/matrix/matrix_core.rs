@@ -906,19 +906,44 @@ impl<T: NumericType> GraphMatrix<T> {
                 let floating = T::DTYPE.is_float();
                 let mut dot = super::dot_product::Dot::new();
                 let mut sum = T::zero();
+                let mut integer_sum = 0_i128;
                 for k in 0..self_cols {
                     let a = self.get_checked(i, k)?;
                     let b = other.get_checked(k, j)?;
                     if floating {
                         dot.add(a.to_f64(), b.to_f64());
+                    } else if T::DTYPE.is_integer() {
+                        integer_sum = a
+                            .to_i128()
+                            .zip(b.to_i128())
+                            .and_then(|(a, b)| a.checked_mul(b))
+                            .and_then(|product| integer_sum.checked_add(product))
+                            .ok_or_else(|| {
+                                GraphError::InvalidInput(
+                                    "Integer dot accumulator overflow or unsupported integer type"
+                                        .into(),
+                                )
+                            })?;
                     } else {
-                        sum = T::add(sum, T::mul(a, b));
+                        sum = a
+                            .checked_mul(b)
+                            .and_then(|v| sum.checked_add(v))
+                            .ok_or_else(|| {
+                                GraphError::InvalidInput("Dot arithmetic overflow".into())
+                            })?;
                     }
                 }
                 if floating {
                     sum = T::from_f64(dot.total()).ok_or_else(|| {
                         GraphError::InvalidInput(
                             "Dot product cannot be represented in output dtype".into(),
+                        )
+                    })?;
+                }
+                if T::DTYPE.is_integer() {
+                    sum = T::from_i128(integer_sum).ok_or_else(|| {
+                        GraphError::InvalidInput(
+                            "Integer dot output exceeds its element dtype".into(),
                         )
                     })?;
                 }
@@ -933,35 +958,12 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Positional matrix subtraction with checked shape and cell access.
     pub fn subtract(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        self.zip_arithmetic(other, T::sub)
+        self.zip_arithmetic(other, T::checked_sub)
     }
 
     /// Element-wise multiplication (Hadamard product)
     pub fn elementwise_multiply(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        let (rows, cols) = self.shape();
-        let (other_rows, other_cols) = other.shape();
-
-        if rows != other_rows || cols != other_cols {
-            return Err(GraphError::InvalidInput(format!(
-                "Matrix dimensions must match for element-wise multiplication: {}x{} vs {}x{}",
-                rows, cols, other_rows, other_cols
-            )));
-        }
-
-        let mut result = Self::zeros(rows, cols);
-        for i in 0..rows {
-            for j in 0..cols {
-                let a = self.get(i, j).ok_or_else(|| {
-                    GraphError::InvalidInput(format!("Invalid cell at ({}, {})", i, j))
-                })?;
-                let b = other.get(i, j).ok_or_else(|| {
-                    GraphError::InvalidInput(format!("Invalid cell at ({}, {})", i, j))
-                })?;
-                result.set(i, j, T::mul(a, b))?;
-            }
-        }
-
-        Ok(result)
+        self.zip_arithmetic(other, T::checked_mul)
     }
 
     /// Matrix power operation (repeated multiplication)
@@ -2862,7 +2864,11 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    fn zip_arithmetic(&self, other: &Self, operation: impl Fn(T, T) -> T) -> GraphResult<Self> {
+    fn zip_arithmetic(
+        &self,
+        other: &Self,
+        operation: impl Fn(T, T) -> Option<T>,
+    ) -> GraphResult<Self> {
         if self.shape() != other.shape() {
             return Err(GraphError::InvalidInput(format!(
                 "Matrix dimensions must match for element-wise arithmetic: {:?} vs {:?}",
@@ -2877,7 +2883,12 @@ impl<T: NumericType> GraphMatrix<T> {
                 result.set(
                     row,
                     col,
-                    operation(self.get_checked(row, col)?, other.get_checked(row, col)?),
+                    operation(self.get_checked(row, col)?, other.get_checked(row, col)?)
+                        .ok_or_else(|| {
+                            GraphError::InvalidInput(
+                                "Integer element-wise arithmetic overflow".into(),
+                            )
+                        })?,
                 )?;
             }
         }
@@ -2897,7 +2908,7 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Add two matrices positionally; mismatched shapes return an error.
     pub fn add(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        self.zip_arithmetic(other, T::add)
+        self.zip_arithmetic(other, T::checked_add)
     }
 
     /// Compute variance of each column

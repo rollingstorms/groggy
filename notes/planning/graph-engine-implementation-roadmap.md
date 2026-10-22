@@ -110,3 +110,5 @@ Numerical item 29.14 removes silent fallbacks from borrowed/owned Rust matrix +,
 Numerical item 29.15 repairs GraphMatrix floating dot products with exact finite f64 accumulation and one rounding; f32 narrows afterward. Native/rational Python tests and matching dev profiles delimit the slice. Linear solves/inverse, integer/custom arithmetic, sparse/lower-level routines, remaining decompositions and production throughput still require work.
 
 Numerical item 29.16 repairs dense floating solve/inverse using direct row-equilibrated partial-pivot elimination. Multiple RHS, source/coordinate identity, scale-aware behavior and explicit domain/range errors have native and rational Python coverage. Condition estimates/refinement, integer arithmetic, remaining indexing/reductions, sparse/complex solvers and remaining decompositions still require work.
+
+Numerical item 29.17 checks built-in integer GraphMatrix add/subtract/Hadamard overflow and matrix-product i128 accumulation/output conversion. Arbitrary precision, other integer backends, exact grouped integer reductions and remaining matrix/sparse/decomposition/conditioning work remain open.
