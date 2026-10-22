@@ -4,6 +4,28 @@ use super::{
     NumericType,
 };
 use crate::storage::matrix::dot_product::Dot;
+#[derive(Clone, Copy)]
+pub(crate) struct NumericValue<T: NumericType>(pub T);
+impl<T: NumericType> crate::storage::array::numeric_reductions::Scalar for NumericValue<T> {
+    fn as_f64(self) -> f64 {
+        self.0.to_f64()
+    }
+    fn integer(self) -> Option<i128> {
+        self.0.to_i128()
+    }
+    fn numeric_cmp(self, other: Self) -> std::cmp::Ordering {
+        if let (Some(a), Some(b)) = (self.0.to_i128(), other.0.to_i128()) {
+            a.cmp(&b)
+        } else {
+            let (a, b) = (self.0.to_f64(), other.0.to_f64());
+            if a == b {
+                std::cmp::Ordering::Equal
+            } else {
+                a.total_cmp(&b)
+            }
+        }
+    }
+}
 pub(crate) struct Product<T: NumericType> {
     float: Dot,
     integer: i128,

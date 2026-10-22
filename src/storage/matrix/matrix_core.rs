@@ -770,11 +770,44 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Cast matrix to different numeric type
     pub fn cast<U: NumericType>(&self) -> GraphResult<GraphMatrix<U>> {
-        // TODO: Implement type casting when UnifiedMatrix supports it
-        // For now, return an error
-        Err(GraphError::InvalidInput(
-            "Type casting not yet implemented in UnifiedMatrix backend".into(),
-        ))
+        self.cast_with_policy(crate::storage::array::numeric_arithmetic::ConversionPolicy::Exact)
+    }
+
+    /// Owned matrix cast with an explicit conversion policy, retaining coordinate identity.
+    pub fn cast_with_policy<U: NumericType>(
+        &self,
+        policy: crate::storage::array::numeric_arithmetic::ConversionPolicy,
+    ) -> GraphResult<GraphMatrix<U>> {
+        use crate::storage::array::numeric_arithmetic::{convert, from_scalar};
+        let (rows, cols) = self.shape();
+        let mut result = if let Some(sparse) = self
+            .storage
+            .checked_sparse()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+        {
+            let mut values = Vec::new();
+            let mut indices = Vec::new();
+            let mut pointers = vec![0];
+            for row in 0..rows {
+                for entry in sparse.row_pointers[row]..sparse.row_pointers[row + 1] {
+                    let value = convert::<U>(from_scalar(sparse.values[entry]), policy)?;
+                    if value != U::zero() {
+                        values.push(value);
+                        indices.push(sparse.col_indices[entry]);
+                    }
+                }
+                pointers.push(values.len());
+            }
+            GraphMatrix::<U>::from_csr(rows, cols, values, indices, pointers)?
+        } else {
+            let values = NumArray::new(self.to_vec()?)
+                .cast_with_policy::<U>(policy)?
+                .into_vec();
+            GraphMatrix::<U>::from_row_major_data(values, rows, cols, None)?
+        };
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
+        Ok(result)
     }
 
     /// Check if the matrix is sparse (has many zero elements)

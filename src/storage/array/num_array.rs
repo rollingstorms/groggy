@@ -1,5 +1,6 @@
 use super::simd_optimizations;
 use super::BaseArray;
+use crate::storage::advanced_matrix::{checked_kernels::NumericValue, NumericType};
 use std::ops::{Add, Mul};
 
 /// NumArray extends BaseArray with statistical and numerical operations.
@@ -61,49 +62,50 @@ impl<T> NumArray<T> {
 }
 
 // Statistical operations - only available for numerical types
-impl<T> NumArray<T>
-where
-    T: Copy + Add<Output = T> + Mul<f64, Output = T> + PartialOrd + Into<f64>,
-{
+impl<T: NumericType> NumArray<T> {
     /// Shared compensated mean; empty=None and nonfinite values propagate.
     pub fn mean(&self) -> Option<f64> {
-        super::numeric_reductions::mean_iter(self.base.as_slice().iter().map(|&x| x.into()))
+        super::numeric_reductions::mean_iter(self.base.as_slice().iter().copied().map(NumericValue))
     }
     /// Shared numeric sum; empty=0.
     pub fn sum(&self) -> f64 {
-        super::numeric_reductions::sum_iter(self.base.as_slice().iter().map(|&x| x.into()))
+        super::numeric_reductions::sum_iter(self.base.as_slice().iter().copied().map(NumericValue))
     }
     /// Shared first numeric minimum, propagating any NaN.
     pub fn min(&self) -> Option<f64> {
         super::numeric_reductions::extremum_iter(
-            self.base.as_slice().iter().map(|&x| x.into()),
+            self.base.as_slice().iter().copied().map(NumericValue),
             true,
         )
     }
     /// Shared first numeric maximum, propagating any NaN.
     pub fn max(&self) -> Option<f64> {
         super::numeric_reductions::extremum_iter(
-            self.base.as_slice().iter().map(|&x| x.into()),
+            self.base.as_slice().iter().copied().map(NumericValue),
             false,
         )
     }
     /// Sample standard deviation computed without first overflowing variance.
     pub fn std_dev(&self) -> Option<f64> {
-        super::numeric_reductions::std_iter(self.base.as_slice().iter().map(|&x| x.into()))
+        super::numeric_reductions::std_iter(self.base.as_slice().iter().copied().map(NumericValue))
     }
     /// Sample variance; empty=None, finite singleton=0.
     pub fn variance(&self) -> Option<f64> {
-        super::numeric_reductions::variance_iter(self.base.as_slice().iter().map(|&x| x.into()))
+        super::numeric_reductions::variance_iter(
+            self.base.as_slice().iter().copied().map(NumericValue),
+        )
     }
     /// Median with checked ordering and an overflow-safe midpoint.
     pub fn median(&self) -> Option<f64> {
-        super::numeric_reductions::median_iter(self.base.as_slice().iter().map(|&x| x.into()))
+        super::numeric_reductions::median_iter(
+            self.base.as_slice().iter().copied().map(NumericValue),
+        )
     }
 
     /// Linearly interpolated percentile; invalid probability/empty=None, NaNs propagate.
     pub fn percentile(&self, p: f64) -> Option<f64> {
         super::numeric_reductions::percentile_iter(
-            self.base.as_slice().iter().map(|&x| x.into()),
+            self.base.as_slice().iter().copied().map(NumericValue),
             p,
         )
     }
@@ -111,8 +113,8 @@ where
     /// Pearson correlation; short/mismatched/constant=None, nonfinite=NaN.
     pub fn correlate(&self, other: &Self) -> Option<f64> {
         super::numeric_reductions::correlate_iter(
-            self.base.as_slice().iter().map(|&x| x.into()),
-            other.base.as_slice().iter().map(|&x| x.into()),
+            self.base.as_slice().iter().copied().map(NumericValue),
+            other.base.as_slice().iter().copied().map(NumericValue),
         )
     }
 
@@ -121,17 +123,7 @@ where
     where
         T: Add<Output = T>,
     {
-        if self.len() != other.len() {
-            return None;
-        }
-
-        let result_data: Vec<T> = self
-            .iter()
-            .zip(other.iter())
-            .map(|(&a, &b)| a + b)
-            .collect();
-
-        Some(NumArray::new(result_data))
+        self.checked_add(other).ok()
     }
 
     /// Multiply all elements by a scalar

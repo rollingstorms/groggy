@@ -28,3 +28,5 @@ preserved separately.
 - 29.40: canonical sparse arithmetic/products/transforms/conversions. Sparse solve/factors and remaining statistics still open.
 
 - 29.41: sparse LU/Cholesky/row-equilibrated solve/sign-log determinants; independent references and 10,000-square storage fixtures.
+
+- 29.42: native typed vector arithmetic, casts, comparisons, unique, scalar reads and Python dispatch; remaining helper/boundary review continues.

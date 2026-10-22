@@ -1,16 +1,7 @@
 //! Shared typed GraphMatrix reductions over checked logical values.
+use crate::storage::advanced_matrix::checked_kernels::NumericValue as Value;
 use crate::storage::{advanced_matrix::NumericType, array::numeric_reductions as k};
 use crate::{GraphError, GraphResult};
-#[derive(Clone, Copy)]
-pub(super) struct Value<T: NumericType>(pub T);
-impl<T: NumericType> k::Scalar for Value<T> {
-    fn as_f64(self) -> f64 {
-        self.0.to_f64()
-    }
-    fn integer(self) -> Option<i128> {
-        self.0.to_i128()
-    }
-}
 pub(super) fn sum<T: NumericType>(values: &[T]) -> GraphResult<T> {
     if T::DTYPE.is_float() {
         let mut dot = super::dot_product::Dot::new();

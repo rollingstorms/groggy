@@ -7,6 +7,25 @@ use groggy::storage::array::{BaseArray, BoolArray, NumArray};
 use groggy::types::AttrValue;
 use pyo3::prelude::*;
 
+use groggy::storage::array::numeric_arithmetic::{
+    self as numeric, ConversionPolicy, NumericBinary, NumericInput,
+};
+fn input(value: &PyAny) -> PyResult<NumericInput> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Ok(NumericInput::Bool(value.extract()?));
+    }
+    if value.is_instance_of::<pyo3::types::PyLong>() {
+        return value.extract::<i128>().map(NumericInput::Integer);
+    }
+    if let Ok(value) = value.extract::<i64>() {
+        return Ok(NumericInput::Integer(i128::from(value)));
+    }
+    value.extract::<f64>().map(NumericInput::Float)
+}
+fn numeric_error(error: groggy::GraphError) -> PyErr {
+    pyo3::exceptions::PyValueError::new_err(error.to_string())
+}
+
 /// Unified statistical array supporting all numeric types internally
 #[pyclass(name = "NumArray", unsendable)]
 #[derive(Clone)]
@@ -25,6 +44,71 @@ enum NumericArrayData {
 }
 
 impl NumericArrayData {
+    fn inputs(&self) -> Vec<NumericInput> {
+        match self {
+            Self::Bool(a) => numeric::inputs(a.as_slice()),
+            Self::Int32(a) => numeric::inputs(a.as_slice()),
+            Self::Int64(a) => numeric::inputs(a.as_slice()),
+            Self::Float32(a) => numeric::inputs(a.as_slice()),
+            Self::Float64(a) => numeric::inputs(a.as_slice()),
+        }
+    }
+    fn converted(values: &[NumericInput], dtype: &str, policy: ConversionPolicy) -> PyResult<Self> {
+        match dtype {
+            "bool" => NumArray::<bool>::from_inputs(values, policy)
+                .map(|a| Self::Bool(BoolArray::new(a.as_slice().to_vec()))),
+            "int32" => NumArray::<i32>::from_inputs(values, policy).map(Self::Int32),
+            "int64" => NumArray::<i64>::from_inputs(values, policy).map(Self::Int64),
+            "float32" => NumArray::<f32>::from_inputs(values, policy).map(Self::Float32),
+            "float64" => NumArray::<f64>::from_inputs(values, policy).map(Self::Float64),
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "Unsupported numeric dtype",
+                ))
+            }
+        }
+        .map_err(numeric_error)
+    }
+    fn binary(&self, other: &Self, op: NumericBinary) -> PyResult<Self> {
+        match (self, other) {
+            (Self::Int32(a), Self::Int32(b)) => a.checked_binary(b, op).map(Self::Int32),
+            (Self::Int64(a), Self::Int64(b)) => a.checked_binary(b, op).map(Self::Int64),
+            (Self::Float32(a), Self::Float32(b)) => a.checked_binary(b, op).map(Self::Float32),
+            (Self::Float64(a), Self::Float64(b)) => a.checked_binary(b, op).map(Self::Float64),
+            (Self::Bool(a), Self::Bool(b)) => NumArray::new(a.as_slice().to_vec())
+                .checked_binary(&NumArray::new(b.as_slice().to_vec()), op)
+                .map(|a| Self::Bool(BoolArray::new(a.as_slice().to_vec()))),
+            _ => {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Vector arithmetic requires matching dtypes; cast explicitly",
+                ))
+            }
+        }
+        .map_err(numeric_error)
+    }
+    fn scalar(&self, value: NumericInput, op: NumericBinary, reverse: bool) -> PyResult<Self> {
+        match self {
+            Self::Int32(a) => a.scalar_binary(value, op, reverse).map(Self::Int32),
+            Self::Int64(a) => a.scalar_binary(value, op, reverse).map(Self::Int64),
+            Self::Float32(a) => a.scalar_binary(value, op, reverse).map(Self::Float32),
+            Self::Float64(a) => a.scalar_binary(value, op, reverse).map(Self::Float64),
+            Self::Bool(a) => NumArray::new(a.as_slice().to_vec())
+                .scalar_binary(value, op, reverse)
+                .map(|a| Self::Bool(BoolArray::new(a.as_slice().to_vec()))),
+        }
+        .map_err(numeric_error)
+    }
+    fn scalar_divide(&self, value: NumericInput, reverse: bool) -> PyResult<Self> {
+        match self {
+            Self::Int32(a) => numeric::divide_scalar(a.as_slice(), value, reverse),
+            Self::Int64(a) => numeric::divide_scalar(a.as_slice(), value, reverse),
+            Self::Float32(a) => numeric::divide_scalar(a.as_slice(), value, reverse),
+            Self::Float64(a) => numeric::divide_scalar(a.as_slice(), value, reverse),
+            Self::Bool(a) => numeric::divide_scalar(a.as_slice(), value, reverse),
+        }
+        .map(Self::Float64)
+        .map_err(numeric_error)
+    }
     /// Get the string representation of the dtype
     fn dtype(&self) -> &'static str {
         match self {
@@ -126,44 +210,39 @@ impl NumericArrayData {
 
     /// Check whether the array contains the provided value
     fn contains_py(&self, item: &PyAny) -> PyResult<bool> {
-        match self {
-            NumericArrayData::Bool(arr) => {
-                let value = item.extract::<bool>()?;
-                Ok(arr.iter().copied().any(|candidate| candidate == value))
-            }
-            NumericArrayData::Int32(arr) => {
-                let raw = item.extract::<i64>()?;
-                let value = i32::try_from(raw).map_err(|_| {
-                    pyo3::exceptions::PyValueError::new_err(format!(
-                        "Value {} out of range for int32",
-                        raw
-                    ))
-                })?;
-                Ok(arr.iter().copied().any(|candidate| candidate == value))
-            }
-            NumericArrayData::Int64(arr) => {
-                let value = item.extract::<i64>()?;
-                Ok(arr.iter().copied().any(|candidate| candidate == value))
-            }
-            NumericArrayData::Float32(arr) => {
-                let value = item.extract::<f64>()? as f32;
-                Ok(arr
-                    .iter()
-                    .copied()
-                    .any(|candidate| (candidate - value).abs() <= f32::EPSILON))
-            }
-            NumericArrayData::Float64(arr) => {
-                let value = item.extract::<f64>()?;
-                Ok(arr
-                    .iter()
-                    .copied()
-                    .any(|candidate| (candidate - value).abs() <= f64::EPSILON))
-            }
-        }
+        let scalar = input(item)?;
+        Ok(
+            numeric::compare_scalar(&self.inputs(), scalar, numeric::NumericComparison::Equal)
+                .into_iter()
+                .any(|v| v),
+        )
     }
 }
 
 impl PyNumArray {
+    fn comparison(&self, other: &PyAny, op: numeric::NumericComparison) -> PyResult<Self> {
+        let values = if let Ok(other) = other.extract::<PyRef<PyNumArray>>() {
+            numeric::compare(&self.inner.inputs(), &other.inner.inputs(), op)
+                .map_err(numeric_error)?
+        } else {
+            numeric::compare_scalar(&self.inner.inputs(), input(other)?, op)
+        };
+        Ok(Self {
+            inner: NumericArrayData::Bool(BoolArray::new(values)),
+        })
+    }
+    fn binary_operand(&self, other: &PyAny, op: NumericBinary, reverse: bool) -> PyResult<Self> {
+        let inner = if let Ok(other) = other.extract::<PyRef<PyNumArray>>() {
+            if reverse {
+                other.inner.binary(&self.inner, op)
+            } else {
+                self.inner.binary(&other.inner, op)
+            }
+        } else {
+            self.inner.scalar(input(other)?, op, reverse)
+        }?;
+        Ok(Self { inner })
+    }
     /// Create new NumArray with automatic type inference
     pub fn new_with_inference(values: &[PyObject], py: Python) -> PyResult<Self> {
         // Try to infer the best dtype from the values
@@ -177,7 +256,7 @@ impl PyNumArray {
                 has_bool = true;
             } else if let Ok(i_val) = value.extract::<i64>(py) {
                 has_int = true;
-                if i_val.abs() > i32::MAX as i64 {
+                if i32::try_from(i_val).is_err() {
                     max_int_size = 64;
                 } else if max_int_size < 32 {
                     max_int_size = 32;
@@ -207,128 +286,21 @@ impl PyNumArray {
 
     /// Create new NumArray with explicit dtype
     pub fn new_with_dtype(values: &[PyObject], dtype: &str, py: Python) -> PyResult<Self> {
-        match dtype {
-            "bool" => {
-                let bool_values: Result<Vec<bool>, _> =
-                    values.iter().map(|v| v.extract::<bool>(py)).collect();
-                match bool_values {
-                    Ok(vals) => Ok(PyNumArray {
-                        inner: NumericArrayData::Bool(BoolArray::new(vals)),
-                    }),
-                    Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(
-                        "Cannot convert values to bool dtype",
-                    )),
-                }
-            }
-            "int32" => {
-                let int_values: Result<Vec<i32>, _> = values
-                    .iter()
-                    .map(|v| {
-                        if let Ok(i) = v.extract::<i32>(py) {
-                            Ok(i)
-                        } else if let Ok(i) = v.extract::<i64>(py) {
-                            Ok(i as i32)
-                        } else if let Ok(f) = v.extract::<f64>(py) {
-                            Ok(f.round() as i32)
-                        } else if let Ok(b) = v.extract::<bool>(py) {
-                            Ok(if b { 1 } else { 0 })
-                        } else {
-                            Err(())
-                        }
-                    })
-                    .collect();
-                match int_values {
-                    Ok(vals) => Ok(PyNumArray {
-                        inner: NumericArrayData::Int32(NumArray::new(vals)),
-                    }),
-                    Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(
-                        "Cannot convert values to int32 dtype",
-                    )),
-                }
-            }
-            "int64" => {
-                let int_values: Result<Vec<i64>, _> = values
-                    .iter()
-                    .map(|v| {
-                        if let Ok(i) = v.extract::<i64>(py) {
-                            Ok(i)
-                        } else if let Ok(i) = v.extract::<i32>(py) {
-                            Ok(i as i64)
-                        } else if let Ok(f) = v.extract::<f64>(py) {
-                            Ok(f.round() as i64)
-                        } else if let Ok(b) = v.extract::<bool>(py) {
-                            Ok(if b { 1 } else { 0 })
-                        } else {
-                            Err(())
-                        }
-                    })
-                    .collect();
-                match int_values {
-                    Ok(vals) => Ok(PyNumArray {
-                        inner: NumericArrayData::Int64(NumArray::new(vals)),
-                    }),
-                    Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(
-                        "Cannot convert values to int64 dtype",
-                    )),
-                }
-            }
-            "float32" => {
-                let float_values: Result<Vec<f32>, _> = values
-                    .iter()
-                    .map(|v| {
-                        if let Ok(f) = v.extract::<f32>(py) {
-                            Ok(f)
-                        } else if let Ok(f) = v.extract::<f64>(py) {
-                            Ok(f as f32)
-                        } else if let Ok(i) = v.extract::<i64>(py) {
-                            Ok(i as f32)
-                        } else if let Ok(b) = v.extract::<bool>(py) {
-                            Ok(if b { 1.0 } else { 0.0 })
-                        } else {
-                            Err(())
-                        }
-                    })
-                    .collect();
-                match float_values {
-                    Ok(vals) => Ok(PyNumArray {
-                        inner: NumericArrayData::Float32(NumArray::new(vals)),
-                    }),
-                    Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(
-                        "Cannot convert values to float32 dtype",
-                    )),
-                }
-            }
-            "float64" => {
-                let float_values: Result<Vec<f64>, _> = values
-                    .iter()
-                    .map(|v| {
-                        if let Ok(f) = v.extract::<f64>(py) {
-                            Ok(f)
-                        } else if let Ok(f) = v.extract::<f32>(py) {
-                            Ok(f as f64)
-                        } else if let Ok(i) = v.extract::<i64>(py) {
-                            Ok(i as f64)
-                        } else if let Ok(b) = v.extract::<bool>(py) {
-                            Ok(if b { 1.0 } else { 0.0 })
-                        } else {
-                            Err(())
-                        }
-                    })
-                    .collect();
-                match float_values {
-                    Ok(vals) => Ok(PyNumArray {
-                        inner: NumericArrayData::Float64(NumArray::new(vals)),
-                    }),
-                    Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(
-                        "Cannot convert values to float64 dtype",
-                    )),
-                }
-            }
-            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "Unsupported dtype: {}. Supported: 'bool', 'int32', 'int64', 'float32', 'float64'",
-                dtype
-            ))),
+        if dtype == "bool" {
+            return values
+                .iter()
+                .map(|v| v.extract::<bool>(py))
+                .collect::<PyResult<Vec<_>>>()
+                .map(|v| Self {
+                    inner: NumericArrayData::Bool(BoolArray::new(v)),
+                });
         }
+        let values = values
+            .iter()
+            .map(|v| input(v.as_ref(py)))
+            .collect::<PyResult<Vec<_>>>()?;
+        NumericArrayData::converted(&values, dtype, ConversionPolicy::Round)
+            .map(|inner| Self { inner })
     }
 
     /// Create from AttrValues with type inference
@@ -456,8 +428,28 @@ impl PyNumArray {
 
     /// Get element at index as f64 (used by matrix operations)
     pub fn get_f64(&self, index: usize) -> Option<f64> {
-        let f64_values = self.inner.to_float64_vec();
-        f64_values.get(index).copied()
+        match &self.inner {
+            NumericArrayData::Bool(a) => a
+                .get(index)
+                .map(numeric::from_scalar)
+                .map(NumericInput::as_f64),
+            NumericArrayData::Int32(a) => a
+                .get(index)
+                .copied()
+                .map(numeric::from_scalar)
+                .map(NumericInput::as_f64),
+            NumericArrayData::Int64(a) => a
+                .get(index)
+                .copied()
+                .map(numeric::from_scalar)
+                .map(NumericInput::as_f64),
+            NumericArrayData::Float32(a) => a
+                .get(index)
+                .copied()
+                .map(numeric::from_scalar)
+                .map(NumericInput::as_f64),
+            NumericArrayData::Float64(a) => a.get(index).copied(),
+        }
     }
 
     /// Get the dtype as a string (public method for FFI utilities)
@@ -737,78 +729,108 @@ impl PyNumArray {
     }
 
     /// Convert to different numeric type
-    fn to_type(&self, dtype: &str) -> PyResult<PyObject> {
-        match dtype {
-            "bool" => {
-                let bool_values = match &self.inner {
-                    NumericArrayData::Bool(arr) => arr.iter().copied().collect(),
-                    NumericArrayData::Int32(arr) => arr.iter().map(|&x| x != 0).collect(),
-                    NumericArrayData::Int64(arr) => arr.iter().map(|&x| x != 0).collect(),
-                    NumericArrayData::Float32(arr) => arr.iter().map(|&x| x != 0.0).collect(),
-                    NumericArrayData::Float64(arr) => arr.iter().map(|&x| x != 0.0).collect(),
-                };
-                let result = PyNumArray::new_bool(bool_values);
-                Python::with_gil(|py| Ok(result.into_py(py)))
-            },
-            "int32" => {
-                let int_values = match &self.inner {
-                    NumericArrayData::Bool(arr) => arr.iter().map(|&x| if x { 1i32 } else { 0i32 }).collect(),
-                    NumericArrayData::Int32(arr) => arr.iter().copied().collect(),
-                    NumericArrayData::Int64(arr) => arr.iter().map(|&x| x as i32).collect(),
-                    NumericArrayData::Float32(arr) => arr.iter().map(|&x| x.round() as i32).collect(),
-                    NumericArrayData::Float64(arr) => arr.iter().map(|&x| x.round() as i32).collect(),
-                };
-                let result = PyNumArray {
-                    inner: NumericArrayData::Int32(NumArray::new(int_values))
-                };
-                Python::with_gil(|py| Ok(result.into_py(py)))
-            },
-            "int64" => {
-                let int_values = match &self.inner {
-                    NumericArrayData::Bool(arr) => arr.iter().map(|&x| if x { 1i64 } else { 0i64 }).collect(),
-                    NumericArrayData::Int32(arr) => arr.iter().map(|&x| x as i64).collect(),
-                    NumericArrayData::Int64(arr) => arr.iter().copied().collect(),
-                    NumericArrayData::Float32(arr) => arr.iter().map(|&x| x.round() as i64).collect(),
-                    NumericArrayData::Float64(arr) => arr.iter().map(|&x| x.round() as i64).collect(),
-                };
-                let result = PyNumArray::new_int64(int_values);
-                Python::with_gil(|py| Ok(result.into_py(py)))
-            },
-            "float32" => {
-                let float_values = match &self.inner {
-                    NumericArrayData::Bool(arr) => arr.iter().map(|&x| if x { 1.0f32 } else { 0.0f32 }).collect(),
-                    NumericArrayData::Int32(arr) => arr.iter().map(|&x| x as f32).collect(),
-                    NumericArrayData::Int64(arr) => arr.iter().map(|&x| x as f32).collect(),
-                    NumericArrayData::Float32(arr) => arr.iter().copied().collect(),
-                    NumericArrayData::Float64(arr) => arr.iter().map(|&x| x as f32).collect(),
-                };
-                let result = PyNumArray {
-                    inner: NumericArrayData::Float32(NumArray::new(float_values))
-                };
-                Python::with_gil(|py| Ok(result.into_py(py)))
-            },
-            "float64" => {
-                let float_values = self.inner.to_float64_vec();
-                let result = PyNumArray::new_float64(float_values);
-                Python::with_gil(|py| Ok(result.into_py(py)))
-            },
-            "basearray" => {
-                let attr_values: Vec<AttrValue> = match &self.inner {
-                    NumericArrayData::Bool(arr) => arr.iter().map(|&x| AttrValue::Bool(x)).collect(),
-                    NumericArrayData::Int32(arr) => arr.iter().map(|&x| AttrValue::SmallInt(x)).collect(),
-                    NumericArrayData::Int64(arr) => arr.iter().map(|&x| AttrValue::Int(x)).collect(),
-                    NumericArrayData::Float32(arr) => arr.iter().map(|&x| AttrValue::Float(x)).collect(),
-                    NumericArrayData::Float64(arr) => arr.iter().map(|&x| AttrValue::Float(x as f32)).collect(),
-                };
-                let base_array = crate::ffi::storage::array::PyBaseArray {
-                    inner: BaseArray::new(attr_values)
-                };
-                Python::with_gil(|py| Ok(base_array.into_py(py)))
+    #[pyo3(signature=(dtype, *, exact=false))]
+    fn to_type(&self, py: Python, dtype: &str, exact: bool) -> PyResult<PyObject> {
+        let policy = if exact {
+            ConversionPolicy::Exact
+        } else {
+            ConversionPolicy::Round
+        };
+        if dtype == "basearray" {
+            let values = match &self.inner {
+                NumericArrayData::Bool(a) => {
+                    NumArray::new(a.as_slice().to_vec()).to_attributes_with_policy(policy)
+                }
+                NumericArrayData::Int32(a) => a.to_attributes_with_policy(policy),
+                NumericArrayData::Int64(a) => a.to_attributes_with_policy(policy),
+                NumericArrayData::Float32(a) => a.to_attributes_with_policy(policy),
+                NumericArrayData::Float64(a) => a.to_attributes_with_policy(policy),
             }
-            _ => Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Unsupported dtype: {}. Supported: 'bool', 'int32', 'int64', 'float32', 'float64', 'basearray'", dtype)
-            ))
+            .map_err(numeric_error)?;
+            return Ok(crate::ffi::storage::array::PyBaseArray {
+                inner: BaseArray::new(values),
+            }
+            .into_py(py));
         }
+        let policy = if exact {
+            ConversionPolicy::Exact
+        } else {
+            ConversionPolicy::Round
+        };
+        Ok(Self {
+            inner: NumericArrayData::converted(&self.inner.inputs(), dtype, policy)?,
+        }
+        .into_py(py))
+    }
+    fn __add__(&self, other: &PyAny) -> PyResult<Self> {
+        self.binary_operand(other, NumericBinary::Add, false)
+    }
+    fn __radd__(&self, other: &PyAny) -> PyResult<Self> {
+        self.binary_operand(other, NumericBinary::Add, true)
+    }
+    fn __sub__(&self, other: &PyAny) -> PyResult<Self> {
+        self.binary_operand(other, NumericBinary::Subtract, false)
+    }
+    fn __rsub__(&self, other: &PyAny) -> PyResult<Self> {
+        self.binary_operand(other, NumericBinary::Subtract, true)
+    }
+    fn __mul__(&self, other: &PyAny) -> PyResult<Self> {
+        self.binary_operand(other, NumericBinary::Multiply, false)
+    }
+    fn __rmul__(&self, other: &PyAny) -> PyResult<Self> {
+        self.binary_operand(other, NumericBinary::Multiply, true)
+    }
+    fn __truediv__(&self, other: &PyAny) -> PyResult<Self> {
+        let inner = if let Ok(other) = other.extract::<PyRef<PyNumArray>>() {
+            NumericArrayData::Float64(
+                numeric::divide(&self.inner.inputs(), &other.inner.inputs())
+                    .map_err(numeric_error)?,
+            )
+        } else {
+            self.inner.scalar_divide(input(other)?, false)?
+        };
+        Ok(Self { inner })
+    }
+    fn __rtruediv__(&self, other: &PyAny) -> PyResult<Self> {
+        Ok(Self {
+            inner: self.inner.scalar_divide(input(other)?, true)?,
+        })
+    }
+    fn norm(&self) -> f64 {
+        match &self.inner {
+            NumericArrayData::Bool(a) => numeric::norm(a.as_slice()),
+            NumericArrayData::Int32(a) => a.norm(),
+            NumericArrayData::Int64(a) => a.norm(),
+            NumericArrayData::Float32(a) => a.norm(),
+            NumericArrayData::Float64(a) => a.norm(),
+        }
+    }
+    fn dot(&self, py: Python, other: &Self) -> PyResult<PyObject> {
+        match (&self.inner, &other.inner) {
+            (NumericArrayData::Int32(a), NumericArrayData::Int32(b)) => {
+                a.dot(b).map(|v| v.to_object(py))
+            }
+            (NumericArrayData::Int64(a), NumericArrayData::Int64(b)) => {
+                a.dot(b).map(|v| v.to_object(py))
+            }
+            (NumericArrayData::Float32(a), NumericArrayData::Float32(b)) => {
+                a.dot(b).map(|v| v.to_object(py))
+            }
+            (NumericArrayData::Float64(a), NumericArrayData::Float64(b)) => {
+                a.dot(b).map(|v| v.to_object(py))
+            }
+            (NumericArrayData::Bool(a), NumericArrayData::Bool(b)) => {
+                NumArray::new(a.as_slice().to_vec())
+                    .dot(&NumArray::new(b.as_slice().to_vec()))
+                    .map(|v| v.to_object(py))
+            }
+            _ => {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Dot requires matching dtypes",
+                ))
+            }
+        }
+        .map_err(numeric_error)
     }
 
     /// Delegate mean to shared typed native kernels.
@@ -1016,145 +1038,42 @@ impl PyNumArray {
     }
 
     /// Get unique values as a new NumArray
-    fn unique(&self) -> PyResult<PyNumArray> {
-        use std::collections::HashSet;
-        let mut unique_values = Vec::new();
-
-        // For numeric types, we can use the actual values for uniqueness
-        match &self.inner {
-            NumericArrayData::Float64(_) => {
-                let mut seen = HashSet::new();
-                let values = self.inner.to_float64_vec();
-                for val in values {
-                    if seen.insert(val.to_bits()) {
-                        // Use bits representation for float comparison
-                        unique_values.push(val);
-                    }
-                }
-            }
-            NumericArrayData::Int64(_) => {
-                let mut seen = HashSet::new();
-                let values = self.inner.to_int64_vec();
-                for val in values {
-                    if seen.insert(val) {
-                        unique_values.push(val as f64); // Convert to f64 for NumArray
-                    }
-                }
-            }
-            NumericArrayData::Bool(_) => {
-                let mut seen = HashSet::new();
-                let values = self.inner.to_bool_vec();
-                for val in values {
-                    if seen.insert(val) {
-                        unique_values.push(if val { 1.0 } else { 0.0 }); // Convert bool to f64
-                    }
-                }
-            }
-            _ => {
-                // For other types, fall back to string representation
-                let mut seen = HashSet::new();
-                for i in 0..self.inner.len() {
-                    Python::with_gil(|py| {
-                        if let Some(val) = self.inner.get_element(i, py) {
-                            let str_repr = format!("{:?}", val);
-                            if seen.insert(str_repr.clone()) {
-                                // Try to convert back to f64, use index if not possible
-                                let numeric_val = str_repr.parse::<f64>().unwrap_or(i as f64);
-                                unique_values.push(numeric_val);
-                            }
-                        }
-                    });
-                }
-            }
-        }
-
-        Ok(PyNumArray::new(unique_values))
+    fn unique(&self) -> PyResult<Self> {
+        let inner = match &self.inner {
+            NumericArrayData::Bool(a) => NumericArrayData::Bool(BoolArray::new(
+                NumArray::new(a.as_slice().to_vec()).unique().into_vec(),
+            )),
+            NumericArrayData::Int32(a) => NumericArrayData::Int32(a.unique()),
+            NumericArrayData::Int64(a) => NumericArrayData::Int64(a.unique()),
+            NumericArrayData::Float32(a) => NumericArrayData::Float32(a.unique()),
+            NumericArrayData::Float64(a) => NumericArrayData::Float64(a.unique()),
+        };
+        Ok(Self { inner })
     }
 
-    // Comparison Operators (return BoolArray)
-
-    /// Greater than comparison (>) - returns NumArray with bool dtype
-    fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let scalar = other.extract::<f64>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("NumArray comparison requires a numeric value")
-        })?;
-
-        let values = self.inner.to_float64_vec();
-        let result: Vec<bool> = values.iter().map(|&x| x > scalar).collect();
-        let bool_array = PyNumArray::new_bool(result);
-        Ok(bool_array.into_py(py))
+    fn __gt__(&self, other: &PyAny) -> PyResult<Self> {
+        self.comparison(other, numeric::NumericComparison::Greater)
     }
-
-    /// Less than comparison (<) - returns NumArray with bool dtype
-    fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let scalar = other.extract::<f64>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("NumArray comparison requires a numeric value")
-        })?;
-
-        let values = self.inner.to_float64_vec();
-        let result: Vec<bool> = values.iter().map(|&x| x < scalar).collect();
-        let bool_array = PyNumArray::new_bool(result);
-        Ok(bool_array.into_py(py))
+    fn __lt__(&self, other: &PyAny) -> PyResult<Self> {
+        self.comparison(other, numeric::NumericComparison::Less)
     }
-
-    /// Greater than or equal comparison (>=) - returns NumArray with bool dtype
-    fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let scalar = other.extract::<f64>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("NumArray comparison requires a numeric value")
-        })?;
-
-        let values = self.inner.to_float64_vec();
-        let result: Vec<bool> = values.iter().map(|&x| x >= scalar).collect();
-        let bool_array = PyNumArray::new_bool(result);
-        Ok(bool_array.into_py(py))
+    fn __ge__(&self, other: &PyAny) -> PyResult<Self> {
+        self.comparison(other, numeric::NumericComparison::GreaterEqual)
     }
-
-    /// Less than or equal comparison (<=) - returns NumArray with bool dtype  
-    fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let scalar = other.extract::<f64>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("NumArray comparison requires a numeric value")
-        })?;
-
-        let values = self.inner.to_float64_vec();
-        let result: Vec<bool> = values.iter().map(|&x| x <= scalar).collect();
-        let bool_array = PyNumArray::new_bool(result);
-        Ok(bool_array.into_py(py))
+    fn __le__(&self, other: &PyAny) -> PyResult<Self> {
+        self.comparison(other, numeric::NumericComparison::LessEqual)
     }
-
-    /// Equality comparison (==) - returns NumArray with bool dtype
-    fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let scalar = other.extract::<f64>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("NumArray comparison requires a numeric value")
-        })?;
-
-        let values = self.inner.to_float64_vec();
-        let result: Vec<bool> = values
-            .iter()
-            .map(|&x| (x - scalar).abs() < f64::EPSILON)
-            .collect();
-        let bool_array = PyNumArray::new_bool(result);
-        Ok(bool_array.into_py(py))
+    fn __eq__(&self, other: &PyAny) -> PyResult<Self> {
+        self.comparison(other, numeric::NumericComparison::Equal)
     }
-
-    /// Not equal comparison (!=) - returns NumArray with bool dtype
-    fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let scalar = other.extract::<f64>().map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("NumArray comparison requires a numeric value")
-        })?;
-
-        let values = self.inner.to_float64_vec();
-        let result: Vec<bool> = values
-            .iter()
-            .map(|&x| (x - scalar).abs() >= f64::EPSILON)
-            .collect();
-        let bool_array = PyNumArray::new_bool(result);
-        Ok(bool_array.into_py(py))
+    fn __ne__(&self, other: &PyAny) -> PyResult<Self> {
+        self.comparison(other, numeric::NumericComparison::NotEqual)
     }
 
     /// Matrix Integration: Reshape NumArray into a GraphMatrix
     fn reshape(&self, py: Python, rows: usize, cols: usize) -> PyResult<PyObject> {
         // Convert to float64 for matrix operations (matrices are typically float)
-        let float_array = self.to_type("float64")?;
+        let float_array = self.to_type(py, "float64", true)?;
         let float_array = float_array.extract::<PyNumArray>(py)?;
 
         let matrix = crate::ffi::storage::matrix::PyGraphMatrix::from_flattened(

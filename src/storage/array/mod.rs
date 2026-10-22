@@ -45,3 +45,5 @@ pub use numarray_benchmark::{
 pub use query::{BatchQueryEvaluator, QueryEvaluator};
 pub use specialized::*;
 pub use traits::*;
+
+pub mod numeric_arithmetic;
