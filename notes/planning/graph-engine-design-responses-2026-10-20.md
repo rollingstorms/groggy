@@ -554,3 +554,11 @@ Use a norm-relative symmetry policy after scaling, average accepted pairs, and r
 
 ### Item 29 LU and determinant — 2026-10-21
 Use bounded real partial-pivot PA=LU without absolute singularity epsilons. A zero pivot can remain in a valid singular factorization; determinant/sign-log expose singularity. Preserve owned coordinate/permutation identity and checked dtype range. Empty determinant is one, order-two subtraction is accurate, and larger determinants exponentiate pivot log sums. Expose slogdet to retain final range; do not claim exact integer or unbounded intermediate range.
+
+### Item 29 numerical rank and condition estimates — 2026-10-21
+Define rank relative to the largest singular value and input dtype precision, with an explicit cutoff override. Condition number reports the untruncated normalized spectral ratio, independently of rank cutoff. Use normalized finite floating SVD inputs to avoid absolute-scale/output-range artifacts. Keep these as numerical estimates and preserve solve policies; residual/refinement/least squares remain separate.
+
+Verification: full locked offline native suite passed (442 library tests, two ignored, plus integration/doc suites); rebuilt Python numerical regressions: 189 passed. Focused Clippy passed with the existing eight lint findings excluded; strict all-target Clippy still reports those same eight existing findings.
+
+### Item 29 complex eigen result — accepted design decision, 2026-10-21
+The caller selected a dedicated complex eigendecomposition result exposing real/imaginary eigenvalues and eigenvector matrices. Preserve the existing real symmetric API and real numeric matrix storage. The general complex solver, convergence/defective-matrix policy, and its independent verification remain implementation work under 29.24.

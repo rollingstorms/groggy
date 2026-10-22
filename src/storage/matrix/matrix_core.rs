@@ -2039,6 +2039,10 @@ impl<T: NumericType> GraphMatrix<T> {
             ));
         }
         let (rows, cols) = self.shape();
+        if rows == 0 || cols == 0 {
+            return Ok(Vec::new());
+        }
+
         let mut data = Vec::with_capacity(
             rows.checked_mul(cols)
                 .ok_or_else(|| GraphError::InvalidInput("Matrix dimensions overflow".into()))?,
@@ -2071,75 +2075,65 @@ impl<T: NumericType> GraphMatrix<T> {
         Self::from_row_major_data(values, rows, cols, None)
     }
 
-    /// Matrix rank - number of linearly independent rows/columns
-    /// Computed using Gaussian elimination with partial pivoting
-    pub fn rank(&self) -> GraphResult<usize>
-    where
-        T: Clone
-            + Copy
-            + Default
-            + std::fmt::Debug
-            + PartialEq
-            + PartialOrd
-            + std::ops::Add<Output = T>
-            + std::ops::Sub<Output = T>
-            + std::ops::Mul<Output = T>
-            + std::ops::Div<Output = T>,
-        f64: From<T>,
-    {
+    /// Numerical rank using singular values and the input dtype's relative precision.
+    pub fn rank(&self) -> GraphResult<usize> {
         let (rows, cols) = self.shape();
-
-        // Create a working copy of the matrix for Gaussian elimination
-        let mut work_matrix = Vec::new();
-        for i in 0..rows {
-            let mut row = Vec::new();
-            for j in 0..cols {
-                let val = self.get(i, j).unwrap_or_else(|| T::default());
-                row.push(f64::from(val));
-            }
-            work_matrix.push(row);
+        let epsilon = if T::DTYPE == crate::storage::advanced_matrix::DType::Float32 {
+            f64::from(f32::EPSILON)
+        } else {
+            f64::EPSILON
+        };
+        self.rank_with_tolerance(epsilon * rows.max(cols).max(1) as f64)
+    }
+    /// Numerical rank with an explicit nonnegative finite relative cutoff.
+    pub fn rank_with_tolerance(&self, relative: f64) -> GraphResult<usize> {
+        if !relative.is_finite() || relative < 0. {
+            return Err(GraphError::InvalidInput(
+                "Rank tolerance must be finite and nonnegative".into(),
+            ));
         }
-
-        let tolerance = 1e-10;
-        let mut rank = 0;
-
-        // Gaussian elimination to count pivot rows
-        for col in 0..cols.min(rows) {
-            // Find pivot row
-            let mut pivot_row = None;
-            let mut max_val = 0.0;
-
-            for row in rank..rows {
-                let abs_val = work_matrix[row][col].abs();
-                if abs_val > tolerance && abs_val > max_val {
-                    max_val = abs_val;
-                    pivot_row = Some(row);
-                }
-            }
-
-            if let Some(pivot) = pivot_row {
-                // Swap rows if needed
-                if pivot != rank {
-                    work_matrix.swap(rank, pivot);
-                }
-
-                // Eliminate column entries below pivot
-                let pivot_val = work_matrix[rank][col];
-
-                for row in (rank + 1)..rows {
-                    if work_matrix[row][col].abs() > tolerance {
-                        let factor = work_matrix[row][col] / pivot_val;
-                        for c in col..cols {
-                            work_matrix[row][c] -= factor * work_matrix[rank][c];
-                        }
-                    }
-                }
-
-                rank += 1;
+        let singular = self.normalized_spectrum()?;
+        let largest = singular.first().copied().unwrap_or(0.);
+        if largest == 0. {
+            return Ok(0);
+        }
+        Ok(singular
+            .iter()
+            .filter(|&&value| value / largest > relative)
+            .count())
+    }
+    /// Estimated spectral (2-norm) condition number from normalized singular values.
+    /// Zero matrices/zero smallest singular value yield infinity; empty order errors.
+    pub fn condition_number(&self) -> GraphResult<f64> {
+        let singular = self.normalized_spectrum()?;
+        let largest = singular.first().copied().ok_or_else(|| {
+            GraphError::InvalidInput("Condition number requires nonempty dimensions".into())
+        })?;
+        let smallest = singular.last().copied().unwrap_or(0.);
+        Ok(if smallest == 0. {
+            f64::INFINITY
+        } else {
+            largest / smallest
+        })
+    }
+    fn normalized_spectrum(&self) -> GraphResult<Vec<f64>> {
+        let (rows, cols) = self.shape();
+        let mut values = self.decomposition_input()?;
+        if values.iter().any(|v| !v.is_finite()) {
+            return Err(GraphError::InvalidInput(
+                "Numerical spectrum requires finite input".into(),
+            ));
+        }
+        if rows == 0 || cols == 0 {
+            return Ok(Vec::new());
+        }
+        let scale = values.iter().fold(0.0_f64, |scale, v| scale.max(v.abs()));
+        if scale != 0. {
+            for value in &mut values {
+                *value /= scale;
             }
         }
-
-        Ok(rank)
+        Ok(super::decomposition::svd(values, rows, cols)?.singular)
     }
 
     /// Tile (repeat) the matrix a specified number of times along each axis

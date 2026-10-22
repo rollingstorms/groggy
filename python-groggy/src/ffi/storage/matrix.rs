@@ -1995,6 +1995,19 @@ impl PyGraphMatrix {
         Ok((py_eigenvals, Py::new(py, py_eigenvecs)?))
     }
 
+    /// Estimate the 2-norm condition number using native normalized singular values.
+    fn condition_number(&self) -> PyResult<f64> {
+        self.inner
+            .condition_number()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+    /// Numerical rank with an explicit relative singular-value tolerance.
+    fn rank_with_tolerance(&self, relative: f64) -> PyResult<usize> {
+        self.inner
+            .rank_with_tolerance(relative)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
     /// Matrix rank - number of linearly independent rows/columns
     /// Uses SVD with numerical tolerance for near-zero singular values
     fn rank(&self) -> PyResult<usize> {

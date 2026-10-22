@@ -130,3 +130,5 @@ Numerical item 29.27 repairs real QR with bounded economy Householder factors an
 Numerical item 29.28 repairs finite real Cholesky using scaled relative symmetry checks, accurate residuals and explicit positive-definite/range/dtype validation. LU/determinant/rank/condition/refinement/least-squares work remains under 29.23.
 
 Numerical item 29.29 repairs finite real LU and determinant/slogdet with partial pivoting, singular/empty support, checked factor range/identity and bounded cubic work. Rank, condition estimation, residual/refinement and least squares remain under 29.23; complex/sparse variants and production performance remain separate.
+
+Numerical item 29.30 repairs rectangular/scale-aware numerical rank and adds an independent normalized 2-norm condition estimate with native/Python APIs and singular-spectrum references. Residual reporting/refinement and least squares are the remaining 29.23 solver slices.
