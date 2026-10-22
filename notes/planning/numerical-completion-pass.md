@@ -53,8 +53,6 @@ preserved separately.
 
 ## Concrete remaining audit work
 
-- Array Range normalization: negative start/stop values and extreme step addition
-  still need native normalization and raw Python slice marshalling.
 - Graph adjacency construction: true CSR graph export/storage-format selection,
   parallel/loop weight accumulation, deterministic coordinate order and failure
   propagation still need a shared checked builder.
@@ -65,3 +63,5 @@ preserved separately.
   inspect supported numerical consumers before parent closure.
 - Explicit sparse/dense spectral materialization policy, broader production
   size/fill/SIMD and final regression/lint/API/documentation gates remain open.
+
+- 29.53: shared raw-bound slice normalization and checked extreme steps; 437 Python regressions.

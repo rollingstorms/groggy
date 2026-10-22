@@ -126,15 +126,9 @@ impl MatrixSlicing for GraphMatrix {
             )));
         }
 
-        let mut row_data = Vec::new();
-        for col_idx in 0..cols {
-            let column = self.get_column_internal(col_idx)?;
-            row_data.push(
-                *column.get(row_idx).ok_or_else(|| {
-                    GraphError::InvalidInput(format!("Row {} not found", row_idx))
-                })?,
-            );
-        }
+        let row_data = (0..cols)
+            .map(|col| self.get_checked(row_idx, col))
+            .collect::<GraphResult<Vec<_>>>()?;
 
         Ok(NumArray::new(row_data))
     }

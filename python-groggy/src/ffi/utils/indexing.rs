@@ -5,7 +5,6 @@
 use groggy::storage::array::{BoolArray, SliceIndex};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PySlice, PyTuple};
-use std::os::raw::c_long;
 // PyBoolArray functionality integrated into unified NumArray
 
 /// Convert Python indexing object to SliceIndex
@@ -17,24 +16,15 @@ pub fn python_index_to_slice_index(_py: Python, index: &PyAny) -> PyResult<Slice
 
     // Handle Python slice object
     if let Ok(slice) = index.downcast::<PySlice>() {
-        let indices = slice.indices(c_long::MAX)?;
-        return Ok(SliceIndex::Range {
-            start: if indices.start == 0 && indices.stop == c_long::MAX as isize {
-                None
-            } else {
-                Some(indices.start as i64)
-            },
-            stop: if indices.stop == c_long::MAX as isize {
-                None
-            } else {
-                Some(indices.stop as i64)
-            },
-            step: if indices.step == 1 {
-                None
-            } else {
-                Some(indices.step as i64)
-            },
-        });
+        let index = SliceIndex::Range {
+            start: slice.getattr("start")?.extract::<Option<i64>>()?,
+            stop: slice.getattr("stop")?.extract::<Option<i64>>()?,
+            step: slice.getattr("step")?.extract::<Option<i64>>()?,
+        };
+        index
+            .validate()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        return Ok(index);
     }
 
     // Handle list of integers
@@ -85,7 +75,7 @@ pub fn python_index_to_slice_index(_py: Python, index: &PyAny) -> PyResult<Slice
     if let Ok(base_array) = index.extract::<PyRef<crate::ffi::storage::array::PyBaseArray>>() {
         // Try to extract as integers for fancy indexing
         let values: Vec<_> = base_array.inner.iter().cloned().collect();
-        
+
         // Check if all values are integers
         let mut int_indices = Vec::new();
         let mut is_all_int = true;
@@ -104,11 +94,11 @@ pub fn python_index_to_slice_index(_py: Python, index: &PyAny) -> PyResult<Slice
                 }
             }
         }
-        
+
         if is_all_int {
             return Ok(SliceIndex::List(int_indices));
         }
-        
+
         // Check if all values are booleans
         let mut bool_values = Vec::new();
         for val in values.iter() {
@@ -121,7 +111,7 @@ pub fn python_index_to_slice_index(_py: Python, index: &PyAny) -> PyResult<Slice
                 }
             }
         }
-        
+
         let bool_array = groggy::storage::BoolArray::new(bool_values);
         return Ok(SliceIndex::BoolArray(bool_array));
     }
@@ -150,39 +140,6 @@ pub fn python_index_to_slice_index(_py: Python, index: &PyAny) -> PyResult<Slice
         "Invalid index type: expected int, slice, list of ints, or BoolArray, got {}",
         index.get_type().name()?
     )))
-}
-
-/// Convert Python slice indices with length constraint
-///
-/// # Future Feature
-///
-/// Designed for advanced slicing operations. Currently unused as basic
-/// indexing patterns handle most use cases. Will be integrated when
-/// NumPy-style advanced indexing is added to the Python API.
-#[allow(dead_code)]
-pub fn python_slice_to_slice_index(
-    _py: Python,
-    slice: &PySlice,
-    length: usize,
-) -> PyResult<SliceIndex> {
-    let indices = slice.indices(length as c_long)?;
-    Ok(SliceIndex::Range {
-        start: if indices.start == 0 && indices.stop == length as isize {
-            None
-        } else {
-            Some(indices.start as i64)
-        },
-        stop: if indices.stop == length as isize {
-            None
-        } else {
-            Some(indices.stop as i64)
-        },
-        step: if indices.step == 1 {
-            None
-        } else {
-            Some(indices.step as i64)
-        },
-    })
 }
 
 #[cfg(test)]

@@ -197,3 +197,5 @@ accepted pinned-state model.
 - [x] **29.51 — Unified public matrix helpers.** Typed maps unify casts/math/scalars/comparison masks; Python scalar_multiply/abs/comparisons delegate to Rust; tile/repeat retain checked empty/sparse/identity behavior. Full native suites and 382 rebuilt Python tests pass. See docs/api/matrix-helper-operations.md.
 
 - [x] **29.52 — Graph-matrix operators.** Checked degrees, correct generalized powers, explicit true normalized Laplacian and transition operators, fixed graph routes and identity-preserving native bridge. Native full suites and 424 rebuilt Python regressions pass. See docs/api/graph-matrix-transforms.md.
+
+- [x] **29.53 — Shared slice normalization.** Actual-length negative/clamped/default bounds, checked extreme steps/allocation, raw Python slice marshalling and selected-cell row reads. Native full suites and 437 rebuilt Python tests pass, including 8,400 list-reference combinations. See docs/api/array-slicing.md.

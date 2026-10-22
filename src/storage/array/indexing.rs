@@ -29,6 +29,13 @@ pub enum SliceIndex {
 }
 
 impl SliceIndex {
+    /// Validate length-independent slice controls before language-boundary dispatch.
+    pub fn validate(&self) -> GraphResult<()> {
+        if let SliceIndex::Range { step, .. } = self {
+            validate_step(step.unwrap_or(1))?;
+        }
+        Ok(())
+    }
     /// Convert Python slice notation to indices
     pub fn resolve_indices(&self, length: usize) -> GraphResult<Vec<usize>> {
         match self {
@@ -62,57 +69,74 @@ impl SliceIndex {
 
 /// Resolve negative indices to positive indices
 fn resolve_negative_index(index: i64, length: usize) -> GraphResult<usize> {
-    let len = length as i64;
+    let len = i128::try_from(length)
+        .map_err(|_| GraphError::InvalidInput("Array length exceeds index working range".into()))?;
+    let index = i128::from(index);
     let resolved = if index < 0 { len + index } else { index };
-
     if resolved < 0 || resolved >= len {
         return Err(GraphError::InvalidInput(format!(
-            "Index {} out of range for array of length {}",
-            index, length
+            "Index {index} out of range for array of length {length}"
         )));
     }
-
-    Ok(resolved as usize)
+    usize::try_from(resolved)
+        .map_err(|_| GraphError::InvalidInput("Resolved index exceeds platform range".into()))
 }
-
-/// Resolve range indices like Python slicing
+fn validate_step(step: i64) -> GraphResult<()> {
+    if step == 0 {
+        Err(GraphError::InvalidInput("Slice step cannot be zero".into()))
+    } else {
+        Ok(())
+    }
+}
+/// Resolve raw slice bounds once against the actual length, including omitted
+/// reverse bounds. i128 working positions prevent i64 step-addition overflow.
 fn resolve_range_indices(
     start: Option<i64>,
     stop: Option<i64>,
     step: Option<i64>,
     length: usize,
 ) -> GraphResult<Vec<usize>> {
-    let len = length as i64;
     let step = step.unwrap_or(1);
-
-    if step == 0 {
-        return Err(GraphError::InvalidInput(
-            "Slice step cannot be zero".to_string(),
-        ));
-    }
-
-    let (start, stop) = if step > 0 {
-        let start = start.unwrap_or(0);
-        let stop = stop.unwrap_or(len);
-        (start, stop)
-    } else {
-        let start = start.unwrap_or(len - 1);
-        let stop = stop.unwrap_or(-len - 1);
-        (start, stop)
+    validate_step(step)?;
+    let step = i128::from(step);
+    let len = i128::try_from(length)
+        .map_err(|_| GraphError::InvalidInput("Array length exceeds slice working range".into()))?;
+    let (lower, upper) = if step > 0 { (0, len) } else { (-1, len - 1) };
+    let bound = |value: i64| {
+        let value = i128::from(value);
+        let value = if value < 0 { len + value } else { value };
+        value.clamp(lower, upper)
     };
-
+    let start = start
+        .map(bound)
+        .unwrap_or(if step > 0 { 0 } else { len - 1 });
+    let stop = stop.map(bound).unwrap_or(if step > 0 { len } else { -1 });
+    let span = if step > 0 { stop - start } else { start - stop };
+    let count = if span <= 0 {
+        0
+    } else {
+        (span - 1) / step.abs() + 1
+    };
+    let count = usize::try_from(count).map_err(|_| {
+        GraphError::InvalidInput("Slice result length exceeds platform range".into())
+    })?;
     let mut indices = Vec::new();
+    indices
+        .try_reserve_exact(count)
+        .map_err(|_| GraphError::InvalidInput("Slice index allocation failed".into()))?;
     let mut current = start;
-
-    while (step > 0 && current < stop && current < len)
-        || (step < 0 && current > stop && current >= 0)
-    {
-        if current >= 0 && current < len {
-            indices.push(current as usize);
+    for position in 0..count {
+        indices.push(
+            usize::try_from(current).map_err(|_| {
+                GraphError::InvalidInput("Slice produced an invalid position".into())
+            })?,
+        );
+        if position + 1 < count {
+            current = current.checked_add(step).ok_or_else(|| {
+                GraphError::InvalidInput("Slice position exceeds working range".into())
+            })?;
         }
-        current += step;
     }
-
     Ok(indices)
 }
 
