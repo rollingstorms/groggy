@@ -32,7 +32,9 @@ impl FromAttrValue<f64> for f64 {
 
 impl FromAttrValue<f32> for f32 {
     fn from_attr_value(value: &AttrValue) -> GraphResult<f32> {
-        <f64 as FromAttrValue<f64>>::from_attr_value(value).map(|v| v as f32)
+        let value = <f64 as FromAttrValue<f64>>::from_attr_value(value)?;
+        <f32 as NumericType>::from_f64(value)
+            .ok_or_else(|| GraphError::InvalidInput("Attribute exceeds f32 range".into()))
     }
 }
 
@@ -41,7 +43,9 @@ impl FromAttrValue<i64> for i64 {
         match value {
             AttrValue::Int(i) => Ok(*i),
             AttrValue::SmallInt(i) => Ok(*i as i64),
-            AttrValue::Float(f) => Ok(*f as i64),
+            AttrValue::Float(f) => <i64 as NumericType>::from_f64(f64::from(*f)).ok_or_else(|| {
+                GraphError::InvalidInput("Attribute is not finite or exceeds i64 range".into())
+            }),
             AttrValue::Bool(b) => Ok(if *b { 1 } else { 0 }),
             AttrValue::Text(s) => s
                 .parse()
@@ -56,7 +60,9 @@ impl FromAttrValue<i64> for i64 {
 
 impl FromAttrValue<i32> for i32 {
     fn from_attr_value(value: &AttrValue) -> GraphResult<i32> {
-        <i64 as FromAttrValue<i64>>::from_attr_value(value).map(|v| v as i32)
+        let value = <i64 as FromAttrValue<i64>>::from_attr_value(value)?;
+        i32::try_from(value)
+            .map_err(|_| GraphError::InvalidInput("Attribute exceeds i32 range".into()))
     }
 }
 

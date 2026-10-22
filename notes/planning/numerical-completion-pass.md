@@ -56,11 +56,11 @@ preserved separately.
 - General matrix arithmetic tape composition: avoid silent detachment and
   cloned-tape node collisions; factor output routes are complete in their stated
   supported domains (29.24), while broad composition remains open.
-- Remaining lower fill/layout and explicit attribute-converter range checks;
-  inspect supported numerical consumers before parent closure.
 - Explicit sparse/dense spectral materialization policy, broader production
   size/fill/SIMD and final regression/lint/API/documentation gates remain open.
 
 - 29.53: shared raw-bound slice normalization and checked extreme steps; 437 Python regressions.
 
 - 29.54: checked graph/view adjacency construction, real CSR, parallel accumulation and scoped identity/weights; 439 Python regressions.
+
+- 29.55: scoped feature export, checked explicit attribute conversion and logical/CSR fill; 440 Python regressions.

@@ -201,3 +201,5 @@ accepted pinned-state model.
 - [x] **29.53 — Shared slice normalization.** Actual-length negative/clamped/default bounds, checked extreme steps/allocation, raw Python slice marshalling and selected-cell row reads. Native full suites and 437 rebuilt Python tests pass, including 8,400 list-reference combinations. See docs/api/array-slicing.md.
 
 - [x] **29.54 — Checked adjacency construction.** True CSR graph export, summed parallel edges/loops, scoped weights/selected edges, canonical coordinates and explicit errors. Full native suites and 439 rebuilt Python regressions pass. See docs/api/graph-matrix-construction.md.
+
+- [x] **29.55 — Feature export and numerical boundaries.** GraphSpace-scoped values, canonical feature columns/node labels, checked attribute ranges and logical dense/CSR fill. Full native suites and 440 rebuilt Python tests pass. See docs/api/matrix-feature-conversion.md.

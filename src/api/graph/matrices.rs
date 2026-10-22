@@ -6,6 +6,78 @@ use crate::storage::{
     matrix::{FromAttrValue, GraphMatrix},
 };
 impl Graph {
+    /// Export numeric scalar feature columns from this graph's value references.
+    /// Missing, null and nonnumeric cells retain legacy zero imputation.
+    pub fn to_matrix<T: NumericType + FromAttrValue<T>>(&self) -> GraphResult<GraphMatrix<T>> {
+        let mut nodes = self.space.node_ids();
+        nodes.sort_unstable();
+        let pool = self.pool.borrow();
+        let (names, _) = pool.attribute_names();
+        let mut names: Vec<_> = names.into_iter().collect();
+        names.sort_unstable();
+        let mut columns = Vec::new();
+        for name in names {
+            let column = pool.get_node_attribute_column(&name);
+            let mut numeric = false;
+            for &node in &nodes {
+                if let Some(index) = self.space.get_node_attr_index(node, &name) {
+                    let value = column.and_then(|values| values.get(index)).ok_or_else(|| {
+                        GraphError::InvalidInput(format!(
+                            "Invalid feature reference for node {node}, attribute {name}"
+                        ))
+                    })?;
+                    numeric |= matches!(
+                        value,
+                        AttrValue::Int(_)
+                            | AttrValue::SmallInt(_)
+                            | AttrValue::Float(_)
+                            | AttrValue::Bool(_)
+                    );
+                }
+            }
+            if numeric {
+                columns.push((name, column));
+            }
+        }
+        let count = nodes
+            .len()
+            .checked_mul(columns.len())
+            .ok_or_else(|| GraphError::InvalidInput("Feature matrix shape overflow".into()))?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(count)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        for &node in &nodes {
+            for (name, column) in &columns {
+                let value = match self.space.get_node_attr_index(node, name) {
+                    Some(index) => {
+                        column.and_then(|values| values.get(index)).ok_or_else(|| {
+                            GraphError::InvalidInput(format!(
+                                "Invalid feature reference for node {node}, attribute {name}"
+                            ))
+                        })?
+                    }
+                    None => &AttrValue::Null,
+                };
+                data.push(match value {
+                    AttrValue::Int(_)
+                    | AttrValue::SmallInt(_)
+                    | AttrValue::Float(_)
+                    | AttrValue::Bool(_) => T::from_attr_value(value)?,
+                    _ => T::from_attr_value(&AttrValue::Null)?,
+                });
+            }
+        }
+        let mut matrix =
+            GraphMatrix::from_row_major_data(data, nodes.len(), columns.len(), Some(&nodes))?;
+        matrix.set_column_names(
+            columns
+                .into_iter()
+                .map(|(name, _)| name.to_string())
+                .collect(),
+        );
+        Ok(matrix)
+    }
+
     /// Build an owned operator from exactly these entity IDs, retaining node order.
     /// Missing weights are one; explicit values use the attribute conversion policy.
     pub fn adjacency_from_entities<T: NumericType + FromAttrValue<T>>(
