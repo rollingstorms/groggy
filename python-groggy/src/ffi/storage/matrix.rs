@@ -640,17 +640,23 @@ impl PyGraphMatrix {
 
     /// Calculate the Frobenius norm (Euclidean norm) of the matrix
     fn norm(&self) -> PyResult<f64> {
-        Ok(self.inner.norm())
+        self.inner
+            .norm()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// Calculate the L1 norm (sum of absolute values) of the matrix
     fn norm_l1(&self) -> PyResult<f64> {
-        Ok(self.inner.norm_l1())
+        self.inner
+            .norm_l1()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// Calculate the L∞ norm (maximum absolute value) of the matrix
     fn norm_inf(&self) -> PyResult<f64> {
-        Ok(self.inner.norm_inf())
+        self.inner
+            .norm_inf()
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     // === STATISTICAL OPERATIONS ===

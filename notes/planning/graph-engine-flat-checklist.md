@@ -177,3 +177,5 @@ accepted pinned-state model.
 - [ ] **AR4 — Open: explicit view ownership.** Finish immutable state/time pins, checked view writes, and graph-table ownership across 12 and 26–27; ordinary current Subgraph values are not yet pinned snapshots.
 - [ ] **AR5 — Partial: smaller Graph coordinator.** Preserve public APIs while extracting cohesive mutation/topology/history/table responsibilities, keeping Rust business logic, thin FFI translation, and a separate deferred Graphiti adapter.
 - [ ] **AR6 — Partial: complete persistence boundary.** Retain the documented distinction between active export and recoverable checked journal storage; complete pooled contents, lifecycle, concurrency, and compatibility before claiming a durable multi-user Graphiti system of record.
+
+- [x] **29.43 — Checked matrix statistics and sparse reductions.** Stable checked entrywise norms and lower population statistics, exact typed integer means, logical-layout validation and CSR zero-group reductions. Full native suites and 310 rebuilt Python numerical regressions passed. Helper APIs, automatic gradients and production gates remain open. See docs/api/matrix-statistics.md.

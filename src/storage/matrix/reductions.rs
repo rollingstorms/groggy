@@ -29,18 +29,6 @@ pub(super) fn sum<T: NumericType>(values: &[T]) -> GraphResult<T> {
         })
     }
 }
-pub(super) fn mean<T: NumericType>(values: &[T]) -> f64 {
-    k::mean_iter(values.iter().copied().map(Value)).unwrap_or(0.)
-}
-pub(super) fn variance<T: NumericType>(values: &[T]) -> f64 {
-    k::variance_iter(values.iter().copied().map(Value)).unwrap_or(0.)
-}
-pub(super) fn std<T: NumericType>(values: &[T]) -> f64 {
-    k::std_iter(values.iter().copied().map(Value)).unwrap_or(0.)
-}
-pub(super) fn population_variance<T: NumericType>(values: &[T]) -> f64 {
-    k::population_variance_iter(values.iter().copied().map(Value)).unwrap_or(0.)
-}
 pub(super) fn extremum<T: NumericType>(values: &[T], minimum: bool) -> GraphResult<Option<T>> {
     let mut best = None;
     for &value in values {
@@ -59,4 +47,82 @@ pub(super) fn extremum<T: NumericType>(values: &[T], minimum: bool) -> GraphResu
         }
     }
     Ok(best)
+}
+
+/// Typed mean with exact integer accumulation and truncation only after division.
+pub(super) fn typed_mean<T: NumericType>(values: &[T], count: usize) -> GraphResult<T> {
+    if count == 0 {
+        return Ok(T::zero());
+    }
+    if T::DTYPE.is_integer() {
+        // Divide before accumulating so the mean of [MAX, MAX] remains valid
+        // even for i128. Quotients and remainders retain exact truncation.
+        let divisor = count as i128;
+        let (mut quotient, mut remainder) = (0_i128, 0_i128);
+        for value in values {
+            let value = value
+                .to_i128()
+                .ok_or_else(|| GraphError::InvalidInput("Invalid integer mean input".into()))?;
+            quotient = quotient.checked_add(value / divisor).ok_or_else(|| {
+                GraphError::InvalidInput("Integer mean accumulator overflow".into())
+            })?;
+            remainder = remainder.checked_add(value % divisor).ok_or_else(|| {
+                GraphError::InvalidInput("Integer mean remainder overflow".into())
+            })?;
+        }
+        quotient = quotient
+            .checked_add(remainder / divisor)
+            .ok_or_else(|| GraphError::InvalidInput("Integer mean output overflow".into()))?;
+        let residual = remainder % divisor;
+        // quotient + residual/divisor must truncate toward zero as a whole.
+        if quotient > 0 && residual < 0 {
+            quotient -= 1;
+        }
+        if quotient < 0 && residual > 0 {
+            quotient += 1;
+        }
+        return T::from_i128(quotient)
+            .ok_or_else(|| GraphError::InvalidInput("Integer mean output overflow".into()));
+    }
+    statistic_value(extended_mean(values, count))
+}
+pub(super) fn statistic_value<T: NumericType>(value: f64) -> GraphResult<T> {
+    T::from_f64(value).ok_or_else(|| {
+        GraphError::InvalidInput("Statistical output cannot be represented in dtype".into())
+    })
+}
+pub(super) fn extended_mean<T: NumericType>(values: &[T], count: usize) -> f64 {
+    k::zero_extended_mean(values.iter().copied().map(Value), count).unwrap_or(0.)
+}
+pub(super) fn extended_std<T: NumericType>(values: &[T], count: usize, sample: bool) -> f64 {
+    k::zero_extended_std(values.iter().copied().map(Value), count, sample).unwrap_or(0.)
+}
+pub(super) fn extended_extremum<T: NumericType>(
+    values: &[T],
+    count: usize,
+    minimum: bool,
+) -> GraphResult<T> {
+    let best = extremum(values, minimum)?.unwrap_or_else(T::zero);
+    if best.to_f64().is_nan() {
+        return Ok(best);
+    }
+    if values.len() < count && ((minimum && best > T::zero()) || (!minimum && best < T::zero())) {
+        Ok(T::zero())
+    } else {
+        Ok(best)
+    }
+}
+
+pub(super) fn extended_variance<T: NumericType>(values: &[T], count: usize, sample: bool) -> f64 {
+    if values.len() == count {
+        let values = values.iter().copied().map(Value);
+        return if sample {
+            k::variance_iter(values)
+        } else {
+            k::population_variance_iter(values)
+        }
+        .unwrap_or(0.);
+    }
+    let std = extended_std(values, count, sample);
+    std * std
 }

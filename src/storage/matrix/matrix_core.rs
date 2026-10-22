@@ -1119,70 +1119,36 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Mean per logical axis; empty reductions are zero and outputs retain T.
     pub fn mean_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
-        self.reduce_axis(axis, |values| {
-            Self::statistic_value(super::reductions::mean(values))
-        })
+        self.reduce_axis(axis, super::reductions::typed_mean)
     }
     /// Sample standard deviation, independently scaled before output conversion.
     pub fn std_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
-        self.reduce_axis(axis, |values| {
-            Self::statistic_value(super::reductions::std(values))
+        self.reduce_axis(axis, |values, count| {
+            super::reductions::statistic_value(super::reductions::extended_std(values, count, true))
         })
     }
-    /// Sample variance; empty/finite singleton=0, nonfinite observations propagate NaN.
+    /// Sample variance; nonfinite observations propagate NaN.
     pub fn var_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
-        self.reduce_axis(axis, |values| {
-            Self::statistic_value(super::reductions::variance(values))
-        })
-    }
-    fn statistic_value(value: f64) -> GraphResult<T> {
-        T::from_f64(value).ok_or_else(|| {
-            GraphError::InvalidInput("Statistical output cannot be represented in dtype".into())
+        self.reduce_axis(axis, |values, count| {
+            super::reductions::statistic_value(super::reductions::extended_variance(
+                values, count, true,
+            ))
         })
     }
     fn reduce_axis<R>(
         &self,
         axis: Axis,
-        operation: impl Fn(&[T]) -> GraphResult<R>,
+        operation: impl Fn(&[T], usize) -> GraphResult<R>,
     ) -> GraphResult<Vec<R>> {
-        let (rows, cols) = self.shape();
-        let (outputs, samples) = match axis {
-            Axis::Rows => (rows, cols),
-            Axis::Columns => (cols, rows),
-        };
-        let dense = match &self.storage.storage {
-            crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Dense(buffer) => {
-                Some(buffer.data().map_err(|e| {
-                    GraphError::InvalidInput(format!("Cannot read matrix storage: {e}"))
-                })?)
-            }
-            _ => None,
-        };
-        (0..outputs)
-            .map(|index| {
-                let values = (0..samples)
-                    .map(|sample| {
-                        let (row, col) = match axis {
-                            Axis::Rows => (index, sample),
-                            Axis::Columns => (sample, index),
-                        };
-                        match &dense {
-                            Some(buffer) => buffer
-                                .as_slice()
-                                .get(self.storage.strides.index(row, col))
-                                .copied()
-                                .ok_or_else(|| {
-                                    GraphError::InvalidInput(
-                                        "Missing matrix reduction value".into(),
-                                    )
-                                }),
-                            None => self.get_checked(row, col),
-                        }
-                    })
-                    .collect::<GraphResult<Vec<_>>>()?;
-                operation(&values)
+        self.storage
+            .reduce_axis(matches!(axis, Axis::Columns), |values, count| {
+                operation(values, count).map_err(|e| {
+                    crate::storage::advanced_matrix::unified_matrix::MatrixError::InvalidInput(
+                        e.to_string(),
+                    )
+                })
             })
-            .collect()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
     }
     fn logical_values(&self) -> GraphResult<Vec<T>> {
         let (rows, cols) = self.shape();
@@ -1203,14 +1169,14 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Minimum per axis; empty reductions retain legacy zero, NaNs propagate.
     pub fn min_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
-        self.reduce_axis(axis, |values| {
-            Ok(super::reductions::extremum(values, true)?.unwrap_or_else(T::zero))
+        self.reduce_axis(axis, |values, count| {
+            super::reductions::extended_extremum(values, count, true)
         })
     }
     /// Maximum per axis; empty reductions retain legacy zero, NaNs propagate.
     pub fn max_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
-        self.reduce_axis(axis, |values| {
-            Ok(super::reductions::extremum(values, false)?.unwrap_or_else(T::zero))
+        self.reduce_axis(axis, |values, count| {
+            super::reductions::extended_extremum(values, count, false)
         })
     }
 
@@ -1295,7 +1261,7 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Checked typed sum per axis, with exact floating accumulation.
     pub fn sum_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
-        self.reduce_axis(axis, super::reductions::sum)
+        self.reduce_axis(axis, |values, _| super::reductions::sum(values))
     }
 
     /// Reshape matrix to new dimensions while preserving total element count
@@ -1369,7 +1335,15 @@ impl<T: NumericType> GraphMatrix<T> {
     }
     /// Global f64 mean, avoiding intermediate typed-sum overflow; empty=0.
     pub fn mean(&self) -> GraphResult<f64> {
-        Ok(super::reductions::mean(&self.logical_values()?))
+        let (rows, cols) = self.shape();
+        let count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| GraphError::InvalidInput("Matrix element count overflow".into()))?;
+        let values = self
+            .storage
+            .reduction_values()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        Ok(super::reductions::extended_mean(&values, count))
     }
     /// Global minimum; empty=None and any NaN propagates.
     pub fn min(&self) -> GraphResult<Option<T>> {
@@ -1424,60 +1398,40 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Calculate the Frobenius norm (Euclidean norm) of the matrix
     /// ||A||_F = sqrt(sum(a_ij^2)) for all i,j
-    pub fn norm(&self) -> f64
-    where
-        T: std::ops::Mul<Output = T> + Copy,
-    {
-        let (rows, cols) = self.shape();
-        let mut sum_of_squares = 0.0;
-
-        for row in 0..rows {
-            for col in 0..cols {
-                if let Some(value) = self.get(row, col) {
-                    let f64_value = value.to_f64();
-                    sum_of_squares += f64_value * f64_value;
-                }
-            }
-        }
-
-        sum_of_squares.sqrt()
+    pub fn norm(&self) -> GraphResult<f64> {
+        let values = self
+            .storage
+            .reduction_values()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        Ok(crate::storage::array::numeric_arithmetic::norm(&values))
     }
 
-    /// Calculate the L1 norm (sum of absolute values) of the matrix
-    /// ||A||_1 = sum(|a_ij|) for all i,j
-    pub fn norm_l1(&self) -> f64 {
-        let (rows, cols) = self.shape();
-        let mut sum_abs = 0.0;
-
-        for row in 0..rows {
-            for col in 0..cols {
-                if let Some(value) = self.get(row, col) {
-                    sum_abs += value.to_f64().abs();
-                }
-            }
+    /// Entrywise L1 norm: sum of absolute values (not an induced matrix norm).
+    pub fn norm_l1(&self) -> GraphResult<f64> {
+        let values = self
+            .storage
+            .reduction_values()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut total = super::dot_product::Dot::new();
+        for value in values.iter() {
+            total.add(value.to_f64().abs(), 1.0);
         }
-
-        sum_abs
+        Ok(total.total())
     }
 
-    /// Calculate the L∞ norm (maximum absolute value) of the matrix
-    /// ||A||_∞ = max(|a_ij|) for all i,j
-    pub fn norm_inf(&self) -> f64 {
-        let (rows, cols) = self.shape();
-        let mut max_abs = 0.0;
-
-        for row in 0..rows {
-            for col in 0..cols {
-                if let Some(value) = self.get(row, col) {
-                    let abs_value = value.to_f64().abs();
-                    if abs_value > max_abs {
-                        max_abs = abs_value;
-                    }
-                }
-            }
+    /// Entrywise infinity norm: maximum absolute value; NaNs propagate.
+    pub fn norm_inf(&self) -> GraphResult<f64> {
+        let values = self
+            .storage
+            .reduction_values()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        if values.iter().any(|x| x.to_f64().is_nan()) {
+            return Ok(f64::NAN);
         }
-
-        max_abs
+        Ok(values
+            .iter()
+            .map(|x| x.to_f64().abs())
+            .fold(0.0_f64, f64::max))
     }
 }
 
@@ -3120,8 +3074,8 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Population variance per column (ddof=0), preserving this legacy convention.
     pub fn column_variances(&self) -> GraphResult<Vec<f64>> {
-        self.reduce_axis(Axis::Columns, |values| {
-            Ok(super::reductions::population_variance(values))
+        self.reduce_axis(Axis::Columns, |values, count| {
+            Ok(super::reductions::extended_variance(values, count, false))
         })
     }
 
@@ -3146,6 +3100,8 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// f64 mean per column; empty reductions are zero.
     pub fn column_means(&self) -> GraphResult<Vec<f64>> {
-        self.reduce_axis(Axis::Columns, |values| Ok(super::reductions::mean(values)))
+        self.reduce_axis(Axis::Columns, |values, count| {
+            Ok(super::reductions::extended_mean(values, count))
+        })
     }
 }

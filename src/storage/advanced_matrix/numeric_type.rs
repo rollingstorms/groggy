@@ -324,7 +324,7 @@ impl NumericType for i64 {
     }
 
     fn from_f64(val: f64) -> Option<Self> {
-        if val.is_finite() && val >= i64::MIN as f64 && val <= i64::MAX as f64 {
+        if val.is_finite() && val >= i64::MIN as f64 && val < -(i64::MIN as f64) {
             Some(val as i64)
         } else {
             None
@@ -540,7 +540,7 @@ impl NumericType for i128 {
 
     fn from_f64(val: f64) -> Option<Self> {
         // Check for extreme values that won't fit in i128
-        if val.is_finite() && val >= i128::MIN as f64 && val <= i128::MAX as f64 {
+        if val.is_finite() && val >= i128::MIN as f64 && val < -(i128::MIN as f64) {
             Some(val as i128)
         } else {
             None

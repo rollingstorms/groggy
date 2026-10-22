@@ -232,6 +232,76 @@ pub fn std_dev<S: Scalar>(data: &[S]) -> Option<f64> {
 pub(crate) fn std_iter<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(data: I) -> Option<f64> {
     dispersion(data, None).map(|(factor, scale)| factor.sqrt() * scale)
 }
+/// Population standard deviation, rescaled after taking the square root.
+pub(crate) fn population_std_iter<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(
+    data: I,
+) -> Option<f64> {
+    let n = data.len();
+    dispersion(data, None).map(|(factor, scale)| {
+        let factor = if n > 1 {
+            factor * ((n - 1) as f64 / n as f64)
+        } else {
+            factor
+        };
+        factor.sqrt() * scale
+    })
+}
+/// Mean including implicit zeros, without allocating them. Stored values may also be zero.
+pub(crate) fn zero_extended_mean<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(
+    data: I,
+    total: usize,
+) -> Option<f64> {
+    let stored = data.len();
+    if total == 0 || stored > total {
+        return None;
+    }
+    if stored == 0 {
+        return Some(0.0);
+    }
+    mean_iter(data).map(|mean| mean * (stored as f64 / total as f64))
+}
+/// Stable dispersion of a group of observations extended by implicit zeros.
+/// The within-group and between-group deviations combine via hypot, avoiding
+/// intermediate squared magnitudes and iteration over absent CSR cells.
+pub(crate) fn zero_extended_std<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(
+    data: I,
+    total: usize,
+    sample: bool,
+) -> Option<f64> {
+    let stored = data.len();
+    if total == 0 || stored > total {
+        return None;
+    }
+    if stored == total {
+        return if sample {
+            std_iter(data)
+        } else {
+            population_std_iter(data)
+        };
+    }
+    if stored == 0 {
+        return Some(0.0);
+    }
+    if data.clone().any(|x| !x.as_f64().is_finite()) {
+        return Some(f64::NAN);
+    }
+    let denominator = if sample && total > 1 {
+        total - 1
+    } else {
+        total
+    } as f64;
+    // Computing the group's standard deviation before weighting can overflow.
+    // Apply its weight to the normalized dispersion before rescaling instead.
+    let (factor, scale) = dispersion(data.clone(), None)?;
+    let within = if stored > 1 {
+        (factor * ((stored - 1) as f64 / denominator)).sqrt() * scale
+    } else {
+        0.0
+    };
+    let between = mean_iter(data)?.abs()
+        * ((stored as f64 / total as f64) * ((total - stored) as f64 / denominator)).sqrt();
+    Some(within.hypot(between))
+}
 /// Compatibility moment around the caller's explicit center, with N-1 denominator.
 /// Retains the legacy zero result for zero/one observation.
 pub fn variance_with_mean(data: &[f64], center: f64) -> f64 {

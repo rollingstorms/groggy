@@ -7,6 +7,67 @@ use crate::storage::advanced_matrix::{
     unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},
 };
 
+use super::checked_kernels::NumericValue;
+use crate::storage::array::{numeric_arithmetic, numeric_reductions as reductions};
+use std::borrow::Cow;
+
+impl<T: NumericType> UnifiedMatrix<T> {
+    /// Checked logical values; CSR norms/statistics need only its stored entries.
+    pub(crate) fn reduction_values(&self) -> MatrixResult<Cow<'_, [T]>> {
+        if let Some(sparse) = self.checked_sparse()? {
+            return Ok(Cow::Borrowed(&sparse.values));
+        }
+        self.to_vec().map(Cow::Owned)
+    }
+    /// Pass each axis's stored observations and full sample count to a reducer.
+    /// Column reduction builds a CSR transpose once; dense layouts are checked once.
+    pub(crate) fn reduce_axis<R>(
+        &self,
+        columns: bool,
+        operation: impl Fn(&[T], usize) -> MatrixResult<R>,
+    ) -> MatrixResult<Vec<R>> {
+        let (outputs, samples) = if columns {
+            (self.cols(), self.rows())
+        } else {
+            (self.rows(), self.cols())
+        };
+        if let Some(sparse) = self.checked_sparse()? {
+            let transposed;
+            let source = if columns {
+                transposed = sparse.transpose()?;
+                &transposed
+            } else {
+                sparse
+            };
+            return (0..outputs)
+                .map(|row| {
+                    operation(
+                        &source.values[source.row_pointers[row]..source.row_pointers[row + 1]],
+                        samples,
+                    )
+                })
+                .collect();
+        }
+        let values = self.to_vec()?;
+        (0..outputs)
+            .map(|index| {
+                if !columns {
+                    return operation(&values[index * samples..(index + 1) * samples], samples);
+                }
+                let column: Vec<T> = (0..samples)
+                    .map(|row| values[row * self.cols() + index])
+                    .collect();
+                operation(&column, samples)
+            })
+            .collect()
+    }
+}
+
+fn checked_count(rows: usize, cols: usize) -> MatrixResult<usize> {
+    rows.checked_mul(cols)
+        .ok_or_else(|| MatrixError::InvalidShape("Matrix element count overflow".into()))
+}
+
 /// Operations trait for matrices
 pub trait MatrixOperations<T: NumericType> {
     /// Element-wise mathematical functions
@@ -308,56 +369,47 @@ pub struct MatrixStats;
 impl MatrixStats {
     /// Calculate the mean of all elements
     pub fn mean<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<f64> {
-        let sum = matrix.sum()?;
-        let count = matrix.len() as f64;
-        Ok(sum.to_f64() / count)
+        let count = checked_count(matrix.rows(), matrix.cols())?;
+        let values = matrix.reduction_values()?;
+        Ok(
+            reductions::zero_extended_mean(values.iter().copied().map(NumericValue), count)
+                .unwrap_or(f64::NAN),
+        )
     }
 
-    /// Calculate the standard deviation
+    /// Population standard deviation, preserving integer offsets until scaling.
     pub fn std<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<f64> {
-        let mean_val = Self::mean(matrix)?;
-        let variance_matrix = matrix.map_elementwise(|x| {
-            let diff = x.to_f64() - mean_val;
-            T::from_f64(diff * diff).unwrap_or(T::zero())
-        })?;
-
-        let variance = Self::mean(&variance_matrix)?;
-        Ok(variance.sqrt())
+        let count = checked_count(matrix.rows(), matrix.cols())?;
+        let values = matrix.reduction_values()?;
+        Ok(
+            reductions::zero_extended_std(values.iter().copied().map(NumericValue), count, false)
+                .unwrap_or(f64::NAN),
+        )
     }
 
     /// Calculate row-wise means
     pub fn row_means<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<Vec<f64>> {
-        let mut means = Vec::with_capacity(matrix.rows());
-
-        for i in 0..matrix.rows() {
-            let row_slice = matrix.slice(i, i + 1, 0, matrix.cols())?;
-            means.push(Self::mean(&row_slice)?);
-        }
-
-        Ok(means)
+        matrix.reduce_axis(false, |values, count| {
+            Ok(
+                reductions::zero_extended_mean(values.iter().copied().map(NumericValue), count)
+                    .unwrap_or(0.0),
+            )
+        })
     }
 
     /// Calculate column-wise means
     pub fn col_means<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<Vec<f64>> {
-        let mut means = Vec::with_capacity(matrix.cols());
-
-        for j in 0..matrix.cols() {
-            let col_slice = matrix.slice(0, matrix.rows(), j, j + 1)?;
-            means.push(Self::mean(&col_slice)?);
-        }
-
-        Ok(means)
+        matrix.reduce_axis(true, |values, count| {
+            Ok(
+                reductions::zero_extended_mean(values.iter().copied().map(NumericValue), count)
+                    .unwrap_or(0.0),
+            )
+        })
     }
 
     /// Calculate the Frobenius norm
     pub fn frobenius_norm<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<f64> {
-        let squared = matrix.map_elementwise(|x| {
-            let x_f64 = x.to_f64();
-            T::from_f64(x_f64 * x_f64).unwrap_or(T::zero())
-        })?;
-
-        let sum_squares = squared.sum()?;
-        Ok(sum_squares.to_f64().sqrt())
+        Ok(numeric_arithmetic::norm(&matrix.reduction_values()?))
     }
 }
 
