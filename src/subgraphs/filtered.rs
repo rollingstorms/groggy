@@ -152,7 +152,7 @@ impl GraphEntity for FilteredSubgraph {
 
     fn related_entities(&self) -> GraphResult<Vec<Box<dyn GraphEntity>>> {
         // Return nodes in this filtered subgraph as EntityNode wrappers
-        use crate::storage::node::EntityNode;
+        use crate::entities::EntityNode;
 
         let entities: Vec<Box<dyn GraphEntity>> = self
             .nodes

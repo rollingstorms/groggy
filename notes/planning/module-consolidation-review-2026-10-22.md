@@ -59,3 +59,11 @@ rename is insufficient, and distinct concepts should retain separate types.
 Do not combine GraphPool, GraphSpace and HistoryForest: retained values, selected
 membership/property references and historical lineage are distinct responsibilities.
 Likewise, temporal validity and recorded lineage should not be collapsed.
+
+## AR7.4 completed ownership migration
+
+Canonical Node/Edge handle state now backs historical adapters under entities;
+storage/node and storage/edge are re-export facades. Source callers have moved.
+Preserve constructor validation differences and historical specialized trait
+behavior explicitly; see `entity-handle-consolidation-2026-10-22.md`. AR7.5 pinned
+view ownership remains a separate behavioral migration.

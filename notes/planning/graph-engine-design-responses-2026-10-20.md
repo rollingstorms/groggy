@@ -769,3 +769,13 @@ expansion guards and owned-data/GIL boundaries apply. Full native suites and
 55-case release receipts are recorded in `matrix-activation-contract-2026-10-22.md`
 and the numerical activation benchmark note. This closes the NC2 helper inventory,
 not universal gradients or the deferred convolution API.
+
+### AR7.4 — Canonical entity handle ownership with compatibility adapters
+
+Node/Edge own handle state under entities; legacy EntityNode/EntityEdge wrap them
+under explicit compatibility modules. Storage imports are facades and actual
+callers use entities. Checked current constructors and unchecked historical
+signatures/trait overrides remain intact; property writes/history/liveness are
+preserved. Native ownership/mutation/restoration/inactive-reference fixtures and
+rebuilt Python live/history/topology gates are recorded in
+`entity-handle-consolidation-2026-10-22.md`. This does not freeze graph views.

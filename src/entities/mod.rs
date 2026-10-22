@@ -4,6 +4,7 @@
 //! trait-based polymorphism. Each entity type implements the appropriate traits
 //! and delegates operations to our existing optimized storage and algorithms.
 
+mod compatibility;
 pub mod edge;
 pub mod meta_edge;
 pub mod meta_node;
@@ -14,3 +15,6 @@ pub use edge::Edge;
 pub use meta_edge::MetaEdge;
 pub use meta_node::MetaNode;
 pub use node::Node;
+
+// Historical constructor/trait adapters over the canonical Node/Edge handles.
+pub use compatibility::{EntityEdge, EntityNode};

@@ -143,7 +143,7 @@ impl GraphEntity for NeighborhoodSubgraph {
             .central_nodes
             .iter()
             .map(|&central_id| {
-                Box::new(crate::storage::node::EntityNode::new(
+                Box::new(crate::entities::EntityNode::new(
                     central_id,
                     self.graph_ref.clone(),
                 )) as Box<dyn GraphEntity>

@@ -50,7 +50,15 @@ impl Node {
             }
         }
 
-        Ok(Node { id, graph })
+        Ok(Self::from_id_unchecked(id, graph))
+    }
+
+    // Compatibility construction preserves the historical unchecked handle API.
+    pub(crate) fn from_id_unchecked(id: NodeId, graph: Rc<RefCell<Graph>>) -> Self {
+        Self { id, graph }
+    }
+    pub(crate) fn graph_handle(&self) -> &Rc<RefCell<Graph>> {
+        &self.graph
     }
 
     /// Get the NodeId for this node
