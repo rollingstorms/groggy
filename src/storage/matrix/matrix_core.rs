@@ -12,7 +12,10 @@
 
 #[path = "factor_autodiff.rs"]
 mod factor_autodiff;
+#[path = "numerical_data.rs"]
+mod numerical_data;
 use crate::storage::advanced_matrix::neural::autodiff::{FactorOutput, Operation};
+pub use numerical_data::NumericalMatrixData;
 
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{

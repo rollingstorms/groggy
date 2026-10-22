@@ -4,6 +4,9 @@
 
 #![allow(unused_variables)]
 
+#[path = "matrix_compute.rs"]
+mod computation;
+
 use groggy::storage::array::BaseArray;
 use groggy::storage::array::NumArray;
 use groggy::storage::GraphMatrix;
@@ -553,9 +556,11 @@ impl PyGraphMatrix {
         // Attempt matrix multiplication first (matrix operand)
         if let Ok(matrix_obj) = operand.extract::<Py<PyGraphMatrix>>() {
             let matrix_ref = matrix_obj.borrow(py);
-            let result_matrix = self.inner.multiply(&matrix_ref.inner).map_err(|e| {
-                PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e))
-            })?;
+            let result_matrix =
+                computation::run(py, [&self.inner, &matrix_ref.inner], |[a, b]| a.multiply(b))
+                    .map_err(|e| {
+                        PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e))
+                    })?;
 
             let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
             return Py::new(py, py_result);
@@ -578,7 +583,7 @@ impl PyGraphMatrix {
 
     /// Matrix inverse (Phase 5 - placeholder for now)
     fn inverse(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        let result = self.inner.inverse().map_err(|e| {
+        let result = computation::run(py, [&self.inner], |[a]| a.inverse()).map_err(|e| {
             PyRuntimeError::new_err(format!("Matrix inverse calculation failed: {:?}", e))
         })?;
         let matrix = PyGraphMatrix { inner: result };
@@ -625,15 +630,14 @@ impl PyGraphMatrix {
     }
 
     /// Return determinant sign and log magnitude through the native LU kernel.
-    fn slogdet(&self) -> PyResult<(f64, f64)> {
-        self.inner
-            .slogdet()
+    fn slogdet(&self, py: Python) -> PyResult<(f64, f64)> {
+        computation::run(py, [&self.inner], |[a]| a.slogdet())
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
     /// Determinant calculation (for square matrices)
-    fn determinant(&self) -> PyResult<f64> {
-        self.inner.determinant().map_err(|e| {
+    fn determinant(&self, py: Python) -> PyResult<f64> {
+        computation::run(py, [&self.inner], |[a]| a.determinant()).map_err(|e| {
             PyRuntimeError::new_err(format!("Determinant calculation failed: {:?}", e))
         })
     }
@@ -1221,9 +1225,10 @@ impl PyGraphMatrix {
     /// Matrix multiplication operator (@)
     /// Implements: matrix1 @ matrix2
     fn __matmul__(&self, py: Python, other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
-        let result_matrix = self.inner.multiply(&other.inner).map_err(|e| {
-            PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e))
-        })?;
+        let result_matrix =
+            computation::run(py, [&self.inner, &other.inner], |[a, b]| a.multiply(b)).map_err(
+                |e| PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e)),
+            )?;
 
         let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
         Py::new(py, py_result)
@@ -1949,9 +1954,7 @@ impl PyGraphMatrix {
 
     /// Solve linear system Ax = b
     fn solve(&self, py: Python, b: &Self) -> PyResult<Py<Self>> {
-        let result = self
-            .inner
-            .solve(&b.inner)
+        let result = computation::run(py, [&self.inner, &b.inner], |[a, b]| a.solve(b))
             .map_err(|e| PyRuntimeError::new_err(format!("Linear system solve failed: {:?}", e)))?;
         let matrix = Self { inner: result };
         Py::new(py, matrix)
@@ -1965,10 +1968,10 @@ impl PyGraphMatrix {
         b: &Self,
         max_refinements: usize,
     ) -> PyResult<(Py<Self>, f64, usize)> {
-        let report = self
-            .inner
-            .solve_refined(&b.inner, max_refinements)
-            .map_err(|e| PyRuntimeError::new_err(format!("Refined solve failed: {:?}", e)))?;
+        let report = computation::run(py, [&self.inner, &b.inner], move |[a, b]| {
+            a.solve_refined(b, max_refinements)
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("Refined solve failed: {:?}", e)))?;
         Ok((
             Py::new(
                 py,
@@ -1984,19 +1987,19 @@ impl PyGraphMatrix {
     /// Owned minimum-norm least squares; rcond defaults to input precision times dimension.
     #[pyo3(signature = (b, rcond=None))]
     fn least_squares(&self, py: Python, b: &Self, rcond: Option<f64>) -> PyResult<Py<Self>> {
-        let result = self
-            .inner
-            .least_squares(&b.inner, rcond)
-            .map_err(|e| PyRuntimeError::new_err(format!("Least squares failed: {:?}", e)))?;
+        let result = computation::run(py, [&self.inner, &b.inner], move |[a, b]| {
+            a.least_squares(b, rcond)
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("Least squares failed: {:?}", e)))?;
         Py::new(py, Self { inner: result })
     }
 
     /// General real-input eigenpairs in a dedicated complex result.
     fn complex_eigenvalue_decomposition(&self, py: Python) -> PyResult<PyComplexEigenResult> {
-        let result = self
-            .inner
-            .complex_eigenvalue_decomposition()
-            .map_err(|e| PyRuntimeError::new_err(format!("Complex eigen failed: {:?}", e)))?;
+        let result = computation::run(py, [&self.inner], |[a]| {
+            a.complex_eigenvalue_decomposition()
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("Complex eigen failed: {:?}", e)))?;
         Ok(PyComplexEigenResult {
             eigenvalues_real: result.eigenvalues_real,
             eigenvalues_imag: result.eigenvalues_imag,
@@ -2017,9 +2020,7 @@ impl PyGraphMatrix {
 
     /// Thin matrix-valued SVD outputs, including k x 1 singular values for gradients.
     fn svd_tracked(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>, Py<Self>)> {
-        let (u, s, vt) = self
-            .inner
-            .svd_tracked()
+        let (u, s, vt) = computation::run(py, [&self.inner], |[a]| a.svd_tracked())
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok((
             Py::new(py, Self { inner: u })?,
@@ -2029,9 +2030,7 @@ impl PyGraphMatrix {
     }
     /// Matrix-valued symmetric eigenvalues (n x 1) and eigenvectors for gradients.
     fn eigen_tracked(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>)> {
-        let (values, vectors) = self
-            .inner
-            .eigen_tracked()
+        let (values, vectors) = computation::run(py, [&self.inner], |[a]| a.eigen_tracked())
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok((
             Py::new(py, Self { inner: values })?,
@@ -2042,10 +2041,10 @@ impl PyGraphMatrix {
     /// Real SVD: A = U * Sigma * V^T, using bounded one-sided Jacobi sweeps.
     /// Returns full U, min(rows, cols) descending values, and full V_transpose.
     fn svd(&self, py: Python) -> PyResult<(Py<Self>, PyObject, Py<Self>)> {
-        let (u_matrix, singular_values, vt_matrix) = self
-            .inner
-            .svd()
-            .map_err(|e| PyRuntimeError::new_err(format!("SVD decomposition failed: {:?}", e)))?;
+        let (u_matrix, singular_values, vt_matrix) = computation::run(py, [&self.inner], |[a]| {
+            a.svd()
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("SVD decomposition failed: {:?}", e)))?;
 
         let u_py = PyGraphMatrix { inner: u_matrix };
         let vt_py = PyGraphMatrix { inner: vt_matrix };
@@ -2063,9 +2062,7 @@ impl PyGraphMatrix {
     /// QR decomposition: A = Q * R
     /// Returns tuple of (Q, R) where Q is orthogonal and R is upper triangular
     fn qr_decomposition(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>)> {
-        let (q_matrix, r_matrix) = self
-            .inner
-            .qr_decomposition()
+        let (q_matrix, r_matrix) = computation::run(py, [&self.inner], |[a]| a.qr_decomposition())
             .map_err(|e| PyRuntimeError::new_err(format!("QR decomposition failed: {:?}", e)))?;
 
         let q_py = PyGraphMatrix { inner: q_matrix };
@@ -2077,10 +2074,10 @@ impl PyGraphMatrix {
     /// LU decomposition: PA = LU
     /// Returns tuple of (P, L, U) where P is permutation, L is lower triangular, U is upper triangular
     fn lu_decomposition(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>, Py<Self>)> {
-        let (p_matrix, l_matrix, u_matrix) = self
-            .inner
-            .lu_decomposition()
-            .map_err(|e| PyRuntimeError::new_err(format!("LU decomposition failed: {:?}", e)))?;
+        let (p_matrix, l_matrix, u_matrix) = computation::run(py, [&self.inner], |[a]| {
+            a.lu_decomposition()
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("LU decomposition failed: {:?}", e)))?;
 
         let p_py = PyGraphMatrix { inner: p_matrix };
         let l_py = PyGraphMatrix { inner: l_matrix };
@@ -2092,34 +2089,33 @@ impl PyGraphMatrix {
     /// Cholesky decomposition: A = L * L^T
     /// Returns L (lower triangular) for positive definite matrices
     fn cholesky_decomposition(&self, py: Python) -> PyResult<Py<Self>> {
-        let l_matrix = self.inner.cholesky_decomposition().map_err(|e| {
-            PyRuntimeError::new_err(format!("Cholesky decomposition failed: {:?}", e))
-        })?;
+        let l_matrix = computation::run(py, [&self.inner], |[a]| a.cholesky_decomposition())
+            .map_err(|e| {
+                PyRuntimeError::new_err(format!("Cholesky decomposition failed: {:?}", e))
+            })?;
 
         Py::new(py, PyGraphMatrix { inner: l_matrix })
     }
 
     /// Cholesky directional derivative for a symmetric input tangent.
     fn cholesky_jvp(&self, py: Python, tangent: &Self) -> PyResult<Py<Self>> {
-        let inner = self
-            .inner
-            .cholesky_jvp(&tangent.inner)
-            .map_err(|e| PyRuntimeError::new_err(format!("Cholesky JVP failed: {:?}", e)))?;
+        let inner = computation::run(py, [&self.inner, &tangent.inner], |[a, b]| {
+            a.cholesky_jvp(b)
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("Cholesky JVP failed: {:?}", e)))?;
         Py::new(py, Self { inner })
     }
     /// Cholesky pullback; returns a symmetric Frobenius input gradient.
     fn cholesky_vjp(&self, py: Python, cotangent: &Self) -> PyResult<Py<Self>> {
-        let inner = self
-            .inner
-            .cholesky_vjp(&cotangent.inner)
-            .map_err(|e| PyRuntimeError::new_err(format!("Cholesky VJP failed: {:?}", e)))?;
+        let inner = computation::run(py, [&self.inner, &cotangent.inner], |[a, b]| {
+            a.cholesky_vjp(b)
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("Cholesky VJP failed: {:?}", e)))?;
         Py::new(py, Self { inner })
     }
 
     fn qr_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Py<Self>, Py<Self>)> {
-        let (q, r) = self
-            .inner
-            .qr_jvp(&tangent.inner)
+        let (q, r) = computation::run(py, [&self.inner, &tangent.inner], |[a, b]| a.qr_jvp(b))
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok((
             Py::new(py, Self { inner: q })?,
@@ -2127,16 +2123,14 @@ impl PyGraphMatrix {
         ))
     }
     fn qr_vjp(&self, py: Python, q: &Self, r: &Self) -> PyResult<Py<Self>> {
-        let inner = self
-            .inner
-            .qr_vjp(&q.inner, &r.inner)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let inner = computation::run(py, [&self.inner, &q.inner, &r.inner], |[a, b, c]| {
+            a.qr_vjp(b, c)
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Py::new(py, Self { inner })
     }
     fn lu_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Py<Self>, Py<Self>)> {
-        let (l, u) = self
-            .inner
-            .lu_jvp(&tangent.inner)
+        let (l, u) = computation::run(py, [&self.inner, &tangent.inner], |[a, b]| a.lu_jvp(b))
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok((
             Py::new(py, Self { inner: l })?,
@@ -2144,33 +2138,30 @@ impl PyGraphMatrix {
         ))
     }
     fn lu_vjp(&self, py: Python, l: &Self, u: &Self) -> PyResult<Py<Self>> {
-        let inner = self
-            .inner
-            .lu_vjp(&l.inner, &u.inner)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let inner = computation::run(py, [&self.inner, &l.inner, &u.inner], |[a, b, c]| {
+            a.lu_vjp(b, c)
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Py::new(py, Self { inner })
     }
 
     /// Distinct real symmetric eigenpair directional derivative.
     fn eigen_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Vec<f64>, Py<Self>)> {
-        let (values, inner) = self
-            .inner
-            .eigen_jvp(&tangent.inner)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let (values, inner) =
+            computation::run(py, [&self.inner, &tangent.inner], |[a, b]| a.eigen_jvp(b))
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok((values, Py::new(py, Self { inner })?))
     }
     fn eigen_vjp(&self, py: Python, values: Vec<f64>, vectors: &Self) -> PyResult<Py<Self>> {
-        let inner = self
-            .inner
-            .eigen_vjp(&values, &vectors.inner)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let inner = computation::run(py, [&self.inner, &vectors.inner], move |[a, b]| {
+            a.eigen_vjp(&values, b)
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Py::new(py, Self { inner })
     }
     /// Positive distinct-spectrum thin SVD directional derivative.
     fn svd_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Py<Self>, Vec<f64>, Py<Self>)> {
-        let (u, s, vt) = self
-            .inner
-            .svd_jvp(&tangent.inner)
+        let (u, s, vt) = computation::run(py, [&self.inner, &tangent.inner], |[a, b]| a.svd_jvp(b))
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok((
             Py::new(py, Self { inner: u })?,
@@ -2179,10 +2170,10 @@ impl PyGraphMatrix {
         ))
     }
     fn svd_vjp(&self, py: Python, u: &Self, s: Vec<f64>, vt: &Self) -> PyResult<Py<Self>> {
-        let inner = self
-            .inner
-            .svd_vjp(&u.inner, &s, &vt.inner)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let inner = computation::run(py, [&self.inner, &u.inner, &vt.inner], move |[a, b, c]| {
+            a.svd_vjp(b, &s, c)
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Py::new(py, Self { inner })
     }
 
@@ -2190,9 +2181,9 @@ impl PyGraphMatrix {
     /// Returns tuple of (eigenvalues, eigenvectors)
     fn eigenvalue_decomposition(&self, py: Python) -> PyResult<(PyObject, Py<Self>)> {
         let (eigenvalues, eigenvector_matrix) =
-            self.inner.eigenvalue_decomposition().map_err(|e| {
-                PyRuntimeError::new_err(format!("Eigenvalue decomposition failed: {:?}", e))
-            })?;
+            computation::run(py, [&self.inner], |[a]| a.eigenvalue_decomposition()).map_err(
+                |e| PyRuntimeError::new_err(format!("Eigenvalue decomposition failed: {:?}", e)),
+            )?;
 
         // Convert eigenvalues to Python list
         let eigenval_list: Vec<f64> = eigenvalues;
@@ -2206,22 +2197,22 @@ impl PyGraphMatrix {
     }
 
     /// Estimate the 2-norm condition number using native normalized singular values.
-    fn condition_number(&self) -> PyResult<f64> {
-        self.inner
-            .condition_number()
+    fn condition_number(&self, py: Python) -> PyResult<f64> {
+        computation::run(py, [&self.inner], |[a]| a.condition_number())
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
     /// Numerical rank with an explicit relative singular-value tolerance.
-    fn rank_with_tolerance(&self, relative: f64) -> PyResult<usize> {
-        self.inner
-            .rank_with_tolerance(relative)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+    fn rank_with_tolerance(&self, py: Python, relative: f64) -> PyResult<usize> {
+        computation::run(py, [&self.inner], move |[a]| {
+            a.rank_with_tolerance(relative)
+        })
+        .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// Matrix rank - number of linearly independent rows/columns
     /// Uses SVD with numerical tolerance for near-zero singular values
-    fn rank(&self) -> PyResult<usize> {
-        self.inner.rank().map_err(|e| {
+    fn rank(&self, py: Python) -> PyResult<usize> {
+        computation::run(py, [&self.inner], |[a]| a.rank()).map_err(|e| {
             PyRuntimeError::new_err(format!("Matrix rank computation failed: {:?}", e))
         })
     }

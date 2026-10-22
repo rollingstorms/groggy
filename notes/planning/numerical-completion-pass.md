@@ -36,3 +36,5 @@ preserved separately.
 - 29.44: checked math/helper domains, sparse transforms/concatenation/split and owned materialization.
 
 - 29.45: seeded factor-output automatic routes and matrix-valued eigen/singular values; general arithmetic tape composition remains open.
+
+- 29.46: owned numerical transfer and GIL release for untracked heavy calls; copy overhead, reductions/backward and release performance remain explicit.
