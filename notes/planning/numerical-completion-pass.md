@@ -170,3 +170,16 @@ replace the old rounded-integer guess; overflow/nonfinite cases fail explicitly.
 Full native suites, strict core Clippy and 560 rebuilt Python regressions pass
 (one existing Python case skipped). See `table-numeric-contract-2026-10-22.md`.
 NC1/29.61 closes; NC2 remains open. This does not settle table writeback policy.
+
+### Item 29.62 — Checked activations, dropout and shared Python routes
+
+Remove ignored conversions/cell errors and duplicate FFI activation loops. Preserve
+metadata, use faithful GELU derivatives and actual logical-row softmax, compose
+ReLU/GELU/sigmoid/tanh/softmax tapes, and reject unsupported tracked leaky/ELU/
+training-dropout calls. Inverted dropout evaluates as identity, validates both
+modes/endpoints and supports storage-equivalent seeded masks. Shared sparse
+expansion guards and owned-data/GIL boundaries apply. Full native suites and
+570 rebuilt Python regressions pass (one existing skip); strict core lint and
+55-case release receipts are recorded in `matrix-activation-contract-2026-10-22.md`
+and the numerical activation benchmark note. This closes the NC2 helper inventory,
+not universal gradients or the deferred convolution API.

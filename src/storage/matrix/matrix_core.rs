@@ -502,19 +502,46 @@ impl<T: NumericType> GraphMatrix<T> {
     }
 
     /// ReLU activation function
-    pub fn relu(&self) -> GraphResult<GraphMatrix<T>> {
-        use crate::storage::matrix::neural::activations::ActivationOps;
-        let result_storage = ActivationOps::relu(&self.storage)
-            .map_err(|e| GraphError::InvalidInput(format!("ReLU activation failed: {:?}", e)))?;
-        Ok(Self::from_storage(result_storage))
+    pub fn relu(&self) -> GraphResult<Self> {
+        let result = self.numerical_result(
+            crate::storage::matrix::neural::activations::ActivationOps::relu(&self.storage),
+        )?;
+        self.track_factor(result, Operation::ReLU)
     }
 
     /// GELU activation function
-    pub fn gelu(&self) -> GraphResult<GraphMatrix<T>> {
-        use crate::storage::matrix::neural::activations::ActivationOps;
-        let result_storage = ActivationOps::gelu(&self.storage)
-            .map_err(|e| GraphError::InvalidInput(format!("GELU activation failed: {:?}", e)))?;
-        Ok(Self::from_storage(result_storage))
+    pub fn gelu(&self) -> GraphResult<Self> {
+        let result = self.numerical_result(
+            crate::storage::matrix::neural::activations::ActivationOps::gelu(&self.storage),
+        )?;
+        self.track_factor(result, Operation::GELU)
+    }
+
+    /// Stable sigmoid activation with an automatic pullback.
+    pub fn sigmoid(&self) -> GraphResult<Self> {
+        let result = self.numerical_result(super::neural::activations::ActivationOps::sigmoid(
+            &self.storage,
+        ))?;
+        self.track_factor(result, Operation::Sigmoid)
+    }
+    /// Hyperbolic tangent activation with an automatic pullback.
+    pub fn tanh(&self) -> GraphResult<Self> {
+        let result = self.numerical_result(super::neural::activations::ActivationOps::tanh(
+            &self.storage,
+        ))?;
+        self.track_factor(result, Operation::Tanh)
+    }
+    /// Stable row softmax; only the established dim=1 convention is supported.
+    pub fn softmax(&self, dim: i32) -> GraphResult<Self> {
+        if dim != 1 {
+            return Err(GraphError::InvalidInput(
+                "Only dim=1 (row-wise) softmax is supported".into(),
+            ));
+        }
+        let result = self.numerical_result(super::neural::activations::ActivationOps::softmax(
+            &self.storage,
+        ))?;
+        self.track_factor(result, Operation::Softmax { axis: 1 })
     }
 
     /// Extract data as a Vec<T> in row-major order
@@ -526,106 +553,66 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Leaky ReLU activation function
     /// Applies f(x) = max(alpha * x, x) where alpha is the negative slope
-    pub fn leaky_relu(&self, alpha: Option<f64>) -> GraphResult<GraphMatrix<T>> {
-        let alpha_val = alpha.unwrap_or(0.01); // Default negative slope
-        let (rows, cols) = self.shape();
-        let mut result = GraphMatrix::zeros(rows, cols);
-
-        for i in 0..rows {
-            for j in 0..cols {
-                if let Some(value) = self.get(i, j) {
-                    let x = value.to_f64();
-                    let activated = if x > 0.0 { x } else { alpha_val * x };
-                    let result_val = T::from_f64(activated).unwrap_or_else(|| T::zero());
-                    let _ = result.set(i, j, result_val);
-                }
-            }
+    pub fn leaky_relu(&self, alpha: Option<f64>) -> GraphResult<Self> {
+        if self.requires_grad {
+            return Err(GraphError::InvalidInput(
+                "Tracked leaky_relu is unsupported; detach explicitly before evaluation".into(),
+            ));
         }
-
-        Ok(result)
+        self.numerical_result(
+            crate::storage::matrix::neural::activations::ActivationOps::leaky_relu(
+                &self.storage,
+                alpha.unwrap_or(0.01),
+            ),
+        )
     }
 
     /// ELU (Exponential Linear Unit) activation function
     /// Applies f(x) = x if x > 0, alpha * (exp(x) - 1) if x <= 0
-    pub fn elu(&self, alpha: Option<f64>) -> GraphResult<GraphMatrix<T>> {
-        let alpha_val = alpha.unwrap_or(1.0); // Default alpha
-        let (rows, cols) = self.shape();
-        let mut result = GraphMatrix::zeros(rows, cols);
-
-        for i in 0..rows {
-            for j in 0..cols {
-                if let Some(value) = self.get(i, j) {
-                    let x = value.to_f64();
-                    let activated = if x > 0.0 {
-                        x
-                    } else {
-                        alpha_val * (x.exp() - 1.0)
-                    };
-                    let result_val = T::from_f64(activated).unwrap_or_else(|| T::zero());
-                    let _ = result.set(i, j, result_val);
-                }
-            }
+    pub fn elu(&self, alpha: Option<f64>) -> GraphResult<Self> {
+        if self.requires_grad {
+            return Err(GraphError::InvalidInput(
+                "Tracked elu is unsupported; detach explicitly before evaluation".into(),
+            ));
         }
-
-        Ok(result)
+        self.numerical_result(
+            crate::storage::matrix::neural::activations::ActivationOps::elu(
+                &self.storage,
+                alpha.unwrap_or(1.0),
+            ),
+        )
     }
 
     /// Dropout operation for regularization
     /// Randomly sets elements to zero with probability p
-    pub fn dropout(&self, p: f64, training: bool) -> GraphResult<GraphMatrix<T>> {
-        if !training {
-            // In evaluation mode, return original matrix scaled by (1 - p)
-            let scale = 1.0 - p;
-            let (rows, cols) = self.shape();
-            let mut result = GraphMatrix::zeros(rows, cols);
-
-            for i in 0..rows {
-                for j in 0..cols {
-                    if let Some(value) = self.get(i, j) {
-                        let scaled_val = value.to_f64() * scale;
-                        let result_val = T::from_f64(scaled_val).unwrap_or_else(|| T::zero());
-                        let _ = result.set(i, j, result_val);
-                    }
-                }
-            }
-
-            return Ok(result);
-        }
-
+    pub fn dropout(&self, p: f64, training: bool) -> GraphResult<Self> {
+        self.dropout_seeded(p, training, fastrand::u64(..))
+    }
+    /// Reproducible inverted dropout; evaluation/p=0 preserve the input tape.
+    pub fn dropout_seeded(&self, p: f64, training: bool, seed: u64) -> GraphResult<Self> {
         if !(0.0..=1.0).contains(&p) {
-            return Err(GraphError::InvalidInput(format!(
-                "Dropout probability must be between 0 and 1, got {}",
-                p
-            )));
+            return Err(GraphError::InvalidInput(
+                "Dropout probability must be finite and between zero and one".into(),
+            ));
         }
-
-        let (rows, cols) = self.shape();
-        let mut result = GraphMatrix::zeros(rows, cols);
-        let scale = 1.0 / (1.0 - p); // Scale factor to maintain expected value
-
-        // Simple pseudo-random number generation for demonstration
-        // In production, this should use a proper RNG
-        let mut seed = (rows * cols) as u64;
-
-        for i in 0..rows {
-            for j in 0..cols {
-                // Simple LCG for demonstration
-                seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
-                let rand_val = (seed as f64) / (u64::MAX as f64);
-
-                if rand_val >= p {
-                    // Keep the element, scaled up
-                    if let Some(value) = self.get(i, j) {
-                        let scaled_val = value.to_f64() * scale;
-                        let result_val = T::from_f64(scaled_val).unwrap_or_else(|| T::zero());
-                        let _ = result.set(i, j, result_val);
-                    }
-                }
-                // Otherwise element stays zero (dropped out)
-            }
+        if !training || p == 0. {
+            let result = self.numerical_result(self.storage.try_map_elementwise(Ok))?;
+            return self.track_factor(result, Operation::Identity);
         }
-
-        Ok(result)
+        if self.requires_grad {
+            return Err(GraphError::InvalidInput(
+                "Tracked training dropout is unsupported; detach explicitly before evaluation"
+                    .into(),
+            ));
+        }
+        self.numerical_result(
+            crate::storage::matrix::neural::activations::ActivationOps::dropout(
+                &self.storage,
+                p,
+                training,
+                seed,
+            ),
+        )
     }
 
     /// 2D Convolution operation (placeholder - integration incomplete)

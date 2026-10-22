@@ -4,7 +4,7 @@ use groggy::{
     GraphResult,
 };
 use pyo3::prelude::*;
-pub(super) trait Output: Sized {
+pub(crate) trait Output: Sized {
     type Wire: Send;
     fn pack(self) -> GraphResult<Self::Wire>;
     fn unpack(wire: Self::Wire) -> GraphResult<Self>;
@@ -85,7 +85,7 @@ impl Output for ComplexEigenResult<f64> {
 }
 /// Only Send owned data cross allow_threads. Tracked matrices keep their tape
 /// ownership and run on the existing GIL path.
-pub(super) fn run<const N: usize, R: Output>(
+pub(crate) fn run<const N: usize, R: Output>(
     py: Python<'_>,
     inputs: [&GraphMatrix; N],
     operation: impl FnOnce([&GraphMatrix; N]) -> GraphResult<R> + Send,

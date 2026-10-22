@@ -5,7 +5,7 @@
 #![allow(unused_variables)]
 
 #[path = "matrix_compute.rs"]
-mod computation;
+pub(crate) mod computation;
 
 use groggy::storage::array::NumArray;
 use groggy::storage::GraphMatrix;
@@ -1651,30 +1651,37 @@ impl PyGraphMatrix {
 
     /// Leaky ReLU activation function
     fn leaky_relu(&self, py: Python, alpha: Option<f64>) -> PyResult<Py<Self>> {
-        let result = self.inner.leaky_relu(alpha).map_err(|e| {
-            PyRuntimeError::new_err(format!("Leaky ReLU activation failed: {:?}", e))
-        })?;
+        let result = computation::run(py, [&self.inner], move |[input]| input.leaky_relu(alpha))
+            .map_err(|e| {
+                PyRuntimeError::new_err(format!("Leaky ReLU activation failed: {:?}", e))
+            })?;
         let matrix = Self { inner: result };
         Py::new(py, matrix)
     }
 
     /// ELU (Exponential Linear Unit) activation function
     fn elu(&self, py: Python, alpha: Option<f64>) -> PyResult<Py<Self>> {
-        let result = self
-            .inner
-            .elu(alpha)
+        let result = computation::run(py, [&self.inner], move |[input]| input.elu(alpha))
             .map_err(|e| PyRuntimeError::new_err(format!("ELU activation failed: {:?}", e)))?;
         let matrix = Self { inner: result };
         Py::new(py, matrix)
     }
 
     /// Dropout operation for regularization
-    fn dropout(&self, py: Python, p: f64, training: Option<bool>) -> PyResult<Py<Self>> {
+    #[pyo3(signature = (p, training=None, seed=None))]
+    fn dropout(
+        &self,
+        py: Python,
+        p: f64,
+        training: Option<bool>,
+        seed: Option<u64>,
+    ) -> PyResult<Py<Self>> {
         let training_val = training.unwrap_or(true);
-        let result = self
-            .inner
-            .dropout(p, training_val)
-            .map_err(|e| PyRuntimeError::new_err(format!("Dropout operation failed: {:?}", e)))?;
+        let result = computation::run(py, [&self.inner], move |[input]| match seed {
+            Some(seed) => input.dropout_seeded(p, training_val, seed),
+            None => input.dropout(p, training_val),
+        })
+        .map_err(|e| PyRuntimeError::new_err(format!("Dropout operation failed: {:?}", e)))?;
         let matrix = Self { inner: result };
         Py::new(py, matrix)
     }

@@ -532,9 +532,22 @@ impl<T: NumericType> ComputationGraph<T> {
                         "GELU operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::matrix::neural::activations::ActivationOps::gelu(
-                    &inputs[0],
-                )
+                crate::storage::matrix::neural::activations::ActivationOps::gelu(&inputs[0])
+            }
+
+            Operation::Softmax { axis } => {
+                if *axis != 1 {
+                    return Err(MatrixError::UnsupportedOperation(
+                        "Only row softmax is supported".into(),
+                    ));
+                }
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Softmax requires exactly one input".into(),
+                    ));
+                }
+                crate::storage::matrix::neural::activations::ActivationOps::softmax(&inputs[0])
             }
 
             Operation::Sum { axis } => {
@@ -965,20 +978,44 @@ impl<T: NumericType> ComputationGraph<T> {
                 self.accumulate_per_input(&[input_id], vec![gradient])
             }
 
-            Operation::ReLU => {
-                // ReLU derivative: 1 if x > 0, 0 otherwise
-                if let Some(&input_id) = node.inputs.first() {
-                    if let Some(input_arc) = self.nodes.get(&input_id) {
-                        let mut input_node = input_arc.lock().unwrap();
-                        if input_node.requires_grad {
-                            let input_value = input_node.value.as_ref().unwrap();
-                            let relu_derivative = crate::storage::matrix::neural::activations::ActivationOps::relu_derivative(input_value)?;
-                            let grad = grad_output.elementwise_multiply(&relu_derivative)?;
-                            input_node.accumulate_gradient(grad)?;
-                        }
-                    }
+            Operation::Softmax { axis } => {
+                if *axis != 1 {
+                    return Err(MatrixError::UnsupportedOperation(
+                        "Only row softmax is supported".into(),
+                    ));
                 }
-                Ok(())
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Softmax requires exactly one input".into(),
+                    ));
+                }
+                let gradient =
+                    crate::storage::matrix::neural::activations::ActivationOps::softmax_vjp(
+                        &inputs[0],
+                        grad_output,
+                    )?;
+                self.accumulate_per_input(&node.inputs, vec![gradient])
+            }
+
+            Operation::ReLU | Operation::GELU | Operation::Sigmoid | Operation::Tanh => {
+                use crate::storage::matrix::neural::activations::ActivationOps;
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Activation requires exactly one input".into(),
+                    ));
+                }
+                let derivative = match node.operation {
+                    Operation::ReLU => ActivationOps::relu_derivative(&inputs[0])?,
+                    Operation::GELU => ActivationOps::gelu_derivative(&inputs[0])?,
+                    Operation::Sigmoid => ActivationOps::sigmoid_derivative(&inputs[0])?,
+                    _ => ActivationOps::tanh_derivative(&inputs[0])?,
+                };
+                self.accumulate_per_input(
+                    &node.inputs,
+                    vec![grad_output.elementwise_multiply(&derivative)?],
+                )
             }
 
             _ => Err(MatrixError::UnsupportedOperation(format!(

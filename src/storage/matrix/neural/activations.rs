@@ -1,10 +1,7 @@
-//! Optimized Activation Functions with SIMD Support
-//!
-//! This module provides high-performance implementations of common neural network
-//! activation functions with automatic SIMD vectorization and differentiation support.
+//! Checked native activation kernels and faithful derivatives.
+//! Zero-preserving maps retain CSR storage; nonzero images use the shared expansion policy.
 
 use crate::storage::matrix::{
-    backend::OperationType,
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},
 };
@@ -42,329 +39,309 @@ pub enum ActivationType {
     ELU(f64), // alpha parameter
 }
 
-/// High-performance activation operations with SIMD optimization
+/// Checked activation operations over logical matrix storage.
 pub struct ActivationOps;
 
 impl ActivationOps {
-    /// Apply ReLU activation: max(0, x)
+    fn invalid(message: &str) -> MatrixError {
+        MatrixError::InvalidInput(message.into())
+    }
+    fn output<T: NumericType>(value: f64) -> MatrixResult<T> {
+        use crate::storage::numeric::scalar::{convert, ConversionPolicy, NumericInput};
+        if !value.is_finite() {
+            return Err(Self::invalid("Activation result exceeds finite range"));
+        }
+        convert(
+            NumericInput::Float(value),
+            if T::DTYPE.is_float() {
+                ConversionPolicy::Round
+            } else {
+                ConversionPolicy::Exact
+            },
+        )
+        .map_err(|e| Self::invalid(&e.to_string()))
+    }
+    fn map<T: NumericType>(
+        input: &UnifiedMatrix<T>,
+        operation: impl Fn(T) -> MatrixResult<T>,
+    ) -> MatrixResult<UnifiedMatrix<T>> {
+        input.try_map_elementwise(|value| {
+            if !value.is_finite() {
+                return Err(Self::invalid("Activations require finite numeric input"));
+            }
+            operation(value)
+        })
+    }
+    fn map_float<T: NumericType>(
+        input: &UnifiedMatrix<T>,
+        operation: impl Fn(f64) -> f64,
+    ) -> MatrixResult<UnifiedMatrix<T>> {
+        Self::map(input, |value| Self::output(operation(value.to_f64())))
+    }
+    fn sigmoid_value(x: f64) -> f64 {
+        if x >= 0. {
+            1. / (1. + (-x).exp())
+        } else {
+            let e = x.exp();
+            e / (1. + e)
+        }
+    }
+    fn gelu_value(x: f64) -> f64 {
+        if x >= 12. {
+            return x;
+        }
+        if x <= -12. {
+            return 0.;
+        }
+        0.5 * x * (1. + ((2. / PI).sqrt() * (x + 0.044715 * x * x * x)).tanh())
+    }
+    fn gelu_slope(x: f64) -> f64 {
+        if x >= 12. {
+            return 1.;
+        }
+        if x <= -12. {
+            return 0.;
+        }
+        let c = (2. / PI).sqrt();
+        let t = (c * (x + 0.044715 * x * x * x)).tanh();
+        0.5 * (1. + t) + 0.5 * x * (1. - t * t) * c * (1. + 3. * 0.044715 * x * x)
+    }
+    /// ReLU preserves exact integer values and zero-preserving sparse storage.
     pub fn relu<T: NumericType>(input: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| if x.to_f64() > 0.0 { x } else { T::zero() })
+        Self::map(input, |x| Ok(if x.to_f64() > 0. { x } else { T::zero() }))
     }
-
-    /// Apply ReLU activation in-place
+    /// Atomic owned replacement: an error leaves the original unchanged.
     pub fn relu_inplace<T: NumericType>(matrix: &mut UnifiedMatrix<T>) -> MatrixResult<()> {
-        Self::apply_elementwise_inplace(matrix, |x| if x.to_f64() > 0.0 { *x } else { T::zero() })
+        *matrix = Self::relu(matrix)?;
+        Ok(())
     }
-
-    /// Apply ReLU derivative: 1 if x > 0, 0 otherwise
+    /// ReLU chooses derivative zero at the origin.
     pub fn relu_derivative<T: NumericType>(
         input: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            if x.to_f64() > 0.0 {
-                T::one()
-            } else {
-                T::zero()
-            }
+        Self::map(input, |x| {
+            Ok(if x.to_f64() > 0. { T::one() } else { T::zero() })
         })
     }
-
-    /// Apply GELU activation: x * Φ(x) where Φ is the CDF of standard normal
-    /// Approximation: 0.5 * x * (1 + tanh(√(2/π) * (x + 0.044715 * x³)))
+    /// Tanh approximation to GELU; its derivative uses the same approximation.
     pub fn gelu<T: NumericType>(input: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            let x_f64 = x.to_f64();
-            let sqrt_2_over_pi = (2.0 / PI).sqrt();
-            let x_cubed = x_f64 * x_f64 * x_f64;
-            let inner = sqrt_2_over_pi * (x_f64 + 0.044715 * x_cubed);
-            let tanh_inner = inner.tanh();
-            let result = 0.5 * x_f64 * (1.0 + tanh_inner);
-            T::from_f64(result).unwrap_or(T::zero())
-        })
+        Self::map_float(input, Self::gelu_value)
     }
-
-    /// Apply GELU derivative
+    /// Faithful derivative of the tanh GELU forward formula.
     pub fn gelu_derivative<T: NumericType>(
         input: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            let x_f64 = x.to_f64();
-            let sqrt_2_over_pi = (2.0 / PI).sqrt();
-
-            // GELU derivative is complex - this is the exact formula
-            let gaussian = (-0.5 * x_f64 * x_f64).exp() / (2.0 * PI).sqrt();
-            let cdf_approx =
-                0.5 * (1.0 + (sqrt_2_over_pi * (x_f64 + 0.044715 * x_f64.powi(3))).tanh());
-            let pdf_part =
-                0.5 * x_f64 * gaussian * sqrt_2_over_pi * (1.0 + 3.0 * 0.044715 * x_f64 * x_f64);
-
-            let result = cdf_approx + pdf_part;
-            T::from_f64(result).unwrap_or(T::zero())
-        })
+        Self::map_float(input, Self::gelu_slope)
     }
-
-    /// Apply Sigmoid activation: 1 / (1 + exp(-x))
+    /// Stable logistic activation.
     pub fn sigmoid<T: NumericType>(input: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            let x_f64 = x.to_f64();
-            // Use numerically stable sigmoid
-            let result = if x_f64 >= 0.0 {
-                let exp_neg_x = (-x_f64).exp();
-                1.0 / (1.0 + exp_neg_x)
-            } else {
-                let exp_x = x_f64.exp();
-                exp_x / (1.0 + exp_x)
-            };
-            T::from_f64(result).unwrap_or(T::zero())
-        })
+        Self::map_float(input, Self::sigmoid_value)
     }
-
-    /// Apply Sigmoid derivative: sigmoid(x) * (1 - sigmoid(x))
+    /// Logistic derivative.
     pub fn sigmoid_derivative<T: NumericType>(
         input: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        let sigmoid_out = Self::sigmoid(input)?;
-        Self::apply_elementwise(&sigmoid_out, |sig| {
-            let sig_f64 = sig.to_f64();
-            let result = sig_f64 * (1.0 - sig_f64);
-            T::from_f64(result).unwrap_or(T::zero())
+        Self::map_float(input, |x| {
+            let s = Self::sigmoid_value(x);
+            s * (1. - s)
         })
     }
-
-    /// Apply Tanh activation: (exp(2x) - 1) / (exp(2x) + 1)
+    /// Hyperbolic tangent activation.
     pub fn tanh<T: NumericType>(input: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            let result = x.to_f64().tanh();
-            T::from_f64(result).unwrap_or(T::zero())
-        })
+        Self::map_float(input, f64::tanh)
     }
-
-    /// Apply Tanh derivative: 1 - tanh²(x)
+    /// Hyperbolic tangent derivative.
     pub fn tanh_derivative<T: NumericType>(
         input: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            let tanh_x = x.to_f64().tanh();
-            let result = 1.0 - tanh_x * tanh_x;
-            T::from_f64(result).unwrap_or(T::zero())
+        Self::map_float(input, |x| {
+            let t = x.tanh();
+            1. - t * t
         })
     }
-
-    /// Apply Swish activation: x * sigmoid(x)
+    /// Swish activation x*sigmoid(x).
     pub fn swish<T: NumericType>(input: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        let sigmoid_out = Self::sigmoid(input)?;
-
-        // Element-wise multiply input * sigmoid(input)
-        Self::elementwise_multiply(input, &sigmoid_out)
+        Self::map_float(input, |x| x * Self::sigmoid_value(x))
     }
-
-    /// Apply Swish derivative: sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x))
+    /// Swish derivative.
     pub fn swish_derivative<T: NumericType>(
         input: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        let sigmoid_out = Self::sigmoid(input)?;
-        let sigmoid_deriv = Self::sigmoid_derivative(input)?;
-
-        // swish'(x) = sigmoid(x) + x * sigmoid'(x)
-        let x_times_sig_deriv = Self::elementwise_multiply(input, &sigmoid_deriv)?;
-        Self::elementwise_add(&sigmoid_out, &x_times_sig_deriv)
+        Self::map_float(input, |x| {
+            let s = Self::sigmoid_value(x);
+            s + x * s * (1. - s)
+        })
     }
-
-    /// Apply Leaky ReLU: max(alpha * x, x)
+    /// Leaky ReLU with a finite negative-side slope.
     pub fn leaky_relu<T: NumericType>(
         input: &UnifiedMatrix<T>,
         alpha: f64,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            let x_f64 = x.to_f64();
-            let result = if x_f64 > 0.0 { x_f64 } else { alpha * x_f64 };
-            T::from_f64(result).unwrap_or(T::zero())
+        if !alpha.is_finite() {
+            return Err(Self::invalid("Leaky ReLU alpha must be finite"));
+        }
+        Self::map(input, |x| {
+            if x.to_f64() > 0. {
+                Ok(x)
+            } else {
+                Self::output(alpha * x.to_f64())
+            }
         })
     }
-
-    /// Apply ELU activation: x if x > 0, alpha * (exp(x) - 1) if x <= 0
+    /// ELU with exp_m1 accuracy near zero and checked output conversion.
     pub fn elu<T: NumericType>(
         input: &UnifiedMatrix<T>,
         alpha: f64,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        Self::apply_elementwise(input, |x| {
-            let x_f64 = x.to_f64();
-            let result = if x_f64 > 0.0 {
-                x_f64
+        if !alpha.is_finite() {
+            return Err(Self::invalid("ELU alpha must be finite"));
+        }
+        Self::map(input, |x| {
+            if x.to_f64() > 0. {
+                Ok(x)
             } else {
-                alpha * (x_f64.exp() - 1.0)
-            };
-            T::from_f64(result).unwrap_or(T::zero())
+                Self::output(alpha * x.to_f64().exp_m1())
+            }
         })
     }
-
-    /// Apply Softmax activation across the last dimension
-    /// Softmax(x_i) = exp(x_i) / Σ exp(x_j)
+    /// Stable row softmax; implicit sparse expansion uses the shared dense guard.
     pub fn softmax<T: NumericType>(input: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        let shape = input.shape();
-        let mut result = UnifiedMatrix::zeros(shape.rows, shape.cols)?;
-
-        // For numerical stability, subtract max from each row
-        for row in 0..shape.rows {
-            // Find max in this row
-            let _row_start = row * shape.cols;
-            let row_data = Self::get_row_data(input, row)?;
-            let max_val = row_data
-                .iter()
-                .map(|x| x.to_f64())
-                .fold(f64::NEG_INFINITY, f64::max);
-
-            // Compute exp(x - max) and sum
-            let mut exp_sum = 0.0;
-            let mut exp_values = Vec::with_capacity(shape.cols);
-
-            for &val in &row_data {
-                let exp_val = (val.to_f64() - max_val).exp();
-                exp_values.push(exp_val);
-                exp_sum += exp_val;
+        if !T::DTYPE.is_float() {
+            return Err(Self::invalid("Softmax requires floating matrix storage"));
+        }
+        if input.checked_sparse()?.is_some() {
+            super::super::resource_policy::implicit_dense(
+                input.rows(),
+                input.cols(),
+                "Sparse softmax output",
+            )?;
+        }
+        let mut output = UnifiedMatrix::zeros(input.rows(), input.cols())?;
+        if input.cols() == 0 {
+            return Ok(output);
+        }
+        for row in 0..input.rows() {
+            let mut maximum = f64::NEG_INFINITY;
+            for col in 0..input.cols() {
+                let value = input.get(row, col)?.to_f64();
+                if !value.is_finite() {
+                    return Err(Self::invalid("Softmax requires finite input"));
+                }
+                maximum = maximum.max(value);
             }
-
-            // Normalize by sum
-            for (col, &exp_val) in exp_values.iter().enumerate() {
-                let softmax_val = exp_val / exp_sum;
-                Self::set_element(
-                    &mut result,
+            let mut total = 0.;
+            for col in 0..input.cols() {
+                total += (input.get(row, col)?.to_f64() - maximum).exp();
+            }
+            for col in 0..input.cols() {
+                output.set(
                     row,
                     col,
-                    T::from_f64(softmax_val).unwrap_or(T::zero()),
+                    Self::output((input.get(row, col)?.to_f64() - maximum).exp() / total)?,
                 )?;
             }
         }
-
-        Ok(result)
+        Ok(output)
     }
-
-    /// SIMD-optimized element-wise operation
-    fn apply_elementwise<T: NumericType, F>(
+    /// Pull back row softmax without constructing a dense Jacobian.
+    pub fn softmax_vjp<T: NumericType>(
         input: &UnifiedMatrix<T>,
-        func: F,
-    ) -> MatrixResult<UnifiedMatrix<T>>
-    where
-        F: Fn(T) -> T + Send + Sync,
-    {
-        let shape = input.shape();
-        let mut result = UnifiedMatrix::zeros(shape.rows, shape.cols)?;
-
-        // Get backend for SIMD operations if available
-        let _backend = input.backend_selector.select_backend(
-            OperationType::ElementwiseAdd, // Use as proxy for element-wise ops
-            shape.rows * shape.cols,
-            T::DTYPE,
-            input.backend_hint.clone(),
-        );
-
-        // Apply function element-wise
-        Self::transform_elements(input, &mut result, func)?;
-
-        Ok(result)
-    }
-
-    /// In-place element-wise operation
-    fn apply_elementwise_inplace<T: NumericType, F>(
-        matrix: &mut UnifiedMatrix<T>,
-        func: F,
-    ) -> MatrixResult<()>
-    where
-        F: Fn(&mut T) -> T + Send + Sync,
-    {
-        // This would need access to the internal storage
-        // For now, implement via temporary copy
-        let temp = Self::apply_elementwise(matrix, |x| func(&mut x.clone()))?;
-        *matrix = temp;
-        Ok(())
-    }
-
-    /// Helper to get row data (simplified implementation)
-    fn get_row_data<T: NumericType>(matrix: &UnifiedMatrix<T>, row: usize) -> MatrixResult<Vec<T>> {
-        let shape = matrix.shape();
-        if row >= shape.rows {
-            return Err(MatrixError::InvalidIndex {
-                row,
-                col: 0,
-                shape: (shape.rows, shape.cols),
-            });
+        gradient: &UnifiedMatrix<T>,
+    ) -> MatrixResult<UnifiedMatrix<T>> {
+        if input.shape() != gradient.shape() {
+            return Err(Self::invalid("Softmax cotangent shape mismatch"));
         }
-
-        // This is a simplified implementation - would need actual matrix data access
-        Ok(vec![T::zero(); shape.cols])
-    }
-
-    /// Helper to set element (simplified implementation)
-    fn set_element<T: NumericType>(
-        matrix: &mut UnifiedMatrix<T>,
-        row: usize,
-        col: usize,
-        _value: T,
-    ) -> MatrixResult<()> {
-        let shape = matrix.shape();
-        if row >= shape.rows || col >= shape.cols {
-            return Err(MatrixError::InvalidIndex {
-                row,
-                col,
-                shape: (shape.rows, shape.cols),
-            });
+        let probabilities = Self::softmax(input)?;
+        let mut output = UnifiedMatrix::zeros(input.rows(), input.cols())?;
+        if input.cols() == 0 {
+            return Ok(output);
         }
-
-        // This would need actual implementation with matrix storage access
-        Ok(())
-    }
-
-    /// Helper to transform elements (simplified)
-    fn transform_elements<T: NumericType, F>(
-        input: &UnifiedMatrix<T>,
-        result: &mut UnifiedMatrix<T>,
-        func: F,
-    ) -> MatrixResult<()>
-    where
-        F: Fn(T) -> T + Send + Sync,
-    {
-        let shape = input.shape();
-        for i in 0..shape.rows {
-            for j in 0..shape.cols {
-                let val = input.get(i, j)?;
-                let transformed = func(val);
-                result.set(i, j, transformed)?;
+        for row in 0..input.rows() {
+            let mut average = crate::storage::numeric::dot_product::Dot::new();
+            for col in 0..input.cols() {
+                let g = gradient.get(row, col)?.to_f64();
+                if !g.is_finite() {
+                    return Err(Self::invalid("Softmax cotangent must be finite"));
+                }
+                average.add(probabilities.get(row, col)?.to_f64(), g);
+            }
+            let average = average.total();
+            for col in 0..input.cols() {
+                let p = probabilities.get(row, col)?.to_f64();
+                let mut product = crate::storage::numeric::dot_product::Dot::new();
+                product.add(p, gradient.get(row, col)?.to_f64());
+                product.add(-p, average);
+                output.set(row, col, Self::output(product.total())?)?;
             }
         }
-        Ok(())
+        Ok(output)
     }
 
-    /// Element-wise addition helper
-    fn elementwise_add<T: NumericType>(
-        a: &UnifiedMatrix<T>,
-        b: &UnifiedMatrix<T>,
+    /// Inverted dropout; seeded masks depend on logical coordinates, not storage layout.
+    /// Evaluation and p=0 are identity; p=1 training is all zero.
+    pub fn dropout<T: NumericType>(
+        input: &UnifiedMatrix<T>,
+        p: f64,
+        training: bool,
+        seed: u64,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        // Use the backend's elementwise_add operation
-        let _backend = a.backend_selector.select_backend(
-            OperationType::ElementwiseAdd,
-            a.shape().rows * a.shape().cols,
-            T::DTYPE,
-            a.backend_hint.clone(),
-        );
-
-        // This would delegate to the actual matrix addition
-        a.add(b)
+        if !(0.0..=1.0).contains(&p) {
+            return Err(Self::invalid(
+                "Dropout probability must be finite and between zero and one",
+            ));
+        }
+        if !training || p == 0. {
+            return input.try_map_elementwise(Ok);
+        }
+        let map = |value: T, index: usize| -> MatrixResult<T> {
+            if !value.is_finite() {
+                return Err(Self::invalid("Dropout requires finite input"));
+            }
+            // SplitMix64 mixing gives reproducible coordinate decisions.
+            let mut bits = seed.wrapping_add((index as u64).wrapping_mul(0x9e3779b97f4a7c15));
+            bits = (bits ^ (bits >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+            bits = (bits ^ (bits >> 27)).wrapping_mul(0x94d049bb133111eb);
+            bits ^= bits >> 31;
+            let uniform = (bits >> 11) as f64 / 9007199254740992.;
+            if p == 1. || uniform < p {
+                Ok(T::zero())
+            } else {
+                Self::output(value.to_f64() / (1. - p))
+            }
+        };
+        if let Some(sparse) = input.checked_sparse()? {
+            let mut values = Vec::new();
+            let mut indices = Vec::new();
+            let mut pointers = vec![0];
+            input
+                .rows()
+                .checked_mul(input.cols())
+                .ok_or_else(|| Self::invalid("Dropout shape overflow"))?;
+            for row in 0..input.rows() {
+                for entry in sparse.row_pointers[row]..sparse.row_pointers[row + 1] {
+                    let col = sparse.col_indices[entry];
+                    let value = map(sparse.values[entry], row * input.cols() + col)?;
+                    if value != T::zero() {
+                        values.push(value);
+                        indices.push(col);
+                    }
+                }
+                pointers.push(values.len());
+            }
+            return UnifiedMatrix::from_csr(input.rows(), input.cols(), values, indices, pointers);
+        }
+        let values = input
+            .to_vec()?
+            .into_iter()
+            .enumerate()
+            .map(|(index, value)| map(value, index))
+            .collect::<MatrixResult<Vec<_>>>()?;
+        UnifiedMatrix::from_data(values, input.rows(), input.cols())
     }
-
-    /// Element-wise multiplication helper
     fn elementwise_multiply<T: NumericType>(
         a: &UnifiedMatrix<T>,
         b: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        // Use the backend's elementwise_mul operation
-        let _backend = a.backend_selector.select_backend(
-            OperationType::ElementwiseMul,
-            a.shape().rows * a.shape().cols,
-            T::DTYPE,
-            a.backend_hint.clone(),
-        );
-
-        // This would delegate to the actual matrix multiplication
         a.elementwise_multiply(b)
     }
 }

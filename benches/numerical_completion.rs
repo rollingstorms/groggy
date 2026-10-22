@@ -361,6 +361,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )?);
     }
+    let activation_input = GraphMatrix::from_row_major_data(
+        (0..100_000).map(|i| (i % 17) as f64 / 8. - 1.).collect(),
+        100_000,
+        1,
+        None,
+    )?;
+    cases.push(measure("dense_gelu_100000", &[100_000, 1], || {
+        activation_input.gelu()?.sum()
+    })?);
+    cases.push(measure(
+        "sparse_relu_diagonal_100000",
+        &[100_000, 100_000],
+        || {
+            let output = diagonal.relu()?;
+            assert!(output.is_sparse());
+            output.sum()
+        },
+    )?);
+    cases.push(measure(
+        "sparse_dropout_diagonal_100000",
+        &[100_000, 100_000],
+        || {
+            let output = diagonal.dropout_seeded(0.5, true, 91)?;
+            assert!(output.is_sparse());
+            output.sum()
+        },
+    )?);
     let report = json!({"profile":"release","arch":std::env::consts::ARCH,"os":std::env::consts::OS,"samples_per_case":7,"reduction_dispatch":"reference/simd-name/auto share checked reference kernels; no explicit SIMD acceleration is claimed","scope":"bounded dense sizes, vector lengths, sparse bandwidth/fill and sparse-native graph-sized operations; not a production SLA","allocation_scope":"process-wide System allocation/reallocation requests; additional live-byte peak during operation; excludes fixture setup; includes output creation/drop; not RSS","cases":cases});
     let output = std::env::var("GROGGY_NUMERICAL_PROFILE")
         .unwrap_or_else(|_| "/tmp/groggy-numerical-profile.json".into());
