@@ -241,6 +241,75 @@ impl<T: NumericType> UnifiedMatrix<T> {
         })
     }
 
+    fn owned_csr(sparse: SparseMatrix<T>) -> MatrixResult<Self> {
+        Self::from_csr(
+            sparse.shape.rows,
+            sparse.shape.cols,
+            sparse.values,
+            sparse.col_indices,
+            sparse.row_pointers,
+        )
+    }
+    fn checked_sparse(&self) -> MatrixResult<Option<&SparseMatrix<T>>> {
+        if let MatrixStorage::Sparse(s) = &self.storage {
+            if s.shape != self.shape {
+                return Err(MatrixError::InvalidInput(
+                    "CSR shape metadata mismatch".into(),
+                ));
+            }
+            s.validate()?;
+            Ok(Some(s))
+        } else {
+            Ok(None)
+        }
+    }
+    /// Explicit owned conversion to canonical CSR.
+    pub fn to_csr(&self) -> MatrixResult<Self> {
+        if let Some(s) = self.checked_sparse()? {
+            return Self::owned_csr(s.clone());
+        }
+        let data = self.to_vec()?;
+        let mut values = Vec::new();
+        let mut indices = Vec::new();
+        let mut pointers = vec![0];
+        for row in 0..self.rows() {
+            for col in 0..self.cols() {
+                let value = data[row * self.cols() + col];
+                if value != T::zero() {
+                    values.push(value);
+                    indices.push(col);
+                }
+            }
+            pointers.push(values.len());
+        }
+        Self::from_csr(self.rows(), self.cols(), values, indices, pointers)
+    }
+    /// Explicit dense materialization in logical row order.
+    pub fn to_dense(&self) -> MatrixResult<Self> {
+        Self::from_data(self.to_vec()?, self.rows(), self.cols())
+    }
+    /// Owned CSR positional selection; dense selection remains in GraphMatrix.
+    pub(crate) fn sparse_select(
+        &self,
+        rows: &[usize],
+        cols: &[usize],
+    ) -> MatrixResult<Option<Self>> {
+        self.checked_sparse()?
+            .map(|s| s.select(rows, cols).and_then(Self::owned_csr))
+            .transpose()
+    }
+
+    pub(crate) fn sparse_map(&self, operation: impl Fn(T) -> T) -> MatrixResult<Option<Self>> {
+        self.checked_sparse()?
+            .map(|s| s.map(operation).and_then(Self::owned_csr))
+            .transpose()
+    }
+    pub(crate) fn sparse_reshape(&self, rows: usize, cols: usize) -> MatrixResult<Option<Self>> {
+        self.checked_sparse()?
+            .map(|s| s.reshape(rows, cols).and_then(Self::owned_csr))
+            .transpose()
+    }
+
     /// Create a matrix from existing data
     pub fn from_data(data: Vec<T>, rows: usize, cols: usize) -> MatrixResult<Self> {
         let size = rows.checked_mul(cols).ok_or(MemoryError::InvalidSize)?;
@@ -441,6 +510,42 @@ impl<T: NumericType> UnifiedMatrix<T> {
                 got: (other.rows(), other.cols()),
             });
         }
+        if let (Some(a), Some(b)) = (self.checked_sparse()?, other.checked_sparse()?) {
+            return Self::owned_csr(a.matmul(b)?);
+        }
+        if let Some(a) = self.checked_sparse()? {
+            let b = other.to_vec()?;
+            if a.values.iter().all(|v| v.is_finite()) && b.iter().all(|v| v.is_finite()) {
+                let mut out = Self::new(self.rows(), other.cols())?;
+                for i in 0..self.rows() {
+                    for j in 0..other.cols() {
+                        let mut dot = super::checked_kernels::Product::<T>::new();
+                        for entry in a.row_pointers[i]..a.row_pointers[i + 1] {
+                            dot.add(a.values[entry], b[a.col_indices[entry] * other.cols() + j])?;
+                        }
+                        out.set(i, j, dot.total()?)?;
+                    }
+                }
+                return Ok(out);
+            }
+        }
+        if let Some(b) = other.checked_sparse()? {
+            let a = self.to_vec()?;
+            if b.values.iter().all(|v| v.is_finite()) && a.iter().all(|v| v.is_finite()) {
+                let bt = b.transpose()?;
+                let mut out = Self::new(self.rows(), other.cols())?;
+                for i in 0..self.rows() {
+                    for j in 0..other.cols() {
+                        let mut dot = super::checked_kernels::Product::<T>::new();
+                        for entry in bt.row_pointers[j]..bt.row_pointers[j + 1] {
+                            dot.add(a[i * self.cols() + bt.col_indices[entry]], bt.values[entry])?;
+                        }
+                        out.set(i, j, dot.total()?)?;
+                    }
+                }
+                return Ok(out);
+            }
+        }
         let a = self.to_vec()?;
         let b = other.to_vec()?;
         let mut out = Self::new(self.rows(), other.cols())?;
@@ -458,12 +563,19 @@ impl<T: NumericType> UnifiedMatrix<T> {
         }
         Ok(out)
     }
-    fn checked_zip(&self, other: &Self, op: fn(T, T) -> Option<T>) -> MatrixResult<Self> {
+    pub(crate) fn checked_zip(
+        &self,
+        other: &Self,
+        op: fn(T, T) -> Option<T>,
+    ) -> MatrixResult<Self> {
         if self.shape != other.shape {
             return Err(MatrixError::DimensionMismatch {
                 expected: self.shape.as_tuple(),
                 got: other.shape.as_tuple(),
             });
+        }
+        if let (Some(a), Some(b)) = (self.checked_sparse()?, other.checked_sparse()?) {
+            return Self::owned_csr(a.binary(b, op)?);
         }
         let values = self
             .to_vec()?
@@ -478,18 +590,30 @@ impl<T: NumericType> UnifiedMatrix<T> {
     }
     /// Checked logical element-wise addition, independent of physical layout.
     pub fn add(&self, other: &Self) -> MatrixResult<Self> {
+        if let (Some(a), Some(b)) = (self.checked_sparse()?, other.checked_sparse()?) {
+            return Self::owned_csr(a.add(b)?);
+        }
         self.checked_zip(other, T::checked_add)
     }
     /// Checked logical element-wise subtraction.
     pub fn subtract(&self, other: &Self) -> MatrixResult<Self> {
+        if let (Some(a), Some(b)) = (self.checked_sparse()?, other.checked_sparse()?) {
+            return Self::owned_csr(a.subtract(b)?);
+        }
         self.checked_zip(other, T::checked_sub)
     }
     /// Checked logical Hadamard product.
     pub fn mul(&self, other: &Self) -> MatrixResult<Self> {
+        if let (Some(a), Some(b)) = (self.checked_sparse()?, other.checked_sparse()?) {
+            return Self::owned_csr(a.hadamard(b)?);
+        }
         self.checked_zip(other, T::checked_mul)
     }
     /// Checked logical scalar multiplication.
     pub fn scale(&self, scalar: T) -> MatrixResult<Self> {
+        if let Some(s) = self.checked_sparse()? {
+            return Self::owned_csr(s.scale(scalar)?);
+        }
         let values = self
             .to_vec()?
             .into_iter()
@@ -508,18 +632,53 @@ impl<T: NumericType> UnifiedMatrix<T> {
 
     /// Sum all elements
     pub fn sum(&self) -> MatrixResult<T::Accumulator> {
+        if let Some(s) = self.checked_sparse()? {
+            return super::checked_kernels::sum(&s.values);
+        }
         super::checked_kernels::sum(&self.to_vec()?)
     }
     /// Maximum logical value with first-tie and NaN propagation.
     pub fn max(&self) -> MatrixResult<T> {
+        if let Some(s) = self.checked_sparse()? {
+            let total = self
+                .rows()
+                .checked_mul(self.cols())
+                .ok_or_else(|| MatrixError::InvalidInput("CSR dimensions overflow".into()))?;
+            if s.values.is_empty() && total > 0 {
+                return Ok(T::zero());
+            }
+            let best = super::checked_kernels::extrema(&s.values, false)?;
+            if total > s.values.len() && !best.to_f64().is_nan() {
+                return super::checked_kernels::extrema(&[best, T::zero()], false);
+            }
+            return Ok(best);
+        }
         super::checked_kernels::extrema(&self.to_vec()?, false)
     }
     /// Minimum logical value with first-tie and NaN propagation.
     pub fn min(&self) -> MatrixResult<T> {
+        if let Some(s) = self.checked_sparse()? {
+            let total = self
+                .rows()
+                .checked_mul(self.cols())
+                .ok_or_else(|| MatrixError::InvalidInput("CSR dimensions overflow".into()))?;
+            if s.values.is_empty() && total > 0 {
+                return Ok(T::zero());
+            }
+            let best = super::checked_kernels::extrema(&s.values, true)?;
+            if total > s.values.len() && !best.to_f64().is_nan() {
+                return super::checked_kernels::extrema(&[best, T::zero()], true);
+            }
+            return Ok(best);
+        }
         super::checked_kernels::extrema(&self.to_vec()?, true)
     }
     /// Owned logical transpose.
     pub fn transpose(&self) -> MatrixResult<Self> {
+        if let Some(s) = self.checked_sparse()? {
+            return Self::owned_csr(s.transpose()?);
+        }
+
         let mut out = Self::new(self.cols(), self.rows())?;
         for i in 0..self.rows() {
             for j in 0..self.cols() {

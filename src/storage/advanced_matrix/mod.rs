@@ -14,6 +14,7 @@ pub mod memory;
 pub mod neural;
 pub mod numeric_type;
 pub mod operations;
+mod sparse_ops;
 pub mod unified_matrix;
 
 pub use backend::{

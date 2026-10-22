@@ -891,6 +891,23 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Transpose the matrix
     pub fn transpose(&self) -> GraphResult<GraphMatrix<T>> {
         let (rows, cols) = self.shape();
+        if self.is_sparse() {
+            if self.row_labels.as_ref().is_some_and(|v| v.len() != rows) {
+                return Err(GraphError::InvalidInput(
+                    "Row label count does not match shape".into(),
+                ));
+            }
+            let mut result = Self::from_storage(
+                self.storage
+                    .transpose()
+                    .map_err(|e| GraphError::InvalidInput(e.to_string()))?,
+            );
+            result.row_labels = Some(self.column_names.clone());
+            if let Some(labels) = &self.row_labels {
+                result.column_names = labels.clone();
+            }
+            return Ok(result);
+        }
         let mut result = Self::arithmetic_zeros(cols, rows)?;
         for row in 0..rows {
             for col in 0..cols {
@@ -909,6 +926,27 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
+    /// Explicit owned conversion to canonical CSR storage.
+    pub fn to_csr(&self) -> GraphResult<Self> {
+        self.convert_storage(true)
+    }
+    /// Explicit owned dense materialization.
+    pub fn to_dense(&self) -> GraphResult<Self> {
+        self.convert_storage(false)
+    }
+    fn convert_storage(&self, sparse: bool) -> GraphResult<Self> {
+        let storage = if sparse {
+            self.storage.to_csr()
+        } else {
+            self.storage.to_dense()
+        }
+        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = Self::from_storage(storage);
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
+        Ok(result)
+    }
+
     /// Matrix multiplication
     pub fn multiply(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
         let (self_rows, self_cols) = self.shape();
@@ -921,6 +959,16 @@ impl<T: NumericType> GraphMatrix<T> {
             )));
         }
 
+        if self.is_sparse() || other.is_sparse() {
+            let storage = self
+                .storage
+                .matmul(&other.storage)
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+            let mut result = Self::from_storage(storage);
+            result.row_labels = self.row_labels.clone();
+            result.column_names = other.column_names.clone();
+            return Ok(result);
+        }
         let mut result = Self::arithmetic_zeros(self_rows, other_cols)?;
 
         result.row_labels = self.row_labels.clone();
@@ -1175,9 +1223,9 @@ impl<T: NumericType> GraphMatrix<T> {
         )
     }
 
-    /// Convert to dense representation (no-op for GraphMatrix which is already dense)
+    /// Explicit owned dense representation.
     pub fn dense(&self) -> GraphResult<GraphMatrix<T>> {
-        Ok(self.clone())
+        self.to_dense()
     }
 
     /// Create GraphMatrix from arrays (legacy compatibility method)
@@ -1238,6 +1286,20 @@ impl<T: NumericType> GraphMatrix<T> {
                 "Reshape element counts must match without overflow".into(),
             ));
         }
+        if self.is_sparse() {
+            if let Some(storage) = self
+                .storage
+                .sparse_reshape(new_rows, new_cols)
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+            {
+                let mut result = Self::from_storage(storage);
+                if (rows, cols) == (new_rows, new_cols) {
+                    result.row_labels = self.row_labels.clone();
+                    result.column_names = self.column_names.clone();
+                }
+                return Ok(result);
+            }
+        }
         let mut result = Self::arithmetic_zeros(new_rows, new_cols)?;
         for row in 0..rows {
             for col in 0..cols {
@@ -1258,6 +1320,18 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Checked typed global sum; callers must handle GraphResult.
     pub fn sum(&self) -> GraphResult<T> {
+        if let crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Sparse(s) =
+            &self.storage.storage
+        {
+            if s.shape.as_tuple() != self.shape() {
+                return Err(GraphError::InvalidInput(
+                    "CSR shape metadata mismatch".into(),
+                ));
+            }
+            s.validate()
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+            return super::reductions::sum(&s.values);
+        }
         super::reductions::sum(&self.logical_values()?)
     }
     /// Global f64 mean, avoiding intermediate typed-sum overflow; empty=0.
@@ -1266,10 +1340,32 @@ impl<T: NumericType> GraphMatrix<T> {
     }
     /// Global minimum; empty=None and any NaN propagates.
     pub fn min(&self) -> GraphResult<Option<T>> {
+        if self.is_sparse() {
+            let (rows, cols) = self.shape();
+            if rows == 0 || cols == 0 {
+                return Ok(None);
+            }
+            return self
+                .storage
+                .min()
+                .map(Some)
+                .map_err(|e| GraphError::InvalidInput(e.to_string()));
+        }
         super::reductions::extremum(&self.logical_values()?, true)
     }
     /// Global maximum; empty=None and any NaN propagates.
     pub fn max(&self) -> GraphResult<Option<T>> {
+        if self.is_sparse() {
+            let (rows, cols) = self.shape();
+            if rows == 0 || cols == 0 {
+                return Ok(None);
+            }
+            return self
+                .storage
+                .max()
+                .map(Some)
+                .map_err(|e| GraphError::InvalidInput(e.to_string()));
+        }
         super::reductions::extremum(&self.logical_values()?, false)
     }
 
@@ -2753,6 +2849,31 @@ impl<T: NumericType> GraphMatrix<T> {
             ));
         }
         let result_rows = selected_rows.map_or(rows, |r| r.len());
+        if self.is_sparse() {
+            let all_rows: Vec<_>;
+            let rows = if let Some(rows) = selected_rows {
+                rows
+            } else {
+                all_rows = (0..self.shape().0).collect();
+                &all_rows
+            };
+            if let Some(storage) = self
+                .storage
+                .sparse_select(rows, selected_cols)
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+            {
+                let mut result = Self::from_storage(storage);
+                result.column_names = selected_cols
+                    .iter()
+                    .map(|&i| self.column_names[i].clone())
+                    .collect();
+                result.row_labels = self
+                    .row_labels
+                    .as_ref()
+                    .map(|labels| rows.iter().map(|&i| labels[i].clone()).collect());
+                return Ok(result);
+            }
+        }
         let mut result = Self::arithmetic_zeros(result_rows, selected_cols.len())?;
         for (col, &source_col) in selected_cols.iter().enumerate() {
             for row in 0..result_rows {
@@ -2785,6 +2906,18 @@ impl<T: NumericType> GraphMatrix<T> {
     // Arithmetic results own storage and retain left positional row/column labels.
     fn map_arithmetic(&self, operation: impl Fn(T) -> T) -> GraphResult<Self> {
         let (rows, cols) = self.shape();
+        if self.is_sparse() {
+            if let Some(storage) = self
+                .storage
+                .sparse_map(&operation)
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+            {
+                let mut result = Self::from_storage(storage);
+                result.row_labels = self.row_labels.clone();
+                result.column_names = self.column_names.clone();
+                return Ok(result);
+            }
+        }
         let mut result = Self::arithmetic_zeros(rows, cols)?;
         for row in 0..rows {
             for col in 0..cols {
@@ -2796,11 +2929,7 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    fn zip_arithmetic(
-        &self,
-        other: &Self,
-        operation: impl Fn(T, T) -> Option<T>,
-    ) -> GraphResult<Self> {
+    fn zip_arithmetic(&self, other: &Self, operation: fn(T, T) -> Option<T>) -> GraphResult<Self> {
         if self.shape() != other.shape() {
             return Err(GraphError::InvalidInput(format!(
                 "Matrix dimensions must match for element-wise arithmetic: {:?} vs {:?}",
@@ -2809,6 +2938,16 @@ impl<T: NumericType> GraphMatrix<T> {
             )));
         }
         let (rows, cols) = self.shape();
+        if self.is_sparse() && other.is_sparse() {
+            let storage = self
+                .storage
+                .checked_zip(&other.storage, operation)
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+            let mut result = Self::from_storage(storage);
+            result.row_labels = self.row_labels.clone();
+            result.column_names = self.column_names.clone();
+            return Ok(result);
+        }
         let mut result = Self::arithmetic_zeros(rows, cols)?;
         for row in 0..rows {
             for col in 0..cols {

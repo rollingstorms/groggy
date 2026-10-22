@@ -19,3 +19,10 @@ Completion requires implemented behavior and recorded evidence. Historical slice
 notes retain their scope; parent boxes remain open until the work above is done.
 Unrelated development benchmark edits present at the start of this pass are
 preserved separately.
+
+## Completed slices in this pass
+
+- 29.37: symmetric eigen/thin-SVD explicit derivatives, independent gradient checks.
+- 29.38: QR/fixed-pivot LU explicit derivatives, independent gradient checks.
+- 29.39: shared checked lower arithmetic, logical layouts, raw backend ABI guards.
+- 29.40: canonical sparse arithmetic/products/transforms/conversions. Sparse solve/factors and remaining statistics still open.

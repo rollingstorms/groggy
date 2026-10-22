@@ -58,6 +58,21 @@ impl PyGraphMatrix {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
+    /// Explicit owned canonical CSR conversion.
+    fn to_csr(&self) -> PyResult<Self> {
+        self.inner
+            .to_csr()
+            .map(|inner| Self { inner })
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+    /// Explicit owned dense materialization.
+    fn to_dense(&self) -> PyResult<Self> {
+        self.inner
+            .to_dense()
+            .map(|inner| Self { inner })
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
     /// Create a new GraphMatrix from BaseArrays (mixed types) or NumArrays (numerical)
     #[new]
     pub fn new(py: Python, arrays: Vec<PyObject>) -> PyResult<Self> {
