@@ -84,3 +84,64 @@ pub(super) fn solve(
     }
     Ok(b)
 }
+
+/// Rounded residual B-A*X, with exact finite dot accumulation before rounding.
+pub(super) fn residual(
+    a: &[f64],
+    b: &[f64],
+    x: &[f64],
+    n: usize,
+    rhs: usize,
+) -> GraphResult<Vec<f64>> {
+    let mut result = super::factorization::zeros(n, rhs)?;
+    for row in 0..n {
+        for col in 0..rhs {
+            let mut dot = super::dot_product::Dot::new();
+            dot.add(b[row * rhs + col], 1.);
+            for j in 0..n {
+                dot.add(-a[row * n + j], x[j * rhs + col]);
+            }
+            result[row * rhs + col] = finite(dot.total())?;
+        }
+    }
+    Ok(result)
+}
+// Log infinity norm avoids overflow in row sums and in the error denominator.
+fn log_inf_norm(values: &[f64], cols: usize) -> f64 {
+    let scale = values.iter().fold(0.0_f64, |scale, v| scale.max(v.abs()));
+    if scale == 0. || cols == 0 {
+        return f64::NEG_INFINITY;
+    }
+    let mut maximum = 0.0_f64;
+    for row in values.chunks_exact(cols) {
+        let mut dot = super::dot_product::Dot::new();
+        for v in row {
+            dot.add(v.abs() / scale, 1.);
+        }
+        maximum = maximum.max(dot.total());
+    }
+    scale.ln() + maximum.ln()
+}
+/// Normwise backward-error estimate using rounded residuals, not a certified bound.
+pub(super) fn backward_error(
+    a: &[f64],
+    b: &[f64],
+    x: &[f64],
+    residual: &[f64],
+    n: usize,
+    rhs: usize,
+) -> f64 {
+    let numerator = log_inf_norm(residual, rhs);
+    if numerator == f64::NEG_INFINITY {
+        return 0.;
+    }
+    let product = log_inf_norm(a, n) + log_inf_norm(x, rhs);
+    let right = log_inf_norm(b, rhs);
+    let largest = product.max(right);
+    let denominator = if largest == f64::NEG_INFINITY {
+        largest
+    } else {
+        largest + ((product - largest).exp() + (right - largest).exp()).ln()
+    };
+    (numerator - denominator).exp()
+}

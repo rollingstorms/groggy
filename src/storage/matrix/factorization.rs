@@ -3,7 +3,7 @@ use crate::{GraphError, GraphResult};
 fn invalid(message: &str) -> GraphError {
     GraphError::InvalidInput(message.into())
 }
-fn zeros(rows: usize, cols: usize) -> GraphResult<Vec<f64>> {
+pub(super) fn zeros(rows: usize, cols: usize) -> GraphResult<Vec<f64>> {
     let count = rows
         .checked_mul(cols)
         .filter(|n| {

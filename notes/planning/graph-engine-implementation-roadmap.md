@@ -132,3 +132,6 @@ Numerical item 29.28 repairs finite real Cholesky using scaled relative symmetry
 Numerical item 29.29 repairs finite real LU and determinant/slogdet with partial pivoting, singular/empty support, checked factor range/identity and bounded cubic work. Rank, condition estimation, residual/refinement and least squares remain under 29.23; complex/sparse variants and production performance remain separate.
 
 Numerical item 29.30 repairs rectangular/scale-aware numerical rank and adds an independent normalized 2-norm condition estimate with native/Python APIs and singular-spectrum references. Residual reporting/refinement and least squares are the remaining 29.23 solver slices.
+
+### Item 29.31 — Solve diagnostics and refinement, 2026-10-21
+Add owned native SolveReport and thin Python tuple without changing solve/inverse. Report a normwise backward-error estimate against original coefficients using exact-dot rounded residuals and log norms; it is not a forward-error/certified guarantee. Bound correction attempts to 16 and accept only strict improvement after output-dtype rounding, preserving coordinate identity and explicit range failures. Repeated dense refactorization is deliberate initial scope; factor reuse, sparse refinement and performance remain open. See docs/api/matrix-solve-refined.md.

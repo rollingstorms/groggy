@@ -1916,6 +1916,30 @@ impl PyGraphMatrix {
         Py::new(py, matrix)
     }
 
+    /// Return (owned solution, normwise backward-error estimate, accepted corrections).
+    #[pyo3(signature = (b, max_refinements=2))]
+    fn solve_refined(
+        &self,
+        py: Python,
+        b: &Self,
+        max_refinements: usize,
+    ) -> PyResult<(Py<Self>, f64, usize)> {
+        let report = self
+            .inner
+            .solve_refined(&b.inner, max_refinements)
+            .map_err(|e| PyRuntimeError::new_err(format!("Refined solve failed: {:?}", e)))?;
+        Ok((
+            Py::new(
+                py,
+                Self {
+                    inner: report.solution,
+                },
+            )?,
+            report.backward_error,
+            report.accepted_refinements,
+        ))
+    }
+
     /// Real SVD: A = U * Sigma * V^T, using bounded one-sided Jacobi sweeps.
     /// Returns full U, min(rows, cols) descending values, and full V_transpose.
     fn svd(&self, py: Python) -> PyResult<(Py<Self>, PyObject, Py<Self>)> {

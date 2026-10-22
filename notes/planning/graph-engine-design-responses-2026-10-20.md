@@ -562,3 +562,8 @@ Verification: full locked offline native suite passed (442 library tests, two ig
 
 ### Item 29 complex eigen result — accepted design decision, 2026-10-21
 The caller selected a dedicated complex eigendecomposition result exposing real/imaginary eigenvalues and eigenvector matrices. Preserve the existing real symmetric API and real numeric matrix storage. The general complex solver, convergence/defective-matrix policy, and its independent verification remain implementation work under 29.24.
+
+### Item 29.31 — Solve diagnostics and refinement, 2026-10-21
+Add owned native SolveReport and thin Python tuple without changing solve/inverse. Report a normwise backward-error estimate against original coefficients using exact-dot rounded residuals and log norms; it is not a forward-error/certified guarantee. Bound correction attempts to 16 and accept only strict improvement after output-dtype rounding, preserving coordinate identity and explicit range failures. Repeated dense refactorization is deliberate initial scope; factor reuse, sparse refinement and performance remain open. See docs/api/matrix-solve-refined.md.
+
+29.31 verification: full locked offline native suites passed; rebuilt Python numerical suite: 194 passed, including independent Fraction residual checks and an overflowing denominator fixture. Focused Clippy passes with only the existing sort/match categories excluded.

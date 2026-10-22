@@ -21,6 +21,15 @@ use crate::viz::display::DisplayConfig;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Owned solution plus a rounded normwise backward-error estimate.
+/// A small backward error alone does not imply a small forward error.
+#[derive(Debug)]
+pub struct SolveReport<T: NumericType> {
+    pub solution: GraphMatrix<T>,
+    pub backward_error: f64,
+    pub accepted_refinements: usize,
+}
+
 /// Matrix properties that can be computed and cached
 #[derive(Debug, Clone)]
 pub struct MatrixProperties {
@@ -1871,6 +1880,72 @@ impl<T: NumericType> GraphMatrix<T> {
         result.row_labels = Some(self.column_names.clone());
         result.column_names = b.column_names.clone();
         Ok(result)
+    }
+
+    /// Solve with residual reporting and at most 16 optional refinement attempts.
+    /// Accept a correction only when the returned-dtype backward error decreases.
+    pub fn solve_refined(
+        &self,
+        b: &GraphMatrix<T>,
+        max_refinements: usize,
+    ) -> GraphResult<SolveReport<T>>
+    where
+        T: std::ops::Add<Output = T>
+            + std::ops::Sub<Output = T>
+            + std::ops::Mul<Output = T>
+            + std::ops::Div<Output = T>
+            + Copy,
+    {
+        if max_refinements > 16 {
+            return Err(GraphError::InvalidInput(
+                "At most 16 refinement attempts are supported".into(),
+            ));
+        }
+        let mut solution = self.solve(b)?;
+        let (n, rhs) = b.shape();
+        let a = self.decomposition_input()?;
+        let b = b.decomposition_input()?;
+        let mut x = solution.decomposition_input()?;
+        let mut residual = super::linear_system::residual(&a, &b, &x, n, rhs)?;
+        let mut error = super::linear_system::backward_error(&a, &b, &x, &residual, n, rhs);
+        let mut accepted = 0;
+        for _ in 0..max_refinements {
+            if error == 0. {
+                break;
+            }
+            let correction = super::linear_system::solve(a.clone(), residual, n, rhs)?;
+            let candidate: Vec<_> = x
+                .iter()
+                .zip(correction)
+                .map(|(v, delta)| v + delta)
+                .collect();
+            let mut candidate = Self::factor_matrix(candidate, n, rhs)?;
+            let candidate_x = candidate.decomposition_input()?;
+            let candidate_residual = super::linear_system::residual(&a, &b, &candidate_x, n, rhs)?;
+            let candidate_error = super::linear_system::backward_error(
+                &a,
+                &b,
+                &candidate_x,
+                &candidate_residual,
+                n,
+                rhs,
+            );
+            if candidate_error >= error {
+                break;
+            }
+            candidate.row_labels = solution.row_labels.clone();
+            candidate.column_names = solution.column_names.clone();
+            solution = candidate;
+            x = candidate_x;
+            residual = candidate_residual;
+            error = candidate_error;
+            accepted += 1;
+        }
+        Ok(SolveReport {
+            solution,
+            backward_error: error,
+            accepted_refinements: accepted,
+        })
     }
 
     /// SVD decomposition: A = U * Σ * V^T
