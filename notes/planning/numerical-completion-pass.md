@@ -54,7 +54,6 @@ preserved separately.
 ## Concrete remaining audit work
 
 - Broader production size/fill/SIMD and final regression/lint/API/documentation gates remain open.
-- Replayable scalar tape primals and deterministic execution order need a final check before closure.
 
 - 29.53: shared raw-bound slice normalization and checked extreme steps; 437 Python regressions.
 
@@ -67,3 +66,5 @@ preserved separately.
 - 29.57: explicit sparse/dense numerical materialization policy; 447 Python regressions.
 
 - 29.58: checked matrix constructors and shared matrix/array conversion; 454 Python regressions.
+
+- 29.59: faithful scalar tape replay, deterministic execution and direct-division gradients; 455 Python regressions.

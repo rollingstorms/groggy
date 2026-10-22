@@ -209,3 +209,5 @@ accepted pinned-state model.
 - [x] **29.57 — Sparse materialization policy.** Bounded implicit dense numerical input conversion with explicit opt-in above the limit; sparse-native solve/factors remain sparse. Full native suites and 447 rebuilt Python tests pass. See docs/api/matrix-sparse-materialization.md.
 
 - [x] **29.58 — Checked construction and array boundaries.** Explicit allocation/shape errors, no fallback matrices, truthful Python dtype handling, exact shared numeric factory/array conversions and checked attribute export. Full native suites and 454 rebuilt Python tests pass. See docs/api/matrix-constructor-boundaries.md.
+
+- [x] **29.59 — Replayable scalar tape and deterministic execution.** Faithful forward nodes, direct-division pullbacks at underflow boundaries, ordered execution and atomic invalid-dependency rejection. Full native suites and 455 rebuilt Python tests pass.

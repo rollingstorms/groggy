@@ -41,3 +41,8 @@ reshape, activation, solve or arbitrary graph operator.
 Evidence: native cloned/independent/repeated-input, sparse, stale-binding and
 joint-factor fixtures; Python NumPy finite differences for a composite SVD loss
 using U, S and Vt together, plus QR reconstruction and chain-rule checks.
+
+Scalar shifts and division retain faithful forward operations for tape replay.
+Division pullbacks divide the cotangent directly instead of forming a possibly
+overflowing reciprocal. Topological execution uses ascending ready-node IDs;
+missing input dependencies reject before inserting an operation node.

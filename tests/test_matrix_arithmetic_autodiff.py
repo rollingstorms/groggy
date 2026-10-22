@@ -78,3 +78,11 @@ def test_saved_bindings_reject_changes_before_a_new_operation():
     a.set(0, 0, 3.)
     with pytest.raises(RuntimeError, match='changed since gradient binding'):
         _ = a + a
+
+
+def test_scalar_division_backward_does_not_overflow_an_unneeded_reciprocal():
+    tiny = float.fromhex('0x0.0000000000001p-1022')
+    a = core([[tiny]]).requires_grad_(True)
+    output = a / tiny
+    output.backward_with_gradient(core([[tiny]]))
+    assert array(a.grad)[0, 0] == 1.

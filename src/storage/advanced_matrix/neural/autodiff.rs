@@ -7,7 +7,8 @@ use crate::storage::advanced_matrix::{
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, Shape, UnifiedMatrix},
 };
-use std::collections::{HashMap, VecDeque};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
@@ -53,6 +54,13 @@ pub enum Operation {
     Log,
     Sqrt,
     ScalarScale {
+        scalar_bits: u64,
+    },
+    ScalarShift {
+        scalar_bits: u64,
+        subtract: bool,
+    },
+    ScalarDivide {
         scalar_bits: u64,
     },
     Cholesky,
@@ -200,6 +208,11 @@ impl<T: NumericType> ComputationGraph<T> {
         output_shape: Shape,
         requires_grad: bool,
     ) -> MatrixResult<NodeId> {
+        if inputs.iter().any(|id| !self.nodes.contains_key(id)) {
+            return Err(MatrixError::ComputationError(
+                "Operation input node not found".into(),
+            ));
+        }
         let id = next_node_id();
 
         let mut node = ComputationNode::new(id, operation, output_shape, requires_grad);
@@ -262,17 +275,17 @@ impl<T: NumericType> ComputationGraph<T> {
         }
 
         // Kahn's algorithm for topological sorting
-        let mut queue: VecDeque<NodeId> = VecDeque::new();
+        let mut queue: BinaryHeap<Reverse<NodeId>> = BinaryHeap::new();
         let mut result = Vec::new();
 
         // Start with nodes that have no dependencies (in-degree 0)
         for (&node_id, &degree) in &in_degree {
             if degree == 0 {
-                queue.push_back(node_id);
+                queue.push(Reverse(node_id));
             }
         }
 
-        while let Some(current) = queue.pop_front() {
+        while let Some(Reverse(current)) = queue.pop() {
             result.push(current);
 
             // Update in-degrees of dependent nodes
@@ -281,7 +294,7 @@ impl<T: NumericType> ComputationGraph<T> {
                     if let Some(degree) = in_degree.get_mut(&dependent) {
                         *degree -= 1;
                         if *degree == 0 {
-                            queue.push_back(dependent);
+                            queue.push(Reverse(dependent));
                         }
                     }
                 }
@@ -382,6 +395,25 @@ impl<T: NumericType> ComputationGraph<T> {
                     ));
                 }
                 inputs[0].subtract(&inputs[1])
+            }
+            Operation::ScalarShift { scalar_bits, .. }
+            | Operation::ScalarDivide { scalar_bits } => {
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Scalar arithmetic requires one input".into(),
+                    ));
+                }
+                let input = crate::storage::GraphMatrix::from_storage(inputs[0].clone());
+                let scalar = f64::from_bits(*scalar_bits);
+                let result = match node.operation {
+                    Operation::ScalarShift { subtract: true, .. } => input.scalar_subtract(scalar),
+                    Operation::ScalarShift { .. } => input.scalar_add(scalar),
+                    _ => input.scalar_divide(scalar),
+                };
+                result
+                    .map(crate::storage::GraphMatrix::into_storage)
+                    .map_err(|e| MatrixError::ComputationError(e.to_string()))
             }
             Operation::Identity | Operation::ScalarScale { .. } => {
                 let inputs = self.get_input_values(&node.inputs)?;
@@ -730,7 +762,11 @@ impl<T: NumericType> ComputationGraph<T> {
                 self.accumulate_per_input(&[id], vec![seed.elementwise_multiply(&derivative)?])
             }
 
-            Operation::Identity | Operation::Transpose | Operation::ScalarScale { .. } => {
+            Operation::Identity
+            | Operation::Transpose
+            | Operation::ScalarScale { .. }
+            | Operation::ScalarShift { .. }
+            | Operation::ScalarDivide { .. } => {
                 if node.inputs.len() != 1 {
                     return Err(MatrixError::ComputationError(
                         "Unary arithmetic requires one input".into(),
@@ -738,6 +774,19 @@ impl<T: NumericType> ComputationGraph<T> {
                 }
                 let input = node.inputs[0];
                 let gradient = match node.operation {
+                    Operation::ScalarDivide { scalar_bits } => {
+                        let scalar = f64::from_bits(scalar_bits);
+                        if scalar == 0. {
+                            return Err(MatrixError::InvalidInput("Division by zero".into()));
+                        }
+                        grad_output.try_map_into(|value| {
+                            T::from_f64(value.to_f64() / scalar).ok_or_else(|| {
+                                MatrixError::InvalidInput(
+                                    "Scalar gradient exceeds dtype range".into(),
+                                )
+                            })
+                        })?
+                    }
                     Operation::Transpose => grad_output.transpose()?,
                     Operation::ScalarScale { scalar_bits } => grad_output.scalar_multiply(
                         T::from_f64(f64::from_bits(scalar_bits)).ok_or_else(|| {
@@ -860,32 +909,19 @@ impl<T: NumericType> ComputationGraph<T> {
             }
 
             Operation::MatMul => {
-                // d(A @ B)/dA = grad_output @ B^T
-                // d(A @ B)/dB = A^T @ grad_output
-                if node.inputs.len() == 2 {
-                    let input_values = self.get_input_values(&node.inputs)?;
-
-                    // Gradient for first input (A)
-                    if let Some(input_arc) = self.nodes.get(&node.inputs[0]) {
-                        let mut input_node = input_arc.lock().unwrap();
-                        if input_node.requires_grad {
-                            let b_transposed = input_values[1].transpose()?;
-                            let grad = grad_output.matmul(&b_transposed)?;
-                            input_node.accumulate_gradient(grad)?;
-                        }
-                    }
-
-                    // Gradient for second input (B)
-                    if let Some(input_arc) = self.nodes.get(&node.inputs[1]) {
-                        let mut input_node = input_arc.lock().unwrap();
-                        if input_node.requires_grad {
-                            let a_transposed = input_values[0].transpose()?;
-                            let grad = a_transposed.matmul(grad_output)?;
-                            input_node.accumulate_gradient(grad)?;
-                        }
-                    }
+                if node.inputs.len() != 2 {
+                    return Err(MatrixError::ComputationError(
+                        "MatMul requires two inputs".into(),
+                    ));
                 }
-                Ok(())
+                let ids = [node.inputs[0], node.inputs[1]];
+                let values = self.get_input_values(&ids)?;
+                let gradients = vec![
+                    grad_output.matmul(&values[1].transpose()?)?,
+                    values[0].transpose()?.matmul(grad_output)?,
+                ];
+                drop(node);
+                self.accumulate_per_input(&ids, gradients)
             }
 
             Operation::FactorOutput { part } => {

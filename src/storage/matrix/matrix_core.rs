@@ -2616,7 +2616,13 @@ impl<T: NumericType> GraphMatrix<T> {
                 .checked_add(scalar)
                 .ok_or_else(|| GraphError::InvalidInput("Scalar addition overflow".into()))
         })?;
-        self.track_factor(result, Operation::Identity)
+        self.track_factor(
+            result,
+            Operation::ScalarShift {
+                scalar_bits: scalar.to_f64().to_bits(),
+                subtract: false,
+            },
+        )
     }
     /// Checked scalar subtraction without a second matrix allocation.
     pub fn scalar_subtract(&self, scalar: f64) -> GraphResult<Self> {
@@ -2626,7 +2632,13 @@ impl<T: NumericType> GraphMatrix<T> {
                 .checked_sub(scalar)
                 .ok_or_else(|| GraphError::InvalidInput("Scalar subtraction overflow".into()))
         })?;
-        self.track_factor(result, Operation::Identity)
+        self.track_factor(
+            result,
+            Operation::ScalarShift {
+                scalar_bits: scalar.to_f64().to_bits(),
+                subtract: true,
+            },
+        )
     }
     /// Floating true division; cast integer matrices explicitly before division.
     pub fn scalar_divide(&self, scalar: f64) -> GraphResult<Self> {
@@ -2645,8 +2657,8 @@ impl<T: NumericType> GraphMatrix<T> {
         })?;
         self.track_factor(
             result,
-            Operation::ScalarScale {
-                scalar_bits: (1.0 / scalar).to_bits(),
+            Operation::ScalarDivide {
+                scalar_bits: scalar.to_bits(),
             },
         )
     }

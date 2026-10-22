@@ -112,3 +112,69 @@ fn joint_qr_outputs_compose_and_cancel_to_original_input() {
     reconstructed.backward().unwrap();
     close(&a.grad().unwrap(), &[1.; 6], 1e-10);
 }
+
+#[test]
+fn division_pullback_uses_direct_division_when_reciprocal_overflows() {
+    let tiny = f64::from_bits(1);
+    let a = m(vec![tiny], 1, 1).requires_grad(true);
+    let mut result = a.scalar_divide(tiny).unwrap();
+    result.backward_with_gradient(&m(vec![tiny], 1, 1)).unwrap();
+    close(&a.grad().unwrap(), &[1.], 1e-12);
+}
+#[test]
+fn tape_scalar_primals_replay_and_invalid_dependencies_do_not_publish_nodes() {
+    use groggy::storage::advanced_matrix::{
+        neural::autodiff::Operation, unified_matrix::Shape, ComputationGraph, UnifiedMatrix,
+    };
+    let mut graph = ComputationGraph::new();
+    let input = graph.create_leaf(UnifiedMatrix::from_data(vec![6.], 1, 1).unwrap(), true);
+    for (operation, expected) in [
+        (
+            Operation::ScalarShift {
+                scalar_bits: 2f64.to_bits(),
+                subtract: false,
+            },
+            8.,
+        ),
+        (
+            Operation::ScalarShift {
+                scalar_bits: 2f64.to_bits(),
+                subtract: true,
+            },
+            4.,
+        ),
+        (
+            Operation::ScalarDivide {
+                scalar_bits: 2f64.to_bits(),
+            },
+            3.,
+        ),
+    ] {
+        let output = graph
+            .create_operation(operation, vec![input], Shape::new(1, 1), true)
+            .unwrap();
+        // Unrelated later IDs must not break forward traversal before output.
+        for _ in 0..8 {
+            graph.create_leaf(UnifiedMatrix::zeros(1, 1).unwrap(), false);
+        }
+        graph.update_execution_order().unwrap();
+        assert_eq!(
+            graph.forward(output).unwrap().to_vec().unwrap(),
+            vec![expected]
+        );
+        assert!(graph
+            .execution_order()
+            .windows(2)
+            .all(|ids| ids[0] < ids[1]));
+    }
+    let before = graph.nodes().len();
+    assert!(graph
+        .create_operation(
+            Operation::Identity,
+            vec![usize::MAX],
+            Shape::new(1, 1),
+            true
+        )
+        .is_err());
+    assert_eq!(graph.nodes().len(), before);
+}
