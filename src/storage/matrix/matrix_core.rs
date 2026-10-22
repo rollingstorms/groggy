@@ -1010,50 +1010,21 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Matrix multiplication
     pub fn multiply(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        let (self_rows, self_cols) = self.shape();
-        let (other_rows, other_cols) = other.shape();
-
-        if self_cols != other_rows {
+        if self.shape().1 != other.shape().0 {
             return Err(GraphError::InvalidInput(format!(
                 "Matrix dimensions incompatible for multiplication: {}x{} * {}x{}",
-                self_rows, self_cols, other_rows, other_cols
+                self.shape().0,
+                self.shape().1,
+                other.shape().0,
+                other.shape().1
             )));
         }
 
-        if self.is_sparse() || other.is_sparse() {
-            let storage = self
-                .storage
-                .matmul(&other.storage)
-                .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
-            let mut result = Self::from_storage(storage);
-            result.row_labels = self.row_labels.clone();
-            result.column_names = other.column_names.clone();
-            return Ok(result);
-        }
-        let mut result = Self::arithmetic_zeros(self_rows, other_cols)?;
-
-        result.row_labels = self.row_labels.clone();
-        result.column_names = other.column_names.clone();
-        if self_rows == 0 || other_cols == 0 || self_cols == 0 {
-            return Ok(result);
-        }
-
-        for i in 0..self_rows {
-            for j in 0..other_cols {
-                let mut product =
-                    crate::storage::advanced_matrix::checked_kernels::Product::<T>::new();
-                for k in 0..self_cols {
-                    product
-                        .add(self.get_checked(i, k)?, other.get_checked(k, j)?)
-                        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
-                }
-                let sum = product
-                    .total()
-                    .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
-                result.set(i, j, sum)?;
-            }
-        }
-
+        let storage = self
+            .storage
+            .matmul(&other.storage)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = Self::from_storage(storage);
         result.row_labels = self.row_labels.clone();
         result.column_names = other.column_names.clone();
         Ok(result)
@@ -1179,20 +1150,9 @@ impl<T: NumericType> GraphMatrix<T> {
             .map_err(|e| GraphError::InvalidInput(e.to_string()))
     }
     fn logical_values(&self) -> GraphResult<Vec<T>> {
-        let (rows, cols) = self.shape();
-        let count = rows
-            .checked_mul(cols)
-            .ok_or_else(|| GraphError::InvalidInput("Matrix element count overflow".into()))?;
-        let mut values = Vec::new();
-        values
-            .try_reserve_exact(count)
-            .map_err(|_| GraphError::InvalidInput("Matrix reduction allocation failed".into()))?;
-        for row in 0..rows {
-            for col in 0..cols {
-                values.push(self.get_checked(row, col)?);
-            }
-        }
-        Ok(values)
+        self.storage
+            .to_vec()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
     }
 
     /// Minimum per axis; empty reductions retain legacy zero, NaNs propagate.

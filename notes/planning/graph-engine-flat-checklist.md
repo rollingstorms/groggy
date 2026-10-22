@@ -185,3 +185,5 @@ accepted pinned-state model.
 - [x] **29.45 — Seeded factor output automatic differentiation.** QR/LU/symmetric eigen/thin-SVD output routes, explicit cotangent seeds, matrix-valued spectral outputs and saved-input behavior; full native suites and 319 rebuilt Python numerical tests pass. General tape composition and production gates remain open. See docs/api/matrix-factor-autodiff.md.
 
 - [x] **29.46 — Owned numerical GIL boundary.** Checked Send snapshots/CSR/labels, thin ownership marshalling and GIL release for untracked heavy kernels; tracked tapes preserved. Native full suites and 324 rebuilt Python numerical tests pass, including worker-progress checks. Copy/performance and broader GIL gates remain explicit. See docs/api/matrix-numerical-threads.md.
+
+- [x] **29.47 — Release numerical corpus and measured bulk kernels.** Twenty release cases, allocation/peak-heap receipts, matched checksums and measured product/norm/materialization improvements with memory/timing limits. Native full suites and 324 rebuilt Python tests pass; broad production gates remain open. See notes/benchmarks/numerical-completion-2026-10-22.md.

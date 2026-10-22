@@ -4,8 +4,8 @@
 entries; `norm_inf()` returns the largest absolute entry. These last two are
 entrywise norms, not induced matrix norms. Empty matrices return zero. All
 three propagate NaN, validate storage/layout metadata and return native
-`GraphResult<f64>` (Python floats or exceptions). Stable hypot accumulation
-avoids squaring overflow/underflow; L1 uses the shared accurate sum kernel.
+`GraphResult<f64>` (Python floats or exceptions). A scaled accurate sum of normalized squares
+avoids intermediate squaring overflow/underflow; L1 uses the shared accurate sum kernel.
 
 Global means and axis statistics use checked logical layouts. CSR operations
 reduce stored entries and account for implicit zeros analytically. Column

@@ -63,3 +63,7 @@ integration_tests_disabled = []
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "numerical_completion"
+harness = false

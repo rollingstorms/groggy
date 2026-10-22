@@ -38,3 +38,5 @@ preserved separately.
 - 29.45: seeded factor-output automatic routes and matrix-valued eigen/singular values; general arithmetic tape composition remains open.
 
 - 29.46: owned numerical transfer and GIL release for untracked heavy calls; copy overhead, reductions/backward and release performance remain explicit.
+
+- 29.47: 20-case release corpus, heap allocation/peak receipts and measured bulk-product/norm/reduction improvements; broad size/SIMD gates remain open.

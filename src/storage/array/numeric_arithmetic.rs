@@ -284,14 +284,25 @@ pub fn divide_scalar<T: NumericType>(
 pub fn contains<T: PartialEq>(values: &[T], value: &T) -> bool {
     values.contains(value)
 }
-/// Stable norm without a projection allocation.
+/// Scaled accurate sum-of-squares norm without a projection allocation.
 pub fn norm<T: NumericType>(values: &[T]) -> f64 {
-    if values.iter().any(|v| v.to_f64().is_nan()) {
-        return f64::NAN;
+    let mut scale = 0.0_f64;
+    for value in values {
+        let value = value.to_f64();
+        if value.is_nan() {
+            return f64::NAN;
+        }
+        scale = scale.max(value.abs());
     }
-    values
-        .iter()
-        .fold(0.0_f64, |norm, v| norm.hypot(v.to_f64()))
+    if scale == 0.0 || scale.is_infinite() {
+        return scale;
+    }
+    let mut squares = crate::storage::matrix::dot_product::Dot::new();
+    for value in values {
+        let normalized = value.to_f64() / scale;
+        squares.add(normalized, normalized);
+    }
+    squares.total().sqrt() * scale
 }
 
 /// Numeric comparison operators; NaN follows IEEE unordered comparison rules.
