@@ -26,6 +26,7 @@ pub enum Operation {
     // Matrix operations
     MatMul,
     Transpose,
+    Cholesky,
     Power {
         exponent: u32,
     },
@@ -329,6 +330,19 @@ impl<T: NumericType> ComputationGraph<T> {
                     ));
                 }
                 inputs[0].matmul(&inputs[1])
+            }
+
+            Operation::Cholesky => {
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Cholesky requires exactly one input".into(),
+                    ));
+                }
+                crate::storage::GraphMatrix::from_storage(inputs[0].clone())
+                    .cholesky_decomposition()
+                    .map(crate::storage::GraphMatrix::into_storage)
+                    .map_err(|e| MatrixError::ComputationError(e.to_string()))
             }
 
             Operation::ReLU => {
@@ -712,6 +726,26 @@ impl<T: NumericType> ComputationGraph<T> {
                     }
                 }
                 Ok(())
+            }
+
+            Operation::Cholesky => {
+                if node.inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Cholesky backward requires exactly one input".into(),
+                    ));
+                }
+                let input_id = node.inputs[0];
+                let output_gradient = grad_output.clone();
+                drop(node);
+                let inputs = self.get_input_values(&[input_id])?;
+                let input = inputs.first().ok_or_else(|| {
+                    MatrixError::ComputationError("Cholesky input value missing".into())
+                })?;
+                let gradient = crate::storage::GraphMatrix::from_storage(input.clone())
+                    .cholesky_vjp(&crate::storage::GraphMatrix::from_storage(output_gradient))
+                    .map_err(|e| MatrixError::ComputationError(e.to_string()))?
+                    .into_storage();
+                self.accumulate_per_input(&[input_id], vec![gradient])
             }
 
             Operation::ReLU => {

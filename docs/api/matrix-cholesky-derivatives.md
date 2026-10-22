@@ -31,8 +31,27 @@ accepted pairs. Floating rounding/underflow and f32 narrowing remain possible;
 no near-singular accuracy bound is promised.
 
 These are explicit derivative calls, with owned outputs and no inherited tape.
-Automatic tape integration and other decomposition derivatives are separate
-checklist work. Each call recomputes the forward factor, costs O(n^3), and uses
+Tracked forward factors also support the existing backward tape as described
+below. Other decomposition derivatives remain separate checklist work. Each call recomputes the forward factor, costs O(n^3), and uses
 O(n²) scratch. Cached/blocked/sparse derivatives and production throughput remain
 open. Native analytic/scale/domain/identity tests and Python independent central
 differences, symmetric-coordinate checks and adjoint identities verify this slice.
+
+## Automatic backward tape
+
+`A.requires_grad_(True).cholesky_decomposition()` in Python (native
+`A.requires_grad(true)`) produces a tracked factor. Calling factor.backward()
+uses the same pullback to populate the source leaf gradient. The existing tape
+seeds an output-shaped matrix of ones, equivalent to differentiating the sum of
+the factor entries; explicit cholesky_vjp supports other output cotangents.
+Chained supported operations propagate to their saved input snapshots.
+Repeated backward clears previous gradients, following the existing tape policy.
+
+Binding gradients saves values. If input values change between binding and the
+tracked forward call, reject explicitly; disable and re-enable tracking to bind
+the new values. Mutations after a successful forward do not change its saved
+input state. This prevents a new Cholesky forward from differentiating a stale
+input. The guard is scoped to tracked Cholesky; broader mutation/tape ownership,
+branch merging and unsupported operators are separate work. The existing general
+grad accessor's metadata/locking policy is unchanged. Low-level Operation::Cholesky
+forward/backward delegates to the same checked native factor/pullback.

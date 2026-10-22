@@ -2116,7 +2116,63 @@ impl<T: NumericType> GraphMatrix<T> {
         let mut lower = Self::factor_matrix(values, rows, rows)?;
         lower.row_labels = self.row_labels.clone();
         lower.column_names = (0..rows).map(|i| format!("chol_{i}")).collect();
-        Ok(lower)
+        self.track_cholesky(lower)
+    }
+
+    // Transfer owned storage across native numerical/tape layers without exposing it publicly.
+    pub(crate) fn into_storage(self) -> UnifiedMatrix<T> {
+        self.storage
+    }
+    fn track_cholesky(&self, mut result: Self) -> GraphResult<Self> {
+        if !self.requires_grad {
+            return Ok(result);
+        }
+        let invalid = |message: &str| GraphError::InvalidInput(message.into());
+        let mut graph = self
+            .computation_graph
+            .clone()
+            .ok_or_else(|| invalid("Missing Cholesky input tape"))?;
+        let input_id = self
+            .current_node_id
+            .ok_or_else(|| invalid("Missing Cholesky input node"))?;
+        let input = graph
+            .get_node(input_id)
+            .ok_or_else(|| invalid("Missing Cholesky input node"))?;
+        {
+            let input = input
+                .lock()
+                .map_err(|_| invalid("Cholesky input tape lock poisoned"))?;
+            let saved = input
+                .value
+                .as_ref()
+                .ok_or_else(|| invalid("Missing Cholesky input snapshot"))?;
+            let saved = Self::from_storage(saved.clone());
+            if saved.shape() != self.shape()
+                || saved.decomposition_input()? != self.decomposition_input()?
+            {
+                return Err(invalid("Cholesky input changed since gradient binding; rebind with requires_grad(false).requires_grad(true)"));
+            }
+        }
+        let (rows, cols) = result.shape();
+        let id = graph
+            .create_operation(
+                crate::storage::advanced_matrix::neural::autodiff::Operation::Cholesky,
+                vec![input_id],
+                crate::storage::advanced_matrix::unified_matrix::Shape::new(rows, cols),
+                true,
+            )
+            .map_err(|e| invalid(&e.to_string()))?;
+        let output = graph
+            .get_node(id)
+            .ok_or_else(|| invalid("Missing Cholesky output node"))?;
+        output
+            .lock()
+            .map_err(|_| invalid("Cholesky output tape lock poisoned"))?
+            .value = Some(result.storage.clone());
+        result.requires_grad = true;
+        result.current_node_id = Some(id);
+        result.computation_graph = Some(graph);
+        Ok(result)
     }
 
     /// Directional derivative of Cholesky for a symmetric input tangent.
