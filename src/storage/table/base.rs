@@ -882,7 +882,11 @@ impl Table for BaseTable {
         })?;
 
         // Get sort indices
-        let indices = sort_column.sort_indices(ascending);
+        let mut indices: Vec<_> = (0..self.nrows).collect();
+        indices.sort_by(|&a, &b| {
+            let order = super::numeric::compare(&sort_column.data()[a], &sort_column.data()[b]);
+            if ascending { order } else { order.reverse() }
+        });
 
         // Apply indices to all columns
         let mut new_columns = HashMap::new();
@@ -2033,34 +2037,8 @@ impl BaseTable {
     }
 
     /// Helper method to compare AttrValues for sorting (used by nlargest/nsmallest)
-    fn compare_attr_values_for_sort(
-        &self,
-        a: &crate::types::AttrValue,
-        b: &crate::types::AttrValue,
-    ) -> std::cmp::Ordering {
-        use crate::types::AttrValue;
-        match (a, b) {
-            (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
-            (AttrValue::SmallInt(a), AttrValue::SmallInt(b)) => a.cmp(b),
-            (AttrValue::Float(a), AttrValue::Float(b)) => {
-                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (AttrValue::Int(a), AttrValue::Float(b)) => (*a as f32)
-                .partial_cmp(b)
-                .unwrap_or(std::cmp::Ordering::Equal),
-            (AttrValue::Float(a), AttrValue::Int(b)) => a
-                .partial_cmp(&(*b as f32))
-                .unwrap_or(std::cmp::Ordering::Equal),
-            (AttrValue::SmallInt(a), AttrValue::Float(b)) => (*a as f32)
-                .partial_cmp(b)
-                .unwrap_or(std::cmp::Ordering::Equal),
-            (AttrValue::Float(a), AttrValue::SmallInt(b)) => a
-                .partial_cmp(&(*b as f32))
-                .unwrap_or(std::cmp::Ordering::Equal),
-            (AttrValue::Int(a), AttrValue::SmallInt(b)) => (*a).cmp(&(*b as i64)),
-            (AttrValue::SmallInt(a), AttrValue::Int(b)) => (*a as i64).cmp(b),
-            _ => std::cmp::Ordering::Equal, // For non-comparable or mixed types
-        }
+    fn compare_attr_values_for_sort(&self, a: &AttrValue, b: &AttrValue) -> std::cmp::Ordering {
+        super::numeric::compare(a, b)
     }
 
     /// Pandas-style query method for string-based filtering
@@ -2129,6 +2107,7 @@ impl BaseTable {
         values_col: &str,
         agg_func: &str,
     ) -> GraphResult<Self> {
+        super::numeric::aggregate(&[], agg_func, true)?;
         // Validation
         if index_cols.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
@@ -2206,6 +2185,15 @@ impl BaseTable {
             new_column_order.push(col_name);
         }
 
+        let mut output_names = std::collections::HashSet::new();
+        if new_column_order
+            .iter()
+            .any(|name| !output_names.insert(name))
+        {
+            return Err(crate::GraphError::InvalidInput(
+                "Pivot keys produce duplicate output column names".into(),
+            ));
+        }
         let num_groups = groups.len();
 
         // Initialize column data vectors
@@ -2237,9 +2225,7 @@ impl BaseTable {
                     if let (Some(col_val), Some(val)) =
                         (columns_array.get(row_idx), values_array.get(row_idx))
                     {
-                        if self.compare_attr_values_for_sort(col_val, unique_val)
-                            == std::cmp::Ordering::Equal
-                        {
+                        if col_val == unique_val {
                             values_to_agg.push(val);
                         }
                     }
@@ -3090,88 +3076,7 @@ impl BaseTable {
 
     /// Helper method to aggregate a list of values using the specified function
     fn aggregate_values(&self, values: &[&AttrValue], agg_func: &str) -> GraphResult<AttrValue> {
-        if values.is_empty() {
-            return Ok(AttrValue::Null);
-        }
-
-        match agg_func {
-            "count" => Ok(AttrValue::Int(values.len() as i64)),
-            "sum" => {
-                let mut sum = 0.0;
-                for value in values {
-                    match value {
-                        AttrValue::Int(i) => sum += *i as f64,
-                        AttrValue::SmallInt(i) => sum += *i as f64,
-                        AttrValue::Float(f) => sum += *f as f64,
-                        AttrValue::Null => continue, // Skip nulls
-                        _ => {
-                            return Err(crate::errors::GraphError::InvalidInput(format!(
-                                "Cannot sum non-numeric value: {:?}",
-                                value
-                            )))
-                        }
-                    }
-                }
-                Ok(AttrValue::Float(sum as f32))
-            }
-            "mean" => {
-                let mut sum = 0.0;
-                let mut count = 0;
-                for value in values {
-                    match value {
-                        AttrValue::Int(i) => {
-                            sum += *i as f64;
-                            count += 1;
-                        }
-                        AttrValue::SmallInt(i) => {
-                            sum += *i as f64;
-                            count += 1;
-                        }
-                        AttrValue::Float(f) => {
-                            sum += *f as f64;
-                            count += 1;
-                        }
-                        AttrValue::Null => continue, // Skip nulls
-                        _ => {
-                            return Err(crate::errors::GraphError::InvalidInput(format!(
-                                "Cannot calculate mean of non-numeric value: {:?}",
-                                value
-                            )))
-                        }
-                    }
-                }
-                if count == 0 {
-                    Ok(AttrValue::Null)
-                } else {
-                    Ok(AttrValue::Float((sum / count as f64) as f32))
-                }
-            }
-            "min" => {
-                let mut min_val = values[0];
-                for &value in values.iter().skip(1) {
-                    if self.compare_attr_values_for_sort(value, min_val) == std::cmp::Ordering::Less
-                    {
-                        min_val = value;
-                    }
-                }
-                Ok(min_val.clone())
-            }
-            "max" => {
-                let mut max_val = values[0];
-                for &value in values.iter().skip(1) {
-                    if self.compare_attr_values_for_sort(value, max_val)
-                        == std::cmp::Ordering::Greater
-                    {
-                        max_val = value;
-                    }
-                }
-                Ok(max_val.clone())
-            }
-            _ => Err(crate::errors::GraphError::InvalidInput(format!(
-                "Unsupported aggregation function: {}",
-                agg_func
-            ))),
-        }
+        super::numeric::aggregate(values, agg_func, true)
     }
 
     /// Helper method to convert AttrValue to string for column naming
@@ -4265,125 +4170,23 @@ impl BaseTable {
         row_indices: &[usize],
         col_name: &str,
         agg_func: &str,
-    ) -> GraphResult<crate::types::AttrValue> {
+    ) -> GraphResult<AttrValue> {
         let column = self.columns.get(col_name).ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput(format!(
-                "Column '{}' not found for aggregation",
-                col_name
+            crate::GraphError::InvalidInput(format!(
+                "Column '{col_name}' not found for aggregation"
             ))
         })?;
-
-        match agg_func.to_lowercase().as_str() {
-            "count" => Ok(crate::types::AttrValue::Int(row_indices.len() as i64)),
-            "sum" => {
-                let mut sum = 0.0;
-                let mut count = 0;
-                for &idx in row_indices {
-                    if let Some(value) = column.get(idx) {
-                        match value {
-                            crate::types::AttrValue::Int(i) => {
-                                sum += *i as f64;
-                                count += 1;
-                            }
-                            crate::types::AttrValue::Float(f) => {
-                                sum += *f as f64;
-                                count += 1;
-                            }
-                            _ => {} // Skip non-numeric values
-                        }
-                    }
-                }
-                if count == 0 {
-                    Ok(crate::types::AttrValue::Null)
-                } else if sum.fract() == 0.0 && sum.abs() <= i64::MAX as f64 {
-                    Ok(crate::types::AttrValue::Int(sum as i64))
-                } else {
-                    Ok(crate::types::AttrValue::Float(sum as f32))
-                }
-            }
-            "avg" | "mean" => {
-                let mut sum = 0.0;
-                let mut count = 0;
-                for &idx in row_indices {
-                    if let Some(value) = column.get(idx) {
-                        match value {
-                            crate::types::AttrValue::Int(i) => {
-                                sum += *i as f64;
-                                count += 1;
-                            }
-                            crate::types::AttrValue::Float(f) if !f.is_nan() => {
-                                sum += *f as f64;
-                                count += 1;
-                            }
-                            _ => {} // Skip non-numeric values and nulls
-                        }
-                    }
-                }
-                if count == 0 {
-                    Ok(crate::types::AttrValue::Null)
-                } else {
-                    Ok(crate::types::AttrValue::Float((sum / count as f64) as f32))
-                }
-            }
-            "min" => {
-                let mut min_val: Option<crate::types::AttrValue> = None;
-                for &idx in row_indices {
-                    if let Some(value) = column.get(idx) {
-                        match value {
-                            crate::types::AttrValue::Int(_) => {
-                                if min_val.is_none()
-                                    || self.compare_values(value, min_val.as_ref().unwrap()) < 0
-                                {
-                                    min_val = Some(value.clone());
-                                }
-                            }
-                            crate::types::AttrValue::Float(f)
-                                if !f.is_nan()
-                                    && (min_val.is_none()
-                                        || self
-                                            .compare_values(value, min_val.as_ref().unwrap())
-                                            < 0) =>
-                            {
-                                min_val = Some(value.clone());
-                            }
-                            _ => {} // Skip non-numeric values and nulls for min/max
-                        }
-                    }
-                }
-                Ok(min_val.unwrap_or(crate::types::AttrValue::Null))
-            }
-            "max" => {
-                let mut max_val: Option<crate::types::AttrValue> = None;
-                for &idx in row_indices {
-                    if let Some(value) = column.get(idx) {
-                        match value {
-                            crate::types::AttrValue::Int(_) => {
-                                if max_val.is_none()
-                                    || self.compare_values(value, max_val.as_ref().unwrap()) > 0
-                                {
-                                    max_val = Some(value.clone());
-                                }
-                            }
-                            crate::types::AttrValue::Float(f)
-                                if !f.is_nan()
-                                    && (max_val.is_none()
-                                        || self
-                                            .compare_values(value, max_val.as_ref().unwrap())
-                                            > 0) =>
-                            {
-                                max_val = Some(value.clone());
-                            }
-                            _ => {} // Skip non-numeric values and nulls for min/max
-                        }
-                    }
-                }
-                Ok(max_val.unwrap_or(crate::types::AttrValue::Null))
-            }
-            _ => Err(crate::errors::GraphError::InvalidInput(format!(
-                "Unknown aggregation function: {}",
-                agg_func
-            ))),
-        }
+        let values = row_indices
+            .iter()
+            .map(|&index| {
+                column.get(index).ok_or_else(|| {
+                    crate::GraphError::InvalidInput(format!(
+                        "Aggregation row {index} exceeds column length"
+                    ))
+                })
+            })
+            .collect::<GraphResult<Vec<_>>>()?;
+        super::numeric::aggregate(&values, &agg_func.to_lowercase(), false)
     }
 
     /// Aggregate entire table (no grouping)
@@ -4408,26 +4211,6 @@ impl BaseTable {
         let mut result = BaseTable::from_columns(result_columns)?;
         result.column_order = column_order;
         Ok(result)
-    }
-
-    /// Helper method to compare AttrValues for min/max operations
-    fn compare_values(&self, a: &crate::types::AttrValue, b: &crate::types::AttrValue) -> i32 {
-        use crate::types::AttrValue;
-        match (a, b) {
-            (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b) as i32,
-            (AttrValue::Float(a), AttrValue::Float(b)) => {
-                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal) as i32
-            }
-            (AttrValue::Int(a), AttrValue::Float(b)) => (*a as f32)
-                .partial_cmp(b)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                as i32,
-            (AttrValue::Float(a), AttrValue::Int(b)) => {
-                a.partial_cmp(&(*b as f32))
-                    .unwrap_or(std::cmp::Ordering::Equal) as i32
-            }
-            _ => 0, // Equal for non-comparable types
-        }
     }
 
     /// Select specific rows by indices
@@ -5180,35 +4963,27 @@ impl BaseTable {
             return Ok(BaseTable::new());
         }
 
-        // Statistics to calculate
-        let stats = vec!["count", "mean", "std", "min", "25%", "50%", "75%", "max"];
-
         // Initialize result columns - one column per original numeric column
         let mut result_columns: HashMap<String, Vec<AttrValue>> = HashMap::new();
         for col_name in &numeric_columns {
             result_columns.insert(col_name.clone(), Vec::new());
         }
 
-        // Calculate statistics for each numeric column
-        for stat in &stats {
-            for col_name in &numeric_columns {
-                if let Some(column) = self.columns.get(col_name) {
-                    let stats_result = self.calculate_column_statistics(column)?;
-
-                    let stat_value = match *stat {
-                        "count" => AttrValue::Float(stats_result.count as f32),
-                        "mean" => AttrValue::Float(stats_result.mean as f32),
-                        "std" => AttrValue::Float(stats_result.std as f32),
-                        "min" => stats_result.min,
-                        "25%" => stats_result.q25,
-                        "50%" => stats_result.q50,
-                        "75%" => stats_result.q75,
-                        "max" => stats_result.max,
-                        _ => AttrValue::Null,
-                    };
-
-                    result_columns.get_mut(col_name).unwrap().push(stat_value);
-                }
+        // Compute the complete set once per column, not once per statistic.
+        for col_name in &numeric_columns {
+            if let Some(column) = self.columns.get(col_name) {
+                let summary = self.calculate_column_statistics(column)?;
+                let values = vec![
+                    crate::storage::numeric::attributes::float_output(summary.count as f64)?,
+                    crate::storage::numeric::attributes::float_output(summary.mean)?,
+                    crate::storage::numeric::attributes::float_output(summary.std)?,
+                    summary.min,
+                    summary.q25,
+                    summary.q50,
+                    summary.q75,
+                    summary.max,
+                ];
+                result_columns.insert(col_name.clone(), values);
             }
         }
 
@@ -5232,80 +5007,35 @@ impl BaseTable {
         &self,
         column: &BaseArray<AttrValue>,
     ) -> GraphResult<ColumnStatistics> {
-        // Extract numeric values
-        let mut numeric_values: Vec<f64> = Vec::new();
-
-        for value in column.data() {
-            match value {
-                AttrValue::Int(i) => numeric_values.push(*i as f64),
-                AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
-                AttrValue::Float(f) => numeric_values.push(*f as f64),
-                AttrValue::Null => {} // Skip nulls
-                _ => {}               // Skip non-numeric
-            }
-        }
-
-        if numeric_values.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "No numeric values found in column".to_string(),
-            ));
-        }
-
-        // Sort for percentiles
-        numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Calculate basic statistics
-        let count = numeric_values.len();
-        let sum: f64 = numeric_values.iter().sum();
-        let mean = sum / count as f64;
-
-        // Calculate standard deviation
-        let variance = numeric_values
-            .iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>()
-            / count as f64;
-        let std = variance.sqrt();
-
-        // Calculate percentiles
-        let min = numeric_values[0];
-        let max = numeric_values[count - 1];
-        let q25 = Self::percentile(&numeric_values, 0.25);
-        let q50 = Self::percentile(&numeric_values, 0.50); // median
-        let q75 = Self::percentile(&numeric_values, 0.75);
-
+        use crate::storage::numeric::{attributes, reductions};
+        let values = attributes::values(column.data())?;
+        let std = reductions::population_std_iter(values.iter().copied()).ok_or_else(|| {
+            crate::GraphError::InvalidInput("No numeric values found in column".into())
+        })?;
+        let minimum = reductions::extremum(&values, true).ok_or_else(|| {
+            crate::GraphError::InvalidInput("No numeric values found in column".into())
+        })?;
+        let maximum = reductions::extremum(&values, false).ok_or_else(|| {
+            crate::GraphError::InvalidInput("No numeric values found in column".into())
+        })?;
+        let numeric = BaseArray::new(
+            column
+                .data()
+                .iter()
+                .filter(|v| attributes::Value::parse(v).is_some())
+                .cloned()
+                .collect(),
+        );
         Ok(ColumnStatistics {
-            count,
-            mean,
+            count: values.len(),
+            mean: numeric.mean()?,
             std,
-            min: AttrValue::Float(min as f32),
-            q25: AttrValue::Float(q25 as f32),
-            q50: AttrValue::Float(q50 as f32),
-            q75: AttrValue::Float(q75 as f32),
-            max: AttrValue::Float(max as f32),
+            min: attributes::float_output(minimum)?,
+            max: attributes::float_output(maximum)?,
+            q25: column.quantile(0.25, "linear")?,
+            q50: column.quantile(0.5, "linear")?,
+            q75: column.quantile(0.75, "linear")?,
         })
-    }
-
-    /// Calculate percentile from sorted numeric values
-    fn percentile(sorted_values: &[f64], p: f64) -> f64 {
-        let n = sorted_values.len();
-        if n == 0 {
-            return 0.0;
-        }
-        if n == 1 {
-            return sorted_values[0];
-        }
-
-        let index = p * (n - 1) as f64;
-        let lower = index.floor() as usize;
-        let upper = index.ceil() as usize;
-
-        if lower == upper {
-            sorted_values[lower]
-        } else {
-            let weight = index - lower as f64;
-            sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight
-        }
     }
 
     // ==================================================================================

@@ -3,6 +3,7 @@ use groggy::{
     storage::{
         array::BaseArray,
         matrix::{MatrixLayout, MatrixStats, UnifiedMatrix},
+        table::{BaseTable, Table},
         Axis, GraphMatrix, NumArray,
     },
     AttrValue, GraphResult,
@@ -334,6 +335,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             )?);
         }
+    }
+    for n in [1_700, 17_000] {
+        let input = BaseTable::from_columns(std::collections::HashMap::from([(
+            "values".into(),
+            BaseArray::new(
+                (0..n)
+                    .map(|i| AttrValue::Int(i64::MAX - 8 + (i % 9) as i64))
+                    .collect(),
+            ),
+        )]))?;
+        cases.push(measure(
+            &format!("table_describe_high_integer_{n}"),
+            &[n, 1],
+            || {
+                let output = input.describe()?;
+                match output.column("values").and_then(|column| column.get(2)) {
+                    Some(AttrValue::Float(value)) if *value > 2. && *value < 3. => {
+                        Ok(f64::from(*value))
+                    }
+                    _ => Err(groggy::GraphError::InvalidInput(
+                        "Invalid high-offset describe spread".into(),
+                    )),
+                }
+            },
+        )?);
     }
     let report = json!({"profile":"release","arch":std::env::consts::ARCH,"os":std::env::consts::OS,"samples_per_case":7,"reduction_dispatch":"reference/simd-name/auto share checked reference kernels; no explicit SIMD acceleration is claimed","scope":"bounded dense sizes, vector lengths, sparse bandwidth/fill and sparse-native graph-sized operations; not a production SLA","allocation_scope":"process-wide System allocation/reallocation requests; additional live-byte peak during operation; excludes fixture setup; includes output creation/drop; not RSS","cases":cases});
     let output = std::env::var("GROGGY_NUMERICAL_PROFILE")

@@ -27,7 +27,7 @@ parent complete. It records specific remaining public paths instead of the vague
 
 | ID | Checklist | Finding | Exit evidence |
 | --- | --- | --- | --- |
-| NC1 | 29.61 / 29.3 | Generic attribute-array quantile/corr/cov/window/cumulative paths and table aggregate/pivot/describe/sort paths still have separate f64/f32 logic. These can round large integers before comparison/centering, skip compact integers, mis-handle missing/domain inputs or silently overflow narrowed outputs. | Route compatible arithmetic through checked shared kernels; preserve each documented missing/value/output policy or report its deliberate correction; independently test large integers, mixed types, windows, empty/nonfinite inputs, sorting/pivot identity and Rust/Python behavior. Avoid inferring table writeback policy from numerical fixes. |
+| NC1 — complete | 29.61 / 29.3 | Generic attribute-array quantile/corr/cov/window/cumulative paths and table aggregate/pivot/describe/sort paths still have separate f64/f32 logic. These can round large integers before comparison/centering, skip compact integers, mis-handle missing/domain inputs or silently overflow narrowed outputs. | Route compatible arithmetic through checked shared kernels; preserve each documented missing/value/output policy or report its deliberate correction; independently test large integers, mixed types, windows, empty/nonfinite inputs, sorting/pivot identity and Rust/Python behavior. Avoid inferring table writeback policy from numerical fixes. |
 | NC2 | 29.62 / 29.4 | Matrix activation/dropout helpers contain ignored cell/conversion errors, metadata loss and tracking detachment; the lower GELU derivative does not differentiate its tanh forward approximation. Evaluation dropout scales values despite inverted training scaling. | Checked native math and controls, faithful derivative/domain handling, preserved metadata/storage where supported, reproducible masking evidence and explicit unsupported tracked boundaries. No silent zeros or discarded errors. |
 | NC3 — complete | 29.63 / 29.25 | Sparse maps with nonzero implicit-zero images and nonfinite sparse product/scale fallbacks can materialize or scan large logical grids outside the spectral input guard. | A common explicit expansion policy prevents unintended large-grid work, with exact small-input IEEE results, sparse-zero-preserving behavior and large early-error/opt-in fixtures. Preserve explicit dense conversion as an opt-in. |
 
@@ -65,3 +65,9 @@ NC1 further completion (29.61b): checked window/cumulative/fractional-change
 kernels and total extreme-shift handling pass native/474 Python regressions and
 strict core Clippy. Expanding release scaling is recorded at three sizes. Table
 aggregation, pivot identity, ordering and describe remain open in 29.61.
+
+NC1 completion (29.61a–c): attribute statistics, windows/cumulative/fractional
+changes and table numeric adapters now have checked shared kernels and explicit
+output/missing/failure policies. Full native suites, strict core Clippy and 560
+rebuilt Python regressions pass (one existing skip). See the three attribute/table
+contract notes. A10 writeback and broader performance guarantees stay separate.

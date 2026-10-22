@@ -5,6 +5,7 @@ pub mod edges;
 pub mod graph_table;
 pub mod integration_tests;
 pub mod nodes;
+mod numeric;
 pub mod table_array;
 pub mod traits;
 

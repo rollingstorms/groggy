@@ -159,3 +159,14 @@ window-scan bound. Shifts beyond length and i32::MIN return fill safely; fractio
 changes retain integer differences. Invalid empty operations, nonfinite inputs
 and narrowed overflow fail explicitly. See `attribute-window-contract-2026-10-22.md`.
 Table numeric paths remain open in 29.61.
+
+### Item 29.61c — Table numerical adapters and NC1 closure
+
+Route table sum/mean/extrema through checked canonical columns, use exact mixed
+numeric ordering for single/multi-column sort/top-N and match pivot keys by the
+same typed identity used for unique keys. Reject ambiguous output column names.
+Describe computes one checked population summary per column. Canonical sum dtypes
+replace the old rounded-integer guess; overflow/nonfinite cases fail explicitly.
+Full native suites, strict core Clippy and 560 rebuilt Python regressions pass
+(one existing Python case skipped). See `table-numeric-contract-2026-10-22.md`.
+NC1/29.61 closes; NC2 remains open. This does not settle table writeback policy.
