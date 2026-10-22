@@ -1182,8 +1182,16 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Materialize the matrix (convert lazy operations to concrete data)
     pub fn materialize(&self) -> GraphResult<GraphMatrix<T>> {
-        // For now, just return a clone since we don't have lazy operations yet
-        Ok(self.clone())
+        let storage = if self.is_sparse() {
+            self.storage.to_csr()
+        } else {
+            self.storage.to_dense()
+        }
+        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = Self::from_storage(storage);
+        result.column_names = self.column_names.clone();
+        result.row_labels = self.row_labels.clone();
+        Ok(result)
     }
 
     /// Get a preview of the matrix data (first few rows/columns)
@@ -1583,79 +1591,37 @@ impl<T: NumericType> GraphMatrix<T> {
     ///     other: Matrix to concatenate with
     ///     axis: 0 for row-wise (vertical), 1 for column-wise (horizontal)
     pub fn concatenate(&self, other: &GraphMatrix<T>, axis: usize) -> GraphResult<GraphMatrix<T>> {
-        let (self_rows, self_cols) = self.shape();
-        let (other_rows, other_cols) = other.shape();
-
-        match axis {
-            0 => {
-                // Concatenate along rows (vertical stacking)
-                if self_cols != other_cols {
-                    return Err(GraphError::InvalidInput(format!(
-                        "Column count mismatch for row concatenation: {} vs {}",
-                        self_cols, other_cols
-                    )));
-                }
-
-                let new_rows = self_rows + other_rows;
-                let mut result = GraphMatrix::zeros(new_rows, self_cols);
-
-                // Copy self matrix to top part
-                for i in 0..self_rows {
-                    for j in 0..self_cols {
-                        if let Some(value) = self.get(i, j) {
-                            let _ = result.set(i, j, value);
-                        }
-                    }
-                }
-
-                // Copy other matrix to bottom part
-                for i in 0..other_rows {
-                    for j in 0..other_cols {
-                        if let Some(value) = other.get(i, j) {
-                            let _ = result.set(self_rows + i, j, value);
-                        }
-                    }
-                }
-
-                Ok(result)
+        for source in [self, other] {
+            if source.column_names.len() != source.shape().1
+                || source
+                    .row_labels
+                    .as_ref()
+                    .is_some_and(|labels| labels.len() != source.shape().0)
+            {
+                return Err(GraphError::InvalidInput(
+                    "Concatenation label count does not match shape".into(),
+                ));
             }
-            1 => {
-                // Concatenate along columns (horizontal stacking)
-                if self_rows != other_rows {
-                    return Err(GraphError::InvalidInput(format!(
-                        "Row count mismatch for column concatenation: {} vs {}",
-                        self_rows, other_rows
-                    )));
-                }
-
-                let new_cols = self_cols + other_cols;
-                let mut result = GraphMatrix::zeros(self_rows, new_cols);
-
-                // Copy self matrix to left part
-                for i in 0..self_rows {
-                    for j in 0..self_cols {
-                        if let Some(value) = self.get(i, j) {
-                            let _ = result.set(i, j, value);
-                        }
-                    }
-                }
-
-                // Copy other matrix to right part
-                for i in 0..other_rows {
-                    for j in 0..other_cols {
-                        if let Some(value) = other.get(i, j) {
-                            let _ = result.set(i, self_cols + j, value);
-                        }
-                    }
-                }
-
-                Ok(result)
-            }
-            _ => Err(GraphError::InvalidInput(format!(
-                "Invalid axis for concatenation: {}. Must be 0 (rows) or 1 (columns)",
-                axis
-            ))),
         }
+        let storage = self
+            .storage
+            .concatenate(&other.storage, axis)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = Self::from_storage(storage);
+        result.column_names = self.column_names.clone();
+        result.row_labels = self.row_labels.clone();
+        if axis == 0 {
+            result.row_labels = self
+                .row_labels
+                .as_ref()
+                .zip(other.row_labels.as_ref())
+                .map(|(a, b)| a.iter().chain(b).cloned().collect());
+        } else {
+            result
+                .column_names
+                .extend(other.column_names.iter().cloned());
+        }
+        Ok(result)
     }
 
     /// Stack matrices along a new axis (creates a new dimension)
@@ -1697,115 +1663,43 @@ impl<T: NumericType> GraphMatrix<T> {
     ///     axis: 0 for row-wise split, 1 for column-wise split
     pub fn split(&self, split_points: &[usize], axis: usize) -> GraphResult<Vec<GraphMatrix<T>>> {
         let (rows, cols) = self.shape();
-        let mut results = Vec::new();
-
-        match axis {
-            0 => {
-                // Split along rows
-                let max_rows = rows;
-                let mut prev_split = 0;
-
-                for &split_point in split_points {
-                    if split_point > max_rows {
-                        return Err(GraphError::InvalidInput(format!(
-                            "Split point {} exceeds matrix rows {}",
-                            split_point, max_rows
-                        )));
-                    }
-                    if split_point <= prev_split {
-                        return Err(GraphError::InvalidInput(
-                            "Split points must be in increasing order".into(),
-                        ));
-                    }
-
-                    let split_rows = split_point - prev_split;
-                    let mut chunk = GraphMatrix::zeros(split_rows, cols);
-
-                    for i in 0..split_rows {
-                        for j in 0..cols {
-                            if let Some(value) = self.get(prev_split + i, j) {
-                                let _ = chunk.set(i, j, value);
-                            }
-                        }
-                    }
-
-                    results.push(chunk);
-                    prev_split = split_point;
-                }
-
-                // Add remaining rows if any
-                if prev_split < max_rows {
-                    let split_rows = max_rows - prev_split;
-                    let mut chunk = GraphMatrix::zeros(split_rows, cols);
-
-                    for i in 0..split_rows {
-                        for j in 0..cols {
-                            if let Some(value) = self.get(prev_split + i, j) {
-                                let _ = chunk.set(i, j, value);
-                            }
-                        }
-                    }
-
-                    results.push(chunk);
-                }
-            }
-            1 => {
-                // Split along columns
-                let max_cols = cols;
-                let mut prev_split = 0;
-
-                for &split_point in split_points {
-                    if split_point > max_cols {
-                        return Err(GraphError::InvalidInput(format!(
-                            "Split point {} exceeds matrix cols {}",
-                            split_point, max_cols
-                        )));
-                    }
-                    if split_point <= prev_split {
-                        return Err(GraphError::InvalidInput(
-                            "Split points must be in increasing order".into(),
-                        ));
-                    }
-
-                    let split_cols = split_point - prev_split;
-                    let mut chunk = GraphMatrix::zeros(rows, split_cols);
-
-                    for i in 0..rows {
-                        for j in 0..split_cols {
-                            if let Some(value) = self.get(i, prev_split + j) {
-                                let _ = chunk.set(i, j, value);
-                            }
-                        }
-                    }
-
-                    results.push(chunk);
-                    prev_split = split_point;
-                }
-
-                // Add remaining columns if any
-                if prev_split < max_cols {
-                    let split_cols = max_cols - prev_split;
-                    let mut chunk = GraphMatrix::zeros(rows, split_cols);
-
-                    for i in 0..rows {
-                        for j in 0..split_cols {
-                            if let Some(value) = self.get(i, prev_split + j) {
-                                let _ = chunk.set(i, j, value);
-                            }
-                        }
-                    }
-
-                    results.push(chunk);
-                }
-            }
+        let limit = match axis {
+            0 => rows,
+            1 => cols,
             _ => {
-                return Err(GraphError::InvalidInput(format!(
-                    "Invalid axis for split: {}. Must be 0 (rows) or 1 (columns)",
-                    axis
-                )))
+                return Err(GraphError::InvalidInput(
+                    "Split axis must be 0 (rows) or 1 (columns)".into(),
+                ))
             }
+        };
+        let mut previous = 0;
+        for &point in split_points {
+            if point <= previous || point > limit {
+                return Err(GraphError::InvalidInput(
+                    "Split points must increase from zero and stay within the selected dimension"
+                        .into(),
+                ));
+            }
+            previous = point;
         }
-
+        let mut results = Vec::new();
+        previous = 0;
+        for point in split_points.iter().copied().chain(std::iter::once(limit)) {
+            if point > previous {
+                let selected_rows: Vec<_> = if axis == 0 {
+                    (previous..point).collect()
+                } else {
+                    (0..rows).collect()
+                };
+                let selected_cols: Vec<_> = if axis == 1 {
+                    (previous..point).collect()
+                } else {
+                    (0..cols).collect()
+                };
+                results.push(self.select_indices(&selected_rows, &selected_cols)?);
+            }
+            previous = point;
+        }
         Ok(results)
     }
 
@@ -2929,6 +2823,11 @@ impl<T: NumericType> GraphMatrix<T> {
                 "Matrix selection index out of bounds".into(),
             ));
         }
+        if self.column_names.len() != cols {
+            return Err(GraphError::InvalidInput(
+                "Column label count does not match shape".into(),
+            ));
+        }
         if self
             .row_labels
             .as_ref()
@@ -3086,7 +2985,7 @@ impl<T: NumericType> GraphMatrix<T> {
         }
 
         if matrices.len() == 1 {
-            return Ok(matrices[0].clone());
+            return matrices[0].materialize();
         }
 
         // Use existing concatenate method with axis=1 (columns)

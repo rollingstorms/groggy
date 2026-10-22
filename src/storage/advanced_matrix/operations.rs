@@ -12,6 +12,78 @@ use crate::storage::array::{numeric_arithmetic, numeric_reductions as reductions
 use std::borrow::Cow;
 
 impl<T: NumericType> UnifiedMatrix<T> {
+    /// Owned positional concatenation. Two CSR inputs produce canonical CSR.
+    pub fn concatenate(&self, other: &Self, axis: usize) -> MatrixResult<Self> {
+        let (rows, cols) = match axis {
+            0 if self.cols() == other.cols() => {
+                (self.rows().checked_add(other.rows()), Some(self.cols()))
+            }
+            1 if self.rows() == other.rows() => {
+                (Some(self.rows()), self.cols().checked_add(other.cols()))
+            }
+            _ => {
+                return Err(MatrixError::InvalidShape(
+                    "Concatenation requires axis 0/1 and matching other dimension".into(),
+                ))
+            }
+        };
+        let (rows, cols) = rows
+            .zip(cols)
+            .ok_or_else(|| MatrixError::InvalidShape("Concatenation dimension overflow".into()))?;
+        checked_count(rows, cols)?;
+        if let (Some(a), Some(b)) = (self.checked_sparse()?, other.checked_sparse()?) {
+            let mut values = Vec::new();
+            let mut indices = Vec::new();
+            let mut pointers = vec![0];
+            if axis == 0 {
+                for source in [a, b] {
+                    for row in 0..source.shape.rows {
+                        let range = source.row_pointers[row]..source.row_pointers[row + 1];
+                        values.extend_from_slice(&source.values[range.clone()]);
+                        indices.extend_from_slice(&source.col_indices[range]);
+                        pointers.push(values.len());
+                    }
+                }
+            } else {
+                for row in 0..rows {
+                    for (source, offset) in [(a, 0), (b, self.cols())] {
+                        let range = source.row_pointers[row]..source.row_pointers[row + 1];
+                        values.extend_from_slice(&source.values[range.clone()]);
+                        indices.extend(source.col_indices[range].iter().map(|col| col + offset));
+                    }
+                    pointers.push(values.len());
+                }
+            }
+            return Self::from_csr(rows, cols, values, indices, pointers);
+        }
+        let (a, b) = (self.to_vec()?, other.to_vec()?);
+        let mut values = reserve_data::<T>(rows, cols)?;
+        if axis == 0 {
+            values.extend(a);
+            values.extend(b);
+        } else {
+            for row in 0..rows {
+                values.extend_from_slice(&a[row * self.cols()..(row + 1) * self.cols()]);
+                values.extend_from_slice(&b[row * other.cols()..(row + 1) * other.cols()]);
+            }
+        }
+        Self::from_data(values, rows, cols)
+    }
+    /// Checked owned elementwise map; zero-preserving CSR transforms stay sparse.
+    pub fn try_map_elementwise(
+        &self,
+        operation: impl Fn(T) -> MatrixResult<T>,
+    ) -> MatrixResult<Self> {
+        if let Some(output) = self.sparse_try_map(&operation)? {
+            return Ok(output);
+        }
+        let output = self
+            .to_vec()?
+            .into_iter()
+            .map(operation)
+            .collect::<MatrixResult<Vec<_>>>()?;
+        Self::from_data(output, self.rows(), self.cols())
+    }
     /// Checked logical values; CSR norms/statistics need only its stored entries.
     pub(crate) fn reduction_values(&self) -> MatrixResult<Cow<'_, [T]>> {
         if let Some(sparse) = self.checked_sparse()? {
@@ -103,29 +175,19 @@ impl<T: NumericType> MatrixOperations<T> for UnifiedMatrix<T> {
     where
         F: Fn(T) -> T + Send + Sync,
     {
-        let input_vec = self.to_vec()?;
-        let output_vec: Vec<T> = input_vec.iter().map(|&x| f(x)).collect();
-
-        UnifiedMatrix::from_data(output_vec, self.rows(), self.cols())
+        self.try_map_elementwise(|value| Ok(f(value)))
     }
 
     fn map_elementwise_inplace<F>(&mut self, f: F) -> MatrixResult<()>
     where
         F: Fn(&mut T) + Send + Sync,
     {
-        match &mut self.storage {
-            crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Dense(buffer) => {
-                let mut data = buffer.data_mut()?;
-                let slice = data.as_slice_mut();
-                for element in slice.iter_mut() {
-                    f(element);
-                }
-                Ok(())
-            }
-            _ => Err(MatrixError::UnsupportedOperation(
-                "In-place operations only supported for dense matrices".to_string(),
-            )),
-        }
+        let output = self.map_elementwise(|mut value| {
+            f(&mut value);
+            value
+        })?;
+        *self = output;
+        Ok(())
     }
 
     fn zip_map<F>(&self, other: &UnifiedMatrix<T>, f: F) -> MatrixResult<UnifiedMatrix<T>>
@@ -151,7 +213,7 @@ impl<T: NumericType> MatrixOperations<T> for UnifiedMatrix<T> {
     }
 
     fn reshape(&self, new_rows: usize, new_cols: usize) -> MatrixResult<UnifiedMatrix<T>> {
-        if new_rows * new_cols != self.len() {
+        if checked_count(new_rows, new_cols)? != checked_count(self.rows(), self.cols())? {
             return Err(MatrixError::InvalidShape(format!(
                 "Cannot reshape {}x{} matrix to {}x{}",
                 self.rows(),
@@ -161,6 +223,9 @@ impl<T: NumericType> MatrixOperations<T> for UnifiedMatrix<T> {
             )));
         }
 
+        if let Some(output) = self.sparse_reshape(new_rows, new_cols)? {
+            return Ok(output);
+        }
         let data = self.to_vec()?;
         UnifiedMatrix::from_data(data, new_rows, new_cols)
     }
@@ -174,8 +239,8 @@ impl<T: NumericType> MatrixOperations<T> for UnifiedMatrix<T> {
     ) -> MatrixResult<UnifiedMatrix<T>> {
         if row_end > self.rows()
             || col_end > self.cols()
-            || row_start >= row_end
-            || col_start >= col_end
+            || row_start > row_end
+            || col_start > col_end
         {
             return Err(MatrixError::InvalidShape(format!(
                 "Invalid slice indices: rows {}..{}, cols {}..{} for shape {:?}",
@@ -189,11 +254,19 @@ impl<T: NumericType> MatrixOperations<T> for UnifiedMatrix<T> {
 
         let slice_rows = row_end - row_start;
         let slice_cols = col_end - col_start;
-        let mut result_data = Vec::with_capacity(slice_rows * slice_cols);
+        if let Some(output) = self.sparse_select(
+            &(row_start..row_end).collect::<Vec<_>>(),
+            &(col_start..col_end).collect::<Vec<_>>(),
+        )? {
+            return Ok(output);
+        }
+        // Validate all logical strides before selecting a subset.
+        let source = self.to_vec()?;
+        let mut result_data = reserve_data::<T>(slice_rows, slice_cols)?;
 
         for i in row_start..row_end {
             for j in col_start..col_end {
-                result_data.push(self.get(i, j)?);
+                result_data.push(source[i * self.cols() + j]);
             }
         }
 
@@ -207,13 +280,13 @@ pub struct ActivationFunctions;
 impl ActivationFunctions {
     /// ReLU activation: max(0, x)
     pub fn relu<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| if x > T::zero() { x } else { T::zero() })
+        matrix.map_elementwise(|x| if x < T::zero() { T::zero() } else { x })
     }
 
     /// ReLU activation in-place
     pub fn relu_inplace<T: NumericType>(matrix: &mut UnifiedMatrix<T>) -> MatrixResult<()> {
         matrix.map_elementwise_inplace(|x| {
-            if *x <= T::zero() {
+            if *x < T::zero() {
                 *x = T::zero();
             }
         })
@@ -221,17 +294,17 @@ impl ActivationFunctions {
 
     /// Sigmoid activation: 1 / (1 + exp(-x))
     pub fn sigmoid<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| {
+        matrix.try_map_elementwise(|x| {
             let exp_neg_x = (-x.to_f64()).exp();
-            T::from_f64(1.0 / (1.0 + exp_neg_x)).unwrap_or(T::zero())
+            checked_function_value(1.0 / (1.0 + exp_neg_x))
         })
     }
 
     /// Tanh activation
     pub fn tanh<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| {
+        matrix.try_map_elementwise(|x| {
             let x_f64 = x.to_f64();
-            T::from_f64(x_f64.tanh()).unwrap_or(T::zero())
+            checked_function_value(x_f64.tanh())
         })
     }
 }
@@ -240,47 +313,54 @@ impl ActivationFunctions {
 pub struct MathFunctions;
 
 impl MathFunctions {
-    /// Element-wise exponential
+    /// Elementwise exponential; floating outputs follow IEEE nonfinite behavior.
     pub fn exp<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| T::from_f64(x.to_f64().exp()).unwrap_or(T::zero()))
+        matrix.try_map_elementwise(|x| checked_function_value(x.to_f64().exp()))
     }
-
-    /// Element-wise natural logarithm
+    /// Natural log; zero/negative inputs give -inf/NaN for floats, errors for integers.
     pub fn ln<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| {
-            let x_f64 = x.to_f64();
-            if x_f64 > 0.0 {
-                T::from_f64(x_f64.ln()).unwrap_or(T::zero())
-            } else {
-                T::zero() // Handle non-positive values
-            }
-        })
+        matrix.try_map_elementwise(|x| checked_function_value(x.to_f64().ln()))
     }
-
-    /// Element-wise square root
+    /// Square root; negative inputs give NaN for floats, errors for integers.
     pub fn sqrt<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| {
-            let x_f64 = x.to_f64();
-            if x_f64 >= 0.0 {
-                T::from_f64(x_f64.sqrt()).unwrap_or(T::zero())
-            } else {
-                T::zero() // Handle negative values
-            }
-        })
+        matrix.try_map_elementwise(|x| checked_function_value(x.to_f64().sqrt()))
     }
-
-    /// Element-wise power
+    /// Elementwise real power, retaining IEEE floating domain/range results.
     pub fn pow<T: NumericType>(
         matrix: &UnifiedMatrix<T>,
         exponent: f64,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| T::from_f64(x.to_f64().powf(exponent)).unwrap_or(T::zero()))
+        matrix.try_map_elementwise(|x| checked_function_value(x.to_f64().powf(exponent)))
     }
-
-    /// Element-wise absolute value
+    /// Exact integer absolute values; MIN errors instead of panicking/wrapping.
     pub fn abs<T: NumericType>(matrix: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
-        matrix.map_elementwise(|x| x.abs())
+        matrix.try_map_elementwise(|x| {
+            if T::DTYPE.is_integer() && x < T::zero() {
+                return T::zero().checked_sub(x).ok_or_else(|| {
+                    MatrixError::InvalidInput("Integer absolute value overflow".into())
+                });
+            }
+            Ok(x.abs())
+        })
     }
+}
+
+fn checked_function_value<T: NumericType>(value: f64) -> MatrixResult<T> {
+    T::from_f64(value).ok_or_else(|| {
+        MatrixError::InvalidInput("Mathematical result cannot be represented in dtype".into())
+    })
+}
+fn reserve_data<T: NumericType>(rows: usize, cols: usize) -> MatrixResult<Vec<T>> {
+    let count = checked_count(rows, cols)?;
+    count
+        .checked_mul(std::mem::size_of::<T>())
+        .filter(|bytes| *bytes <= isize::MAX as usize)
+        .ok_or_else(|| MatrixError::InvalidShape("Matrix byte count overflow".into()))?;
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(count)
+        .map_err(|_| MatrixError::InvalidShape("Matrix allocation failed".into()))?;
+    Ok(values)
 }
 
 /// Utility functions for creating special matrices
@@ -290,14 +370,14 @@ impl MatrixUtils {
     /// Create a random matrix with values between 0 and 1
     pub fn random<T: NumericType>(rows: usize, cols: usize) -> MatrixResult<UnifiedMatrix<T>> {
         // Simple pseudo-random implementation
-        let mut data = Vec::with_capacity(rows * cols);
+        let mut data = reserve_data::<T>(rows, cols)?;
         let mut seed = 12345u64;
 
-        for _ in 0..(rows * cols) {
+        for _ in 0..checked_count(rows, cols)? {
             seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
             let random_val = (seed / 65536) % 32768;
             let normalized = random_val as f64 / 32767.0;
-            data.push(T::from_f64(normalized).unwrap_or(T::zero()));
+            data.push(checked_function_value(normalized)?);
         }
 
         UnifiedMatrix::from_data(data, rows, cols)
@@ -309,7 +389,8 @@ impl MatrixUtils {
         cols: usize,
         value: T,
     ) -> MatrixResult<UnifiedMatrix<T>> {
-        let data = vec![value; rows * cols];
+        let mut data = reserve_data::<T>(rows, cols)?;
+        data.resize(checked_count(rows, cols)?, value);
         UnifiedMatrix::from_data(data, rows, cols)
     }
 
@@ -351,7 +432,7 @@ impl MatrixUtils {
     where
         F: Fn(usize, usize) -> T,
     {
-        let mut data = Vec::with_capacity(rows * cols);
+        let mut data = reserve_data::<T>(rows, cols)?;
 
         for i in 0..rows {
             for j in 0..cols {

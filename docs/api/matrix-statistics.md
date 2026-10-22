@@ -32,3 +32,24 @@ Evidence: `tests/matrix_statistics_checked.rs` and
 large sparse shapes, extreme ranges, integer offsets, invalid layouts,
 nonfinite data and empty reductions. This establishes numerical/storage
 behavior; release performance remains a separate gate.
+
+## Identity, construction and earlier regression coverage
+
+`GraphMatrix.eye(n)` and checked `identity(n)` produce diagonal identities.
+Zero-sized identities and rectangular empty matrices retain their shapes.
+The nested-list factory accepts **columns**, so `from_data([[1., 4.],
+[2., 6.], [3., 8.]])` has shape `(2, 3)`, row standard deviations `[1., 2.]`
+and row variances `[1., 4.]`.
+
+Aligned empty buffers expose zero elements with valid aligned allocations.
+Checked shape/byte multiplication rejects overflow and buffers constructed from
+data require the requested element count. f32 conversion preserves NaN/infinity
+and rejects finite f64 inputs outside the f32 range.
+
+Earlier coverage remains in `tests/matrix_statistics.rs` and
+`tests/test_matrix_statistics.py`. The development timing fixture
+`benches/matrix_statistics_profile.py` and
+[initial benchmark notes](../../notes/benchmarks/matrix-statistics-2026-10-20.md)
+report process RSS/debug measurements, not release allocation guarantees.
+Legacy infallible constructor fallback policies and broader autodiff/performance
+gates remain separate work.

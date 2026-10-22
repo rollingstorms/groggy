@@ -216,15 +216,27 @@ impl<T: NumericType> SparseMatrix<T> {
         Self::new(rows, cols, self.values.clone(), indices, pointers)
     }
     pub(crate) fn map(&self, operation: impl Fn(T) -> T) -> MatrixResult<Self> {
+        self.try_map(|value| Ok(operation(value)))
+    }
+    pub(crate) fn try_map(&self, operation: impl Fn(T) -> MatrixResult<T>) -> MatrixResult<Self> {
         self.validate()?;
-        let implicit = operation(T::zero());
+        let count = self
+            .shape
+            .rows
+            .checked_mul(self.shape.cols)
+            .ok_or_else(|| invalid("CSR map shape overflow"))?;
+        let implicit = if self.values.len() < count {
+            operation(T::zero())?
+        } else {
+            T::zero()
+        };
         let mut values = Vec::new();
         let mut indices = Vec::new();
         let mut pointers = vec![0];
         for row in 0..self.shape.rows {
             if implicit == T::zero() {
                 for entry in self.row_pointers[row]..self.row_pointers[row + 1] {
-                    let value = operation(self.values[entry]);
+                    let value = operation(self.values[entry])?;
                     if value != T::zero() {
                         indices.push(self.col_indices[entry]);
                         values.push(value);
@@ -232,7 +244,13 @@ impl<T: NumericType> SparseMatrix<T> {
                 }
             } else {
                 for col in 0..self.shape.cols {
-                    let value = operation(self.at(row, col));
+                    let value = match self.col_indices
+                        [self.row_pointers[row]..self.row_pointers[row + 1]]
+                        .binary_search(&col)
+                    {
+                        Ok(entry) => operation(self.values[self.row_pointers[row] + entry])?,
+                        Err(_) => implicit,
+                    };
                     if value != T::zero() {
                         indices.push(col);
                         values.push(value);
