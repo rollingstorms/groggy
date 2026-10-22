@@ -14,6 +14,20 @@ use std::sync::{Arc, Mutex, Weak};
 /// Unique identifier for computation graph nodes
 pub type NodeId = usize;
 
+/// Differentiable real factor outputs. Full arbitrary SVD null bases are excluded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FactorOutput {
+    QrQ,
+    QrR,
+    LuL,
+    LuU,
+    EigenValues,
+    EigenVectors,
+    SvdU,
+    SvdValues,
+    SvdVt,
+}
+
 /// Operations supported in the computation graph
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
@@ -27,6 +41,9 @@ pub enum Operation {
     MatMul,
     Transpose,
     Cholesky,
+    FactorOutput {
+        part: FactorOutput,
+    },
     Power {
         exponent: u32,
     },
@@ -332,6 +349,19 @@ impl<T: NumericType> ComputationGraph<T> {
                 inputs[0].matmul(&inputs[1])
             }
 
+            Operation::FactorOutput { part } => {
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Factor output requires one saved input".into(),
+                    ));
+                }
+                crate::storage::GraphMatrix::from_storage(inputs[0].clone())
+                    .factor_output(*part)
+                    .map(crate::storage::GraphMatrix::into_storage)
+                    .map_err(|e| MatrixError::ComputationError(e.to_string()))
+            }
+
             Operation::Cholesky => {
                 let inputs = self.get_input_values(&node.inputs)?;
                 if inputs.len() != 1 {
@@ -508,24 +538,50 @@ impl<T: NumericType> ComputationGraph<T> {
 
     /// Backward pass (gradient computation)
     pub fn backward(&mut self, output_node: NodeId) -> MatrixResult<()> {
-        // 1) Clear all previously accumulated grads (avoid silent carry-over across calls)
-        for node_arc in self.nodes.values() {
-            let mut n = node_arc.lock().unwrap();
-            n.gradient = None;
-        }
+        let shape = self
+            .nodes
+            .get(&output_node)
+            .ok_or_else(|| MatrixError::ComputationError("Output node not found".into()))?
+            .lock()
+            .map_err(|_| MatrixError::ComputationError("Output tape lock poisoned".into()))?
+            .shape;
+        self.backward_with_gradient(output_node, UnifiedMatrix::ones(shape.rows, shape.cols)?)
+    }
 
-        // 2) Seed the output grad with 1s (scalar or same shape)
-        if let Some(node_arc) = self.nodes.get(&output_node) {
-            let mut node = node_arc.lock().unwrap();
-            if node.gradient.is_none() {
-                let grad = UnifiedMatrix::ones(node.shape.rows, node.shape.cols)?;
-                node.set_gradient(grad)?;
-            }
-        } else {
-            return Err(MatrixError::ComputationError(
-                "Output node not found".to_string(),
+    /// Pull back a caller-supplied seed, replacing gradients from prior calls.
+    pub fn backward_with_gradient(
+        &mut self,
+        output_node: NodeId,
+        gradient: UnifiedMatrix<T>,
+    ) -> MatrixResult<()> {
+        let output = self
+            .nodes
+            .get(&output_node)
+            .ok_or_else(|| MatrixError::ComputationError("Output node not found".into()))?;
+        let shape = output
+            .lock()
+            .map_err(|_| MatrixError::ComputationError("Output tape lock poisoned".into()))?
+            .shape;
+        if gradient.shape() != shape {
+            return Err(MatrixError::DimensionMismatch {
+                expected: shape.as_tuple(),
+                got: gradient.shape().as_tuple(),
+            });
+        }
+        if gradient.to_vec()?.iter().any(|value| !value.is_finite()) {
+            return Err(MatrixError::InvalidInput(
+                "Backward seed must be finite".into(),
             ));
         }
+        for node in self.nodes.values() {
+            node.lock()
+                .map_err(|_| MatrixError::ComputationError("Tape lock poisoned".into()))?
+                .gradient = None;
+        }
+        output
+            .lock()
+            .map_err(|_| MatrixError::ComputationError("Output tape lock poisoned".into()))?
+            .set_gradient(gradient)?;
 
         // 3) Propagate in reverse topological order up to output_node
         for &node_id in self.execution_order.iter().rev() {
@@ -726,6 +782,27 @@ impl<T: NumericType> ComputationGraph<T> {
                     }
                 }
                 Ok(())
+            }
+
+            Operation::FactorOutput { part } => {
+                if node.inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Factor backward requires one saved input".into(),
+                    ));
+                }
+                let input_id = node.inputs[0];
+                let part = *part;
+                let gradient = grad_output.clone();
+                drop(node);
+                let inputs = self.get_input_values(&[input_id])?;
+                let input = inputs
+                    .first()
+                    .ok_or_else(|| MatrixError::ComputationError("Missing factor input".into()))?;
+                let gradient = crate::storage::GraphMatrix::from_storage(input.clone())
+                    .factor_output_vjp(part, &crate::storage::GraphMatrix::from_storage(gradient))
+                    .map_err(|e| MatrixError::ComputationError(e.to_string()))?
+                    .into_storage();
+                self.accumulate_per_input(&[input_id], vec![gradient])
             }
 
             Operation::Cholesky => {

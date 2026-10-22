@@ -34,3 +34,5 @@ preserved separately.
 - 29.43: checked entrywise norms, integer-preserving and sparse zero-group matrix statistics, logical-layout and conversion boundaries.
 
 - 29.44: checked math/helper domains, sparse transforms/concatenation/split and owned materialization.
+
+- 29.45: seeded factor-output automatic routes and matrix-valued eigen/singular values; general arithmetic tape composition remains open.

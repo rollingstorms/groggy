@@ -181,3 +181,5 @@ accepted pinned-state model.
 - [x] **29.43 — Checked matrix statistics and sparse reductions.** Stable checked entrywise norms and lower population statistics, exact typed integer means, logical-layout validation and CSR zero-group reductions. Full native suites and 310 rebuilt Python numerical regressions passed. Helper APIs, automatic gradients and production gates remain open. See docs/api/matrix-statistics.md.
 
 - [x] **29.44 — Checked helper operations.** Fallible mathematical conversion/domain handling, prepared logical in-place maps, CSR-aware transforms/concat/split, checked shape helpers and owned materialization. Native full suites and 312 rebuilt Python numerical tests pass. See docs/api/matrix-helper-operations.md.
+
+- [x] **29.45 — Seeded factor output automatic differentiation.** QR/LU/symmetric eigen/thin-SVD output routes, explicit cotangent seeds, matrix-valued spectral outputs and saved-input behavior; full native suites and 319 rebuilt Python numerical tests pass. General tape composition and production gates remain open. See docs/api/matrix-factor-autodiff.md.

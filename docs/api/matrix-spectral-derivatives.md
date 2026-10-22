@@ -35,3 +35,5 @@ differences and JVP/VJP adjoint identities across square/tall/wide and scaled
 fixtures. NumPy is a test reference only.
 
 Mathematical context: [Auto-Differentiating Linear Algebra](https://arxiv.org/abs/1710.08717).
+
+Automatic factor output routes and their current composition limits are now described in [factor autodiff](matrix-factor-autodiff.md).

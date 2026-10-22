@@ -10,6 +10,10 @@
 //! - Memory-efficient storage with fusion optimization
 //! - Intelligent backend selection for optimal performance
 
+#[path = "factor_autodiff.rs"]
+mod factor_autodiff;
+use crate::storage::advanced_matrix::neural::autodiff::{FactorOutput, Operation};
+
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{
     AdvancedMemoryPool, ComputationGraph, NumericType, UnifiedMatrix,
@@ -731,6 +735,24 @@ impl<T: NumericType> GraphMatrix<T> {
         }
     }
 
+    /// Pull back an explicit output cotangent through the saved computation tape.
+    pub fn backward_with_gradient(&mut self, gradient: &Self) -> GraphResult<()> {
+        let input = gradient
+            .storage
+            .to_dense()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let id = self
+            .current_node_id
+            .ok_or_else(|| GraphError::InvalidInput("No current gradient node".into()))?;
+        let graph = self
+            .computation_graph
+            .as_mut()
+            .ok_or_else(|| GraphError::InvalidInput("No computation graph".into()))?;
+        graph
+            .backward_with_gradient(id, input)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
+    }
+
     /// Get gradient matrix
     pub fn grad(&self) -> Option<GraphMatrix<T>> {
         if let Some(ref graph) = self.computation_graph {
@@ -739,7 +761,10 @@ impl<T: NumericType> GraphMatrix<T> {
                     let node = node_arc.lock().unwrap();
                     if let Some(ref gradient_matrix) = node.gradient {
                         // Convert UnifiedMatrix gradient to GraphMatrix
-                        return Some(Self::from_storage(gradient_matrix.clone()));
+                        let mut gradient = Self::from_storage(gradient_matrix.clone());
+                        gradient.column_names = self.column_names.clone();
+                        gradient.row_labels = self.row_labels.clone();
+                        return Some(gradient);
                     }
                 }
             }
@@ -1952,11 +1977,24 @@ impl<T: NumericType> GraphMatrix<T> {
             + std::ops::Div<Output = T>,
     {
         let (rows, cols) = self.shape();
+        if self.requires_grad && rows != cols {
+            return Err(GraphError::InvalidInput("Tracked rectangular SVD requires svd_tracked() thin outputs; a full null basis has no supported derivative".into()));
+        }
         let result = super::decomposition::svd(self.decomposition_input()?, rows, cols)?;
         Ok((
-            Self::decomposition_matrix(result.u, rows, rows)?,
+            self.track_factor(
+                Self::decomposition_matrix(result.u, rows, rows)?,
+                Operation::FactorOutput {
+                    part: FactorOutput::SvdU,
+                },
+            )?,
             result.singular,
-            Self::decomposition_matrix(result.vt, cols, cols)?,
+            self.track_factor(
+                Self::decomposition_matrix(result.vt, cols, cols)?,
+                Operation::FactorOutput {
+                    part: FactorOutput::SvdVt,
+                },
+            )?,
         ))
     }
 
@@ -1982,7 +2020,20 @@ impl<T: NumericType> GraphMatrix<T> {
         q.column_names = basis.clone();
         r.row_labels = Some(basis);
         r.column_names = self.column_names.clone();
-        Ok((q, r))
+        Ok((
+            self.track_factor(
+                q,
+                Operation::FactorOutput {
+                    part: FactorOutput::QrQ,
+                },
+            )?,
+            self.track_factor(
+                r,
+                Operation::FactorOutput {
+                    part: FactorOutput::QrR,
+                },
+            )?,
+        ))
     }
     fn factor_matrix(values: Vec<f64>, rows: usize, cols: usize) -> GraphResult<Self> {
         let values = values
@@ -2094,7 +2145,21 @@ impl<T: NumericType> GraphMatrix<T> {
         lower.column_names = basis.clone();
         upper.row_labels = Some(basis);
         upper.column_names = self.column_names.clone();
-        Ok((p, lower, upper))
+        Ok((
+            p,
+            self.track_factor(
+                lower,
+                Operation::FactorOutput {
+                    part: FactorOutput::LuL,
+                },
+            )?,
+            self.track_factor(
+                upper,
+                Operation::FactorOutput {
+                    part: FactorOutput::LuU,
+                },
+            )?,
+        ))
     }
 
     /// Checked real floating Cholesky factor A=L*L^T.
@@ -2136,7 +2201,10 @@ impl<T: NumericType> GraphMatrix<T> {
     pub(crate) fn into_storage(self) -> UnifiedMatrix<T> {
         self.storage
     }
-    fn track_cholesky(&self, mut result: Self) -> GraphResult<Self> {
+    fn track_cholesky(&self, result: Self) -> GraphResult<Self> {
+        self.track_factor(result, Operation::Cholesky)
+    }
+    fn track_factor(&self, mut result: Self, operation: Operation) -> GraphResult<Self> {
         if !self.requires_grad {
             return Ok(result);
         }
@@ -2144,21 +2212,21 @@ impl<T: NumericType> GraphMatrix<T> {
         let mut graph = self
             .computation_graph
             .clone()
-            .ok_or_else(|| invalid("Missing Cholesky input tape"))?;
+            .ok_or_else(|| invalid("Missing Factor input tape"))?;
         let input_id = self
             .current_node_id
-            .ok_or_else(|| invalid("Missing Cholesky input node"))?;
+            .ok_or_else(|| invalid("Missing Factor input node"))?;
         let input = graph
             .get_node(input_id)
-            .ok_or_else(|| invalid("Missing Cholesky input node"))?;
+            .ok_or_else(|| invalid("Missing Factor input node"))?;
         {
             let input = input
                 .lock()
-                .map_err(|_| invalid("Cholesky input tape lock poisoned"))?;
+                .map_err(|_| invalid("Factor input tape lock poisoned"))?;
             let saved = input
                 .value
                 .as_ref()
-                .ok_or_else(|| invalid("Missing Cholesky input snapshot"))?;
+                .ok_or_else(|| invalid("Missing Factor input snapshot"))?;
             let saved = Self::from_storage(saved.clone());
             let same_values = if let (Some(a), Some(b)) = (
                 saved
@@ -2177,13 +2245,13 @@ impl<T: NumericType> GraphMatrix<T> {
                 saved.decomposition_input()? == self.decomposition_input()?
             };
             if saved.shape() != self.shape() || !same_values {
-                return Err(invalid("Cholesky input changed since gradient binding; rebind with requires_grad(false).requires_grad(true)"));
+                return Err(invalid("Factor input changed since gradient binding; rebind with requires_grad(false).requires_grad(true)"));
             }
         }
         let (rows, cols) = result.shape();
         let id = graph
             .create_operation(
-                crate::storage::advanced_matrix::neural::autodiff::Operation::Cholesky,
+                operation,
                 vec![input_id],
                 crate::storage::advanced_matrix::unified_matrix::Shape::new(rows, cols),
                 true,
@@ -2191,10 +2259,10 @@ impl<T: NumericType> GraphMatrix<T> {
             .map_err(|e| invalid(&e.to_string()))?;
         let output = graph
             .get_node(id)
-            .ok_or_else(|| invalid("Missing Cholesky output node"))?;
+            .ok_or_else(|| invalid("Missing Factor output node"))?;
         output
             .lock()
-            .map_err(|_| invalid("Cholesky output tape lock poisoned"))?
+            .map_err(|_| invalid("Factor output tape lock poisoned"))?
             .value = Some(result.storage.clone());
         result.requires_grad = true;
         result.current_node_id = Some(id);
@@ -2246,6 +2314,9 @@ impl<T: NumericType> GraphMatrix<T> {
     /// General real-input eigendecomposition with dedicated real/imaginary outputs.
     /// Reject nonconvergence, defective/unresolved bases and failed residual checks.
     pub fn complex_eigenvalue_decomposition(&self) -> GraphResult<ComplexEigenResult<T>> {
+        if self.requires_grad {
+            return Err(GraphError::InvalidInput("Automatic gradients for general complex eigenpairs are unsupported; detach explicitly to compute owned factors".into()));
+        }
         let (rows, cols) = self.shape();
         if rows != cols {
             return Err(GraphError::InvalidInput(
@@ -2440,7 +2511,15 @@ impl<T: NumericType> GraphMatrix<T> {
         }
         let (values, vectors) =
             super::decomposition::symmetric_eigen(self.decomposition_input()?, rows)?;
-        Ok((values, Self::decomposition_matrix(vectors, rows, rows)?))
+        Ok((
+            values,
+            self.track_factor(
+                Self::decomposition_matrix(vectors, rows, rows)?,
+                Operation::FactorOutput {
+                    part: FactorOutput::EigenVectors,
+                },
+            )?,
+        ))
     }
 
     fn decomposition_input(&self) -> GraphResult<Vec<f64>> {

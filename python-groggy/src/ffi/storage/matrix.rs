@@ -333,6 +333,13 @@ impl PyGraphMatrix {
             .map_err(|e| PyRuntimeError::new_err(format!("Backward pass failed: {:?}", e)))
     }
 
+    /// Pull back an explicit finite cotangent, replacing prior tape gradients.
+    fn backward_with_gradient(&mut self, gradient: &Self) -> PyResult<()> {
+        self.inner
+            .backward_with_gradient(&gradient.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
     /// Zero out all gradients in the computation graph
     fn zero_grad(&mut self) -> PyResult<()> {
         self.inner
@@ -2006,6 +2013,30 @@ impl PyGraphMatrix {
                 },
             )?,
         })
+    }
+
+    /// Thin matrix-valued SVD outputs, including k x 1 singular values for gradients.
+    fn svd_tracked(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>, Py<Self>)> {
+        let (u, s, vt) = self
+            .inner
+            .svd_tracked()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((
+            Py::new(py, Self { inner: u })?,
+            Py::new(py, Self { inner: s })?,
+            Py::new(py, Self { inner: vt })?,
+        ))
+    }
+    /// Matrix-valued symmetric eigenvalues (n x 1) and eigenvectors for gradients.
+    fn eigen_tracked(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>)> {
+        let (values, vectors) = self
+            .inner
+            .eigen_tracked()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((
+            Py::new(py, Self { inner: values })?,
+            Py::new(py, Self { inner: vectors })?,
+        ))
     }
 
     /// Real SVD: A = U * Sigma * V^T, using bounded one-sided Jacobi sweeps.

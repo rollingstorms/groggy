@@ -35,3 +35,5 @@ P*dA=dL*U+L*dU, orthogonality tangents, independent finite differences and
 JVP/VJP adjoint identities across shape/scale/domain fixtures.
 
 Mathematical context: [Auto-Differentiating Linear Algebra](https://arxiv.org/abs/1710.08717).
+
+Automatic factor output routes and their current composition limits are now described in [factor autodiff](matrix-factor-autodiff.md).
