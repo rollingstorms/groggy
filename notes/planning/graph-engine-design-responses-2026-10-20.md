@@ -539,3 +539,6 @@ Keep selections owned with positional identity, including duplicates and empty a
 
 ### Item 29 canonical CSR — 2026-10-21
 Use sorted unique in-range columns and no stored zeros as the explicit CSR contract. Reject malformed/duplicate construction; checked set inserts/removes canonically. Clones own independent sparse vectors. Existing checked GraphMatrix consumers may densify; expose this behavior and its cost rather than claim sparse optimization. Distinguish storage kind from numeric zero density.
+
+### Item 29 measured floating dot acceleration — 2026-10-21
+Optimize the exact reference kernel only with a behavior-preserving checked path. Integral-valued factors may accumulate in i128; flush exact subtotal bits to the bin accumulator when needed. Keep nonfinite checks ahead of zero shortcuts. Measure integral and fractional controls separately and retain the remaining fractional/reference cost explicitly.

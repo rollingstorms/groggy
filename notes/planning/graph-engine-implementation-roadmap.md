@@ -118,3 +118,7 @@ Numerical item 29.18 repairs integer-only ArrayArray sum/mean/std precision thro
 Numerical item 29.19 repairs owned column/2D selection, raw Python slicing/masks, logical reshape and transpose with explicit validation, identity and empty-shape behavior. Remaining reductions, lower-level views/lazy/sparse paths and general decomposition/performance work remain open.
 
 Numerical item 29.20 establishes canonical CSR construction/access/update/clone and native/Python checked-consumer correctness, with dense output semantics. Efficient sparse kernels, sparse factorizations, lower-level backend coverage and production-scale evidence still remain under 29.4/29.6.
+
+Numerical item 29.21 introduces a checked i128 fast path for integral-valued floating dots, retaining exact transitions to reference bins. Matching dev profiles measure integral and fractional-control workloads; this does not close release-scale throughput, generic fractional acceleration, allocation accounting, SIMD or GIL work.
+
+Numerical finish status after 29.15–29.21: floating dot accuracy, direct floating solves/inverse, checked built-in integer arithmetic, typed grouped integer statistics, owned indexing/transforms, canonical CSR basics and an initial measured dot fast path have concrete slices. The six broad areas are not complete. Flat items 29.22–29.26 explicitly retain remaining reductions, conditioning/real factorizations, general complex eigen/gradients, efficient sparse kernels and production performance gates; parent items 29.3–29.6 remain open.

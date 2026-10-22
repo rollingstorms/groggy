@@ -4,6 +4,7 @@ const LIMBS: usize = 136;
 const MASK: u128 = (1_u128 << 32) - 1;
 
 pub(super) struct Dot {
+    integer: Option<i128>,
     positive: [u128; LIMBS],
     negative: [u128; LIMBS],
     nan: bool,
@@ -13,6 +14,7 @@ pub(super) struct Dot {
 impl Dot {
     pub(super) fn new() -> Self {
         Self {
+            integer: Some(0),
             positive: [0; LIMBS],
             negative: [0; LIMBS],
             nan: false,
@@ -27,6 +29,38 @@ impl Dot {
             self.positive_infinity |= product == f64::INFINITY;
             self.negative_infinity |= product == f64::NEG_INFINITY;
             return;
+        }
+        if a == 0.0 || b == 0.0 {
+            return;
+        }
+        if let Some(integer) = self.integer {
+            if a.abs() <= 9223372036854775808.0
+                && b.abs() <= 9223372036854775808.0
+                && a.trunc() == a
+                && b.trunc() == b
+            {
+                if let Some(next) = (a as i128)
+                    .checked_mul(b as i128)
+                    .and_then(|v| integer.checked_add(v))
+                {
+                    self.integer = Some(next);
+                    return;
+                }
+            }
+            // Preserve every bit when switching from the integer fast path to bins.
+            let bins = if integer < 0 {
+                &mut self.negative
+            } else {
+                &mut self.positive
+            };
+            let mut magnitude = integer.unsigned_abs();
+            let mut limb = 2148 / 32;
+            while magnitude != 0 {
+                bins[limb] += (magnitude & MASK) << (2148 % 32);
+                magnitude >>= 32;
+                limb += 1;
+            }
+            self.integer = None;
         }
         let parts = |value: f64| {
             let bits = value.to_bits();
@@ -63,6 +97,9 @@ impl Dot {
         if self.negative_infinity {
             return f64::NEG_INFINITY;
         }
+        if let Some(integer) = self.integer {
+            return integer as f64;
+        }
         for bins in [&mut self.positive, &mut self.negative] {
             for i in 0..LIMBS - 1 {
                 bins[i + 1] += bins[i] >> 32;
@@ -98,7 +135,11 @@ impl Dot {
             significand = (significand << 1) | u64::from(bit(index));
         }
         let halfway = bit(shift - 1) != 0;
-        let sticky = (0..shift - 1).any(|index| bit(index) != 0);
+        let discarded = shift - 1;
+        let whole = discarded / 32;
+        let remainder = discarded % 32;
+        let sticky = magnitude[..whole].iter().any(|&limb| limb != 0)
+            || magnitude[whole] & ((1_u32 << remainder) - 1) != 0;
         if halfway && (sticky || significand & 1 != 0) {
             significand += 1;
         }

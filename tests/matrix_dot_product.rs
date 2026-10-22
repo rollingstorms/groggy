@@ -41,3 +41,32 @@ fn nonfinite_inputs_follow_ieee_and_exact_cancellation_is_positive_zero() {
         0.0_f64.to_bits()
     );
 }
+
+#[test]
+fn exact_integer_fast_path_falls_back_without_losing_bits_or_nonfinite_precedence() {
+    let large = 2f64.powi(63);
+    let mut a = vec![large; 9];
+    a.extend(vec![large; 9]);
+    a.push(1.);
+    let mut b = vec![large; 9];
+    b.extend(vec![-large; 9]);
+    b.push(1.);
+    assert_eq!(dot(a, b), 1.);
+    assert_eq!(dot(vec![large, large, 0.5], vec![large, -large, 1.]), 0.5);
+    assert!(dot(vec![1., 0.], vec![1., f64::INFINITY]).is_nan());
+    assert_eq!(dot(vec![2., 3.], vec![4., 5.]), 23.);
+    for exponent in [-1000, -47, 17, 1000] {
+        let base = 2f64.powi(exponent);
+        let half_exponent = exponent - 53;
+        let half = if half_exponent < -1022 {
+            f64::from_bits(1_u64 << (half_exponent + 1074))
+        } else {
+            f64::from_bits(((half_exponent + 1023) as u64) << 52)
+        };
+        assert_eq!(dot(vec![base, half], vec![1., 1.]), base);
+        assert_eq!(
+            dot(vec![base, half, f64::from_bits(1)], vec![1., 1., 1.]),
+            f64::from_bits(base.to_bits() + 1)
+        );
+    }
+}

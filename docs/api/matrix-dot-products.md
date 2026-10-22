@@ -35,3 +35,20 @@ allocation measurements. Fixed-bin reference accuracy has a cost; measured accel
 and wider production-scale benchmarking remain under item 29.6.
 
 Measured dev medians (same staged extension setup): 1x1024 by 1024x1, 0.200 to 0.231 ms; 16x32 by 32x16, 1.201 to 10.644 ms; 32x64 by 64x32, 9.368 to 48.532 ms. This reference repair regresses these small-product timings by about 1.15x/8.86x/5.18x. These fixtures establish the cost to address in measured acceleration; no speed improvement is claimed.
+
+## Checked integer fast path (29.21)
+
+Integral-valued finite factors with magnitude at most 2^63 first accumulate checked
+i128 products/totals. If any product or subtotal cannot continue, or a non-integral
+factor appears, flush the exact integer subtotal into the exponent bins and continue
+there. No integer bits are discarded at this transition. Nonfinite checks precede
+zero shortcuts so zero times infinity still produces NaN. All-integral totals round
+to f64 only at the end; the numerical result contract is unchanged.
+
+This optimization targets integral-valued floating workloads; general fractional
+inputs still use the reference bins and retain their measured cost. Matching dev
+fixtures are benches/matrix_dot_fast_profile.py and its before/after JSON files,
+including a fractional control workload. Release-scale throughput, allocation counts,
+SIMD/GIL work and efficient fractional kernels remain open under item 29.6.
+
+Final rounding also checks discarded bits by whole 32-bit words, preserving halfway/sticky semantics while avoiding a bit-by-bit scan. Matching dev before/after medians were 0.230→0.179 ms (1x1024 dot), 16.331→1.470 ms (16x32 by 32x16 integral), 52.646→11.385 ms (32x64 by 64x32 integral), and 10.437→6.098 ms (16x32 fractional control). The raw contended after-run is retained separately; its samples vary substantially. These small noisy dev fixtures compare against the exact-bin reference, not a promise of speedup against the original inaccurate kernel or release workloads.
