@@ -55,3 +55,8 @@ remain separate roadmap milestones.
 NC3 completion: shared map/nonfinite fallback guards, explicit opt-in, full native
 suites, strict all-target core Clippy and 462 rebuilt Python regressions. NC1/NC2
 remain open.
+
+NC1 partial completion (29.61a): attribute quantile/correlation/covariance now use
+checked shared numeric adapters with integer/mixed residuals, exact ranking and
+explicit failure domains. Window/cumulative and table paths remain open. See
+`attribute-statistics-contract-2026-10-22.md`.

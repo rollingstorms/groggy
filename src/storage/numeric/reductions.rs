@@ -9,6 +9,15 @@ pub trait Scalar: Copy {
     fn integer(self) -> Option<i128> {
         None
     }
+    /// Subtract before conversion when integer information is available.
+    fn difference(self, origin: Self) -> f64 {
+        match (self.integer(), origin.integer()) {
+            (Some(a), Some(b)) => a
+                .checked_sub(b)
+                .map_or_else(|| self.as_f64() - origin.as_f64(), |d| d as f64),
+            _ => self.as_f64() - origin.as_f64(),
+        }
+    }
     /// Numeric order, used only after NaNs have been screened.
     fn numeric_cmp(self, other: Self) -> Ordering {
         let (a, b) = (self.as_f64(), other.as_f64());
@@ -156,12 +165,7 @@ fn dispersion<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(
     }
     let offset = |x: S| match about {
         Some(mean) => x.as_f64() - mean,
-        None => match (x.integer(), origin.integer()) {
-            (Some(a), Some(b)) => a
-                .checked_sub(b)
-                .map_or_else(|| x.as_f64() - origin.as_f64(), |d| d as f64),
-            _ => x.as_f64() - origin.as_f64(),
-        },
+        None => x.difference(origin),
     };
     let mut scale = 0.0_f64;
     let mut overflow = false;
@@ -459,12 +463,7 @@ fn centered<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(data: I) -> Vec<f
     let Some(origin) = data.clone().next() else {
         return Vec::new();
     };
-    let difference = |x: S| match (x.integer(), origin.integer()) {
-        (Some(a), Some(b)) => a
-            .checked_sub(b)
-            .map_or_else(|| x.as_f64() - origin.as_f64(), |d| d as f64),
-        _ => x.as_f64() - origin.as_f64(),
-    };
+    let difference = |x: S| x.difference(origin);
     let overflow = data.clone().any(|x| !difference(x).is_finite());
     let scale = data
         .clone()

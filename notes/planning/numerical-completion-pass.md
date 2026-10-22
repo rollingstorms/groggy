@@ -139,3 +139,13 @@ suites, strict all-target core Clippy and 462 rebuilt Python regressions pass,
 including 10k-square early-error and just-over-limit explicit opt-in fixtures.
 Sparse kernel parent 29.25 closes within the documented native domain and measured
 coverage; arbitrary fill or production-memory guarantees are not implied.
+
+### Item 29.61a — Checked attribute pair statistics and quantiles
+
+Canonical BaseArray delegates to shared numeric attribute kernels. Preserve exact
+integer ordering/centering, mixed integer/f32 residuals, pairwise missing cells,
+average Spearman ties and legacy Kendall tau-a. Reject mismatched lengths, negative
+ddof, invalid empty quantile arguments, nonfinite input and f32 output overflow.
+Native/Python rational and boundary references are recorded in
+`attribute-statistics-contract-2026-10-22.md`. Remaining window/cumulative/table
+paths keep 29.61 and its numerical parent open.
