@@ -6,7 +6,7 @@ with separate reviewable commits and synchronized checklist evidence.
 ## Work queue
 
 - [x] Real spectral derivatives: symmetric eigen and thin SVD JVP/VJP, distinct-spectrum/rank policy, native/Python finite-difference and adjoint references.
-- [ ] QR/LU JVP/VJP with locally stable rank/pivot policies and independent reconstruction/gradient references.
+- [x] QR/LU JVP/VJP with locally stable rank/pivot policies and independent reconstruction/gradient references.
 - [ ] Supported automatic differentiation routes, saved inputs, multi-output factors and explicit unsupported derivative domains.
 - [ ] Numeric array arithmetic, conversion/shape/domain contracts, exact checked integer operations and Python dispatch.
 - [ ] Lower-level matrix arithmetic, logical layouts, reductions, backend consistency and remaining matrix APIs/consumers.

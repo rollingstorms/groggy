@@ -2241,6 +2241,77 @@ impl<T: NumericType> GraphMatrix<T> {
         })
     }
 
+    /// Economy QR directional derivative on a resolved locally fixed sign branch.
+    pub fn qr_jvp(&self, tangent: &Self) -> GraphResult<(Self, Self)> {
+        let (m, n) = self.shape();
+        let k = m.min(n);
+        if tangent.shape() != self.shape() {
+            return Err(GraphError::InvalidInput("QR tangent shape mismatch".into()));
+        }
+        let (q, r) = super::triangular_derivatives::qr_jvp(
+            self.decomposition_input()?,
+            tangent.decomposition_input()?,
+            m,
+            n,
+        )?;
+        Ok((Self::factor_matrix(q, m, k)?, Self::factor_matrix(r, k, n)?))
+    }
+    /// Economy QR pullback for matching Q/R cotangents.
+    pub fn qr_vjp(&self, q: &Self, r: &Self) -> GraphResult<Self> {
+        let (m, n) = self.shape();
+        let k = m.min(n);
+        if q.shape() != (m, k) || r.shape() != (k, n) {
+            return Err(GraphError::InvalidInput(
+                "QR cotangent shape mismatch".into(),
+            ));
+        }
+        let values = super::triangular_derivatives::qr_vjp(
+            self.decomposition_input()?,
+            q.decomposition_input()?,
+            r.decomposition_input()?,
+            m,
+            n,
+        )?;
+        let mut result = Self::factor_matrix(values, m, n)?;
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
+        Ok(result)
+    }
+    /// Fixed-pivot LU directional derivative; permutation derivative is zero.
+    pub fn lu_jvp(&self, tangent: &Self) -> GraphResult<(Self, Self)> {
+        let (n, cols) = self.shape();
+        if n != cols || tangent.shape() != self.shape() {
+            return Err(GraphError::InvalidInput(
+                "LU derivative requires matching square inputs".into(),
+            ));
+        }
+        let (l, u) = super::triangular_derivatives::lu_jvp(
+            self.decomposition_input()?,
+            tangent.decomposition_input()?,
+            n,
+        )?;
+        Ok((Self::factor_matrix(l, n, n)?, Self::factor_matrix(u, n, n)?))
+    }
+    /// Fixed-pivot LU pullback for lower/upper factor cotangents.
+    pub fn lu_vjp(&self, l: &Self, u: &Self) -> GraphResult<Self> {
+        let (n, cols) = self.shape();
+        if n != cols || l.shape() != self.shape() || u.shape() != self.shape() {
+            return Err(GraphError::InvalidInput(
+                "LU derivative requires matching square cotangents".into(),
+            ));
+        }
+        let values = super::triangular_derivatives::lu_vjp(
+            self.decomposition_input()?,
+            l.decomposition_input()?,
+            u.decomposition_input()?,
+            n,
+        )?;
+        let mut result = Self::factor_matrix(values, n, n)?;
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
+        Ok(result)
+    }
+
     /// Symmetric eigenvalue/eigenvector directional derivative; distinct spectrum required.
     pub fn eigen_jvp(&self, tangent: &Self) -> GraphResult<(Vec<f64>, Self)> {
         let (n, cols) = self.shape();

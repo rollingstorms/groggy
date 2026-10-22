@@ -2064,6 +2064,41 @@ impl PyGraphMatrix {
         Py::new(py, Self { inner })
     }
 
+    fn qr_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Py<Self>, Py<Self>)> {
+        let (q, r) = self
+            .inner
+            .qr_jvp(&tangent.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((
+            Py::new(py, Self { inner: q })?,
+            Py::new(py, Self { inner: r })?,
+        ))
+    }
+    fn qr_vjp(&self, py: Python, q: &Self, r: &Self) -> PyResult<Py<Self>> {
+        let inner = self
+            .inner
+            .qr_vjp(&q.inner, &r.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+    fn lu_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Py<Self>, Py<Self>)> {
+        let (l, u) = self
+            .inner
+            .lu_jvp(&tangent.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((
+            Py::new(py, Self { inner: l })?,
+            Py::new(py, Self { inner: u })?,
+        ))
+    }
+    fn lu_vjp(&self, py: Python, l: &Self, u: &Self) -> PyResult<Py<Self>> {
+        let inner = self
+            .inner
+            .lu_vjp(&l.inner, &u.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+
     /// Distinct real symmetric eigenpair directional derivative.
     fn eigen_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Vec<f64>, Py<Self>)> {
         let (values, inner) = self

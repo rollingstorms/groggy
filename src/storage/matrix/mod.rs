@@ -20,6 +20,7 @@ pub mod matrix_core;
 mod reductions;
 pub mod slicing;
 mod spectral_derivatives;
+mod triangular_derivatives;
 
 pub use conversions::*;
 pub use matrix_core::*;

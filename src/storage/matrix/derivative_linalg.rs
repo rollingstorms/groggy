@@ -87,3 +87,62 @@ pub(super) fn thin_columns(a: &[f64], rows: usize, cols: usize, k: usize) -> Gra
     }
     Ok(out)
 }
+/// Solve op(A) X=B for triangular A, retaining the RHS column count.
+pub(super) fn solve_triangular(
+    a: &[f64],
+    mut b: Vec<f64>,
+    n: usize,
+    rhs: usize,
+    lower: bool,
+    trans: bool,
+) -> GraphResult<Vec<f64>> {
+    for step in 0..n {
+        let row = if lower != trans { step } else { n - 1 - step };
+        for col in 0..rhs {
+            let mut dot = super::dot_product::Dot::new();
+            dot.add(b[row * rhs + col], 1.);
+            if lower != trans {
+                for k in 0..row {
+                    dot.add(
+                        -if trans {
+                            a[k * n + row]
+                        } else {
+                            a[row * n + k]
+                        },
+                        b[k * rhs + col],
+                    );
+                }
+            } else {
+                for k in row + 1..n {
+                    dot.add(
+                        -if trans {
+                            a[k * n + row]
+                        } else {
+                            a[row * n + k]
+                        },
+                        b[k * rhs + col],
+                    );
+                }
+            }
+            if a[row * n + row] == 0. {
+                return Err(invalid("Derivative triangular factor is singular"));
+            }
+            b[row * rhs + col] = finite(finite(dot.total())? / a[row * n + row])?;
+        }
+    }
+    Ok(b)
+}
+pub(super) fn right_solve(
+    b: &[f64],
+    rows: usize,
+    a: &[f64],
+    n: usize,
+    lower: bool,
+    trans: bool,
+) -> GraphResult<Vec<f64>> {
+    transpose(
+        &solve_triangular(a, transpose(b, rows, n)?, n, rows, lower, !trans)?,
+        n,
+        rows,
+    )
+}

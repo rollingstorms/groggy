@@ -34,7 +34,22 @@ pub(super) fn normalize(input: &mut [f64]) -> GraphResult<f64> {
     Ok(scale)
 }
 /// Economy Householder QR: Q is rows x min(rows,cols), R is min(rows,cols) x cols.
-pub(super) fn qr(mut a: Vec<f64>, rows: usize, cols: usize) -> GraphResult<(Vec<f64>, Vec<f64>)> {
+pub(super) fn qr(a: Vec<f64>, rows: usize, cols: usize) -> GraphResult<(Vec<f64>, Vec<f64>)> {
+    qr_impl(a, rows, cols, false)
+}
+pub(super) fn qr_derivative_chart(
+    a: Vec<f64>,
+    rows: usize,
+    cols: usize,
+) -> GraphResult<(Vec<f64>, Vec<f64>)> {
+    qr_impl(a, rows, cols, true)
+}
+fn qr_impl(
+    mut a: Vec<f64>,
+    rows: usize,
+    cols: usize,
+    derivative: bool,
+) -> GraphResult<(Vec<f64>, Vec<f64>)> {
     let scale = normalize(&mut a)?;
     let k = rows.min(cols);
     let mut reflectors = Vec::with_capacity(k);
@@ -43,6 +58,13 @@ pub(super) fn qr(mut a: Vec<f64>, rows: usize, cols: usize) -> GraphResult<(Vec<
         if norm == 0. {
             reflectors.push(None);
             continue;
+        }
+        if derivative
+            && a[col * cols + col].abs() <= 64. * f64::EPSILON * rows.max(cols).max(1) as f64 * norm
+        {
+            return Err(invalid(
+                "QR derivative is on an unresolved Householder sign boundary",
+            ));
         }
         let alpha = -norm.copysign(a[col * cols + col]);
         let mut v: Vec<_> = (col..rows).map(|row| a[row * cols + col]).collect();
