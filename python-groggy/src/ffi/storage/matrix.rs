@@ -589,6 +589,13 @@ impl PyGraphMatrix {
         Py::new(py, py_result)
     }
 
+    /// Return determinant sign and log magnitude through the native LU kernel.
+    fn slogdet(&self) -> PyResult<(f64, f64)> {
+        self.inner
+            .slogdet()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
     /// Determinant calculation (for square matrices)
     fn determinant(&self) -> PyResult<f64> {
         self.inner.determinant().map_err(|e| {

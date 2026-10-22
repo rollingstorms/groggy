@@ -147,3 +147,78 @@ pub(super) fn cholesky(mut a: Vec<f64>, n: usize) -> GraphResult<Vec<f64>> {
     }
     Ok(lower)
 }
+
+pub(super) struct Lu {
+    pub upper: Vec<f64>,
+    pub lower: Vec<f64>,
+    pub permutation: Vec<usize>,
+    pub swaps: usize,
+}
+/// Partial-pivot PA=LU. Zero pivot columns are retained for singular factorizations.
+pub(super) fn lu(mut upper: Vec<f64>, n: usize) -> GraphResult<Lu> {
+    if upper.iter().any(|v| !v.is_finite()) {
+        return Err(invalid("LU requires finite input"));
+    }
+    let mut lower = zeros(n, n)?;
+    let mut permutation: Vec<_> = (0..n).collect();
+    let mut swaps = 0;
+    for i in 0..n {
+        lower[i * n + i] = 1.;
+    }
+    for col in 0..n {
+        let mut pivot = col;
+        for row in col + 1..n {
+            if upper[row * n + col].abs() > upper[pivot * n + col].abs() {
+                pivot = row;
+            }
+        }
+        if upper[pivot * n + col] == 0. {
+            continue;
+        }
+        if pivot != col {
+            for j in 0..n {
+                upper.swap(col * n + j, pivot * n + j);
+            }
+            for j in 0..col {
+                lower.swap(col * n + j, pivot * n + j);
+            }
+            permutation.swap(col, pivot);
+            swaps += 1;
+        }
+        for row in col + 1..n {
+            let factor = upper[row * n + col] / upper[col * n + col];
+            lower[row * n + col] = factor;
+            upper[row * n + col] = 0.;
+            for j in col + 1..n {
+                let value = (-factor).mul_add(upper[col * n + j], upper[row * n + j]);
+                if !value.is_finite() {
+                    return Err(invalid("LU factors exceed finite range"));
+                }
+                upper[row * n + j] = value;
+            }
+        }
+    }
+    Ok(Lu {
+        upper,
+        lower,
+        permutation,
+        swaps,
+    })
+}
+pub(super) fn slogdet(factor: &Lu, n: usize) -> (f64, f64) {
+    let mut sign = if factor.swaps.is_multiple_of(2) {
+        1.
+    } else {
+        -1.
+    };
+    let mut logs = Vec::with_capacity(n);
+    for i in 0..n {
+        let pivot = factor.upper[i * n + i];
+        if pivot == 0. {
+            return (0., f64::NEG_INFINITY);
+        }
+        sign *= pivot.signum();
+        logs.push(pivot.abs().ln());
+    }
+    (sign, crate::storage::array::numeric_reductions::sum(&logs))
+}

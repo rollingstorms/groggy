@@ -551,3 +551,6 @@ Use real economy Householder QR with k=min(m,n), avoiding impossible wide orthon
 
 ### Item 29 scaled real Cholesky — 2026-10-21
 Use a norm-relative symmetry policy after scaling, average accepted pairs, and require strictly positive residual pivots at working precision. Reject unsupported/range errors instead of guessing factors. Support native f32/f64 and empty order, retaining owned source/basis identity. Conditioning, pivoted/complex/sparse factors and gradients remain separate.
+
+### Item 29 LU and determinant — 2026-10-21
+Use bounded real partial-pivot PA=LU without absolute singularity epsilons. A zero pivot can remain in a valid singular factorization; determinant/sign-log expose singularity. Preserve owned coordinate/permutation identity and checked dtype range. Empty determinant is one, order-two subtraction is accurate, and larger determinants exponentiate pivot log sums. Expose slogdet to retain final range; do not claim exact integer or unbounded intermediate range.

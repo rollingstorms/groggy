@@ -1763,101 +1763,46 @@ impl<T: NumericType> GraphMatrix<T> {
 
     // === BATCH 5: ADVANCED LINEAR ALGEBRA OPERATIONS ===
 
-    /// Matrix determinant calculation (for square matrices)
-    pub fn determinant(&self) -> GraphResult<f64>
-    where
-        T: std::ops::Add<Output = T> + std::ops::Sub<Output = T> + std::ops::Mul<Output = T> + Copy,
-    {
+    /// Floating determinant; empty order is one, singular input is zero.
+    pub fn determinant(&self) -> GraphResult<f64> {
         let (rows, cols) = self.shape();
         if rows != cols {
-            return Err(GraphError::InvalidInput(format!(
-                "Determinant requires square matrix, got {}x{}",
-                rows, cols
-            )));
+            return Err(GraphError::InvalidInput(
+                "Determinant requires square input".into(),
+            ));
         }
-
+        let values = self.decomposition_input()?;
+        if values.iter().any(|v| !v.is_finite()) {
+            return Err(GraphError::InvalidInput(
+                "Determinant requires finite input".into(),
+            ));
+        }
+        if rows == 0 {
+            return Ok(1.);
+        }
         if rows == 1 {
-            // 1x1 matrix determinant
-            return Ok(self
-                .get(0, 0)
-                .ok_or_else(|| GraphError::InvalidInput("Invalid matrix element".into()))?
-                .to_f64());
+            return Ok(values[0]);
         }
-
         if rows == 2 {
-            // 2x2 matrix determinant: ad - bc
-            let a = self
-                .get(0, 0)
-                .ok_or_else(|| GraphError::InvalidInput("Invalid matrix element".into()))?
-                .to_f64();
-            let b = self
-                .get(0, 1)
-                .ok_or_else(|| GraphError::InvalidInput("Invalid matrix element".into()))?
-                .to_f64();
-            let c = self
-                .get(1, 0)
-                .ok_or_else(|| GraphError::InvalidInput("Invalid matrix element".into()))?
-                .to_f64();
-            let d = self
-                .get(1, 1)
-                .ok_or_else(|| GraphError::InvalidInput("Invalid matrix element".into()))?
-                .to_f64();
-
-            return Ok(a * d - b * c);
+            let mut dot = super::dot_product::Dot::new();
+            dot.add(values[0], values[3]);
+            dot.add(-values[1], values[2]);
+            return Ok(dot.total());
         }
-
-        // For larger matrices, use cofactor expansion (simplified implementation)
-        let mut det = 0.0;
-        for j in 0..cols {
-            let element = self
-                .get(0, j)
-                .ok_or_else(|| GraphError::InvalidInput("Invalid matrix element".into()))?
-                .to_f64();
-
-            // Create minor matrix (remove row 0 and column j)
-            let minor = self.create_minor(0, j)?;
-            let minor_det = minor.determinant()?;
-
-            // Add to determinant with alternating signs
-            if j % 2 == 0 {
-                det += element * minor_det;
-            } else {
-                det -= element * minor_det;
-            }
-        }
-
-        Ok(det)
+        let factor = super::factorization::lu(values, rows)?;
+        let (sign, log) = super::factorization::slogdet(&factor, rows);
+        Ok(if sign == 0. { 0. } else { sign * log.exp() })
     }
-
-    /// Create minor matrix by removing specified row and column
-    fn create_minor(&self, remove_row: usize, remove_col: usize) -> GraphResult<GraphMatrix<T>> {
+    /// Sign and log absolute determinant, avoiding final product range loss.
+    pub fn slogdet(&self) -> GraphResult<(f64, f64)> {
         let (rows, cols) = self.shape();
-        let new_rows = rows - 1;
-        let new_cols = cols - 1;
-
-        let mut minor = GraphMatrix::zeros(new_rows, new_cols);
-
-        let mut minor_i = 0;
-        for i in 0..rows {
-            if i == remove_row {
-                continue;
-            }
-
-            let mut minor_j = 0;
-            for j in 0..cols {
-                if j == remove_col {
-                    continue;
-                }
-
-                if let Some(value) = self.get(i, j) {
-                    let _ = minor.set(minor_i, minor_j, value);
-                }
-                minor_j += 1;
-            }
-            minor_i += 1;
+        if rows != cols {
+            return Err(GraphError::InvalidInput(
+                "Log determinant requires square input".into(),
+            ));
         }
-
-        Ok(minor)
+        let factor = super::factorization::lu(self.decomposition_input()?, rows)?;
+        Ok(super::factorization::slogdet(&factor, rows))
     }
 
     /// Floating dense inverse using a direct solve against identity.
@@ -1993,135 +1938,47 @@ impl<T: NumericType> GraphMatrix<T> {
         Self::from_row_major_data(values, rows, cols, None)
     }
 
-    /// LU Decomposition with partial pivoting: PA = LU
-    /// Returns (P, L, U) where P is permutation matrix, L is lower triangular, U is upper triangular
-    pub fn lu_decomposition(&self) -> GraphResult<(GraphMatrix<T>, GraphMatrix<T>, GraphMatrix<T>)>
-    where
-        T: Clone
-            + Copy
-            + Default
-            + std::fmt::Debug
-            + PartialEq
-            + PartialOrd
-            + std::ops::Add<Output = T>
-            + std::ops::Sub<Output = T>
-            + std::ops::Mul<Output = T>
-            + std::ops::Div<Output = T>,
-        f64: From<T>,
-        T: From<f64>,
-    {
+    /// Floating partial-pivot factorization PA=LU; singular pivots remain zero.
+    pub fn lu_decomposition(
+        &self,
+    ) -> GraphResult<(GraphMatrix<T>, GraphMatrix<T>, GraphMatrix<T>)> {
         let (rows, cols) = self.shape();
         if rows != cols {
+            return Err(GraphError::InvalidInput("LU requires square input".into()));
+        }
+        if self
+            .row_labels
+            .as_ref()
+            .is_some_and(|labels| labels.len() != rows)
+        {
             return Err(GraphError::InvalidInput(
-                "LU decomposition requires square matrix".into(),
+                "LU row labels do not match shape".into(),
             ));
         }
-
-        let n = rows;
-
-        // Create working copy of the matrix
-        let mut a = Vec::new();
-        for i in 0..n {
-            let mut row = Vec::new();
-            for j in 0..n {
-                let val = self.get(i, j).unwrap_or_else(|| T::default());
-                row.push(f64::from(val));
-            }
-            a.push(row);
+        let factor = super::factorization::lu(self.decomposition_input()?, rows)?;
+        let mut p = Self::arithmetic_zeros(rows, rows)?;
+        for (row, &col) in factor.permutation.iter().enumerate() {
+            p.set(row, col, T::one())?;
         }
-
-        // Initialize permutation vector (tracks row swaps)
-        let mut perm: Vec<usize> = (0..n).collect();
-
-        // Initialize L matrix (will be lower triangular with 1s on diagonal)
-        let mut l = vec![vec![0.0; n]; n];
-        for i in 0..n {
-            l[i][i] = 1.0; // Diagonal elements of L are 1
+        let mut lower = Self::factor_matrix(factor.lower, rows, rows)?;
+        let mut upper = Self::factor_matrix(factor.upper, rows, rows)?;
+        let permuted = self.row_labels.as_ref().map(|labels| {
+            factor
+                .permutation
+                .iter()
+                .map(|&i| labels[i].clone())
+                .collect::<Vec<_>>()
+        });
+        p.row_labels = permuted.clone();
+        if let Some(labels) = &self.row_labels {
+            p.column_names = labels.clone();
         }
-
-        // Gaussian elimination with partial pivoting
-        for k in 0..n {
-            // Find the pivot (largest element in column k, rows k to n-1)
-            let mut pivot_row = k;
-            let mut max_val = a[k][k].abs();
-
-            for i in (k + 1)..n {
-                let abs_val = a[i][k].abs();
-                if abs_val > max_val {
-                    max_val = abs_val;
-                    pivot_row = i;
-                }
-            }
-
-            // Check for singular matrix
-            if max_val < 1e-12 {
-                return Err(GraphError::InvalidInput(
-                    "Matrix is singular, LU decomposition failed".into(),
-                ));
-            }
-
-            // Swap rows if needed
-            if pivot_row != k {
-                a.swap(k, pivot_row);
-                perm.swap(k, pivot_row);
-
-                // Also swap the L matrix entries for rows already processed
-                for j in 0..k {
-                    let temp = l[k][j];
-                    l[k][j] = l[pivot_row][j];
-                    l[pivot_row][j] = temp;
-                }
-            }
-
-            // Elimination step
-            for i in (k + 1)..n {
-                let factor = a[i][k] / a[k][k];
-                l[i][k] = factor; // Store multiplier in L matrix
-
-                // Update row i
-                for j in k..n {
-                    a[i][j] -= factor * a[k][j];
-                }
-            }
-        }
-
-        // Build U matrix (a now contains the upper triangular part)
-        let mut u_arrays = Vec::new();
-        for j in 0..n {
-            let mut col_data = Vec::new();
-            for i in 0..n {
-                let val = if i <= j { a[i][j] } else { 0.0 };
-                col_data.push(T::from(val));
-            }
-            u_arrays.push(NumArray::new(col_data));
-        }
-        let u_matrix = GraphMatrix::from_arrays(u_arrays)?;
-
-        // Build L matrix
-        let mut l_arrays = Vec::new();
-        for j in 0..n {
-            let mut col_data = Vec::new();
-            for i in 0..n {
-                let val = if i >= j { l[i][j] } else { 0.0 };
-                col_data.push(T::from(val));
-            }
-            l_arrays.push(NumArray::new(col_data));
-        }
-        let l_matrix = GraphMatrix::from_arrays(l_arrays)?;
-
-        // Build permutation matrix P
-        let mut p_arrays = Vec::new();
-        for j in 0..n {
-            let mut col_data = Vec::new();
-            for i in 0..n {
-                let val = if perm[i] == j { 1.0 } else { 0.0 };
-                col_data.push(T::from(val));
-            }
-            p_arrays.push(NumArray::new(col_data));
-        }
-        let p_matrix = GraphMatrix::from_arrays(p_arrays)?;
-
-        Ok((p_matrix, l_matrix, u_matrix))
+        lower.row_labels = permuted;
+        let basis: Vec<_> = (0..rows).map(|i| format!("lu_{i}")).collect();
+        lower.column_names = basis.clone();
+        upper.row_labels = Some(basis);
+        upper.column_names = self.column_names.clone();
+        Ok((p, lower, upper))
     }
 
     /// Checked real floating Cholesky factor A=L*L^T.

@@ -128,3 +128,5 @@ Numerical item 29.22 repairs GraphMatrix global/axis/trace and legacy column red
 Numerical item 29.27 repairs real QR with bounded economy Householder factors and checked scale/domain/identity behavior. Wide shapes migrate to m×k and k×n. Cholesky/LU/determinant/rank/conditioning/refinement and least-squares work still remain under 29.23.
 
 Numerical item 29.28 repairs finite real Cholesky using scaled relative symmetry checks, accurate residuals and explicit positive-definite/range/dtype validation. LU/determinant/rank/condition/refinement/least-squares work remains under 29.23.
+
+Numerical item 29.29 repairs finite real LU and determinant/slogdet with partial pivoting, singular/empty support, checked factor range/identity and bounded cubic work. Rank, condition estimation, residual/refinement and least squares remain under 29.23; complex/sparse variants and production performance remain separate.
