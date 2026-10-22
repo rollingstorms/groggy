@@ -33,3 +33,19 @@ def test_arrayarray_group_keys_and_documented_f32_results_survive_single_and_mul
         groups.agg({'kind': 'sum'})
     with pytest.raises(ValueError, match='Unknown aggregation'):
         groups.agg({'x': 'unknown'})
+
+
+def test_grouped_i64_cancellation_and_high_offset_standard_deviation_survive_both_dispatches():
+    graph = Graph()
+    largest = 2**63 - 1
+    for kind, sequence in [('offset', [largest - 2, largest - 1, largest]),
+                           ('cancel', [largest, 1, -largest])]:
+        for value in sequence:
+            graph.add_node(kind=kind, value=value)
+    groups = graph.nodes.table().group_by('kind')['value']
+    assert keyed(groups.sum(), 'sum')['cancel'] == 1.
+    assert keyed(groups.std(), 'std')['offset'] == 1.
+    result = groups.agg({'total': 'sum', 'deviation': 'std'})
+    assert keyed(result, 'total')['cancel'] == 1.
+    assert keyed(result, 'deviation')['offset'] == 1.
+    assert keyed(groups.count(), 'count') == {'offset': 3., 'cancel': 3.}

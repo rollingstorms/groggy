@@ -82,3 +82,48 @@ fn table_aggregations_preserve_key_identity_and_check_narrowing_and_collisions()
         Some(&AttrValue::Float(f32::INFINITY))
     );
 }
+
+#[test]
+fn grouped_integer_reductions_keep_high_offset_differences_and_cancellation() {
+    let arrays = ArrayArray::with_named_keys(
+        vec![
+            BaseArray::new(vec![
+                AttrValue::Int(i64::MAX),
+                AttrValue::Int(1),
+                AttrValue::Int(-i64::MAX),
+            ]),
+            BaseArray::new(vec![
+                AttrValue::Int(i64::MAX - 2),
+                AttrValue::Int(i64::MAX - 1),
+                AttrValue::Int(i64::MAX),
+            ]),
+            BaseArray::new(vec![
+                AttrValue::Null,
+                AttrValue::Text("skip".into()),
+                AttrValue::Bool(true),
+                AttrValue::SmallInt(3),
+            ]),
+            BaseArray::new(vec![]),
+        ],
+        vec!["a".into(), "b".into(), "c".into(), "d".into()],
+        "kind",
+    )
+    .unwrap();
+    assert_eq!(arrays.numeric_reduce("sum").unwrap()[0], 1.);
+    assert_eq!(arrays.numeric_reduce("std").unwrap()[1], 1.);
+    assert_eq!(arrays.numeric_reduce("mean").unwrap()[0], 1. / 3.);
+    assert_eq!(arrays.numeric_counts(), vec![3, 3, 2, 0]);
+    assert_eq!(arrays.numeric_reduce("mean").unwrap()[2], 2.);
+    assert_eq!(arrays.numeric_reduce("std").unwrap()[3], 0.);
+    let result = arrays
+        .aggregate_numeric(&[("deviation".into(), "std".into())])
+        .unwrap();
+    assert_eq!(
+        result.get_column("deviation").unwrap().get(1),
+        Some(&AttrValue::Float(1.))
+    );
+    assert!(result.get_column("kind").is_some());
+    assert!(ArrayArray::new(Vec::<BaseArray<AttrValue>>::new())
+        .numeric_reduce("unknown")
+        .is_err());
+}

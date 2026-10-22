@@ -112,3 +112,5 @@ Numerical item 29.15 repairs GraphMatrix floating dot products with exact finite
 Numerical item 29.16 repairs dense floating solve/inverse using direct row-equilibrated partial-pivot elimination. Multiple RHS, source/coordinate identity, scale-aware behavior and explicit domain/range errors have native and rational Python coverage. Condition estimates/refinement, integer arithmetic, remaining indexing/reductions, sparse/complex solvers and remaining decompositions still require work.
 
 Numerical item 29.17 checks built-in integer GraphMatrix add/subtract/Hadamard overflow and matrix-product i128 accumulation/output conversion. Arbitrary precision, other integer backends, exact grouped integer reductions and remaining matrix/sparse/decomposition/conditioning work remain open.
+
+Numerical item 29.18 repairs integer-only ArrayArray sum/mean/std precision through typed native reductions for both single and multi aggregation. Explicit float projection, mixed-type working limits and f32 materialization remain documented; other grouped-table paths and storage widening are separate.

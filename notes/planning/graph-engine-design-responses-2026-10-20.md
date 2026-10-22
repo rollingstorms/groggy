@@ -530,3 +530,6 @@ Use direct row-equilibrated partial-pivot elimination and the same kernel for in
 
 ### Item 29 integer matrix arithmetic — 2026-10-21
 Reject integer overflow rather than debug panic/release wrap. Keep output dtype stable; use checked i128 products/subtotals and one final narrowing for built-in integer matmul. This allows output-range cancellation but rejects accumulator overflow explicitly. Retain bool OR/AND semantics. Custom NumericType hooks have compatible defaults and own their arithmetic contract.
+
+### Item 29 typed grouped integer statistics — 2026-10-21
+Preserve original i64 scalars for statistical reductions rather than materialize f64 first. Share single/multi aggregation and generic result-table validation. Keep numeric inclusion/empty/count rules and f32 stored outputs explicit; widening storage and exact mixed arithmetic are separate work.

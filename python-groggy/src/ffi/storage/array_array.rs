@@ -110,13 +110,15 @@ impl PyArrayArray {
     /// means = arr_arr.mean()  # [2.0, 5.0]
     /// ```
     fn mean(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array()?;
-        let means = numeric_arrays.mean();
+        let means = self
+            .inner
+            .numeric_reduce("mean")
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| {
             if self.inner.keys().is_some() {
                 // Package as table with keys
-                numeric_arrays
+                self.inner
                     .to_table_with_aggregation("mean", means)
                     .map(|table| PyBaseTable::from_table(table).into_py(py))
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -129,12 +131,14 @@ impl PyArrayArray {
 
     /// Calculate sum of each array
     fn sum(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array()?;
-        let sums = numeric_arrays.sum();
+        let sums = self
+            .inner
+            .numeric_reduce("sum")
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| {
             if self.inner.keys().is_some() {
-                numeric_arrays
+                self.inner
                     .to_table_with_aggregation("sum", sums)
                     .map(|table| PyBaseTable::from_table(table).into_py(py))
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -146,12 +150,14 @@ impl PyArrayArray {
 
     /// Calculate minimum of each array
     fn min(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array()?;
-        let mins = numeric_arrays.min();
+        let mins = self
+            .inner
+            .numeric_reduce("min")
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| {
             if self.inner.keys().is_some() {
-                numeric_arrays
+                self.inner
                     .to_table_with_aggregation("min", mins)
                     .map(|table| PyBaseTable::from_table(table).into_py(py))
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -163,12 +169,14 @@ impl PyArrayArray {
 
     /// Calculate maximum of each array
     fn max(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array()?;
-        let maxs = numeric_arrays.max();
+        let maxs = self
+            .inner
+            .numeric_reduce("max")
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| {
             if self.inner.keys().is_some() {
-                numeric_arrays
+                self.inner
                     .to_table_with_aggregation("max", maxs)
                     .map(|table| PyBaseTable::from_table(table).into_py(py))
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -180,12 +188,14 @@ impl PyArrayArray {
 
     /// Calculate standard deviation of each array
     fn std(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array()?;
-        let stds = numeric_arrays.std();
+        let stds = self
+            .inner
+            .numeric_reduce("std")
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| {
             if self.inner.keys().is_some() {
-                numeric_arrays
+                self.inner
                     .to_table_with_aggregation("std", stds)
                     .map(|table| PyBaseTable::from_table(table).into_py(py))
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -197,13 +207,12 @@ impl PyArrayArray {
 
     /// Count elements in each array
     fn count(&self) -> PyResult<PyObject> {
-        let numeric_arrays = self.to_numeric_array_array()?;
-        let counts = numeric_arrays.count();
+        let counts = self.inner.numeric_counts();
 
         Python::with_gil(|py| {
             if self.inner.keys().is_some() {
                 let counts_f64: Vec<f64> = counts.iter().map(|&c| c as f64).collect();
-                numeric_arrays
+                self.inner
                     .to_table_with_aggregation("count", counts_f64)
                     .map(|table| PyBaseTable::from_table(table).into_py(py))
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
@@ -232,8 +241,8 @@ impl PyArrayArray {
             .iter()
             .map(|(name, function)| Ok((name.extract()?, function.extract()?)))
             .collect();
-        self.to_numeric_array_array()?
-            .aggregate(&spec?)
+        self.inner
+            .aggregate_numeric(&spec?)
             .map(PyBaseTable::from_table)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }

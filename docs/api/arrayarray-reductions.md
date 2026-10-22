@@ -12,11 +12,16 @@ overflow-safe means and independently scaled std follow the NumArray kernels.
 `ArrayArray<AttrValue>.numeric_arrays()` owns the existing numeric projection:
 Int/SmallInt/Float/Bool values become f64; null/text/collection values are skipped.
 Boolean values are zero/one. Preserve both group keys and their actual column name.
-The Python bridge delegates this conversion and multi-aggregation dispatch to Rust.
+The Python bridge delegates conversion and multi-aggregation dispatch to Rust.
+After item 29.18, statistical methods bypass the lossy projection and retain typed
+integer hints through sum/mean and centered std; explicit to_type remains a float
+projection.
 Existing `count()` on the Python bridge counts projected numeric elements, while
 native `ArrayArray<T>.count()` counts all elements. Neither meaning changes here.
-Large integers still lose precision at this explicit f64 conversion boundary;
-exact typed grouped integer statistics remain open.
+Large integers still lose precision in explicit numeric_arrays/to_type conversion.
+Typed integer-only statistical groups now retain i128 subtotals/differences until
+f64 output. Mixed integer/float groups still have ordinary f64 working limits;
+output f64 and stored f32 cannot represent every i64 result.
 
 The Python constructor remains empty-only; grouped table or subgraph attribute
 extraction supplies populated containers. This repair does not introduce a new
@@ -40,5 +45,15 @@ Evidence: `tests/arrayarray_reductions.rs` covers cancellation, large means, tin
 ragged/empty/NaN input, numeric projection, key identity, narrowing overflow and output
 collisions. `tests/test_arrayarray_reductions.py` covers grouped extraction, named keys,
 single/multi aggregation, documented f32 output precision and flattening. Storage
-format widening, exact grouped i64 moments, general grouped-table implementations,
+format widening, exact mixed-type arithmetic, general grouped-table implementations,
 GIL release, throughput and query semantics remain open.
+
+## Typed grouped integer statistics (29.18)
+
+Single and multi-aggregation use one native typed reduction path, retaining original
+i64 values until shared kernels finish. The regression cases include [MAX,1,-MAX]
+summing to 1 and [MAX-2,MAX-1,MAX] having sample std 1. Numeric count uses the same
+legacy inclusion rule without constructing a float column. Shared generic table
+materialization preserves named keys and checked f32 narrowing. Empty=0, bool-as-number,
+skipping, IEEE behavior, count return types and output ownership stay unchanged.
+This does not introduce arbitrary-precision mixed arithmetic or wider table storage.

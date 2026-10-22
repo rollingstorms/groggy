@@ -113,9 +113,179 @@ where
     pub fn iter(&self) -> impl Iterator<Item = &BaseArray<T>> {
         self.arrays.iter()
     }
+    /// Convert to BaseTable with results and group keys
+    ///
+    /// This is used to automatically package aggregation results into a table.
+    /// If keys are present, creates a table with 'group_key' and 'value' columns.
+    /// If no keys, creates a table with just 'value' column.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let arr_arr = ArrayArray::with_keys(arrays, vec!["A", "B", "C"]);
+    /// let means = arr_arr.mean();
+    /// let table = arr_arr.to_table_with_aggregation("mean", means);
+    /// // Table has columns: ['group_key', 'mean']
+    /// ```ignore
+    pub fn to_table_with_aggregation(
+        &self,
+        agg_name: &str,
+        values: Vec<f64>,
+    ) -> Result<BaseTable, GraphError> {
+        if self.len() != values.len() {
+            return Err(GraphError::InvalidInput(format!(
+                "Number of values ({}) must match number of arrays ({})",
+                values.len(),
+                self.len()
+            )));
+        }
+
+        let mut columns = self.key_columns();
+        if columns.contains_key(agg_name) {
+            return Err(GraphError::InvalidInput(format!(
+                "Aggregation column conflicts with group key: {agg_name}"
+            )));
+        }
+        columns.insert(agg_name.to_string(), Self::stored_aggregation(values)?);
+
+        BaseTable::from_columns(columns)
+    }
+    fn materialize_aggregations(
+        &self,
+        spec: &[(String, String)],
+        values: impl Fn(&str) -> Result<Vec<f64>, GraphError>,
+    ) -> Result<BaseTable, GraphError> {
+        let mut columns = self.key_columns();
+        for (name, function) in spec {
+            if columns.contains_key(name) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Duplicate or group-key-conflicting aggregation column: {name}"
+                )));
+            }
+            validate_reduction(function)?;
+            columns.insert(name.clone(), Self::stored_aggregation(values(function)?)?);
+        }
+        BaseTable::from_columns(columns)
+    }
+
+    // Table AttrValue floats are f32: reject finite overflow rather than create infinity.
+    fn stored_aggregation(
+        values: Vec<f64>,
+    ) -> Result<BaseArray<crate::types::AttrValue>, GraphError> {
+        let values = values
+            .into_iter()
+            .map(|value| {
+                let stored = value as f32;
+                if value.is_finite() && !stored.is_finite() {
+                    Err(GraphError::InvalidInput(
+                        "Finite aggregation result exceeds f32 table storage".into(),
+                    ))
+                } else {
+                    Ok(crate::types::AttrValue::Float(stored))
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(BaseArray::from_attr_values(values))
+    }
+
+    fn key_columns(&self) -> std::collections::HashMap<String, BaseArray<crate::types::AttrValue>> {
+        let mut columns = std::collections::HashMap::new();
+        if let Some(keys) = &self.keys {
+            columns.insert(
+                self.key_name.as_deref().unwrap_or("group_key").to_string(),
+                BaseArray::from_attr_values(
+                    keys.iter()
+                        .cloned()
+                        .map(crate::types::AttrValue::Text)
+                        .collect(),
+                ),
+            );
+        }
+        columns
+    }
+}
+
+#[derive(Clone, Copy)]
+enum AttributeNumber {
+    Integer(i64),
+    Float(f64),
+}
+impl super::numeric_reductions::Scalar for AttributeNumber {
+    fn as_f64(self) -> f64 {
+        match self {
+            Self::Integer(v) => v as f64,
+            Self::Float(v) => v,
+        }
+    }
+    fn integer(self) -> Option<i128> {
+        match self {
+            Self::Integer(v) => Some(i128::from(v)),
+            Self::Float(_) => None,
+        }
+    }
+}
+fn attribute_number(value: &crate::types::AttrValue) -> Option<AttributeNumber> {
+    use crate::types::AttrValue;
+    match value {
+        AttrValue::Int(v) => Some(AttributeNumber::Integer(*v)),
+        AttrValue::SmallInt(v) => Some(AttributeNumber::Integer(i64::from(*v))),
+        AttrValue::Bool(v) => Some(AttributeNumber::Integer(i64::from(*v))),
+        AttrValue::Float(v) => Some(AttributeNumber::Float(f64::from(*v))),
+        _ => None,
+    }
+}
+fn validate_reduction(function: &str) -> Result<(), GraphError> {
+    match function {
+        "mean" | "sum" | "min" | "max" | "std" | "count" => Ok(()),
+        _ => Err(GraphError::InvalidInput(format!(
+            "Unknown aggregation function: {function}"
+        ))),
+    }
+}
+fn reduce_numeric<S: super::numeric_reductions::Scalar>(
+    values: &[S],
+    function: &str,
+) -> Result<f64, GraphError> {
+    use super::numeric_reductions as k;
+    Ok(match function {
+        "sum" => k::sum(values),
+        "mean" => k::mean(values).unwrap_or(0.0),
+        "min" => k::extremum(values, true).unwrap_or(0.0),
+        "max" => k::extremum(values, false).unwrap_or(0.0),
+        "std" => k::std_dev(values).unwrap_or(0.0),
+        "count" => values.len() as f64,
+        _ => {
+            return Err(GraphError::InvalidInput(format!(
+                "Unknown aggregation function: {function}"
+            )));
+        }
+    })
 }
 
 impl ArrayArray<crate::types::AttrValue> {
+    /// Reduce numeric values while retaining exact integer hints until f64 output.
+    /// Legacy null/text/collection skipping and bool-as-zero/one remain explicit.
+    pub fn numeric_reduce(&self, function: &str) -> Result<Vec<f64>, GraphError> {
+        validate_reduction(function)?;
+        self.arrays
+            .iter()
+            .map(|array| {
+                let values: Vec<_> = array.iter().filter_map(attribute_number).collect();
+                reduce_numeric(&values, function)
+            })
+            .collect()
+    }
+    /// Count projected numeric scalars without converting integers or copying values.
+    pub fn numeric_counts(&self) -> Vec<usize> {
+        self.arrays
+            .iter()
+            .map(|a| a.iter().filter(|v| attribute_number(v).is_some()).count())
+            .collect()
+    }
+    /// Typed numeric multi-aggregation with shared table/key validation.
+    pub fn aggregate_numeric(&self, spec: &[(String, String)]) -> Result<BaseTable, GraphError> {
+        self.materialize_aggregations(spec, |function| self.numeric_reduce(function))
+    }
+
     /// Legacy numeric projection: retain scalar numbers/bools, skip null/text/collections.
     /// Retains keys and their column name. Integer values convert
     /// to f64 here; this projection does not promise exact i64 statistics.
@@ -199,104 +369,15 @@ impl ArrayArray<f64> {
         self.arrays.iter().map(|arr| arr.len()).collect()
     }
 
-    /// Convert to BaseTable with results and group keys
-    ///
-    /// This is used to automatically package aggregation results into a table.
-    /// If keys are present, creates a table with 'group_key' and 'value' columns.
-    /// If no keys, creates a table with just 'value' column.
-    ///
-    /// # Example
-    /// ```ignore
-    /// let arr_arr = ArrayArray::with_keys(arrays, vec!["A", "B", "C"]);
-    /// let means = arr_arr.mean();
-    /// let table = arr_arr.to_table_with_aggregation("mean", means);
-    /// // Table has columns: ['group_key', 'mean']
-    /// ```ignore
-    pub fn to_table_with_aggregation(
-        &self,
-        agg_name: &str,
-        values: Vec<f64>,
-    ) -> Result<BaseTable, GraphError> {
-        if self.len() != values.len() {
-            return Err(GraphError::InvalidInput(format!(
-                "Number of values ({}) must match number of arrays ({})",
-                values.len(),
-                self.len()
-            )));
-        }
-
-        let mut columns = self.key_columns();
-        if columns.contains_key(agg_name) {
-            return Err(GraphError::InvalidInput(format!(
-                "Aggregation column conflicts with group key: {agg_name}"
-            )));
-        }
-        columns.insert(agg_name.to_string(), Self::stored_aggregation(values)?);
-
-        BaseTable::from_columns(columns)
-    }
-    // Table AttrValue floats are f32: reject finite overflow rather than create infinity.
-    fn stored_aggregation(
-        values: Vec<f64>,
-    ) -> Result<BaseArray<crate::types::AttrValue>, GraphError> {
-        let values = values
-            .into_iter()
-            .map(|value| {
-                let stored = value as f32;
-                if value.is_finite() && !stored.is_finite() {
-                    Err(GraphError::InvalidInput(
-                        "Finite aggregation result exceeds f32 table storage".into(),
-                    ))
-                } else {
-                    Ok(crate::types::AttrValue::Float(stored))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(BaseArray::from_attr_values(values))
-    }
-
-    fn key_columns(&self) -> std::collections::HashMap<String, BaseArray<crate::types::AttrValue>> {
-        let mut columns = std::collections::HashMap::new();
-        if let Some(keys) = &self.keys {
-            columns.insert(
-                self.key_name.as_deref().unwrap_or("group_key").to_string(),
-                BaseArray::from_attr_values(
-                    keys.iter()
-                        .cloned()
-                        .map(crate::types::AttrValue::Text)
-                        .collect(),
-                ),
-            );
-        }
-        columns
-    }
-
     /// Materialize named numeric aggregations, retaining keys and checked f32 table results.
     /// Reject unknown functions and duplicate/key-conflicting output names.
     pub fn aggregate(&self, spec: &[(String, String)]) -> Result<BaseTable, GraphError> {
-        let mut columns = self.key_columns();
-        for (name, function) in spec {
-            if columns.contains_key(name) {
-                return Err(GraphError::InvalidInput(format!(
-                    "Duplicate or group-key-conflicting aggregation column: {name}"
-                )));
-            }
-            let values = match function.as_str() {
-                "mean" => self.mean(),
-                "sum" => self.sum(),
-                "min" => self.min(),
-                "max" => self.max(),
-                "std" => self.std(),
-                "count" => self.count().into_iter().map(|n| n as f64).collect(),
-                _ => {
-                    return Err(GraphError::InvalidInput(format!(
-                        "Unknown aggregation function: {function}"
-                    )))
-                }
-            };
-            columns.insert(name.clone(), Self::stored_aggregation(values)?);
-        }
-        BaseTable::from_columns(columns)
+        self.materialize_aggregations(spec, |function| {
+            self.arrays
+                .iter()
+                .map(|array| reduce_numeric(array.as_slice(), function))
+                .collect()
+        })
     }
 }
 
