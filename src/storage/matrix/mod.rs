@@ -10,6 +10,7 @@
 mod complex_eigen;
 pub mod conversions;
 mod decomposition;
+mod decomposition_derivatives;
 mod dot_product;
 mod factorization;
 mod least_squares;

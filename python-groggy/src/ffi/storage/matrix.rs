@@ -2047,6 +2047,23 @@ impl PyGraphMatrix {
         Py::new(py, PyGraphMatrix { inner: l_matrix })
     }
 
+    /// Cholesky directional derivative for a symmetric input tangent.
+    fn cholesky_jvp(&self, py: Python, tangent: &Self) -> PyResult<Py<Self>> {
+        let inner = self
+            .inner
+            .cholesky_jvp(&tangent.inner)
+            .map_err(|e| PyRuntimeError::new_err(format!("Cholesky JVP failed: {:?}", e)))?;
+        Py::new(py, Self { inner })
+    }
+    /// Cholesky pullback; returns a symmetric Frobenius input gradient.
+    fn cholesky_vjp(&self, py: Python, cotangent: &Self) -> PyResult<Py<Self>> {
+        let inner = self
+            .inner
+            .cholesky_vjp(&cotangent.inner)
+            .map_err(|e| PyRuntimeError::new_err(format!("Cholesky VJP failed: {:?}", e)))?;
+        Py::new(py, Self { inner })
+    }
+
     /// Eigenvalue decomposition: A * V = V * Λ
     /// Returns tuple of (eigenvalues, eigenvectors)
     fn eigenvalue_decomposition(&self, py: Python) -> PyResult<(PyObject, Py<Self>)> {

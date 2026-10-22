@@ -2119,6 +2119,47 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(lower)
     }
 
+    /// Directional derivative of Cholesky for a symmetric input tangent.
+    pub fn cholesky_jvp(&self, tangent: &Self) -> GraphResult<Self> {
+        self.cholesky_derivative(tangent, false)
+    }
+    /// Pull back a factor cotangent to a symmetric Frobenius input gradient.
+    /// Off-diagonal entries contribute twice when a symmetric pair is varied together.
+    pub fn cholesky_vjp(&self, cotangent: &Self) -> GraphResult<Self> {
+        self.cholesky_derivative(cotangent, true)
+    }
+    fn cholesky_derivative(&self, direction: &Self, reverse: bool) -> GraphResult<Self> {
+        let (rows, cols) = self.shape();
+        if rows != cols || direction.shape() != self.shape() {
+            return Err(GraphError::InvalidInput(
+                "Cholesky derivative requires square input and a matching direction".into(),
+            ));
+        }
+        if self
+            .row_labels
+            .as_ref()
+            .is_some_and(|labels| labels.len() != rows)
+        {
+            return Err(GraphError::InvalidInput(
+                "Cholesky row labels do not match shape".into(),
+            ));
+        }
+        let values = super::decomposition_derivatives::cholesky(
+            self.decomposition_input()?,
+            direction.decomposition_input()?,
+            rows,
+            reverse,
+        )?;
+        let mut result = Self::factor_matrix(values, rows, cols)?;
+        result.row_labels = self.row_labels.clone();
+        result.column_names = if reverse {
+            self.column_names.clone()
+        } else {
+            (0..rows).map(|i| format!("chol_{i}")).collect()
+        };
+        Ok(result)
+    }
+
     /// General real-input eigendecomposition with dedicated real/imaginary outputs.
     /// Reject nonconvergence, defective/unresolved bases and failed residual checks.
     pub fn complex_eigenvalue_decomposition(&self) -> GraphResult<ComplexEigenResult<T>> {
