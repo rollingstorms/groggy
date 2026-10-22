@@ -388,6 +388,10 @@ impl PyNumArray {
         }
     }
 
+    pub(crate) fn to_float64_exact(&self) -> PyResult<NumArray<f64>> {
+        NumArray::from_inputs(&self.inner.inputs(), ConversionPolicy::Exact).map_err(numeric_error)
+    }
+
     /// Get length for backward compatibility
     pub fn len(&self) -> usize {
         self.inner.len()

@@ -154,102 +154,49 @@ fn array(values: Vec<PyObject>) -> PyResult<PyObject> {
 #[pyfunction]
 #[pyo3(signature = (data))]
 fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
-    // Check if data is a list of lists (nested structure)
-    if let Ok(nested_lists) = data.extract::<Vec<Vec<PyObject>>>(py) {
-        // Convert nested lists to core NumArrays for GraphMatrix
-        let mut core_arrays = Vec::new();
-        for row in nested_lists {
-            // Convert PyObjects to f64 values
-            let mut f64_values = Vec::new();
-            for py_obj in row {
-                if let Ok(f_val) = py_obj.extract::<f64>(py) {
-                    f64_values.push(f_val);
-                } else if let Ok(i_val) = py_obj.extract::<i64>(py) {
-                    f64_values.push(i_val as f64);
-                } else if let Ok(b_val) = py_obj.extract::<bool>(py) {
-                    f64_values.push(if b_val { 1.0 } else { 0.0 });
-                } else {
-                    f64_values.push(0.0); // Default for non-numeric
-                }
-            }
-            // Create NumArray<f64> directly
-            let num_array = ::groggy::storage::array::NumArray::new(f64_values);
-            core_arrays.push(num_array);
-        }
-
-        // Create core GraphMatrix directly
-        let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                "Failed to create matrix: {:?}",
-                e
-            ))
-        })?;
-
-        Ok(PyGraphMatrix { inner: matrix })
+    use ::groggy::storage::{
+        array::{numeric_arithmetic::ConversionPolicy, NumArray},
+        GraphMatrix,
+    };
+    use ffi::storage::{
+        array::PyBaseArray,
+        num_array::{input, PyNumArray},
+    };
+    let items = data.extract::<Vec<PyObject>>(py).map_err(|_| {
+        pyo3::exceptions::PyTypeError::new_err(
+            "matrix expects numeric columns, a flat numeric list, or BaseArray/NumArray columns",
+        )
+    })?;
+    if !items.is_empty()
+        && items.iter().all(|item| {
+            item.extract::<PyRef<PyBaseArray>>(py).is_ok()
+                || item.extract::<PyRef<PyNumArray>>(py).is_ok()
+        })
+    {
+        return PyGraphMatrix::new(py, items);
     }
-    // Check if data is a flat list (single row)
-    else if let Ok(flat_list) = data.extract::<Vec<PyObject>>(py) {
-        // Convert single list to single-row matrix
-        let mut f64_values = Vec::new();
-        for py_obj in flat_list {
-            if let Ok(f_val) = py_obj.extract::<f64>(py) {
-                f64_values.push(f_val);
-            } else if let Ok(i_val) = py_obj.extract::<i64>(py) {
-                f64_values.push(i_val as f64);
-            } else if let Ok(b_val) = py_obj.extract::<bool>(py) {
-                f64_values.push(if b_val { 1.0 } else { 0.0 });
-            } else {
-                f64_values.push(0.0); // Default for non-numeric
-            }
-        }
-        let num_array = ::groggy::storage::array::NumArray::new(f64_values);
-        let core_arrays = vec![num_array];
-
-        // Create core GraphMatrix directly
-        let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                "Failed to create matrix: {:?}",
-                e
-            ))
-        })?;
-
-        Ok(PyGraphMatrix { inner: matrix })
-    }
-    // Check if data is a list of BaseArrays
-    else if let Ok(array_list) = data.extract::<Vec<Py<PyBaseArray>>>(py) {
-        // Convert PyBaseArrays to NumArrays for GraphMatrix
-        let mut core_arrays = Vec::new();
-        for py_array_ref in array_list.iter() {
-            let py_array = py_array_ref.borrow(py);
-            // Convert BaseArray<AttrValue> to NumArray<f64>
-            let mut f64_values = Vec::new();
-            for attr_value in py_array.inner.iter() {
-                match attr_value {
-                    ::groggy::AttrValue::Float(f) => f64_values.push(*f as f64),
-                    ::groggy::AttrValue::Int(i) => f64_values.push(*i as f64),
-                    ::groggy::AttrValue::SmallInt(i) => f64_values.push(*i as f64),
-                    ::groggy::AttrValue::Bool(b) => f64_values.push(if *b { 1.0 } else { 0.0 }),
-                    _ => f64_values.push(0.0),
-                }
-            }
-            let num_array = ::groggy::storage::array::NumArray::new(f64_values);
-            core_arrays.push(num_array);
-        }
-
-        // Create core GraphMatrix
-        let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                "Failed to create matrix: {:?}",
-                e
-            ))
-        })?;
-
-        Ok(PyGraphMatrix::from_graph_matrix(matrix))
-    } else {
-        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "matrix() expects nested lists [[1,2],[3,4]], flat list [1,2,3,4], or list of BaseArrays"
-        ))
-    }
+    let columns = items
+        .iter()
+        .map(|item| item.extract::<Vec<PyObject>>(py))
+        .collect::<PyResult<Vec<_>>>();
+    let columns = match columns {
+        Ok(columns) => columns,
+        Err(_) => vec![items],
+    };
+    let arrays = columns
+        .into_iter()
+        .map(|column| {
+            let values = column
+                .iter()
+                .map(|value| input(value.as_ref(py)))
+                .collect::<PyResult<Vec<_>>>()?;
+            NumArray::<f64>::from_inputs(&values, ConversionPolicy::Exact)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    GraphMatrix::from_arrays(arrays)
+        .map(PyGraphMatrix::from_graph_matrix)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
 /// Create a GraphTable from dictionary or arrays with column names

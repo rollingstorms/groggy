@@ -150,17 +150,23 @@ impl<T: NumericType> GraphMatrix<T> {
         row_pointers: Vec<usize>,
     ) -> GraphResult<Self> {
         UnifiedMatrix::from_csr(rows, cols, values, col_indices, row_pointers)
-            .map(Self::from_storage)
             .map_err(|e| GraphError::InvalidInput(format!("CSR construction failed: {e:?}")))
+            .and_then(Self::try_from_storage)
     }
 
     /// Create GraphMatrix from UnifiedMatrix storage
     pub fn from_storage(storage: UnifiedMatrix<T>) -> Self {
+        Self::try_from_storage(storage).unwrap_or_else(|error| {
+            panic!("GraphMatrix storage metadata allocation failed: {error}; use try_from_storage")
+        })
+    }
+    /// Checked storage wrapper including column-label allocation.
+    pub fn try_from_storage(storage: UnifiedMatrix<T>) -> GraphResult<Self> {
         let shape = storage.shape();
         let (_rows, cols) = (shape.rows, shape.cols);
-        let column_names = (0..cols).map(|i| format!("col_{}", i)).collect();
+        let column_names = Self::default_column_names(cols)?;
 
-        Self {
+        Ok(Self {
             storage,
             column_names,
             row_labels: None,
@@ -170,16 +176,32 @@ impl<T: NumericType> GraphMatrix<T> {
             memory_pool: Arc::new(AdvancedMemoryPool::new()),
             properties: None,
             graph: None,
-        }
+        })
     }
 
-    /// Create zeros matrix
+    fn default_column_names(cols: usize) -> GraphResult<Vec<String>> {
+        let mut names = Vec::new();
+        names.try_reserve_exact(cols).map_err(|e| {
+            GraphError::InvalidInput(format!("Column label allocation failed: {e}"))
+        })?;
+        for col in 0..cols {
+            names.push(format!("col_{col}"));
+        }
+        Ok(names)
+    }
+
+    /// Checked zero constructor, preserving requested shape or returning an error.
+    pub fn try_zeros(rows: usize, cols: usize) -> GraphResult<Self> {
+        UnifiedMatrix::zeros(rows, cols)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
+            .and_then(Self::try_from_storage)
+    }
+    /// Legacy infallible constructor. Panics on invalid/unallocatable shapes;
+    /// use try_zeros when dimensions originate outside the program.
     pub fn zeros(rows: usize, cols: usize) -> Self {
-        let storage = UnifiedMatrix::zeros(rows, cols).unwrap_or_else(|_| {
-            // Fallback to minimal matrix on error
-            UnifiedMatrix::new(1, 1).expect("Failed to create minimal matrix")
-        });
-        Self::from_storage(storage)
+        Self::try_zeros(rows, cols).unwrap_or_else(|error| {
+            panic!("GraphMatrix::zeros failed: {error}; use try_zeros for fallible construction")
+        })
     }
 
     /// Create a zero matrix with specified dimensions and type (FFI compatibility)
@@ -192,13 +214,17 @@ impl<T: NumericType> GraphMatrix<T> {
         Self::zeros(rows, cols)
     }
 
-    /// Create ones matrix
+    /// Checked one constructor.
+    pub fn try_ones(rows: usize, cols: usize) -> GraphResult<Self> {
+        UnifiedMatrix::ones(rows, cols)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
+            .and_then(Self::try_from_storage)
+    }
+    /// Legacy infallible constructor; use try_ones for fallible construction.
     pub fn ones(rows: usize, cols: usize) -> Self {
-        let storage = UnifiedMatrix::ones(rows, cols).unwrap_or_else(|_| {
-            // Fallback to minimal matrix on error
-            UnifiedMatrix::new(1, 1).expect("Failed to create minimal matrix")
-        });
-        Self::from_storage(storage)
+        Self::try_ones(rows, cols).unwrap_or_else(|error| {
+            panic!("GraphMatrix::ones failed: {error}; use try_ones for fallible construction")
+        })
     }
 
     /// Check whether the matrix contains any data
@@ -207,11 +233,17 @@ impl<T: NumericType> GraphMatrix<T> {
         shape.rows == 0 || shape.cols == 0
     }
 
-    /// Create a square identity matrix.
+    /// Checked square identity constructor.
+    pub fn try_eye(size: usize) -> GraphResult<Self> {
+        UnifiedMatrix::identity(size)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
+            .and_then(Self::try_from_storage)
+    }
+    /// Legacy infallible identity constructor; use try_eye or identity for errors.
     pub fn eye(size: usize) -> Self {
-        let storage = UnifiedMatrix::identity(size)
-            .unwrap_or_else(|_| UnifiedMatrix::new(1, 1).expect("Failed to create minimal matrix"));
-        Self::from_storage(storage)
+        Self::try_eye(size).unwrap_or_else(|error| {
+            panic!("GraphMatrix::eye failed: {error}; use try_eye for fallible construction")
+        })
     }
 
     /// Get matrix shape
@@ -237,12 +269,12 @@ impl<T: NumericType> GraphMatrix<T> {
             let col_names = if rows == cols {
                 node_ids.iter().map(|id| format!("node_{}", id)).collect()
             } else {
-                (0..cols).map(|i| format!("col_{}", i)).collect()
+                Self::default_column_names(cols)?
             };
             let row_labels = node_ids.iter().map(|id| format!("node_{}", id)).collect();
             (col_names, Some(row_labels))
         } else {
-            let col_names = (0..cols).map(|i| format!("col_{}", i)).collect();
+            let col_names = Self::default_column_names(cols)?;
             (col_names, None)
         };
 
@@ -769,11 +801,7 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Create an identity matrix of given size
     pub fn identity(size: usize) -> GraphResult<Self> {
-        UnifiedMatrix::identity(size)
-            .map(Self::from_storage)
-            .map_err(|error| {
-                GraphError::InvalidInput(format!("Identity matrix creation failed: {error:?}"))
-            })
+        Self::try_eye(size)
     }
 
     /// Get element at specific row and column
@@ -1072,10 +1100,20 @@ impl<T: NumericType> GraphMatrix<T> {
         self.to_dense()
     }
 
+    /// Convert owned logical values to attributes with explicit precision policy.
+    pub fn to_attribute_array(
+        &self,
+        policy: crate::storage::array::numeric_arithmetic::ConversionPolicy,
+    ) -> GraphResult<crate::storage::array::BaseArray<AttrValue>> {
+        let values = crate::storage::array::NumArray::new(self.to_vec()?)
+            .to_attributes_with_policy(policy)?;
+        Ok(crate::storage::array::BaseArray::new(values))
+    }
+
     /// Create GraphMatrix from arrays (legacy compatibility method)
     pub fn from_arrays(arrays: Vec<crate::storage::array::NumArray<T>>) -> GraphResult<Self> {
         if arrays.is_empty() {
-            return Ok(Self::zeros(0, 0));
+            return Self::try_zeros(0, 0);
         }
 
         let cols = arrays.len();
@@ -1094,7 +1132,7 @@ impl<T: NumericType> GraphMatrix<T> {
         }
 
         // Create the matrix and populate it column by column
-        let mut matrix = Self::zeros(rows, cols);
+        let mut matrix = Self::try_zeros(rows, cols)?;
         for (col_idx, array) in arrays.iter().enumerate() {
             for (row_idx, value) in array.iter().enumerate() {
                 matrix.set(row_idx, col_idx, *value)?;
@@ -2548,7 +2586,7 @@ impl<T: NumericType> GraphMatrix<T> {
         let storage = UnifiedMatrix::zeros(rows, cols).map_err(|e| {
             GraphError::InvalidInput(format!("Arithmetic allocation failed: {e:?}"))
         })?;
-        Ok(Self::from_storage(storage))
+        Self::try_from_storage(storage)
     }
 
     // Arithmetic results own storage and retain positional labels.

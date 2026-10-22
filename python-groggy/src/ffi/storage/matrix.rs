@@ -7,10 +7,8 @@
 #[path = "matrix_compute.rs"]
 mod computation;
 
-use groggy::storage::array::BaseArray;
 use groggy::storage::array::NumArray;
 use groggy::storage::GraphMatrix;
-use groggy::types::AttrValue as RustAttrValue;
 use pyo3::exceptions::{
     PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
     PyValueError,
@@ -88,62 +86,19 @@ impl PyGraphMatrix {
         let mut core_arrays: Vec<NumArray<f64>> = Vec::new();
 
         for (i, array_obj) in arrays.iter().enumerate() {
-            // Try NumArray first (preferred for matrices)
             if let Ok(num_array) = array_obj.extract::<PyRef<PyNumArray>>(py) {
-                // Convert to f64 array for matrix use
-                if let Some(f64_array) = num_array.as_float64_array() {
-                    core_arrays.push(f64_array.clone());
-                } else {
-                    // Convert other types to f64
-                    let f64_values = num_array.to_float64_vec();
-                    let f64_array = NumArray::new(f64_values);
-                    core_arrays.push(f64_array);
-                }
-            }
-            // Convert BaseArray to NumArray<f64>
-            else if let Ok(base_array) = array_obj.extract::<PyRef<PyBaseArray>>(py) {
-                let f64_values: Vec<f64> = base_array
-                    .inner
-                    .iter()
-                    .map(|attr_value| match attr_value {
-                        RustAttrValue::Float(f) => *f as f64,
-                        RustAttrValue::Int(i) => *i as f64,
-                        RustAttrValue::Bool(b) => {
-                            if *b {
-                                1.0
-                            } else {
-                                0.0
-                            }
-                        }
-                        _ => 0.0, // Default for non-numeric types
-                    })
-                    .collect();
-                core_arrays.push(NumArray::new(f64_values));
-            }
-            // Convert legacy PyGraphArray to NumArray<f64>
-            else if let Ok(base_array) = array_obj.extract::<PyRef<PyBaseArray>>(py) {
-                let f64_values: Vec<f64> = base_array
-                    .inner
-                    .data()
-                    .iter()
-                    .map(|attr_value| match attr_value {
-                        RustAttrValue::Float(f) => *f as f64,
-                        RustAttrValue::Int(i) => *i as f64,
-                        RustAttrValue::Bool(b) => {
-                            if *b {
-                                1.0
-                            } else {
-                                0.0
-                            }
-                        }
-                        _ => 0.0, // Default for non-numeric types
-                    })
-                    .collect();
-                core_arrays.push(NumArray::new(f64_values));
+                core_arrays.push(num_array.to_float64_exact()?);
+            } else if let Ok(base_array) = array_obj.extract::<PyRef<PyBaseArray>>(py) {
+                core_arrays.push(
+                    NumArray::<f64>::from_attributes(
+                        base_array.inner.data(),
+                        groggy::storage::array::numeric_arithmetic::ConversionPolicy::Exact,
+                    )
+                    .map_err(|e| PyTypeError::new_err(e.to_string()))?,
+                );
             } else {
                 return Err(PyTypeError::new_err(format!(
-                    "Array {} must be BaseArray, NumArray, or GraphArray",
-                    i
+                    "Array {i} must be BaseArray or NumArray"
                 )));
             }
         }
@@ -184,21 +139,12 @@ impl PyGraphMatrix {
         cols: usize,
         dtype: Option<&str>,
     ) -> PyResult<Py<Self>> {
-        // Parse dtype string to AttrValueType
-        let attr_type = match dtype.unwrap_or("float") {
-            "int" | "int64" => groggy::AttrValueType::Int,
-            "float" | "float64" | "f64" => groggy::AttrValueType::Float,
-            "bool" => groggy::AttrValueType::Bool,
-            "str" | "string" | "text" => groggy::AttrValueType::Text,
-            _ => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported dtype: {}",
-                    dtype.unwrap_or("unknown")
-                )))
-            }
-        };
-
-        let matrix = GraphMatrix::zeros(rows, cols);
+        match dtype.unwrap_or("float64") {
+            "float"|"float64"|"f64"=>{},
+            value=>return Err(PyValueError::new_err(format!("Python GraphMatrix stores float64; unsupported dtype {value}. Use a typed native matrix or NumArray for other dtypes"))),
+        }
+        let matrix =
+            GraphMatrix::try_zeros(rows, cols).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Py::new(py, Self { inner: matrix })
     }
 
@@ -211,21 +157,12 @@ impl PyGraphMatrix {
         cols: usize,
         dtype: Option<&str>,
     ) -> PyResult<Py<Self>> {
-        // Parse dtype string to AttrValueType (for consistency with zeros)
-        let _attr_type = match dtype.unwrap_or("float") {
-            "int" | "int64" => groggy::AttrValueType::Int,
-            "float" | "float64" | "f64" => groggy::AttrValueType::Float,
-            "bool" => groggy::AttrValueType::Bool,
-            "str" | "string" | "text" => groggy::AttrValueType::Text,
-            _ => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported dtype: {}",
-                    dtype.unwrap_or("unknown")
-                )))
-            }
-        };
-
-        let matrix = GraphMatrix::ones(rows, cols);
+        match dtype.unwrap_or("float64") {
+            "float"|"float64"|"f64"=>{},
+            value=>return Err(PyValueError::new_err(format!("Python GraphMatrix stores float64; unsupported dtype {value}. Use a typed native matrix or NumArray for other dtypes"))),
+        }
+        let matrix =
+            GraphMatrix::try_ones(rows, cols).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Py::new(py, Self { inner: matrix })
     }
 
@@ -1563,124 +1500,43 @@ impl PyGraphMatrix {
         rows: usize,
         cols: usize,
     ) -> PyResult<Self> {
-        let total_elements = rows * cols;
-        let array_len = num_array.len();
-
-        if total_elements == 0 {
-            return Err(PyValueError::new_err(
-                "Cannot create matrix with zero rows or columns",
-            ));
-        }
-
-        if array_len != total_elements {
-            return Err(PyValueError::new_err(format!(
-                "Array length {} does not match matrix dimensions {}×{} = {}",
-                array_len, rows, cols, total_elements
-            )));
-        }
-
-        // Reshape the flattened array into column vectors
-        let mut columns = Vec::new();
-
-        for col_idx in 0..cols {
-            let mut column_values = Vec::new();
-
-            // Extract values for this column (row-major to column-major conversion)
-            for row_idx in 0..rows {
-                let flat_index = row_idx * cols + col_idx;
-                let value = num_array.get_f64(flat_index).ok_or_else(|| {
-                    PyIndexError::new_err(format!("Index {} out of bounds", flat_index))
-                })?;
-                column_values.push(value);
-            }
-
-            columns.push(NumArray::new(column_values));
-        }
-
-        let matrix = GraphMatrix::from_arrays(columns)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create matrix: {}", e)))?;
-
-        Ok(PyGraphMatrix { inner: matrix })
+        let values = num_array.to_float64_exact()?;
+        let inner = GraphMatrix::from_row_major_data(values.as_slice().to_vec(), rows, cols, None)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(Self { inner })
     }
 
     /// Convert matrix to BaseArray containing all values as AttrValues
-    pub fn to_base_array(&self, py: Python) -> PyResult<PyObject> {
-        let (rows, cols) = self.inner.shape();
-        let mut attr_values = Vec::new();
-
-        // Collect all matrix values as AttrValue::Float
-        for row_idx in 0..rows {
-            for col_idx in 0..cols {
-                match self.inner.get(row_idx, col_idx) {
-                    Some(value) => attr_values.push(RustAttrValue::Float(value as f32)),
-                    None => attr_values.push(RustAttrValue::Null),
-                }
-            }
-        }
-
-        let base_array = BaseArray::new(attr_values);
-        let py_base = PyBaseArray { inner: base_array };
-        Ok(py_base.into_py(py))
+    #[pyo3(signature=(*,exact=false))]
+    pub fn to_base_array(&self, py: Python, exact: bool) -> PyResult<PyObject> {
+        use groggy::storage::array::numeric_arithmetic::ConversionPolicy;
+        let inner = self
+            .inner
+            .to_attribute_array(if exact {
+                ConversionPolicy::Exact
+            } else {
+                ConversionPolicy::Round
+            })
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyBaseArray { inner }.into_py(py))
     }
 
-    /// Create matrix from BaseArray containing numeric values
+    /// Create matrix from numeric attribute values, rejecting missing/nonnumeric cells.
     #[staticmethod]
     pub fn from_base_array(
-        py: Python,
+        _py: Python,
         base_array: &PyBaseArray,
         rows: usize,
         cols: usize,
     ) -> PyResult<Self> {
-        let total_elements = rows * cols;
-        let array_len = base_array.inner.len();
-
-        if total_elements == 0 {
-            return Err(PyValueError::new_err(
-                "Cannot create matrix with zero rows or columns",
-            ));
-        }
-
-        if array_len != total_elements {
-            return Err(PyValueError::new_err(format!(
-                "Array length {} does not match matrix dimensions {}×{} = {}",
-                array_len, rows, cols, total_elements
-            )));
-        }
-
-        // First, try to convert BaseArray to numeric values
-        let numeric_values: Result<Vec<f64>, String> = base_array
-            .inner
-            .iter()
-            .map(|attr_val| match attr_val {
-                RustAttrValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
-                RustAttrValue::SmallInt(i) => Ok(*i as f64),
-                RustAttrValue::Int(i) => Ok(*i as f64),
-                RustAttrValue::Float(f) => Ok(*f as f64),
-                RustAttrValue::Null => Ok(0.0), // Default null to 0.0
-                other => Err(format!("Cannot convert {:?} to numeric value", other)),
-            })
-            .collect();
-
-        let values = numeric_values.map_err(PyTypeError::new_err)?;
-
-        // Reshape into column vectors (row-major to column-major)
-        let mut columns = Vec::new();
-
-        for col_idx in 0..cols {
-            let mut column_values = Vec::new();
-
-            for row_idx in 0..rows {
-                let flat_index = row_idx * cols + col_idx;
-                column_values.push(values[flat_index]);
-            }
-
-            columns.push(NumArray::new(column_values));
-        }
-
-        let matrix = GraphMatrix::from_arrays(columns)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create matrix: {}", e)))?;
-
-        Ok(PyGraphMatrix { inner: matrix })
+        let values = NumArray::<f64>::from_attributes(
+            base_array.inner.data(),
+            groggy::storage::array::numeric_arithmetic::ConversionPolicy::Exact,
+        )
+        .map_err(|e| PyTypeError::new_err(e.to_string()))?;
+        let inner = GraphMatrix::from_row_major_data(values.as_slice().to_vec(), rows, cols, None)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(Self { inner })
     }
 
     /// Get degree matrix from adjacency matrix

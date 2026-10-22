@@ -201,6 +201,15 @@ pub fn divide(a: &[NumericInput], b: &[NumericInput]) -> GraphResult<NumArray<f6
     Ok(NumArray::new(values))
 }
 impl<T: NumericType> NumArray<T> {
+    /// Strict numeric attribute conversion with an explicit precision policy.
+    pub fn from_attributes(
+        values: &[crate::types::AttrValue],
+        policy: ConversionPolicy,
+    ) -> GraphResult<Self> {
+        let (_, values) = attribute_inputs(values)?;
+        Self::from_inputs(&values, policy)
+    }
+
     /// Construct with an explicit conversion/rounding policy.
     pub fn from_inputs(values: &[NumericInput], policy: ConversionPolicy) -> GraphResult<Self> {
         Ok(Self::new(
