@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 use groggy::storage::array::numeric_arithmetic::{
     self as numeric, ConversionPolicy, NumericBinary, NumericInput,
 };
-fn input(value: &PyAny) -> PyResult<NumericInput> {
+pub(crate) fn input(value: &PyAny) -> PyResult<NumericInput> {
     if value.is_instance_of::<pyo3::types::PyBool>() {
         return Ok(NumericInput::Bool(value.extract()?));
     }

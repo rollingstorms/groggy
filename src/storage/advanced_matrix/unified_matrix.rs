@@ -299,19 +299,6 @@ impl<T: NumericType> UnifiedMatrix<T> {
             .transpose()
     }
 
-    pub(crate) fn sparse_map(&self, operation: impl Fn(T) -> T) -> MatrixResult<Option<Self>> {
-        self.checked_sparse()?
-            .map(|s| s.map(operation).and_then(Self::owned_csr))
-            .transpose()
-    }
-    pub(crate) fn sparse_try_map(
-        &self,
-        operation: impl Fn(T) -> MatrixResult<T>,
-    ) -> MatrixResult<Option<Self>> {
-        self.checked_sparse()?
-            .map(|s| s.try_map(operation).and_then(Self::owned_csr))
-            .transpose()
-    }
     pub(crate) fn sparse_reshape(&self, rows: usize, cols: usize) -> MatrixResult<Option<Self>> {
         self.checked_sparse()?
             .map(|s| s.reshape(rows, cols).and_then(Self::owned_csr))

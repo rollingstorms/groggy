@@ -215,10 +215,10 @@ impl<T: NumericType> SparseMatrix<T> {
         }
         Self::new(rows, cols, self.values.clone(), indices, pointers)
     }
-    pub(crate) fn map(&self, operation: impl Fn(T) -> T) -> MatrixResult<Self> {
-        self.try_map(|value| Ok(operation(value)))
-    }
-    pub(crate) fn try_map(&self, operation: impl Fn(T) -> MatrixResult<T>) -> MatrixResult<Self> {
+    pub(crate) fn try_map_into<U: NumericType>(
+        &self,
+        operation: impl Fn(T) -> MatrixResult<U>,
+    ) -> MatrixResult<SparseMatrix<U>> {
         self.validate()?;
         let count = self
             .shape
@@ -228,16 +228,16 @@ impl<T: NumericType> SparseMatrix<T> {
         let implicit = if self.values.len() < count {
             operation(T::zero())?
         } else {
-            T::zero()
+            U::zero()
         };
         let mut values = Vec::new();
         let mut indices = Vec::new();
         let mut pointers = vec![0];
         for row in 0..self.shape.rows {
-            if implicit == T::zero() {
+            if implicit == U::zero() {
                 for entry in self.row_pointers[row]..self.row_pointers[row + 1] {
                     let value = operation(self.values[entry])?;
-                    if value != T::zero() {
+                    if value != U::zero() {
                         indices.push(self.col_indices[entry]);
                         values.push(value);
                     }
@@ -251,7 +251,7 @@ impl<T: NumericType> SparseMatrix<T> {
                         Ok(entry) => operation(self.values[self.row_pointers[row] + entry])?,
                         Err(_) => implicit,
                     };
-                    if value != T::zero() {
+                    if value != U::zero() {
                         indices.push(col);
                         values.push(value);
                     }
@@ -259,7 +259,7 @@ impl<T: NumericType> SparseMatrix<T> {
             }
             pointers.push(values.len());
         }
-        Self::new(self.shape.rows, self.shape.cols, values, indices, pointers)
+        SparseMatrix::<U>::new(self.shape.rows, self.shape.cols, values, indices, pointers)
     }
     /// Preserve sparse storage; nonfinite scalars can make implicit zeros nonzero.
     pub fn scale(&self, scalar: T) -> MatrixResult<Self> {

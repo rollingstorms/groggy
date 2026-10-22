@@ -46,3 +46,5 @@ preserved separately.
 - 29.49: checked logarithmic matrix powers and corrected noncommuting explicit/automatic derivatives.
 
 - 29.50: actual economy SVD, thin tracked/gradient/spectrum/least-squares consumers and 25-case release receipts.
+
+- 29.51: shared typed maps and checked public math/scalar/comparison/tile/repeat routes.

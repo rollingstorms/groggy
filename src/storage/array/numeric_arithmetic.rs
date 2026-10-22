@@ -426,7 +426,8 @@ pub fn compare_inputs(a: NumericInput, b: NumericInput) -> Option<std::cmp::Orde
         (a, b) => a.as_f64().partial_cmp(&b.as_f64()),
     }
 }
-fn comparison(a: NumericInput, b: NumericInput, op: NumericComparison) -> bool {
+/// Compare one numeric pair, retaining exact integer ordering and IEEE NaNs.
+pub fn comparison(a: NumericInput, b: NumericInput, op: NumericComparison) -> bool {
     use std::cmp::Ordering;
     let order = compare_inputs(a, b);
     match op {

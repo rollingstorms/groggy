@@ -193,3 +193,5 @@ accepted pinned-state model.
 - [x] **29.49 — Matrix powers and noncommuting derivatives.** Logarithmic checked forward powers, recursive JVP/VJP and corrected automatic pullbacks with sparse/empty/label behavior. Native full/focused suites and 364 rebuilt Python regressions pass. See docs/api/matrix-powers.md.
 
 - [x] **29.50 — True economy SVD.** Thin factors avoid full square null bases; tracked/derivative/rank/condition/least-squares consumers use thin indexing and positional identity. Native full suites and 376 rebuilt Python regressions pass; 25-case release corpus records allocation/time evidence. See docs/api/matrix-economy-svd.md.
+
+- [x] **29.51 — Unified public matrix helpers.** Typed maps unify casts/math/scalars/comparison masks; Python scalar_multiply/abs/comparisons delegate to Rust; tile/repeat retain checked empty/sparse/identity behavior. Full native suites and 382 rebuilt Python tests pass. See docs/api/matrix-helper-operations.md.

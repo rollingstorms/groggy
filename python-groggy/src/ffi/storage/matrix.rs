@@ -1312,181 +1312,37 @@ impl PyGraphMatrix {
     /// Absolute value operator (abs)
     /// Implements: abs(matrix) (element-wise absolute value)
     fn __abs__(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        // Apply element-wise absolute value
-        let (rows, cols) = self.inner.shape();
-        let mut result_arrays = Vec::new();
+        self.abs(py)
+    }
 
-        for col in 0..cols {
-            if let Some(column) = self.inner.get_column(col) {
-                let mut abs_values = Vec::new();
-                for value in column.iter() {
-                    abs_values.push(value.abs());
-                }
-                result_arrays.push(groggy::storage::array::NumArray::new(abs_values));
-            } else {
-                return Err(PyRuntimeError::new_err("Failed to get matrix column"));
-            }
-        }
-
-        let result_matrix =
-            groggy::storage::GraphMatrix::from_arrays(result_arrays).map_err(|e| {
-                PyRuntimeError::new_err(format!("Absolute value operation failed: {:?}", e))
-            })?;
-
-        Py::new(
+    /// Elementwise comparisons retain the existing floating 0/1 matrix output.
+    fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        self.comparison_result(
             py,
-            PyGraphMatrix {
-                inner: result_matrix,
-            },
+            other,
+            groggy::storage::array::numeric_arithmetic::NumericComparison::Greater,
         )
     }
-
-    /// Comparison operator (>)
-    /// Implements: matrix > scalar (element-wise comparison)
-    fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        if let Ok(scalar) = other.extract::<f64>() {
-            let (rows, cols) = self.inner.shape();
-            let mut result_arrays = Vec::new();
-
-            for col in 0..cols {
-                if let Some(column) = self.inner.get_column(col) {
-                    let mut bool_values = Vec::new();
-                    for value in column.iter() {
-                        bool_values.push(if *value > scalar { 1.0 } else { 0.0 });
-                    }
-                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
-                } else {
-                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
-                }
-            }
-
-            let result_matrix =
-                groggy::storage::GraphMatrix::from_arrays(result_arrays).map_err(|e| {
-                    PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e))
-                })?;
-
-            return Py::new(
-                py,
-                PyGraphMatrix {
-                    inner: result_matrix,
-                },
-            );
-        }
-
-        Err(PyTypeError::new_err(
-            "Comparison operations only support scalar values",
-        ))
-    }
-
-    /// Comparison operator (<)
-    /// Implements: matrix < scalar (element-wise comparison)
     fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        if let Ok(scalar) = other.extract::<f64>() {
-            let (rows, cols) = self.inner.shape();
-            let mut result_arrays = Vec::new();
-
-            for col in 0..cols {
-                if let Some(column) = self.inner.get_column(col) {
-                    let mut bool_values = Vec::new();
-                    for value in column.iter() {
-                        bool_values.push(if *value < scalar { 1.0 } else { 0.0 });
-                    }
-                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
-                } else {
-                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
-                }
-            }
-
-            let result_matrix =
-                groggy::storage::GraphMatrix::from_arrays(result_arrays).map_err(|e| {
-                    PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e))
-                })?;
-
-            return Py::new(
-                py,
-                PyGraphMatrix {
-                    inner: result_matrix,
-                },
-            );
-        }
-
-        Err(PyTypeError::new_err(
-            "Comparison operations only support scalar values",
-        ))
+        self.comparison_result(
+            py,
+            other,
+            groggy::storage::array::numeric_arithmetic::NumericComparison::Less,
+        )
     }
-
-    /// Comparison operator (>=)
-    /// Implements: matrix >= scalar (element-wise comparison)
     fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        if let Ok(scalar) = other.extract::<f64>() {
-            let (rows, cols) = self.inner.shape();
-            let mut result_arrays = Vec::new();
-
-            for col in 0..cols {
-                if let Some(column) = self.inner.get_column(col) {
-                    let mut bool_values = Vec::new();
-                    for value in column.iter() {
-                        bool_values.push(if *value >= scalar { 1.0 } else { 0.0 });
-                    }
-                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
-                } else {
-                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
-                }
-            }
-
-            let result_matrix =
-                groggy::storage::GraphMatrix::from_arrays(result_arrays).map_err(|e| {
-                    PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e))
-                })?;
-
-            return Py::new(
-                py,
-                PyGraphMatrix {
-                    inner: result_matrix,
-                },
-            );
-        }
-
-        Err(PyTypeError::new_err(
-            "Comparison operations only support scalar values",
-        ))
+        self.comparison_result(
+            py,
+            other,
+            groggy::storage::array::numeric_arithmetic::NumericComparison::GreaterEqual,
+        )
     }
-
-    /// Comparison operator (<=)
-    /// Implements: matrix <= scalar (element-wise comparison)
     fn __le__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        if let Ok(scalar) = other.extract::<f64>() {
-            let (rows, cols) = self.inner.shape();
-            let mut result_arrays = Vec::new();
-
-            for col in 0..cols {
-                if let Some(column) = self.inner.get_column(col) {
-                    let mut bool_values = Vec::new();
-                    for value in column.iter() {
-                        bool_values.push(if *value <= scalar { 1.0 } else { 0.0 });
-                    }
-                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
-                } else {
-                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
-                }
-            }
-
-            let result_matrix =
-                groggy::storage::GraphMatrix::from_arrays(result_arrays).map_err(|e| {
-                    PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e))
-                })?;
-
-            return Py::new(
-                py,
-                PyGraphMatrix {
-                    inner: result_matrix,
-                },
-            );
-        }
-
-        Err(PyTypeError::new_err(
-            "Comparison operations only support scalar values",
-        ))
+        self.comparison_result(
+            py,
+            other,
+            groggy::storage::array::numeric_arithmetic::NumericComparison::LessEqual,
+        )
     }
 
     // === NEURAL NETWORK OPERATIONS ===
@@ -1523,14 +1379,11 @@ impl PyGraphMatrix {
         crate::ffi::neural::activations::gelu(py, self)
     }
 
-    // === PLACEHOLDER OPERATIONS ===
-    // These will be implemented once core matrix operations are stable
-
-    /// Placeholder for scalar operations
+    /// Native checked scalar multiplication.
     fn scalar_multiply(&self, py: Python, scalar: f64) -> PyResult<Py<PyGraphMatrix>> {
-        Err(PyNotImplementedError::new_err(
-            "Scalar operations will be implemented in next iteration",
-        ))
+        let inner = computation::run(py, [&self.inner], move |[a]| a.scalar_multiply(scalar))
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
     }
 
     // ========================================================================
@@ -2506,6 +2359,20 @@ impl PyGraphMatrix {
 }
 
 impl PyGraphMatrix {
+    fn comparison_result(
+        &self,
+        py: Python,
+        other: &PyAny,
+        op: groggy::storage::array::numeric_arithmetic::NumericComparison,
+    ) -> PyResult<Py<PyGraphMatrix>> {
+        let scalar = crate::ffi::storage::num_array::input(other)?;
+        let inner = computation::run(py, [&self.inner], move |[a]| {
+            a.comparison_mask(scalar, op)?.cast::<f64>()
+        })
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+
     /// Create PyGraphMatrix from core GraphMatrix
     pub fn from_graph_matrix(matrix: GraphMatrix) -> Self {
         Self { inner: matrix }

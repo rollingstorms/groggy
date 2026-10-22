@@ -69,20 +69,34 @@ impl<T: NumericType> UnifiedMatrix<T> {
         }
         Self::from_data(values, rows, cols)
     }
-    /// Checked owned elementwise map; zero-preserving CSR transforms stay sparse.
-    pub fn try_map_elementwise(
+    /// Fallible typed map with canonical CSR and checked logical layouts.
+    pub fn try_map_into<U: NumericType>(
         &self,
-        operation: impl Fn(T) -> MatrixResult<T>,
-    ) -> MatrixResult<Self> {
-        if let Some(output) = self.sparse_try_map(&operation)? {
-            return Ok(output);
+        operation: impl Fn(T) -> MatrixResult<U>,
+    ) -> MatrixResult<UnifiedMatrix<U>> {
+        if let Some(sparse) = self.checked_sparse()? {
+            let mapped = sparse.try_map_into(operation)?;
+            return UnifiedMatrix::<U>::from_csr(
+                mapped.shape.rows,
+                mapped.shape.cols,
+                mapped.values,
+                mapped.col_indices,
+                mapped.row_pointers,
+            );
         }
         let output = self
             .to_vec()?
             .into_iter()
             .map(operation)
             .collect::<MatrixResult<Vec<_>>>()?;
-        Self::from_data(output, self.rows(), self.cols())
+        UnifiedMatrix::<U>::from_data(output, self.rows(), self.cols())
+    }
+    /// Checked owned elementwise map; zero-preserving CSR transforms stay sparse.
+    pub fn try_map_elementwise(
+        &self,
+        operation: impl Fn(T) -> MatrixResult<T>,
+    ) -> MatrixResult<Self> {
+        self.try_map_into(operation)
     }
     /// Checked logical values; CSR norms/statistics need only its stored entries.
     pub(crate) fn reduction_values(&self) -> MatrixResult<Cow<'_, [T]>> {

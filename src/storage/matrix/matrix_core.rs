@@ -21,7 +21,6 @@ use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{
     AdvancedMemoryPool, ComputationGraph, NumericType, UnifiedMatrix,
 };
-use crate::storage::array::NumArray;
 use crate::storage::table::BaseTable;
 use crate::types::{AttrValue, NodeId};
 use crate::viz::display::DisplayConfig;
@@ -505,24 +504,6 @@ impl<T: NumericType> GraphMatrix<T> {
 
 // Backward compatibility for f64 GraphMatrix
 impl GraphMatrix<f64> {
-    /// Broadcast a scalar addition without constructing a second matrix.
-    pub fn scalar_add(&self, scalar: f64) -> GraphResult<Self> {
-        self.map_arithmetic(|value| value + scalar)
-    }
-
-    /// Broadcast a scalar subtraction without constructing a second matrix.
-    pub fn scalar_subtract(&self, scalar: f64) -> GraphResult<Self> {
-        self.map_arithmetic(|value| value - scalar)
-    }
-
-    /// Divide values directly; reject either signed zero, allow other IEEE values.
-    pub fn scalar_divide(&self, scalar: f64) -> GraphResult<Self> {
-        if scalar == 0.0 {
-            return Err(GraphError::InvalidInput("Division by zero".into()));
-        }
-        self.map_arithmetic(|value| value / scalar)
-    }
-
     /// Create zeros matrix with f64 type (backward compatibility)
     pub fn zeros_f64(rows: usize, cols: usize) -> Self {
         Self::zeros(rows, cols)
@@ -807,32 +788,15 @@ impl<T: NumericType> GraphMatrix<T> {
         policy: crate::storage::array::numeric_arithmetic::ConversionPolicy,
     ) -> GraphResult<GraphMatrix<U>> {
         use crate::storage::array::numeric_arithmetic::{convert, from_scalar};
-        let (rows, cols) = self.shape();
-        let mut result = if let Some(sparse) = self
+        let storage = self
             .storage
-            .checked_sparse()
-            .map_err(|e| GraphError::InvalidInput(e.to_string()))?
-        {
-            let mut values = Vec::new();
-            let mut indices = Vec::new();
-            let mut pointers = vec![0];
-            for row in 0..rows {
-                for entry in sparse.row_pointers[row]..sparse.row_pointers[row + 1] {
-                    let value = convert::<U>(from_scalar(sparse.values[entry]), policy)?;
-                    if value != U::zero() {
-                        values.push(value);
-                        indices.push(sparse.col_indices[entry]);
-                    }
-                }
-                pointers.push(values.len());
-            }
-            GraphMatrix::<U>::from_csr(rows, cols, values, indices, pointers)?
-        } else {
-            let values = NumArray::new(self.to_vec()?)
-                .cast_with_policy::<U>(policy)?
-                .into_vec();
-            GraphMatrix::<U>::from_row_major_data(values, rows, cols, None)?
-        };
+            .try_map_into(|value| {
+                convert::<U>(from_scalar(value), policy).map_err(|e| {
+                    crate::storage::advanced_matrix::MatrixError::InvalidInput(e.to_string())
+                })
+            })
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = GraphMatrix::<U>::from_storage(storage);
         result.row_labels = self.row_labels.clone();
         result.column_names = self.column_names.clone();
         Ok(result)
@@ -2543,208 +2507,112 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(super::decomposition::svd_economy(values, rows, cols)?.singular)
     }
 
-    /// Tile (repeat) the matrix a specified number of times along each axis
-    /// reps: (rows_repeat, cols_repeat) - how many times to repeat in each dimension
-    pub fn tile(&self, reps: (usize, usize)) -> GraphResult<GraphMatrix<T>>
-    where
-        T: Clone + Copy + Default,
-    {
+    /// Repeat the whole matrix block with checked sizes and positional labels.
+    pub fn tile(&self, reps: (usize, usize)) -> GraphResult<Self> {
         let (rows, cols) = self.shape();
-        let (row_reps, col_reps) = reps;
-
-        let new_rows = rows * row_reps;
-        let new_cols = cols * col_reps;
-
-        // Create new arrays for the tiled matrix
-        let mut new_arrays = Vec::new();
-
-        for new_col in 0..new_cols {
-            let orig_col = new_col % cols;
-            let mut column_data = Vec::with_capacity(new_rows);
-
-            // Repeat the original column row_reps times
-            for _ in 0..row_reps {
-                for row in 0..rows {
-                    let value = self.get(row, orig_col).unwrap_or_else(|| T::default());
-                    column_data.push(value);
-                }
-            }
-
-            new_arrays.push(NumArray::new(column_data));
-        }
-
-        GraphMatrix::from_arrays(new_arrays)
+        let new_rows = rows
+            .checked_mul(reps.0)
+            .ok_or_else(|| GraphError::InvalidInput("Tile row count overflow".into()))?;
+        let new_cols = cols
+            .checked_mul(reps.1)
+            .ok_or_else(|| GraphError::InvalidInput("Tile column count overflow".into()))?;
+        new_rows
+            .checked_mul(new_cols)
+            .ok_or_else(|| GraphError::InvalidInput("Tile element count overflow".into()))?;
+        let row_indices = Self::selection_positions(new_rows, |index| index % rows)?;
+        let col_indices = Self::selection_positions(new_cols, |index| index % cols)?;
+        self.select_indices(&row_indices, &col_indices)
     }
-
-    /// Repeat elements of the matrix along a specified axis
-    /// repeats: number of times to repeat each element
-    /// axis: 0 for rows, 1 for columns
-    pub fn repeat(&self, repeats: usize, axis: usize) -> GraphResult<GraphMatrix<T>>
-    where
-        T: Clone + Copy + Default,
-    {
+    /// Repeat each row (axis 0) or column (axis 1), preserving empty dimensions.
+    pub fn repeat(&self, repeats: usize, axis: usize) -> GraphResult<Self> {
         let (rows, cols) = self.shape();
-
-        match axis {
-            0 => {
-                // Repeat along rows (each row gets repeated)
-                let new_rows = rows * repeats;
-                let mut new_arrays = Vec::new();
-
-                for col in 0..cols {
-                    let mut column_data = Vec::with_capacity(new_rows);
-
-                    for row in 0..rows {
-                        let value = self.get(row, col).unwrap_or_else(|| T::default());
-                        // Repeat this value 'repeats' times
-                        for _ in 0..repeats {
-                            column_data.push(value);
-                        }
-                    }
-
-                    new_arrays.push(NumArray::new(column_data));
-                }
-
-                GraphMatrix::from_arrays(new_arrays)
+        let (new_rows, new_cols) = match axis {
+            0 => (rows.checked_mul(repeats), Some(cols)),
+            1 => (Some(rows), cols.checked_mul(repeats)),
+            _ => {
+                return Err(GraphError::InvalidInput(
+                    "Axis must be 0 (rows) or 1 (columns)".into(),
+                ))
             }
-            1 => {
-                // Repeat along columns (each column gets repeated)
-                let _new_cols = cols * repeats;
-                let mut new_arrays = Vec::new();
-
-                for col in 0..cols {
-                    let column_data: Vec<T> = (0..rows)
-                        .map(|row| self.get(row, col).unwrap_or_else(|| T::default()))
-                        .collect();
-
-                    // Add this column 'repeats' times
-                    for _ in 0..repeats {
-                        new_arrays.push(NumArray::new(column_data.clone()));
-                    }
-                }
-
-                GraphMatrix::from_arrays(new_arrays)
-            }
-            _ => Err(GraphError::InvalidInput(
-                "Axis must be 0 (rows) or 1 (columns)".into(),
-            )),
-        }
+        };
+        let (new_rows, new_cols) = new_rows
+            .zip(new_cols)
+            .ok_or_else(|| GraphError::InvalidInput("Repeat dimension overflow".into()))?;
+        new_rows
+            .checked_mul(new_cols)
+            .ok_or_else(|| GraphError::InvalidInput("Repeat element count overflow".into()))?;
+        let row_indices =
+            Self::selection_positions(
+                new_rows,
+                |index| if axis == 0 { index / repeats } else { index },
+            )?;
+        let col_indices =
+            Self::selection_positions(
+                new_cols,
+                |index| if axis == 1 { index / repeats } else { index },
+            )?;
+        self.select_indices(&row_indices, &col_indices)
     }
-
-    /// Element-wise absolute value
-    pub fn abs(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: Clone + Copy + Default,
-        f64: From<T>,
-        T: From<f64>,
-    {
-        let (rows, cols) = self.shape();
-        let mut new_arrays = Vec::new();
-
-        for col in 0..cols {
-            let mut column_data = Vec::with_capacity(rows);
-
-            for row in 0..rows {
-                let value = self.get(row, col).unwrap_or_else(|| T::default());
-                let abs_value = f64::from(value).abs();
-                column_data.push(T::from(abs_value));
-            }
-
-            new_arrays.push(NumArray::new(column_data));
-        }
-
-        GraphMatrix::from_arrays(new_arrays)
+    fn selection_positions(
+        count: usize,
+        position: impl Fn(usize) -> usize,
+    ) -> GraphResult<Vec<usize>> {
+        let mut indices = Vec::new();
+        indices
+            .try_reserve_exact(count)
+            .map_err(|_| GraphError::InvalidInput("Selection allocation failed".into()))?;
+        indices.extend((0..count).map(position));
+        Ok(indices)
     }
-
-    /// Element-wise exponential (e^x)
-    pub fn exp(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: Clone + Copy + Default,
-        f64: From<T>,
-        T: From<f64>,
-    {
-        let (rows, cols) = self.shape();
-        let mut new_arrays = Vec::new();
-
-        for col in 0..cols {
-            let mut column_data = Vec::with_capacity(rows);
-
-            for row in 0..rows {
-                let value = self.get(row, col).unwrap_or_else(|| T::default());
-                let exp_value = f64::from(value).exp();
-                column_data.push(T::from(exp_value));
-            }
-
-            new_arrays.push(NumArray::new(column_data));
-        }
-
-        GraphMatrix::from_arrays(new_arrays)
+    /// Entrywise absolute value with exact checked integer semantics.
+    pub fn abs(&self) -> GraphResult<Self> {
+        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::abs(
+            &self.storage,
+        ))
     }
-
-    /// Element-wise natural logarithm
-    pub fn log(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: Clone + Copy + Default,
-        f64: From<T>,
-        T: From<f64>,
-    {
-        let (rows, cols) = self.shape();
-        let mut new_arrays = Vec::new();
-
-        for col in 0..cols {
-            let mut column_data = Vec::with_capacity(rows);
-
-            for row in 0..rows {
-                let value = self.get(row, col).unwrap_or_else(|| T::default());
-                let f_value = f64::from(value);
-
-                // Handle negative values and zero (ln is undefined)
-                let log_value = if f_value > 0.0 {
-                    f_value.ln()
-                } else {
-                    f64::NAN // Or could return error
-                };
-
-                column_data.push(T::from(log_value));
-            }
-
-            new_arrays.push(NumArray::new(column_data));
-        }
-
-        GraphMatrix::from_arrays(new_arrays)
+    /// Entrywise exponential, with IEEE floating outputs and checked conversion.
+    pub fn exp(&self) -> GraphResult<Self> {
+        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::exp(
+            &self.storage,
+        ))
     }
-
-    /// Element-wise square root
-    pub fn sqrt(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: Clone + Copy + Default,
-        f64: From<T>,
-        T: From<f64>,
-    {
-        let (rows, cols) = self.shape();
-        let mut new_arrays = Vec::new();
-
-        for col in 0..cols {
-            let mut column_data = Vec::with_capacity(rows);
-
-            for row in 0..rows {
-                let value = self.get(row, col).unwrap_or_else(|| T::default());
-                let f_value = f64::from(value);
-
-                // Handle negative values (sqrt is undefined for real numbers)
-                let sqrt_value = if f_value >= 0.0 {
-                    f_value.sqrt()
-                } else {
-                    f64::NAN // Or could return error
-                };
-
-                column_data.push(T::from(sqrt_value));
-            }
-
-            new_arrays.push(NumArray::new(column_data));
-        }
-
-        GraphMatrix::from_arrays(new_arrays)
+    /// Entrywise natural log; floating zero/negative inputs yield -inf/NaN.
+    pub fn log(&self) -> GraphResult<Self> {
+        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::ln(
+            &self.storage,
+        ))
+    }
+    /// Entrywise square root; negative floating inputs yield NaN.
+    pub fn sqrt(&self) -> GraphResult<Self> {
+        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::sqrt(
+            &self.storage,
+        ))
+    }
+    fn numerical_result(
+        &self,
+        storage: crate::storage::advanced_matrix::MatrixResult<UnifiedMatrix<T>>,
+    ) -> GraphResult<Self> {
+        let mut result =
+            Self::from_storage(storage.map_err(|e| GraphError::InvalidInput(e.to_string()))?);
+        result.column_names = self.column_names.clone();
+        result.row_labels = self.row_labels.clone();
+        Ok(result)
+    }
+    /// Owned boolean comparison mask; preserves exact mixed numeric ordering.
+    pub fn comparison_mask(
+        &self,
+        scalar: crate::storage::array::numeric_arithmetic::NumericInput,
+        op: crate::storage::array::numeric_arithmetic::NumericComparison,
+    ) -> GraphResult<GraphMatrix<bool>> {
+        use crate::storage::array::numeric_arithmetic::{comparison, from_scalar};
+        let storage = self
+            .storage
+            .try_map_into(|value| Ok(comparison(from_scalar(value), scalar, op)))
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut result = GraphMatrix::<bool>::from_storage(storage);
+        result.column_names = self.column_names.clone();
+        result.row_labels = self.row_labels.clone();
+        Ok(result)
     }
 }
 
@@ -2884,32 +2752,59 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(Self::from_storage(storage))
     }
 
-    // Arithmetic results own storage and retain left positional row/column labels.
-    fn map_arithmetic(&self, operation: impl Fn(T) -> T) -> GraphResult<Self> {
-        let (rows, cols) = self.shape();
-        if self.is_sparse() {
-            if let Some(storage) = self
-                .storage
-                .sparse_map(&operation)
-                .map_err(|e| GraphError::InvalidInput(e.to_string()))?
-            {
-                let mut result = Self::from_storage(storage);
-                result.row_labels = self.row_labels.clone();
-                result.column_names = self.column_names.clone();
-                return Ok(result);
-            }
-        }
-        let mut result = Self::arithmetic_zeros(rows, cols)?;
-        for row in 0..rows {
-            for col in 0..cols {
-                result.set(row, col, operation(self.get_checked(row, col)?))?;
-            }
-        }
-        result.column_names = self.column_names.clone();
-        result.row_labels = self.row_labels.clone();
-        Ok(result)
+    // Arithmetic results own storage and retain positional labels.
+    fn map_checked_arithmetic(&self, operation: impl Fn(T) -> GraphResult<T>) -> GraphResult<Self> {
+        self.numerical_result(self.storage.try_map_elementwise(|value| {
+            operation(value).map_err(|e| {
+                crate::storage::advanced_matrix::MatrixError::InvalidInput(e.to_string())
+            })
+        }))
     }
-
+    fn arithmetic_scalar(scalar: f64) -> GraphResult<T> {
+        use crate::storage::array::numeric_arithmetic::{convert, ConversionPolicy, NumericInput};
+        convert(
+            NumericInput::Float(scalar),
+            if T::DTYPE.is_float() {
+                ConversionPolicy::Round
+            } else {
+                ConversionPolicy::Exact
+            },
+        )
+    }
+    /// Checked scalar addition without a second matrix allocation.
+    pub fn scalar_add(&self, scalar: f64) -> GraphResult<Self> {
+        let scalar = Self::arithmetic_scalar(scalar)?;
+        self.map_checked_arithmetic(|value| {
+            value
+                .checked_add(scalar)
+                .ok_or_else(|| GraphError::InvalidInput("Scalar addition overflow".into()))
+        })
+    }
+    /// Checked scalar subtraction without a second matrix allocation.
+    pub fn scalar_subtract(&self, scalar: f64) -> GraphResult<Self> {
+        let scalar = Self::arithmetic_scalar(scalar)?;
+        self.map_checked_arithmetic(|value| {
+            value
+                .checked_sub(scalar)
+                .ok_or_else(|| GraphError::InvalidInput("Scalar subtraction overflow".into()))
+        })
+    }
+    /// Floating true division; cast integer matrices explicitly before division.
+    pub fn scalar_divide(&self, scalar: f64) -> GraphResult<Self> {
+        if scalar == 0. {
+            return Err(GraphError::InvalidInput("Division by zero".into()));
+        }
+        if !T::DTYPE.is_float() {
+            return Err(GraphError::InvalidInput(
+                "Cast to floating dtype before matrix true division".into(),
+            ));
+        }
+        self.map_checked_arithmetic(|value| {
+            T::from_f64(value.to_f64() / scalar).ok_or_else(|| {
+                GraphError::InvalidInput("Scalar division exceeds dtype range".into())
+            })
+        })
+    }
     fn zip_arithmetic(&self, other: &Self, operation: fn(T, T) -> Option<T>) -> GraphResult<Self> {
         if self.shape() != other.shape() {
             return Err(GraphError::InvalidInput(format!(
@@ -2949,13 +2844,14 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    /// Multiply each value by a scalar, preserving shape and positional labels.
-    pub fn scalar_multiply(&self, scalar: f64) -> GraphResult<GraphMatrix<T>>
-    where
-        T: std::ops::Mul<Output = T> + From<f64>,
-    {
-        let scalar = T::from(scalar);
-        self.map_arithmetic(|value| value * scalar)
+    /// Checked dtype-preserving scalar multiplication.
+    pub fn scalar_multiply(&self, scalar: f64) -> GraphResult<Self> {
+        let scalar = Self::arithmetic_scalar(scalar)?;
+        self.map_checked_arithmetic(|value| {
+            value
+                .checked_mul(scalar)
+                .ok_or_else(|| GraphError::InvalidInput("Scalar multiplication overflow".into()))
+        })
     }
 
     /// Add two matrices positionally; mismatched shapes return an error.
