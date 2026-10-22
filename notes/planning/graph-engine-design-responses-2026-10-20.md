@@ -548,3 +548,6 @@ Use checked GraphResult global reductions and shared native typed kernels across
 
 ### Item 29 economy QR — 2026-10-21
 Use real economy Householder QR with k=min(m,n), avoiding impossible wide orthonormal output and unnecessary full tall Q. Retain zero/rank-deficient orthonormal completion without epsilon rank decisions. Reject input/range/dtype failures explicitly; preserve source and basis identity in owned factors. Complex/pivoted QR, gradients and least squares are separate work.
+
+### Item 29 scaled real Cholesky — 2026-10-21
+Use a norm-relative symmetry policy after scaling, average accepted pairs, and require strictly positive residual pivots at working precision. Reject unsupported/range errors instead of guessing factors. Support native f32/f64 and empty order, retaining owned source/basis identity. Conditioning, pivoted/complex/sparse factors and gradients remain separate.

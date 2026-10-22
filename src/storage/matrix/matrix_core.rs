@@ -2124,99 +2124,28 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok((p_matrix, l_matrix, u_matrix))
     }
 
-    /// Cholesky Decomposition: A = L * L^T for positive definite matrices
-    /// Returns L (lower triangular matrix) where A = L * L^T
-    pub fn cholesky_decomposition(&self) -> GraphResult<GraphMatrix<T>>
-    where
-        T: Clone
-            + Copy
-            + Default
-            + std::fmt::Debug
-            + PartialEq
-            + PartialOrd
-            + std::ops::Add<Output = T>
-            + std::ops::Sub<Output = T>
-            + std::ops::Mul<Output = T>
-            + std::ops::Div<Output = T>,
-        f64: From<T>,
-        T: From<f64>,
-    {
+    /// Checked real floating Cholesky factor A=L*L^T.
+    pub fn cholesky_decomposition(&self) -> GraphResult<GraphMatrix<T>> {
         let (rows, cols) = self.shape();
         if rows != cols {
             return Err(GraphError::InvalidInput(
-                "Cholesky decomposition requires square matrix".into(),
+                "Cholesky requires square input".into(),
             ));
         }
-
-        let n = rows;
-
-        // Check if matrix is symmetric (simplified check)
-        for i in 0..n {
-            for j in 0..i {
-                let a_ij = f64::from(self.get(i, j).unwrap_or_else(|| T::default()));
-                let a_ji = f64::from(self.get(j, i).unwrap_or_else(|| T::default()));
-                if (a_ij - a_ji).abs() > 1e-10 {
-                    return Err(GraphError::InvalidInput(
-                        "Matrix must be symmetric for Cholesky decomposition".into(),
-                    ));
-                }
-            }
+        if self
+            .row_labels
+            .as_ref()
+            .is_some_and(|labels| labels.len() != rows)
+        {
+            return Err(GraphError::InvalidInput(
+                "Cholesky row labels do not match shape".into(),
+            ));
         }
-
-        // Initialize L matrix
-        let mut l = vec![vec![0.0; n]; n];
-
-        // Cholesky decomposition algorithm
-        for i in 0..n {
-            for j in 0..=i {
-                if i == j {
-                    // Diagonal elements: L[i][i] = sqrt(A[i][i] - sum(L[i][k]^2 for k < i))
-                    let mut sum = 0.0;
-                    for k in 0..i {
-                        sum += l[i][k] * l[i][k];
-                    }
-                    let a_ii = f64::from(self.get(i, i).unwrap_or_else(|| T::default()));
-                    let diag_val = a_ii - sum;
-
-                    if diag_val <= 0.0 {
-                        return Err(GraphError::InvalidInput(
-                            "Matrix is not positive definite".into(),
-                        ));
-                    }
-
-                    l[i][j] = diag_val.sqrt();
-                } else {
-                    // Off-diagonal elements: L[i][j] = (A[i][j] - sum(L[i][k]*L[j][k] for k < j)) / L[j][j]
-                    let mut sum = 0.0;
-                    for k in 0..j {
-                        sum += l[i][k] * l[j][k];
-                    }
-                    let a_ij = f64::from(self.get(i, j).unwrap_or_else(|| T::default()));
-
-                    if l[j][j] == 0.0 {
-                        return Err(GraphError::InvalidInput(
-                            "Division by zero in Cholesky decomposition".into(),
-                        ));
-                    }
-
-                    l[i][j] = (a_ij - sum) / l[j][j];
-                }
-            }
-        }
-
-        // Build L matrix
-        let mut l_arrays = Vec::new();
-        for j in 0..n {
-            let mut col_data = Vec::new();
-            for i in 0..n {
-                let val = if i >= j { l[i][j] } else { 0.0 };
-                col_data.push(T::from(val));
-            }
-            l_arrays.push(NumArray::new(col_data));
-        }
-        let l_matrix = GraphMatrix::from_arrays(l_arrays)?;
-
-        Ok(l_matrix)
+        let values = super::factorization::cholesky(self.decomposition_input()?, rows)?;
+        let mut lower = Self::factor_matrix(values, rows, rows)?;
+        lower.row_labels = self.row_labels.clone();
+        lower.column_names = (0..rows).map(|i| format!("chol_{i}")).collect();
+        Ok(lower)
     }
 
     /// Real symmetric eigendecomposition with descending eigenvalues.

@@ -126,3 +126,5 @@ Numerical finish status after 29.15–29.21: floating dot accuracy, direct float
 Numerical item 29.22 repairs GraphMatrix global/axis/trace and legacy column reductions, with typed stable kernels, checked Rust results, explicit IEEE/empty behavior and preserved sample/population conventions. Remaining work is now 29.23–29.26 plus lower-level/neural reduction consistency and production performance; the parent numerical categories remain open.
 
 Numerical item 29.27 repairs real QR with bounded economy Householder factors and checked scale/domain/identity behavior. Wide shapes migrate to m×k and k×n. Cholesky/LU/determinant/rank/conditioning/refinement and least-squares work still remain under 29.23.
+
+Numerical item 29.28 repairs finite real Cholesky using scaled relative symmetry checks, accurate residuals and explicit positive-definite/range/dtype validation. LU/determinant/rank/condition/refinement/least-squares work remains under 29.23.

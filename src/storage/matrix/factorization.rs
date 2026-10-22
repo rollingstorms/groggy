@@ -98,3 +98,52 @@ pub(super) fn qr(mut a: Vec<f64>, rows: usize, cols: usize) -> GraphResult<(Vec<
     }
     Ok((q, r))
 }
+
+/// Real Cholesky A=L*L^T with norm-relative symmetry checks and checked residuals.
+pub(super) fn cholesky(mut a: Vec<f64>, n: usize) -> GraphResult<Vec<f64>> {
+    let scale = normalize(&mut a)?;
+    let tolerance = 8. * f64::EPSILON * n.max(1) as f64;
+    for row in 0..n {
+        for col in 0..row {
+            if (a[row * n + col] - a[col * n + row]).abs() > tolerance {
+                return Err(invalid("Cholesky requires symmetric input"));
+            }
+            let average = a[row * n + col] + (a[col * n + row] - a[row * n + col]) * 0.5;
+            a[row * n + col] = average;
+            a[col * n + row] = average;
+        }
+    }
+    let mut lower = zeros(n, n)?;
+    for row in 0..n {
+        for col in 0..=row {
+            let mut residual = super::dot_product::Dot::new();
+            residual.add(a[row * n + col], 1.);
+            for k in 0..col {
+                residual.add(-lower[row * n + k], lower[col * n + k]);
+            }
+            let residual = residual.total();
+            let value = if row == col {
+                if residual <= 0. {
+                    return Err(invalid(
+                        "Cholesky input is not positive definite at the working precision",
+                    ));
+                }
+                residual.sqrt()
+            } else {
+                residual / lower[col * n + col]
+            };
+            if !value.is_finite() {
+                return Err(invalid("Cholesky arithmetic exceeds finite range"));
+            }
+            lower[row * n + col] = value;
+        }
+    }
+    let scale = scale.sqrt();
+    for value in &mut lower {
+        *value *= scale;
+    }
+    if lower.iter().any(|v| !v.is_finite()) {
+        return Err(invalid("Cholesky output exceeds finite range"));
+    }
+    Ok(lower)
+}
