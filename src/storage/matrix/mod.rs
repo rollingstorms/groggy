@@ -7,6 +7,7 @@
 //! - Memory fusion optimization
 //! - Full backward compatibility
 
+mod complex_eigen;
 pub mod conversions;
 mod decomposition;
 mod dot_product;

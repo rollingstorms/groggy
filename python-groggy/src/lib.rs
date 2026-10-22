@@ -503,6 +503,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyComponentsArray>()?;
     m.add_class::<ffi::storage::components::PyComponentsArrayIterator>()?;
     m.add_class::<PyGraphMatrix>()?;
+    m.add_class::<ffi::storage::matrix::PyComplexEigenResult>()?;
 
     // Register specialized arrays (Phase 2 - Unified Delegation Architecture)
     m.add_class::<PySubgraphArray>()?;

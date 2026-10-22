@@ -30,6 +30,15 @@ pub struct SolveReport<T: NumericType> {
     pub accepted_refinements: usize,
 }
 
+/// Dedicated complex eigen result for real input; eigenvectors are columns.
+#[derive(Debug)]
+pub struct ComplexEigenResult<T: NumericType> {
+    pub eigenvalues_real: Vec<f64>,
+    pub eigenvalues_imag: Vec<f64>,
+    pub eigenvectors_real: GraphMatrix<T>,
+    pub eigenvectors_imag: GraphMatrix<T>,
+}
+
 /// Matrix properties that can be computed and cached
 #[derive(Debug, Clone)]
 pub struct MatrixProperties {
@@ -2108,6 +2117,31 @@ impl<T: NumericType> GraphMatrix<T> {
         lower.row_labels = self.row_labels.clone();
         lower.column_names = (0..rows).map(|i| format!("chol_{i}")).collect();
         Ok(lower)
+    }
+
+    /// General real-input eigendecomposition with dedicated real/imaginary outputs.
+    /// Reject nonconvergence, defective/unresolved bases and failed residual checks.
+    pub fn complex_eigenvalue_decomposition(&self) -> GraphResult<ComplexEigenResult<T>> {
+        let (rows, cols) = self.shape();
+        if rows != cols {
+            return Err(GraphError::InvalidInput(
+                "Complex eigen requires square input".into(),
+            ));
+        }
+        let result = super::complex_eigen::eigen(self.decomposition_input()?, rows)?;
+        let mut real = Self::factor_matrix(result.vectors_real, rows, rows)?;
+        let mut imag = Self::factor_matrix(result.vectors_imag, rows, rows)?;
+        let basis: Vec<_> = (0..rows).map(|i| format!("eigen_{i}")).collect();
+        real.row_labels = Some(self.column_names.clone());
+        imag.row_labels = real.row_labels.clone();
+        real.column_names = basis.clone();
+        imag.column_names = basis;
+        Ok(ComplexEigenResult {
+            eigenvalues_real: result.values_real,
+            eigenvalues_imag: result.values_imag,
+            eigenvectors_real: real,
+            eigenvectors_imag: imag,
+        })
     }
 
     /// Real symmetric eigendecomposition with descending eigenvalues.

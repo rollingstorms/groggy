@@ -28,6 +28,19 @@ pub struct PyGraphMatrix {
     pub inner: GraphMatrix,
 }
 
+/// Owned complex eigendecomposition components without complex matrix storage.
+#[pyclass(name = "ComplexEigenResult", unsendable)]
+pub struct PyComplexEigenResult {
+    #[pyo3(get)]
+    pub eigenvalues_real: Vec<f64>,
+    #[pyo3(get)]
+    pub eigenvalues_imag: Vec<f64>,
+    #[pyo3(get)]
+    pub eigenvectors_real: Py<PyGraphMatrix>,
+    #[pyo3(get)]
+    pub eigenvectors_imag: Py<PyGraphMatrix>,
+}
+
 #[pymethods]
 impl PyGraphMatrix {
     /// Create owned canonical CSR storage; columns in each row must be sorted/unique.
@@ -1948,6 +1961,30 @@ impl PyGraphMatrix {
             .least_squares(&b.inner, rcond)
             .map_err(|e| PyRuntimeError::new_err(format!("Least squares failed: {:?}", e)))?;
         Py::new(py, Self { inner: result })
+    }
+
+    /// General real-input eigenpairs in a dedicated complex result.
+    fn complex_eigenvalue_decomposition(&self, py: Python) -> PyResult<PyComplexEigenResult> {
+        let result = self
+            .inner
+            .complex_eigenvalue_decomposition()
+            .map_err(|e| PyRuntimeError::new_err(format!("Complex eigen failed: {:?}", e)))?;
+        Ok(PyComplexEigenResult {
+            eigenvalues_real: result.eigenvalues_real,
+            eigenvalues_imag: result.eigenvalues_imag,
+            eigenvectors_real: Py::new(
+                py,
+                Self {
+                    inner: result.eigenvectors_real,
+                },
+            )?,
+            eigenvectors_imag: Py::new(
+                py,
+                Self {
+                    inner: result.eigenvectors_imag,
+                },
+            )?,
+        })
     }
 
     /// Real SVD: A = U * Sigma * V^T, using bounded one-sided Jacobi sweeps.
