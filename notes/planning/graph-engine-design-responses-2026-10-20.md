@@ -545,3 +545,6 @@ Optimize the exact reference kernel only with a behavior-preserving checked path
 
 ### Item 29 shared matrix reductions — 2026-10-21
 Use checked GraphResult global reductions and shared native typed kernels across axes/columns/trace. Keep sample axis and population column variance conventions explicit, along with typed-statistic conversion rather than introduce promotion. Preserve non-reduced axis length for empty inputs. Collect owned logical values/slices for consistent kernels and record this scratch/performance cost; lower-level/neural reductions are separate.
+
+### Item 29 economy QR — 2026-10-21
+Use real economy Householder QR with k=min(m,n), avoiding impossible wide orthonormal output and unnecessary full tall Q. Retain zero/rank-deficient orthonormal completion without epsilon rank decisions. Reject input/range/dtype failures explicitly; preserve source and basis identity in owned factors. Complex/pivoted QR, gradients and least squares are separate work.

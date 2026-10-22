@@ -1,0 +1,100 @@
+//! Bounded in-house dense real factorizations with explicit numerical domains.
+use crate::{GraphError, GraphResult};
+fn invalid(message: &str) -> GraphError {
+    GraphError::InvalidInput(message.into())
+}
+fn zeros(rows: usize, cols: usize) -> GraphResult<Vec<f64>> {
+    let count = rows
+        .checked_mul(cols)
+        .filter(|n| {
+            n.checked_mul(8)
+                .is_some_and(|bytes| bytes <= isize::MAX as usize)
+        })
+        .ok_or_else(|| invalid("Factorization size overflow"))?;
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(count)
+        .map_err(|_| invalid("Factorization allocation failed"))?;
+    values.resize(count, 0.);
+    Ok(values)
+}
+fn normalize(input: &mut [f64]) -> GraphResult<f64> {
+    if input.iter().any(|v| !v.is_finite()) {
+        return Err(invalid("Factorization requires finite values"));
+    }
+    let scale = input.iter().fold(0.0_f64, |s, v| s.max(v.abs()));
+    let scale = if scale == 0. { 1. } else { scale };
+    for value in input {
+        let scaled = *value / scale;
+        if *value != 0. && scaled == 0. {
+            return Err(invalid("Factorization scaling loses input range"));
+        }
+        *value = scaled;
+    }
+    Ok(scale)
+}
+/// Economy Householder QR: Q is rows x min(rows,cols), R is min(rows,cols) x cols.
+pub(super) fn qr(mut a: Vec<f64>, rows: usize, cols: usize) -> GraphResult<(Vec<f64>, Vec<f64>)> {
+    let scale = normalize(&mut a)?;
+    let k = rows.min(cols);
+    let mut reflectors = Vec::with_capacity(k);
+    for col in 0..k {
+        let norm = (col..rows).fold(0.0_f64, |norm, row| norm.hypot(a[row * cols + col]));
+        if norm == 0. {
+            reflectors.push(None);
+            continue;
+        }
+        let alpha = -norm.copysign(a[col * cols + col]);
+        let mut v: Vec<_> = (col..rows).map(|row| a[row * cols + col]).collect();
+        v[0] -= alpha;
+        let norm = v.iter().fold(0.0_f64, |norm, v| norm.hypot(*v));
+        for value in &mut v {
+            *value /= norm;
+        }
+        for j in col..cols {
+            let mut dot = super::dot_product::Dot::new();
+            for (offset, &v) in v.iter().enumerate() {
+                dot.add(v, a[(col + offset) * cols + j]);
+            }
+            let projection = dot.total();
+            for (offset, &v) in v.iter().enumerate() {
+                let index = (col + offset) * cols + j;
+                a[index] = (-2. * v).mul_add(projection, a[index]);
+            }
+        }
+        a[col * cols + col] = alpha;
+        for row in col + 1..rows {
+            a[row * cols + col] = 0.;
+        }
+        reflectors.push(Some(v));
+    }
+    let mut q = zeros(rows, k)?;
+    for i in 0..k {
+        q[i * k + i] = 1.;
+    }
+    for col in (0..k).rev() {
+        if let Some(v) = &reflectors[col] {
+            for j in 0..k {
+                let mut dot = super::dot_product::Dot::new();
+                for (offset, &v) in v.iter().enumerate() {
+                    dot.add(v, q[(col + offset) * k + j]);
+                }
+                let projection = dot.total();
+                for (offset, &v) in v.iter().enumerate() {
+                    let index = (col + offset) * k + j;
+                    q[index] = (-2. * v).mul_add(projection, q[index]);
+                }
+            }
+        }
+    }
+    let mut r = zeros(k, cols)?;
+    for row in 0..k {
+        for col in row..cols {
+            r[row * cols + col] = a[row * cols + col] * scale;
+        }
+    }
+    if q.iter().chain(&r).any(|v| !v.is_finite()) {
+        return Err(invalid("QR output exceeds finite range"));
+    }
+    Ok((q, r))
+}

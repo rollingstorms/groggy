@@ -1952,97 +1952,45 @@ impl<T: NumericType> GraphMatrix<T> {
         ))
     }
 
-    /// QR decomposition: A = Q * R
-    /// Returns (Q, R) where Q is orthogonal and R is upper triangular
-    pub fn qr_decomposition(&self) -> GraphResult<(GraphMatrix<T>, GraphMatrix<T>)>
-    where
-        T: Clone
-            + Copy
-            + Default
-            + std::fmt::Debug
-            + PartialEq
-            + PartialOrd
-            + std::ops::Add<Output = T>
-            + std::ops::Sub<Output = T>
-            + std::ops::Mul<Output = T>
-            + std::ops::Div<Output = T>,
-        f64: From<T>,
-    {
+    /// Economy Householder QR: Q is m x min(m,n), R is min(m,n) x n.
+    /// Zero/rank-deficient inputs retain an orthonormal Q; finite floating input only.
+    pub fn qr_decomposition(&self) -> GraphResult<(GraphMatrix<T>, GraphMatrix<T>)> {
         let (rows, cols) = self.shape();
-
-        // Modified Gram-Schmidt process
-        let mut q_vectors: Vec<Vec<T>> = Vec::new();
-        let mut r_matrix = GraphMatrix::zeros(cols, cols);
-
-        for j in 0..cols {
-            // Get column j from original matrix
-            let mut col_j = Vec::new();
-            for i in 0..rows {
-                col_j.push(self.get(i, j).unwrap_or_else(|| T::default()));
-            }
-
-            // Orthogonalize against previous Q columns
-            for k in 0..j {
-                if let Some(q_k) = q_vectors.get(k) {
-                    // Compute R[k,j] = q_k^T * a_j
-                    let mut dot_product = 0.0;
-                    for i in 0..rows {
-                        dot_product += f64::from(q_k[i]) * f64::from(col_j[i]);
-                    }
-                    let _ = r_matrix.set(
-                        k,
-                        j,
-                        T::from_f64(dot_product).unwrap_or_else(|| T::default()),
-                    );
-
-                    // a_j = a_j - R[k,j] * q_k
-                    for i in 0..rows {
-                        let old_val = f64::from(col_j[i]);
-                        let projection = dot_product * f64::from(q_k[i]);
-                        col_j[i] =
-                            T::from_f64(old_val - projection).unwrap_or_else(|| T::default());
-                    }
-                }
-            }
-
-            // Compute R[j,j] = ||a_j||
-            let mut norm_sq = 0.0;
-            for &val in &col_j {
-                let f_val = f64::from(val);
-                norm_sq += f_val * f_val;
-            }
-            let norm = norm_sq.sqrt();
-            let _ = r_matrix.set(j, j, T::from_f64(norm).unwrap_or_else(|| T::default()));
-
-            // q_j = a_j / R[j,j]
-            if norm > 1e-10 {
-                for val in &mut col_j {
-                    let f_val = f64::from(*val);
-                    *val = T::from_f64(f_val / norm).unwrap_or_else(|| T::default());
-                }
-            }
-
-            q_vectors.push(col_j);
+        if self
+            .row_labels
+            .as_ref()
+            .is_some_and(|labels| labels.len() != rows)
+        {
+            return Err(GraphError::InvalidInput(
+                "QR row labels do not match shape".into(),
+            ));
         }
-
-        // Construct Q matrix
-        let mut q_arrays = Vec::new();
-        for j in 0..cols {
-            if j < q_vectors.len() {
-                q_arrays.push(NumArray::new(q_vectors[j].clone()));
-            } else {
-                // Fill with orthogonal unit vectors
-                let mut unit_vec = vec![T::default(); rows];
-                if j < rows {
-                    unit_vec[j] = T::from_f64(1.0).unwrap_or_else(|| T::default());
+        let k = rows.min(cols);
+        let (q, r) = super::factorization::qr(self.decomposition_input()?, rows, cols)?;
+        let mut q = Self::factor_matrix(q, rows, k)?;
+        let mut r = Self::factor_matrix(r, k, cols)?;
+        let basis: Vec<_> = (0..k).map(|i| format!("qr_{i}")).collect();
+        q.row_labels = self.row_labels.clone();
+        q.column_names = basis.clone();
+        r.row_labels = Some(basis);
+        r.column_names = self.column_names.clone();
+        Ok((q, r))
+    }
+    fn factor_matrix(values: Vec<f64>, rows: usize, cols: usize) -> GraphResult<Self> {
+        let values = values
+            .into_iter()
+            .map(|value| {
+                if !value.is_finite() {
+                    return Err(GraphError::InvalidInput(
+                        "Nonfinite factorization output".into(),
+                    ));
                 }
-                q_arrays.push(NumArray::new(unit_vec));
-            }
-        }
-
-        let q_matrix = GraphMatrix::from_arrays(q_arrays)?;
-
-        Ok((q_matrix, r_matrix))
+                T::from_f64(value).filter(|v| v.is_finite()).ok_or_else(|| {
+                    GraphError::InvalidInput("Factorization output exceeds dtype range".into())
+                })
+            })
+            .collect::<GraphResult<Vec<_>>>()?;
+        Self::from_row_major_data(values, rows, cols, None)
     }
 
     /// LU Decomposition with partial pivoting: PA = LU
