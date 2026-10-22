@@ -15,7 +15,7 @@ pub(crate) enum Value {
     Float(f64),
 }
 impl Value {
-    fn parse(value: &AttrValue) -> Option<Self> {
+    pub(crate) fn parse(value: &AttrValue) -> Option<Self> {
         match value {
             AttrValue::Int(value) => Some(Self::Integer(*value)),
             AttrValue::SmallInt(value) => Some(Self::Integer(i64::from(*value))),
@@ -29,7 +29,7 @@ impl Value {
             Self::Float(v) => NumericInput::Float(v),
         }
     }
-    fn parts(self) -> (f64, f64) {
+    pub(crate) fn parts(self) -> (f64, f64) {
         match self {
             Self::Integer(v) => {
                 let hi = v as f64;

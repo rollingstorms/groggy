@@ -60,3 +60,8 @@ NC1 partial completion (29.61a): attribute quantile/correlation/covariance now u
 checked shared numeric adapters with integer/mixed residuals, exact ranking and
 explicit failure domains. Window/cumulative and table paths remain open. See
 `attribute-statistics-contract-2026-10-22.md`.
+
+NC1 further completion (29.61b): checked window/cumulative/fractional-change
+kernels and total extreme-shift handling pass native/474 Python regressions and
+strict core Clippy. Expanding release scaling is recorded at three sizes. Table
+aggregation, pivot identity, ordering and describe remain open in 29.61.

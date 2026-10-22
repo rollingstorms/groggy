@@ -3,6 +3,7 @@
 const LIMBS: usize = 136;
 const MASK: u128 = (1_u128 << 32) - 1;
 
+#[derive(Clone)]
 pub(crate) struct Dot {
     integer: Option<i128>,
     positive: [u128; LIMBS],

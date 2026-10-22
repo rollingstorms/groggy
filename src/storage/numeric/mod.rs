@@ -9,3 +9,5 @@ pub mod scalar;
 pub mod types;
 pub use scalar::{ConversionPolicy, NumericComparison, NumericInput};
 pub use types::{DType, NumericType};
+
+pub mod attribute_windows;

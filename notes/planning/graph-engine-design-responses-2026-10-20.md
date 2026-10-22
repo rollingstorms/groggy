@@ -735,3 +735,13 @@ ddof, invalid empty quantile arguments, nonfinite input and f32 output overflow.
 Native/Python rational and boundary references are recorded in
 `attribute-statistics-contract-2026-10-22.md`. Remaining window/cumulative/table
 paths keep 29.61 and its numerical parent open.
+
+### Item 29.61b — Attribute windows, cumulative statistics and shifts
+
+Shared checked native windows include compact integers and preserve typed
+centering/mixed cancellation, population standard deviation and existing missing
+cell/output conventions. Expanding work is linear; rolling retains its explicit
+window-scan bound. Shifts beyond length and i32::MIN return fill safely; fractional
+changes retain integer differences. Invalid empty operations, nonfinite inputs
+and narrowed overflow fail explicitly. See `attribute-window-contract-2026-10-22.md`.
+Table numeric paths remain open in 29.61.

@@ -1076,61 +1076,9 @@ impl BaseArray<AttrValue> {
     /// # Returns
     /// New BaseArray with rolling operation results
     pub fn rolling(&self, window: usize, operation: &str) -> GraphResult<Self> {
-        if window == 0 {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Window size must be greater than 0".to_string(),
-            ));
-        }
-
-        let mut result_values = Vec::new();
-
-        for i in 0..self.data().len() {
-            if i + 1 < window {
-                // Not enough data for window, use null
-                result_values.push(AttrValue::Null);
-            } else {
-                // Extract window data
-                let start_idx = if i + 1 >= window { i + 1 - window } else { 0 };
-                let window_data: Vec<f64> = self.data()[start_idx..=i]
-                    .iter()
-                    .filter_map(|val| match val {
-                        AttrValue::Int(i) => Some(*i as f64),
-                        AttrValue::Float(f) => Some(*f as f64),
-                        _ => None,
-                    })
-                    .collect();
-
-                if window_data.is_empty() {
-                    result_values.push(AttrValue::Null);
-                } else {
-                    let result = match operation {
-                        "mean" => window_data.iter().sum::<f64>() / window_data.len() as f64,
-                        "sum" => window_data.iter().sum::<f64>(),
-                        "min" => window_data.iter().cloned().fold(f64::INFINITY, f64::min),
-                        "max" => window_data
-                            .iter()
-                            .cloned()
-                            .fold(f64::NEG_INFINITY, f64::max),
-                        "std" => {
-                            let mean = window_data.iter().sum::<f64>() / window_data.len() as f64;
-                            let variance =
-                                window_data.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
-                                    / window_data.len() as f64;
-                            variance.sqrt()
-                        }
-                        _ => {
-                            return Err(crate::errors::GraphError::InvalidInput(format!(
-                                "Unsupported rolling operation: {}",
-                                operation
-                            )));
-                        }
-                    };
-                    result_values.push(AttrValue::Float(result as f32));
-                }
-            }
-        }
-
-        Ok(BaseArray::from_attr_values(result_values))
+        Ok(BaseArray::from_attr_values(
+            crate::storage::numeric::attribute_windows::rolling(self.data(), window, operation)?,
+        ))
     }
 
     /// Expanding window operation (cumulative from start)
@@ -1141,48 +1089,9 @@ impl BaseArray<AttrValue> {
     /// # Returns
     /// New BaseArray with expanding operation results
     pub fn expanding(&self, operation: &str) -> GraphResult<Self> {
-        let mut result_values = Vec::new();
-
-        for i in 0..self.data().len() {
-            // Extract data from start to current position
-            let window_data: Vec<f64> = self.data()[0..=i]
-                .iter()
-                .filter_map(|val| match val {
-                    AttrValue::Int(i) => Some(*i as f64),
-                    AttrValue::Float(f) => Some(*f as f64),
-                    _ => None,
-                })
-                .collect();
-
-            if window_data.is_empty() {
-                result_values.push(AttrValue::Null);
-            } else {
-                let result = match operation {
-                    "mean" => window_data.iter().sum::<f64>() / window_data.len() as f64,
-                    "sum" => window_data.iter().sum::<f64>(),
-                    "min" => window_data.iter().cloned().fold(f64::INFINITY, f64::min),
-                    "max" => window_data
-                        .iter()
-                        .cloned()
-                        .fold(f64::NEG_INFINITY, f64::max),
-                    "std" => {
-                        let mean = window_data.iter().sum::<f64>() / window_data.len() as f64;
-                        let variance = window_data.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
-                            / window_data.len() as f64;
-                        variance.sqrt()
-                    }
-                    _ => {
-                        return Err(crate::errors::GraphError::InvalidInput(format!(
-                            "Unsupported expanding operation: {}",
-                            operation
-                        )));
-                    }
-                };
-                result_values.push(AttrValue::Float(result as f32));
-            }
-        }
-
-        Ok(BaseArray::from_attr_values(result_values))
+        Ok(BaseArray::from_attr_values(
+            crate::storage::numeric::attribute_windows::expanding(self.data(), operation, false)?,
+        ))
     }
 
     /// Cumulative sum operation
@@ -1190,27 +1099,9 @@ impl BaseArray<AttrValue> {
     /// # Returns
     /// New BaseArray with cumulative sum values
     pub fn cumsum(&self) -> GraphResult<Self> {
-        let mut result_values = Vec::new();
-        let mut running_sum = 0.0;
-
-        for val in self.data() {
-            match val {
-                AttrValue::Int(i) => {
-                    running_sum += *i as f64;
-                    result_values.push(AttrValue::Float(running_sum as f32));
-                }
-                AttrValue::Float(f) => {
-                    running_sum += *f as f64;
-                    result_values.push(AttrValue::Float(running_sum as f32));
-                }
-                _ => {
-                    // For non-numeric values, keep the running sum unchanged
-                    result_values.push(AttrValue::Float(running_sum as f32));
-                }
-            }
-        }
-
-        Ok(BaseArray::from_attr_values(result_values))
+        Ok(BaseArray::from_attr_values(
+            crate::storage::numeric::attribute_windows::expanding(self.data(), "sum", true)?,
+        ))
     }
 
     /// Cumulative minimum operation
@@ -1218,31 +1109,9 @@ impl BaseArray<AttrValue> {
     /// # Returns
     /// New BaseArray with cumulative minimum values
     pub fn cummin(&self) -> GraphResult<Self> {
-        let mut result_values = Vec::new();
-        let mut running_min = f64::INFINITY;
-
-        for val in self.data() {
-            match val {
-                AttrValue::Int(i) => {
-                    running_min = running_min.min(*i as f64);
-                    result_values.push(AttrValue::Float(running_min as f32));
-                }
-                AttrValue::Float(f) => {
-                    running_min = running_min.min(*f as f64);
-                    result_values.push(AttrValue::Float(running_min as f32));
-                }
-                _ => {
-                    // For non-numeric values, keep current running minimum
-                    if running_min != f64::INFINITY {
-                        result_values.push(AttrValue::Float(running_min as f32));
-                    } else {
-                        result_values.push(AttrValue::Null);
-                    }
-                }
-            }
-        }
-
-        Ok(BaseArray::from_attr_values(result_values))
+        Ok(BaseArray::from_attr_values(
+            crate::storage::numeric::attribute_windows::expanding(self.data(), "min", false)?,
+        ))
     }
 
     /// Cumulative maximum operation
@@ -1250,31 +1119,9 @@ impl BaseArray<AttrValue> {
     /// # Returns
     /// New BaseArray with cumulative maximum values
     pub fn cummax(&self) -> GraphResult<Self> {
-        let mut result_values = Vec::new();
-        let mut running_max = f64::NEG_INFINITY;
-
-        for val in self.data() {
-            match val {
-                AttrValue::Int(i) => {
-                    running_max = running_max.max(*i as f64);
-                    result_values.push(AttrValue::Float(running_max as f32));
-                }
-                AttrValue::Float(f) => {
-                    running_max = running_max.max(*f as f64);
-                    result_values.push(AttrValue::Float(running_max as f32));
-                }
-                _ => {
-                    // For non-numeric values, keep current running maximum
-                    if running_max != f64::NEG_INFINITY {
-                        result_values.push(AttrValue::Float(running_max as f32));
-                    } else {
-                        result_values.push(AttrValue::Null);
-                    }
-                }
-            }
-        }
-
-        Ok(BaseArray::from_attr_values(result_values))
+        Ok(BaseArray::from_attr_values(
+            crate::storage::numeric::attribute_windows::expanding(self.data(), "max", false)?,
+        ))
     }
 
     /// Shift operation - shift values by specified periods
@@ -1293,14 +1140,16 @@ impl BaseArray<AttrValue> {
             return Ok(BaseArray::from_attr_values(self.data().clone()));
         }
 
+        let shift = periods.unsigned_abs() as usize;
+        if shift >= self.data().len() {
+            return Ok(BaseArray::from_attr_values(result_values));
+        }
         if periods > 0 {
             // Shift right
-            let shift = periods as usize;
             result_values[shift..self.data().len()]
                 .clone_from_slice(&self.data()[..(self.data().len() - shift)]);
         } else {
             // Shift left
-            let shift = (-periods) as usize;
             result_values[..(self.data().len() - shift)].clone_from_slice(&self.data()[shift..]);
         }
 
@@ -1315,41 +1164,12 @@ impl BaseArray<AttrValue> {
     /// # Returns
     /// New BaseArray with percentage change values
     pub fn pct_change(&self, periods: Option<usize>) -> GraphResult<Self> {
-        let periods = periods.unwrap_or(1);
-        let mut result_values = Vec::new();
-
-        for i in 0..self.data().len() {
-            if i < periods {
-                result_values.push(AttrValue::Null);
-            } else {
-                let current = match &self.data()[i] {
-                    AttrValue::Int(val) => *val as f64,
-                    AttrValue::Float(val) => *val as f64,
-                    _ => {
-                        result_values.push(AttrValue::Null);
-                        continue;
-                    }
-                };
-
-                let previous = match &self.data()[i - periods] {
-                    AttrValue::Int(val) => *val as f64,
-                    AttrValue::Float(val) => *val as f64,
-                    _ => {
-                        result_values.push(AttrValue::Null);
-                        continue;
-                    }
-                };
-
-                if previous == 0.0 {
-                    result_values.push(AttrValue::Null);
-                } else {
-                    let pct_change = (current - previous) / previous;
-                    result_values.push(AttrValue::Float(pct_change as f32));
-                }
-            }
-        }
-
-        Ok(BaseArray::from_attr_values(result_values))
+        Ok(BaseArray::from_attr_values(
+            crate::storage::numeric::attribute_windows::pct_change(
+                self.data(),
+                periods.unwrap_or(1),
+            )?,
+        ))
     }
 }
 

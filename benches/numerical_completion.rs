@@ -1,10 +1,11 @@
 //! Release numerical corpus with process-wide allocation receipts (single runner).
 use groggy::{
     storage::{
+        array::BaseArray,
         matrix::{MatrixLayout, MatrixStats, UnifiedMatrix},
         Axis, GraphMatrix, NumArray,
     },
-    GraphResult,
+    AttrValue, GraphResult,
 };
 use serde_json::{json, Value};
 use std::{
@@ -307,6 +308,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[n, n],
         || GraphMatrix::sparse_weighted_adjacency_from_edges(&nodes, &edges, true)?.sum(),
     )?);
+    for n in [1_700, 17_000, 170_000] {
+        let input = BaseArray::new(
+            (0..n)
+                .map(|i| AttrValue::SmallInt((i % 17) as i32 - 8))
+                .collect(),
+        );
+        for operation in ["std", "mean"] {
+            let expected = if operation == "std" { 24f64.sqrt() } else { 0. };
+            cases.push(measure(
+                &format!("attribute_expanding_{operation}_{n}"),
+                &[n],
+                || {
+                    let output = input.expanding(operation)?;
+                    let value = match output.data().last() {
+                        Some(AttrValue::Float(v)) => f64::from(*v),
+                        _ => {
+                            return Err(groggy::GraphError::InvalidInput(
+                                "Missing expanding statistic".into(),
+                            ))
+                        }
+                    };
+                    assert!((value - expected).abs() < 1e-6);
+                    Ok(value)
+                },
+            )?);
+        }
+    }
     let report = json!({"profile":"release","arch":std::env::consts::ARCH,"os":std::env::consts::OS,"samples_per_case":7,"reduction_dispatch":"reference/simd-name/auto share checked reference kernels; no explicit SIMD acceleration is claimed","scope":"bounded dense sizes, vector lengths, sparse bandwidth/fill and sparse-native graph-sized operations; not a production SLA","allocation_scope":"process-wide System allocation/reallocation requests; additional live-byte peak during operation; excludes fixture setup; includes output creation/drop; not RSS","cases":cases});
     let output = std::env::var("GROGGY_NUMERICAL_PROFILE")
         .unwrap_or_else(|_| "/tmp/groggy-numerical-profile.json".into());
