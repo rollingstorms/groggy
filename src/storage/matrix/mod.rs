@@ -12,6 +12,7 @@ mod decomposition;
 mod dot_product;
 mod linear_system;
 pub mod matrix_core;
+mod reductions;
 pub mod slicing;
 
 pub use conversions::*;

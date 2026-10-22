@@ -542,3 +542,6 @@ Use sorted unique in-range columns and no stored zeros as the explicit CSR contr
 
 ### Item 29 measured floating dot acceleration — 2026-10-21
 Optimize the exact reference kernel only with a behavior-preserving checked path. Integral-valued factors may accumulate in i128; flush exact subtotal bits to the bin accumulator when needed. Keep nonfinite checks ahead of zero shortcuts. Measure integral and fractional controls separately and retain the remaining fractional/reference cost explicitly.
+
+### Item 29 shared matrix reductions — 2026-10-21
+Use checked GraphResult global reductions and shared native typed kernels across axes/columns/trace. Keep sample axis and population column variance conventions explicit, along with typed-statistic conversion rather than introduce promotion. Preserve non-reduced axis length for empty inputs. Collect owned logical values/slices for consistent kernels and record this scratch/performance cost; lower-level/neural reductions are separate.

@@ -1071,214 +1071,101 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    /// Calculate mean along an axis
-    pub fn mean_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        let sums = self.sum_axis(axis)?;
-        let count = match axis {
-            Axis::Rows => self.shape().1,    // number of columns
-            Axis::Columns => self.shape().0, // number of rows
-        };
-
-        if count == 0 {
-            return Ok(Vec::new());
-        }
-
-        let count_t = T::from_f64(count as f64).unwrap_or(T::one());
-        Ok(sums.into_iter().map(|sum| T::div(sum, count_t)).collect())
-    }
-
-    /// Sample standard deviation (ddof=1), preserving the result element type.
-    /// Axis::Rows reduces each row; Axis::Columns reduces each column.
-    /// Empty and finite singleton reductions return zero, matching var_axis.
-    pub fn std_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        self.sample_variances(axis)?
-            .into_iter()
-            .map(|variance| Self::statistic_value(variance.sqrt()))
-            .collect()
-    }
-
-    /// Sample variance (ddof=1), using f64 intermediate accumulators.
-    /// Results retain T; integer matrices retain their existing conversion rules.
-    pub fn var_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
-    where
-        T: std::ops::Add<Output = T> + std::ops::Sub<Output = T> + std::ops::Mul<Output = T> + Copy,
-    {
-        self.sample_variances(axis)?
-            .into_iter()
-            .map(Self::statistic_value)
-            .collect()
-    }
-
-    fn statistic_value(value: f64) -> GraphResult<T> {
-        T::from_f64(value).ok_or_else(|| {
-            GraphError::InvalidInput(format!(
-                "Statistical result {value} cannot be represented as {:?}",
-                T::DTYPE
-            ))
+    /// Mean per logical axis; empty reductions are zero and outputs retain T.
+    pub fn mean_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
+        self.reduce_axis(axis, |values| {
+            Self::statistic_value(super::reductions::mean(values))
         })
     }
-
-    fn sample_variances(&self, axis: Axis) -> GraphResult<Vec<f64>> {
+    /// Sample standard deviation, independently scaled before output conversion.
+    pub fn std_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
+        self.reduce_axis(axis, |values| {
+            Self::statistic_value(super::reductions::std(values))
+        })
+    }
+    /// Sample variance; empty/finite singleton=0, nonfinite observations propagate NaN.
+    pub fn var_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
+        self.reduce_axis(axis, |values| {
+            Self::statistic_value(super::reductions::variance(values))
+        })
+    }
+    fn statistic_value(value: f64) -> GraphResult<T> {
+        T::from_f64(value).ok_or_else(|| {
+            GraphError::InvalidInput("Statistical output cannot be represented in dtype".into())
+        })
+    }
+    fn reduce_axis<R>(
+        &self,
+        axis: Axis,
+        operation: impl Fn(&[T]) -> GraphResult<R>,
+    ) -> GraphResult<Vec<R>> {
         let (rows, cols) = self.shape();
         let (outputs, samples) = match axis {
             Axis::Rows => (rows, cols),
             Axis::Columns => (cols, rows),
         };
-        let mut means = vec![0.0; outputs];
-        let mut squares = vec![0.0; outputs];
         let dense = match &self.storage.storage {
             crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Dense(buffer) => {
-                Some(buffer.data().map_err(|error| {
-                    GraphError::InvalidInput(format!("Cannot read dense matrix: {error}"))
+                Some(buffer.data().map_err(|e| {
+                    GraphError::InvalidInput(format!("Cannot read matrix storage: {e}"))
                 })?)
             }
             _ => None,
         };
-        // Welford updates in row-major traversal avoid whole-matrix temporaries
-        // and the unstable E[x*x] - E[x]^2 formula.
+        (0..outputs)
+            .map(|index| {
+                let values = (0..samples)
+                    .map(|sample| {
+                        let (row, col) = match axis {
+                            Axis::Rows => (index, sample),
+                            Axis::Columns => (sample, index),
+                        };
+                        match &dense {
+                            Some(buffer) => buffer
+                                .as_slice()
+                                .get(self.storage.strides.index(row, col))
+                                .copied()
+                                .ok_or_else(|| {
+                                    GraphError::InvalidInput(
+                                        "Missing matrix reduction value".into(),
+                                    )
+                                }),
+                            None => self.get_checked(row, col),
+                        }
+                    })
+                    .collect::<GraphResult<Vec<_>>>()?;
+                operation(&values)
+            })
+            .collect()
+    }
+    fn logical_values(&self) -> GraphResult<Vec<T>> {
+        let (rows, cols) = self.shape();
+        let count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| GraphError::InvalidInput("Matrix element count overflow".into()))?;
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(count)
+            .map_err(|_| GraphError::InvalidInput("Matrix reduction allocation failed".into()))?;
         for row in 0..rows {
             for col in 0..cols {
-                let value = if let Some(buffer) = &dense {
-                    buffer
-                        .as_slice()
-                        .get(self.storage.strides.index(row, col))
-                        .copied()
-                } else {
-                    self.get(row, col)
-                }
-                .ok_or_else(|| {
-                    GraphError::InvalidInput(format!("Missing matrix value at ({row}, {col})"))
-                })?
-                .to_f64();
-                let (index, count) = match axis {
-                    Axis::Rows => (row, col + 1),
-                    Axis::Columns => (col, row + 1),
-                };
-                let delta = value - means[index];
-                means[index] += delta / count as f64;
-                squares[index] += delta * (value - means[index]);
+                values.push(self.get_checked(row, col)?);
             }
         }
-        Ok(squares
-            .into_iter()
-            .map(|sum| {
-                if samples > 1 {
-                    sum / (samples - 1) as f64
-                } else {
-                    sum
-                }
-            })
-            .collect())
+        Ok(values)
     }
 
-    /// Calculate minimum along an axis
-    pub fn min_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
-    where
-        T: PartialOrd + Copy,
-    {
-        let (rows, cols) = self.shape();
-        match axis {
-            Axis::Rows => {
-                // Minimum of each row across columns
-                let mut result = Vec::with_capacity(rows);
-                for row in 0..rows {
-                    let mut row_min = None;
-                    for col in 0..cols {
-                        if let Some(value) = self.get(row, col) {
-                            match row_min {
-                                None => row_min = Some(value),
-                                Some(current_min) => {
-                                    if value < current_min {
-                                        row_min = Some(value);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    result.push(row_min.unwrap_or_else(|| T::zero()));
-                }
-                Ok(result)
-            }
-            Axis::Columns => {
-                // Minimum of each column across rows
-                let mut result = Vec::with_capacity(cols);
-                for col in 0..cols {
-                    let mut col_min = None;
-                    for row in 0..rows {
-                        if let Some(value) = self.get(row, col) {
-                            match col_min {
-                                None => col_min = Some(value),
-                                Some(current_min) => {
-                                    if value < current_min {
-                                        col_min = Some(value);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    result.push(col_min.unwrap_or_else(|| T::zero()));
-                }
-                Ok(result)
-            }
-        }
+    /// Minimum per axis; empty reductions retain legacy zero, NaNs propagate.
+    pub fn min_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
+        self.reduce_axis(axis, |values| {
+            Ok(super::reductions::extremum(values, true)?.unwrap_or_else(T::zero))
+        })
     }
-
-    /// Calculate maximum along an axis
-    pub fn max_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
-    where
-        T: PartialOrd + Copy,
-    {
-        let (rows, cols) = self.shape();
-        match axis {
-            Axis::Rows => {
-                // Maximum of each row across columns
-                let mut result = Vec::with_capacity(rows);
-                for row in 0..rows {
-                    let mut row_max = None;
-                    for col in 0..cols {
-                        if let Some(value) = self.get(row, col) {
-                            match row_max {
-                                None => row_max = Some(value),
-                                Some(current_max) => {
-                                    if value > current_max {
-                                        row_max = Some(value);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    result.push(row_max.unwrap_or_else(|| T::zero()));
-                }
-                Ok(result)
-            }
-            Axis::Columns => {
-                // Maximum of each column across rows
-                let mut result = Vec::with_capacity(cols);
-                for col in 0..cols {
-                    let mut col_max = None;
-                    for row in 0..rows {
-                        if let Some(value) = self.get(row, col) {
-                            match col_max {
-                                None => col_max = Some(value),
-                                Some(current_max) => {
-                                    if value > current_max {
-                                        col_max = Some(value);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    result.push(col_max.unwrap_or_else(|| T::zero()));
-                }
-                Ok(result)
-            }
-        }
+    /// Maximum per axis; empty reductions retain legacy zero, NaNs propagate.
+    pub fn max_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
+        self.reduce_axis(axis, |values| {
+            Ok(super::reductions::extremum(values, false)?.unwrap_or_else(T::zero))
+        })
     }
 
     /// Materialize the matrix (convert lazy operations to concrete data)
@@ -1360,42 +1247,9 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(matrix)
     }
 
-    /// Sum along a specific axis
-    pub fn sum_axis(&self, axis: Axis) -> GraphResult<Vec<T>>
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        let (rows, cols) = self.shape();
-        match axis {
-            Axis::Rows => {
-                // Sum each row across columns (returns vector of length `rows`)
-                let mut result = Vec::with_capacity(rows);
-                for row in 0..rows {
-                    let mut row_sum = T::zero();
-                    for col in 0..cols {
-                        if let Some(value) = self.get(row, col) {
-                            row_sum = row_sum + value;
-                        }
-                    }
-                    result.push(row_sum);
-                }
-                Ok(result)
-            }
-            Axis::Columns => {
-                // Sum each column across rows (returns vector of length `cols`)
-                let mut result = Vec::with_capacity(cols);
-                for col in 0..cols {
-                    let mut col_sum = T::zero();
-                    for row in 0..rows {
-                        if let Some(value) = self.get(row, col) {
-                            col_sum = col_sum + value;
-                        }
-                    }
-                    result.push(col_sum);
-                }
-                Ok(result)
-            }
-        }
+    /// Checked typed sum per axis, with exact floating accumulation.
+    pub fn sum_axis(&self, axis: Axis) -> GraphResult<Vec<T>> {
+        self.reduce_axis(axis, super::reductions::sum)
     }
 
     /// Reshape matrix to new dimensions while preserving total element count
@@ -1437,82 +1291,21 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    /// Global sum of all elements in the matrix
-    pub fn sum(&self) -> T
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        let (rows, cols) = self.shape();
-        let mut total = T::zero();
-        for row in 0..rows {
-            for col in 0..cols {
-                if let Some(value) = self.get(row, col) {
-                    total = total + value;
-                }
-            }
-        }
-        total
+    /// Checked typed global sum; callers must handle GraphResult.
+    pub fn sum(&self) -> GraphResult<T> {
+        super::reductions::sum(&self.logical_values()?)
     }
-
-    /// Global mean of all elements in the matrix
-    pub fn mean(&self) -> f64
-    where
-        T: std::ops::Add<Output = T> + Copy,
-    {
-        let (rows, cols) = self.shape();
-        let total_elements = (rows * cols) as f64;
-        if total_elements == 0.0 {
-            return 0.0;
-        }
-        self.sum().to_f64() / total_elements
+    /// Global f64 mean, avoiding intermediate typed-sum overflow; empty=0.
+    pub fn mean(&self) -> GraphResult<f64> {
+        Ok(super::reductions::mean(&self.logical_values()?))
     }
-
-    /// Global minimum value in the matrix
-    pub fn min(&self) -> Option<T>
-    where
-        T: PartialOrd + Copy,
-    {
-        let (rows, cols) = self.shape();
-        let mut min_val = None;
-        for row in 0..rows {
-            for col in 0..cols {
-                if let Some(value) = self.get(row, col) {
-                    match min_val {
-                        None => min_val = Some(value),
-                        Some(current_min) => {
-                            if value < current_min {
-                                min_val = Some(value);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        min_val
+    /// Global minimum; empty=None and any NaN propagates.
+    pub fn min(&self) -> GraphResult<Option<T>> {
+        super::reductions::extremum(&self.logical_values()?, true)
     }
-
-    /// Global maximum value in the matrix
-    pub fn max(&self) -> Option<T>
-    where
-        T: PartialOrd + Copy,
-    {
-        let (rows, cols) = self.shape();
-        let mut max_val = None;
-        for row in 0..rows {
-            for col in 0..cols {
-                if let Some(value) = self.get(row, col) {
-                    match max_val {
-                        None => max_val = Some(value),
-                        Some(current_max) => {
-                            if value > current_max {
-                                max_val = Some(value);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        max_val
+    /// Global maximum; empty=None and any NaN propagates.
+    pub fn max(&self) -> GraphResult<Option<T>> {
+        super::reductions::extremum(&self.logical_values()?, false)
     }
 
     /// Calculate the trace (sum of diagonal elements) of the matrix
@@ -1529,13 +1322,10 @@ impl<T: NumericType> GraphMatrix<T> {
             )));
         }
 
-        let mut trace_sum = T::zero();
-        for i in 0..rows {
-            if let Some(diagonal_value) = self.get(i, i) {
-                trace_sum = trace_sum + diagonal_value;
-            }
-        }
-        Ok(trace_sum)
+        let diagonal = (0..rows)
+            .map(|i| self.get_checked(i, i))
+            .collect::<GraphResult<Vec<_>>>()?;
+        super::reductions::sum(&diagonal)
     }
 
     /// Calculate the Frobenius norm (Euclidean norm) of the matrix
@@ -2990,37 +2780,11 @@ impl<T: NumericType> GraphMatrix<T> {
         self.zip_arithmetic(other, T::checked_add)
     }
 
-    /// Compute variance of each column
-    pub fn column_variances(&self) -> GraphResult<Vec<f64>>
-    where
-        T: Into<f64> + Copy,
-    {
-        let (rows, cols) = self.shape();
-        let mut variances = Vec::with_capacity(cols);
-
-        for col in 0..cols {
-            if let Some(column_data) = self.get_column(col) {
-                // Compute mean
-                let sum: f64 = column_data.iter().map(|&x| x.into()).sum();
-                let mean = sum / rows as f64;
-
-                // Compute variance
-                let variance: f64 = column_data
-                    .iter()
-                    .map(|&x| {
-                        let diff = x.into() - mean;
-                        diff * diff
-                    })
-                    .sum::<f64>()
-                    / rows as f64;
-
-                variances.push(variance);
-            } else {
-                variances.push(0.0);
-            }
-        }
-
-        Ok(variances)
+    /// Population variance per column (ddof=0), preserving this legacy convention.
+    pub fn column_variances(&self) -> GraphResult<Vec<f64>> {
+        self.reduce_axis(Axis::Columns, |values| {
+            Ok(super::reductions::population_variance(values))
+        })
     }
 
     /// Concatenate matrices horizontally (by columns)
@@ -3042,24 +2806,8 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(result)
     }
 
-    /// Compute mean of each column
-    pub fn column_means(&self) -> GraphResult<Vec<f64>>
-    where
-        f64: From<T>,
-    {
-        let (rows, cols) = self.shape();
-        let mut means = Vec::with_capacity(cols);
-
-        for col in 0..cols {
-            if let Some(column_data) = self.get_column(col) {
-                let sum: f64 = column_data.iter().map(|&x| f64::from(x)).sum();
-                let mean = sum / rows as f64;
-                means.push(mean);
-            } else {
-                means.push(0.0);
-            }
-        }
-
-        Ok(means)
+    /// f64 mean per column; empty reductions are zero.
+    pub fn column_means(&self) -> GraphResult<Vec<f64>> {
+        self.reduce_axis(Axis::Columns, |values| Ok(super::reductions::mean(values)))
     }
 }

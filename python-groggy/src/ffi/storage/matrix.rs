@@ -759,22 +759,30 @@ impl PyGraphMatrix {
 
     /// Global sum of all elements in the matrix
     fn sum(&self) -> PyResult<f64> {
-        Ok(self.inner.sum())
+        self.inner
+            .sum()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
     /// Global mean of all elements in the matrix  
     fn mean(&self) -> PyResult<f64> {
-        Ok(self.inner.mean())
+        self.inner
+            .mean()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
     /// Global minimum value in the matrix
     fn min(&self) -> PyResult<Option<f64>> {
-        Ok(self.inner.min())
+        self.inner
+            .min()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
     /// Global maximum value in the matrix
     fn max(&self) -> PyResult<Option<f64>> {
-        Ok(self.inner.max())
+        self.inner
+            .max()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
     // === SCIENTIFIC COMPUTING CONVERSIONS ===

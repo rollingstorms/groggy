@@ -211,6 +211,20 @@ pub(crate) fn variance_iter<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(
 ) -> Option<f64> {
     dispersion(data, None).map(|(factor, scale)| (factor * scale) * scale)
 }
+/// Population counterpart for matrix column APIs; empty=None, finite singleton=0.
+pub(crate) fn population_variance_iter<S: Scalar, I: ExactSizeIterator<Item = S> + Clone>(
+    data: I,
+) -> Option<f64> {
+    let n = data.len();
+    dispersion(data, None).map(|(factor, scale)| {
+        let factor = if n > 1 {
+            factor * ((n - 1) as f64 / n as f64)
+        } else {
+            factor
+        };
+        (factor * scale) * scale
+    })
+}
 /// Standard deviation computed before rescaling, even when variance overflows.
 pub fn std_dev<S: Scalar>(data: &[S]) -> Option<f64> {
     std_iter(data.iter().copied())
