@@ -1,8 +1,8 @@
 # Module consolidation review — 2026-10-22
 
-Status: proposal following the user's request to unify matrix/advanced_matrix
-and identify similarly ambiguous boundaries. No module moves are implemented by
-this review. Existing functionality and public imports should remain supported
+Status: reviewed and now tracked as AR7.1–AR7.11 in the flat checklist at the
+user's request. The inventory is complete; no module moves are implemented by
+this review. The finish-priority plan schedules matrix/array foundations first. Existing functionality and public imports should remain supported
 through compatibility re-exports during migration.
 
 ## First: one matrix module

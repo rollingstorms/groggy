@@ -8,6 +8,17 @@ Companion to the design workbook. Baseline: `c01f20d4`, branch `groggy-roadmap-2
 
 A01-A06 cover storage/history dependencies; A07-A11 cover schema, merge, retention, views and indexing; A12-A15 cover algorithms, numerical behavior, pipelines and operating targets. A16 covers duplicate/retry policy; A17 is deferred Graphiti integration.
 
+### Implementation priority while this workbook is being completed
+
+See [the finish plan](roadmap-finish-priorities-2026-10-22.md) for per-task gates.
+Prioritize **A01 and A03–A06** for upcoming state/history/temporal decisions,
+then **A02 and A07–A11** for durable lifecycle, merge, retention, table and index
+policies. A12–A13/A16 accompany relevant compatibility/verification work;
+A14–A15 precede pipeline/service commitments; A17 stays behind core completion.
+Module consolidation and accepted read/ownership/numerical correctness work can
+continue now. This reading order does not supply answers or override established
+choices; all blank decision fields below remain unchanged.
+
 ## Established constraints
 
 Immutable state-pinned views; stale writes conflict; one version per accepted checked batch; separate effective/recorded time; explicit optional recorded_by; inactive history retained until explicit purge; global identity; flexible properties with optional schema; one serialized writer first; undirected default; Neo4j/NetworkX comparison targets; Graphiti integration deferred behind core/numerical completion.

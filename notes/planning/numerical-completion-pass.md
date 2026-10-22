@@ -77,3 +77,13 @@ The existing 25-case release corpus was rebuilt and rerun idle; see
 strict gates remain open. The user's matrix/advanced_matrix consolidation request
 and related candidate review are recorded separately in
 `module-consolidation-review-2026-10-22.md`; module moves are not yet implemented.
+
+## Scheduled next work
+
+Module moves are tracked in checklist AR7.2–AR7.3 before final numerical parent
+closure: matrix/advanced_matrix/adjacency first, then canonical arrays/shared
+numeric primitives, using the current tests and release receipt as migration
+baselines. Preserve old imports. Finish a finite numerical finding inventory,
+size/fill/dispatch measurement and API/lint gates; do not introduce unrelated
+optional features as automatic blockers. See
+`roadmap-finish-priorities-2026-10-22.md` for subsequent core work and workbook gates.

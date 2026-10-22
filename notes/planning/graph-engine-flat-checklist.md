@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-10-21 on `groggy-roadmap-2026-10-20`.
+Updated 2026-10-22 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -19,6 +19,33 @@ or batch clock default. It does not mean computing a read records new history.
 An explicit snapshot/checkpoint and a reconstructed effective-time view are
 separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
+
+## Execution priority — remaining work
+
+The stable 01–34 and AR IDs below are retained. Consolidation is now tracked as
+AR7, with explicit tasks rather than an unimplemented proposal alone. Existing
+checkmarks retain their stated scope; no broad parent closes merely because many
+subtasks passed. Detailed dependencies and workbook gates are in
+[the finish plan](roadmap-finish-priorities-2026-10-22.md).
+
+| Order | Work to finish | Checklist IDs | Workbook boundary |
+| --- | --- | --- | --- |
+| 1 | Consolidate matrix/advanced_matrix/adjacency and shared array/numeric foundations; finish numerical audit/performance gates. | AR7.2–AR7.3; 29.3–29.6, 29.25–29.26; 32.3 | Preserve current contracts; no new policy needed for module migration. A13/A15 govern additional guarantees/target selection. |
+| 2 | Canonical entity handles, shared view ownership, live/retained read rules and pinned state reads. | AR7.4–AR7.5, AR1–AR2, AR4; 02.2, 03.2, 12.2, 26.1 | Accepted immutable/state-pin model permits read work now. New writeback/join choices wait for A10. |
+| 3 | Finish the property/change/snapshot model, coordinated writes, retained pool/meta recovery and effective-time reconstruction. | AR7.9, AR3, AR6; 04.2, 05.3, 06.3, 07.3–07.4, 09.4, 10.3, 11.2, 12.2–12.3, 13.3, 16.2–16.3 | A01, A03–A06 gate new lifecycle, compatibility and temporal-conflict policy. Implement unambiguous accepted cases and shared machinery while answers are pending. |
+| 4 | Storage lifecycle, schema evolution, complete branches/merges and explicit retention/reclamation. | 08.3, 10.4, 14.1–14.2, 15.1–15.2; AR6 | A02, A07–A09; format/recovery machinery can proceed separately from choosing automatic schedules or destructive policy. |
+| 5 | Complete indexes/native queries, table identity/writeback, remaining algorithms and pipeline execution. | AR7.7–AR7.8, AR7.10; 18.2–18.3, 21.1–21.2, 27.1–27.2, 28.09, 28.15–28.16, 30.1–30.2 | A10–A12/A14/A16 as applicable. Table work resumes after numerical/core foundations; no implicit decision on ambiguous writeback or pipeline history. |
+| 6 | Finish presentation/API consolidation, differential/failure/scale evidence, operational tooling and core release documentation. | AR5, AR7.6, AR7.11; 01.2, 09.5, 19.2, 31.3–31.4, 32.1–32.3, 33.2–33.3, 34.1–34.2 | Tests/docs run throughout. Service/scale commitments require A15; complete embedded and multi-user milestones separately. |
+| 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
+
+**Immediate next task:** AR7.2, using the existing numerical tests and 25-case
+release receipt as the before-move baseline. Preserve public imports with
+compatibility re-exports. Then AR7.3 and a finite 29 closeout finding list; do not
+turn every potential enhancement into a new prerequisite. A finding is resolved
+by implementation/evidence or an explicit owner-approved deferral, not by
+silently weakening a promised capability.
+
+## Flat implementation checklist
 
 - [x] **01.1 — Established graph baseline.** Verify empty construction, undirected default, explicit directed creation, and the one-node/no-edge minimum in Rust and Python. Evidence: `engine_contract` suites.
 - [ ] **01.2 — Review: extend conformance with each repaired surface.** Cover the established contract across history, properties, views, queries, tables, algorithms, and persistence; keep baseline checks distinct from full conformance.
@@ -177,6 +204,19 @@ accepted pinned-state model.
 - [ ] **AR4 — Open: explicit view ownership.** Finish immutable state/time pins, checked view writes, and graph-table ownership across 12 and 26–27; ordinary current Subgraph values are not yet pinned snapshots.
 - [ ] **AR5 — Partial: smaller Graph coordinator.** Preserve public APIs while extracting cohesive mutation/topology/history/table responsibilities, keeping Rust business logic, thin FFI translation, and a separate deferred Graphiti adapter.
 - [ ] **AR6 — Partial: complete persistence boundary.** Retain the documented distinction between active export and recoverable checked journal storage; complete pooled contents, lifecycle, concurrency, and compatibility before claiming a durable multi-user Graphiti system of record.
+
+- [ ] **AR7 — Open: consolidate modules around authoritative ownership.** Keep the original 34 workstreams; this is architecture work supporting them. Preserve functioning APIs and separate concepts through internal modules/types. Track implementation and caller migration below; the review itself is not a completed refactor.
+- [x] **AR7.1 — Consolidation inventory and proposal.** Identify matrix/advanced_matrix/adjacency dependency cycles, two BaseArray implementations, parallel entity wrappers, overlapping view ownership/display systems and query/execution/state/table boundaries. Evidence: `module-consolidation-review-2026-10-22.md`; implementation tasks remain unchecked.
+- [ ] **AR7.2 — One matrix module.** Move matrix/advanced_matrix and adjacency helpers behind one canonical matrix module with explicit storage/layout, kernels/linalg, graph operators, autodiff and backend/buffer responsibilities. Keep the public matrix/storage/owned-transfer distinctions; preserve old public import paths through compatibility re-exports. Separate generic autodiff from layer-specific neural functionality. Verify imports, native/Python numerical behavior and before/after benchmark receipts.
+- [ ] **AR7.3 — One array foundation and shared numeric primitives.** Migrate the nongeneric/generic BaseArray overlap to one canonical column representation while retaining NumArray/BoolArray roles and required metadata. Give dtype, conversion, checked scalar arithmetic and accurate accumulation a shared owner so arrays do not depend on matrix facade internals. Verify dtype/precision/null/ownership and public conversion compatibility.
+- [ ] **AR7.4 — One entity-handle family.** Consolidate EntityNode/EntityEdge and Node/Edge graph-backed wrappers under entities; preserve ID/trait/mutation/history behavior and compatibility names. Keep pooled value storage separate from entity handles; migrate every actual caller.
+- [ ] **AR7.5 — Shared view state and membership ownership.** Consolidate common membership, state/time pins, cache validity and adjacency scope across subgraph variants. Retain filter/component/neighborhood metadata and efficient specialized algorithms. Complete AR4/26 contracts rather than treating code movement as proof that a view is immutable.
+- [ ] **AR7.6 — One display foundation.** Consolidate display/viz-display configuration, data formatting and truncation; use thin Python/interactive adapters. Preserve intentional presentation differences and examples. Move presentation responsibilities out of misleading core compatibility exports after callers migrate.
+- [ ] **AR7.7 — Shared expression/query semantics.** Inventory array filters, graph query parsing and builder expressions; share supported scalar predicate/value semantics and explicit lowering. Preserve distinct graph traversal planning and documented language features; test current APIs before retiring parallel parsing paths.
+- [ ] **AR7.8 — Coherent algorithm execution boundary.** Map algorithm pipelines, steps, Python IR and batch plans to one validation/lowering/execution contract, retaining distinct composition levels. Remove overlapping execution paths only after feature parity/cancellation/state ownership evidence; resolve A14 before changing naming/history policy.
+- [ ] **AR7.9 — Canonical state/change records.** Consolidate duplicate AttributeChange/EntityType definitions and overlapping change conversions. Preserve selected state, retained history lineage and effective-time indexing as distinct responsibilities; verify typed deltas/reconstruction/storage compatibility before migrating serialization.
+- [ ] **AR7.10 — Explicit table foundation and graph adapters.** Share column/table ownership and conversion/writeback mechanisms while retaining node/edge bundles and table collections where their roles differ. Resolve identity/update contracts under 27 and A10; no blanket merger of all table types.
+- [ ] **AR7.11 — Consolidation compatibility and retirement gate.** For each move, migrate internal/FFI/Python callers, keep documented compatibility imports, verify examples and relevant persistence schemas, and compare numerical/graph behavior and benchmark receipts. Retire old implementation paths only when no supported behavior depends on them. Record any public-name removal separately rather than silently breaking users.
 
 - [x] **29.43 — Checked matrix statistics and sparse reductions.** Stable checked entrywise norms and lower population statistics, exact typed integer means, logical-layout validation and CSR zero-group reductions. Full native suites and 310 rebuilt Python numerical regressions passed. Helper APIs, automatic gradients and production gates remain open. See docs/api/matrix-statistics.md.
 

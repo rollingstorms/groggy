@@ -661,3 +661,15 @@ Add checked zero/one/identity/storage wrappers including label allocation, remov
 
 ### Item 29.59 — Replay scalar primals and deterministic tape execution
 Store scalar shifts/divisors as actual forward operations rather than derivative-only identity/reciprocal nodes. Pull scalar division gradients back by direct division so representable results survive reciprocal overflow. Use deterministic node-ID topological ordering, reject missing dependencies before publishing operation nodes and route matrix-product contributions through shared repeated-input accumulation. Full locked offline native suites, focused Clippy (excluding existing sort/match categories) and 455 rebuilt Python regressions passed. Native replay/ordering/dependency and native/Python subnormal-cotangent fixtures cover the repairs. See docs/api/matrix-arithmetic-autodiff.md.
+
+### Module consolidation and finish priorities — 2026-10-22
+
+The owner requested adding consolidation to the flat checklist and prioritizing
+completion while the workbook is pending. AR7.1 records the completed inventory;
+AR7.2–AR7.11 track module/caller consolidation and compatibility verification.
+The proposed execution order starts with matrix/array foundations and numerical
+closeout, then entity/view ownership, state/history/time, durable lifecycle and
+remaining core surfaces, with Graphiti integration after core completion. The
+finish plan maps remaining IDs and specific appendix dependencies. This planning
+update supplies no answers to blank workbook questions and marks no module moves
+or original roadmap parents complete. See `roadmap-finish-priorities-2026-10-22.md`.

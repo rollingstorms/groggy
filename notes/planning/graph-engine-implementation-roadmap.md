@@ -31,6 +31,21 @@ These are changes to the *existing* engine's internal responsibilities, not a re
 - **AR5 — A smaller coordinator and thin adapters (items 19, 21, 25, 30).** Keep `Graph` as the stable public facade while moving mutation coordination, topology reads, history, and table conversion into cohesive internal components. Keep FFI limited to translation, and put Graphiti episode, provenance, UUID, and temporal mapping in an adapter above the core. Split crates or files only where this yields a real responsibility boundary.
 - **AR6 — Honest persistence boundary (items 10, 20, 25, 33–34).** Decide whether Groggy is an in-memory engine with export or Graphiti's durable system of record. If durable, persist snapshots and the typed change record with versioned recovery and migration. Keep existing export functions distinct from a transactional storage guarantee, and make incomplete or no-op public operations explicit rather than silently succeeding.
 
+## Current completion order — 2026-10-22
+
+Module consolidation is now implementation work in flat-checklist **AR7.1–AR7.11**,
+with the inventory complete and module moves still open. Preserve the original
+34 roadmap items and existing functionality/imports. Start with matrix and shared
+array/numeric foundations, close the numerical gates, then entity/view ownership,
+exact state/history/time, durable lifecycle, query/table/algorithm/pipeline surfaces
+and the core release/service gates. Verification runs throughout; Graphiti-specific
+integration remains behind the core milestone and stays on the full roadmap.
+
+The [finish priorities](roadmap-finish-priorities-2026-10-22.md) map checklist IDs to
+dependencies and specific workbook questions. Module moves and already-decided
+correctness work can proceed while the owner completes the workbook. Blank
+answers do not settle new mutation, temporal, merge, purge or service policy.
+
 ## Stage 1 — Verify and repair core invariants
 
 Preserve Groggy's established graph model and make its behavior consistent across public APIs. The one-node, zero-edge graph is the smallest meaningful graph; an empty `Graph` is also supported as a construction state. This stage tests and repairs implementation against the existing contract.
