@@ -615,7 +615,7 @@ impl Context {
 
         // Sort by total duration (descending)
         let mut counters: Vec<_> = self.call_counters.iter().collect();
-        counters.sort_by(|a, b| b.1.total_duration().cmp(&a.1.total_duration()));
+        counters.sort_by_key(|counter| std::cmp::Reverse(counter.1.total_duration()));
 
         println!(
             "\n{:<50} {:>10} {:>12} {:>12}",

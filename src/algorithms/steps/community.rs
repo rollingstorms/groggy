@@ -99,7 +99,7 @@ impl Step for CommunitySeedStep {
                         (n, deg)
                     })
                     .collect();
-                degree_pairs.sort_by(|a, b| b.1.cmp(&a.1));
+                degree_pairs.sort_by_key(|pair| std::cmp::Reverse(pair.1));
 
                 // High-degree nodes (top 10% or at least 1) get unique labels
                 let num_hubs = ((nodes.len() as f64 * 0.1).ceil() as usize).max(1);

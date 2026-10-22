@@ -91,12 +91,12 @@ fn verify_eigen(data: &[f64], n: usize) -> Vec<f64> {
     orthogonal(&v);
     assert!(values.windows(2).all(|x| x[0] >= x[1]));
     let scale = data.iter().fold(1e-300_f64, |v, x| v.max(x.abs()));
-    for col in 0..n {
+    for (col, &eigenvalue) in values.iter().enumerate().take(n) {
         for row in 0..n {
             let av: f64 = (0..n)
                 .map(|k| data[row * n + k] / scale * v.get(k, col).unwrap())
                 .sum();
-            assert!((av - v.get(row, col).unwrap() * (values[col] / scale)).abs() < 1e-10);
+            assert!((av - v.get(row, col).unwrap() * (eigenvalue / scale)).abs() < 1e-10);
         }
     }
     values
@@ -218,12 +218,12 @@ fn f32_symmetric_eigendecomposition_is_available_with_f64_accumulation() {
     let a = GraphMatrix::<f32>::from_row_major_data(vec![2., 1., 1., 2.], 2, 2, None).unwrap();
     let (values, v) = a.eigenvalue_decomposition().unwrap();
     assert!((values[0] - 3.).abs() < 1e-12 && (values[1] - 1.).abs() < 1e-12);
-    for col in 0..2 {
+    for (col, &eigenvalue) in values.iter().enumerate().take(2) {
         for row in 0..2 {
             let actual: f64 = (0..2)
                 .map(|k| a.get(row, k).unwrap() as f64 * v.get(k, col).unwrap() as f64)
                 .sum();
-            assert!((actual - values[col] * v.get(row, col).unwrap() as f64).abs() < 1e-6);
+            assert!((actual - eigenvalue * v.get(row, col).unwrap() as f64).abs() < 1e-6);
         }
     }
 }

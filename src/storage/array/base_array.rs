@@ -858,9 +858,9 @@ impl BaseArray<AttrValue> {
         // Sort if requested
         if sort {
             if ascending {
-                results.sort_by(|a, b| a.1.cmp(&b.1));
+                results.sort_by_key(|entry| entry.1);
             } else {
-                results.sort_by(|a, b| b.1.cmp(&a.1));
+                results.sort_by_key(|entry| std::cmp::Reverse(entry.1));
             }
         }
 

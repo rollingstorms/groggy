@@ -1,7 +1,7 @@
 //! Release numerical corpus with process-wide allocation receipts (single runner).
 use groggy::{
     storage::{
-        matrix::{MatrixStats, UnifiedMatrix},
+        matrix::{MatrixLayout, MatrixStats, UnifiedMatrix},
         Axis, GraphMatrix, NumArray,
     },
     GraphResult,
@@ -68,6 +68,11 @@ fn measure(
         BYTES.store(0, Relaxed);
         let start = Instant::now();
         let checksum = black_box(operation()?);
+        if !checksum.is_finite() {
+            return Err(groggy::GraphError::InvalidInput(format!(
+                "Nonfinite benchmark checksum: {name}"
+            )));
+        }
         let seconds = start.elapsed().as_secs_f64();
         let (calls, bytes, peak) = (
             CALLS.load(Relaxed),
@@ -216,7 +221,93 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     cases.push(measure("large_tall_least_squares", &[10000, 4, 1], || {
         tall.least_squares(&rhs, None)?.sum()
     })?);
-    let report = json!({"profile":"release","arch":std::env::consts::ARCH,"os":std::env::consts::OS,"samples_per_case":7,"allocation_scope":"process-wide System allocation/reallocation requests; additional live-byte peak during operation; excludes fixture setup; includes output creation/drop; not RSS","cases":cases});
+    // Larger bounded workloads; fixture creation is excluded from measurements.
+    for n in [128, 256, 512] {
+        let input = matrix(n);
+        let transposed = input.transpose()?;
+        cases.push(measure(
+            &format!("dense_fractional_matmul_{n}"),
+            &[n, n, n],
+            || input.multiply(&transposed)?.sum(),
+        )?);
+    }
+    let mut column_storage =
+        UnifiedMatrix::<f64>::new_with_layout(96, 96, MatrixLayout::ColumnMajor)?;
+    for row in 0..96 {
+        for col in 0..96 {
+            column_storage.set(row, col, ((row * 31 + col * 17) % 127) as f64 / 131.)?;
+        }
+    }
+    let column_major = GraphMatrix::try_from_storage(column_storage)?;
+    cases.push(measure("column_major_matmul_96", &[96, 96, 96], || {
+        column_major.multiply(&column_major)?.sum()
+    })?);
+    let n = 1_000_000;
+    let vector = NumArray::new((0..n).map(|i| (i % 127) as f64 / 131.).collect());
+    assert_eq!(vector.sum(), vector.sum_simd());
+    assert_eq!(vector.sum(), vector.sum_auto());
+    cases.push(measure("million_vector_add_and_sum", &[n], || {
+        Ok(vector.checked_add(&vector)?.sum())
+    })?);
+    cases.push(measure("million_vector_dot", &[n], || vector.dot(&vector))?);
+    cases.push(measure("million_vector_norm", &[n], || Ok(vector.norm()))?);
+    cases.push(measure("million_vector_reference_sum", &[n], || {
+        Ok(vector.sum())
+    })?);
+    cases.push(measure("million_vector_simd_name_sum", &[n], || {
+        Ok(vector.sum_simd())
+    })?);
+    cases.push(measure("million_vector_auto_sum", &[n], || {
+        Ok(vector.sum_auto())
+    })?);
+    for width in [1, 4, 16] {
+        let n = 2000;
+        let mut indices = Vec::with_capacity(n * width);
+        for row in 0..n {
+            let mut row_indices: Vec<_> = (0..width).map(|offset| (row + offset) % n).collect();
+            row_indices.sort_unstable();
+            indices.extend(row_indices);
+        }
+        let input = GraphMatrix::from_csr(
+            n,
+            n,
+            vec![1. / width as f64; n * width],
+            indices,
+            (0..=n).map(|row| row * width).collect(),
+        )?;
+        let product = input.multiply(&input)?;
+        assert!(product.is_sparse());
+        assert!((product.sum()? - n as f64).abs() < 1e-9);
+        let mut receipt = measure(&format!("csr_band_product_width_{width}"), &[n, n], || {
+            input.multiply(&input)?.sum()
+        })?;
+        receipt["input_nnz"] = json!(n * width);
+        receipt["output_nnz"] = json!(n * n - product.zero_count()?);
+        cases.push(receipt);
+        let rhs = GraphMatrix::try_ones(n, 8)?;
+        cases.push(measure(
+            &format!("csr_dense_rhs_width_{width}"),
+            &[n, n, 8],
+            || input.multiply(&rhs)?.sum(),
+        )?);
+    }
+    let n = 100_000;
+    let diagonal = GraphMatrix::from_csr(n, n, vec![4.; n], (0..n).collect(), (0..=n).collect())?;
+    let rhs = GraphMatrix::try_ones(n, 1)?;
+    cases.push(measure("large_csr_diagonal_solve", &[n, n, 1], || {
+        diagonal.solve(&rhs)?.sum()
+    })?);
+    cases.push(measure("large_csr_diagonal_cholesky", &[n, n], || {
+        diagonal.cholesky_decomposition()?.sum()
+    })?);
+    let nodes: Vec<_> = (0..n).collect();
+    let edges: Vec<_> = (0..n).map(|row| (row, (row + 1) % n, 1.)).collect();
+    cases.push(measure(
+        "large_csr_graph_operator_construction",
+        &[n, n],
+        || GraphMatrix::sparse_weighted_adjacency_from_edges(&nodes, &edges, true)?.sum(),
+    )?);
+    let report = json!({"profile":"release","arch":std::env::consts::ARCH,"os":std::env::consts::OS,"samples_per_case":7,"reduction_dispatch":"reference/simd-name/auto share checked reference kernels; no explicit SIMD acceleration is claimed","scope":"bounded dense sizes, vector lengths, sparse bandwidth/fill and sparse-native graph-sized operations; not a production SLA","allocation_scope":"process-wide System allocation/reallocation requests; additional live-byte peak during operation; excludes fixture setup; includes output creation/drop; not RSS","cases":cases});
     let output = std::env::var("GROGGY_NUMERICAL_PROFILE")
         .unwrap_or_else(|_| "/tmp/groggy-numerical-profile.json".into());
     std::fs::write(&output, serde_json::to_string_pretty(&report)?)?;

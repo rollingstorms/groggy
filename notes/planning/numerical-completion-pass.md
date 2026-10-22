@@ -53,7 +53,7 @@ preserved separately.
 
 ## Concrete remaining audit work
 
-- Broader production size/fill/SIMD and final regression/lint/API/documentation gates remain open.
+- Expanded bounded size/fill/reference-dispatch and strict core lint gates pass in 29.60. Remaining functional closeout is 29.61–29.63; production targets remain A15/29.26/32 work.
 
 - 29.53: shared raw-bound slice normalization and checked extreme steps; 437 Python regressions.
 
@@ -115,3 +115,16 @@ existing sort/match categories) and 455 rebuilt Python regressions passed. All 2
 optimized idle-run workload checksums match the pre-migration receipt at 1e-13;
 raw receipt is benches/numerical_array_foundation_2026-10-22.json. Broader numerical
 performance gates and remaining module/view tasks stay open.
+
+### Item 29.60 — Expanded release baseline and strict core gates
+
+Extend the corpus from 25 to 44 cases, retaining original checksums, finite result
+receipts and allocation/time samples. Cover dense through 512-square, million-value
+vectors/dispatch, banded sparse fill/mixed products and 100k-square sparse-native
+operations. Full locked offline native suites, 455 rebuilt Python regressions and
+strict all-target core Clippy pass after behavior-preserving sort/match/test lint
+cleanup. Record dispatch as reference (not SIMD acceleration), non-universal heap
+measurement and unresolved production budgets. The finite closeout finding list
+names remaining attribute/table, activation/tracking and sparse expansion repairs
+under 29.61–29.63; broad parents remain open. See the numerical expanded benchmark
+note and numerical-closeout-findings-2026-10-22.md.

@@ -814,7 +814,7 @@ impl TraversalEngine {
         self.state_pool.return_state(state);
 
         let postprocess_start = std::time::Instant::now();
-        components.sort_unstable_by(|a, b| b.size.cmp(&a.size));
+        components.sort_unstable_by_key(|component| std::cmp::Reverse(component.size));
         let postprocessing_time = postprocess_start.elapsed();
 
         let execution_time = start_time.elapsed();
