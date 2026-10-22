@@ -394,6 +394,15 @@ impl Subgraph {
         Arc::clone(cache)
     }
 
+    /// Compute an owned numerical snapshot of this view's selected active edges.
+    /// The view itself continues to read its live parent graph.
+    pub fn adjacency_matrix(&self, sparse: bool, weight_attr: Option<&str>) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
+        let graph = self.graph.borrow();
+        let nodes: Vec<_> = self.ordered_nodes().iter().copied().filter(|&id| graph.space().contains_node(id)).collect();
+        let edges: Vec<_> = self.ordered_edges().iter().copied().filter(|&id| graph.space().contains_edge(id)).collect();
+        graph.adjacency_from_entities(&nodes, &edges, sparse, weight_attr)
+    }
+
     /// Retrieve a cached CSR adjacency if the current version matches.
     pub(crate) fn csr_cache_get(&self, add_reverse: bool) -> Option<Arc<Csr>> {
         let version = {

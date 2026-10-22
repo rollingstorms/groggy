@@ -53,9 +53,6 @@ preserved separately.
 
 ## Concrete remaining audit work
 
-- Graph adjacency construction: true CSR graph export/storage-format selection,
-  parallel/loop weight accumulation, deterministic coordinate order and failure
-  propagation still need a shared checked builder.
 - General matrix arithmetic tape composition: avoid silent detachment and
   cloned-tape node collisions; factor output routes are complete in their stated
   supported domains (29.24), while broad composition remains open.
@@ -65,3 +62,5 @@ preserved separately.
   size/fill/SIMD and final regression/lint/API/documentation gates remain open.
 
 - 29.53: shared raw-bound slice normalization and checked extreme steps; 437 Python regressions.
+
+- 29.54: checked graph/view adjacency construction, real CSR, parallel accumulation and scoped identity/weights; 439 Python regressions.

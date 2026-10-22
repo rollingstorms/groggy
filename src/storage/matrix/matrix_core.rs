@@ -12,6 +12,8 @@
 
 #[path = "factor_autodiff.rs"]
 mod factor_autodiff;
+#[path = "graph_construction.rs"]
+mod graph_construction;
 #[path = "graph_transforms.rs"]
 mod graph_transforms;
 #[path = "numerical_data.rs"]
@@ -26,7 +28,6 @@ use crate::storage::advanced_matrix::{
 use crate::storage::table::BaseTable;
 use crate::types::{AttrValue, NodeId};
 use crate::viz::display::DisplayConfig;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Owned solution plus a rounded normwise backward-error estimate.
@@ -228,7 +229,14 @@ impl<T: NumericType> GraphMatrix<T> {
             .map_err(|e| GraphError::InvalidInput(format!("Matrix creation failed: {:?}", e)))?;
 
         let (column_names, row_labels) = if let Some(node_ids) = nodes {
-            let col_names = node_ids.iter().map(|id| format!("node_{}", id)).collect();
+            if node_ids.len() != rows {
+                return Err(GraphError::InvalidInput("Row IDs must match matrix rows".into()));
+            }
+            let col_names = if rows == cols {
+                node_ids.iter().map(|id| format!("node_{}", id)).collect()
+            } else {
+                (0..cols).map(|i| format!("col_{}", i)).collect()
+            };
             let row_labels = node_ids.iter().map(|id| format!("node_{}", id)).collect();
             (col_names, Some(row_labels))
         } else {
@@ -247,85 +255,6 @@ impl<T: NumericType> GraphMatrix<T> {
             properties: None,
             graph: None,
         })
-    }
-
-    /// Create adjacency matrix from edge data
-    pub fn adjacency_from_edges(nodes: &[NodeId], edges: &[(NodeId, NodeId)]) -> GraphResult<Self> {
-        Self::adjacency_from_edges_with_direction(nodes, edges, false)
-    }
-
-    /// Create adjacency matrix while preserving directed edge orientation.
-    pub fn adjacency_from_edges_with_direction(
-        nodes: &[NodeId],
-        edges: &[(NodeId, NodeId)],
-        directed: bool,
-    ) -> GraphResult<Self> {
-        let size = nodes.len();
-        if size == 0 {
-            return Ok(Self::zeros(0, 0));
-        }
-
-        let node_to_index: HashMap<NodeId, usize> = nodes
-            .iter()
-            .enumerate()
-            .map(|(i, &node)| (node, i))
-            .collect();
-
-        let mut matrix_data = vec![T::zero(); size * size];
-
-        for &(source, target) in edges {
-            if let (Some(&src_idx), Some(&tgt_idx)) =
-                (node_to_index.get(&source), node_to_index.get(&target))
-            {
-                matrix_data[src_idx * size + tgt_idx] = T::one();
-                if !directed {
-                    matrix_data[tgt_idx * size + src_idx] = T::one();
-                }
-            }
-        }
-
-        Self::from_row_major_data(matrix_data, size, size, Some(nodes))
-    }
-
-    /// Create weighted adjacency matrix from weighted edge data  
-    pub fn weighted_adjacency_from_edges(
-        nodes: &[NodeId],
-        weighted_edges: &[(NodeId, NodeId, T)],
-    ) -> GraphResult<Self> {
-        Self::weighted_adjacency_from_edges_with_direction(nodes, weighted_edges, false)
-    }
-
-    /// Create weighted adjacency while preserving directed edge orientation.
-    pub fn weighted_adjacency_from_edges_with_direction(
-        nodes: &[NodeId],
-        weighted_edges: &[(NodeId, NodeId, T)],
-        directed: bool,
-    ) -> GraphResult<Self> {
-        let size = nodes.len();
-        if size == 0 {
-            return Ok(Self::zeros(0, 0));
-        }
-
-        let node_to_index: HashMap<NodeId, usize> = nodes
-            .iter()
-            .enumerate()
-            .map(|(i, &node)| (node, i))
-            .collect();
-
-        let mut matrix_data = vec![T::zero(); size * size];
-
-        for &(source, target, weight) in weighted_edges {
-            if let (Some(&src_idx), Some(&tgt_idx)) =
-                (node_to_index.get(&source), node_to_index.get(&target))
-            {
-                matrix_data[src_idx * size + tgt_idx] = weight;
-                if !directed {
-                    matrix_data[tgt_idx * size + src_idx] = weight;
-                }
-            }
-        }
-
-        Self::from_row_major_data(matrix_data, size, size, Some(nodes))
     }
 
     /// Internal method to get column by index - needed by slicing module

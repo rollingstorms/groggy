@@ -12,6 +12,7 @@
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
 mod identity;
+mod matrices;
 pub(crate) mod kinds;
 mod persistence;
 mod publication;
@@ -29,7 +30,7 @@ use crate::state::change_tracker::ChangeTracker;
 use crate::state::history::{CommitDiff, HistoricalView, HistoryForest};
 use crate::state::ref_manager::BranchInfo;
 use crate::state::space::GraphSpace;
-use crate::storage::adjacency::{AdjacencyMatrix, MatrixFormat, MatrixType};
+use crate::storage::adjacency::AdjacencyMatrix;
 use crate::storage::pool::GraphPool;
 use crate::subgraphs::neighborhood::NeighborhoodSampler;
 use crate::temporal::TemporalSnapshot;
@@ -2768,22 +2769,7 @@ impl Graph {
 
     /// Generate adjacency matrix for the entire graph
     pub fn adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
-        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-
-        // Convert edges to (source, target) tuples
-        let mut edges = Vec::new();
-        for edge_id in edge_ids {
-            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
-                edges.push((source, target));
-            }
-        }
-
-        crate::storage::matrix::GraphMatrix::adjacency_from_edges_with_direction(
-            &nodes,
-            &edges,
-            self.is_directed(),
-        )
+        self.to_adjacency_matrix()
     }
 
     /// Simple adjacency matrix (alias for adjacency_matrix)
@@ -2918,169 +2904,6 @@ impl Graph {
     /// Convert to integer matrix
     pub fn to_matrix_i64(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<i64>> {
         self.to_matrix::<i64>()
-    }
-
-    /// Create GraphMatrix adjacency representation (replaces AdjacencyMatrix)
-    pub fn to_adjacency_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
-    where
-        T: crate::storage::advanced_matrix::NumericType,
-    {
-        use crate::storage::matrix::GraphMatrix;
-
-        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
-        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-
-        // Convert edges to (source, target) tuples
-        let mut edges = Vec::new();
-        for edge_id in edge_ids {
-            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
-                edges.push((source, target));
-            }
-        }
-
-        GraphMatrix::adjacency_from_edges_with_direction(&nodes, &edges, self.is_directed())
-    }
-
-    /// Create weighted GraphMatrix adjacency representation
-    pub fn to_weighted_adjacency_matrix<T>(
-        &self,
-        weight_attr: &str,
-    ) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
-    where
-        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
-    {
-        use crate::storage::matrix::GraphMatrix;
-
-        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
-        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-
-        // Resolve the active edge column through GraphSpace's attribute indices.
-        let weights = self.get_edges_attrs(&weight_attr.to_string(), &edge_ids)?;
-        let mut weighted_edges = Vec::with_capacity(edge_ids.len());
-        for (edge_id, weight_value) in edge_ids.into_iter().zip(weights) {
-            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
-                let weight = T::from_attr_value(&weight_value.unwrap_or(AttrValue::Float(1.0)))?;
-                weighted_edges.push((source, target, weight));
-            }
-        }
-
-        GraphMatrix::weighted_adjacency_from_edges_with_direction(
-            &nodes,
-            &weighted_edges,
-            self.is_directed(),
-        )
-    }
-
-    /// Generate weighted adjacency matrix using specified edge attribute
-    pub fn weighted_adjacency_matrix(&mut self, weight_attr: &str) -> GraphResult<AdjacencyMatrix> {
-        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
-        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-
-        // Convert edges to (source, target, weight) tuples
-        let mut weighted_edges = Vec::new();
-        for edge_id in edge_ids {
-            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
-                let weight = match self.get_edge_attr(edge_id, &weight_attr.to_string()) {
-                    Ok(Some(attr_val)) => match attr_val {
-                        AttrValue::Float(w) => w as f64,
-                        AttrValue::Int(i) => i as f64,
-                        _ => 1.0,
-                    },
-                    Ok(None) => 1.0, // Attribute doesn't exist
-                    Err(_) => 1.0,   // Error getting attribute
-                };
-                weighted_edges.push((source, target, weight));
-            }
-        }
-
-        crate::storage::matrix::GraphMatrix::weighted_adjacency_from_edges_with_direction(
-            &nodes,
-            &weighted_edges,
-            self.is_directed(),
-        )
-    }
-
-    /// Generate dense adjacency matrix
-    pub fn dense_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        // In the unified system, all matrices are dense NumArrays
-        self.adjacency_matrix()
-    }
-
-    /// Generate sparse adjacency matrix  
-    pub fn sparse_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        // In the unified system, all matrices are dense NumArrays
-        // TODO: Implement true sparse matrix support if needed
-        self.adjacency_matrix()
-    }
-
-    /// Generate Laplacian matrix
-    pub fn laplacian_matrix(&mut self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
-        let adj = self.adjacency_matrix()?;
-        if normalized {
-            adj.normalized_laplacian()
-        } else {
-            adj.to_laplacian()
-        }
-    }
-
-    /// Generate a row-stochastic transition matrix; dangling rows remain zero.
-    pub fn transition_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        self.adjacency_matrix()?.transition_matrix()
-    }
-
-    /// Generate adjacency matrix for a subgraph with specific nodes
-    pub fn subgraph_adjacency_matrix(
-        &mut self,
-        node_ids: &[NodeId],
-    ) -> GraphResult<AdjacencyMatrix> {
-        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-
-        // Filter edges to only include those between the specified nodes
-        let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
-        let mut subgraph_edges = Vec::new();
-
-        for edge_id in edge_ids {
-            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
-                if node_set.contains(&source) && node_set.contains(&target) {
-                    subgraph_edges.push((source, target));
-                }
-            }
-        }
-
-        crate::storage::matrix::GraphMatrix::adjacency_from_edges_with_direction(
-            node_ids,
-            &subgraph_edges,
-            self.is_directed(),
-        )
-    }
-
-    /// Generate custom adjacency matrix with full control
-    pub fn custom_adjacency_matrix(
-        &mut self,
-        _format: MatrixFormat, // Ignored in unified system
-        matrix_type: MatrixType,
-        _compact_indexing: bool, // Ignored in unified system
-        node_ids: Option<&[NodeId]>,
-    ) -> GraphResult<AdjacencyMatrix> {
-        // Get the base adjacency matrix for the specified nodes or full graph
-        let base_matrix = if let Some(nodes) = node_ids {
-            self.subgraph_adjacency_matrix(nodes)?
-        } else {
-            self.adjacency_matrix()?
-        };
-
-        // Apply the specified matrix transformation
-        match matrix_type {
-            MatrixType::Adjacency => Ok(base_matrix),
-            MatrixType::Laplacian { normalized } => {
-                if normalized {
-                    base_matrix.normalized_laplacian()
-                } else {
-                    base_matrix.to_laplacian()
-                }
-            }
-            MatrixType::Transition => base_matrix.transition_matrix(),
-        }
     }
 
     // === BULK ATTRIBUTE OPERATIONS (FFI WRAPPERS) ===

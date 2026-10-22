@@ -1629,29 +1629,24 @@ impl PySubgraph {
     /// Convert this subgraph to its adjacency matrix representation
     /// Enables chaining like: subgraph.to_matrix().eigen().stats()
     pub fn to_matrix(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
-        self.adjacency_matrix()
+        self.adjacency_matrix(false, None)
     }
 
     // === ADJACENCY METHODS (moved from Graph to Subgraph) ===
 
     /// Convert this subgraph to its adjacency matrix representation
     /// Returns a GraphMatrix with rows/columns scoped to this subgraph
-    fn adjacency_matrix(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
-        let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
-        let graph_ref = self.inner.graph();
-        let adjacency_matrix = {
-            let mut graph_borrowed = graph_ref.borrow_mut();
-            graph_borrowed
-                .subgraph_adjacency_matrix(&node_ids)
-                .map_err(crate::ffi::utils::graph_error_to_py_err)?
-        };
-
-        Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(adjacency_matrix))
+    #[pyo3(signature = (*, sparse=false, weight_attr=None))]
+    fn adjacency_matrix(&self, sparse: bool, weight_attr: Option<&str>) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        let matrix = self.inner.adjacency_matrix(sparse, weight_attr)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(matrix))
     }
 
-    /// Get adjacency matrix (alias for adjacency_matrix)
-    fn adj(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
-        self.adjacency_matrix()
+    /// Get adjacency matrix (alias for adjacency_matrix).
+    #[pyo3(signature = (*, sparse=false, weight_attr=None))]
+    fn adj(&self, sparse: bool, weight_attr: Option<&str>) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        self.adjacency_matrix(sparse, weight_attr)
     }
 
     /// Get adjacency list representation
