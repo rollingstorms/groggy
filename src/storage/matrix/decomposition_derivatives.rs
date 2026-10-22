@@ -71,7 +71,7 @@ fn parts(mut x: f64) -> (f64, i32) {
     )
 }
 // Avoid forming a potentially overflowing/underflowing scale ratio first.
-fn rescale(value: f64, numerator: f64, denominator: f64) -> GraphResult<f64> {
+pub(super) fn rescale(value: f64, numerator: f64, denominator: f64) -> GraphResult<f64> {
     if value == 0. {
         return Ok(value);
     }

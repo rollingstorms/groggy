@@ -2064,6 +2064,41 @@ impl PyGraphMatrix {
         Py::new(py, Self { inner })
     }
 
+    /// Distinct real symmetric eigenpair directional derivative.
+    fn eigen_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Vec<f64>, Py<Self>)> {
+        let (values, inner) = self
+            .inner
+            .eigen_jvp(&tangent.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((values, Py::new(py, Self { inner })?))
+    }
+    fn eigen_vjp(&self, py: Python, values: Vec<f64>, vectors: &Self) -> PyResult<Py<Self>> {
+        let inner = self
+            .inner
+            .eigen_vjp(&values, &vectors.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+    /// Positive distinct-spectrum thin SVD directional derivative.
+    fn svd_jvp(&self, py: Python, tangent: &Self) -> PyResult<(Py<Self>, Vec<f64>, Py<Self>)> {
+        let (u, s, vt) = self
+            .inner
+            .svd_jvp(&tangent.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok((
+            Py::new(py, Self { inner: u })?,
+            s,
+            Py::new(py, Self { inner: vt })?,
+        ))
+    }
+    fn svd_vjp(&self, py: Python, u: &Self, s: Vec<f64>, vt: &Self) -> PyResult<Py<Self>> {
+        let inner = self
+            .inner
+            .svd_vjp(&u.inner, &s, &vt.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Py::new(py, Self { inner })
+    }
+
     /// Eigenvalue decomposition: A * V = V * Λ
     /// Returns tuple of (eigenvalues, eigenvectors)
     fn eigenvalue_decomposition(&self, py: Python) -> PyResult<(PyObject, Py<Self>)> {

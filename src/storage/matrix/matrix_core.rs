@@ -2241,6 +2241,84 @@ impl<T: NumericType> GraphMatrix<T> {
         })
     }
 
+    /// Symmetric eigenvalue/eigenvector directional derivative; distinct spectrum required.
+    pub fn eigen_jvp(&self, tangent: &Self) -> GraphResult<(Vec<f64>, Self)> {
+        let (n, cols) = self.shape();
+        if n != cols || tangent.shape() != self.shape() {
+            return Err(GraphError::InvalidInput(
+                "Eigen JVP requires matching square matrices".into(),
+            ));
+        }
+        let (values, vectors) = super::spectral_derivatives::eigen_jvp(
+            self.decomposition_input()?,
+            tangent.decomposition_input()?,
+            n,
+        )?;
+        Ok((values, Self::factor_matrix(vectors, n, n)?))
+    }
+    /// Symmetric Frobenius pullback of real symmetric eigenpairs.
+    pub fn eigen_vjp(&self, values: &[f64], vectors: &Self) -> GraphResult<Self> {
+        let (n, cols) = self.shape();
+        if n != cols || values.len() != n || vectors.shape() != (n, n) {
+            return Err(GraphError::InvalidInput(
+                "Eigen VJP requires matching eigenvalue/vector cotangents".into(),
+            ));
+        }
+        let values = super::spectral_derivatives::eigen_vjp(
+            self.decomposition_input()?,
+            values.to_vec(),
+            vectors.decomposition_input()?,
+            n,
+        )?;
+        let mut result = Self::factor_matrix(values, n, n)?;
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
+        Ok(result)
+    }
+    /// Thin SVD directional derivative: dU(m*k), dS(k), dVt(k*n).
+    pub fn svd_jvp(&self, tangent: &Self) -> GraphResult<(Self, Vec<f64>, Self)> {
+        let (m, n) = self.shape();
+        let k = m.min(n);
+        if tangent.shape() != self.shape() {
+            return Err(GraphError::InvalidInput(
+                "SVD JVP requires a matching input tangent".into(),
+            ));
+        }
+        let (u, s, vt) = super::spectral_derivatives::svd_jvp(
+            self.decomposition_input()?,
+            tangent.decomposition_input()?,
+            m,
+            n,
+        )?;
+        Ok((
+            Self::factor_matrix(u, m, k)?,
+            s,
+            Self::factor_matrix(vt, k, n)?,
+        ))
+    }
+    /// Thin SVD pullback; positive separated singular values required.
+    pub fn svd_vjp(&self, u: &Self, s: &[f64], vt: &Self) -> GraphResult<Self> {
+        let (m, n) = self.shape();
+        let k = m.min(n);
+        if u.shape() != (m, k) || s.len() != k || vt.shape() != (k, n) {
+            return Err(GraphError::InvalidInput(
+                "SVD VJP requires thin factor cotangents".into(),
+            ));
+        }
+        let values = super::spectral_derivatives::svd_vjp(
+            self.decomposition_input()?,
+            u.decomposition_input()?,
+            s.to_vec(),
+            vt.decomposition_input()?,
+            m,
+            n,
+        )?;
+        let mut result = Self::factor_matrix(values, m, n)?;
+        result.row_labels = self.row_labels.clone();
+        result.column_names = self.column_names.clone();
+        Ok(result)
+    }
+
     /// Real symmetric eigendecomposition with descending eigenvalues.
     /// Eigenvectors are orthonormal columns; other domains reject explicitly.
     pub fn eigenvalue_decomposition(&self) -> GraphResult<(Vec<f64>, GraphMatrix<T>)>

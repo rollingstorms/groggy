@@ -11,6 +11,7 @@ mod complex_eigen;
 pub mod conversions;
 mod decomposition;
 mod decomposition_derivatives;
+mod derivative_linalg;
 mod dot_product;
 mod factorization;
 mod least_squares;
@@ -18,6 +19,7 @@ mod linear_system;
 pub mod matrix_core;
 mod reductions;
 pub mod slicing;
+mod spectral_derivatives;
 
 pub use conversions::*;
 pub use matrix_core::*;

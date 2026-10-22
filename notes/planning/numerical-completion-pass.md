@@ -1,0 +1,21 @@
+# Numerical completion pass — 2026-10-21
+
+User request: finish the remaining linear algebra and numerical items together,
+with separate reviewable commits and synchronized checklist evidence.
+
+## Work queue
+
+- [x] Real spectral derivatives: symmetric eigen and thin SVD JVP/VJP, distinct-spectrum/rank policy, native/Python finite-difference and adjoint references.
+- [ ] QR/LU JVP/VJP with locally stable rank/pivot policies and independent reconstruction/gradient references.
+- [ ] Supported automatic differentiation routes, saved inputs, multi-output factors and explicit unsupported derivative domains.
+- [ ] Numeric array arithmetic, conversion/shape/domain contracts, exact checked integer operations and Python dispatch.
+- [ ] Lower-level matrix arithmetic, logical layouts, reductions, backend consistency and remaining matrix APIs/consumers.
+- [ ] Sparse-aware canonical arithmetic, products, transpose/selection, conversions and numerical solve/factor paths with explicit storage/materialization policies.
+- [ ] Release benchmark corpus covering fractional/integer/dense/sparse/vector work, allocation/peak-memory receipts and measured improvements.
+- [ ] Python GIL behavior and explicit owned-kernel boundaries where useful.
+- [ ] Complete regression/lint/API/doc review and accurate closure of 29.3–29.6/29.24–29.26.
+
+Completion requires implemented behavior and recorded evidence. Historical slice
+notes retain their scope; parent boxes remain open until the work above is done.
+Unrelated development benchmark edits present at the start of this pass are
+preserved separately.
