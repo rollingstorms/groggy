@@ -30,6 +30,21 @@ pub struct PyGraphMatrix {
 
 #[pymethods]
 impl PyGraphMatrix {
+    /// Create owned canonical CSR storage; columns in each row must be sorted/unique.
+    #[classmethod]
+    fn from_csr(
+        _cls: &PyType,
+        rows: usize,
+        cols: usize,
+        values: Vec<f64>,
+        col_indices: Vec<usize>,
+        row_pointers: Vec<usize>,
+    ) -> PyResult<Self> {
+        GraphMatrix::from_csr(rows, cols, values, col_indices, row_pointers)
+            .map(|inner| Self { inner })
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
     /// Create a new GraphMatrix from BaseArrays (mixed types) or NumArrays (numerical)
     #[new]
     pub fn new(py: Python, arrays: Vec<PyObject>) -> PyResult<Self> {

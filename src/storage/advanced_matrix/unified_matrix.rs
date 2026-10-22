@@ -144,7 +144,7 @@ pub enum MatrixStorage<T: NumericType> {
 }
 
 /// Sparse matrix representation (simplified CSR format)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SparseMatrix<T: NumericType> {
     pub values: Vec<T>,
     pub col_indices: Vec<usize>,
@@ -197,6 +197,25 @@ pub struct UnifiedMatrix<T: NumericType> {
 }
 
 impl<T: NumericType> UnifiedMatrix<T> {
+    /// Construct owned validated canonical CSR storage.
+    pub fn from_csr(
+        rows: usize,
+        cols: usize,
+        values: Vec<T>,
+        col_indices: Vec<usize>,
+        row_pointers: Vec<usize>,
+    ) -> MatrixResult<Self> {
+        let sparse = SparseMatrix::new(rows, cols, values, col_indices, row_pointers)?;
+        Ok(Self {
+            storage: MatrixStorage::Sparse(sparse),
+            shape: Shape::new(rows, cols),
+            strides: Strides::row_major((rows, cols)),
+            layout: MatrixLayout::RowMajor,
+            backend_hint: BackendHint::AutoSelect,
+            backend_selector: Arc::new(BackendSelector::new()),
+        })
+    }
+
     /// Create a new dense matrix with the given shape
     pub fn new(rows: usize, cols: usize) -> MatrixResult<Self> {
         Self::new_with_layout(rows, cols, MatrixLayout::RowMajor)
@@ -335,9 +354,14 @@ impl<T: NumericType> UnifiedMatrix<T> {
                 let idx = self.strides.index(row, col);
                 Ok(data.as_slice()[idx])
             }
-            MatrixStorage::Sparse(_) => Err(MatrixError::UnsupportedOperation(
-                "Sparse matrix indexing not implemented".to_string(),
-            )),
+            MatrixStorage::Sparse(sparse) => {
+                if sparse.shape != self.shape {
+                    return Err(MatrixError::InvalidInput(
+                        "CSR shape metadata mismatch".into(),
+                    ));
+                }
+                sparse.get(row, col)
+            }
             MatrixStorage::View(_) => Err(MatrixError::UnsupportedOperation(
                 "Matrix view indexing not implemented".to_string(),
             )),
@@ -363,6 +387,14 @@ impl<T: NumericType> UnifiedMatrix<T> {
                 let idx = self.strides.index(row, col);
                 data.as_slice_mut()[idx] = value;
                 Ok(())
+            }
+            MatrixStorage::Sparse(sparse) => {
+                if sparse.shape != self.shape {
+                    return Err(MatrixError::InvalidInput(
+                        "CSR shape metadata mismatch".into(),
+                    ));
+                }
+                sparse.set(row, col, value)
             }
             _ => Err(MatrixError::UnsupportedOperation(
                 "Setting elements in non-dense matrices not implemented".to_string(),
@@ -705,6 +737,14 @@ impl<T: NumericType> UnifiedMatrix<T> {
     pub fn to_vec(&self) -> MatrixResult<Vec<T>> {
         match &self.storage {
             MatrixStorage::Dense(buffer) => buffer.to_vec().map_err(MatrixError::from),
+            MatrixStorage::Sparse(sparse) => {
+                if sparse.shape != self.shape {
+                    return Err(MatrixError::InvalidInput(
+                        "CSR shape metadata mismatch".into(),
+                    ));
+                }
+                sparse.to_dense_values()
+            }
             _ => Err(MatrixError::UnsupportedOperation(
                 "to_vec for non-dense matrices not implemented".to_string(),
             )),
@@ -753,6 +793,14 @@ impl<T: NumericType> Clone for UnifiedMatrix<T> {
                     backend_selector: Arc::clone(&self.backend_selector),
                 }
             }
+            MatrixStorage::Sparse(sparse) => Self {
+                storage: MatrixStorage::Sparse(sparse.clone()),
+                shape: self.shape,
+                strides: self.strides,
+                layout: self.layout,
+                backend_hint: self.backend_hint.clone(),
+                backend_selector: Arc::clone(&self.backend_selector),
+            },
             _ => panic!("Cloning non-dense matrices not implemented"),
         }
     }

@@ -8,6 +8,7 @@
 pub mod backend;
 pub mod backends;
 pub mod benchmarks;
+mod csr;
 pub mod memory;
 pub mod neural;
 pub mod numeric_type;

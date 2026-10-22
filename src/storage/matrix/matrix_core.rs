@@ -47,15 +47,17 @@ impl MatrixProperties {
             false
         };
 
-        // Calculate sparsity for numeric matrices
-        let (is_sparse, sparsity) = if is_numeric {
-            let zero_count = matrix.count_zeros();
-            let total_elements = rows * cols;
-            let sparsity_ratio = zero_count as f64 / total_elements as f64;
-            (sparsity_ratio > 0.5, Some(sparsity_ratio))
-        } else {
-            (false, None)
-        };
+        // Numerical zero density is distinct from actual sparse storage.
+        let sparsity = matrix.zero_count().ok().and_then(|zeros| {
+            rows.checked_mul(cols).map(|total| {
+                if total == 0 {
+                    0.0
+                } else {
+                    zeros as f64 / total as f64
+                }
+            })
+        });
+        let is_sparse = matrix.is_sparse();
 
         Self {
             is_square,
@@ -112,6 +114,19 @@ pub struct GraphMatrix<T: NumericType = f64> {
 }
 
 impl<T: NumericType> GraphMatrix<T> {
+    /// Construct a canonical CSR matrix with owned validated storage.
+    pub fn from_csr(
+        rows: usize,
+        cols: usize,
+        values: Vec<T>,
+        col_indices: Vec<usize>,
+        row_pointers: Vec<usize>,
+    ) -> GraphResult<Self> {
+        UnifiedMatrix::from_csr(rows, cols, values, col_indices, row_pointers)
+            .map(Self::from_storage)
+            .map_err(|e| GraphError::InvalidInput(format!("CSR construction failed: {e:?}")))
+    }
+
     /// Create GraphMatrix from UnifiedMatrix storage
     pub fn from_storage(storage: UnifiedMatrix<T>) -> Self {
         let shape = storage.shape();
@@ -397,11 +412,32 @@ impl<T: NumericType> GraphMatrix<T> {
         (a_f64 - b_f64).abs() < tolerance
     }
 
-    /// Count zero elements in the matrix (internal helper)
-    pub(crate) fn count_zeros(&self) -> usize {
-        // For now, return 0 as UnifiedMatrix doesn't expose element access
-        // TODO: Implement proper zero counting when UnifiedMatrix exposes element iteration
-        0
+    /// Count actual zero values, including implicit CSR entries.
+    pub fn zero_count(&self) -> GraphResult<usize> {
+        let (rows, cols) = self.shape();
+        let count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| GraphError::InvalidInput("Matrix element count overflow".into()))?;
+        if let crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Sparse(sparse) =
+            &self.storage.storage
+        {
+            if (sparse.shape.rows, sparse.shape.cols) != (rows, cols) {
+                return Err(GraphError::InvalidInput(
+                    "CSR shape metadata mismatch".into(),
+                ));
+            }
+            sparse
+                .validate()
+                .map_err(|e| GraphError::InvalidInput(format!("Invalid CSR: {e:?}")))?;
+            return Ok(count - sparse.values.len());
+        }
+        let mut zeros = 0;
+        for row in 0..rows {
+            for col in 0..cols {
+                zeros += usize::from(self.get_checked(row, col)? == T::zero());
+            }
+        }
+        Ok(zeros)
     }
 
     /// Generate dense HTML representation for matrices with truncation
@@ -750,9 +786,10 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Check if the matrix is sparse (has many zero elements)
     pub fn is_sparse(&self) -> bool {
-        // TODO: Implement sparsity detection based on UnifiedMatrix data
-        // For now, assume dense matrices
-        false
+        matches!(
+            &self.storage.storage,
+            crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Sparse(_)
+        )
     }
 
     /// Check if the matrix is square (same number of rows and columns)

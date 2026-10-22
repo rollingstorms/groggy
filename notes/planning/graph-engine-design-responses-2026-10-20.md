@@ -536,3 +536,6 @@ Preserve original i64 scalars for statistical reductions rather than materialize
 
 ### Item 29 matrix selections and transforms — 2026-10-21
 Keep selections owned with positional identity, including duplicates and empty axes. Validate indices before reading or allocating. Resolve raw Python slices in the Rust core at actual dimensions. Reshape follows logical row order and resets labels only when the coordinate shape changes; transpose exchanges axis identity. Lower-level views and graph bindings are separate contracts.
+
+### Item 29 canonical CSR — 2026-10-21
+Use sorted unique in-range columns and no stored zeros as the explicit CSR contract. Reject malformed/duplicate construction; checked set inserts/removes canonically. Clones own independent sparse vectors. Existing checked GraphMatrix consumers may densify; expose this behavior and its cost rather than claim sparse optimization. Distinguish storage kind from numeric zero density.
