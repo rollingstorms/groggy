@@ -53,8 +53,8 @@ preserved separately.
 
 ## Concrete remaining audit work
 
-- Explicit sparse/dense spectral materialization policy, broader production
-  size/fill/SIMD and final regression/lint/API/documentation gates remain open.
+- Broader production size/fill/SIMD and final regression/lint/API/documentation gates remain open.
+- Constructor/FFI boundary review found fallback 1x1 matrices and a duplicate BaseArray conversion path still needing repair.
 
 - 29.53: shared raw-bound slice normalization and checked extreme steps; 437 Python regressions.
 
@@ -63,3 +63,5 @@ preserved separately.
 - 29.55: scoped feature export, checked explicit attribute conversion and logical/CSR fill; 440 Python regressions.
 
 - 29.56: matrix arithmetic/shared tape composition and joint factor losses; 446 Python regressions.
+
+- 29.57: explicit sparse/dense numerical materialization policy; 447 Python regressions.

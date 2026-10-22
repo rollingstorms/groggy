@@ -205,3 +205,5 @@ accepted pinned-state model.
 - [x] **29.55 — Feature export and numerical boundaries.** GraphSpace-scoped values, canonical feature columns/node labels, checked attribute ranges and logical dense/CSR fill. Full native suites and 440 rebuilt Python tests pass. See docs/api/matrix-feature-conversion.md.
 
 - [x] **29.56 — Matrix tape composition.** Unique nodes/shared tape unions, arithmetic/scalar/math/transpose/conversion gradients, joint factor losses and explicit binding/domain errors. Full native suites and 446 rebuilt Python regressions pass. See docs/api/matrix-arithmetic-autodiff.md.
+
+- [x] **29.57 — Sparse materialization policy.** Bounded implicit dense numerical input conversion with explicit opt-in above the limit; sparse-native solve/factors remain sparse. Full native suites and 447 rebuilt Python tests pass. See docs/api/matrix-sparse-materialization.md.
