@@ -9,7 +9,14 @@ use crate::storage::advanced_matrix::{
 };
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
+static NEXT_NODE_ID: AtomicUsize = AtomicUsize::new(0);
+fn next_node_id() -> NodeId {
+    NEXT_NODE_ID
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .expect("Computation node ID space exhausted")
+}
 
 /// Unique identifier for computation graph nodes
 pub type NodeId = usize;
@@ -40,6 +47,14 @@ pub enum Operation {
     // Matrix operations
     MatMul,
     Transpose,
+    Identity,
+    Abs,
+    Exp,
+    Log,
+    Sqrt,
+    ScalarScale {
+        scalar_bits: u64,
+    },
     Cholesky,
     FactorOutput {
         part: FactorOutput,
@@ -141,7 +156,6 @@ impl<T: NumericType> ComputationNode<T> {
 #[derive(Debug, Clone)]
 pub struct ComputationGraph<T: NumericType> {
     nodes: HashMap<NodeId, Arc<Mutex<ComputationNode<T>>>>,
-    next_id: NodeId,
     /// Topologically sorted execution order
     execution_order: Vec<NodeId>,
 }
@@ -150,7 +164,6 @@ impl<T: NumericType> ComputationGraph<T> {
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
-            next_id: 0,
             execution_order: Vec::new(),
         }
     }
@@ -169,8 +182,7 @@ impl<T: NumericType> ComputationGraph<T> {
 
     /// Create a new leaf node (input or parameter)
     pub fn create_leaf(&mut self, value: UnifiedMatrix<T>, requires_grad: bool) -> NodeId {
-        let id = self.next_id;
-        self.next_id += 1;
+        let id = next_node_id();
 
         let shape = value.shape();
         let mut node = ComputationNode::new(id, Operation::Leaf, shape, requires_grad);
@@ -188,8 +200,7 @@ impl<T: NumericType> ComputationGraph<T> {
         output_shape: Shape,
         requires_grad: bool,
     ) -> MatrixResult<NodeId> {
-        let id = self.next_id;
-        self.next_id += 1;
+        let id = next_node_id();
 
         let mut node = ComputationNode::new(id, operation, output_shape, requires_grad);
 
@@ -208,6 +219,22 @@ impl<T: NumericType> ComputationGraph<T> {
         self.update_execution_order()?;
 
         Ok(id)
+    }
+
+    /// Union cloned or independent tapes without replacing shared ancestor nodes.
+    pub(crate) fn merge(&mut self, other: &Self) -> MatrixResult<()> {
+        for (&id, node) in &other.nodes {
+            if let Some(existing) = self.nodes.get(&id) {
+                if !Arc::ptr_eq(existing, node) {
+                    return Err(MatrixError::ComputationError(
+                        "Conflicting computation node identity".into(),
+                    ));
+                }
+            }
+        }
+        self.nodes
+            .extend(other.nodes.iter().map(|(&id, node)| (id, Arc::clone(node))));
+        self.update_execution_order()
     }
 
     /// Get node by ID
@@ -275,7 +302,7 @@ impl<T: NumericType> ComputationGraph<T> {
     pub fn forward(&self, output_node: NodeId) -> MatrixResult<UnifiedMatrix<T>> {
         for &node_id in &self.execution_order {
             if node_id > output_node {
-                break; // Only compute up to the requested output
+                continue; // Unrelated later-created nodes do not end this traversal.
             }
 
             if let Some(node_arc) = self.nodes.get(&node_id) {
@@ -327,6 +354,51 @@ impl<T: NumericType> ComputationGraph<T> {
                     ));
                 }
                 inputs[0].add(&inputs[1])
+            }
+
+            Operation::Abs | Operation::Exp | Operation::Log | Operation::Sqrt => {
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Elementwise math requires one input".into(),
+                    ));
+                }
+                let input = crate::storage::GraphMatrix::from_storage(inputs[0].clone());
+                let result = match node.operation {
+                    Operation::Abs => input.abs(),
+                    Operation::Exp => input.exp(),
+                    Operation::Log => input.log(),
+                    _ => input.sqrt(),
+                };
+                result
+                    .map(crate::storage::GraphMatrix::into_storage)
+                    .map_err(|e| MatrixError::ComputationError(e.to_string()))
+            }
+            Operation::Subtract => {
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 2 {
+                    return Err(MatrixError::ComputationError(
+                        "Subtract requires two inputs".into(),
+                    ));
+                }
+                inputs[0].subtract(&inputs[1])
+            }
+            Operation::Identity | Operation::ScalarScale { .. } => {
+                let inputs = self.get_input_values(&node.inputs)?;
+                if inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Unary arithmetic requires one input".into(),
+                    ));
+                }
+                match node.operation {
+                    Operation::ScalarScale { scalar_bits } => {
+                        let scalar = T::from_f64(f64::from_bits(scalar_bits)).ok_or_else(|| {
+                            MatrixError::InvalidInput("Scale exceeds dtype range".into())
+                        })?;
+                        inputs[0].scalar_multiply(scalar)
+                    }
+                    _ => Ok(inputs[0].clone()),
+                }
             }
 
             Operation::Multiply => {
@@ -622,6 +694,62 @@ impl<T: NumericType> ComputationGraph<T> {
         match &node.operation {
             Operation::Leaf => Ok(()), // Leaf nodes don't propagate gradients
 
+            Operation::Abs | Operation::Exp | Operation::Log | Operation::Sqrt => {
+                if node.inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Elementwise math requires one input".into(),
+                    ));
+                }
+                let id = node.inputs[0];
+                let operation = node.operation.clone();
+                let seed = grad_output.clone();
+                drop(node);
+                let inputs = self.get_input_values(&[id])?;
+                let derivative = inputs[0].try_map_into(|value| {
+                    let x = value.to_f64();
+                    let slope = match operation {
+                        Operation::Abs if x != 0. => x.signum(),
+                        Operation::Exp => x.exp(),
+                        Operation::Log if x > 0. => 1. / x,
+                        Operation::Sqrt if x > 0. => 0.5 / x.sqrt(),
+                        _ => {
+                            return Err(MatrixError::InvalidInput(
+                                "Derivative is undefined or singular at this input".into(),
+                            ))
+                        }
+                    };
+                    if !slope.is_finite() {
+                        return Err(MatrixError::InvalidInput(
+                            "Derivative exceeds finite range".into(),
+                        ));
+                    }
+                    T::from_f64(slope).ok_or_else(|| {
+                        MatrixError::InvalidInput("Derivative exceeds dtype range".into())
+                    })
+                })?;
+                self.accumulate_per_input(&[id], vec![seed.elementwise_multiply(&derivative)?])
+            }
+
+            Operation::Identity | Operation::Transpose | Operation::ScalarScale { .. } => {
+                if node.inputs.len() != 1 {
+                    return Err(MatrixError::ComputationError(
+                        "Unary arithmetic requires one input".into(),
+                    ));
+                }
+                let input = node.inputs[0];
+                let gradient = match node.operation {
+                    Operation::Transpose => grad_output.transpose()?,
+                    Operation::ScalarScale { scalar_bits } => grad_output.scalar_multiply(
+                        T::from_f64(f64::from_bits(scalar_bits)).ok_or_else(|| {
+                            MatrixError::InvalidInput("Scale exceeds dtype range".into())
+                        })?,
+                    )?,
+                    _ => grad_output.clone(),
+                };
+                drop(node);
+                self.accumulate_per_input(&[input], vec![gradient])
+            }
+
             Operation::Add => {
                 if node.inputs.len() == 2 {
                     let ids = [node.inputs[0], node.inputs[1]];
@@ -838,6 +966,19 @@ impl<T: NumericType> ComputationGraph<T> {
                 *entry = entry.add(&grads[i])?;
             } else {
                 merged.insert(id, grads[i].clone());
+            }
+        }
+
+        for gradient in merged.values() {
+            let finite = if let Some(sparse) = gradient.checked_sparse()? {
+                sparse.values.iter().all(|value| value.is_finite())
+            } else {
+                gradient.to_vec()?.iter().all(|value| value.is_finite())
+            };
+            if !finite {
+                return Err(MatrixError::InvalidInput(
+                    "Gradient exceeds finite dtype range".into(),
+                ));
             }
         }
 
@@ -1270,7 +1411,7 @@ mod tests {
     fn test_computation_graph_creation() {
         let graph: ComputationGraph<f64> = ComputationGraph::new();
         assert_eq!(graph.nodes.len(), 0);
-        assert_eq!(graph.next_id, 0);
+        assert!(graph.execution_order.is_empty());
     }
 
     #[test]

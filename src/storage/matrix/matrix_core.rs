@@ -10,6 +10,8 @@
 //! - Memory-efficient storage with fusion optimization
 //! - Intelligent backend selection for optimal performance
 
+#[path = "arithmetic_autodiff.rs"]
+mod arithmetic_autodiff;
 #[path = "factor_autodiff.rs"]
 mod factor_autodiff;
 #[path = "graph_construction.rs"]
@@ -862,7 +864,7 @@ impl<T: NumericType> GraphMatrix<T> {
             if let Some(labels) = &self.row_labels {
                 result.column_names = labels.clone();
             }
-            return Ok(result);
+            return self.track_factor(result, Operation::Transpose);
         }
         let mut result = Self::arithmetic_zeros(cols, rows)?;
         for row in 0..rows {
@@ -879,7 +881,7 @@ impl<T: NumericType> GraphMatrix<T> {
             }
             result.column_names = labels.clone();
         }
-        Ok(result)
+        self.track_factor(result, Operation::Transpose)
     }
 
     /// Explicit owned conversion to canonical CSR storage.
@@ -900,7 +902,7 @@ impl<T: NumericType> GraphMatrix<T> {
         let mut result = Self::from_storage(storage);
         result.row_labels = self.row_labels.clone();
         result.column_names = self.column_names.clone();
-        Ok(result)
+        self.track_factor(result, Operation::Identity)
     }
 
     /// Matrix multiplication
@@ -922,17 +924,19 @@ impl<T: NumericType> GraphMatrix<T> {
         let mut result = Self::from_storage(storage);
         result.row_labels = self.row_labels.clone();
         result.column_names = other.column_names.clone();
-        Ok(result)
+        self.track_binary(other, result, Operation::MatMul)
     }
 
     /// Positional matrix subtraction with checked shape and cell access.
     pub fn subtract(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        self.zip_arithmetic(other, T::checked_sub)
+        let result = self.zip_arithmetic(other, T::checked_sub)?;
+        self.track_binary(other, result, Operation::Subtract)
     }
 
     /// Element-wise multiplication (Hadamard product)
     pub fn elementwise_multiply(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        self.zip_arithmetic(other, T::checked_mul)
+        let result = self.zip_arithmetic(other, T::checked_mul)?;
+        self.track_binary(other, result, Operation::Multiply)
     }
 
     /// Nonnegative integer matrix power by exponentiation by squaring.
@@ -1923,45 +1927,8 @@ impl<T: NumericType> GraphMatrix<T> {
             return Ok(result);
         }
         let invalid = |message: &str| GraphError::InvalidInput(message.into());
-        let mut graph = self
-            .computation_graph
-            .clone()
-            .ok_or_else(|| invalid("Missing Factor input tape"))?;
-        let input_id = self
-            .current_node_id
-            .ok_or_else(|| invalid("Missing Factor input node"))?;
-        let input = graph
-            .get_node(input_id)
-            .ok_or_else(|| invalid("Missing Factor input node"))?;
-        {
-            let input = input
-                .lock()
-                .map_err(|_| invalid("Factor input tape lock poisoned"))?;
-            let saved = input
-                .value
-                .as_ref()
-                .ok_or_else(|| invalid("Missing Factor input snapshot"))?;
-            let saved = Self::from_storage(saved.clone());
-            let same_values = if let (Some(a), Some(b)) = (
-                saved
-                    .storage
-                    .checked_sparse()
-                    .map_err(|e| invalid(&e.to_string()))?,
-                self.storage
-                    .checked_sparse()
-                    .map_err(|e| invalid(&e.to_string()))?,
-            ) {
-                a.shape == b.shape
-                    && a.values == b.values
-                    && a.col_indices == b.col_indices
-                    && a.row_pointers == b.row_pointers
-            } else {
-                saved.decomposition_input()? == self.decomposition_input()?
-            };
-            if saved.shape() != self.shape() || !same_values {
-                return Err(invalid("Factor input changed since gradient binding; rebind with requires_grad(false).requires_grad(true)"));
-            }
-        }
+        result.finite_tape_values()?;
+        let (mut graph, input_id) = self.bound_tape()?;
         let (rows, cols) = result.shape();
         let id = graph
             .create_operation(
@@ -2403,27 +2370,31 @@ impl<T: NumericType> GraphMatrix<T> {
     }
     /// Entrywise absolute value with exact checked integer semantics.
     pub fn abs(&self) -> GraphResult<Self> {
-        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::abs(
+        let result = self.numerical_result(crate::storage::advanced_matrix::MathFunctions::abs(
             &self.storage,
-        ))
+        ))?;
+        self.track_factor(result, Operation::Abs)
     }
     /// Entrywise exponential, with IEEE floating outputs and checked conversion.
     pub fn exp(&self) -> GraphResult<Self> {
-        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::exp(
+        let result = self.numerical_result(crate::storage::advanced_matrix::MathFunctions::exp(
             &self.storage,
-        ))
+        ))?;
+        self.track_factor(result, Operation::Exp)
     }
     /// Entrywise natural log; floating zero/negative inputs yield -inf/NaN.
     pub fn log(&self) -> GraphResult<Self> {
-        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::ln(
+        let result = self.numerical_result(crate::storage::advanced_matrix::MathFunctions::ln(
             &self.storage,
-        ))
+        ))?;
+        self.track_factor(result, Operation::Log)
     }
     /// Entrywise square root; negative floating inputs yield NaN.
     pub fn sqrt(&self) -> GraphResult<Self> {
-        self.numerical_result(crate::storage::advanced_matrix::MathFunctions::sqrt(
-            &self.storage,
-        ))
+        let result = self.numerical_result(
+            crate::storage::advanced_matrix::MathFunctions::sqrt(&self.storage),
+        )?;
+        self.track_factor(result, Operation::Sqrt)
     }
     fn numerical_result(
         &self,
@@ -2611,20 +2582,22 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Checked scalar addition without a second matrix allocation.
     pub fn scalar_add(&self, scalar: f64) -> GraphResult<Self> {
         let scalar = Self::arithmetic_scalar(scalar)?;
-        self.map_checked_arithmetic(|value| {
+        let result = self.map_checked_arithmetic(|value| {
             value
                 .checked_add(scalar)
                 .ok_or_else(|| GraphError::InvalidInput("Scalar addition overflow".into()))
-        })
+        })?;
+        self.track_factor(result, Operation::Identity)
     }
     /// Checked scalar subtraction without a second matrix allocation.
     pub fn scalar_subtract(&self, scalar: f64) -> GraphResult<Self> {
         let scalar = Self::arithmetic_scalar(scalar)?;
-        self.map_checked_arithmetic(|value| {
+        let result = self.map_checked_arithmetic(|value| {
             value
                 .checked_sub(scalar)
                 .ok_or_else(|| GraphError::InvalidInput("Scalar subtraction overflow".into()))
-        })
+        })?;
+        self.track_factor(result, Operation::Identity)
     }
     /// Floating true division; cast integer matrices explicitly before division.
     pub fn scalar_divide(&self, scalar: f64) -> GraphResult<Self> {
@@ -2636,11 +2609,17 @@ impl<T: NumericType> GraphMatrix<T> {
                 "Cast to floating dtype before matrix true division".into(),
             ));
         }
-        self.map_checked_arithmetic(|value| {
+        let result = self.map_checked_arithmetic(|value| {
             T::from_f64(value.to_f64() / scalar).ok_or_else(|| {
                 GraphError::InvalidInput("Scalar division exceeds dtype range".into())
             })
-        })
+        })?;
+        self.track_factor(
+            result,
+            Operation::ScalarScale {
+                scalar_bits: (1.0 / scalar).to_bits(),
+            },
+        )
     }
     fn zip_arithmetic(&self, other: &Self, operation: fn(T, T) -> Option<T>) -> GraphResult<Self> {
         if self.shape() != other.shape() {
@@ -2684,16 +2663,23 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Checked dtype-preserving scalar multiplication.
     pub fn scalar_multiply(&self, scalar: f64) -> GraphResult<Self> {
         let scalar = Self::arithmetic_scalar(scalar)?;
-        self.map_checked_arithmetic(|value| {
+        let result = self.map_checked_arithmetic(|value| {
             value
                 .checked_mul(scalar)
                 .ok_or_else(|| GraphError::InvalidInput("Scalar multiplication overflow".into()))
-        })
+        })?;
+        self.track_factor(
+            result,
+            Operation::ScalarScale {
+                scalar_bits: scalar.to_f64().to_bits(),
+            },
+        )
     }
 
     /// Add two matrices positionally; mismatched shapes return an error.
     pub fn add(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> {
-        self.zip_arithmetic(other, T::checked_add)
+        let result = self.zip_arithmetic(other, T::checked_add)?;
+        self.track_binary(other, result, Operation::Add)
     }
 
     /// Population variance per column (ddof=0), preserving this legacy convention.

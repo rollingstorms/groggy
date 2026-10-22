@@ -53,9 +53,6 @@ preserved separately.
 
 ## Concrete remaining audit work
 
-- General matrix arithmetic tape composition: avoid silent detachment and
-  cloned-tape node collisions; factor output routes are complete in their stated
-  supported domains (29.24), while broad composition remains open.
 - Explicit sparse/dense spectral materialization policy, broader production
   size/fill/SIMD and final regression/lint/API/documentation gates remain open.
 
@@ -64,3 +61,5 @@ preserved separately.
 - 29.54: checked graph/view adjacency construction, real CSR, parallel accumulation and scoped identity/weights; 439 Python regressions.
 
 - 29.55: scoped feature export, checked explicit attribute conversion and logical/CSR fill; 440 Python regressions.
+
+- 29.56: matrix arithmetic/shared tape composition and joint factor losses; 446 Python regressions.

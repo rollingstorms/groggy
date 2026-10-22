@@ -31,5 +31,4 @@ calls retain their tape ownership.
 Evidence: `tests/matrix_power_checked.rs` checks polynomial sums, adjoints,
 saved inputs, integer errors, empty shapes, sparse identity and large exponents.
 `tests/test_matrix_power_checked.py` compares independent NumPy matrix powers,
-finite differences, adjoints and seeded automatic gradients. General arithmetic
-tape composition remains a separate follow-up.
+finite differences, adjoints and seeded automatic gradients. Supported [arithmetic tape composition](matrix-arithmetic-autodiff.md) now retains these power nodes.

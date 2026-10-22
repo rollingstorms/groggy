@@ -25,11 +25,11 @@ eigen gradients are unsupported and require explicit detachment for forward
 computation. There is no derivative through a permutation or arbitrary null
 basis. Value-list APIs remain unchanged; matrix-valued APIs expose the tape.
 
-For a loss involving several outputs, use the existing explicit joint
-`qr_vjp`, `lu_vjp`, `eigen_vjp` or `svd_vjp` with all cotangents. Independent
-`backward_with_gradient` calls replace gradients rather than summing across
-calls. Existing GraphMatrix arithmetic/tape composition limitations are not
-removed by these factor routes; this is not a claim of universal autodiff.
+For a loss involving several outputs, use explicit joint `qr_vjp`, `lu_vjp`,
+`eigen_vjp` or `svd_vjp`, or combine outputs through the supported
+[arithmetic tape operations](matrix-arithmetic-autodiff.md) and differentiate the
+composite result once. Independent backward calls replace gradients rather than
+summing across calls. This supported set does not imply universal autodiff.
 
 Native `tests/matrix_factor_autodiff.rs` checks saved inputs, every output
 route, malformed seeds, empty shapes and unsupported domains. Python
