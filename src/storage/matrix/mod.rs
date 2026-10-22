@@ -19,6 +19,7 @@ mod linear_system;
 pub mod matrix_core;
 mod reductions;
 pub mod slicing;
+mod sparse_factorization;
 mod spectral_derivatives;
 mod triangular_derivatives;
 

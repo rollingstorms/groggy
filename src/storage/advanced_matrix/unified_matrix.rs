@@ -250,7 +250,7 @@ impl<T: NumericType> UnifiedMatrix<T> {
             sparse.row_pointers,
         )
     }
-    fn checked_sparse(&self) -> MatrixResult<Option<&SparseMatrix<T>>> {
+    pub(crate) fn checked_sparse(&self) -> MatrixResult<Option<&SparseMatrix<T>>> {
         if let MatrixStorage::Sparse(s) = &self.storage {
             if s.shape != self.shape {
                 return Err(MatrixError::InvalidInput(

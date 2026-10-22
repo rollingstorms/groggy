@@ -26,3 +26,5 @@ preserved separately.
 - 29.38: QR/fixed-pivot LU explicit derivatives, independent gradient checks.
 - 29.39: shared checked lower arithmetic, logical layouts, raw backend ABI guards.
 - 29.40: canonical sparse arithmetic/products/transforms/conversions. Sparse solve/factors and remaining statistics still open.
+
+- 29.41: sparse LU/Cholesky/row-equilibrated solve/sign-log determinants; independent references and 10,000-square storage fixtures.

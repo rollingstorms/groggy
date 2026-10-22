@@ -1832,6 +1832,16 @@ impl<T: NumericType> GraphMatrix<T> {
                 "Determinant requires square input".into(),
             ));
         }
+        if rows > 2 {
+            if let Some(sparse) = self
+                .storage
+                .checked_sparse()
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+            {
+                let (sign, log) = super::sparse_factorization::slogdet(sparse)?;
+                return Ok(if sign == 0. { 0. } else { sign * log.exp() });
+            }
+        }
         let values = self.decomposition_input()?;
         if values.iter().any(|v| !v.is_finite()) {
             return Err(GraphError::InvalidInput(
@@ -1861,6 +1871,13 @@ impl<T: NumericType> GraphMatrix<T> {
             return Err(GraphError::InvalidInput(
                 "Log determinant requires square input".into(),
             ));
+        }
+        if let Some(sparse) = self
+            .storage
+            .checked_sparse()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+        {
+            return super::sparse_factorization::slogdet(sparse);
         }
         let factor = super::factorization::lu(self.decomposition_input()?, rows)?;
         Ok(super::factorization::slogdet(&factor, rows))
@@ -1909,12 +1926,20 @@ impl<T: NumericType> GraphMatrix<T> {
                 "Linear solve requires square coefficients and matching RHS rows".into(),
             ));
         }
-        let values = super::linear_system::solve(
-            self.decomposition_input()?,
-            b.decomposition_input()?,
-            rows,
-            b_cols,
-        )?;
+        let values = if let Some(sparse) = self
+            .storage
+            .checked_sparse()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+        {
+            super::sparse_factorization::solve(sparse, b.decomposition_input()?, b_cols)?
+        } else {
+            super::linear_system::solve(
+                self.decomposition_input()?,
+                b.decomposition_input()?,
+                rows,
+                b_cols,
+            )?
+        };
         let mut result = Self::arithmetic_zeros(rows, b_cols)?;
         for row in 0..rows {
             for col in 0..b_cols {
@@ -2095,6 +2120,35 @@ impl<T: NumericType> GraphMatrix<T> {
         Self::from_row_major_data(values, rows, cols, None)
     }
 
+    fn sparse_factor_matrix(
+        factor: crate::storage::advanced_matrix::unified_matrix::SparseMatrix<f64>,
+    ) -> GraphResult<Self> {
+        let mut values = Vec::new();
+        let mut indices = Vec::new();
+        let mut pointers = vec![0];
+        for row in 0..factor.shape.rows {
+            for entry in factor.row_pointers[row]..factor.row_pointers[row + 1] {
+                let value = T::from_f64(factor.values[entry])
+                    .filter(|v| v.is_finite())
+                    .ok_or_else(|| {
+                        GraphError::InvalidInput("Sparse factor output exceeds dtype range".into())
+                    })?;
+                if value != T::zero() {
+                    values.push(value);
+                    indices.push(factor.col_indices[entry]);
+                }
+            }
+            pointers.push(values.len());
+        }
+        Self::from_csr(
+            factor.shape.rows,
+            factor.shape.cols,
+            values,
+            indices,
+            pointers,
+        )
+    }
+
     /// Floating partial-pivot factorization PA=LU; singular pivots remain zero.
     pub fn lu_decomposition(
         &self,
@@ -2112,16 +2166,40 @@ impl<T: NumericType> GraphMatrix<T> {
                 "LU row labels do not match shape".into(),
             ));
         }
-        let factor = super::factorization::lu(self.decomposition_input()?, rows)?;
-        let mut p = Self::arithmetic_zeros(rows, rows)?;
-        for (row, &col) in factor.permutation.iter().enumerate() {
-            p.set(row, col, T::one())?;
-        }
-        let mut lower = Self::factor_matrix(factor.lower, rows, rows)?;
-        let mut upper = Self::factor_matrix(factor.upper, rows, rows)?;
+        let (permutation, mut p, mut lower, mut upper) = if let Some(sparse) = self
+            .storage
+            .checked_sparse()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+        {
+            let factor = super::sparse_factorization::lu(sparse)?;
+            let p = Self::from_csr(
+                rows,
+                rows,
+                vec![T::one(); rows],
+                factor.permutation.clone(),
+                (0..=rows).collect(),
+            )?;
+            (
+                factor.permutation,
+                p,
+                Self::sparse_factor_matrix(factor.lower)?,
+                Self::sparse_factor_matrix(factor.upper)?,
+            )
+        } else {
+            let factor = super::factorization::lu(self.decomposition_input()?, rows)?;
+            let mut p = Self::arithmetic_zeros(rows, rows)?;
+            for (row, &col) in factor.permutation.iter().enumerate() {
+                p.set(row, col, T::one())?;
+            }
+            (
+                factor.permutation,
+                p,
+                Self::factor_matrix(factor.lower, rows, rows)?,
+                Self::factor_matrix(factor.upper, rows, rows)?,
+            )
+        };
         let permuted = self.row_labels.as_ref().map(|labels| {
-            factor
-                .permutation
+            permutation
                 .iter()
                 .map(|&i| labels[i].clone())
                 .collect::<Vec<_>>()
@@ -2155,8 +2233,19 @@ impl<T: NumericType> GraphMatrix<T> {
                 "Cholesky row labels do not match shape".into(),
             ));
         }
-        let values = super::factorization::cholesky(self.decomposition_input()?, rows)?;
-        let mut lower = Self::factor_matrix(values, rows, rows)?;
+        let mut lower = if let Some(sparse) = self
+            .storage
+            .checked_sparse()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+        {
+            Self::sparse_factor_matrix(super::sparse_factorization::cholesky(sparse)?)?
+        } else {
+            Self::factor_matrix(
+                super::factorization::cholesky(self.decomposition_input()?, rows)?,
+                rows,
+                rows,
+            )?
+        };
         lower.row_labels = self.row_labels.clone();
         lower.column_names = (0..rows).map(|i| format!("chol_{i}")).collect();
         self.track_cholesky(lower)
@@ -2190,9 +2279,23 @@ impl<T: NumericType> GraphMatrix<T> {
                 .as_ref()
                 .ok_or_else(|| invalid("Missing Cholesky input snapshot"))?;
             let saved = Self::from_storage(saved.clone());
-            if saved.shape() != self.shape()
-                || saved.decomposition_input()? != self.decomposition_input()?
-            {
+            let same_values = if let (Some(a), Some(b)) = (
+                saved
+                    .storage
+                    .checked_sparse()
+                    .map_err(|e| invalid(&e.to_string()))?,
+                self.storage
+                    .checked_sparse()
+                    .map_err(|e| invalid(&e.to_string()))?,
+            ) {
+                a.shape == b.shape
+                    && a.values == b.values
+                    && a.col_indices == b.col_indices
+                    && a.row_pointers == b.row_pointers
+            } else {
+                saved.decomposition_input()? == self.decomposition_input()?
+            };
+            if saved.shape() != self.shape() || !same_values {
                 return Err(invalid("Cholesky input changed since gradient binding; rebind with requires_grad(false).requires_grad(true)"));
             }
         }
