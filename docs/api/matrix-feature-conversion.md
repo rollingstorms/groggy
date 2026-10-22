@@ -23,5 +23,6 @@ precision already absent from storage.
 Lower-level `UnifiedMatrix.fill` validates dense logical addresses before any
 writes. It fills selected logical cells while preserving padding; invalid strides
 return errors without partial mutation. CSR fill retains CSR: nonzero fill stores
-all logical cells, while zero fill clears stored values. Callers should expect
-quadratic storage when filling a large sparse matrix with a nonzero value.
+all logical cells within the implicit expansion limit, while zero fill clears
+stored values. Larger nonzero fills require explicit dense conversion; callers
+should expect quadratic storage after opting into that dense work.

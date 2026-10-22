@@ -53,6 +53,8 @@ mod linear_system;
 pub mod matrix_core;
 pub(crate) mod matrix_power;
 mod reductions;
+mod resource_policy;
+pub use resource_policy::IMPLICIT_DENSE_ELEMENT_LIMIT;
 pub mod slicing;
 mod sparse_factorization;
 mod spectral_derivatives;

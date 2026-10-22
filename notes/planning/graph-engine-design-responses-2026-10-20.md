@@ -714,3 +714,14 @@ measurement and unresolved production budgets. The finite closeout finding list
 names remaining attribute/table, activation/tracking and sparse expansion repairs
 under 29.61–29.63; broad parents remain open. See the numerical expanded benchmark
 note and numerical-closeout-findings-2026-10-22.md.
+
+### Item 29.63 — Shared sparse expansion and nonfinite fallback policy
+
+Use one public implicit-dense cell limit for spectral input conversion, nonzero
+CSR map images and nonfinite CSR scale/product scans. Guard sparse operands before
+mixed nonfinite products can flatten them; retain explicit dense opt-in, small
+IEEE results and large sparse zero-preserving maps. Full locked offline native
+suites, strict all-target core Clippy and 462 rebuilt Python regressions pass,
+including 10k-square early-error and just-over-limit explicit opt-in fixtures.
+Sparse kernel parent 29.25 closes within the documented native domain and measured
+coverage; arbitrary fill or production-memory guarantees are not implied.

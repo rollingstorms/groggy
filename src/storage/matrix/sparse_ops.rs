@@ -81,6 +81,24 @@ impl<T: NumericType> SparseMatrix<T> {
             return Err(invalid("CSR product dimensions differ"));
         }
         let nonfinite = self.values.iter().chain(&b.values).any(|v| !v.is_finite());
+        if nonfinite {
+            super::resource_policy::implicit_dense(
+                self.shape.rows,
+                self.shape.cols,
+                "Nonfinite CSR product input",
+            )?;
+            super::resource_policy::implicit_dense(
+                b.shape.rows,
+                b.shape.cols,
+                "Nonfinite CSR product input",
+            )?;
+            super::resource_policy::implicit_dense(
+                self.shape.rows,
+                b.shape.cols,
+                "Nonfinite CSR product output",
+            )?;
+        }
+
         let mut values = Vec::new();
         let mut indices = Vec::new();
         let mut pointers = vec![0];
@@ -230,6 +248,13 @@ impl<T: NumericType> SparseMatrix<T> {
         } else {
             U::zero()
         };
+        if implicit != U::zero() {
+            super::resource_policy::implicit_dense(
+                self.shape.rows,
+                self.shape.cols,
+                "CSR nonzero-image map",
+            )?;
+        }
         let mut values = Vec::new();
         let mut indices = Vec::new();
         let mut pointers = vec![0];
@@ -264,6 +289,13 @@ impl<T: NumericType> SparseMatrix<T> {
     /// Preserve sparse storage; nonfinite scalars can make implicit zeros nonzero.
     pub fn scale(&self, scalar: T) -> MatrixResult<Self> {
         self.validate()?;
+        if !scalar.is_finite() {
+            super::resource_policy::implicit_dense(
+                self.shape.rows,
+                self.shape.cols,
+                "Nonfinite CSR scale",
+            )?;
+        }
         let mut values = Vec::new();
         let mut indices = Vec::new();
         let mut pointers = vec![0];

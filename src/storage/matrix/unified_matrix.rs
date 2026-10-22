@@ -557,6 +557,21 @@ impl<T: NumericType> UnifiedMatrix<T> {
                 return Ok(out);
             }
         }
+        // Mixed nonfinite fallback must not silently densify a large CSR operand.
+        if self.checked_sparse()?.is_some() {
+            super::resource_policy::implicit_dense(
+                self.rows(),
+                self.cols(),
+                "Nonfinite mixed product input",
+            )?;
+        }
+        if other.checked_sparse()?.is_some() {
+            super::resource_policy::implicit_dense(
+                other.rows(),
+                other.cols(),
+                "Nonfinite mixed product input",
+            )?;
+        }
         let a = self.to_vec()?;
         let b = other.to_vec()?;
         let mut out = Self::new(self.rows(), other.cols())?;

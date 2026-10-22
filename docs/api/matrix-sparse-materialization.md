@@ -27,3 +27,18 @@ ordering/fill bounds and universal sparse spectral throughput remain future work
 
 Native/Python tests check early rejection on large CSR input, retained small
 spectral results, and unaffected sparse-native solve/Cholesky routes.
+
+## Expansion beyond spectral kernels
+
+The same public `matrix::IMPLICIT_DENSE_ELEMENT_LIMIT` (also available through
+GraphMatrix's existing associated constant) covers nonzero implicit-zero images
+in CSR maps: exp, log, nonzero scalar shifts and dense comparison masks. Small
+inputs retain IEEE values and canonical CSR results; above the limit callers must
+explicitly convert to dense first. Sparse zero-preserving maps stay sparse and do
+not hit this limit merely because their logical shape is large.
+
+Nonfinite CSR scale and product fallback paths also check the logical input/grid
+work before scanning it. Mixed nonfinite products cannot silently flatten a large
+CSR operand. Explicit dense conversion opts into that work. Sparse nonzero fill
+uses the same map policy. This does not bound arbitrary finite sparse-product or
+factorization fill, inherently dense outputs, or total workspace memory.

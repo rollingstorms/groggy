@@ -2236,21 +2236,28 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Maximum sparse input cells implicitly materialized by dense numerical consumers.
     /// Explicit `to_dense()` opts into larger dense work and its memory costs.
-    pub const IMPLICIT_DENSE_ELEMENT_LIMIT: usize = 1_048_576;
+    pub const IMPLICIT_DENSE_ELEMENT_LIMIT: usize = super::IMPLICIT_DENSE_ELEMENT_LIMIT;
 
     fn decomposition_input(&self) -> GraphResult<Vec<f64>> {
         use crate::storage::matrix::DType;
         if !matches!(T::DTYPE, DType::Float32 | DType::Float64) {
             return Err(GraphError::InvalidInput("Decomposition requires floating-point matrix elements".into()));
         }
-        let (rows,cols)=self.shape();
-        let count=rows.checked_mul(cols).ok_or_else(||GraphError::InvalidInput("Matrix dimensions overflow".into()))?;
-        if self.is_sparse() && count>Self::IMPLICIT_DENSE_ELEMENT_LIMIT {
-            return Err(GraphError::InvalidInput(format!("Dense numerical materialization of {rows}x{cols} CSR exceeds the implicit {}-cell limit; call to_dense() explicitly to opt in",Self::IMPLICIT_DENSE_ELEMENT_LIMIT)));
+        let (rows, cols) = self.shape();
+        let count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| GraphError::InvalidInput("Matrix dimensions overflow".into()))?;
+        if self.is_sparse() {
+            super::resource_policy::implicit_dense(rows, cols, "Dense numerical materialization")
+                .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
         }
-        let values=self.storage.to_vec().map_err(|e|GraphError::InvalidInput(e.to_string()))?;
-        let mut data=Vec::new();
-        data.try_reserve_exact(count).map_err(|e|GraphError::InvalidInput(e.to_string()))?;
+        let values = self
+            .storage
+            .to_vec()
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(count)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
         data.extend(values.into_iter().map(NumericType::to_f64));
         Ok(data)
     }
