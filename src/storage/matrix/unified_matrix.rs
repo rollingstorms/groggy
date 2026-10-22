@@ -3,7 +3,7 @@
 //! This module implements the unified matrix type that serves as the foundation
 //! for all matrix operations in the advanced matrix system.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     backend::{BackendHint, BackendSelector},
     memory::{MatrixLayout, MemoryError, SharedBuffer},
     numeric_type::NumericType,

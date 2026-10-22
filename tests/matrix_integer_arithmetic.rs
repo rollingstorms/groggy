@@ -1,4 +1,4 @@
-use groggy::storage::{advanced_matrix::NumericType, GraphMatrix};
+use groggy::storage::{matrix::NumericType, GraphMatrix};
 fn matrix<T: NumericType>(values: Vec<T>, rows: usize, cols: usize) -> GraphMatrix<T> {
     GraphMatrix::from_row_major_data(values, rows, cols, None).unwrap()
 }

@@ -50,7 +50,7 @@ impl<T: NumericType> GraphMatrix<T> {
     }
     /// Weighted row-degree diagonal. Self-loop weight occurs once in row degree.
     pub fn to_degree_matrix(&self) -> GraphResult<Self> {
-        if T::DTYPE == crate::storage::advanced_matrix::DType::Bool {
+        if T::DTYPE == crate::storage::matrix::DType::Bool {
             return Err(GraphError::InvalidInput(
                 "Cast boolean adjacency to a numeric dtype for row degrees".into(),
             ));

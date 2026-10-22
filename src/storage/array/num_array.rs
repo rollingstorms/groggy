@@ -1,6 +1,6 @@
 use super::simd_optimizations;
 use super::BaseArray;
-use crate::storage::advanced_matrix::{checked_kernels::NumericValue, NumericType};
+use crate::storage::matrix::{checked_kernels::NumericValue, NumericType};
 use std::ops::{Add, Mul};
 
 /// NumArray extends BaseArray with statistical and numerical operations.

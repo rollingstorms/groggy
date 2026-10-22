@@ -2,7 +2,7 @@
 use super::*;
 use crate::storage::{
     adjacency::{MatrixFormat, MatrixType},
-    advanced_matrix::NumericType,
+    matrix::NumericType,
     matrix::{FromAttrValue, GraphMatrix},
 };
 impl Graph {

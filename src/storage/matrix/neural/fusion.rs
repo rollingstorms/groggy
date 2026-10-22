@@ -3,7 +3,7 @@
 //! This module implements operation fusion optimizations that combine multiple
 //! operations into single kernels to reduce memory bandwidth and improve performance.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     neural::autodiff::{ComputationGraph, NodeId, Operation},
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, Shape, UnifiedMatrix},
@@ -587,7 +587,7 @@ impl<T: NumericType> FusionEngine<T> {
 
         // Apply ReLU in-place
         *output =
-            crate::storage::advanced_matrix::neural::activations::ActivationOps::relu(&with_bias)?;
+            crate::storage::matrix::neural::activations::ActivationOps::relu(&with_bias)?;
 
         Ok(())
     }
@@ -612,7 +612,7 @@ impl<T: NumericType> FusionEngine<T> {
         };
 
         outputs[0] =
-            crate::storage::advanced_matrix::neural::activations::ActivationOps::relu(&result)?;
+            crate::storage::matrix::neural::activations::ActivationOps::relu(&result)?;
         Ok(())
     }
 
@@ -628,7 +628,7 @@ impl<T: NumericType> FusionEngine<T> {
         }
 
         outputs[0] =
-            crate::storage::advanced_matrix::neural::activations::ActivationOps::gelu(inputs[0])?;
+            crate::storage::matrix::neural::activations::ActivationOps::gelu(inputs[0])?;
         Ok(())
     }
 
@@ -643,7 +643,7 @@ impl<T: NumericType> FusionEngine<T> {
             ));
         }
 
-        outputs[0] = crate::storage::advanced_matrix::neural::activations::ActivationOps::softmax(
+        outputs[0] = crate::storage::matrix::neural::activations::ActivationOps::softmax(
             inputs[0],
         )?;
         Ok(())

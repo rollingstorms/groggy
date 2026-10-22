@@ -1,6 +1,6 @@
 //! Checked graph operators: one contribution per edge instance, canonical CSR.
 use super::*;
-use crate::storage::advanced_matrix::checked_kernels::Product;
+use crate::storage::matrix::checked_kernels::Product;
 use std::collections::HashMap;
 
 impl<T: NumericType> GraphMatrix<T> {

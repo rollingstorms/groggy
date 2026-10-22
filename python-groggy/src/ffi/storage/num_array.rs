@@ -307,8 +307,8 @@ impl PyNumArray {
         let (dtype, values) = numeric::attribute_inputs(&attr_values)
             .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
         let dtype = match dtype {
-            groggy::storage::advanced_matrix::DType::Float64 => "float64",
-            groggy::storage::advanced_matrix::DType::Int64 => "int64",
+            groggy::storage::matrix::DType::Float64 => "float64",
+            groggy::storage::matrix::DType::Int64 => "int64",
             _ => "int32",
         };
         NumericArrayData::converted(&values, dtype, ConversionPolicy::Round)
@@ -319,8 +319,8 @@ impl PyNumArray {
         let (dtype, values) = numeric::promoted_attribute_inputs(values)
             .map_err(|e| pyo3::exceptions::PyTypeError::new_err(format!("BaseArray contains non-numeric or missing data and cannot be converted to numeric array: {e}")))?;
         let dtype = match dtype {
-            groggy::storage::advanced_matrix::DType::Bool => "bool",
-            groggy::storage::advanced_matrix::DType::Int64 => "int64",
+            groggy::storage::matrix::DType::Bool => "bool",
+            groggy::storage::matrix::DType::Int64 => "int64",
             _ => "float64",
         };
         NumericArrayData::converted(&values, dtype, ConversionPolicy::Round)

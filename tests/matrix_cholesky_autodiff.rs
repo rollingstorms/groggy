@@ -1,5 +1,5 @@
 use groggy::storage::{
-    advanced_matrix::{
+    matrix::{
         neural::autodiff::Operation, unified_matrix::Shape, ComputationGraph, UnifiedMatrix,
     },
     GraphMatrix,

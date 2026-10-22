@@ -8,7 +8,7 @@
 use super::*;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::advanced_matrix::numeric_type::NumericType;
+use crate::storage::matrix::numeric_type::NumericType;
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::embeddings::flat_embedding::{compute_flat_embedding_matrix, FlatEmbedConfig};
 use crate::viz::embeddings::{EmbeddingMethod, GraphEmbeddingExt};

@@ -1,14 +1,7 @@
-//! GraphMatrix - High-performance matrix with neural network capabilities
+//! Public graph-matrix API over the canonical matrix storage and numerical engine.
 //!
-//! This module provides GraphMatrix with advanced optimization backend using
-//! the NumericType trait system for mixed-precision computations.
-//!
-//! # Design Principles
-//! - GraphMatrix<T> with generic NumericType support (f64 default)
-//! - Built on UnifiedMatrix backend with BLAS/NumPy delegation
-//! - Neural network operations: matmul, conv2d, activations, autodiff
-//! - Memory-efficient storage with fusion optimization
-//! - Intelligent backend selection for optimal performance
+//! Owns labels, graph metadata and supported differentiation bindings. Numerical
+//! storage/kernels and owned thread-transfer data have separate responsibilities.
 
 #[path = "arithmetic_autodiff.rs"]
 mod arithmetic_autodiff;
@@ -20,11 +13,11 @@ mod graph_construction;
 mod graph_transforms;
 #[path = "numerical_data.rs"]
 mod numerical_data;
-use crate::storage::advanced_matrix::neural::autodiff::{FactorOutput, Operation};
+use crate::storage::matrix::autodiff::{FactorOutput, Operation};
 pub use numerical_data::NumericalMatrixData;
 
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     AdvancedMemoryPool, ComputationGraph, NumericType, UnifiedMatrix,
 };
 use crate::storage::table::BaseTable;
@@ -403,7 +396,7 @@ impl<T: NumericType> GraphMatrix<T> {
         let count = rows
             .checked_mul(cols)
             .ok_or_else(|| GraphError::InvalidInput("Matrix element count overflow".into()))?;
-        if let crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Sparse(sparse) =
+        if let crate::storage::matrix::unified_matrix::MatrixStorage::Sparse(sparse) =
             &self.storage.storage
         {
             if (sparse.shape.rows, sparse.shape.cols) != (rows, cols) {
@@ -510,7 +503,7 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// ReLU activation function
     pub fn relu(&self) -> GraphResult<GraphMatrix<T>> {
-        use crate::storage::advanced_matrix::neural::activations::ActivationOps;
+        use crate::storage::matrix::neural::activations::ActivationOps;
         let result_storage = ActivationOps::relu(&self.storage)
             .map_err(|e| GraphError::InvalidInput(format!("ReLU activation failed: {:?}", e)))?;
         Ok(Self::from_storage(result_storage))
@@ -518,7 +511,7 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// GELU activation function
     pub fn gelu(&self) -> GraphResult<GraphMatrix<T>> {
-        use crate::storage::advanced_matrix::neural::activations::ActivationOps;
+        use crate::storage::matrix::neural::activations::ActivationOps;
         let result_storage = ActivationOps::gelu(&self.storage)
             .map_err(|e| GraphError::InvalidInput(format!("GELU activation failed: {:?}", e)))?;
         Ok(Self::from_storage(result_storage))
@@ -639,7 +632,7 @@ impl<T: NumericType> GraphMatrix<T> {
     pub fn conv2d(
         &self,
         _kernel: &GraphMatrix<T>,
-        _config: crate::storage::advanced_matrix::neural::convolution::ConvolutionConfig,
+        _config: crate::storage::matrix::neural::convolution::ConvolutionConfig,
     ) -> GraphResult<GraphMatrix<T>> {
         // TODO: Complete Conv2D integration - API mismatch between Conv2D (expects ConvTensor) and GraphMatrix (UnifiedMatrix)
         // Conv2D::new requires (in_channels, out_channels, config) not (kernel, config)
@@ -757,7 +750,7 @@ impl<T: NumericType> GraphMatrix<T> {
             .storage
             .try_map_into(|value| {
                 convert::<U>(from_scalar(value), policy).map_err(|e| {
-                    crate::storage::advanced_matrix::MatrixError::InvalidInput(e.to_string())
+                    crate::storage::matrix::MatrixError::InvalidInput(e.to_string())
                 })
             })
             .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
@@ -771,7 +764,7 @@ impl<T: NumericType> GraphMatrix<T> {
     pub fn is_sparse(&self) -> bool {
         matches!(
             &self.storage.storage,
-            crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Sparse(_)
+            crate::storage::matrix::unified_matrix::MatrixStorage::Sparse(_)
         )
     }
 
@@ -1019,7 +1012,7 @@ impl<T: NumericType> GraphMatrix<T> {
         self.storage
             .reduce_axis(matches!(axis, Axis::Columns), |values, count| {
                 operation(values, count).map_err(|e| {
-                    crate::storage::advanced_matrix::unified_matrix::MatrixError::InvalidInput(
+                    crate::storage::matrix::unified_matrix::MatrixError::InvalidInput(
                         e.to_string(),
                     )
                 })
@@ -1202,7 +1195,7 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Checked typed global sum; callers must handle GraphResult.
     pub fn sum(&self) -> GraphResult<T> {
-        if let crate::storage::advanced_matrix::unified_matrix::MatrixStorage::Sparse(s) =
+        if let crate::storage::matrix::unified_matrix::MatrixStorage::Sparse(s) =
             &self.storage.storage
         {
             if s.shape.as_tuple() != self.shape() {
@@ -1809,7 +1802,7 @@ impl<T: NumericType> GraphMatrix<T> {
     }
 
     fn sparse_factor_matrix(
-        factor: crate::storage::advanced_matrix::unified_matrix::SparseMatrix<f64>,
+        factor: crate::storage::matrix::unified_matrix::SparseMatrix<f64>,
     ) -> GraphResult<Self> {
         let mut values = Vec::new();
         let mut indices = Vec::new();
@@ -1972,7 +1965,7 @@ impl<T: NumericType> GraphMatrix<T> {
             .create_operation(
                 operation,
                 vec![input_id],
-                crate::storage::advanced_matrix::unified_matrix::Shape::new(rows, cols),
+                crate::storage::matrix::unified_matrix::Shape::new(rows, cols),
                 true,
             )
             .map_err(|e| invalid(&e.to_string()))?;
@@ -2246,7 +2239,7 @@ impl<T: NumericType> GraphMatrix<T> {
     pub const IMPLICIT_DENSE_ELEMENT_LIMIT: usize = 1_048_576;
 
     fn decomposition_input(&self) -> GraphResult<Vec<f64>> {
-        use crate::storage::advanced_matrix::DType;
+        use crate::storage::matrix::DType;
         if !matches!(T::DTYPE, DType::Float32 | DType::Float64) {
             return Err(GraphError::InvalidInput("Decomposition requires floating-point matrix elements".into()));
         }
@@ -2282,7 +2275,7 @@ impl<T: NumericType> GraphMatrix<T> {
     }
     fn default_rank_tolerance(&self) -> f64 {
         let (rows, cols) = self.shape();
-        let epsilon = if T::DTYPE == crate::storage::advanced_matrix::DType::Float32 {
+        let epsilon = if T::DTYPE == crate::storage::matrix::DType::Float32 {
             f64::from(f32::EPSILON)
         } else {
             f64::EPSILON
@@ -2399,21 +2392,21 @@ impl<T: NumericType> GraphMatrix<T> {
     }
     /// Entrywise absolute value with exact checked integer semantics.
     pub fn abs(&self) -> GraphResult<Self> {
-        let result = self.numerical_result(crate::storage::advanced_matrix::MathFunctions::abs(
+        let result = self.numerical_result(crate::storage::matrix::MathFunctions::abs(
             &self.storage,
         ))?;
         self.track_factor(result, Operation::Abs)
     }
     /// Entrywise exponential, with IEEE floating outputs and checked conversion.
     pub fn exp(&self) -> GraphResult<Self> {
-        let result = self.numerical_result(crate::storage::advanced_matrix::MathFunctions::exp(
+        let result = self.numerical_result(crate::storage::matrix::MathFunctions::exp(
             &self.storage,
         ))?;
         self.track_factor(result, Operation::Exp)
     }
     /// Entrywise natural log; floating zero/negative inputs yield -inf/NaN.
     pub fn log(&self) -> GraphResult<Self> {
-        let result = self.numerical_result(crate::storage::advanced_matrix::MathFunctions::ln(
+        let result = self.numerical_result(crate::storage::matrix::MathFunctions::ln(
             &self.storage,
         ))?;
         self.track_factor(result, Operation::Log)
@@ -2421,13 +2414,13 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Entrywise square root; negative floating inputs yield NaN.
     pub fn sqrt(&self) -> GraphResult<Self> {
         let result = self.numerical_result(
-            crate::storage::advanced_matrix::MathFunctions::sqrt(&self.storage),
+            crate::storage::matrix::MathFunctions::sqrt(&self.storage),
         )?;
         self.track_factor(result, Operation::Sqrt)
     }
     fn numerical_result(
         &self,
-        storage: crate::storage::advanced_matrix::MatrixResult<UnifiedMatrix<T>>,
+        storage: crate::storage::matrix::MatrixResult<UnifiedMatrix<T>>,
     ) -> GraphResult<Self> {
         let mut result =
             Self::from_storage(storage.map_err(|e| GraphError::InvalidInput(e.to_string()))?);
@@ -2593,7 +2586,7 @@ impl<T: NumericType> GraphMatrix<T> {
     fn map_checked_arithmetic(&self, operation: impl Fn(T) -> GraphResult<T>) -> GraphResult<Self> {
         self.numerical_result(self.storage.try_map_elementwise(|value| {
             operation(value).map_err(|e| {
-                crate::storage::advanced_matrix::MatrixError::InvalidInput(e.to_string())
+                crate::storage::matrix::MatrixError::InvalidInput(e.to_string())
             })
         }))
     }

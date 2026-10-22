@@ -1,7 +1,7 @@
 //! Release numerical corpus with process-wide allocation receipts (single runner).
 use groggy::{
     storage::{
-        advanced_matrix::{MatrixStats, UnifiedMatrix},
+        matrix::{MatrixStats, UnifiedMatrix},
         Axis, GraphMatrix, NumArray,
     },
     GraphResult,

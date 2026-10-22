@@ -1,5 +1,5 @@
 //! Checked matrix powers and noncommuting Frechet derivatives.
-use crate::storage::advanced_matrix::{MatrixError, MatrixResult, NumericType, UnifiedMatrix};
+use crate::storage::matrix::{MatrixError, MatrixResult, NumericType, UnifiedMatrix};
 fn owned<T: NumericType>(a: &UnifiedMatrix<T>) -> MatrixResult<UnifiedMatrix<T>> {
     if a.rows() != a.cols() {
         return Err(MatrixError::InvalidShape(

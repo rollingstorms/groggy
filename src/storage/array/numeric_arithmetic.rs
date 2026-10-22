@@ -1,6 +1,6 @@
 //! Native numeric conversion and checked vector arithmetic policies.
 use super::NumArray;
-use crate::storage::advanced_matrix::{DType, NumericType};
+use crate::storage::matrix::{DType, NumericType};
 use crate::{GraphError, GraphResult};
 #[derive(Clone, Copy, Debug)]
 pub enum NumericInput {
@@ -298,7 +298,7 @@ impl<T: NumericType> NumArray<T> {
         if self.len() != other.len() {
             return Err(invalid("Vector dot lengths differ"));
         }
-        let mut dot = crate::storage::advanced_matrix::checked_kernels::Product::<T>::new();
+        let mut dot = crate::storage::matrix::checked_kernels::Product::<T>::new();
         for (&a, &b) in self.iter().zip(other.iter()) {
             dot.add(a, b).map_err(|e| invalid(&e.to_string()))?;
         }

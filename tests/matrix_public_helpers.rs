@@ -1,5 +1,5 @@
 use groggy::storage::{
-    advanced_matrix::UnifiedMatrix,
+    matrix::UnifiedMatrix,
     array::numeric_arithmetic::{NumericComparison, NumericInput},
     GraphMatrix,
 };

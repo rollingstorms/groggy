@@ -1,5 +1,5 @@
 use groggy::storage::{
-    advanced_matrix::{MatrixLayout, UnifiedMatrix},
+    matrix::{MatrixLayout, UnifiedMatrix},
     GraphMatrix,
 };
 #[test]
@@ -52,7 +52,7 @@ fn sparse_and_malformed_metadata_have_explicit_behavior_and_matmul_alias_agrees(
 
 #[test]
 fn safe_raw_backend_wrappers_validate_extents_types_and_preserve_outputs_on_errors() {
-    use groggy::storage::advanced_matrix::backend::{ComputeBackendExt, NativeBackend};
+    use groggy::storage::matrix::backend::{ComputeBackendExt, NativeBackend};
     let backend = NativeBackend;
     let mut c = [7.];
     assert!(backend

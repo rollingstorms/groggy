@@ -835,8 +835,8 @@ TESTING STRATEGY:
 */
 
 // Error type conversions
-impl From<crate::storage::advanced_matrix::unified_matrix::MatrixError> for GraphError {
-    fn from(error: crate::storage::advanced_matrix::unified_matrix::MatrixError) -> Self {
+impl From<crate::storage::matrix::unified_matrix::MatrixError> for GraphError {
+    fn from(error: crate::storage::matrix::unified_matrix::MatrixError) -> Self {
         GraphError::ConversionError {
             from: "MatrixError".to_string(),
             to: "GraphError".to_string(),

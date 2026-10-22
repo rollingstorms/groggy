@@ -1,6 +1,6 @@
 use groggy::{
     storage::{
-        advanced_matrix::{unified_matrix::MatrixStorage, Strides, UnifiedMatrix},
+        matrix::{unified_matrix::MatrixStorage, Strides, UnifiedMatrix},
         matrix::FromAttrValue,
     },
     types::AttrValue,

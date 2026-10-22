@@ -3,7 +3,7 @@
 //! This module implements a basic automatic differentiation system for computing
 //! gradients efficiently in neural network training and optimization.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, Shape, UnifiedMatrix},
 };
@@ -496,7 +496,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         "ReLU operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::advanced_matrix::neural::activations::ActivationOps::relu(
+                crate::storage::matrix::neural::activations::ActivationOps::relu(
                     &inputs[0],
                 )
             }
@@ -508,7 +508,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         "Sigmoid operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::advanced_matrix::neural::activations::ActivationOps::sigmoid(
+                crate::storage::matrix::neural::activations::ActivationOps::sigmoid(
                     &inputs[0],
                 )
             }
@@ -520,7 +520,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         "Tanh operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::advanced_matrix::neural::activations::ActivationOps::tanh(
+                crate::storage::matrix::neural::activations::ActivationOps::tanh(
                     &inputs[0],
                 )
             }
@@ -532,7 +532,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         "GELU operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::advanced_matrix::neural::activations::ActivationOps::gelu(
+                crate::storage::matrix::neural::activations::ActivationOps::gelu(
                     &inputs[0],
                 )
             }
@@ -972,7 +972,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         let mut input_node = input_arc.lock().unwrap();
                         if input_node.requires_grad {
                             let input_value = input_node.value.as_ref().unwrap();
-                            let relu_derivative = crate::storage::advanced_matrix::neural::activations::ActivationOps::relu_derivative(input_value)?;
+                            let relu_derivative = crate::storage::matrix::neural::activations::ActivationOps::relu_derivative(input_value)?;
                             let grad = grad_output.elementwise_multiply(&relu_derivative)?;
                             input_node.accumulate_gradient(grad)?;
                         }
@@ -1338,7 +1338,7 @@ impl<T: NumericType> AutoDiffTensor<T> {
     /// Apply ReLU activation
     pub fn relu(&self) -> MatrixResult<Self> {
         let result_data =
-            crate::storage::advanced_matrix::neural::activations::ActivationOps::relu(&self.data)?;
+            crate::storage::matrix::neural::activations::ActivationOps::relu(&self.data)?;
         let result_shape = result_data.shape();
 
         let mut graph = self.graph.lock().unwrap();
@@ -1470,7 +1470,7 @@ mod tests {
         let node: ComputationNode<f64> = ComputationNode::new(
             0,
             Operation::ReLU,
-            crate::storage::advanced_matrix::unified_matrix::Shape::new(10, 10),
+            crate::storage::matrix::unified_matrix::Shape::new(10, 10),
             true,
         );
 

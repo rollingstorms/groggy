@@ -7,7 +7,7 @@
 #![allow(clippy::borrowed_box)]
 #![allow(clippy::missing_safety_doc)]
 
-use crate::storage::advanced_matrix::numeric_type::{DType, NumericType};
+use crate::storage::matrix::numeric_type::{DType, NumericType};
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -772,13 +772,13 @@ impl BackendSelector {
         let mut backends: Vec<Box<dyn ComputeBackend>> = vec![];
 
         // Add BLAS backend if available (highest priority for supported ops)
-        let blas_backend = crate::storage::advanced_matrix::backends::BlasBackend::new();
+        let blas_backend = crate::storage::matrix::backends::BlasBackend::new();
         if blas_backend.is_available() {
             backends.push(Box::new(blas_backend));
         }
 
         // Add NumPy backend if available (second priority)
-        let numpy_backend = crate::storage::advanced_matrix::backends::NumPyBackend::new();
+        let numpy_backend = crate::storage::matrix::backends::NumPyBackend::new();
         if numpy_backend.is_available() {
             backends.push(Box::new(numpy_backend));
         }

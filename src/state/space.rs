@@ -55,7 +55,7 @@ pub struct TopologySnapshot {
     pub neighbor_nodes: Arc<Vec<NodeId>>,
     pub neighbor_edges: Arc<Vec<EdgeId>>,
     /// Cached adjacency matrix (computed from neighbors for fast access)
-    pub adjacency_matrix: Option<Arc<crate::storage::adjacency::AdjacencyMatrix>>,
+    pub adjacency_matrix: Option<Arc<crate::storage::matrix::adjacency::AdjacencyMatrix>>,
     pub version: u64,
 }
 

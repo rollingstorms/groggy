@@ -1,4 +1,4 @@
-use groggy::storage::{advanced_matrix::UnifiedMatrix, GraphMatrix, NumericalMatrixData};
+use groggy::storage::{matrix::UnifiedMatrix, GraphMatrix, NumericalMatrixData};
 fn assert_send<T: Send>() {}
 #[test]
 fn owned_numerical_data_transfer_preserves_values_storage_and_labels() {

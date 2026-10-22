@@ -308,3 +308,16 @@ Add checked zero/one/identity/storage wrappers including label allocation, remov
 
 ### Item 29.59 — Replay scalar primals and deterministic tape execution
 Store scalar shifts/divisors as actual forward operations rather than derivative-only identity/reciprocal nodes. Pull scalar division gradients back by direct division so representable results survive reciprocal overflow. Use deterministic node-ID topological ordering, reject missing dependencies before publishing operation nodes and route matrix-product contributions through shared repeated-input accumulation. Full locked offline native suites, focused Clippy (excluding existing sort/match categories) and 455 rebuilt Python regressions passed. Native replay/ordering/dependency and native/Python subnormal-cotangent fixtures cover the repairs. See docs/api/matrix-arithmetic-autodiff.md.
+
+### AR7.2 — Canonical matrix implementation completed
+
+Move the advanced storage/backend/arithmetic/neural implementations and adjacency
+helpers into storage::matrix; generic autodiff has a direct matrix module. Legacy
+advanced_matrix, storage adjacency and neural autodiff imports are re-exports of
+the same types. Preserve GraphMatrix/UnifiedMatrix/owned-transfer responsibilities
+and Python APIs; migrate maintained callers. Full locked offline native suites,
+legacy type/trait/nested-import compatibility fixtures, focused Clippy (excluding
+existing sort/match categories) and 455 rebuilt Python regressions passed. Rebuilt
+25-case release corpus and idle rerun agree with every prior workload checksum at
+1e-13 tolerance. Receipt: benches/numerical_matrix_consolidation_2026-10-22.json.
+This is an ownership migration, not a new speedup or broad numerical completion.

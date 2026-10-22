@@ -4,7 +4,7 @@
 //! and the NumericType trait system used in the advanced matrix backend.
 
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::advanced_matrix::NumericType;
+use crate::storage::matrix::NumericType;
 use crate::types::AttrValue;
 
 /// Trait for converting AttrValue to numeric types

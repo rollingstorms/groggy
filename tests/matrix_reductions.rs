@@ -1,5 +1,5 @@
 use groggy::storage::{Axis, GraphMatrix};
-fn matrix<T: groggy::storage::advanced_matrix::NumericType>(
+fn matrix<T: groggy::storage::matrix::NumericType>(
     v: Vec<T>,
     r: usize,
     c: usize,

@@ -1,5 +1,5 @@
 use groggy::storage::{
-    advanced_matrix::{operations::MatrixStats, MatrixLayout, NumericType, UnifiedMatrix},
+    matrix::{operations::MatrixStats, MatrixLayout, NumericType, UnifiedMatrix},
     Axis, GraphMatrix,
 };
 fn close(a: f64, b: f64) {

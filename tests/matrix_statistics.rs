@@ -64,7 +64,7 @@ fn statistics_handle_large_offsets_f32_nonfinite_and_degenerate_axes() {
 
 #[test]
 fn checked_constructors_reject_overflow_and_mismatched_buffer_lengths() {
-    use groggy::storage::advanced_matrix::{MatrixLayout, SharedBuffer};
+    use groggy::storage::matrix::{MatrixLayout, SharedBuffer};
     assert!(GraphMatrix::<f64>::from_row_major_data(vec![], usize::MAX, 2, None).is_err());
     assert!(SharedBuffer::<f64>::new((usize::MAX, 2), MatrixLayout::RowMajor).is_err());
     assert!(SharedBuffer::<f64>::from_data(vec![1.], (0, 0), MatrixLayout::RowMajor).is_err());
@@ -76,7 +76,7 @@ fn checked_constructors_reject_overflow_and_mismatched_buffer_lengths() {
 
 #[test]
 fn axis_statistics_follow_column_major_storage_strides() {
-    use groggy::storage::advanced_matrix::{MatrixLayout, UnifiedMatrix};
+    use groggy::storage::matrix::{MatrixLayout, UnifiedMatrix};
     let mut storage =
         UnifiedMatrix::<f64>::new_with_layout(2, 3, MatrixLayout::ColumnMajor).unwrap();
     for (row, values) in [[1., 2., 3.], [4., 6., 8.]].iter().enumerate() {

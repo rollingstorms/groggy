@@ -10,7 +10,7 @@ pub use blas::{BlasBackend, BlasType};
 pub use numpy::NumPyBackend;
 
 /// Re-export for convenience
-pub use crate::storage::advanced_matrix::backend::{
+pub use crate::storage::matrix::backend::{
     BackendError, BackendHint, BackendPerformance, BackendResult, BackendSelector, ComputeBackend,
     ComputeBackendExt, OperationType,
 };

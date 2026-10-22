@@ -1,5 +1,5 @@
 use groggy::storage::{
-    advanced_matrix::{
+    matrix::{
         ActivationFunctions, MathFunctions, MatrixLayout, MatrixOperations, MatrixStats,
         MatrixUtils, UnifiedMatrix,
     },
@@ -42,7 +42,7 @@ fn sparse_helpers_preserve_storage_and_checked_shapes() {
     let b = b.reshape(n * 2, n / 2).unwrap();
     assert!(matches!(
         b.storage,
-        groggy::storage::advanced_matrix::unified_matrix::MatrixStorage::Sparse(_)
+        groggy::storage::matrix::unified_matrix::MatrixStorage::Sparse(_)
     ));
     assert_eq!(
         a.slice(1, 3, 1, 3).unwrap().to_vec().unwrap(),

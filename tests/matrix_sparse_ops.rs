@@ -1,5 +1,5 @@
 use groggy::storage::{
-    advanced_matrix::unified_matrix::{MatrixStorage, SparseMatrix, UnifiedMatrix},
+    matrix::unified_matrix::{MatrixStorage, SparseMatrix, UnifiedMatrix},
     GraphMatrix,
 };
 #[test]

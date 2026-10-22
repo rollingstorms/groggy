@@ -27,8 +27,8 @@ pub use node::*;
 pub use pool::*;
 pub use table::*;
 
-// Re-export advanced_matrix items (canonical benchmark items)
-pub use advanced_matrix::{
+// Re-export canonical numerical engine items; legacy imports remain aliases.
+pub use matrix::{
     quick_benchmark as matrix_quick_benchmark, AdvancedMemoryPool, BenchmarkConfig,
     BenchmarkResult, BlasBackend, BlasType, DType, MatrixBenchmarkSuite, MatrixLayout, MemoryError,
     MemoryResult, NumPyBackend, NumericType, SharedBuffer, UnifiedMatrix,

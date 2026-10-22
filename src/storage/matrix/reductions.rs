@@ -1,6 +1,6 @@
 //! Shared typed GraphMatrix reductions over checked logical values.
-use crate::storage::advanced_matrix::checked_kernels::NumericValue as Value;
-use crate::storage::{advanced_matrix::NumericType, array::numeric_reductions as k};
+use crate::storage::matrix::checked_kernels::NumericValue as Value;
+use crate::storage::{matrix::NumericType, array::numeric_reductions as k};
 use crate::{GraphError, GraphResult};
 pub(super) fn sum<T: NumericType>(values: &[T]) -> GraphResult<T> {
     if T::DTYPE.is_float() {

@@ -4,7 +4,7 @@
 //! (image to column) transformation technique, which converts convolutions into
 //! highly optimized matrix multiplications.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},
 };

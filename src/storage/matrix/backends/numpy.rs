@@ -3,7 +3,7 @@
 //! This is a stub implementation that can be extended when PyO3 and NumPy
 //! dependencies are available. For now, it provides the interface structure.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     backend::{BackendError, BackendPerformance, BackendResult, ComputeBackend, OperationType},
     numeric_type::DType,
 };

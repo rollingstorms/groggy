@@ -1,6 +1,6 @@
 use groggy::{
     storage::{
-        advanced_matrix::DType,
+        matrix::DType,
         array::numeric_arithmetic::{attribute_inputs, integer_indices, ConversionPolicy},
         NumArray,
     },

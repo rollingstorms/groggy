@@ -3,7 +3,7 @@
 //! This module provides extensive performance measurement and validation tools
 //! for the advanced matrix system, enabling systematic performance optimization.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     backend::{BackendHint, BackendSelector, ComputeBackend, ComputeBackendExt, OperationType},
     numeric_type::{DType, NumericType},
     unified_matrix::MatrixError,

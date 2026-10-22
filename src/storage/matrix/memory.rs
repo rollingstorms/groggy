@@ -3,7 +3,7 @@
 //! This module implements sophisticated memory management for the advanced matrix system,
 //! including shared buffers, memory pools, and zero-copy operations across backends.
 
-use crate::storage::advanced_matrix::numeric_type::NumericType;
+use crate::storage::matrix::numeric_type::NumericType;
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::collections::HashMap;
 use std::ptr::NonNull;

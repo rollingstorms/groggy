@@ -3,7 +3,7 @@
 //! This is a stub implementation that would use BLAS libraries (OpenBLAS, Intel MKL, etc.)
 //! for maximum performance on linear algebra operations when available.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     backend::{BackendError, BackendPerformance, BackendResult, ComputeBackend, OperationType},
     numeric_type::DType,
 };

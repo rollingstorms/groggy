@@ -3,7 +3,7 @@
 //! This module provides high-performance implementations of common neural network
 //! activation functions with automatic SIMD vectorization and differentiation support.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     backend::OperationType,
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},

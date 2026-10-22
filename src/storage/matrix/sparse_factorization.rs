@@ -1,5 +1,5 @@
 //! In-house sparse numeric LU/Cholesky with explicit fill-in and no dense A.
-use crate::storage::advanced_matrix::{unified_matrix::SparseMatrix, DType, NumericType};
+use crate::storage::matrix::{unified_matrix::SparseMatrix, DType, NumericType};
 use crate::{GraphError, GraphResult};
 use std::collections::{BTreeMap, BTreeSet};
 fn invalid(message: &str) -> GraphError {

@@ -1358,7 +1358,7 @@ impl GraphTable {
     /// Convert table data to GraphMatrix with generic numeric type support
     pub fn to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
     where
-        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
+        T: crate::storage::matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
         use crate::storage::matrix::GraphMatrix;
 
@@ -1436,7 +1436,7 @@ impl GraphTable {
     /// Convert edges table to GraphMatrix
     pub fn edges_to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
     where
-        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
+        T: crate::storage::matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
         use crate::storage::matrix::GraphMatrix;
 

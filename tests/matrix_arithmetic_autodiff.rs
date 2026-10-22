@@ -123,7 +123,7 @@ fn division_pullback_uses_direct_division_when_reciprocal_overflows() {
 }
 #[test]
 fn tape_scalar_primals_replay_and_invalid_dependencies_do_not_publish_nodes() {
-    use groggy::storage::advanced_matrix::{
+    use groggy::storage::matrix::{
         neural::autodiff::Operation, unified_matrix::Shape, ComputationGraph, UnifiedMatrix,
     };
     let mut graph = ComputationGraph::new();

@@ -1,4 +1,4 @@
-use groggy::storage::{advanced_matrix::unified_matrix::SparseMatrix, GraphMatrix};
+use groggy::storage::{matrix::unified_matrix::SparseMatrix, GraphMatrix};
 #[test]
 fn csr_reads_updates_clones_and_owned_dense_consumers_match_references() {
     let mut a =

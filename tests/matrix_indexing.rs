@@ -1,5 +1,5 @@
 use groggy::storage::{
-    advanced_matrix::{MatrixLayout, UnifiedMatrix},
+    matrix::{MatrixLayout, UnifiedMatrix},
     matrix::{MatrixIndex, MatrixSlice, MatrixSlicing},
     GraphMatrix,
 };

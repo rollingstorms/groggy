@@ -2,7 +2,7 @@
 //!
 //! This module provides additional operations and utilities for the unified matrix system.
 
-use crate::storage::advanced_matrix::{
+use crate::storage::matrix::{
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},
 };
@@ -511,7 +511,7 @@ impl MatrixStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::advanced_matrix::unified_matrix::Matrix64;
+    use crate::storage::matrix::unified_matrix::Matrix64;
 
     #[test]
     fn test_relu_activation() {

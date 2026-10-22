@@ -30,7 +30,7 @@ use crate::state::change_tracker::ChangeTracker;
 use crate::state::history::{CommitDiff, HistoricalView, HistoryForest};
 use crate::state::ref_manager::BranchInfo;
 use crate::state::space::GraphSpace;
-use crate::storage::adjacency::AdjacencyMatrix;
+use crate::storage::matrix::adjacency::AdjacencyMatrix;
 use crate::storage::pool::GraphPool;
 use crate::subgraphs::neighborhood::NeighborhoodSampler;
 use crate::temporal::TemporalSnapshot;
