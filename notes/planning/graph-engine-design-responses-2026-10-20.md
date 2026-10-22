@@ -572,3 +572,8 @@ Add owned native SolveReport and thin Python tuple without changing solve/invers
 Follow-up inspection found a spectral floor in the underlying SVD that overrode the explicit numerical-rank cutoff and could report infinite condition for a diagonal matrix with a resolved tiny singular value. Rotate nonzero columns and retain computed nonzero norms instead. Preserve bounded convergence/basis errors rather than invent missing directions. Add diagonal tests through 1e-300 alongside existing decomposition references. Finite-precision rank uncertainty remains explicit.
 
 29.32 verification: full locked offline native suites passed; rebuilt Python numerical suite: 197 passed. Focused Clippy passed with the same existing sort/match categories excluded.
+
+### Item 29.33 — Real minimum-norm least squares, 2026-10-21
+Use the bounded in-house real SVD to solve rectangular/rank-deficient multiple-RHS systems, retaining components above an explicit relative cutoff (default shared with numerical rank). Normalize finite floating coefficients/RHS, use accurate dot projections/reconstruction and preserve owned unknown/RHS identity. Reject shape/dtype/cutoff/convergence/working-range failures. Empty/zero systems return the minimum-norm zero result. Dense full factors and repeated allocation remain explicit costs; sparse/thin optimization, gradients and release throughput remain open. This finishes the bounded real factorization/diagnostic list in 29.23, while 29.24–29.26 remain open. See docs/api/matrix-least-squares.md.
+
+29.33 verification: full locked offline native suites passed; rebuilt Python numerical suite: 215 passed. Focused Clippy passed with only the existing sort/match categories excluded.

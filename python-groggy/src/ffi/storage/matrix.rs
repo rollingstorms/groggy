@@ -1940,6 +1940,16 @@ impl PyGraphMatrix {
         ))
     }
 
+    /// Owned minimum-norm least squares; rcond defaults to input precision times dimension.
+    #[pyo3(signature = (b, rcond=None))]
+    fn least_squares(&self, py: Python, b: &Self, rcond: Option<f64>) -> PyResult<Py<Self>> {
+        let result = self
+            .inner
+            .least_squares(&b.inner, rcond)
+            .map_err(|e| PyRuntimeError::new_err(format!("Least squares failed: {:?}", e)))?;
+        Py::new(py, Self { inner: result })
+    }
+
     /// Real SVD: A = U * Sigma * V^T, using bounded one-sided Jacobi sweeps.
     /// Returns full U, min(rows, cols) descending values, and full V_transpose.
     fn svd(&self, py: Python) -> PyResult<(Py<Self>, PyObject, Py<Self>)> {

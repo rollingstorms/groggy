@@ -11,6 +11,7 @@ pub mod conversions;
 mod decomposition;
 mod dot_product;
 mod factorization;
+mod least_squares;
 mod linear_system;
 pub mod matrix_core;
 mod reductions;

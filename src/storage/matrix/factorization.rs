@@ -18,7 +18,7 @@ pub(super) fn zeros(rows: usize, cols: usize) -> GraphResult<Vec<f64>> {
     values.resize(count, 0.);
     Ok(values)
 }
-fn normalize(input: &mut [f64]) -> GraphResult<f64> {
+pub(super) fn normalize(input: &mut [f64]) -> GraphResult<f64> {
     if input.iter().any(|v| !v.is_finite()) {
         return Err(invalid("Factorization requires finite values"));
     }

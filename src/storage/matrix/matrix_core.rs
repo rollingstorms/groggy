@@ -1948,6 +1948,36 @@ impl<T: NumericType> GraphMatrix<T> {
         })
     }
 
+    /// Minimum-norm real least squares using a relative truncated SVD.
+    /// Supports rectangular/rank-deficient input and multiple RHS columns.
+    pub fn least_squares(&self, b: &GraphMatrix<T>, relative: Option<f64>) -> GraphResult<Self> {
+        let (rows, cols) = self.shape();
+        let (b_rows, rhs) = b.shape();
+        if b_rows != rows {
+            return Err(GraphError::InvalidInput(
+                "Least squares requires matching RHS rows".into(),
+            ));
+        }
+        let relative = relative.unwrap_or_else(|| self.default_rank_tolerance());
+        if !relative.is_finite() || relative < 0. {
+            return Err(GraphError::InvalidInput(
+                "Least-squares tolerance must be finite and nonnegative".into(),
+            ));
+        }
+        let values = super::least_squares::solve(
+            self.decomposition_input()?,
+            b.decomposition_input()?,
+            rows,
+            cols,
+            rhs,
+            relative,
+        )?;
+        let mut result = Self::factor_matrix(values, cols, rhs)?;
+        result.row_labels = Some(self.column_names.clone());
+        result.column_names = b.column_names.clone();
+        Ok(result)
+    }
+
     /// SVD decomposition: A = U * Σ * V^T
     /// Returns (U, singular_values, V_transpose)
     pub fn svd(&self) -> GraphResult<(GraphMatrix<T>, Vec<f64>, GraphMatrix<T>)>
@@ -2152,13 +2182,16 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Numerical rank using singular values and the input dtype's relative precision.
     pub fn rank(&self) -> GraphResult<usize> {
+        self.rank_with_tolerance(self.default_rank_tolerance())
+    }
+    fn default_rank_tolerance(&self) -> f64 {
         let (rows, cols) = self.shape();
         let epsilon = if T::DTYPE == crate::storage::advanced_matrix::DType::Float32 {
             f64::from(f32::EPSILON)
         } else {
             f64::EPSILON
         };
-        self.rank_with_tolerance(epsilon * rows.max(cols).max(1) as f64)
+        epsilon * rows.max(cols).max(1) as f64
     }
     /// Numerical rank with an explicit nonnegative finite relative cutoff.
     pub fn rank_with_tolerance(&self, relative: f64) -> GraphResult<usize> {
