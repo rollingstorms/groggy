@@ -117,6 +117,37 @@ impl PyGraphView {
     fn to_matrix(&self, py: Python) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
         owned_matrix(py, &self.inner, |view| view.to_matrix::<f64>())
     }
+    /// Owned node table from captured values; no working-graph writeback.
+    fn nodes_table(&self, py: Python) -> PyResult<crate::ffi::storage::table::PyNodesTable> {
+        let data = py
+            .allow_threads(|| self.inner.node_table_data())
+            .map_err(graph_error_to_py_err)?;
+        Ok(crate::ffi::storage::table::PyNodesTable {
+            table: data.into_nodes_table().map_err(graph_error_to_py_err)?,
+        })
+    }
+    /// Owned edge table from captured values and endpoints.
+    fn edges_table(&self, py: Python) -> PyResult<crate::ffi::storage::table::PyEdgesTable> {
+        let data = py
+            .allow_threads(|| self.inner.edge_table_data())
+            .map_err(graph_error_to_py_err)?;
+        Ok(crate::ffi::storage::table::PyEdgesTable {
+            table: data.into_edges_table().map_err(graph_error_to_py_err)?,
+        })
+    }
+    /// Owned graph table; both components use this immutable state.
+    fn table(&self, py: Python) -> PyResult<crate::ffi::storage::table::PyGraphTable> {
+        let (nodes, edges) = py
+            .allow_threads(|| -> groggy::GraphResult<_> {
+                Ok((self.inner.node_table_data()?, self.inner.edge_table_data()?))
+            })
+            .map_err(graph_error_to_py_err)?;
+        let table = groggy::storage::table::GraphTable::new(
+            nodes.into_nodes_table().map_err(graph_error_to_py_err)?,
+            edges.into_edges_table().map_err(graph_error_to_py_err)?,
+        );
+        Ok(crate::ffi::storage::table::PyGraphTable::from_table(table))
+    }
     /// Cheap ownership copy; the frozen state and selected membership remain shared.
     fn copy(&self) -> Self {
         self.clone()

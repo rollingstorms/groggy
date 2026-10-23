@@ -10,7 +10,8 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 Implemented: AR7.2 matrix consolidation, AR7.3 canonical arrays/shared numeric
 foundations, 29.60–29.63 finite numerical fixes/receipts, AR7.4 entity ownership,
-and AR7.5a–c shared read state, explicit immutable selections and frozen matrix exports. Evidence is
+and AR7.5a–d shared read state, explicit immutable selections and frozen matrix/table
+exports with shared live/frozen projection kernels. Evidence is
 linked from the flat checklist. Supported-scope implementation is distinct from
 remaining broad capability and production gates (including A13/A15).
 

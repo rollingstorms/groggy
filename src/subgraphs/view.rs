@@ -338,6 +338,57 @@ impl GraphView {
         )
     }
 
+    /// Owned node columns from this captured selection, transferable between threads.
+    pub fn node_table_data(
+        &self,
+    ) -> GraphResult<crate::storage::table::projection::OwnedTableData> {
+        let nodes = self.node_ids();
+        let attrs = &self.state.snapshot().node_attributes;
+        let names: std::collections::BTreeSet<_> = nodes
+            .iter()
+            .filter_map(|id| attrs.get(id))
+            .flat_map(|attrs| attrs.keys())
+            .collect();
+        crate::storage::table::projection::nodes(
+            &nodes,
+            names.into_iter().cloned().collect(),
+            |id, name| Ok(attrs.get(&id).and_then(|attrs| attrs.get(name))),
+        )
+    }
+    /// Owned edge columns from captured endpoints and selected edge instances.
+    pub fn edge_table_data(
+        &self,
+    ) -> GraphResult<crate::storage::table::projection::OwnedTableData> {
+        let edges = self.edge_ids();
+        let attrs = &self.state.snapshot().edge_attributes;
+        let names: std::collections::BTreeSet<_> = edges
+            .iter()
+            .filter_map(|id| attrs.get(id))
+            .flat_map(|attrs| attrs.keys())
+            .collect();
+        crate::storage::table::projection::edges(
+            &edges,
+            names.into_iter().cloned().collect(),
+            |id| self.edge_endpoints(id),
+            |id, name| Ok(attrs.get(&id).and_then(|attrs| attrs.get(name))),
+        )
+    }
+    /// Independent node table; missing properties occupy aligned null cells.
+    pub fn nodes_table(&self) -> GraphResult<crate::storage::table::NodesTable> {
+        self.node_table_data()?.into_nodes_table()
+    }
+    /// Independent edge table retaining captured endpoint identity.
+    pub fn edges_table(&self) -> GraphResult<crate::storage::table::EdgesTable> {
+        self.edge_table_data()?.into_edges_table()
+    }
+    /// Independent node/edge tables from one immutable state and selection.
+    pub fn table(&self) -> GraphResult<crate::storage::table::GraphTable> {
+        Ok(crate::storage::table::GraphTable::new(
+            self.nodes_table()?,
+            self.edges_table()?,
+        ))
+    }
+
     /// Explicit owned projection for consumers that require materialized state.
     /// Does not recover retained meta-group payloads or create history.
     pub fn to_snapshot(&self) -> GraphSnapshot {

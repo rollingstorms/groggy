@@ -51,6 +51,20 @@ fn read_state(c: &mut Criterion) {
                 b.iter(|| black_box(view.adjacency_matrix::<f64>(true, None).unwrap()));
             },
         );
+        group.bench_with_input(
+            BenchmarkId::new("live_tables", count),
+            &graph,
+            |b, graph| {
+                b.iter(|| black_box(graph.table().unwrap()));
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("frozen_tables", count),
+            &view,
+            |b, view| {
+                b.iter(|| black_box(view.table().unwrap()));
+            },
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

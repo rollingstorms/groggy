@@ -92,3 +92,13 @@ Python transfers owned numerical data across the GIL boundary. Storage encoding
 no longer changes numeric text conversion. See
 `frozen-matrix-export-contract-2026-10-22.md` for policies, tests and receipts.
 Existing table/query/algorithm consumers still require migration.
+
+## AR7.5d shared table projection
+
+Graph and Subgraph no longer assemble tables in separate per-entity loops.
+GraphView uses the same attribute-first kernel over captured maps. Owned column
+transfer is distinct from display/server-bearing tables and writable graph owners.
+This repairs sparse-property row alignment in legacy Subgraph exports and makes
+ordering/error policy consistent. Source-pin propagation through table selections/
+joins and graph writeback remain separate; see
+`frozen-table-export-contract-2026-10-22.md`.

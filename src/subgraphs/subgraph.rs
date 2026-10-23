@@ -496,132 +496,28 @@ impl Subgraph {
         Ok(csr_arc)
     }
 
-    /// Get a NodesTable representation of subgraph nodes
-    /// Uses new BaseTable system
-    pub fn nodes_table(&self) -> crate::errors::GraphResult<crate::storage::table::NodesTable> {
-        use crate::storage::array::BaseArray;
-        use crate::storage::table::{BaseTable, NodesTable};
-        use std::collections::HashMap;
-
-        let graph = self.graph.borrow();
-
-        // Collect nodes with their attributes (only nodes in this subgraph)
-        let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-
-        // Initialize with node_id column
-        attribute_columns.insert("node_id".to_string(), Vec::new());
-
-        // Collect all nodes in this subgraph
-        for &node_id in self.nodes.iter() {
-            attribute_columns
-                .get_mut("node_id")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(node_id as i64));
-
-            // Get all attributes for this node
-            if let Ok(attrs) = graph.get_node_attrs(node_id) {
-                for (attr_name, attr_value) in attrs {
-                    attribute_columns
-                        .entry(attr_name)
-                        .or_insert_with(|| Vec::with_capacity(self.nodes.len()))
-                        .push(attr_value);
-                }
-            }
-        }
-
-        // Ensure all columns have same length (fill with nulls)
-        let num_rows = self.nodes.len();
-        for column in attribute_columns.values_mut() {
-            while column.len() < num_rows {
-                column.push(crate::types::AttrValue::Null);
-            }
-        }
-
-        // Convert to BaseArrays and create BaseTable
-        let mut columns_map = HashMap::new();
-
-        for (name, data) in attribute_columns {
-            columns_map.insert(name, BaseArray::from_attr_values(data));
-        }
-
-        let base_table = BaseTable::from_columns(columns_map)?;
-        NodesTable::from_base_table(base_table)
+    /// Materialize selected current nodes with aligned properties in stable ID order.
+    pub fn nodes_table(&self) -> GraphResult<crate::storage::table::NodesTable> {
+        self.graph
+            .borrow()
+            .node_table_data_for_entities(&self.ordered_nodes())?
+            .into_nodes_table()
     }
 
-    /// Get an EdgesTable representation of subgraph edges
-    /// Uses new BaseTable system
-    pub fn edges_table(&self) -> crate::errors::GraphResult<crate::storage::table::EdgesTable> {
-        use crate::storage::array::BaseArray;
-        use crate::storage::table::{BaseTable, EdgesTable};
-        use std::collections::HashMap;
-
-        let graph = self.graph.borrow();
-
-        // Collect edges with their attributes (only edges in this subgraph)
-        let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-
-        // Initialize required columns
-        attribute_columns.insert("edge_id".to_string(), Vec::new());
-        attribute_columns.insert("source".to_string(), Vec::new());
-        attribute_columns.insert("target".to_string(), Vec::new());
-
-        // Collect all edges in this subgraph
-        for &edge_id in self.edges.iter() {
-            let (source, target) = graph.edge_endpoints(edge_id)?;
-
-            // Add required column values
-            attribute_columns
-                .get_mut("edge_id")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(edge_id as i64));
-            attribute_columns
-                .get_mut("source")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(source as i64));
-            attribute_columns
-                .get_mut("target")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(target as i64));
-
-            // Get all attributes for this edge
-            if let Ok(attrs) = graph.get_edge_attrs(edge_id) {
-                for (attr_name, attr_value) in attrs {
-                    attribute_columns
-                        .entry(attr_name)
-                        .or_insert_with(|| Vec::with_capacity(self.edges.len()))
-                        .push(attr_value);
-                }
-            }
-        }
-
-        // Ensure all columns have same length (fill with nulls)
-        let num_rows = self.edges.len();
-        for column in attribute_columns.values_mut() {
-            while column.len() < num_rows {
-                column.push(crate::types::AttrValue::Null);
-            }
-        }
-
-        // Convert to BaseArrays and create BaseTable
-        let mut columns_map = HashMap::new();
-
-        for (name, data) in attribute_columns {
-            columns_map.insert(name, BaseArray::from_attr_values(data));
-        }
-
-        let base_table = BaseTable::from_columns(columns_map)?;
-        EdgesTable::from_base_table(base_table)
+    /// Materialize selected current edge instances with aligned properties/endpoints.
+    pub fn edges_table(&self) -> GraphResult<crate::storage::table::EdgesTable> {
+        self.graph
+            .borrow()
+            .edge_table_data_for_entities(&self.ordered_edges())?
+            .into_edges_table()
     }
 
-    /// Get a GraphTable representation containing both nodes and edges
-    /// This is the comprehensive table view of the subgraph
-    pub fn table(&self) -> crate::errors::GraphResult<crate::storage::table::GraphTable> {
-        use crate::storage::table::GraphTable;
-
-        let nodes = self.nodes_table()?;
-        let edges = self.edges_table()?;
-
-        Ok(GraphTable::new(nodes, edges))
+    /// Owned tables from the current working selection. This does not freeze Subgraph.
+    pub fn table(&self) -> GraphResult<crate::storage::table::GraphTable> {
+        Ok(crate::storage::table::GraphTable::new(
+            self.nodes_table()?,
+            self.edges_table()?,
+        ))
     }
 }
 

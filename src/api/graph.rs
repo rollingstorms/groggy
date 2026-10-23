@@ -12,11 +12,12 @@
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
 mod identity;
-mod matrices;
 pub(crate) mod kinds;
+mod matrices;
 mod persistence;
 mod publication;
 mod schema;
+mod tables;
 use identity::ExternalIdentityIndex;
 pub use identity::{EdgeUpsert, ExternalEntityRef, NodeUpsert, EXTERNAL_ID};
 pub use kinds::{LABELS, RELATIONSHIP_TYPE};
@@ -3112,147 +3113,20 @@ impl Graph {
         ))
     }
 
-    /// Get a NodesTable representation of graph nodes
-    /// Implements: g.nodes.table() (this is called from the accessor)
-    pub fn nodes_table(&self) -> crate::errors::GraphResult<crate::storage::table::NodesTable> {
-        use crate::storage::array::BaseArray;
-        use crate::storage::table::{BaseTable, NodesTable};
-        use std::collections::HashMap;
-
-        // Collect all nodes with their attributes
-        let mut node_ids = Vec::new();
-        let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-
-        // Initialize with node_id column
-        attribute_columns.insert("node_id".to_string(), Vec::new());
-
-        // Collect all nodes
-        for (node_index, node_id) in self.node_ids().into_iter().enumerate() {
-            node_ids.push(node_id);
-            attribute_columns
-                .get_mut("node_id")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(node_id as i64));
-
-            // Get all attributes for this node
-            if let Ok(attrs) = self.get_node_attrs(node_id) {
-                for (attr_name, attr_value) in attrs {
-                    let column = attribute_columns.entry(attr_name).or_insert_with(|| {
-                        // Initialize new column with nulls for all previous rows
-                        let mut col = Vec::with_capacity(self.space.node_count());
-                        col.resize(node_index, crate::types::AttrValue::Null);
-                        col
-                    });
-                    column.push(attr_value);
-                }
-            }
-
-            // For any existing columns that didn't get a value for this node, add null
-            for (attr_name, column) in attribute_columns.iter_mut() {
-                if attr_name == "node_id" {
-                    continue; // Skip node_id column as we already handled it
-                }
-                while column.len() <= node_index {
-                    column.push(crate::types::AttrValue::Null);
-                }
-            }
-        }
-
-        // Ensure all columns have same length (fill with nulls)
-        let num_rows = node_ids.len();
-        for column in attribute_columns.values_mut() {
-            while column.len() < num_rows {
-                column.push(crate::types::AttrValue::Null);
-            }
-        }
-
-        // Convert to BaseArrays and create BaseTable
-        let mut columns_map = std::collections::HashMap::new();
-
-        for (name, data) in attribute_columns {
-            columns_map.insert(name, BaseArray::from_attr_values(data));
-        }
-
-        let base_table = BaseTable::from_columns(columns_map)?;
-        NodesTable::from_base_table(base_table)
+    /// Owned node table in stable ID order, with row-aligned current properties.
+    pub fn nodes_table(&self) -> GraphResult<crate::storage::table::NodesTable> {
+        let mut nodes = self.node_ids();
+        nodes.sort_unstable();
+        self.node_table_data_for_entities(&nodes)?
+            .into_nodes_table()
     }
 
-    /// Get an EdgesTable representation of graph edges  
-    /// Implements: g.edges.table() (this is called from the accessor)
-    pub fn edges_table(&self) -> crate::errors::GraphResult<crate::storage::table::EdgesTable> {
-        use crate::storage::array::BaseArray;
-        use crate::storage::table::{BaseTable, EdgesTable};
-        use std::collections::HashMap;
-
-        // Collect all edges with their attributes
-        let mut edge_data = Vec::new();
-        let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-
-        // Initialize required columns
-        attribute_columns.insert("edge_id".to_string(), Vec::new());
-        attribute_columns.insert("source".to_string(), Vec::new());
-        attribute_columns.insert("target".to_string(), Vec::new());
-
-        // Collect all edges
-        for (edge_index, edge_id) in self.edge_ids().into_iter().enumerate() {
-            let (source, target) = self.edge_endpoints(edge_id)?;
-            edge_data.push((edge_id, source, target));
-
-            // Add required column values
-            attribute_columns
-                .get_mut("edge_id")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(edge_id as i64));
-            attribute_columns
-                .get_mut("source")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(source as i64));
-            attribute_columns
-                .get_mut("target")
-                .unwrap()
-                .push(crate::types::AttrValue::Int(target as i64));
-
-            // Get all attributes for this edge
-            if let Ok(attrs) = self.get_edge_attrs(edge_id) {
-                for (attr_name, attr_value) in attrs {
-                    let column = attribute_columns.entry(attr_name).or_insert_with(|| {
-                        // Initialize new column with nulls for all previous rows
-                        let mut col = Vec::with_capacity(self.space.edge_count());
-                        col.resize(edge_index, crate::types::AttrValue::Null);
-                        col
-                    });
-                    column.push(attr_value);
-                }
-            }
-
-            // For any existing columns that didn't get a value for this edge, add null
-            for (attr_name, column) in attribute_columns.iter_mut() {
-                if matches!(attr_name.as_str(), "edge_id" | "source" | "target") {
-                    continue; // Skip required columns as we already handled them
-                }
-                while column.len() <= edge_index {
-                    column.push(crate::types::AttrValue::Null);
-                }
-            }
-        }
-
-        // Ensure all columns have same length (fill with nulls)
-        let num_rows = edge_data.len();
-        for column in attribute_columns.values_mut() {
-            while column.len() < num_rows {
-                column.push(crate::types::AttrValue::Null);
-            }
-        }
-
-        // Convert to BaseArrays and create BaseTable
-        let mut columns_map = std::collections::HashMap::new();
-
-        for (name, data) in attribute_columns {
-            columns_map.insert(name, BaseArray::from_attr_values(data));
-        }
-
-        let base_table = BaseTable::from_columns(columns_map)?;
-        EdgesTable::from_base_table(base_table)
+    /// Owned edge table in stable ID order, with current endpoints/properties.
+    pub fn edges_table(&self) -> GraphResult<crate::storage::table::EdgesTable> {
+        let mut edges = self.edge_ids();
+        edges.sort_unstable();
+        self.edge_table_data_for_entities(&edges)?
+            .into_edges_table()
     }
 
     /// 🎨 Get visualization module for unified rendering

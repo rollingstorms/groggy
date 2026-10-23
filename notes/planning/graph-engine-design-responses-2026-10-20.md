@@ -815,3 +815,16 @@ core Clippy pass; the rebuilt Python numerical/read/history gate has 671 passed
 and one existing skip. All three documented examples execute. Bounded export
 costs and remaining adapter migration are recorded in
 `frozen-matrix-export-contract-2026-10-22.md`.
+
+### AR7.5d — Row-aligned table exports and shared projection
+
+Graph/Subgraph/GraphView table exports share native attribute-first projection
+kernels and stable IDs/column order. Sparse properties no longer shift onto the
+wrong Subgraph rows. Stale selections, unreadable references and structural-name
+collisions fail explicitly. Frozen tables retain captured values/endpoints;
+Python transfers owned columns with the GIL released during projection. Results
+remain independent owned tables, without source-pin joins or graph writeback.
+Full native suites and strict all-target core Clippy pass; rebuilt Python
+numerical/read/history/table gate: 677 passed, one existing skip. All four
+read-view examples execute. Policy boundaries, regressions and measured costs:
+`frozen-table-export-contract-2026-10-22.md`. AR7.5/26.1/27.1 remain open.

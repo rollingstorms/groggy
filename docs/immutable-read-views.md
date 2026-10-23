@@ -65,7 +65,7 @@ instances in stable edge order.
 
 `copy()` shares the captured state and membership. Views support concurrent
 readers; the working graph retains its existing writer model. GraphView currently
-provides property, membership, topology and owned matrix exports. Algorithm/query/table adapters
+provides property, membership, topology and owned matrix/table exports. Algorithm/query adapters
 are the next migration step; this API does not promise inherited algorithm methods
 or reconstruction at arbitrary mutation timestamps.
 
@@ -105,3 +105,28 @@ assert features.to_numpy()[0, 0] == 7
 
 Exports do not capture the graph again, create a checkpoint or record a delta.
 Live `Graph` exports share the projection kernels but read their current owner.
+
+
+## Export tables with aligned properties
+
+`nodes_table()`, `edges_table()` and `table()` export owned copies from the view's
+captured selection. Rows follow sorted IDs. Structural columns come first
+(`node_id`, or `edge_id`, `source`, `target`), followed by sorted property names.
+Missing properties occupy null cells in the correct row. Scalar, text and vector
+values retain their attribute types; missing and explicit-null properties both
+appear as null cells. Use the view's presence methods when that distinction matters.
+
+```python
+tables = view.table()
+graph.set_node_attr(a, "score", 8)
+assert tables.nodes["node_id"].to_list() == [a, b]
+assert tables.nodes["score"].to_list() == [7, None]
+assert view.nodes_table()["score"].to_list() == [7, None]
+```
+
+These exports share the native projection code used by `Graph` and `Subgraph`.
+A fresh legacy export reads the current working state. Stale selected IDs,
+unreadable value references and properties colliding with structural column names
+raise errors. Exports preserve IDs; a table does not carry a writeback owner or an
+implicit graph join policy. Editing an exported table cannot change its source.
+Python releases the GIL while projecting captured column data.
