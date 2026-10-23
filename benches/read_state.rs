@@ -97,6 +97,20 @@ fn read_state(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("frozen_bfs", count), &view, |b, view| {
             b.iter(|| black_box(view.bfs_distances(nodes[0]).unwrap()));
         });
+        group.bench_with_input(
+            BenchmarkId::new("prepared_dijkstra", count),
+            &algorithm_input,
+            |b, input| {
+                b.iter(|| black_box(input.dijkstra_distances(nodes[0], None, None).unwrap()));
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("frozen_dijkstra", count),
+            &view,
+            |b, view| {
+                b.iter(|| black_box(view.dijkstra_distances(nodes[0], None).unwrap()));
+            },
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

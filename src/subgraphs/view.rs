@@ -314,6 +314,15 @@ impl GraphView {
     pub fn dfs_order(&self, start: NodeId) -> GraphResult<Vec<(NodeId, i64)>> {
         self.algorithm_input()?.dfs_order(start, None)
     }
+    /// Captured nonnegative weighted distances as owned f64 rows in node-ID order.
+    pub fn dijkstra_distances(
+        &self,
+        start: NodeId,
+        weight_attr: Option<&str>,
+    ) -> GraphResult<Vec<(NodeId, f64)>> {
+        self.algorithm_input()?
+            .dijkstra_distances(start, weight_attr, None)
+    }
     /// Owned adjacency from captured edge instances and captured weights.
     /// Missing weights are one; explicit values follow the shared graph conversion policy.
     pub fn adjacency_matrix<

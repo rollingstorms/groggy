@@ -147,6 +147,17 @@ impl PyGraphView {
         py.allow_threads(|| self.inner.dfs_order(start))
             .map_err(graph_error_to_py_err)
     }
+    /// Nonnegative weighted distances from captured values, with no property writes.
+    #[pyo3(signature = (start, weight_attr=None))]
+    fn dijkstra_distances(
+        &self,
+        py: Python,
+        start: NodeId,
+        weight_attr: Option<String>,
+    ) -> PyResult<Vec<(NodeId, f64)>> {
+        py.allow_threads(|| self.inner.dijkstra_distances(start, weight_attr.as_deref()))
+            .map_err(graph_error_to_py_err)
+    }
     /// Owned adjacency operator from this selection's captured weights/topology.
     #[pyo3(signature = (sparse=true, weight_attr=None))]
     fn adjacency_matrix(

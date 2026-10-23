@@ -114,4 +114,46 @@ impl AlgorithmRead {
         )
         .map_err(|error| GraphError::InvalidInput(error.to_string()))
     }
+    pub(crate) fn checked_weights(
+        &self,
+        attr: Option<&str>,
+    ) -> GraphResult<std::collections::HashMap<(NodeId, NodeId), f64>> {
+        crate::query::weights::checked_pairs(
+            &self.view.edge_ids(),
+            self.view.is_directed(),
+            |edge| self.view.edge_endpoints(edge),
+            |edge| {
+                Ok(attr.and_then(|name| {
+                    self.view
+                        .read_state()
+                        .snapshot()
+                        .edge_attributes
+                        .get(&edge)
+                        .and_then(|attrs| attrs.get(name))
+                }))
+            },
+        )
+    }
+    /// Nonnegative weighted distances over captured state, ordered by original ID.
+    /// Missing weights are one; explicit null/nonnumeric/negative/nonfinite weights fail.
+    pub fn dijkstra_distances(
+        &self,
+        start: NodeId,
+        weight_attr: Option<&str>,
+        cancel: Option<&AtomicBool>,
+    ) -> GraphResult<Vec<(NodeId, f64)>> {
+        let source = self.source(start)?;
+        if cancel.is_some_and(|token| token.load(Ordering::Relaxed)) {
+            return Err(GraphError::InvalidInput("dijkstra cancelled".into()));
+        }
+        let weights = self.checked_weights(weight_attr)?;
+        super::pathfinding::dijkstra::distances(
+            || cancel.is_some_and(|token| token.load(Ordering::Relaxed)),
+            &self.csr,
+            &self.nodes,
+            source,
+            &weights,
+        )
+        .map_err(|error| GraphError::InvalidInput(error.to_string()))
+    }
 }

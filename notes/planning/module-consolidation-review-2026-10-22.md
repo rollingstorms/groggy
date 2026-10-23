@@ -122,3 +122,12 @@ separate. Native input clones share preparation; Python convenience methods
 prepare per call and release the GIL. Remaining weighted/centrality/component and
 pipeline readers still need migration. See
 `frozen-traversal-contract-2026-10-22.md`.
+
+### AR7.5g — Shared checked frozen Dijkstra distances
+
+Live/frozen inputs share weight validation/minimum parallel-pair assembly and
+one cancellable distance kernel. GraphView reads captured weights and selected
+CSR, with owned f64 rows and no property writes. Python releases the GIL; legacy
+pipeline marker/writeback behavior remains intact. Full native suites, strict
+core Clippy and 316 rebuilt Python tests pass (five existing skips). Seven read
+examples execute. Scope and costs: `frozen-dijkstra-contract-2026-10-22.md`.

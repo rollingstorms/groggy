@@ -82,57 +82,64 @@ impl DijkstraShortestPath {
         }
         Ok(sources[0])
     }
+}
 
-    fn run(
-        &self,
-        ctx: &mut Context,
-        csr: &Csr,
-        nodes: &[NodeId],
-        source: usize,
-        weights: &HashMap<(NodeId, NodeId), f64>,
-    ) -> Result<Vec<(NodeId, f64)>> {
-        let mut distances = vec![f64::INFINITY; nodes.len()];
-        let mut heap = BinaryHeap::new();
-        distances[source] = 0.0;
-        heap.push(DijkstraState {
-            cost: 0.0,
-            node_idx: source,
-        });
-        while let Some(DijkstraState { cost, node_idx: u }) = heap.pop() {
-            if ctx.is_cancelled() {
+pub(crate) fn distances(
+    is_cancelled: impl Fn() -> bool,
+    csr: &Csr,
+    nodes: &[NodeId],
+    source: usize,
+    weights: &HashMap<(NodeId, NodeId), f64>,
+) -> Result<Vec<(NodeId, f64)>> {
+    if is_cancelled() {
+        return Err(anyhow!("dijkstra cancelled"));
+    }
+    let mut distances = vec![f64::INFINITY; nodes.len()];
+    let mut heap = BinaryHeap::new();
+    distances[source] = 0.0;
+    heap.push(DijkstraState {
+        cost: 0.0,
+        node_idx: source,
+    });
+    while let Some(DijkstraState { cost, node_idx: u }) = heap.pop() {
+        if is_cancelled() {
+            return Err(anyhow!("dijkstra cancelled"));
+        }
+        if cost > distances[u] {
+            continue;
+        }
+        for &v in csr.neighbors(u) {
+            if is_cancelled() {
                 return Err(anyhow!("dijkstra cancelled"));
             }
-            if cost > distances[u] {
-                continue;
+            let pair = (nodes[u], nodes[v]);
+            let weight = weights
+                .get(&pair)
+                .copied()
+                .ok_or_else(|| anyhow!("missing checked Dijkstra weight for {pair:?}"))?;
+            let candidate = cost + weight;
+            if !candidate.is_finite() {
+                return Err(anyhow!("Dijkstra distance overflow"));
             }
-            for &v in csr.neighbors(u) {
-                let pair = (nodes[u], nodes[v]);
-                let weight = weights
-                    .get(&pair)
-                    .copied()
-                    .ok_or_else(|| anyhow!("missing checked Dijkstra weight for {pair:?}"))?;
-                let candidate = cost + weight;
-                if !candidate.is_finite() {
-                    return Err(anyhow!("Dijkstra distance overflow"));
-                }
-                if candidate < distances[v] {
-                    distances[v] = candidate;
-                    heap.push(DijkstraState {
-                        cost: candidate,
-                        node_idx: v,
-                    });
-                }
+            if candidate < distances[v] {
+                distances[v] = candidate;
+                heap.push(DijkstraState {
+                    cost: candidate,
+                    node_idx: v,
+                });
             }
         }
-        let rows: Vec<_> = nodes
-            .iter()
-            .copied()
-            .zip(distances)
-            .filter(|(_, distance)| distance.is_finite())
-            .collect();
-        ctx.emit_iteration(0, rows.len());
-        Ok(rows)
     }
+    let rows: Vec<_> = nodes
+        .iter()
+        .copied()
+        .zip(distances)
+        .filter(|(_, distance)| distance.is_finite())
+        .collect();
+    if is_cancelled() {
+        return Err(anyhow!("dijkstra cancelled"));
+    }
+    Ok(rows)
 }
 
 impl Algorithm for DijkstraShortestPath {
@@ -200,7 +207,8 @@ impl Algorithm for DijkstraShortestPath {
 
         // Phase 3: Execute Dijkstra (will use cached CSR automatically)
         let compute_start = Instant::now();
-        let distances = self.run(ctx, &csr, &nodes, source, &weights)?;
+        let distances = distances(|| ctx.is_cancelled(), &csr, &nodes, source, &weights)?;
+        ctx.emit_iteration(0, distances.len());
         ctx.record_call("dijkstra.compute", compute_start.elapsed());
         ctx.record_stat("dijkstra.count.reached_nodes", distances.len() as f64);
         if ctx.is_cancelled() {

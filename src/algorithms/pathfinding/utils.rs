@@ -248,33 +248,37 @@ pub(crate) fn checked_dijkstra_weights(
             ));
         }
     }
-    let mut edges: Vec<_> = subgraph.edge_set().iter().copied().collect();
-    edges.sort_unstable();
-    let mut weights: HashMap<(NodeId, NodeId), f64> = HashMap::new();
-    for edge in edges {
-        let (u, v) = graph.edge_endpoints(edge)?;
-        if !subgraph.node_set().contains(&u) || !subgraph.node_set().contains(&v) {
-            return Err(crate::GraphError::InvalidInput(format!(
-                "edge {edge} has an endpoint outside the selected subgraph"
-            )));
-        }
-        let value = attr
-            .map(|name| graph.get_edge_attr(edge, name))
-            .transpose()?
-            .flatten();
-        let weight = crate::query::weights::dijkstra_weight(value.as_ref(), edge)?;
-        weights
-            .entry((u, v))
-            .and_modify(|old| *old = old.min(weight))
-            .or_insert(weight);
-        if graph.is_undirected() {
-            weights
-                .entry((v, u))
-                .and_modify(|old| *old = old.min(weight))
-                .or_insert(weight);
-        }
-    }
-    Ok(weights)
+    let edges = subgraph.ordered_edges();
+    let pool = graph.pool();
+    crate::query::weights::checked_pairs(
+        &edges,
+        graph.is_directed(),
+        |edge| {
+            let (u, v) = graph.edge_endpoints(edge)?;
+            if !subgraph.node_set().contains(&u) || !subgraph.node_set().contains(&v) {
+                return Err(crate::GraphError::InvalidInput(format!(
+                    "edge {edge} has an endpoint outside the selected subgraph"
+                )));
+            }
+            Ok((u, v))
+        },
+        |edge| {
+            attr.and_then(|name| {
+                graph
+                    .space()
+                    .get_edge_attr_index(edge, name)
+                    .map(|index| (name, index))
+            })
+            .map(|(name, index)| {
+                pool.get_attr_by_index(name, index, false).ok_or_else(|| {
+                    crate::GraphError::InvalidInput(format!(
+                        "Invalid weight reference for edge {edge}"
+                    ))
+                })
+            })
+            .transpose()
+        },
+    )
 }
 
 pub fn collect_edge_weights(

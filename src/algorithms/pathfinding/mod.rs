@@ -1,6 +1,6 @@
 mod astar;
 pub(crate) mod bfs_dfs;
-mod dijkstra;
+pub(crate) mod dijkstra;
 pub mod utils;
 
 pub use astar::AStarPathfinding;

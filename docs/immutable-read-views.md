@@ -201,3 +201,26 @@ freeze the whole pipeline, implement checked view writeback, or expose depth/
 node limits through these two integer-row methods. Those remain distinct from the
 existing graph traversal-selection API. Recorded historical read states can also
 prepare this input; arbitrary effective-time reconstruction remains separate.
+
+
+## Weighted distances from captured properties
+
+`dijkstra_distances(start, weight_attr=None)` returns reachable `(node_id, f64
+cost)` rows in ascending node-ID order. It shares the current Dijkstra kernel and
+weight validation. Every selected edge is validated, including unreachable ones.
+A missing weight is one; zero is allowed. Explicit null, Boolean/text/vector,
+negative and nonfinite weights fail. Parallel instances contribute their minimum
+weight for distances; directed orientation and the selected scope are preserved.
+
+```python
+assert view.dijkstra_distances(a, weight_attr="weight") == [(a, 0.0), (b, 2.0)]
+assert view.dijkstra_distances(a) == [(a, 0.0), (b, 1.0)]
+```
+
+These owned f64 rows are not narrowed into f32 properties and do not write the
+graph. Native `AlgorithmRead.dijkstra_distances` reuses prepared topology and
+supports an optional cancellation flag. Weight maps are validated per call from
+the captured values. Python releases the GIL for the complete read. Numeric
+weights follow the existing f64 conversion contract; this is not a promise of
+exact arbitrary-size integer path sums. Weighted shortest paths and matrix
+exports have distinct null/text policies.
