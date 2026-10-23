@@ -1,5 +1,8 @@
 use std::collections::{BinaryHeap, HashMap, VecDeque};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -77,6 +80,39 @@ pub enum ClosenessDirection {
     Incoming,
 }
 
+impl ClosenessDirection {
+    /// Parse the directed distance convention, case insensitively.
+    pub fn parse(value: &str) -> Result<Self> {
+        match value.to_lowercase().as_str() {
+            "outgoing" => Ok(Self::Outgoing),
+            "incoming" => Ok(Self::Incoming),
+            _ => Err(anyhow!("direction must be outgoing or incoming")),
+        }
+    }
+}
+
+fn transpose(csr: &Csr) -> Csr {
+    let n = csr.node_count();
+    let mut result = Csr {
+        offsets: vec![0; n + 1],
+        neighbors: vec![0; csr.neighbors.len()],
+    };
+    for &target in &csr.neighbors {
+        result.offsets[target + 1] += 1;
+    }
+    for row in 0..n {
+        result.offsets[row + 1] += result.offsets[row];
+    }
+    let mut positions = result.offsets[..n].to_vec();
+    for source in 0..n {
+        for &target in csr.neighbors(source) {
+            result.neighbors[positions[target]] = source;
+            positions[target] += 1;
+        }
+    }
+    result
+}
+
 #[derive(Clone, Debug)]
 pub struct ClosenessCentrality {
     harmonic: bool,
@@ -108,6 +144,34 @@ impl ClosenessCentrality {
     pub fn with_normalization(mut self, normalized: bool) -> Self {
         self.normalized = normalized;
         self
+    }
+
+    pub(crate) fn compute_read(
+        &self,
+        input: &crate::algorithms::AlgorithmRead,
+        cancel: Option<&AtomicBool>,
+    ) -> crate::GraphResult<Vec<(NodeId, f64)>> {
+        let run = || -> Result<_> {
+            if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+                return Err(anyhow!("closeness cancelled"));
+            }
+            let weights = input.checked_weights(self.weight_attr.as_deref())?;
+            if weights.values().any(|&weight| weight <= 0.0) {
+                return Err(anyhow!("closeness edge lengths must be strictly positive"));
+            }
+            let incoming =
+                input.view().is_directed() && self.direction == ClosenessDirection::Incoming;
+            let transposed = incoming.then(|| transpose(input.csr()));
+            self.compute(
+                &mut Context::default(),
+                transposed.as_ref().unwrap_or(input.csr()),
+                input.node_ids(),
+                self.weight_attr.as_ref().map(|_| &weights),
+                incoming,
+                cancel,
+            )
+        };
+        run().map_err(|error| crate::GraphError::InvalidInput(error.to_string()))
     }
 
     fn metadata_template() -> AlgorithmMetadata {
@@ -169,6 +233,7 @@ impl ClosenessCentrality {
         nodes: &[NodeId],
         weights: Option<&HashMap<(NodeId, NodeId), f64>>,
         reverse_weights: bool,
+        cancel: Option<&AtomicBool>,
     ) -> Result<Vec<(NodeId, f64)>> {
         let n = nodes.len();
         let mut scores = Vec::with_capacity(n);
@@ -176,7 +241,7 @@ impl ClosenessCentrality {
         let mut queue = VecDeque::with_capacity(n);
         let mut heap = BinaryHeap::new();
         for (source, &node) in nodes.iter().enumerate() {
-            if ctx.is_cancelled() {
+            if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
                 return Err(anyhow!("closeness cancelled"));
             }
             distances.fill(f64::INFINITY);
@@ -188,7 +253,8 @@ impl ClosenessCentrality {
                     node_idx: source,
                 });
                 while let Some(DijkstraState { cost, node_idx: u }) = heap.pop() {
-                    if ctx.is_cancelled() {
+                    if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed))
+                    {
                         return Err(anyhow!("closeness cancelled"));
                     }
                     if cost > distances[u] {
@@ -220,7 +286,8 @@ impl ClosenessCentrality {
                 queue.clear();
                 queue.push_back(source);
                 while let Some(u) = queue.pop_front() {
-                    if ctx.is_cancelled() {
+                    if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed))
+                    {
                         return Err(anyhow!("closeness cancelled"));
                     }
                     for &v in csr.neighbors(u) {
@@ -267,6 +334,9 @@ impl ClosenessCentrality {
             }
             scores.push((node, score));
             ctx.emit_iteration(source, 0);
+        }
+        if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+            return Err(anyhow!("closeness cancelled"));
         }
         Ok(scores)
     }
@@ -355,29 +425,14 @@ impl Algorithm for ClosenessCentrality {
         let incoming = !add_reverse && self.direction == ClosenessDirection::Incoming;
         // Incoming adjacency is private: the shared false cache always means
         // outgoing directed adjacency for other algorithms.
-        let transposed = if incoming {
-            let mut rows = vec![Vec::new(); n];
-            for u in 0..n {
-                for &v in csr.neighbors(u) {
-                    rows[v].push(u);
-                }
-            }
-            let mut transposed = Csr::default();
-            transposed.offsets.push(0);
-            for row in rows {
-                transposed.neighbors.extend(row);
-                transposed.offsets.push(transposed.neighbors.len());
-            }
-            Some(transposed)
-        } else {
-            None
-        };
+        let transposed = incoming.then(|| transpose(&csr));
         let scores = self.compute(
             ctx,
             transposed.as_ref().unwrap_or(&csr),
             &nodes,
             self.weight_attr.as_ref().map(|_| &weights),
             incoming,
+            None,
         )?;
         ctx.record_call("closeness.compute", compute_start.elapsed());
 

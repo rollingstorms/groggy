@@ -183,6 +183,33 @@ fn read_state(c: &mut Criterion) {
                 },
             );
         }
+        // Bound all-source centrality timing to 100/1000-node induced paths.
+        let centrality_view = view.select_nodes(&nodes[..count / 10]).unwrap();
+        let centrality_input = centrality_view.algorithm_input().unwrap();
+        let closeness =
+            groggy::algorithms::centrality::ClosenessCentrality::new(true, None, "unused".into());
+        group.bench_with_input(
+            BenchmarkId::new("prepared_closeness", count / 10),
+            &centrality_input,
+            |b, input| b.iter(|| black_box(input.closeness(&closeness, None).unwrap())),
+        );
+        group.bench_with_input(
+            BenchmarkId::new("frozen_closeness", count / 10),
+            &centrality_view,
+            |b, view| {
+                b.iter(|| {
+                    black_box(
+                        view.closeness(
+                            true,
+                            None,
+                            groggy::algorithms::centrality::ClosenessDirection::Outgoing,
+                            false,
+                        )
+                        .unwrap(),
+                    )
+                })
+            },
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

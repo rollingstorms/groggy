@@ -306,6 +306,23 @@ impl GraphView {
     pub fn algorithm_input(&self) -> GraphResult<crate::algorithms::AlgorithmRead> {
         crate::algorithms::AlgorithmRead::new(self.clone())
     }
+    /// Captured closeness scores; outgoing, unnormalized distances by default.
+    pub fn closeness(
+        &self,
+        harmonic: bool,
+        weight_attr: Option<AttrName>,
+        direction: crate::algorithms::centrality::ClosenessDirection,
+        normalized: bool,
+    ) -> GraphResult<Vec<(NodeId, f64)>> {
+        let algorithm = crate::algorithms::centrality::ClosenessCentrality::new(
+            harmonic,
+            weight_attr,
+            "closeness".into(),
+        )
+        .with_direction(direction)
+        .with_normalization(normalized);
+        self.algorithm_input()?.closeness(&algorithm, None)
+    }
     /// Owned f64 PageRank scores with explicit convergence information.
     pub fn pagerank(
         &self,

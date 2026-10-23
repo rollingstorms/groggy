@@ -137,6 +137,23 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Captured classic or harmonic closeness, returned as owned f64 rows.
+    #[pyo3(signature = (harmonic=true, weight_attr=None, direction="outgoing", normalized=false))]
+    fn closeness(
+        &self,
+        py: Python,
+        harmonic: bool,
+        weight_attr: Option<String>,
+        direction: &str,
+        normalized: bool,
+    ) -> PyResult<Vec<(NodeId, f64)>> {
+        let direction = groggy::algorithms::centrality::ClosenessDirection::parse(direction)
+            .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+        py.allow_threads(|| {
+            self.inner.closeness(harmonic, weight_attr, direction, normalized)
+        })
+        .map_err(graph_error_to_py_err)
+    }
     /// Captured unweighted PageRank, including explicit convergence status.
     #[pyo3(signature = (damping=0.85, max_iter=50, tolerance=1e-6, personalization_attr=None))]
     fn pagerank(

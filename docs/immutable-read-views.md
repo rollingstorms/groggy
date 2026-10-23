@@ -335,3 +335,34 @@ releases the GIL during preparation/computation. Reads write no properties,
 deltas or checkpoints. The existing live algorithm wrapper shares validation and
 the iteration kernel; its explicit persistence and telemetry behavior remain.
 This does not change the current f32 property-storage format.
+
+## Closeness
+
+`closeness(harmonic=True, weight_attr=None, direction="outgoing", normalized=False)`
+returns owned f64 `(node_id, score)` rows from captured distances. The defaults
+match the existing registry: harmonic, outgoing and unnormalized. Classic
+closeness (`harmonic=False`) is reachable-count divided by total distance;
+harmonic closeness sums inverse distances. Unreachable nodes contribute zero.
+Normalization divides harmonic scores by n-1, or multiplies classic scores by
+the reachable fraction. Incoming mode reverses distances on directed graphs;
+both modes coincide on undirected graphs.
+
+```python
+closeness_graph = gr.Graph(directed=True)
+u, v, w = closeness_graph.add_nodes(3)
+closeness_graph.add_edge(u, v)
+closeness_graph.add_edge(v, w)
+closeness_view = closeness_graph.read_view()
+assert closeness_view.closeness() == [(u, 1.5), (v, 1.0), (w, 0.0)]
+assert closeness_view.closeness(direction="incoming") == [(u, 0.0), (v, 1.0), (w, 1.5)]
+assert dict(closeness_view.closeness(harmonic=False))[u] == 2 / 3
+```
+
+An explicit weight attribute requires finite strictly positive numeric lengths
+on every selected edge, including loops and disconnected edges; missing is one.
+Parallel edges use the minimum length. Without an explicit weight attribute,
+stored lengths do not affect hop distances. Empty input returns no rows; isolates
+score zero. Reads preserve selected edge scope and captured values, publish no
+properties/deltas/checkpoints, and release the Python GIL. Native callers can
+reuse `AlgorithmRead::closeness(&ClosenessCentrality, cancel)`. Live and captured
+reads share the scoring kernel and the CSR transpose used for incoming mode.

@@ -20,15 +20,14 @@ fn scores(
 ) -> Vec<(usize, f64)> {
     let mut ctx = Context::new();
     ctx.set_persist_results(false);
-    ClosenessCentrality::new(harmonic, weighted.then(|| "w".into()), "c".into())
+    let algorithm = ClosenessCentrality::new(harmonic, weighted.then(|| "w".into()), "c".into())
         .with_direction(if incoming {
             ClosenessDirection::Incoming
         } else {
             ClosenessDirection::Outgoing
         })
-        .with_normalization(normalized)
-        .execute(&mut ctx, selected(g))
-        .unwrap();
+        .with_normalization(normalized);
+    algorithm.execute(&mut ctx, selected(g)).unwrap();
     let AlgorithmOutput::NodeScores(values) = ctx
         .take_outputs()
         .remove("centrality.closeness.scores")
@@ -36,6 +35,19 @@ fn scores(
     else {
         panic!("expected scores")
     };
+    let captured = g
+        .borrow()
+        .read_view()
+        .unwrap()
+        .algorithm_input()
+        .unwrap()
+        .closeness(&algorithm, None)
+        .unwrap();
+    assert_eq!(captured.len(), values.len());
+    for ((node, actual), (expected_node, expected)) in captured.iter().zip(&values) {
+        assert_eq!(node, expected_node);
+        assert!((actual - expected).abs() <= 1e-12 * expected.abs().max(1.0));
+    }
     values
 }
 #[test]

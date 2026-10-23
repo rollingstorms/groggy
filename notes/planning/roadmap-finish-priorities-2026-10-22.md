@@ -162,3 +162,12 @@ Captured PageRank now shares one validated power-iteration kernel with the live
 wrapper. Owned results expose finite-budget convergence status. See
 `frozen-pagerank-contract-2026-10-22.md`. Next independent read migrations:
 closeness and betweenness; broader AR7.5 remains open.
+
+
+## AR7.5k — Frozen closeness (2026-10-22)
+
+Completed captured classic/harmonic closeness reads using the existing distance/
+scoring kernel and a shared compact incoming CSR transpose. Preserve defaults,
+normalization and strict selected weight rules; return owned f64 rows without
+publication. See `frozen-closeness-contract-2026-10-22.md`. Betweenness and broad
+AR7.5 remain open.

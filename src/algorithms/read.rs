@@ -76,6 +76,14 @@ impl AlgorithmRead {
     pub fn csr(&self) -> &Csr {
         &self.csr
     }
+    /// Captured classic/harmonic closeness scores, with no property writes.
+    pub fn closeness(
+        &self,
+        algorithm: &super::centrality::ClosenessCentrality,
+        cancel: Option<&AtomicBool>,
+    ) -> GraphResult<Vec<(NodeId, f64)>> {
+        algorithm.compute_read(self, cancel)
+    }
     /// Owned PageRank scores and explicit finite-budget convergence status.
     /// Uses captured personalization and selected edge occurrences; writes nothing.
     pub fn pagerank(
