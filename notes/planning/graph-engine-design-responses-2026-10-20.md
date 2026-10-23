@@ -1015,3 +1015,11 @@ precision and handle extreme finite products without materializing rounded f64
 fences. Invalid factors/nonfinite cells fail; row alignment/rank conventions
 remain. Python releases the GIL. See `table-outliers-2026-10-23.md`. Remaining
 consumer/default inference work stays open.
+
+## 2026-10-23 — graph numeric literals (07.3a.2h)
+
+Graph decimal/scientific literals retain f64 with explicit f32/f64 suffixes for
+typed equality. Complete-input validation rejects malformed/overflowing tokens,
+incomplete strings and trailing input. Live/frozen node and edge filters share
+the parser without changing property identity or numeric ordering. See
+`graph-query-literals-2026-10-23.md`; broader AR7.7 and defaults remain open.

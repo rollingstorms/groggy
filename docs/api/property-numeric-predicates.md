@@ -34,3 +34,8 @@ Cross-table numeric extrema use the same exact comparator and reject unordered
 NaNs. The remaining expression grammar/planning unification under AR7.7 is open:
 this does not replace the parsers or promise compiled/broadcast predicate plans.
 Ordinary Python property float defaults have not switched yet (07.3a.3).
+
+Graph string filters now parse decimal/scientific literals at f64 precision,
+with explicit f32/f64 suffixes for typed equality. See graph-query-literals.md
+for migration examples and complete-input validation. This does not change the
+separate array/table numeric equality contract above.

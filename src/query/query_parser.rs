@@ -130,7 +130,9 @@ impl QueryParser {
 
         self.tokenize(query)?;
         self.position = 0;
-        self.parse_node_expression()
+        let filter = self.parse_node_expression()?;
+        self.expect_end()?;
+        Ok(filter)
     }
 
     /// Parse an edge query string into an EdgeFilter
@@ -141,7 +143,9 @@ impl QueryParser {
 
         self.tokenize(query)?;
         self.position = 0;
-        self.parse_edge_expression()
+        let filter = self.parse_edge_expression()?;
+        self.expect_end()?;
+        Ok(filter)
     }
 
     /// Tokenize the input query string
@@ -197,6 +201,7 @@ impl QueryParser {
                     let quote_char = ch;
                     let mut value = String::new();
                     let mut escaped = false;
+                    let mut closed = false;
 
                     for (_, ch) in chars.by_ref() {
                         if escaped {
@@ -205,58 +210,39 @@ impl QueryParser {
                         } else if ch == '\\' {
                             escaped = true;
                         } else if ch == quote_char {
+                            closed = true;
                             break;
                         } else {
                             value.push(ch);
                         }
                     }
 
+                    if !closed {
+                        return Err(QueryError::InvalidSyntax {
+                            message: "Unterminated string literal".into(),
+                            position: pos,
+                        });
+                    }
                     self.tokens.push(Token::Value(AttrValue::Text(value)));
                 }
-                _ if ch.is_ascii_digit() || ch == '-' => {
-                    // Parse number
+                _ if ch.is_ascii_digit() || matches!(ch, '-' | '+' | '.') => {
                     let start_pos = pos;
-                    let mut number_str = String::new();
-                    number_str.push(ch);
-
-                    while let Some(&(_, next_ch)) = chars.peek() {
-                        if next_ch.is_ascii_digit() || next_ch == '.' {
-                            number_str.push(next_ch);
+                    let mut literal = String::from(ch);
+                    while let Some(&(_, next)) = chars.peek() {
+                        let exponent_sign = matches!(next, '+' | '-')
+                            && matches!(literal.as_bytes().last(), Some(b'e' | b'E'));
+                        if next.is_ascii_alphanumeric()
+                            || matches!(next, '.' | '_')
+                            || exponent_sign
+                        {
+                            literal.push(next);
                             chars.next();
                         } else {
                             break;
                         }
                     }
-
-                    let value = if number_str.contains('.') {
-                        match number_str.parse::<f32>() {
-                            Ok(f) => AttrValue::Float(f),
-                            Err(_) => {
-                                return Err(QueryError::InvalidValue {
-                                    value: number_str,
-                                    position: start_pos,
-                                })
-                            }
-                        }
-                    } else {
-                        match number_str.parse::<i64>() {
-                            Ok(i) => {
-                                if i >= i32::MIN as i64 && i <= i32::MAX as i64 {
-                                    AttrValue::SmallInt(i as i32)
-                                } else {
-                                    AttrValue::Int(i)
-                                }
-                            }
-                            Err(_) => {
-                                return Err(QueryError::InvalidValue {
-                                    value: number_str,
-                                    position: start_pos,
-                                })
-                            }
-                        }
-                    };
-
-                    self.tokens.push(Token::Value(value));
+                    self.tokens
+                        .push(Token::Value(parse_numeric_literal(&literal, start_pos)?));
                 }
                 _ if ch.is_ascii_alphabetic() || ch == '_' => {
                     // Parse identifier or keyword
@@ -498,6 +484,17 @@ impl QueryParser {
     }
 
     /// Helper methods for parsing
+    fn expect_end(&self) -> QueryResult<()> {
+        if let Some(token) = self.current_token() {
+            return Err(QueryError::UnexpectedToken {
+                expected: "end of query".into(),
+                found: format!("{token:?}"),
+                position: self.position,
+            });
+        }
+        Ok(())
+    }
+
     fn current_token(&self) -> Option<&Token> {
         self.tokens.get(self.position)
     }
@@ -544,6 +541,40 @@ impl QueryParser {
                 position: self.position,
             })
         }
+    }
+}
+
+/// Decimal/scientific floating literals default to f64; suffixes select storage identity.
+fn parse_numeric_literal(literal: &str, position: usize) -> QueryResult<AttrValue> {
+    let invalid = || QueryError::InvalidValue {
+        value: literal.into(),
+        position,
+    };
+    if let Some(number) = literal.strip_suffix("f32") {
+        return number
+            .parse::<f32>()
+            .ok()
+            .filter(|v| v.is_finite())
+            .map(AttrValue::Float)
+            .ok_or_else(invalid);
+    }
+    let (number, explicit_float) = match literal.strip_suffix("f64") {
+        Some(number) => (number, true),
+        None => (literal, false),
+    };
+    if explicit_float || number.contains(['.', 'e', 'E']) {
+        number
+            .parse::<f64>()
+            .ok()
+            .filter(|v| v.is_finite())
+            .map(AttrValue::Float64)
+            .ok_or_else(invalid)
+    } else {
+        let value = number.parse::<i64>().map_err(|_| invalid())?;
+        Ok(match i32::try_from(value) {
+            Ok(value) => AttrValue::SmallInt(value),
+            Err(_) => AttrValue::Int(value),
+        })
     }
 }
 
@@ -662,10 +693,10 @@ mod tests {
             EdgeFilter::AttributeFilter { name, filter } => {
                 assert_eq!(name, "weight");
                 match filter {
-                    AttributeFilter::GreaterThan(AttrValue::Float(f)) => {
-                        assert!((f - 0.5).abs() < f32::EPSILON);
+                    AttributeFilter::GreaterThan(AttrValue::Float64(f)) => {
+                        assert!((f - 0.5).abs() < f64::EPSILON);
                     }
-                    _ => panic!("Expected GreaterThan with Float(0.5)"),
+                    _ => panic!("Expected GreaterThan with Float64(0.5)"),
                 }
             }
             _ => panic!("Expected AttributeFilter"),
