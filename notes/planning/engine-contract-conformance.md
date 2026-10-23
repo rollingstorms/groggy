@@ -591,3 +591,11 @@ source extrema/rank quartiles and f64 statistics, reject nonfinite observations,
 and fix text uniqueness/empty ratios. Existing population/rank conventions stay
 explicit. See `table-profiles-2026-10-23.md` and `docs/api/table-profiles.md`.
 Remaining property consumers and ordinary float-default migration remain open.
+
+## 2026-10-23 — f64 algorithm properties (07.3a.2d)
+
+Dijkstra, closeness, betweenness and PageRank persistence retains owned f64
+scores, replacing prior f32-only output bounds. Shared edge weight/capacity
+access recognizes f64, and compatibility handles inherit the canonical policy.
+See `algorithm-float64-properties-2026-10-23.md`. This is a property-tag migration,
+not completion of remaining consumer/default or publication-policy work.

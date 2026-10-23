@@ -167,12 +167,9 @@ fn invalid_lengths_and_persistent_overflow_preserve_previous_values() {
     for harmonic in [false, true] {
         let value = scores(&g, harmonic, false, false, true)[0].1;
         assert!(value.is_finite() && value > f32::MAX as f64);
-        assert!(
-            ClosenessCentrality::new(harmonic, Some("w".into()), "c".into())
-                .execute(&mut Context::new(), selected(&g))
-                .is_err()
-        );
-        assert!(g.borrow().get_node_attr(0, &"c".into()).unwrap().is_none());
+        ClosenessCentrality::new(harmonic, Some("w".into()), "c".into())
+            .execute(&mut Context::new(), selected(&g)).unwrap();
+        assert_eq!(g.borrow().get_node_attr(0, &"c".into()).unwrap(), Some(AttrValue::Float64(value)));
     }
 }
 #[test]

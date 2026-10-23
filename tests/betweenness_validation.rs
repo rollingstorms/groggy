@@ -20,7 +20,7 @@ fn score(g: &SharedGraph, n: usize) -> f64 {
         .unwrap()
         .unwrap()
     {
-        AttrValue::Float(v) => v as f64,
+        AttrValue::Float64(v) => v,
         other => panic!("unexpected {other:?}"),
     }
 }

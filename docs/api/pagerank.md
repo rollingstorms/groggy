@@ -54,8 +54,8 @@ certified distance to the exact stationary solution, particularly near damping
 one. A caller needing convergence must inspect the profile and retry or reject.
 
 Check finite/nonnegative scores during computation and normalize final f64 mass.
-Persistent runs bulk-write existing f32 graph properties; rounding/underflow can
-occur there. Nonpersistent runs return owned full-precision `(NodeId, f64)` rows
+Persistent runs bulk-write f64 graph properties, retaining the computed values.
+Nonpersistent runs return owned full-precision `(NodeId, f64)` rows
 under `centrality.pagerank.scores`, using the typed native `NodeScores` output;
 FFI only translates these rows. They do not write properties or publish history.
 Cancellation is checked before computation, during iterations and before final
@@ -83,6 +83,6 @@ against a separate pivoted linear solve of `(I-alpha*P^T)x=(1-alpha)*p`. Other
 fixtures cover invalid controls/properties, all-zero personalization,
 empty/singleton/sparse-ID/parallel/loop inputs, cancellation, stale selections,
 bounded approximation and original-ID f64 outputs. `tests/test_pagerank_validation.py`
-checks rebuilt Python behavior, f32 stored values and nonpersistent f64 rows.
+checks rebuilt Python behavior, f64 stored values and nonpersistent f64 rows.
 Remaining work includes broader options, external-backend, near-one damping,
 large-scale/cancellation and history-pinned input certification under item 28.

@@ -628,12 +628,8 @@ impl Algorithm for BetweennessCentrality {
         let start_time = Instant::now();
         let scores = self.compute(ctx, &subgraph)?;
 
-        if ctx.persist_results()
-            && scores
-                .iter()
-                .any(|&(_, score)| !score.is_finite() || score.abs() > f32::MAX as f64)
-        {
-            return Err(anyhow!("betweenness score exceeds finite f32 output range"));
+        if ctx.persist_results() && scores.iter().any(|&(_, score)| !score.is_finite()) {
+            return Err(anyhow!("betweenness score exceeds finite f64 output range"));
         }
 
         // === Persist Results ===
@@ -641,7 +637,7 @@ impl Algorithm for BetweennessCentrality {
             let write_start = Instant::now();
             let attr_values: Vec<(NodeId, AttrValue)> = scores
                 .iter()
-                .map(|&(node, score)| (node, AttrValue::Float(score as f32)))
+                .map(|&(node, score)| (node, AttrValue::Float64(score)))
                 .collect();
 
             subgraph
@@ -736,7 +732,7 @@ mod tests {
         let score_a = result.get_node_attribute(a, &attr_name).unwrap().unwrap();
 
         match (score_b, score_c, score_a) {
-            (AttrValue::Float(sb), AttrValue::Float(sc), AttrValue::Float(sa)) => {
+            (AttrValue::Float64(sb), AttrValue::Float64(sc), AttrValue::Float64(sa)) => {
                 assert!(sb > sa);
                 assert!(sc > sa);
             }

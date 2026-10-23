@@ -50,7 +50,7 @@ def test_invalid_lengths_preserve_previous_output(value):
     assert g.get_node_attr(a, "c") == 7
 
 
-def test_f64_results_remain_available_when_f32_properties_would_overflow():
+def test_f64_results_persist_beyond_the_f32_range():
     g = Graph()
     a, b = g.add_node(), g.add_node()
     e = g.add_edge(a, b)
@@ -59,9 +59,8 @@ def test_f64_results_remain_available_when_f32_properties_would_overflow():
     algo = algorithms.centrality.closeness("w", "c")
     _, profile = apply(sub, algo, persist=False, return_profile=True)
     assert profile["outputs"]["centrality.closeness.scores"][0][1] > 1e39
-    with pytest.raises(RuntimeError, match="f32"):
-        sub.apply(algo)
-    assert g.get_node_attr(a, "c") is None
+    sub.apply(algo)
+    assert g.get_node_attr(a, "c") == profile["outputs"]["centrality.closeness.scores"][0][1]
 
 
 def test_invalid_direction_rejects():

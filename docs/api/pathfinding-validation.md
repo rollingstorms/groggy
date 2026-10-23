@@ -18,7 +18,7 @@ The selected path still retains exact edge-instance IDs and f64 total cost in Ru
 
 The checked Dijkstra algorithm and weighted ShortestPathMap pipeline step share scalar validation and selection checks. Weighted [closeness](closeness.md) additionally requires strictly positive lengths. Their distance-only endpoint map takes the minimum weight across selected parallel edges and supplies both orientations for an undirected graph. It does not deduplicate the underlying graph or change the direct path API's edge identity. Stale selected nodes/edges reject before computing/writing these checked results. Tiny improvements are compared directly rather than discarded using an absolute machine-epsilon offset; heap ordering/equality agree.
 
-[Dijkstra wrapper](dijkstra.md) nonpersistent output now returns original-ID f64 distance rows and validates one selected source marker; it checks cancellation during traversal and before final output. Dijkstra algorithm persistence still stores f32 property results. A distance outside finite f32 range now rejects before any result column write, instead of silently storing infinity. The pipeline variable map and direct Path cost use f64. This does not change the graph's wider property dtype contract.
+[Dijkstra wrapper](dijkstra.md) nonpersistent output now returns original-ID f64 distance rows and validates one selected source marker; it checks cancellation during traversal and before final output. Dijkstra algorithm persistence now retains f64 property results. A nonfinite distance rejects before any result column write. The pipeline variable map and direct Path cost use f64. This does not change the graph's wider property dtype contract.
 
 ## Checked A*
 
@@ -73,7 +73,7 @@ certification.
 
 Paths count distinct edge instances. Equal minimum-length parallel edges contribute separate shortest paths; more expensive parallel edges are excluded. Weighted CSR is built locally and never replaces the shared all-edge topology cache. Unweighted CSR retains parallel instances. Directed raw scores count ordered source/target pairs; undirected raw scores divide by two. Normalized scores divide the ordered-pair accumulation by `(n-1)*(n-2)`, including isolates in `n`.
 
-Weighted distance/tie comparisons use exact computed f64 values, without an absolute tolerance. A positive step that rounds away in f64 rejects, as do nonfinite path counts or results outside the persisted f32 score range. Failures preserve existing output properties. This is not arbitrary precision shortest-path counting; rational/decimal mathematical ties can differ after floating arithmetic. Validation adds O(E) work, and weighted execution needs local O(E) CSR storage. No speedup is claimed.
+Weighted distance/tie comparisons use exact computed f64 values, without an absolute tolerance. A positive step that rounds away in f64 rejects, as do nonfinite path counts or nonfinite f64 scores. Failures preserve existing output properties. This is not arbitrary precision shortest-path counting; rational/decimal mathematical ties can differ after floating arithmetic. Validation adds O(E) work, and weighted execution needs local O(E) CSR storage. No speedup is claimed.
 
 Checks include an independent exhaustive simple edge-path enumerator for directed/undirected, normalized/raw, weighted/unit multigraphs with loops and an isolate; cache reuse, tiny lengths, invalid weights, stale selections, rounded-away distances and path-count overflow are covered. See `tests/betweenness_validation.rs` and `tests/test_betweenness_validation.py`.
 

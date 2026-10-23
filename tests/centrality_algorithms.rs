@@ -75,7 +75,7 @@ fn pipeline_runs_betweenness_and_closeness() {
         .unwrap();
 
     match (bc, cc) {
-        (AttrValue::Float(_), AttrValue::Float(_)) => {}
+        (AttrValue::Float64(_), AttrValue::Float64(_)) => {}
         _ => panic!("expected float attributes"),
     }
 }
@@ -136,7 +136,7 @@ fn pipeline_runs_weighted_centrality() {
         .unwrap();
 
     match (bw, cw) {
-        (AttrValue::Float(_), AttrValue::Float(_)) => {}
+        (AttrValue::Float64(_), AttrValue::Float64(_)) => {}
         _ => panic!("expected float attributes"),
     }
 }

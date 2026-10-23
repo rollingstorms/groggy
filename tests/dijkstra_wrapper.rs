@@ -218,13 +218,9 @@ fn f64_rows_preserve_large_distances_and_tiny_improvements_with_sparse_ids() {
         run(&algo, selected(&g)).0,
         vec![(0, 0.), (2, f32::MAX as f64), (3, 2. * f32::MAX as f64)]
     );
-    assert!(algo.execute(&mut Context::new(), selected(&g)).is_err());
-    for n in [0, 2, 3] {
-        assert!(g
-            .borrow()
-            .get_node_attr(n, &"out".into())
-            .unwrap()
-            .is_none());
+    algo.execute(&mut Context::new(), selected(&g)).unwrap();
+    for (n, distance) in [(0, 0.), (2, f32::MAX as f64), (3, 2. * f32::MAX as f64)] {
+        assert_eq!(g.borrow().get_node_attr(n, &"out".into()).unwrap(), Some(AttrValue::Float64(distance)));
     }
     let mut graph = Graph::new_directed();
     graph.add_nodes(3);

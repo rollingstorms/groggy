@@ -220,10 +220,12 @@ impl Algorithm for DijkstraShortestPath {
             let attr_values: Vec<(NodeId, AttrValue)> = distances
                 .iter()
                 .map(|&(node, cost)| {
-                    if cost > f32::MAX as f64 {
-                        return Err(anyhow!("Dijkstra distance for node {node} cannot be represented in f32 properties"));
+                    if !cost.is_finite() {
+                        return Err(anyhow!(
+                            "Dijkstra distance for node {node} exceeds finite f64 property range"
+                        ));
                     }
-                    Ok((node, AttrValue::Float(cost as f32)))
+                    Ok((node, AttrValue::Float64(cost)))
                 })
                 .collect::<Result<_>>()?;
 
@@ -297,8 +299,8 @@ mod tests {
 
         let attr_name: AttrName = "distance".to_string();
         let dist_c = result.get_node_attribute(c, &attr_name).unwrap().unwrap();
-        if let AttrValue::Float(distance) = dist_c {
-            assert!((distance - 1.0).abs() <= f32::EPSILON);
+        if let AttrValue::Float64(distance) = dist_c {
+            assert!((distance - 1.0).abs() <= f64::EPSILON);
         } else {
             panic!("expected float distance");
         }

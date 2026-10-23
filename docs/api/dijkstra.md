@@ -26,7 +26,7 @@ first-marker choice and corrects the old truthy/multiple-source documentation.
 
 Every selected node/edge must be active and every edge endpoint selected, checked
 before cache access. Every selected weight, including on unreachable edges, must
-be finite nonnegative numeric Float/Int/SmallInt; missing is one. Zero lengths and
+be finite nonnegative numeric Float/Float64/Int/SmallInt; missing is one. Zero lengths and
 zero cycles are valid. Directed graphs follow outgoing edges; undirected graphs
 traverse both ways. Parallel endpoint pairs use their minimum length without
 changing underlying edge identities. Results contain distances, not path edge IDs.
@@ -38,9 +38,9 @@ No fixed latency is promised during setup or every high-degree neighbor scan.
 
 Nonpersistent output is an owned list of `(original_node_id, f64_distance)` rows,
 ordered by node ID, for reached nodes only. It uses the existing NodeScores
-translation and writes no properties. Persistent runs validate all f32 distance
-representations before one existing bulk property setter; overflow rejects with
-no result values written. Rounding/underflow remains possible in f32 properties.
+translation and writes no properties. Persistent runs retain finite f64 distance
+properties through one existing bulk property setter, with the same values as
+owned output. Nonfinite results reject before any result values are written.
 Previous output properties on unreached nodes remain unchanged. No new durable
 transaction boundary or state-pinned historical input contract is introduced.
 
@@ -54,7 +54,7 @@ directions/every source, with zero/compact/missing weights, parallel instances,
 loops and actual repeated cache hits, against independent Floyd-Warshall.
 Further fixtures cover missing/ambiguous sources, cancellation, stale/open
 selections, invalid unreachable weights, sparse/singleton/empty cases, tiny
-improvements and f64 distances outside persistent f32 range.
+improvements and persistent f64 distances beyond the f32 range.
 `tests/test_dijkstra_wrapper.py` checks the rebuilt Python surface, marker values,
 nonpersistent rows and rejection without partial writes. Broader external-backend,
 scale, remaining caller and historical-input certification remains item 28 work.

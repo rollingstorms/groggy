@@ -108,7 +108,7 @@ fn algorithm_and_pipeline_share_validation_and_symmetric_minimum_parallel_weight
         g.borrow()
             .get_node_attr(target, &"distance".into())
             .unwrap(),
-        Some(AttrValue::Float(2.))
+        Some(AttrValue::Float64(2.))
     );
     let mut vars = StepVariables::default();
     vars.set_scalar("source", AlgorithmParamValue::Int(1));
@@ -130,7 +130,7 @@ fn algorithm_and_pipeline_share_validation_and_symmetric_minimum_parallel_weight
         g.borrow()
             .get_node_attr(target, &"distance".into())
             .unwrap(),
-        Some(AttrValue::Float(2.))
+        Some(AttrValue::Float64(2.))
     );
 }
 #[test]
@@ -168,7 +168,7 @@ fn algorithm_distance_overflow_rejects_before_persisting_any_result() {
         .unwrap();
     for pair in nodes.windows(2) {
         let e = g.add_edge(pair[0], pair[1]).unwrap();
-        g.set_edge_attr(e, "w".into(), AttrValue::Float(f32::MAX))
+        g.set_edge_attr(e, "w".into(), AttrValue::Float64(f64::MAX))
             .unwrap();
     }
     let g = Rc::new(RefCell::new(g));

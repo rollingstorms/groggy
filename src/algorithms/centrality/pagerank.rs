@@ -447,7 +447,7 @@ impl Algorithm for PageRank {
             let attr_values: Vec<(NodeId, AttrValue)> = result
                 .scores
                 .into_iter()
-                .map(|(node, value)| (node, AttrValue::Float(value as f32)))
+                .map(|(node, value)| (node, AttrValue::Float64(value)))
                 .collect();
 
             subgraph
@@ -533,7 +533,7 @@ mod tests {
             .get_node_attribute(a, &"pagerank".into())
             .unwrap()
             .unwrap();
-        if let AttrValue::Float(score) = attr {
+        if let AttrValue::Float64(score) = attr {
             assert!(score > 0.0);
         } else {
             panic!("expected float score");

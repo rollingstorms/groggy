@@ -165,6 +165,7 @@ pub trait EdgeOperations: GraphEntity {
     fn weight(&self) -> GraphResult<Option<f64>> {
         match self.get_edge_attribute(&"weight".into())? {
             Some(AttrValue::Float(w)) => Ok(Some(w as f64)),
+            Some(AttrValue::Float64(w)) => Ok(Some(w)),
             Some(AttrValue::Int(w)) => Ok(Some(w as f64)),
             Some(AttrValue::SmallInt(w)) => Ok(Some(w as f64)),
             _ => Ok(None),
@@ -179,7 +180,7 @@ pub trait EdgeOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient attribute storage
     fn set_weight(&self, weight: f64) -> GraphResult<()> {
-        self.set_edge_attribute("weight".into(), AttrValue::Float(weight as f32))
+        self.set_edge_attribute("weight".into(), AttrValue::Float64(weight))
     }
 
     /// Get edge capacity if stored as attribute (for flow networks)
@@ -192,6 +193,7 @@ pub trait EdgeOperations: GraphEntity {
     fn capacity(&self) -> GraphResult<Option<f64>> {
         match self.get_edge_attribute(&"capacity".into())? {
             Some(AttrValue::Float(c)) => Ok(Some(c as f64)),
+            Some(AttrValue::Float64(c)) => Ok(Some(c)),
             Some(AttrValue::Int(c)) => Ok(Some(c as f64)),
             Some(AttrValue::SmallInt(c)) => Ok(Some(c as f64)),
             _ => Ok(None),

@@ -444,10 +444,12 @@ impl Algorithm for ClosenessCentrality {
             let attr_values: Vec<(NodeId, AttrValue)> = scores
                 .iter()
                 .map(|&(node, score)| {
-                    if score > f32::MAX as f64 {
-                        return Err(anyhow!("closeness score for node {node} cannot be represented in f32 properties"));
+                    if !score.is_finite() {
+                        return Err(anyhow!(
+                            "closeness score for node {node} exceeds finite f64 property range"
+                        ));
                     }
-                    Ok((node, AttrValue::Float(score as f32)))
+                    Ok((node, AttrValue::Float64(score)))
                 })
                 .collect::<Result<_>>()?;
 
@@ -535,7 +537,7 @@ mod tests {
         let score_c = result.get_node_attribute(c, &attr_name).unwrap().unwrap();
 
         match (score_b, score_a, score_c) {
-            (AttrValue::Float(sb), AttrValue::Float(sa), AttrValue::Float(sc)) => {
+            (AttrValue::Float64(sb), AttrValue::Float64(sa), AttrValue::Float64(sc)) => {
                 assert!(sb > sa);
                 assert!(sb > sc);
             }

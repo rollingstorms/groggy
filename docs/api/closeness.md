@@ -36,7 +36,7 @@ Unreachable nodes contribute nothing. Isolates/singletons score zero, and empty
 input returns no scores. Normalization does not imply a [0,1] range when arbitrary
 positive lengths smaller than one are supplied.
 
-Weights must be finite strictly positive numeric lengths (Float/Int/SmallInt);
+Weights must be finite strictly positive numeric lengths (Float/Float64/Int/SmallInt);
 missing values are one. Explicit zero, null, bool, negative, nonnumeric and
 nonfinite lengths reject before computation, including unreachable selected
 edges. This tightens the former zero-length behavior, which skipped reciprocal
@@ -61,9 +61,9 @@ promised for every validation, setup or high-degree adjacency scan.
 Results use ordered original node IDs and f64 accumulation. Nonpersistent runs
 return owned `(NodeId, f64)` rows in native/Python profile output
 `centrality.closeness.scores`, without property writes. Persistent runs preflight
-all scores for finite f32 representation and use one existing bulk property
-setter. Overflow rejects before any score is written. Underflow/rounding remains
-possible in f32 properties. This operation does not introduce a durable transaction
+all scores for finite f64 representation and use one existing bulk property
+setter. Overflow rejects before any score is written. Stored values retain the
+same f64 precision as owned score output. This operation does not introduce a durable transaction
 boundary or implement the unfinished state-pinned input-view contract.
 
 Unweighted all-source traversal takes O(V(V+E)); weighted traversal uses the
@@ -79,7 +79,7 @@ graph directions and weighted/unweighted modes, all harmonic/classic,
 incoming/outgoing and normalized/raw options against an independent Floyd-Warshall
 reference. Other fixtures cover empty/singleton/sparse/parallel/loop inputs,
 missing/compact weights, stale/open selections, cancellation, cache direction
-isolation and f32 overflow with retained nonpersistent f64 output.
+isolation and finite f64 scores beyond the f32 range in both output modes.
 `tests/test_closeness_validation.py` checks rebuilt Python behavior and existing
 positional arguments. Full item 28 remains open for external-backend, larger-scale,
 remaining caller/option and state-pinned-input certification.

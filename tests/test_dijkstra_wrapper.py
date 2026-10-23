@@ -59,7 +59,7 @@ def test_invalid_unreachable_weights_are_not_silently_ignored(bad):
         run(g, nodes)
 
 
-def test_f64_output_survives_when_persistent_f32_distances_would_overflow():
+def test_f64_distances_persist_beyond_the_f32_range():
     g = Graph(directed=True)
     a, b, c = nodes = [g.add_node() for _ in range(3)]
     g.set_node_attr(a, "source", True)
@@ -69,6 +69,5 @@ def test_f64_output_survives_when_persistent_f32_distances_would_overflow():
     _, profile = run(g, nodes)
     rows = profile["outputs"]["pathfinding.dijkstra.distances"]
     assert rows[-1][0] == c and rows[-1][1] > 5.9e38
-    with pytest.raises(RuntimeError, match="f32"):
-        g.induced_subgraph(nodes).apply(algorithms.pathfinding.dijkstra("source", "w", "out"))
-    assert all(g.get_node_attr(n, "out") is None for n in nodes)
+    g.induced_subgraph(nodes).apply(algorithms.pathfinding.dijkstra("source", "w", "out"))
+    assert [(n, g.get_node_attr(n, "out")) for n in nodes] == rows

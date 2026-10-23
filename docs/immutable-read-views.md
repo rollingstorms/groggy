@@ -334,7 +334,9 @@ Native callers can reuse `AlgorithmRead::pagerank(&PageRank, cancel)`. Python
 releases the GIL during preparation/computation. Reads write no properties,
 deltas or checkpoints. The existing live algorithm wrapper shares validation and
 the iteration kernel; its explicit persistence and telemetry behavior remain.
-This does not change the current f32 property-storage format.
+Live PageRank persistence now stores f64 properties as well. Existing f32 values
+retain their original storage tags; ordinary Python float inference migrates
+separately.
 
 ## Closeness
 
