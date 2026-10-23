@@ -1723,8 +1723,8 @@ impl PyGraph {
         for change in diff.attr_changes {
             let item = PyDict::new(py);
             let kind = match change.entity_type {
-                groggy::state::history::EntityType::Node => "node",
-                groggy::state::history::EntityType::Edge => "edge",
+                groggy::state::change::EntityType::Node => "node",
+                groggy::state::change::EntityType::Edge => "edge",
             };
             item.set_item("entity_type", kind)?;
             item.set_item("entity_id", change.entity_id)?;

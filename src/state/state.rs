@@ -11,6 +11,9 @@
 //! - Reconstruction: Algorithms to build snapshots from deltas
 //! - State comparison: Diffing and analysis utilities
 
+// Compatibility imports; the logical change record has one authoritative owner.
+pub use crate::state::change::{AttributeChange, EntityType};
+
 use crate::errors::{GraphError, GraphResult};
 use crate::state::delta::DeltaObject;
 use crate::state::history::Delta;
@@ -679,22 +682,6 @@ impl StateDiff {
             attributes_changed: self.attribute_changes.len(),
         }
     }
-}
-
-/// A single attribute change between states
-#[derive(Debug, Clone)]
-pub struct AttributeChange {
-    pub entity_type: EntityType,
-    pub entity_id: u64,
-    pub attr_name: AttrName,
-    pub old_value: Option<AttrValue>,
-    pub new_value: Option<AttrValue>,
-}
-
-#[derive(Debug, Clone)]
-pub enum EntityType {
-    Node,
-    Edge,
 }
 
 /// Statistics about a snapshot

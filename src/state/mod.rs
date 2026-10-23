@@ -8,6 +8,7 @@
 //! - Reference management
 //! - Space management
 
+pub mod change;
 pub mod change_tracker;
 pub mod delta;
 pub mod history;
@@ -24,12 +25,12 @@ pub use ref_manager::*;
 pub use space::*;
 pub use topology::*;
 
-// Re-export history items except those that conflict with state module
+// Re-export history-specific containers; logical change types share one owner.
 pub use history::{
     Commit, CommitDiff, Delta, HistoricalView, HistoryForest, HistoryStatistics, ViewSummary,
 };
 
-// Re-export state items (including the canonical AttributeChange and EntityType)
+// Re-export state items and their compatibility exports of canonical change types.
 pub use state::*;
 
 pub use read_state::PinnedReadState;

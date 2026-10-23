@@ -10,6 +10,9 @@
 //! - Git-like branching model (lightweight branches, merge capabilities)
 //! - Efficient diff-based storage (only store what changed)
 
+// Preserve legacy public names while sharing the snapshot diff representation.
+pub use crate::state::change::{AttributeChange, EntityType};
+
 use crate::errors::{GraphError, GraphResult};
 use crate::state::change_tracker::ChangeSet;
 use crate::state::ref_manager::BranchInfo;
@@ -552,20 +555,7 @@ impl HistoryForest {
             nodes_removed: diff.nodes_removed,
             edges_added: diff.edges_added,
             edges_removed: diff.edges_removed,
-            attr_changes: diff
-                .attribute_changes
-                .into_iter()
-                .map(|change| AttributeChange {
-                    entity_type: match change.entity_type {
-                        crate::state::state::EntityType::Node => EntityType::Node,
-                        crate::state::state::EntityType::Edge => EntityType::Edge,
-                    },
-                    entity_id: change.entity_id,
-                    attr_name: change.attr_name,
-                    old_value: change.old_value,
-                    new_value: change.new_value,
-                })
-                .collect(),
+            attr_changes: diff.attribute_changes,
         })
     }
 
@@ -1017,22 +1007,6 @@ pub struct CommitDiff {
     pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
     pub edges_removed: Vec<EdgeId>,
     pub attr_changes: Vec<AttributeChange>,
-}
-
-/// A single attribute change
-#[derive(Debug, Clone)]
-pub struct AttributeChange {
-    pub entity_type: EntityType, // Node or Edge
-    pub entity_id: u64,          // NodeId or EdgeId
-    pub attr_name: AttrName,
-    pub old_value: Option<AttrValue>,
-    pub new_value: Option<AttrValue>,
-}
-
-#[derive(Debug, Clone)]
-pub enum EntityType {
-    Node,
-    Edge,
 }
 
 /// Statistics about the history system

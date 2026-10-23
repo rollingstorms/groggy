@@ -935,3 +935,13 @@ parallel shortest-instance counts, selected isolates and normalization. Repaired
 dropped live transient outputs and indexer overflow; strengthened cancellation.
 See `frozen-betweenness-contract-2026-10-23.md`. The centrality read slices are
 complete; remaining algorithms, registry/pipeline and broad AR7.5 stay open.
+
+
+## AR7.9a — Canonical logical change records (2026-10-23)
+
+Snapshot and history attribute differences now use one record/target type owned
+by state::change, with exact legacy re-exports. Commit diffs move the existing
+record vector directly; FFI output is unchanged. Preserve typed/null/absence
+semantics and leave diagnostic/sampling scopes separate. See
+`change-record-owner-2026-10-23.md`; broad AR7.9 and temporal publication/storage
+migration remain open.
