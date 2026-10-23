@@ -105,13 +105,13 @@ Roadmap: 9, 12, 19 / AR3, AR5. Timing: BEFORE CHANGING DEFAULT APIS.
 
 Suggested: explicit checked API now; change defaults only with a documented major release.
 
-Decision: ____________________
+Decision (2026-10-23): Migrate defaults now: ordinary mutations publish checked changes automatically; commit denotes an explicit checkpoint. Preserve atomic failure and visible errors.
 
 ### A03.2 - Which existing scripts, notebooks or downstream APIs must be included as compatibility fixtures before renaming commit and checkout?
 
 Suggested: collect your real examples and test them before deprecating any names.
 
-Decision (2026-10-22): Audit real examples/fixtures; proceed with terminology/API changes now. A03.1 default publication awaits separate clarification.
+Decision (2026-10-22): Audit real examples/fixtures; proceed with terminology/API changes now. A03.1 now confirms migrating automatic-publication defaults.
 
 Notes / conditions: ____________________
 
@@ -173,7 +173,7 @@ Decision (2026-10-22): Confirmed: remain absent until another explicit assignmen
 
 Suggested: restore from an explicit retained state, with an optional patch.
 
-Decision (2026-10-22): Restore previous properties by default unless explicitly overridden; default retained cutoff awaits clarification.
+Decision (2026-10-23): Require an explicit retained state when restoring an entity. This corrects the earlier provisional default-restoration interpretation.
 
 Notes / conditions: ____________________
 
@@ -291,13 +291,13 @@ Roadmap: 15, 33 / AR1, AR6. Timing: BEFORE DESTRUCTIVE MAINTENANCE.
 
 Suggested: named checkpoints pin history; optional explicit audit pins use the same retention mechanism.
 
-Decision (2026-10-22): Owner rejects proposal (“no”); exact checkpoint/audit retention interaction awaits clarification. No implicit purge.
+Decision (2026-10-23): No extra permanent checkpoint/audit pins. Purge remains explicit and must preserve shared branches and open immutable views.
 
 ### A09.2 - What grace period and backup requirement should protect an explicit destructive purge, and should strict audit retention be an optional graph policy?
 
 Suggested: configurable grace period and an optional strict audit policy; preview the affected states.
 
-Decision (2026-10-22): Owner rejects combined proposal (“no”); exact grace/backup/audit rule awaits clarification. No destructive change authorized here.
+Decision (2026-10-23): No mandatory grace period or backup. Explicit purge must preserve shared branches and open immutable views. Current scope is a data science library, with production retention policies deferred.
 
 Notes / conditions: ____________________
 

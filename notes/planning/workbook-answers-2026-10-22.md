@@ -13,17 +13,18 @@ answered questions change status. Unanswered or qualified choices remain visible
 | A01.2 | Suggested. | **Confirmed:** copy/materialize the selected state by default; transfer history only explicitly. |
 | A02.1 | Defer checkpoint schedule until MVP/first use; question a maximum budget; benchmark opening. | **Confirmed:** measure recovery/open time now; defer scheduling thresholds and mandatory log/disk limits. Do not invent an opening SLA. |
 | A02.2 | Suggested; asks whether checkpoint is compressed state. | **Confirmed:** verified side-by-side format conversion, retaining original until verification. A checkpoint is saved state/recovery information; compression is optional. |
-| A03.2 | Check examples, but change everything now. | **Confirmed:** audit real repository examples as compatibility fixtures and proceed with the requested terminology/API migration now. Automatic-publication default (A03.1) is separately pending explicit clarification. |
+| A03.1 | Yes, migrate defaults now. | **Confirmed (2026-10-23):** checked automatic publication becomes the default for ordinary Graph mutations now; commit means an explicit checkpoint. Publication errors must remain visible and a failed batch must publish nothing. |
+| A03.2 | Check examples, but change everything now. | **Confirmed:** audit real repository examples as compatibility fixtures and proceed with the requested terminology/API migration now. A03.1 now separately confirms automatic-publication defaults. |
 | A04.1 | Only explicit changes/effective time; confirmed later accepted write wins equal-time conflicts. | **Confirmed:** mutation events carry effective time; reads/computation create no changes. At identical effective time for the same key, later accepted version wins. Explicit recorded cutoff can reveal the earlier accepted value. |
 | A04.2 | Reject it. | **Confirmed, overrides suggestion:** reject an effective edge whose endpoint validity does not support it; do not silently retain/hide invalid topology as the default. Backdated combinations need whole-proposed-timeline validation. |
 | A05.1 | Remain absent. | **Confirmed:** unset persists until a later set; no fallback to an older value. |
-| A05.2 | Restore unless explicit. | **Confirmed direction:** explicit entity restoration restores previous properties by default, unless overridden. Which retained point supplies the default is pending clarification; do not implement a guessed cutoff. |
+| A05.2 | Restore unless explicit. | **Confirmed correction (2026-10-23):** restoration requires an explicit retained state; do not select a pre-deactivation state automatically. |
 | A06.1 | Suggested. | **Confirmed:** first-class UTC instant, calendar date and duration first; distinct versioned types. Local/timezone-aware calendar types need their own precise rules later. |
 | A06.2 | Change default; asks whether f32 was for memory. | **Confirmed:** ordinary Python floats default to f64. This intentionally supersedes the proposed preserve-f32 default. Preserve existing typed data during storage migration; do not pretend widening recovers already-rounded bits. |
 | A07.1 | “You could, I guess.” | **Tentative:** no definite choice between branch schema identity and global installed policy. Keep the current policy until clarified. |
 | A07.2 | Okay. | **Confirmed:** explicit compatible migration stages, each atomic and separately recorded. |
-| A09.1 | No. | **Proposal rejected:** do not infer extra permanent named-checkpoint/audit retention roots. Interaction with explicit purge/shared branches/open views is pending clarification. |
-| A09.2 | No. | **Proposal rejected:** the combined grace-period/backup/audit proposal is not accepted. Exact purge protections are pending clarification; no destructive maintenance is authorized by this answer alone. |
+| A09.1 | No. | **Proposal rejected:** do not infer extra permanent named-checkpoint/audit retention roots. **Confirmed (2026-10-23):** purge is explicit and must preserve shared branches and open immutable views. |
+| A09.2 | No. | **Proposal rejected:** the combined grace-period/backup/audit proposal is not accepted. **Confirmed (2026-10-23):** no mandatory grace period or backup; explicit purge still preserves shared branches and open immutable views. This is currently a data science library policy, not a production database retention guarantee. |
 | A10.1 | Conditional yes if joining duplicates things. | **Conditional interpretation:** repeated table rows can map to the same source entity; a join does not itself create graph entities. Reject ambiguous/conflicting writeback without explicit target mapping/reduction. No silent last-row-wins update. |
 | A10.2 | One batch. | **Confirmed:** one mixed atomic writeback for unambiguously identified node and edge updates. |
 | A11.2 | Fail. | **Confirmed, overrides suggestion:** fail when an index required by the selected query execution is unavailable; scanning must be explicit, not an automatic fallback. This does not make today's ordinary scan API require a nonexistent optional index. |
@@ -41,14 +42,17 @@ answered questions change status. Unanswered or qualified choices remain visible
 - For two explicit writes at the same effective timestamp, **later accepted write wins**.
 - Membership/source-pin group revisions use **new immutable references**, retaining the old reference.
 
+- Ordinary mutations adopt checked automatic publication now; commit is an explicit checkpoint.
+- Entity restoration requires an explicit retained state.
+- Explicit purge preserves shared branches and open immutable views, without extra permanent checkpoint/audit pins or mandatory grace/backup. Scope is currently a data science library.
+
 ## Questions not answered by the original message
 
-A03.1 (publication default; clarification requested), A08.1–A08.2 (rewiring/merge),
+A08.1–A08.2 (rewiring/merge),
 A11.1 (index recovery versus rebuild), A13.1 (shape/broadcast policy), A14.1
 (stage naming), A15.2 (service limits), A16.2 (durable retry key), and A17.2
 (adapter correction/fact identity). A07.1 remains tentative. A15.1/A17.1 supply
-measurement/fixture direction, not complete production targets. Clarification is
-also pending for A05.2's restore source and A09's exact retention rule. A question
+measurement/fixture direction, not complete production targets. A03.1, A05.2 and A09 were clarified on 2026-10-23. A question
 being unanswered in this message does not undo earlier accepted behavior; existing
 exact-shape operations and other established contracts remain in force.
 

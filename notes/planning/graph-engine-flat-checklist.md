@@ -290,3 +290,9 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **29.61c — Checked table aggregation, pivot identity, numeric ordering and describe.** Shared column kernels, exact mixed comparisons, typed pivot equality/name-collision errors, checked outputs and one summary per described column. Evidence/policies: `table-numeric-contract-2026-10-22.md`. This closes the finite NC1 inventory; A10 writeback and broader guarantees remain separate.
 - [x] **29.62 — Matrix activation/dropout and tracking boundaries.** Replace ignored cell/conversion errors and wrong GELU derivative; retain identity metadata, validate controls and correct dropout evaluation/training behavior. Supported derivatives must compose; unsupported tracked operations must be explicit. Scope and exits: NC2 in `numerical-closeout-findings-2026-10-22.md`.
 - [x] **29.63 — Explicit sparse expansion boundary.** Extend safe materialization policy to nonzero-image transforms and nonfinite sparse fallback paths, preserving small-input IEEE results and explicit dense opt-in. Full native suites, strict all-target core Clippy and 462 rebuilt Python regressions verify early rejection, dense opt-in and small IEEE/sparse-zero-preserving behavior. Scope and exits: NC3 in `numerical-closeout-findings-2026-10-22.md`.
+
+### Owner clarification — 2026-10-23
+
+- A03.1: migrate ordinary Graph mutations to checked automatic publication now; commit is an explicit checkpoint. Implementation and compatibility gates remain required.
+- A05.2: restoration requires an explicit retained state; supersedes provisional automatic pre-deactivation restoration.
+- A09: explicit purge preserves shared branches/open immutable views, with no extra permanent checkpoint/audit pins or mandatory grace period/backup. Current scope is a data science library.
