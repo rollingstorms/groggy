@@ -1,10 +1,10 @@
-"""Windows use stored f32 outputs and exact high-offset integer differences."""
+"""Windows use stored f64 outputs and exact high-offset integer differences."""
 import math
 import statistics
 from fractions import Fraction
 
 import pytest
-from groggy import BaseArray
+from groggy import AttrValue, BaseArray
 
 
 def values(array):
@@ -48,6 +48,6 @@ def test_windows_reject_bad_domains_and_overflow():
     for action in (lambda: BaseArray([]).expanding("bad"),
                    lambda: BaseArray([]).rolling(0, "sum"),
                    lambda: BaseArray([math.nan]).rolling(2, "mean"),
-                   lambda: BaseArray([3e38, 3e38]).cumsum()):
+                   lambda: BaseArray([AttrValue.float64(1e308), AttrValue.float64(1e308)]).cumsum()):
         with pytest.raises((ValueError, RuntimeError)):
             action()

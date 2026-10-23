@@ -51,6 +51,46 @@ impl Number {
         }
     }
 }
+impl crate::storage::numeric::reductions::Scalar for Number {
+    fn as_f64(self) -> f64 {
+        self.parts().0
+    }
+    fn integer(self) -> Option<i128> {
+        match self {
+            Self::Integer(v) => Some(i128::from(v)),
+            _ => None,
+        }
+    }
+    fn difference(self, origin: Self) -> f64 {
+        self.offset(origin)
+    }
+    fn numeric_cmp(self, other: Self) -> Ordering {
+        self.cmp(other)
+    }
+}
+
+#[derive(Clone)]
+struct ValidatedNumbers<I> {
+    values: I,
+    remaining: usize,
+}
+impl<'a, I: Iterator<Item = &'a AttrValue>> Iterator for ValidatedNumbers<I> {
+    type Item = Number;
+    fn next(&mut self) -> Option<Number> {
+        let value = self.values.find_map(Number::from_attr);
+        if value.is_some() {
+            self.remaining -= 1;
+        } else {
+            self.remaining = 0;
+        }
+        value
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+}
+impl<'a, I: Iterator<Item = &'a AttrValue>> ExactSizeIterator for ValidatedNumbers<I> {}
+
 fn compare_int_float(integer: i64, float: f64) -> Ordering {
     if float < i64::MIN as f64 {
         return Ordering::Greater;
@@ -99,22 +139,22 @@ impl Compensated {
     }
 }
 
-struct Input<'a> {
-    values: &'a [AttrValue],
+struct Input<I> {
+    values: I,
     count: usize,
     origin: Number,
     integer_sum: i128,
     floats: Compensated,
     has_float: bool,
 }
-impl<'a> Input<'a> {
-    fn new(values: &'a [AttrValue], operation: &str) -> GraphResult<Self> {
+impl<'a, I: Iterator<Item = &'a AttrValue> + Clone> Input<I> {
+    fn new(values: I, operation: &str) -> GraphResult<Self> {
         let mut origin = None;
         let mut count = 0;
         let mut integer_sum = 0_i128;
         let mut floats = Compensated::default();
         let mut has_float = false;
-        for (index, value) in values.iter().enumerate() {
+        for (index, value) in values.clone().enumerate() {
             if matches!(value, AttrValue::Null) {
                 continue;
             }
@@ -158,8 +198,21 @@ impl<'a> Input<'a> {
             has_float,
         })
     }
-    fn numbers(&self) -> impl Iterator<Item = Number> + '_ {
-        self.values.iter().filter_map(Number::from_attr)
+    fn numbers(&self) -> impl ExactSizeIterator<Item = Number> + Clone + '_ {
+        ValidatedNumbers {
+            values: self.values.clone(),
+            remaining: self.count,
+        }
+    }
+    #[cold]
+    fn exact_divided(&self, divisor: usize) -> f64 {
+        let mut total = crate::storage::numeric::dot_product::Dot::new();
+        for value in self.numbers() {
+            let (hi, lo) = value.parts();
+            total.add(hi, 1.0);
+            total.add(lo, 1.0);
+        }
+        total.total_divided_by(divisor)
     }
     fn total(&self) -> f64 {
         let mut total = self.floats;
@@ -179,23 +232,51 @@ fn checked(value: f64, operation: &str) -> GraphResult<f64> {
 }
 
 pub(super) fn sum(values: &[AttrValue]) -> GraphResult<AttrValue> {
+    sum_iter(values.iter())
+}
+pub(crate) fn sum_iter<'a>(
+    values: impl Iterator<Item = &'a AttrValue> + Clone,
+) -> GraphResult<AttrValue> {
     let input = Input::new(values, "sum")?;
     if !input.has_float {
         let value = i64::try_from(input.integer_sum)
             .map_err(|_| invalid("Integer sum exceeds i64 output range"))?;
         return Ok(AttrValue::Int(value));
     }
-    let value = input.total() as f32;
+    let value = input.total();
+    let value = if value.is_finite() {
+        value
+    } else {
+        input.exact_divided(1)
+    };
     if !value.is_finite() {
-        return Err(invalid("Float sum exceeds finite f32 output range"));
+        return Err(invalid("Float sum exceeds finite f64 output range"));
     }
-    Ok(AttrValue::Float(value))
+    Ok(AttrValue::Float64(value))
 }
 pub(super) fn mean(values: &[AttrValue]) -> GraphResult<f64> {
+    mean_iter(values.iter())
+}
+pub(crate) fn mean_iter<'a>(
+    values: impl Iterator<Item = &'a AttrValue> + Clone,
+) -> GraphResult<f64> {
     let input = Input::new(values, "mean")?;
-    checked(input.total() / input.count as f64, "Mean")
+    let value = input.total() / input.count as f64;
+    checked(
+        if value.is_finite() {
+            value
+        } else {
+            input.exact_divided(input.count)
+        },
+        "Mean",
+    )
 }
 pub(super) fn variance(values: &[AttrValue]) -> GraphResult<f64> {
+    variance_iter(values.iter())
+}
+pub(crate) fn variance_iter<'a>(
+    values: impl Iterator<Item = &'a AttrValue> + Clone,
+) -> GraphResult<f64> {
     let input = Input::new(values, "variance")?;
     if input.count < 2 {
         return Err(invalid(
@@ -216,8 +297,24 @@ pub(super) fn variance(values: &[AttrValue]) -> GraphResult<f64> {
     }
     checked(squared.total() / (input.count - 1) as f64, "Variance")
 }
+pub(super) fn std(values: &[AttrValue]) -> GraphResult<f64> {
+    std_iter(values.iter())
+}
+pub(crate) fn std_iter<'a>(
+    values: impl Iterator<Item = &'a AttrValue> + Clone,
+) -> GraphResult<f64> {
+    let input = Input::new(values, "standard deviation")?;
+    if input.count < 2 {
+        return Err(invalid(
+            "Cannot compute variance with less than 2 non-null values",
+        ));
+    }
+    let value = crate::storage::numeric::reductions::std_iter(input.numbers())
+        .ok_or_else(|| invalid("Cannot compute standard deviation of empty array"))?;
+    checked(value, "Standard deviation")
+}
 pub(super) fn median(values: &[AttrValue]) -> GraphResult<f64> {
-    let input = Input::new(values, "median")?;
+    let input = Input::new(values.iter(), "median")?;
     let mut numbers: Vec<_> = input.numbers().collect();
     numbers.sort_by(|a, b| a.cmp(*b));
     let middle = numbers.len() / 2;

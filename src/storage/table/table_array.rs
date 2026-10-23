@@ -128,39 +128,7 @@ impl TableArray {
             let mut row_data = HashMap::new();
 
             for col_name in first_table.column_order() {
-                let mut total_sum = AttrValue::Int(0);
-                let mut is_float = false;
-                let mut float_sum = 0.0;
-                let mut int_sum: i64 = 0;
-
-                for table in &self.tables {
-                    if let Some(column) = table.columns().get(col_name) {
-                        let column_sum = column.sum()?;
-                        match (&total_sum, &column_sum) {
-                            (_, AttrValue::Float(f)) => {
-                                if !is_float {
-                                    float_sum = int_sum as f64;
-                                    is_float = true;
-                                }
-                                float_sum += *f as f64;
-                            }
-                            (_, AttrValue::Int(i)) => {
-                                if is_float {
-                                    float_sum += *i as f64;
-                                } else {
-                                    int_sum += i;
-                                }
-                            }
-                            _ => {} // Skip non-numeric values
-                        }
-                    }
-                }
-
-                total_sum = if is_float {
-                    AttrValue::Float(float_sum as f32)
-                } else {
-                    AttrValue::Int(int_sum)
-                };
+                let total_sum = self.sum_column(col_name)?;
 
                 row_data.insert(col_name.clone(), vec![total_sum]);
             }
@@ -229,7 +197,7 @@ impl TableArray {
                 // Calculate mean for each numeric column
                 for col_name in first_table.column_order() {
                     if let Some(column) = table.columns().get(col_name) {
-                        let column_mean = AttrValue::Float(column.mean()? as f32);
+                        let column_mean = AttrValue::Float64(column.mean()?);
                         result_columns.get_mut(col_name).unwrap().push(column_mean);
                     }
                 }
@@ -353,7 +321,7 @@ impl TableArray {
                     if let Some(column) = table.columns().get(col_name) {
                         let result_value = match agg_func.as_str() {
                             "sum" => column.sum()?,
-                            "mean" => AttrValue::Float(column.mean()? as f32),
+                            "mean" => AttrValue::Float64(column.mean()?),
                             "count" => AttrValue::Int(column.count() as i64),
                             "min" => column.min()?,
                             "max" => column.max()?,
@@ -876,70 +844,23 @@ impl TableArray {
     /// Sum values in a column across all tables
     /// Returns the total sum of the specified column across all tables
     pub fn sum_column(&self, column: &str) -> GraphResult<AttrValue> {
-        let total_sum = AttrValue::Int(0);
-        let mut is_float = false;
-        let mut float_sum = 0.0;
-        let mut int_sum: i64 = 0;
-
-        for table in &self.tables {
-            if let Some(col_array) = table.columns().get(column) {
-                let table_sum = col_array.sum()?;
-                match (&total_sum, &table_sum) {
-                    (_, AttrValue::Float(f)) => {
-                        if !is_float {
-                            float_sum = int_sum as f64;
-                            is_float = true;
-                        }
-                        float_sum += *f as f64;
-                    }
-                    (_, AttrValue::Int(i)) => {
-                        if is_float {
-                            float_sum += *i as f64;
-                        } else {
-                            int_sum += i;
-                        }
-                    }
-                    _ => {
-                        return Err(crate::errors::GraphError::InvalidInput(format!(
-                            "Cannot sum non-numeric values in column '{}'",
-                            column
-                        )))
-                    }
-                }
-            }
+        let values = self.column_values(column);
+        if values.clone().next().is_none() {
+            return Ok(AttrValue::Int(0));
         }
-
-        if is_float {
-            Ok(AttrValue::Float(float_sum as f32))
-        } else {
-            Ok(AttrValue::Int(int_sum))
-        }
+        crate::storage::array::reductions::sum_iter(values)
     }
 
-    /// Mean of values in a column across all tables
-    /// Returns the average of the specified column across all tables
+    fn column_values<'a>(&'a self, column: &'a str) -> impl Iterator<Item = &'a AttrValue> + Clone {
+        self.tables
+            .iter()
+            .filter_map(move |table| table.columns().get(column))
+            .flat_map(|column| column.data().iter())
+    }
+
+    /// Mean across selected rows, with exact integer accumulation and no flattening copy.
     pub fn mean_column(&self, column: &str) -> GraphResult<f64> {
-        let mut total_sum = 0.0;
-        let mut total_count = 0;
-
-        for table in &self.tables {
-            if let Some(col_array) = table.columns().get(column) {
-                let table_mean = col_array.mean()?;
-                let table_count = col_array.count();
-
-                total_sum += table_mean * table_count as f64;
-                total_count += table_count;
-            }
-        }
-
-        if total_count == 0 {
-            return Err(crate::errors::GraphError::InvalidInput(format!(
-                "No values found in column '{}'",
-                column
-            )));
-        }
-
-        Ok(total_sum / total_count as f64)
+        crate::storage::array::reductions::mean_iter(self.column_values(column))
     }
 
     /// Minimum value in a column across all tables
@@ -1001,49 +922,7 @@ impl TableArray {
     /// Standard deviation of values in a column across all tables
     /// Returns the standard deviation of the specified column across all tables
     pub fn std_column(&self, column: &str) -> GraphResult<f64> {
-        let mean = self.mean_column(column)?;
-        let mut sum_squared_diffs = 0.0;
-        let mut total_count = 0;
-
-        for table in &self.tables {
-            if let Some(col_array) = table.columns().get(column) {
-                for value in col_array.data().iter() {
-                    match value {
-                        AttrValue::Int(i) => {
-                            let diff = *i as f64 - mean;
-                            sum_squared_diffs += diff * diff;
-                            total_count += 1;
-                        }
-                        AttrValue::SmallInt(i) => {
-                            let diff = *i as f64 - mean;
-                            sum_squared_diffs += diff * diff;
-                            total_count += 1;
-                        }
-                        AttrValue::Float(f) => {
-                            let diff = *f as f64 - mean;
-                            sum_squared_diffs += diff * diff;
-                            total_count += 1;
-                        }
-                        AttrValue::Null => {} // Skip null values
-                        _ => {
-                            return Err(crate::errors::GraphError::InvalidInput(format!(
-                            "Cannot compute standard deviation of non-numeric data in column '{}'",
-                            column
-                        )))
-                        }
-                    }
-                }
-            }
-        }
-
-        if total_count <= 1 {
-            return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Cannot compute standard deviation with {} values in column '{}'",
-                total_count, column
-            )));
-        }
-
-        Ok((sum_squared_diffs / (total_count - 1) as f64).sqrt())
+        crate::storage::array::reductions::std_iter(self.column_values(column))
     }
 
     /// Helper method to compare AttrValues for min/max operations

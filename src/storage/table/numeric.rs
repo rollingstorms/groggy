@@ -64,7 +64,7 @@ pub(super) fn aggregate(
     }
     if numeric.is_empty() {
         return Ok(if pivot && operation == "sum" {
-            AttrValue::Float(0.)
+            AttrValue::Float64(0.)
         } else {
             AttrValue::Null
         });

@@ -167,24 +167,16 @@ where
         BaseTable::from_columns(columns)
     }
 
-    // Table AttrValue floats are f32: reject finite overflow rather than create infinity.
+    // Floating aggregation outputs retain the computation's f64 representation.
     fn stored_aggregation(
         values: Vec<f64>,
     ) -> Result<BaseArray<crate::types::AttrValue>, GraphError> {
-        let values = values
-            .into_iter()
-            .map(|value| {
-                let stored = value as f32;
-                if value.is_finite() && !stored.is_finite() {
-                    Err(GraphError::InvalidInput(
-                        "Finite aggregation result exceeds f32 table storage".into(),
-                    ))
-                } else {
-                    Ok(crate::types::AttrValue::Float(stored))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(BaseArray::from_attr_values(values))
+        Ok(BaseArray::from_attr_values(
+            values
+                .into_iter()
+                .map(crate::types::AttrValue::Float64)
+                .collect(),
+        ))
     }
 
     fn key_columns(&self) -> std::collections::HashMap<String, BaseArray<crate::types::AttrValue>> {
@@ -301,6 +293,7 @@ impl ArrayArray<crate::types::AttrValue> {
                         .iter()
                         .filter_map(|value| match value {
                             AttrValue::Float(v) => Some(f64::from(*v)),
+                            AttrValue::Float64(v) => Some(*v),
                             AttrValue::Int(v) => Some(*v as f64),
                             AttrValue::SmallInt(v) => Some(f64::from(*v)),
                             AttrValue::Bool(v) => Some(if *v { 1.0 } else { 0.0 }),

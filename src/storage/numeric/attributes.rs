@@ -1,8 +1,8 @@
-//! Checked attribute statistics: preserve integer hints until the final f32 output.
+//! Checked attribute statistics: preserve integer hints through checked f64 output.
 use super::{
     dot_product::Dot,
     reductions::{self, Scalar},
-    scalar::{compare_inputs, convert, ConversionPolicy, NumericInput},
+    scalar::{compare_inputs, NumericInput},
 };
 use crate::{AttrValue, GraphError, GraphResult};
 use std::cmp::Ordering;
@@ -81,9 +81,9 @@ pub(crate) fn float_output(value: f64) -> GraphResult<AttrValue> {
     if !value.is_finite() {
         return Err(invalid("Attribute statistic exceeds finite working range"));
     }
-    convert::<f32>(NumericInput::Float(value), ConversionPolicy::Round).map(AttrValue::Float)
+    Ok(AttrValue::Float64(value))
 }
-/// Numeric quantile, skipping null/nonnumeric cells; output retains attribute f32 storage.
+/// Numeric quantile, skipping null/nonnumeric cells; output retains f64 precision.
 pub fn quantile(input: &[AttrValue], q: f64, interpolation: &str) -> GraphResult<AttrValue> {
     if !(0.0..=1.0).contains(&q) {
         return Err(invalid("Quantile must be finite and between zero and one"));
@@ -215,12 +215,12 @@ pub fn covariance(x: &[AttrValue], y: &[AttrValue], ddof: i32) -> GraphResult<At
     if x.len() <= ddof as usize {
         return Ok(AttrValue::Null);
     }
-    let denominator = (x.len() - ddof as usize) as f64;
+    let denominator = x.len() - ddof as usize;
     let x = centered(&x);
     let y = centered(&y);
     let mut product = Dot::new();
     for (&x, &y) in x.iter().zip(&y) {
         product.add(x, y);
     }
-    float_output(product.total() / denominator)
+    float_output(product.total_divided_by(denominator))
 }

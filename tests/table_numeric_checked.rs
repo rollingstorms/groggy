@@ -38,7 +38,7 @@ fn aggregate_preserves_integer_sums_compact_values_and_missing_policy() {
     )]);
     assert_eq!(aggregate(&t, "sum"), AttrValue::Int(1));
     assert_eq!(aggregate(&t, "count"), AttrValue::Int(5));
-    assert_eq!(aggregate(&t, "mean"), AttrValue::Float(1. / 3.));
+    assert_eq!(aggregate(&t, "mean"), AttrValue::Float64(1. / 3.));
     let t = table(vec![(
         "x",
         vec![
@@ -49,13 +49,13 @@ fn aggregate_preserves_integer_sums_compact_values_and_missing_policy() {
     )]);
     assert_eq!(aggregate(&t, "min"), AttrValue::Int(1));
     assert_eq!(aggregate(&t, "max"), AttrValue::SmallInt(3));
-    assert_eq!(aggregate(&t, "sum"), AttrValue::Float(6.));
+    assert_eq!(aggregate(&t, "sum"), AttrValue::Float64(6.));
 }
 #[test]
 fn aggregates_reject_integer_float_overflow_and_nonfinite_values() {
     for values in [
         vec![AttrValue::Int(i64::MAX), AttrValue::Int(1)],
-        vec![AttrValue::Float(f32::MAX); 2],
+        vec![AttrValue::Float64(f64::MAX); 2],
         vec![AttrValue::Float(f32::NAN)],
     ] {
         let t = table(vec![("x", values)]);
@@ -108,11 +108,11 @@ fn pivot_keys_match_identity_and_text_facts_do_not_merge() {
     let p = t.pivot_table(&["g".into()], "key", "x", "sum").unwrap();
     assert_eq!(
         p.column("key_a").unwrap().data(),
-        &vec![AttrValue::Float(2.)]
+        &vec![AttrValue::Float64(2.)]
     );
     assert_eq!(
         p.column("key_b").unwrap().data(),
-        &vec![AttrValue::Float(7.)]
+        &vec![AttrValue::Float64(7.)]
     );
     let t = table(vec![
         ("g", vec![AttrValue::Int(1); 2]),
@@ -130,7 +130,7 @@ fn pivot_keys_match_identity_and_text_facts_do_not_merge() {
         .map(|(_, v)| v.data()[0].clone())
         .collect();
     sums.sort();
-    assert_eq!(sums, vec![AttrValue::Float(2.), AttrValue::Float(7.)]);
+    assert_eq!(sums, vec![AttrValue::Float64(2.), AttrValue::Float64(7.)]);
 }
 #[test]
 fn pivot_rejects_ambiguous_output_names_and_empty_invalid_aggregation() {
@@ -156,7 +156,7 @@ fn describe_retains_population_spread_and_small_cancellation() {
     let d = t.describe().unwrap();
     assert_eq!(
         d.column("x").unwrap().data()[2],
-        AttrValue::Float((2f32 / 3.).sqrt())
+        AttrValue::Float64((2f64 / 3.).sqrt())
     );
     let t = table(vec![(
         "x",
@@ -164,9 +164,9 @@ fn describe_retains_population_spread_and_small_cancellation() {
     )]);
     let d = t.describe().unwrap();
     let values = d.column("x").unwrap().data();
-    assert_eq!(values[0], AttrValue::Float(2.));
-    assert_eq!(values[1], AttrValue::Float(-0.5));
-    assert_eq!(values[5], AttrValue::Float(-0.5));
+    assert_eq!(values[0], AttrValue::Float64(2.));
+    assert_eq!(values[1], AttrValue::Float64(-0.5));
+    assert_eq!(values[5], AttrValue::Float64(-0.5));
     let t = table(vec![("x", vec![AttrValue::Float(f32::INFINITY)])]);
     assert!(t.describe().is_err());
 }

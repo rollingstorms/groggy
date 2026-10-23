@@ -23,6 +23,22 @@ impl Dot {
             negative_infinity: false,
         }
     }
+    fn flush_integer(&mut self) {
+        if let Some(integer) = self.integer.take() {
+            let bins = if integer < 0 {
+                &mut self.negative
+            } else {
+                &mut self.positive
+            };
+            let mut magnitude = integer.unsigned_abs();
+            let mut limb = 2148 / 32;
+            while magnitude != 0 {
+                bins[limb] += (magnitude & MASK) << (2148 % 32);
+                magnitude >>= 32;
+                limb += 1;
+            }
+        }
+    }
     pub(crate) fn add(&mut self, a: f64, b: f64) {
         if !a.is_finite() || !b.is_finite() {
             let product = a * b;
@@ -48,20 +64,7 @@ impl Dot {
                     return;
                 }
             }
-            // Preserve every bit when switching from the integer fast path to bins.
-            let bins = if integer < 0 {
-                &mut self.negative
-            } else {
-                &mut self.positive
-            };
-            let mut magnitude = integer.unsigned_abs();
-            let mut limb = 2148 / 32;
-            while magnitude != 0 {
-                bins[limb] += (magnitude & MASK) << (2148 % 32);
-                magnitude >>= 32;
-                limb += 1;
-            }
-            self.integer = None;
+            self.flush_integer();
         }
         let parts = |value: f64| {
             let bits = value.to_bits();
@@ -88,7 +91,28 @@ impl Dot {
             limb += 1;
         }
     }
-    pub(crate) fn total(mut self) -> f64 {
+    pub(crate) fn total(self) -> f64 {
+        self.total_divided_by(1)
+    }
+    /// Divide the exact accumulator by a positive count before rounding once.
+    pub(crate) fn total_divided_by(self, divisor: usize) -> f64 {
+        self.total_scaled_divided_by(divisor, 0)
+    }
+    /// Population moment root without requiring its squared value to fit in f64.
+    pub(crate) fn sqrt_divided_by(self, divisor: usize) -> f64 {
+        let variance = self.clone().total_divided_by(divisor);
+        if variance.is_finite() {
+            return variance.max(0.0).sqrt();
+        }
+        if variance.is_nan() {
+            return f64::NAN;
+        }
+        self.total_scaled_divided_by(divisor, -1024).sqrt() * 2f64.powi(512)
+    }
+    fn total_scaled_divided_by(mut self, divisor: usize, exponent_adjust: i32) -> f64 {
+        if divisor == 0 {
+            return f64::NAN;
+        }
         if self.nan || (self.positive_infinity && self.negative_infinity) {
             return f64::NAN;
         }
@@ -99,7 +123,16 @@ impl Dot {
             return f64::NEG_INFINITY;
         }
         if let Some(integer) = self.integer {
-            return integer as f64;
+            if divisor == 1 && exponent_adjust == 0 {
+                return integer as f64;
+            }
+            if exponent_adjust == 0
+                && integer.unsigned_abs() <= 1_u128 << 53
+                && divisor as u128 <= 1_u128 << 53
+            {
+                return integer as f64 / divisor as f64;
+            }
+            self.flush_integer();
         }
         for bins in [&mut self.positive, &mut self.negative] {
             for i in 0..LIMBS - 1 {
@@ -125,11 +158,20 @@ impl Dot {
             borrow = i64::from(difference < 0);
             magnitude[i] = difference as u32;
         }
+        let mut division_remainder = 0_u128;
+        if divisor != 1 {
+            for limb in magnitude.iter_mut().rev() {
+                let numerator = (division_remainder << 32) | u128::from(*limb);
+                *limb = (numerator / divisor as u128) as u32;
+                division_remainder = numerator % divisor as u128;
+            }
+        }
         let Some(last) = magnitude.iter().rposition(|&v| v != 0) else {
             return 0.0;
         };
         let highest = last * 32 + 31 - magnitude[last].leading_zeros() as usize;
-        let shift = highest.saturating_sub(52).max(1074);
+        let minimum_shift = (1074 - exponent_adjust).max(0) as usize;
+        let shift = highest.saturating_sub(52).max(minimum_shift);
         let bit = |index: usize| (magnitude[index / 32] >> (index % 32)) & 1;
         let mut significand = 0_u64;
         for index in (shift..=highest).rev() {
@@ -139,7 +181,8 @@ impl Dot {
         let discarded = shift - 1;
         let whole = discarded / 32;
         let remainder = discarded % 32;
-        let sticky = magnitude[..whole].iter().any(|&limb| limb != 0)
+        let sticky = division_remainder != 0
+            || magnitude[..whole].iter().any(|&limb| limb != 0)
             || magnitude[whole] & ((1_u32 << remainder) - 1) != 0;
         if halfway && (sticky || significand & 1 != 0) {
             significand += 1;
@@ -148,7 +191,7 @@ impl Dot {
         if significand < 1_u64 << 52 {
             return f64::from_bits(sign | significand);
         }
-        let mut exponent = shift as i32 - 2148 + 52;
+        let mut exponent = shift as i32 - 2148 + 52 + exponent_adjust;
         if significand == 1_u64 << 53 {
             significand >>= 1;
             exponent += 1;
@@ -159,5 +202,34 @@ impl Dot {
         f64::from_bits(
             sign | (((exponent + 1023) as u64) << 52) | (significand & ((1_u64 << 52) - 1)),
         )
+    }
+}
+
+#[cfg(test)]
+mod division_tests {
+    use super::Dot;
+    #[test]
+    fn divide_before_rounding_preserves_representable_means_and_remainder_sticky_bits() {
+        let mut total = Dot::new();
+        total.add(f64::MAX, 1.0);
+        total.add(f64::MAX, 1.0);
+        assert_eq!(total.clone().total(), f64::INFINITY);
+        assert_eq!(total.total_divided_by(2), f64::MAX);
+        let mut integer = Dot::new();
+        integer.add(1.0, 1.0);
+        assert_eq!(integer.total_divided_by(3), 1.0 / 3.0);
+        for sign in [1.0, -1.0] {
+            let tiny = f64::from_bits(1);
+            let mut boundary = Dot::new();
+            boundary.add(sign * tiny, 1.5);
+            boundary.add(sign * tiny, tiny);
+            assert_eq!(
+                boundary.total_divided_by(3).to_bits(),
+                (sign * tiny).to_bits()
+            );
+        }
+        let mut tie = Dot::new();
+        tie.add(-f64::from_bits(1), 1.0);
+        assert_eq!(tie.total_divided_by(2).to_bits(), (-0.0_f64).to_bits());
     }
 }

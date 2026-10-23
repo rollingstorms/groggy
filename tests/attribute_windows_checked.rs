@@ -2,10 +2,10 @@ use groggy::{storage::array::BaseArray, AttrValue};
 fn column(values: Vec<AttrValue>) -> BaseArray<AttrValue> {
     BaseArray::new(values)
 }
-fn floats(values: &[Option<f32>]) -> Vec<AttrValue> {
+fn floats(values: &[Option<f64>]) -> Vec<AttrValue> {
     values
         .iter()
-        .map(|v| v.map_or(AttrValue::Null, AttrValue::Float))
+        .map(|v| v.map_or(AttrValue::Null, AttrValue::Float64))
         .collect()
 }
 #[test]
@@ -18,7 +18,7 @@ fn windows_preserve_high_integer_residuals_and_population_std() {
     ]);
     assert_eq!(
         a.expanding("std").unwrap().data(),
-        &floats(&[Some(0.), Some(0.5), Some((2f32 / 3.).sqrt())])
+        &floats(&[Some(0.), Some(0.5), Some((2f64 / 3.).sqrt())])
     );
     assert_eq!(
         a.rolling(2, "std").unwrap().data(),
@@ -40,11 +40,11 @@ fn cumulative_exact_sum_survives_mixed_cancellation_and_compact_values() {
         AttrValue::Null,
     ]);
     let sum = a.cumsum().unwrap();
-    assert_eq!(sum.data()[0], AttrValue::Float(0.));
+    assert_eq!(sum.data()[0], AttrValue::Float64(0.));
     assert_eq!(&sum.data()[2..], &floats(&[Some(-1.), Some(2.), Some(2.)]));
     let expanding = a.expanding("mean").unwrap();
     assert_eq!(expanding.data()[0], AttrValue::Null);
-    assert_eq!(expanding.data()[2], AttrValue::Float(-0.5));
+    assert_eq!(expanding.data()[2], AttrValue::Float64(-0.5));
     let a = column(vec![
         AttrValue::Null,
         AttrValue::SmallInt(3),
@@ -73,11 +73,11 @@ fn windows_validate_empty_domains_and_narrowed_overflow() {
     let invalid = column(vec![AttrValue::Float(f32::NAN)]);
     assert!(invalid.rolling(2, "sum").is_err());
     assert!(invalid.cumsum().is_err());
-    let huge = column(vec![AttrValue::Float(f32::MAX); 2]);
+    let huge = column(vec![AttrValue::Float64(f64::MAX); 2]);
     assert!(huge.cumsum().is_err());
     assert_eq!(
         huge.expanding("mean").unwrap().data(),
-        &vec![AttrValue::Float(f32::MAX); 2]
+        &vec![AttrValue::Float64(f64::MAX); 2]
     );
 }
 #[test]
@@ -106,7 +106,7 @@ fn shifts_outside_length_and_minimum_period_are_total() {
 #[test]
 fn fractional_changes_preserve_small_integer_differences_and_missing_policy() {
     let a = column(vec![AttrValue::Int(i64::MAX - 1), AttrValue::Int(i64::MAX)]);
-    let expected = (1. / (i64::MAX - 1) as f64) as f32;
+    let expected = 1. / (i64::MAX - 1) as f64;
     assert_eq!(
         a.pct_change(None).unwrap().data(),
         &floats(&[None, Some(expected)])

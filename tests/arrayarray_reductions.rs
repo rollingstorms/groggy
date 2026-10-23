@@ -50,7 +50,7 @@ fn table_aggregations_preserve_key_identity_and_check_narrowing_and_collisions()
     let t = a.to_table_with_aggregation("std", vec![value]).unwrap();
     assert_eq!(
         t.get_column("std").unwrap().get(0),
-        Some(&AttrValue::Float(value as f32))
+        Some(&AttrValue::Float64(value))
     );
     assert_eq!(
         t.get_column("kind").unwrap().get(0),
@@ -64,7 +64,7 @@ fn table_aggregations_preserve_key_identity_and_check_narrowing_and_collisions()
         .unwrap();
     assert_eq!(
         t.get_column("deviation").unwrap().get(0),
-        Some(&AttrValue::Float(value as f32))
+        Some(&AttrValue::Float64(value))
     );
     assert!(a.to_table_with_aggregation("kind", vec![1.]).is_err());
     assert!(a.to_table_with_aggregation("x", vec![]).is_err());
@@ -73,13 +73,20 @@ fn table_aggregations_preserve_key_identity_and_check_narrowing_and_collisions()
         .aggregate(&[("x".into(), "sum".into()), ("x".into(), "max".into())])
         .is_err());
     assert!(a.aggregate(&[("x".into(), "unknown".into())]).is_err());
-    assert!(a.to_table_with_aggregation("huge", vec![f64::MAX]).is_err());
+    assert_eq!(
+        a.to_table_with_aggregation("huge", vec![f64::MAX])
+            .unwrap()
+            .get_column("huge")
+            .unwrap()
+            .get(0),
+        Some(&AttrValue::Float64(f64::MAX))
+    );
     let stored = a
         .to_table_with_aggregation("ieee", vec![f64::INFINITY])
         .unwrap();
     assert_eq!(
         stored.get_column("ieee").unwrap().get(0),
-        Some(&AttrValue::Float(f32::INFINITY))
+        Some(&AttrValue::Float64(f64::INFINITY))
     );
 }
 
@@ -120,7 +127,7 @@ fn grouped_integer_reductions_keep_high_offset_differences_and_cancellation() {
         .unwrap();
     assert_eq!(
         result.get_column("deviation").unwrap().get(1),
-        Some(&AttrValue::Float(1.))
+        Some(&AttrValue::Float64(1.))
     );
     assert!(result.get_column("kind").is_some());
     assert!(ArrayArray::new(Vec::<BaseArray<AttrValue>>::new())

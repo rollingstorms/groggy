@@ -51,9 +51,10 @@ f64. Algorithm parameters preserve their f64 values when converted to properties
 
 ## Remaining default-migration gate
 
-Before changing ordinary Python float defaults, migrate the remaining array/table
-predicate and arithmetic paths, output casts, legacy weight accessors and algorithm
-persistence, display/type inference, text/CSV conversion and vector consumers.
+Array/table numeric predicates and checked numerical outputs are now migrated.
+Before changing ordinary Python float defaults, finish legacy weight accessors
+and algorithm persistence, profiling/display/type inference, text/CSV conversion
+and vector consumers.
 Verify dtype, mixed precision, old-format reads, schema, history, full numerical
 and Python compatibility at the final switch. The parent 07.3a remains open.
 

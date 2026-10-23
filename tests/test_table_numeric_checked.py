@@ -2,7 +2,7 @@
 import math
 
 import pytest
-from groggy import BaseTable
+from groggy import AttrValue, BaseTable
 
 
 def column(table, name="x"):
@@ -15,7 +15,7 @@ def test_aggregate_cancellation_compact_values_and_checked_output():
     assert column(table.aggregate({"x": "sum"})) == [1]
     assert column(table.aggregate({"x": "count"})) == [5]
     assert column(table.aggregate({"x": "mean"})) == pytest.approx([1 / 3], rel=1e-7)
-    for values in ([maximum, 1], [3e38, 3e38], [math.nan]):
+    for values in ([maximum, 1], [AttrValue.float64(1e308), AttrValue.float64(1e308)], [math.nan]):
         with pytest.raises((ValueError, RuntimeError)):
             BaseTable.from_dict({"x": values}).aggregate({"x": "sum"})
 

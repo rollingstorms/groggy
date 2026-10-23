@@ -33,15 +33,15 @@ fn sums_preserve_integer_cancellation_and_validate_final_output_range() {
                 V::Float(-(2.0_f32).powi(63)),
                 V::SmallInt(2),
             ],
-            V::Float(1.0),
+            V::Float64(1.0),
         ),
         (
             vec![V::Float(1e20), V::Float(1.0), V::Float(-1e20)],
-            V::Float(1.0),
+            V::Float64(1.0),
         ),
         (
             vec![V::Int(i64::MAX), V::SmallInt(1), V::Float(0.0)],
-            V::Float((2.0_f32).powi(63)),
+            V::Float64((2.0_f64).powi(63)),
         ),
     ] {
         for values in permutations(&values) {
@@ -55,7 +55,7 @@ fn sums_preserve_integer_cancellation_and_validate_final_output_range() {
     for values in [
         vec![V::Int(i64::MAX), V::Int(1)],
         vec![V::Int(i64::MIN), V::Int(-1)],
-        vec![V::Float(f32::MAX); 2],
+        vec![V::Float64(f64::MAX); 2],
     ] {
         assert!(BaseArray::new(values.clone()).sum().is_err());
         assert!(LegacyArray::new(values, AttrValueType::Int).sum().is_err());
@@ -111,7 +111,7 @@ fn medians_keep_exact_integer_order_and_even_pair_cancellation() {
     assert_eq!(array.mean().unwrap(), 0.0);
     let expected = 2.0 * f64::from(f32::MAX).powi(2);
     assert_eq!(array.var().unwrap(), expected);
-    assert_eq!(array.std().unwrap(), expected.sqrt());
+    assert!((array.std().unwrap() / expected.sqrt() - 1.).abs() < 1e-15);
     let values = vec![V::Int(5), V::Null, V::SmallInt(1), V::Float(2.0)];
     let array = BaseArray::new(values.clone());
     assert_eq!(array.median().unwrap(), 2.0);

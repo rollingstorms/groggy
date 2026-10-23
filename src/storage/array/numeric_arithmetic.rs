@@ -152,7 +152,7 @@ impl<T: NumericType> NumArray<T> {
         }
         self.iter().fold(0.0_f64, |norm, v| norm.hypot(v.to_f64()))
     }
-    /// Legacy attribute materialization with checked finite f32/int narrowing.
+    /// Attribute materialization preserves explicit floating widths and checked integers.
     pub fn to_attributes(&self) -> GraphResult<Vec<crate::types::AttrValue>> {
         self.to_attributes_with_policy(ConversionPolicy::Round)
     }
@@ -172,7 +172,10 @@ impl<T: NumericType> NumArray<T> {
                 NumericInput::Integer(v) => i64::try_from(v)
                     .map(AttrValue::Int)
                     .map_err(|_| invalid("Integer attribute range exceeded")),
-                NumericInput::Float(_) => convert::<f32>(v, policy).map(AttrValue::Float),
+                NumericInput::Float(_) if T::DTYPE == DType::Float32 => {
+                    convert::<f32>(v, policy).map(AttrValue::Float)
+                }
+                NumericInput::Float(_) => convert::<f64>(v, policy).map(AttrValue::Float64),
             })
             .collect()
     }

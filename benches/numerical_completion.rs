@@ -323,7 +323,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 || {
                     let output = input.expanding(operation)?;
                     let value = match output.data().last() {
-                        Some(AttrValue::Float(v)) => f64::from(*v),
+                        Some(AttrValue::Float64(v)) => *v,
                         _ => {
                             return Err(groggy::GraphError::InvalidInput(
                                 "Missing expanding statistic".into(),
@@ -351,8 +351,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             || {
                 let output = input.describe()?;
                 match output.column("values").and_then(|column| column.get(2)) {
-                    Some(AttrValue::Float(value)) if *value > 2. && *value < 3. => {
-                        Ok(f64::from(*value))
+                    Some(AttrValue::Float64(value)) if *value > 2. && *value < 3. => {
+                        Ok(*value)
                     }
                     _ => Err(groggy::GraphError::InvalidInput(
                         "Invalid high-offset describe spread".into(),

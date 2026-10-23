@@ -964,3 +964,13 @@ comparison owner, shared with graph numeric ordering. Fix epsilon/narrowing,
 operator-prefix and parity faults; preserve typed graph equality and storage
 identity. See `float64-numeric-predicates-2026-10-23.md`. Remaining arithmetic/
 outputs, broader expression planning and the Python default switch remain open.
+
+
+## 07.3a.2b — f64 numerical results and range (2026-10-23)
+
+Checked numerical property outputs retain f64; explicit NumArray f32 stays typed.
+Stream cross-table reducers, preserve cross-chunk integer cancellation, divide
+exact accumulations before final rounding and rescale wide moment roots. Preserve
+finite/error and empty policies; use f64 tolerances for approximate statistics.
+See `float64-numerical-outputs-2026-10-23.md`. Remaining consumers and ordinary
+Python default inference stay open.

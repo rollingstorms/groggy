@@ -1,9 +1,9 @@
-"""Attribute statistics retain integer residuals until final f32 storage."""
+"""Attribute statistics retain integer residuals through final f64 storage."""
 import math
 from fractions import Fraction
 
 import pytest
-from groggy import BaseArray
+from groggy import AttrValue, BaseArray
 
 
 def test_large_and_mixed_integer_pair_statistics():
@@ -14,7 +14,7 @@ def test_large_and_mixed_integer_pair_statistics():
         left = BaseArray(values)
         assert left.cov(right) == 1.0
         for method in ("pearson", "spearman", "kendall"):
-            assert left.corr(right, method) == 1.0
+            assert left.corr(right, method) == pytest.approx(1.0, abs=1e-14)
 
 
 def test_quantile_cancellation_and_empty_validation():
@@ -32,11 +32,11 @@ def test_quantile_cancellation_and_empty_validation():
 def test_paired_missing_and_invalid_domains():
     left, right = BaseArray([1, None, 3]), BaseArray([2, 99, 6])
     assert left.cov(right) == 4.0
-    assert left.corr(right) == 1.0
+    assert left.corr(right) == pytest.approx(1.0, abs=1e-14)
     for action in (lambda: left.cov(right, -1),
                    lambda: left.corr(BaseArray([1])),
                    lambda: BaseArray([math.nan, 1]).corr(BaseArray([1, 2]), "spearman"),
-                   lambda: BaseArray([3e38, -3e38]).cov(BaseArray([3e38, -3e38]))):
+                   lambda: BaseArray([AttrValue.float64(1e300), AttrValue.float64(-1e300)]).cov(BaseArray([AttrValue.float64(1e300), AttrValue.float64(-1e300)]))):
         with pytest.raises((ValueError, RuntimeError)):
             action()
 

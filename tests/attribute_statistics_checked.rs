@@ -5,6 +5,7 @@ fn column(values: Vec<AttrValue>) -> BaseArray<AttrValue> {
 fn f(value: AttrValue) -> f64 {
     match value {
         AttrValue::Float(v) => f64::from(v),
+        AttrValue::Float64(v) => v,
         v => panic!("Expected float, got {v:?}"),
     }
 }
@@ -22,7 +23,7 @@ fn high_integer_and_mixed_correlations_and_covariance_keep_small_differences() {
         AttrValue::SmallInt(3),
     ]);
     for method in ["pearson", "spearman", "kendall"] {
-        assert_eq!(f(a.corr(&b, method).unwrap()), 1.);
+        assert!((f(a.corr(&b, method).unwrap()) - 1.).abs() < 1e-14);
     }
     assert_eq!(f(a.cov(&b, 1).unwrap()), 1.);
     let mixed = column(vec![
@@ -31,7 +32,7 @@ fn high_integer_and_mixed_correlations_and_covariance_keep_small_differences() {
         AttrValue::Float(2f32.powi(63)),
     ]);
     assert_eq!(f(mixed.cov(&b, 1).unwrap()), 1.);
-    assert_eq!(f(mixed.corr(&b, "pearson").unwrap()), 1.);
+    assert!((f(mixed.corr(&b, "pearson").unwrap()) - 1.).abs() < 1e-14);
 }
 #[test]
 fn quantile_midpoints_preserve_integer_residuals_and_validate_before_empty_return() {
@@ -67,7 +68,7 @@ fn paired_missing_values_shape_and_nonfinite_domains_are_explicit() {
         AttrValue::SmallInt(6),
     ]);
     assert_eq!(f(x.cov(&y, 1).unwrap()), 4.);
-    assert_eq!(f(x.corr(&y, "pearson").unwrap()), 1.);
+    assert!((f(x.corr(&y, "pearson").unwrap()) - 1.).abs() < 1e-14);
     assert!(x.corr(&column(vec![]), "pearson").is_err());
     assert!(x.cov(&y, -1).is_err());
     for value in [f32::NAN, f32::INFINITY] {
@@ -76,8 +77,8 @@ fn paired_missing_values_shape_and_nonfinite_domains_are_explicit() {
         assert!(a.quantile(0.5, "linear").is_err());
     }
     let huge = column(vec![
-        AttrValue::Float(f32::MAX),
-        AttrValue::Float(-f32::MAX),
+        AttrValue::Float64(f64::MAX),
+        AttrValue::Float64(-f64::MAX),
     ]);
     assert!(huge.cov(&huge, 1).is_err());
     let constant = column(vec![AttrValue::Int(2); 3]);

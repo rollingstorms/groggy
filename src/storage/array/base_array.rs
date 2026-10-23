@@ -642,7 +642,7 @@ impl BaseArray<AttrValue> {
 
     /// Sample standard deviation; require at least two finite non-null numbers.
     pub fn std(&self) -> GraphResult<f64> {
-        Ok(self.var()?.sqrt())
+        super::reductions::std(self.inner.as_slice())
     }
 
     /// Compensated sample variance, retaining small differences near i64 boundaries.

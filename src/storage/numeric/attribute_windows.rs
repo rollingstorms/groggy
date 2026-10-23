@@ -29,6 +29,7 @@ struct Running {
     origin: Option<Value>,
     mean_offset: f64,
     moment: f64,
+    wide_moment: Option<Box<Dot>>,
     min: Option<Value>,
     max: Option<Value>,
 }
@@ -40,6 +41,7 @@ impl Running {
             origin: None,
             mean_offset: 0.,
             moment: 0.,
+            wide_moment: None,
             min: None,
             max: None,
         }
@@ -56,7 +58,21 @@ impl Running {
         self.count += 1;
         let delta = offset - self.mean_offset;
         self.mean_offset += delta / self.count as f64;
-        self.moment += delta * (offset - self.mean_offset);
+        let residual = offset - self.mean_offset;
+        if let Some(moment) = self.wide_moment.as_mut() {
+            moment.add(delta, residual);
+        } else {
+            let product = delta * residual;
+            let next = self.moment + product;
+            if next.is_finite() {
+                self.moment = next;
+            } else {
+                let mut moment = Box::new(Dot::new());
+                moment.add(self.moment, 1.0);
+                moment.add(delta, residual);
+                self.wide_moment = Some(moment);
+            }
+        }
         if self
             .min
             .is_none_or(|v| value.numeric_cmp(v) == Ordering::Less)
@@ -74,23 +90,41 @@ impl Running {
     fn output(&self, operation: &str, empty_sum: bool) -> GraphResult<AttrValue> {
         if self.count == 0 {
             return Ok(if empty_sum && operation == "sum" {
-                AttrValue::Float(0.)
+                AttrValue::Float64(0.)
             } else {
                 AttrValue::Null
             });
         }
         let value = match operation {
             "sum" => self.sum.clone().total(),
-            "mean" => self.sum.clone().total() / self.count as f64,
+            "mean" => {
+                let total = self.sum.clone().total();
+                if total.is_finite() {
+                    total / self.count as f64
+                } else {
+                    self.sum.clone().total_divided_by(self.count)
+                }
+            }
             "min" => self.min.map_or(0., Scalar::as_f64),
             "max" => self.max.map_or(0., Scalar::as_f64),
-            _ => (self.moment.max(0.) / self.count as f64).sqrt(),
+            _ => {
+                if let Some(moment) = &self.wide_moment {
+                    (**moment).clone().sqrt_divided_by(self.count)
+                } else {
+                    if !self.moment.is_finite() {
+                        return Err(invalid(
+                            "Attribute window variance exceeds finite working range",
+                        ));
+                    }
+                    (self.moment.max(0.0) / self.count as f64).sqrt()
+                }
+            }
         };
         float_output(value)
     }
 }
 /// Full row-count windows; missing/nonnumeric cells do not count toward the statistic.
-/// Output is f32; standard deviation uses the population denominator.
+/// Output is f64; standard deviation uses the population denominator.
 pub fn rolling(input: &[AttrValue], window: usize, operation: &str) -> GraphResult<Vec<AttrValue>> {
     validate(operation)?;
     if window == 0 {

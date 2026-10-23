@@ -299,6 +299,44 @@ fn read_state(c: &mut Criterion) {
                 })
             },
         );
+        let numeric_column = groggy::storage::array::BaseArray::new(predicate_values.clone());
+        let numeric_tables = groggy::storage::table::TableArray::from_tables(
+            predicate_values
+                .chunks(count / 10)
+                .map(|values| {
+                    groggy::storage::table::BaseTable::from_columns(
+                        std::collections::HashMap::from([(
+                            "x".into(),
+                            groggy::storage::array::BaseArray::new(values.to_vec()),
+                        )]),
+                    )
+                    .unwrap()
+                })
+                .collect(),
+        );
+        let expected_mean = 1.0 + (count - 1) as f64 * 2f64.powi(-41);
+        assert!((numeric_column.mean().unwrap() - expected_mean).abs() < 1e-14);
+        assert!((numeric_tables.mean_column("x").unwrap() - expected_mean).abs() < 1e-14);
+        group.bench_with_input(
+            BenchmarkId::new("attribute_f64_mean", count),
+            &numeric_column,
+            |b, column| b.iter(|| black_box(column.mean().unwrap())),
+        );
+        group.bench_with_input(
+            BenchmarkId::new("attribute_f64_sum", count),
+            &numeric_column,
+            |b, column| b.iter(|| black_box(column.sum().unwrap())),
+        );
+        group.bench_with_input(
+            BenchmarkId::new("tables_f64_mean", count),
+            &numeric_tables,
+            |b, tables| b.iter(|| black_box(tables.mean_column("x").unwrap())),
+        );
+        group.bench_with_input(
+            BenchmarkId::new("tables_f64_sum", count),
+            &numeric_tables,
+            |b, tables| b.iter(|| black_box(tables.sum_column("x").unwrap())),
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();
