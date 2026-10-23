@@ -475,3 +475,14 @@ core Clippy passes. Rebuilt Python core/subgraph/read/history/property/algorithm
 gate: 255 passed, five existing skips. All five read-view examples execute.
 `frozen-query-contract-2026-10-22.md` records boundaries and measured costs.
 Broader query-language/index and algorithm migration remain open.
+
+### AR7.5f — Immutable algorithm input and shared BFS/DFS kernels
+
+AlgorithmRead shares captured selection, stable node-row identity and CSR without
+a working owner. GraphView/native/Python integer-row traversal survives owner
+mutation/drop and accepts recorded historical pins. Legacy pipeline wrappers
+share the kernels while retaining current marker/telemetry/writeback ownership.
+Full native suites, strict all-target core Clippy and 276 rebuilt Python tests
+pass (five existing skips). Six documented examples execute. Exhaustive small
+topology, cancellation, thread transfer and long-path evidence is recorded in
+`frozen-traversal-contract-2026-10-22.md`; broader algorithm migration remains open.

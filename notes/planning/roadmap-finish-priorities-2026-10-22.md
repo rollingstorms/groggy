@@ -10,12 +10,13 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 Implemented: AR7.2 matrix consolidation, AR7.3 canonical arrays/shared numeric
 foundations, 29.60–29.63 finite numerical fixes/receipts, AR7.4 entity ownership,
-and AR7.5a–e shared read state, explicit immutable selections, frozen matrix/table
-exports and shared scoped query predicates. Evidence is
+and AR7.5a–f shared read state, explicit immutable selections, frozen matrix/table
+exports, scoped query predicates and prepared BFS/DFS reads. Evidence is
 linked from the flat checklist. Supported-scope implementation is distinct from
 remaining broad capability and production gates (including A13/A15).
 
-Next: migrate algorithm read consumers onto shared immutable state/membership,
+Next: migrate the remaining weighted-path, component and centrality readers
+onto the prepared immutable algorithm input,
 retaining a separate working mutation owner. Source-preserving table adapters
 remain separate from the completed owned table projections. Ordinary legacy
 Subgraph/table reads are not yet certified frozen. Stages 3–6 retain their existing

@@ -22,11 +22,13 @@ pub mod community;
 pub mod execution;
 pub mod pathfinding;
 pub mod pipeline;
+pub mod read;
 pub mod registry;
 pub mod steps;
 pub mod temporal;
 
 pub use pipeline::{AlgorithmSpec, Pipeline, PipelineBuilder, PipelineSpec};
+pub use read::AlgorithmRead;
 pub use registry::{global_registry, AlgorithmFactory, Registry};
 pub use steps::{
     ensure_core_steps_registered, global_step_registry, register_core_steps, Step, StepMetadata,

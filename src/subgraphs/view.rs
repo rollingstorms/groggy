@@ -302,6 +302,18 @@ impl GraphView {
         )?;
         self.select_edges(&ids)
     }
+    /// Prepare reusable immutable CSR/row identity for native algorithms.
+    pub fn algorithm_input(&self) -> GraphResult<crate::algorithms::AlgorithmRead> {
+        crate::algorithms::AlgorithmRead::new(self.clone())
+    }
+    /// Reachable hop distances as owned (node ID, distance) rows in ascending ID order.
+    pub fn bfs_distances(&self, start: NodeId) -> GraphResult<Vec<(NodeId, i64)>> {
+        self.algorithm_input()?.bfs_distances(start, None)
+    }
+    /// Ascending-neighbor depth-first preorder as owned (node ID, order) rows.
+    pub fn dfs_order(&self, start: NodeId) -> GraphResult<Vec<(NodeId, i64)>> {
+        self.algorithm_input()?.dfs_order(start, None)
+    }
     /// Owned adjacency from captured edge instances and captured weights.
     /// Missing weights are one; explicit values follow the shared graph conversion policy.
     pub fn adjacency_matrix<

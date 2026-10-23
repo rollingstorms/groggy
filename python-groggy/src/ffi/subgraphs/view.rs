@@ -137,6 +137,16 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Frozen hop distances as (node ID, distance) rows; writes no properties.
+    fn bfs_distances(&self, py: Python, start: NodeId) -> PyResult<Vec<(NodeId, i64)>> {
+        py.allow_threads(|| self.inner.bfs_distances(start))
+            .map_err(graph_error_to_py_err)
+    }
+    /// Frozen ascending-neighbor DFS preorder as (node ID, order) rows.
+    fn dfs_order(&self, py: Python, start: NodeId) -> PyResult<Vec<(NodeId, i64)>> {
+        py.allow_threads(|| self.inner.dfs_order(start))
+            .map_err(graph_error_to_py_err)
+    }
     /// Owned adjacency operator from this selection's captured weights/topology.
     #[pyo3(signature = (sparse=true, weight_attr=None))]
     fn adjacency_matrix(

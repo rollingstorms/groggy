@@ -37,21 +37,27 @@ impl TraversalKind {
     }
 }
 
-fn bfs_distances(
-    ctx: &Context,
+pub(crate) fn bfs_distances(
+    is_cancelled: impl Fn() -> bool,
     csr: &Csr,
     nodes: &[NodeId],
     source: usize,
 ) -> Result<Vec<(NodeId, i64)>> {
+    if is_cancelled() {
+        return Err(anyhow!("bfs cancelled"));
+    }
     let mut distances = vec![None; nodes.len()];
     let mut queue = VecDeque::new();
     distances[source] = Some(0usize);
     queue.push_back((source, 0usize));
     while let Some((u, depth)) = queue.pop_front() {
-        if ctx.is_cancelled() {
+        if is_cancelled() {
             return Err(anyhow!("bfs cancelled"));
         }
         for &v in csr.neighbors(u) {
+            if is_cancelled() {
+                return Err(anyhow!("bfs cancelled"));
+            }
             if distances[v].is_none() {
                 let next = depth
                     .checked_add(1)
@@ -61,24 +67,37 @@ fn bfs_distances(
             }
         }
     }
-    nodes
+    if is_cancelled() {
+        return Err(anyhow!("bfs cancelled"));
+    }
+    let rows = nodes
         .iter()
         .copied()
         .zip(distances)
         .filter_map(|(node, distance)| distance.map(|d| (node, d)))
         .map(|(node, distance)| Ok((node, i64::try_from(distance)?)))
-        .collect()
+        .collect::<Result<_>>()?;
+    if is_cancelled() {
+        return Err(anyhow!("bfs cancelled"));
+    }
+    Ok(rows)
 }
 
-fn dfs_order(
-    ctx: &Context,
+pub(crate) fn dfs_order(
+    is_cancelled: impl Fn() -> bool,
     csr: &Csr,
     nodes: &[NodeId],
     source: usize,
 ) -> Result<Vec<(NodeId, i64)>> {
+    if is_cancelled() {
+        return Err(anyhow!("dfs cancelled"));
+    }
     // Sort only a private copy. Shared CSR ordering may come from another caller.
     let mut sorted = csr.clone();
     for u in 0..sorted.node_count() {
+        if is_cancelled() {
+            return Err(anyhow!("dfs cancelled"));
+        }
         sorted.neighbors[sorted.offsets[u]..sorted.offsets[u + 1]].sort_unstable();
     }
     let mut visited = vec![false; nodes.len()];
@@ -87,7 +106,7 @@ fn dfs_order(
     // Explicit recursive-DFS frames: at most one frame per visited node.
     let mut stack = vec![(source, 0usize)];
     while let Some((u, next)) = stack.last_mut() {
-        if ctx.is_cancelled() {
+        if is_cancelled() {
             return Err(anyhow!("dfs cancelled"));
         }
         let row = sorted.neighbors(*u);
@@ -102,6 +121,9 @@ fn dfs_order(
             order.push((nodes[v], i64::try_from(order.len())?));
             stack.push((v, 0));
         }
+    }
+    if is_cancelled() {
+        return Err(anyhow!("dfs cancelled"));
     }
     Ok(order)
 }
@@ -173,8 +195,8 @@ fn execute_traversal(
     };
     let compute_start = Instant::now();
     let rows = match kind {
-        TraversalKind::Bfs => bfs_distances(ctx, &csr, &nodes, source)?,
-        TraversalKind::Dfs => dfs_order(ctx, &csr, &nodes, source)?,
+        TraversalKind::Bfs => bfs_distances(|| ctx.is_cancelled(), &csr, &nodes, source)?,
+        TraversalKind::Dfs => dfs_order(|| ctx.is_cancelled(), &csr, &nodes, source)?,
     };
     ctx.record_call(format!("{prefix}.compute"), compute_start.elapsed());
     ctx.record_stat(format!("{prefix}.count.reached_nodes"), rows.len() as f64);
@@ -351,4 +373,36 @@ pub fn register(registry: &Registry) -> Result<()> {
                 as Box<dyn Algorithm>,
         )
     })
+}
+
+#[cfg(test)]
+mod read_cancellation_tests {
+    use super::*;
+    use std::cell::Cell;
+    #[test]
+    fn bfs_and_dfs_poll_during_work_and_reject_partial_rows() {
+        let csr = Csr {
+            offsets: vec![0, 3, 4, 5, 5],
+            neighbors: vec![1, 2, 3, 2, 3],
+        };
+        let nodes = [0, 1, 2, 3];
+        let polls = Cell::new(0);
+        let cancelled = || {
+            polls.set(polls.get() + 1);
+            polls.get() > 4
+        };
+        assert!(bfs_distances(cancelled, &csr, &nodes, 0)
+            .unwrap_err()
+            .to_string()
+            .contains("cancelled"));
+        polls.set(0);
+        let cancelled = || {
+            polls.set(polls.get() + 1);
+            polls.get() > 8
+        };
+        assert!(dfs_order(cancelled, &csr, &nodes, 0)
+            .unwrap_err()
+            .to_string()
+            .contains("cancelled"));
+    }
 }

@@ -1,5 +1,5 @@
 mod astar;
-mod bfs_dfs;
+pub(crate) mod bfs_dfs;
 mod dijkstra;
 pub mod utils;
 

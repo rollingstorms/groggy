@@ -65,6 +65,38 @@ fn read_state(c: &mut Criterion) {
                 b.iter(|| black_box(view.table().unwrap()));
             },
         );
+        group.bench_with_input(
+            BenchmarkId::new("algorithm_prepare", count),
+            &view,
+            |b, view| {
+                b.iter(|| black_box(view.algorithm_input().unwrap()));
+            },
+        );
+        let algorithm_input = view.algorithm_input().unwrap();
+        group.bench_with_input(
+            BenchmarkId::new("algorithm_clone", count),
+            &algorithm_input,
+            |b, input| {
+                b.iter(|| black_box(input.clone()));
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("prepared_bfs", count),
+            &algorithm_input,
+            |b, input| {
+                b.iter(|| black_box(input.bfs_distances(nodes[0], None).unwrap()));
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("prepared_dfs", count),
+            &algorithm_input,
+            |b, input| {
+                b.iter(|| black_box(input.dfs_order(nodes[0], None).unwrap()));
+            },
+        );
+        group.bench_with_input(BenchmarkId::new("frozen_bfs", count), &view, |b, view| {
+            b.iter(|| black_box(view.bfs_distances(nodes[0]).unwrap()));
+        });
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

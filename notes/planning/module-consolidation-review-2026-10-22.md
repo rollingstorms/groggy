@@ -112,3 +112,13 @@ selection construction to Rust, fixing whole-parent leakage. Scalar ranges use
 the canonical exact comparison helper. This does not consolidate the separate
 array expression language, algorithm pipeline IR or pending query-language scope.
 See `frozen-query-contract-2026-10-22.md`.
+
+## AR7.5f immutable algorithm input
+
+AlgorithmRead holds captured selection plus shared ordered node IDs/index and CSR,
+without a working graph owner. Frozen traversal and legacy pipeline BFS/DFS share
+one integer-row kernel implementation; marker/result writeback adapters remain
+separate. Native input clones share preparation; Python convenience methods
+prepare per call and release the GIL. Remaining weighted/centrality/component and
+pipeline readers still need migration. See
+`frozen-traversal-contract-2026-10-22.md`.

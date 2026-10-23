@@ -66,7 +66,8 @@ instances in stable edge order.
 `copy()` shares the captured state and membership. Views support concurrent
 readers; the working graph retains its existing writer model. GraphView currently
 provides property, membership, topology, filtering and owned matrix/table exports.
-Algorithm adapters remain the next migration step; this API does not promise inherited algorithm methods
+BFS/DFS integer-row reads are supported; broader algorithm adapters remain under
+migration. This API does not promise inherited algorithm methods
 or reconstruction at arbitrary mutation timestamps.
 
 
@@ -168,3 +169,35 @@ language, certify placeholder endpoint-attribute conveniences, or implement
 inherited graph algorithms on GraphView. Unknown attributes follow the native
 predicate rules here; the legacy Graph Python facade retains its existing
 attribute-name validation.
+
+
+## Traverse frozen topology
+
+`bfs_distances(start)` returns reachable `(node_id, hop_distance)` rows in ascending
+node-ID order. `dfs_order(start)` returns reachable `(node_id, preorder_index)`
+rows in discovery order, visiting neighbors in ascending node-ID order. Both use
+exact integers, count a parallel connection as one discovery, and stay within
+selected edges. Directed traversal follows outgoing edges; undirected traversal
+uses both orientations. An unknown or unselected start raises an error. An
+isolated selected start returns one row with zero.
+
+```python
+assert view.bfs_distances(a) == [(a, 0), (b, 1)]
+assert view.dfs_order(a) == [(a, 0), (b, 1)]
+assert view.select_nodes([a]).bfs_distances(a) == [(a, 0)]
+```
+
+These are owned integer rows, not traversal-tree graph selections. They write no
+attributes, refresh no state and create no history. Python releases the GIL for
+preparation and traversal. Native callers can prepare `view.algorithm_input()`
+once, reuse its sorted node identities/CSR through `AlgorithmRead`, and pass an
+optional atomic cancellation flag to its traversal methods. Clones share the
+captured view and prepared topology. The Python convenience methods prepare an
+input for each call; they do not introduce a hidden graph-sensitive cache.
+
+The current-state pipeline BFS/DFS wrappers share these kernels but retain their
+existing marker, telemetry and explicit persistence behavior. This slice does not
+freeze the whole pipeline, implement checked view writeback, or expose depth/
+node limits through these two integer-row methods. Those remain distinct from the
+existing graph traversal-selection API. Recorded historical read states can also
+prepare this input; arbitrary effective-time reconstruction remains separate.
