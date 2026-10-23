@@ -49,6 +49,33 @@ pub fn from_scalar<T: NumericType>(value: T) -> NumericInput {
 pub fn inputs<T: NumericType>(values: &[T]) -> Vec<NumericInput> {
     values.iter().copied().map(from_scalar).collect()
 }
+/// Numeric property value without narrowing; Boolean properties are a separate domain.
+pub fn attribute_number(value: &crate::AttrValue) -> Option<NumericInput> {
+    use crate::AttrValue;
+    match value {
+        AttrValue::SmallInt(v) => Some(NumericInput::Integer(i128::from(*v))),
+        AttrValue::Int(v) => Some(NumericInput::Integer(i128::from(*v))),
+        AttrValue::Float(v) => Some(NumericInput::Float(f64::from(*v))),
+        AttrValue::Float64(v) => Some(NumericInput::Float(*v)),
+        _ => None,
+    }
+}
+
+/// Scalar query comparison with exact integer ordering and IEEE unordered NaNs.
+/// Unknown operators return false, preserving the query adapters' error policy.
+pub fn compare_operator(a: NumericInput, b: NumericInput, operator: &str) -> bool {
+    let operation = match operator {
+        "==" => NumericComparison::Equal,
+        "!=" => NumericComparison::NotEqual,
+        "<" => NumericComparison::Less,
+        "<=" => NumericComparison::LessEqual,
+        ">" => NumericComparison::Greater,
+        ">=" => NumericComparison::GreaterEqual,
+        _ => return false,
+    };
+    comparison(a, b, operation)
+}
+
 /// Native inference for the legacy numeric attribute bridge (bool/small ints ->
 /// int32, larger ints -> int64, any float -> float64). Null is not numeric zero.
 pub fn attribute_inputs(

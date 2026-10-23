@@ -200,3 +200,12 @@ and width-aware schemas are available. See `float64-property-foundation-2026-10-
 This implements a dependency of the accepted f64 decision. Consumer migration
 07.3a.2 and the ordinary Python default switch 07.3a.3 remain open; the parent is
 not complete, and stored legacy f32 values are not widened automatically.
+
+
+## 07.3a.2a — Shared exact numeric predicates (2026-10-23)
+
+Array/table numeric predicates and cross-table extrema now use one wide scalar
+comparison owner, shared with graph numeric ordering. Fix epsilon/narrowing,
+operator-prefix and parity faults; preserve typed graph equality and storage
+identity. See `float64-numeric-predicates-2026-10-23.md`. Remaining arithmetic/
+outputs, broader expression planning and the Python default switch remain open.

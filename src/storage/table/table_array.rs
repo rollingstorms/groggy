@@ -1050,32 +1050,15 @@ impl TableArray {
     fn compare_attr_values(&self, a: &AttrValue, b: &AttrValue) -> GraphResult<i32> {
         use std::cmp::Ordering;
 
-        let ordering = match (a, b) {
-            (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
-            (AttrValue::SmallInt(a), AttrValue::SmallInt(b)) => a.cmp(b),
-            (AttrValue::Float(a), AttrValue::Float(b)) => {
-                a.partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::Int(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::Int(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::SmallInt(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::SmallInt(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::SmallInt(a), AttrValue::Int(b)) => (*a as i64).cmp(b),
-            (AttrValue::Int(a), AttrValue::SmallInt(b)) => a.cmp(&(*b as i64)),
-            _ => {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    "Cannot compare non-numeric values".to_string(),
-                ))
-            }
-        };
+        use crate::storage::numeric::scalar::{attribute_number, compare_inputs};
+        let (a, b) = attribute_number(a)
+            .zip(attribute_number(b))
+            .ok_or_else(|| {
+                crate::GraphError::InvalidInput("Cannot compare non-numeric values".into())
+            })?;
+        let ordering = compare_inputs(a, b).ok_or_else(|| {
+            crate::GraphError::InvalidInput("Cannot order NaN numeric values".into())
+        })?;
 
         Ok(match ordering {
             Ordering::Less => -1,

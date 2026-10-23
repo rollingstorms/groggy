@@ -69,24 +69,11 @@ impl QueryEvaluator {
             return Ok(false);
         }
 
-        // Parse comparison operators
-        if let Some(result) = self.try_parse_comparison(value, ">")? {
-            return Ok(result);
-        }
-        if let Some(result) = self.try_parse_comparison(value, "<")? {
-            return Ok(result);
-        }
-        if let Some(result) = self.try_parse_comparison(value, ">=")? {
-            return Ok(result);
-        }
-        if let Some(result) = self.try_parse_comparison(value, "<=")? {
-            return Ok(result);
-        }
-        if let Some(result) = self.try_parse_comparison(value, "==")? {
-            return Ok(result);
-        }
-        if let Some(result) = self.try_parse_comparison(value, "!=")? {
-            return Ok(result);
+        // Match the longest token first so >= and <= are not consumed as > or <.
+        for operator in [">=", "<=", "==", "!=", ">", "<"] {
+            if let Some(result) = self.try_parse_comparison(value, operator)? {
+                return Ok(result);
+            }
         }
 
         // Handle special expressions
@@ -131,8 +118,8 @@ impl QueryEvaluator {
             return Ok(AttrValue::Int(int_val));
         }
 
-        if let Ok(float_val) = s.parse::<f32>() {
-            return Ok(AttrValue::Float(float_val));
+        if let Ok(float_val) = s.parse::<f64>() {
+            return Ok(AttrValue::Float64(float_val));
         }
 
         if s == "true" {
@@ -155,49 +142,11 @@ impl QueryEvaluator {
         right: &AttrValue,
         operator: &str,
     ) -> GraphResult<bool> {
+        use crate::storage::numeric::scalar::{attribute_number, compare_operator};
+        if let Some((a, b)) = attribute_number(left).zip(attribute_number(right)) {
+            return Ok(compare_operator(a, b, operator));
+        }
         match (left, right) {
-            (AttrValue::Int(a), AttrValue::Int(b)) => Ok(match operator {
-                ">" => a > b,
-                "<" => a < b,
-                ">=" => a >= b,
-                "<=" => a <= b,
-                "==" => a == b,
-                "!=" => a != b,
-                _ => false,
-            }),
-            (AttrValue::Float(a), AttrValue::Float(b)) => Ok(match operator {
-                ">" => a > b,
-                "<" => a < b,
-                ">=" => a >= b,
-                "<=" => a <= b,
-                "==" => (a - b).abs() < f32::EPSILON,
-                "!=" => (a - b).abs() >= f32::EPSILON,
-                _ => false,
-            }),
-            (AttrValue::Int(a), AttrValue::Float(b)) => {
-                let a_f = *a as f32;
-                Ok(match operator {
-                    ">" => a_f > *b,
-                    "<" => a_f < *b,
-                    ">=" => a_f >= *b,
-                    "<=" => a_f <= *b,
-                    "==" => (a_f - b).abs() < f32::EPSILON,
-                    "!=" => (a_f - b).abs() >= f32::EPSILON,
-                    _ => false,
-                })
-            }
-            (AttrValue::Float(a), AttrValue::Int(b)) => {
-                let b_f = *b as f32;
-                Ok(match operator {
-                    ">" => a > &b_f,
-                    "<" => a < &b_f,
-                    ">=" => a >= &b_f,
-                    "<=" => a <= &b_f,
-                    "==" => (a - b_f).abs() < f32::EPSILON,
-                    "!=" => (a - b_f).abs() >= f32::EPSILON,
-                    _ => false,
-                })
-            }
             (AttrValue::Text(a), AttrValue::Text(b)) => Ok(match operator {
                 "==" => a == b,
                 "!=" => a != b,
@@ -221,6 +170,7 @@ impl QueryEvaluator {
         let length = match value {
             AttrValue::Text(s) => s.len(),
             AttrValue::FloatVec(v) => v.len(),
+            AttrValue::Float64Vec(v) => v.len(),
             AttrValue::Bytes(b) => b.len(),
             _ => 0,
         };
@@ -240,7 +190,9 @@ impl QueryEvaluator {
     fn evaluate_even_expression(&self, value: &AttrValue) -> GraphResult<bool> {
         match value {
             AttrValue::Int(i) => Ok(*i % 2 == 0),
-            AttrValue::Float(f) => Ok((*f as i64) % 2 == 0),
+            AttrValue::SmallInt(i) => Ok(*i % 2 == 0),
+            AttrValue::Float(f) => Ok(f.is_finite() && f64::from(*f) % 2.0 == 0.0),
+            AttrValue::Float64(f) => Ok(f.is_finite() && *f % 2.0 == 0.0),
             _ => Ok(false),
         }
     }

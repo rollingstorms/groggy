@@ -253,6 +253,52 @@ fn read_state(c: &mut Criterion) {
                 |b, graph| b.iter(|| black_box(graph.pin_current_state().unwrap())),
             );
         }
+        let predicate_values: Vec<_> = (0..count)
+            .map(|i| AttrValue::Float64(1.0 + i as f64 * 2f64.powi(-40)))
+            .collect();
+        let evaluator = groggy::storage::array::QueryEvaluator::new("value > 1.0000000005");
+        assert_eq!(
+            predicate_values
+                .iter()
+                .filter(|value| evaluator.evaluate(value).unwrap())
+                .count(),
+            count - 550
+        );
+        group.bench_with_input(
+            BenchmarkId::new("array_f64_predicate", count),
+            &predicate_values,
+            |b, values| {
+                b.iter(|| {
+                    black_box(
+                        values
+                            .iter()
+                            .filter(|value| evaluator.evaluate(value).unwrap())
+                            .count(),
+                    )
+                })
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("table_f64_predicate", count),
+            &predicate_values,
+            |b, values| {
+                b.iter(|| {
+                    black_box(
+                        values
+                            .iter()
+                            .filter(|value| {
+                                groggy::storage::table::BaseTable::compare_attr_value(
+                                    value,
+                                    ">",
+                                    "1.0000000005",
+                                )
+                                .unwrap()
+                            })
+                            .count(),
+                    )
+                })
+            },
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

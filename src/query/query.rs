@@ -91,18 +91,11 @@ pub enum AttributeFilter {
 impl AttributeFilter {
     /// Match scalar equality or exact numeric ordering, without narrowing integers.
     pub fn matches(&self, value: &AttrValue) -> bool {
-        use crate::storage::numeric::scalar::{compare_inputs, NumericInput};
+        use crate::storage::numeric::scalar::{attribute_number, compare_inputs};
         use std::cmp::Ordering;
-        let numeric = |value: &AttrValue| match value {
-            AttrValue::Int(v) => Some(NumericInput::Integer(i128::from(*v))),
-            AttrValue::SmallInt(v) => Some(NumericInput::Integer(i128::from(*v))),
-            AttrValue::Float(v) => Some(NumericInput::Float(f64::from(*v))),
-            AttrValue::Float64(v) => Some(NumericInput::Float(*v)),
-            _ => None,
-        };
         let order = |target| {
-            numeric(value)
-                .zip(numeric(target))
+            attribute_number(value)
+                .zip(attribute_number(target))
                 .and_then(|(a, b)| compare_inputs(a, b))
         };
         match self {

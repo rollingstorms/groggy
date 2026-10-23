@@ -1794,54 +1794,16 @@ impl BaseTable {
     ) -> GraphResult<bool> {
         use crate::types::AttrValue;
 
+        use crate::storage::numeric::scalar::{attribute_number, compare_operator, NumericInput};
+        if let Some(number) = attribute_number(attr_val) {
+            let target = value_str
+                .parse::<i128>()
+                .map(NumericInput::Integer)
+                .ok()
+                .or_else(|| value_str.parse::<f64>().ok().map(NumericInput::Float));
+            return Ok(target.is_some_and(|target| compare_operator(number, target, operator)));
+        }
         let result = match attr_val {
-            AttrValue::Int(i) => {
-                if let Ok(val) = value_str.parse::<i64>() {
-                    match operator {
-                        "==" => *i == val,
-                        "!=" => *i != val,
-                        "<" => *i < val,
-                        "<=" => *i <= val,
-                        ">" => *i > val,
-                        ">=" => *i >= val,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            AttrValue::SmallInt(i) => {
-                if let Ok(val) = value_str.parse::<i32>() {
-                    let i_val = *i as i64;
-                    let val_i64 = val as i64;
-                    match operator {
-                        "==" => i_val == val_i64,
-                        "!=" => i_val != val_i64,
-                        "<" => i_val < val_i64,
-                        "<=" => i_val <= val_i64,
-                        ">" => i_val > val_i64,
-                        ">=" => i_val >= val_i64,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            AttrValue::Float(f) => {
-                if let Ok(val) = value_str.parse::<f32>() {
-                    match operator {
-                        "==" => (*f - val).abs() < f32::EPSILON,
-                        "!=" => (*f - val).abs() >= f32::EPSILON,
-                        "<" => *f < val,
-                        "<=" => *f <= val,
-                        ">" => *f > val,
-                        ">=" => *f >= val,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
             AttrValue::Bool(b) => {
                 if let Ok(val) = value_str.parse::<bool>() {
                     match operator {
