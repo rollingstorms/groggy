@@ -232,6 +232,27 @@ fn read_state(c: &mut Criterion) {
                 },
             );
         }
+        for (name, value) in [
+            (
+                "capture_f32_vector",
+                AttrValue::FloatVec((0..count).map(|i| i as f32 / count as f32).collect()),
+            ),
+            (
+                "capture_f64_vector",
+                AttrValue::Float64Vec((0..count).map(|i| i as f64 / count as f64).collect()),
+            ),
+        ] {
+            let mut property_graph = Graph::new();
+            let node = property_graph.add_node();
+            property_graph
+                .set_node_attr(node, "embedding".into(), value)
+                .unwrap();
+            group.bench_with_input(
+                BenchmarkId::new(name, count),
+                &property_graph,
+                |b, graph| b.iter(|| black_box(graph.pin_current_state().unwrap())),
+            );
+        }
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

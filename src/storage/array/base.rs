@@ -102,6 +102,8 @@ impl BaseArray {
                 AttrValue::Text(_) => AttrValueType::Text,
                 AttrValue::Int(_) => AttrValueType::Int,
                 AttrValue::Float(_) => AttrValueType::Float,
+                AttrValue::Float64(_) => AttrValueType::Float64,
+                AttrValue::Float64Vec(_) => AttrValueType::Float64Vec,
                 AttrValue::Bool(_) => AttrValueType::Bool,
                 _ => AttrValueType::Text,
             }

@@ -230,6 +230,7 @@ fn attribute_number(value: &crate::types::AttrValue) -> Option<AttributeNumber> 
         AttrValue::SmallInt(v) => Some(AttributeNumber::Integer(i64::from(*v))),
         AttrValue::Bool(v) => Some(AttributeNumber::Integer(i64::from(*v))),
         AttrValue::Float(v) => Some(AttributeNumber::Float(f64::from(*v))),
+        AttrValue::Float64(v) => Some(AttributeNumber::Float(*v)),
         _ => None,
     }
 }

@@ -188,3 +188,13 @@ record vector directly; FFI output is unchanged. Preserve typed/null/absence
 semantics and leave diagnostic/sampling scopes separate. See
 `change-record-owner-2026-10-23.md`; broad AR7.9 and temporal publication/storage
 migration remain open.
+
+
+## 07.3a.1 — f64 property foundation (2026-10-23)
+
+Distinct f64 scalar/vector tags and bit-pattern codecs now preserve wide values
+through the tested property/history/storage lifecycle; explicit Python constructors
+and width-aware schemas are available. See `float64-property-foundation-2026-10-23.md`.
+This implements a dependency of the accepted f64 decision. Consumer migration
+07.3a.2 and the ordinary Python default switch 07.3a.3 remain open; the parent is
+not complete, and stored legacy f32 values are not widened automatically.

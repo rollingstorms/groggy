@@ -614,7 +614,7 @@ def test_builder_core_histogram():
     # Create test graph with known value distribution
     g = Graph()
     for i in range(10):
-        g.add_node(i, value=float(i))  # Values 0-9
+        g.add_node(value=float(i))  # Allocated IDs and values are both 0-9.
 
     # Build histogram algorithm
     builder = AlgorithmBuilder("test_histogram")

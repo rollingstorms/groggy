@@ -20,6 +20,7 @@ impl Value {
             AttrValue::Int(value) => Some(Self::Integer(*value)),
             AttrValue::SmallInt(value) => Some(Self::Integer(i64::from(*value))),
             AttrValue::Float(value) => Some(Self::Float(f64::from(*value))),
+            AttrValue::Float64(value) => Some(Self::Float(*value)),
             _ => None,
         }
     }

@@ -136,6 +136,8 @@ pub fn attr_value_to_display_text(attr: &crate::types::AttrValue) -> String {
     match attr {
         AttrValue::Int(i) => i.to_string(),
         AttrValue::Float(f) => f.to_string(),
+        AttrValue::Float64(f) => f.to_string(),
+        AttrValue::Float64Vec(v) => format!("[{} f64 values]", v.len()),
         AttrValue::Text(s) => s.clone(),
         AttrValue::CompactText(s) => s.as_str().to_string(),
         AttrValue::SmallInt(i) => i.to_string(),
@@ -161,6 +163,18 @@ pub fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
 
     match attr {
         AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+        AttrValue::Float64(f) => serde_json::Number::from_f64(*f)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        AttrValue::Float64Vec(v) => serde_json::Value::Array(
+            v.iter()
+                .map(|&f| {
+                    serde_json::Number::from_f64(f)
+                        .map(serde_json::Value::Number)
+                        .unwrap_or(serde_json::Value::Null)
+                })
+                .collect(),
+        ),
         AttrValue::Float(f) => serde_json::Number::from_f64(*f as f64)
             .map(serde_json::Value::Number)
             .unwrap_or(serde_json::Value::Null),
@@ -252,6 +266,8 @@ fn attr_to_wire(attr: &crate::types::AttrValue) -> WireCell {
         AttrValue::Int(i) => WireCell::N(*i),
         AttrValue::SmallInt(i) => WireCell::N(*i as i64),
         AttrValue::Float(f) => WireCell::F(*f as f64),
+        AttrValue::Float64(f) => WireCell::F(*f),
+        AttrValue::Float64Vec(v) => WireCell::A(v.iter().map(|&f| WireCell::F(f)).collect()),
         AttrValue::Text(s) => WireCell::S(s.clone()),
         AttrValue::CompactText(s) => WireCell::S(s.as_str().to_string()),
         AttrValue::Bool(b) => WireCell::B(*b),

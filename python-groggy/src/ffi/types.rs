@@ -46,6 +46,17 @@ impl PyAttrValue {
         Self::from_py_value(value)
     }
 
+    /// Explicit lossless f64 scalar property; legacy f32 constructors remain typed.
+    #[staticmethod]
+    fn float64(value: f64) -> Self {
+        Self::new(RustAttrValue::Float64(value))
+    }
+    /// Explicit lossless f64 vector property.
+    #[staticmethod]
+    fn float64_vec(values: Vec<f64>) -> Self {
+        Self::new(RustAttrValue::Float64Vec(values))
+    }
+
     /// Explicit float32 vector constructor, including empty vectors and numeric casts.
     #[staticmethod]
     fn float_vec(values: Vec<f32>) -> Self {
@@ -80,6 +91,8 @@ impl PyAttrValue {
         match &self.inner {
             RustAttrValue::Int(_) => "int",
             RustAttrValue::Float(_) => "float",
+            RustAttrValue::Float64(_) => "float64",
+            RustAttrValue::Float64Vec(_) => "float64_vec",
             RustAttrValue::Text(_) => "text",
             RustAttrValue::Bool(_) => "bool",
             RustAttrValue::FloatVec(_) => "float_vec",
@@ -105,6 +118,8 @@ impl PyAttrValue {
             match &self.inner {
                 RustAttrValue::Int(i) => i.to_string(),
                 RustAttrValue::Float(f) => f.to_string(),
+                RustAttrValue::Float64(f) => f.to_string(),
+                RustAttrValue::Float64Vec(v) => format!("{:?}", v),
                 RustAttrValue::Text(s) => format!("\"{}\"", s),
                 RustAttrValue::Bool(b) => b.to_string(),
                 RustAttrValue::FloatVec(v) => format!("{:?}", v),
@@ -139,6 +154,8 @@ impl PyAttrValue {
         Ok(match &self.inner {
             RustAttrValue::Int(i) => i.to_string(),
             RustAttrValue::Float(f) => f.to_string(),
+            RustAttrValue::Float64(f) => f.to_string(),
+            RustAttrValue::Float64Vec(v) => format!("{:?}", v),
             RustAttrValue::Text(s) => s.clone(),
             RustAttrValue::Bool(b) => b.to_string(),
             RustAttrValue::FloatVec(v) => format!("{:?}", v),

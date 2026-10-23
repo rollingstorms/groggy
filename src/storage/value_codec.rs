@@ -16,6 +16,8 @@ enum StoredValue {
     Null,
     Int(i64),
     Float(u32),
+    Float64(u64),
+    Float64Vec(Vec<u64>),
     Bool(bool),
     Text(String),
     FloatVec(Vec<u32>),
@@ -49,6 +51,8 @@ pub(crate) fn encode(value: &AttrValue) -> Result<Value, GraphError> {
             Int(v) => StoredValue::Int(*v),
             SmallInt(v) => StoredValue::Int(i64::from(*v)),
             Float(v) => StoredValue::Float(v.to_bits()),
+            Float64(v) => StoredValue::Float64(v.to_bits()),
+            Float64Vec(v) => StoredValue::Float64Vec(v.iter().map(|f| f.to_bits()).collect()),
             Bool(v) => StoredValue::Bool(*v),
             Text(v) => StoredValue::Text(v.clone()),
             CompactText(v) => StoredValue::Text(v.as_str().to_owned()),
@@ -84,6 +88,10 @@ pub(crate) fn decode(value: Value) -> Result<AttrValue, GraphError> {
         StoredValue::Null => AttrValue::Null,
         StoredValue::Int(v) => AttrValue::Int(v),
         StoredValue::Float(v) => AttrValue::Float(f32::from_bits(v)),
+        StoredValue::Float64(v) => AttrValue::Float64(f64::from_bits(v)),
+        StoredValue::Float64Vec(v) => {
+            AttrValue::Float64Vec(v.into_iter().map(f64::from_bits).collect())
+        }
         StoredValue::Bool(v) => AttrValue::Bool(v),
         StoredValue::Text(v) => AttrValue::Text(v),
         StoredValue::FloatVec(v) => {

@@ -94,6 +94,7 @@ pub(crate) fn personalization_value(node: NodeId, value: Option<&AttrValue>) -> 
     let value = match value {
         None => 1.0,
         Some(AttrValue::Float(value)) => *value as f64,
+        Some(AttrValue::Float64(value)) => *value,
         Some(AttrValue::Int(value)) => *value as f64,
         Some(AttrValue::SmallInt(value)) => *value as f64,
         Some(_) => return Err(anyhow!("node {node}: personalization must be numeric")),

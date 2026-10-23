@@ -326,13 +326,11 @@ impl AlgorithmParamValue {
         use crate::types::AttrValue;
         match self {
             AlgorithmParamValue::Int(v) => Some(AttrValue::Int(*v)),
-            AlgorithmParamValue::Float(v) => Some(AttrValue::Float(*v as f32)),
+            AlgorithmParamValue::Float(v) => Some(AttrValue::Float64(*v)),
             AlgorithmParamValue::Bool(v) => Some(AttrValue::Bool(*v)),
             AlgorithmParamValue::Text(v) => Some(AttrValue::Text(v.clone())),
             AlgorithmParamValue::IntList(v) => Some(AttrValue::IntVec(v.clone())),
-            AlgorithmParamValue::FloatList(v) => {
-                Some(AttrValue::FloatVec(v.iter().map(|f| *f as f32).collect()))
-            }
+            AlgorithmParamValue::FloatList(v) => Some(AttrValue::Float64Vec(v.clone())),
             AlgorithmParamValue::BoolList(v) => Some(AttrValue::BoolVec(v.clone())),
             AlgorithmParamValue::TextList(v) => Some(AttrValue::TextVec(v.clone())),
             AlgorithmParamValue::Json(v) => Some(AttrValue::Json(v.to_string())),
@@ -344,6 +342,8 @@ impl AlgorithmParamValue {
     pub fn from_attr_value(value: AttrValue) -> Option<Self> {
         match value {
             AttrValue::Float(v) => Some(AlgorithmParamValue::Float(f64::from(v))),
+            AttrValue::Float64(v) => Some(AlgorithmParamValue::Float(v)),
+            AttrValue::Float64Vec(v) => Some(AlgorithmParamValue::FloatList(v)),
             AttrValue::Int(v) => Some(AlgorithmParamValue::Int(v)),
             AttrValue::Bool(v) => Some(AlgorithmParamValue::Bool(v)),
             AttrValue::Text(v) => Some(AlgorithmParamValue::Text(v)),

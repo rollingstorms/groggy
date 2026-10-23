@@ -67,6 +67,10 @@ pub fn attribute_inputs(
                     wide |= i32::try_from(*value).is_err();
                     NumericInput::Integer(i128::from(*value))
                 }
+                AttrValue::Float64(value) => {
+                    floating = true;
+                    NumericInput::Float(*value)
+                }
                 AttrValue::Float(value) => {
                     floating = true;
                     NumericInput::Float(f64::from(*value))

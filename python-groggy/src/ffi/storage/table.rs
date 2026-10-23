@@ -1392,6 +1392,14 @@ impl PyBaseTable {
                             }
                             "int64"
                         }
+                        AttrValue::Float64(_) => {
+                            numeric_type = Some(NumericType::Float64);
+                            "float64"
+                        }
+                        AttrValue::Float64Vec(_) => {
+                            is_all_numeric = false;
+                            "float64_vec"
+                        }
                         AttrValue::Float(_) => {
                             if numeric_type.is_none() {
                                 numeric_type = Some(NumericType::Float32);
@@ -2866,6 +2874,18 @@ impl PyBaseTable {
                             groggy::AttrValue::SmallInt(i) => {
                                 Value::Number(serde_json::Number::from(*i as i64))
                             }
+                            groggy::AttrValue::Float64(f) => serde_json::Number::from_f64(*f)
+                                .map(Value::Number)
+                                .unwrap_or(Value::Null),
+                            groggy::AttrValue::Float64Vec(v) => Value::Array(
+                                v.iter()
+                                    .map(|&f| {
+                                        serde_json::Number::from_f64(f)
+                                            .map(Value::Number)
+                                            .unwrap_or(Value::Null)
+                                    })
+                                    .collect(),
+                            ),
                             groggy::AttrValue::Float(f) => Value::Number(
                                 serde_json::Number::from_f64((*f).into())
                                     .unwrap_or(serde_json::Number::from(0)),

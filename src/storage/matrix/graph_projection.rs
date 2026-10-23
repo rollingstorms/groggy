@@ -5,7 +5,11 @@ use std::collections::HashSet;
 fn numeric(value: &AttrValue) -> bool {
     matches!(
         value,
-        AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_) | AttrValue::Bool(_)
+        AttrValue::Int(_)
+            | AttrValue::SmallInt(_)
+            | AttrValue::Float(_)
+            | AttrValue::Float64(_)
+            | AttrValue::Bool(_)
     )
 }
 pub(crate) fn features<'a, T: NumericType + FromAttrValue<T>>(

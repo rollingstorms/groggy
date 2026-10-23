@@ -32,6 +32,7 @@ impl FromAttrValue<f64> for f64 {
     fn from_attr_value(value: &AttrValue) -> GraphResult<f64> {
         match value {
             AttrValue::Float(f) => Ok(*f as f64),
+            AttrValue::Float64(f) => Ok(*f),
             AttrValue::Int(i) => Ok(*i as f64),
             AttrValue::SmallInt(i) => Ok(*i as f64),
             AttrValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
@@ -64,6 +65,9 @@ impl FromAttrValue<i64> for i64 {
         match value {
             AttrValue::Int(i) => Ok(*i),
             AttrValue::SmallInt(i) => Ok(*i as i64),
+            AttrValue::Float64(f) => <i64 as NumericType>::from_f64(*f).ok_or_else(|| {
+                GraphError::InvalidInput("Attribute is not finite or exceeds i64 range".into())
+            }),
             AttrValue::Float(f) => <i64 as NumericType>::from_f64(f64::from(*f)).ok_or_else(|| {
                 GraphError::InvalidInput("Attribute is not finite or exceeds i64 range".into())
             }),
@@ -99,6 +103,7 @@ impl FromAttrValue<bool> for bool {
             AttrValue::Int(i) => Ok(*i != 0),
             AttrValue::SmallInt(i) => Ok(*i != 0),
             AttrValue::Float(f) => Ok(*f != 0.0),
+            AttrValue::Float64(f) => Ok(*f != 0.0),
             value @ (AttrValue::Text(_)
             | AttrValue::CompactText(_)
             | AttrValue::CompressedText(_)) => {

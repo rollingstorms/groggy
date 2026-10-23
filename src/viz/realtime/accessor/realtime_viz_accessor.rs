@@ -78,6 +78,8 @@ impl DataSourceRealtimeAccessor {
                 // Convert all types to Text for consistent JSON serialization
                 // This prevents the {"Text": "value"} wrapper issue
                 AttrValue::Float(f) => AttrValue::Text(f.to_string()),
+                AttrValue::Float64(f) => AttrValue::Text(f.to_string()),
+                AttrValue::Float64Vec(v) => AttrValue::Text(format!("[{} f64 values]", v.len())),
                 AttrValue::Int(i) => AttrValue::Text(i.to_string()),
                 AttrValue::Text(s) => AttrValue::Text(s),
                 AttrValue::Bool(b) => AttrValue::Text(b.to_string()),
@@ -326,6 +328,7 @@ impl DataSourceRealtimeAccessor {
                 // Try to extract numeric value from attributes
                 let result = attributes.get(col_name).and_then(|attr| match attr {
                     AttrValue::Float(f) => Some(*f as f64),
+                    AttrValue::Float64(f) => Some(*f),
                     AttrValue::Int(i) => Some(*i as f64),
                     AttrValue::SmallInt(i) => Some(*i as f64),
                     AttrValue::Text(s) => s.parse::<f64>().ok(),
@@ -376,6 +379,7 @@ impl DataSourceRealtimeAccessor {
             if let Some(attr) = node.attributes.get(col_name) {
                 let val = match attr {
                     AttrValue::Float(f) => Some(*f as f64),
+                    AttrValue::Float64(f) => Some(*f),
                     AttrValue::Int(i) => Some(*i as f64),
                     AttrValue::SmallInt(i) => Some(*i as f64),
                     AttrValue::Text(s) => s.parse::<f64>().ok(),

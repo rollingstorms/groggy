@@ -21,6 +21,10 @@ pub enum PropertyKind {
     NodeArray,
     EdgeArray,
     SubgraphRef,
+    Float32,
+    Float64,
+    Float32Vec,
+    Float64Vec,
 }
 impl PropertyKind {
     fn matches(self, value: &AttrValue) -> bool {
@@ -28,11 +32,15 @@ impl PropertyKind {
         match self {
             Self::Any => true,
             Self::Int => matches!(value, Int(_) | SmallInt(_)),
-            Self::Float => matches!(value, Float(_)),
+            Self::Float => matches!(value, Float(_) | Float64(_)),
+            Self::Float32 => matches!(value, Float(_)),
+            Self::Float64 => matches!(value, Float64(_)),
             Self::Bool => matches!(value, Bool(_)),
             Self::Text => matches!(value, Text(_) | CompactText(_) | CompressedText(_)),
             Self::IntVec => matches!(value, IntVec(_)),
-            Self::FloatVec => matches!(value, FloatVec(_) | CompressedFloatVec(_)),
+            Self::FloatVec => matches!(value, FloatVec(_) | CompressedFloatVec(_) | Float64Vec(_)),
+            Self::Float32Vec => matches!(value, FloatVec(_) | CompressedFloatVec(_)),
+            Self::Float64Vec => matches!(value, Float64Vec(_)),
             Self::BoolVec => matches!(value, BoolVec(_)),
             Self::TextVec => matches!(value, TextVec(_)),
             Self::Bytes => matches!(value, Bytes(_)),

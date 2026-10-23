@@ -189,6 +189,8 @@ pub fn attr_value_to_python_value(py: Python, attr_value: &RustAttrValue) -> PyR
         RustAttrValue::Int(value) => value.to_object(py),
         RustAttrValue::SmallInt(value) => value.to_object(py),
         RustAttrValue::Float(value) => value.to_object(py),
+        RustAttrValue::Float64(value) => value.to_object(py),
+        RustAttrValue::Float64Vec(value) => value.to_object(py),
         RustAttrValue::Bool(value) => value.to_object(py),
         RustAttrValue::Text(value) => value.to_object(py),
         RustAttrValue::CompactText(value) => value.as_str().to_object(py),

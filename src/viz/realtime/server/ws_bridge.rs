@@ -230,6 +230,8 @@ impl WsBridge {
         let attr_to_string = |attr_value: &crate::types::AttrValue| -> String {
             match attr_value {
                 crate::types::AttrValue::Float(f) => f.to_string(),
+                crate::types::AttrValue::Float64(f) => f.to_string(),
+                crate::types::AttrValue::Float64Vec(v) => format!("[{} f64 values]", v.len()),
                 crate::types::AttrValue::Int(i) => i.to_string(),
                 crate::types::AttrValue::Text(s) => s.clone(),
                 crate::types::AttrValue::Bool(b) => b.to_string(),

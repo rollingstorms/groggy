@@ -56,6 +56,8 @@ impl From<&AttrValue> for NetworkXValue {
             AttrValue::Text(s) => NetworkXValue::String(s.clone()),
             AttrValue::Int(i) => NetworkXValue::Integer(*i),
             AttrValue::Float(f) => NetworkXValue::Float((*f) as f64),
+            AttrValue::Float64(f) => NetworkXValue::Float(*f),
+            AttrValue::Float64Vec(v) => NetworkXValue::String(format!("{v:?}")),
             AttrValue::SmallInt(i) => NetworkXValue::Integer(*i as i64),
             AttrValue::Bool(b) => NetworkXValue::Boolean(*b),
             AttrValue::Null => NetworkXValue::Null,

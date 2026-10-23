@@ -670,6 +670,8 @@ impl RealtimeServer {
                                 let simple_attrs: std::collections::HashMap<String, String> = node.attributes.iter().map(|(key, attr_value)| {
                                     let simple_value = match attr_value {
                                         crate::types::AttrValue::Float(f) => f.to_string(),
+                                        crate::types::AttrValue::Float64(f) => f.to_string(),
+                                        crate::types::AttrValue::Float64Vec(v) => format!("[{} f64 values]", v.len()),
                                         crate::types::AttrValue::Int(i) => i.to_string(),
                                         crate::types::AttrValue::Text(s) => s.clone(),
                                         crate::types::AttrValue::Bool(b) => b.to_string(),
@@ -771,6 +773,8 @@ impl RealtimeServer {
                                 let simple_attrs: std::collections::HashMap<String, String> = edge.attributes.iter().map(|(key, attr_value)| {
                                     let simple_value = match attr_value {
                                         crate::types::AttrValue::Float(f) => f.to_string(),
+                                        crate::types::AttrValue::Float64(f) => f.to_string(),
+                                        crate::types::AttrValue::Float64Vec(v) => format!("[{} f64 values]", v.len()),
                                         crate::types::AttrValue::Int(i) => i.to_string(),
                                         crate::types::AttrValue::Text(s) => s.clone(),
                                         crate::types::AttrValue::Bool(b) => b.to_string(),

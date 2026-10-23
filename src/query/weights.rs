@@ -5,6 +5,7 @@ pub(crate) fn dijkstra_weight(value: Option<&AttrValue>, edge: EdgeId) -> GraphR
     let weight = match value {
         None => 1.0,
         Some(AttrValue::Float(value)) => *value as f64,
+        Some(AttrValue::Float64(value)) => *value,
         Some(AttrValue::Int(value)) => *value as f64,
         Some(AttrValue::SmallInt(value)) => *value as f64,
         Some(_) => {
@@ -58,6 +59,7 @@ pub(crate) fn checked_heuristics<'a>(
             let cost = match value(node)? {
                 None => 0.0,
                 Some(AttrValue::Float(v)) => f64::from(*v),
+                Some(AttrValue::Float64(v)) => *v,
                 Some(AttrValue::Int(v)) => *v as f64,
                 Some(AttrValue::SmallInt(v)) => f64::from(*v),
                 _ => {

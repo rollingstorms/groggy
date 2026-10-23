@@ -121,7 +121,7 @@ This is the heart of the flexible attribute system. Should support:
 */
 
 /// Efficient storage for attribute values supporting multiple data types
-/// DESIGN: Enum dispatch is fast, Hash implementation handles f32 properly
+/// DESIGN: Enum dispatch is fast; property hashing handles f32/f64 identity explicitly
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AttrValue {
     /// 32-bit float (embeddings, coordinates, ML features)
@@ -162,6 +162,10 @@ pub enum AttrValue {
     EdgeArray(Vec<EdgeId>),
     /// JSON-serialized complex data (lists, dicts, nested structures)
     Json(String),
+    /// 64-bit floating property; append to preserve legacy serialized variant indices.
+    Float64(f64),
+    /// Lossless 64-bit floating property vector.
+    Float64Vec(Vec<f64>),
 }
 
 /// Custom PartialEq implementation that compares logical content across storage variants
@@ -227,6 +231,13 @@ impl Hash for AttrValue {
         self.type_discriminant().hash(state);
         match self {
             Self::Float(value) => canonical_float_bits(*value).hash(state),
+            Self::Float64(value) => canonical_float64_bits(*value).hash(state),
+            Self::Float64Vec(values) => {
+                values.len().hash(state);
+                for value in values {
+                    canonical_float64_bits(*value).hash(state);
+                }
+            }
             Self::Int(value) => value.hash(state),
             Self::SmallInt(value) => (*value as i64).hash(state),
             Self::Text(value) => {
@@ -287,6 +298,20 @@ fn canonical_float_bits(value: f32) -> u32 {
     }
 }
 
+fn canonical_float64_bits(value: f64) -> u64 {
+    if value == 0.0 {
+        0
+    } else if value.is_nan() {
+        f64::NAN.to_bits()
+    } else {
+        value.to_bits()
+    }
+}
+fn compare_float64_values(left: f64, right: f64) -> std::cmp::Ordering {
+    f64::from_bits(canonical_float64_bits(left))
+        .total_cmp(&f64::from_bits(canonical_float64_bits(right)))
+}
+
 fn compare_float_values(left: f32, right: f32) -> std::cmp::Ordering {
     f32::from_bits(canonical_float_bits(left))
         .total_cmp(&f32::from_bits(canonical_float_bits(right)))
@@ -328,6 +353,13 @@ impl Ord for AttrValue {
             (Int(left), SmallInt(right)) => left.cmp(&(*right as i64)),
             (SmallInt(left), Int(right)) => (*left as i64).cmp(right),
             (Float(left), Float(right)) => compare_float_values(*left, *right),
+            (Float64(left), Float64(right)) => compare_float64_values(*left, *right),
+            (Float64Vec(left), Float64Vec(right)) => left
+                .iter()
+                .zip(right)
+                .map(|(&a, &b)| compare_float64_values(a, b))
+                .find(|order| *order != Ordering::Equal)
+                .unwrap_or_else(|| left.len().cmp(&right.len())),
             (Bool(left), Bool(right)) => left.cmp(right),
             (IntVec(left), IntVec(right)) => left.cmp(right),
             (TextVec(left), TextVec(right)) => left.cmp(right),
@@ -389,6 +421,8 @@ impl AttrValue {
             AttrValue::NodeArray(_) => 11,
             AttrValue::EdgeArray(_) => 12,
             AttrValue::Json(_) => 13,
+            AttrValue::Float64(_) => 14,
+            AttrValue::Float64Vec(_) => 15,
         }
     }
 }
@@ -529,6 +563,7 @@ impl AttrValue {
             AttrValue::SmallInt(_) => Some(NumericType::Int32),
             AttrValue::Int(_) => Some(NumericType::Int64),
             AttrValue::Float(_) => Some(NumericType::Float32),
+            AttrValue::Float64(_) => Some(NumericType::Float64),
             _ => None,
         }
     }
@@ -554,8 +589,7 @@ impl AttrValue {
                 Some(AttrValue::Float(if *b { 1.0 } else { 0.0 }))
             }
             (AttrValue::Bool(b), NumericType::Float64) => {
-                // Note: We store f32 in AttrValue, so convert to f32
-                Some(AttrValue::Float(if *b { 1.0 } else { 0.0 }))
+                Some(AttrValue::Float64(if *b { 1.0 } else { 0.0 }))
             }
 
             // SmallInt (i32) conversions
@@ -563,7 +597,7 @@ impl AttrValue {
             (AttrValue::SmallInt(i), NumericType::Int32) => Some(AttrValue::SmallInt(*i)),
             (AttrValue::SmallInt(i), NumericType::Int64) => Some(AttrValue::Int(*i as i64)),
             (AttrValue::SmallInt(i), NumericType::Float32) => Some(AttrValue::Float(*i as f32)),
-            (AttrValue::SmallInt(i), NumericType::Float64) => Some(AttrValue::Float(*i as f32)), // Still stored as f32
+            (AttrValue::SmallInt(i), NumericType::Float64) => Some(AttrValue::Float64(*i as f64)),
 
             // Int (i64) conversions
             (AttrValue::Int(i), NumericType::Bool) => Some(AttrValue::Bool(*i != 0)),
@@ -576,7 +610,7 @@ impl AttrValue {
             }
             (AttrValue::Int(i), NumericType::Int64) => Some(AttrValue::Int(*i)),
             (AttrValue::Int(i), NumericType::Float32) => Some(AttrValue::Float(*i as f32)), // May lose precision
-            (AttrValue::Int(i), NumericType::Float64) => Some(AttrValue::Float(*i as f32)), // Still stored as f32
+            (AttrValue::Int(i), NumericType::Float64) => Some(AttrValue::Float64(*i as f64)),
 
             // Float (f32) conversions
             (AttrValue::Float(f), NumericType::Bool) => Some(AttrValue::Bool(*f != 0.0)),
@@ -597,7 +631,24 @@ impl AttrValue {
                 }
             }
             (AttrValue::Float(f), NumericType::Float32) => Some(AttrValue::Float(*f)),
-            (AttrValue::Float(f), NumericType::Float64) => Some(AttrValue::Float(*f)), // Still stored as f32
+            (AttrValue::Float(f), NumericType::Float64) => Some(AttrValue::Float64(f64::from(*f))),
+            (AttrValue::Float64(f), NumericType::Float64) => Some(AttrValue::Float64(*f)),
+            (AttrValue::Float64(f), NumericType::Float32)
+                if !f.is_finite() || f.abs() <= f32::MAX as f64 =>
+            {
+                Some(AttrValue::Float(*f as f32))
+            }
+            (AttrValue::Float64(f), NumericType::Bool) => Some(AttrValue::Bool(*f != 0.0)),
+            (AttrValue::Float64(f), NumericType::Int32)
+                if f.round() >= i32::MIN as f64 && f.round() <= i32::MAX as f64 =>
+            {
+                Some(AttrValue::SmallInt(f.round() as i32))
+            }
+            (AttrValue::Float64(f), NumericType::Int64)
+                if f.round() >= i64::MIN as f64 && f.round() < -(i64::MIN as f64) =>
+            {
+                Some(AttrValue::Int(f.round() as i64))
+            }
 
             _ => None, // Non-numeric input
         }
@@ -820,6 +871,8 @@ pub enum AttrValueType {
     NodeArray,
     EdgeArray,
     Json,
+    Float64,
+    Float64Vec,
 }
 
 impl AttrValueType {
@@ -827,7 +880,10 @@ impl AttrValueType {
     pub fn is_numeric(&self) -> bool {
         matches!(
             self,
-            AttrValueType::Float | AttrValueType::Int | AttrValueType::SmallInt
+            AttrValueType::Float
+                | AttrValueType::Float64
+                | AttrValueType::Int
+                | AttrValueType::SmallInt
         )
     }
 }
@@ -842,6 +898,8 @@ impl std::fmt::Display for AttrValue {
                     write!(f, "{}", val)
                 }
             }
+            AttrValue::Float64(val) => write!(f, "{}", val),
+            AttrValue::Float64Vec(val) => write!(f, "{:?}", val),
             AttrValue::Int(val) => write!(f, "{}", val),
             AttrValue::Text(val) => write!(f, "{}", val),
             AttrValue::Bool(val) => write!(f, "{}", val),
@@ -870,10 +928,28 @@ impl std::fmt::Display for AttrValue {
 }
 
 impl AttrValue {
+    /// Scalar floating value widened to f64 without narrowing.
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Self::Float(v) => Some(f64::from(*v)),
+            Self::Float64(v) => Some(*v),
+            _ => None,
+        }
+    }
+    /// Borrow an explicitly stored f64 vector; the existing f32 getter stays typed.
+    pub fn as_float64_vec(&self) -> Option<&Vec<f64>> {
+        match self {
+            Self::Float64Vec(v) => Some(v),
+            _ => None,
+        }
+    }
+
     /// Get runtime type information as string
     pub fn type_name(&self) -> &'static str {
         match self {
             AttrValue::Float(_) => "Float",
+            AttrValue::Float64(_) => "Float64",
+            AttrValue::Float64Vec(_) => "Float64Vec",
             AttrValue::Int(_) => "Int",
             AttrValue::Text(_) => "Text",
             AttrValue::FloatVec(_) => "FloatVec",
@@ -898,6 +974,8 @@ impl AttrValue {
     pub fn dtype(&self) -> AttrValueType {
         match self {
             AttrValue::Float(_) => AttrValueType::Float,
+            AttrValue::Float64(_) => AttrValueType::Float64,
+            AttrValue::Float64Vec(_) => AttrValueType::Float64Vec,
             AttrValue::Int(_) => AttrValueType::Int,
             AttrValue::Text(_) => AttrValueType::Text,
             AttrValue::FloatVec(_) => AttrValueType::FloatVec,
@@ -922,6 +1000,10 @@ impl AttrValue {
     pub fn memory_size(&self) -> usize {
         match self {
             AttrValue::Float(_) => std::mem::size_of::<f32>(),
+            AttrValue::Float64(_) => std::mem::size_of::<f64>(),
+            AttrValue::Float64Vec(v) => {
+                std::mem::size_of::<Vec<f64>>() + v.capacity() * std::mem::size_of::<f64>()
+            }
             AttrValue::Int(_) => std::mem::size_of::<i64>(),
             AttrValue::Text(s) => std::mem::size_of::<String>() + s.capacity(),
             AttrValue::FloatVec(v) => {

@@ -6,6 +6,8 @@ pub fn attr_value_to_display_text(attr: &crate::types::AttrValue) -> String {
     match attr {
         AttrValue::Int(i) => i.to_string(),
         AttrValue::Float(f) => f.to_string(),
+        AttrValue::Float64(f) => f.to_string(),
+        AttrValue::Float64Vec(v) => format!("[{} f64 values]", v.len()),
         AttrValue::Text(s) => s.clone(),
         AttrValue::CompactText(s) => s.as_str().to_string(),
         AttrValue::SmallInt(i) => i.to_string(),

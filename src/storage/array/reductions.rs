@@ -13,6 +13,7 @@ impl Number {
             AttrValue::Int(v) => Some(Self::Integer(*v)),
             AttrValue::SmallInt(v) => Some(Self::Integer(i64::from(*v))),
             AttrValue::Float(v) => Some(Self::Float(f64::from(*v))),
+            AttrValue::Float64(v) => Some(Self::Float(*v)),
             _ => None,
         }
     }

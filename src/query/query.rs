@@ -97,6 +97,7 @@ impl AttributeFilter {
             AttrValue::Int(v) => Some(NumericInput::Integer(i128::from(*v))),
             AttrValue::SmallInt(v) => Some(NumericInput::Integer(i128::from(*v))),
             AttrValue::Float(v) => Some(NumericInput::Float(f64::from(*v))),
+            AttrValue::Float64(v) => Some(NumericInput::Float(*v)),
             _ => None,
         };
         let order = |target| {
