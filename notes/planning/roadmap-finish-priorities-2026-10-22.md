@@ -6,6 +6,19 @@ This is an execution order, not a replacement vision or a claim that unfinished
 items are absent from the existing engine. Original 01–34 numbering is retained;
 AR7 tracks consolidation. Pending workbook suggestions are not accepted decisions.
 
+## Current execution checkpoint
+
+Implemented: AR7.2 matrix consolidation, AR7.3 canonical arrays/shared numeric
+foundations, 29.60–29.63 finite numerical fixes/receipts, AR7.4 entity ownership,
+and AR7.5a–b shared read state plus explicit immutable selections. Evidence is
+linked from the flat checklist. Supported-scope implementation is distinct from
+remaining broad capability and production gates (including A13/A15).
+
+Next: migrate existing graph/table adapters and read consumers onto that shared
+state/membership, retaining a separate working mutation owner. Ordinary legacy
+Subgraph/table reads are not yet certified frozen. Stages 3–6 retain their existing
+partial/open work and specific workbook dependencies; no blank policy is accepted.
+
 ## Immediate work, without waiting for the whole workbook
 
 1. **AR7.2 — one matrix module.** Use the current 455 Python regressions, full

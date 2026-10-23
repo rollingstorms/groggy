@@ -1,0 +1,108 @@
+//! Thin adapters for immutable native read selections; no writable graph ownership.
+use crate::ffi::utils::{attr_value_to_python_value, graph_error_to_py_err};
+use groggy::{EdgeId, GraphView, NodeId};
+use pyo3::prelude::*;
+#[pyclass(name = "GraphView")]
+#[derive(Clone)]
+pub struct PyGraphView {
+    pub inner: GraphView,
+}
+#[pymethods]
+impl PyGraphView {
+    #[getter]
+    fn node_ids(&self, py: Python) -> Vec<NodeId> {
+        py.allow_threads(|| self.inner.node_ids())
+    }
+    #[getter]
+    fn edge_ids(&self, py: Python) -> Vec<EdgeId> {
+        py.allow_threads(|| self.inner.edge_ids())
+    }
+    fn node_count(&self) -> usize {
+        self.inner.node_count()
+    }
+    fn edge_count(&self) -> usize {
+        self.inner.edge_count()
+    }
+    fn contains_node(&self, id: NodeId) -> bool {
+        self.inner.contains_node(id)
+    }
+    fn contains_edge(&self, id: EdgeId) -> bool {
+        self.inner.contains_edge(id)
+    }
+    #[getter]
+    fn is_directed(&self) -> bool {
+        self.inner.is_directed()
+    }
+    fn node_attr(&self, py: Python, id: NodeId, name: &str) -> PyResult<PyObject> {
+        match self
+            .inner
+            .node_attr(id, &name.into())
+            .map_err(graph_error_to_py_err)?
+        {
+            Some(value) => attr_value_to_python_value(py, &value),
+            None => Ok(py.None()),
+        }
+    }
+    fn edge_attr(&self, py: Python, id: EdgeId, name: &str) -> PyResult<PyObject> {
+        match self
+            .inner
+            .edge_attr(id, &name.into())
+            .map_err(graph_error_to_py_err)?
+        {
+            Some(value) => attr_value_to_python_value(py, &value),
+            None => Ok(py.None()),
+        }
+    }
+    fn has_node_attribute(&self, id: NodeId, name: &str) -> PyResult<bool> {
+        self.inner
+            .has_node_attribute(id, &name.into())
+            .map_err(graph_error_to_py_err)
+    }
+    fn has_edge_attribute(&self, id: EdgeId, name: &str) -> PyResult<bool> {
+        self.inner
+            .has_edge_attribute(id, &name.into())
+            .map_err(graph_error_to_py_err)
+    }
+    fn node_attribute_keys(&self, id: NodeId) -> PyResult<Vec<String>> {
+        self.inner
+            .node_attribute_keys(id)
+            .map_err(graph_error_to_py_err)
+    }
+    fn edge_attribute_keys(&self, id: EdgeId) -> PyResult<Vec<String>> {
+        self.inner
+            .edge_attribute_keys(id)
+            .map_err(graph_error_to_py_err)
+    }
+    fn edge_endpoints(&self, id: EdgeId) -> PyResult<(NodeId, NodeId)> {
+        self.inner.edge_endpoints(id).map_err(graph_error_to_py_err)
+    }
+    fn neighbors(&self, id: NodeId) -> PyResult<Vec<NodeId>> {
+        self.inner.neighbors(id).map_err(graph_error_to_py_err)
+    }
+    fn incident_edges(&self, id: NodeId) -> PyResult<Vec<EdgeId>> {
+        self.inner.incident_edges(id).map_err(graph_error_to_py_err)
+    }
+    fn degree(&self, id: NodeId) -> PyResult<usize> {
+        self.inner.degree(id).map_err(graph_error_to_py_err)
+    }
+    fn out_degree(&self, id: NodeId) -> PyResult<usize> {
+        self.inner.out_degree(id).map_err(graph_error_to_py_err)
+    }
+    fn in_degree(&self, id: NodeId) -> PyResult<usize> {
+        self.inner.in_degree(id).map_err(graph_error_to_py_err)
+    }
+    fn select_nodes(&self, py: Python, ids: Vec<NodeId>) -> PyResult<Self> {
+        py.allow_threads(|| self.inner.select_nodes(&ids))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    fn select_edges(&self, py: Python, ids: Vec<EdgeId>) -> PyResult<Self> {
+        py.allow_threads(|| self.inner.select_edges(&ids))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    /// Cheap ownership copy; the frozen state and selected membership remain shared.
+    fn copy(&self) -> Self {
+        self.clone()
+    }
+}

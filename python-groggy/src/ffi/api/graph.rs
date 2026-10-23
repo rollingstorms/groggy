@@ -1036,6 +1036,15 @@ impl PyGraph {
         Ok(edge_ids)
     }
 
+    /// Capture immutable current state; later working-graph writes do not alter this view.
+    fn read_view(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        self.inner
+            .borrow()
+            .read_view()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     /// Filter nodes using NodeFilter object or string query
     ///
     /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead

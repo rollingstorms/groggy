@@ -199,8 +199,8 @@ pub use storage::{
 pub use state::{ChangeTracker, ColumnDelta, DeltaObject, GraphSpace};
 pub use storage::array::NumArray as StatsArray;
 pub use subgraphs::{
-    AggregationFunction, ComponentSubgraph, FilteredSubgraph, HierarchicalOperations, MetaNode,
-    NeighborhoodSubgraph, SimilarityMetric,
+    AggregationFunction, ComponentSubgraph, FilteredSubgraph, GraphView, HierarchicalOperations,
+    MetaNode, NeighborhoodSubgraph, SimilarityMetric,
 };
 pub use temporal::TemporalSnapshot;
 

@@ -438,6 +438,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyGraph>()?;
     m.add_class::<ffi::api::durable::PyDurableGraph>()?;
     m.add_class::<PySubgraph>()?;
+    m.add_class::<ffi::subgraphs::view::PyGraphView>()?;
 
     // Register array and matrix types
     m.add_class::<PyBaseArray>()?;

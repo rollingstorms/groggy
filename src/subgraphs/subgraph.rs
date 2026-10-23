@@ -324,6 +324,16 @@ impl Subgraph {
         Ok(induced_edges)
     }
 
+    /// Explicitly freeze this selection's current values/topology, without changing its write owner.
+    /// Fails if selected IDs are no longer active; does not reconstruct a historical state.
+    pub fn pin_view(&self) -> GraphResult<crate::subgraphs::GraphView> {
+        crate::subgraphs::GraphView::from_membership(
+            self.graph.borrow().pin_current_state()?,
+            self.nodes.as_ref().clone(),
+            self.edges.as_ref().clone(),
+        )
+    }
+
     /// Get reference to the parent graph (for read operations)
     pub fn graph(&self) -> Rc<RefCell<Graph>> {
         self.graph.clone()

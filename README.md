@@ -56,6 +56,8 @@ result = graph.view().apply(algo)
 ```
 
 ### Documentation
+
+- Immutable read views: [current API and scope](docs/immutable-read-views.md)
 - Algorithms Guide: https://rollingstorms.github.io/groggy/guide/algorithms/
 - Builder DSL: https://rollingstorms.github.io/groggy/guide/builder/
 - Tutorials: https://rollingstorms.github.io/groggy/builder/tutorials/

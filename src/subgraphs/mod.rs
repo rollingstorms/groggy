@@ -14,6 +14,7 @@ pub mod hierarchical;
 pub mod neighborhood;
 pub mod subgraph;
 pub mod visualization;
+pub mod view;
 
 pub use component::*;
 pub use composer::*;
@@ -22,3 +23,5 @@ pub use hierarchical::*;
 pub use neighborhood::*;
 pub use subgraph::*;
 pub use visualization::*;
+
+pub use view::GraphView;

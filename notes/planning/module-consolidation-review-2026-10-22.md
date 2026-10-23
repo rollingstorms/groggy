@@ -75,3 +75,11 @@ membership/adjacency ownership. Ordinary graph/table view migration remains open
 `pinned-read-state-foundation-2026-10-22.md`. Measured fresh capture cost requires
 related views to share a pin; property writes do not advance topology version, so
 that version cannot identify cached property state.
+
+## AR7.5b immutable selection representation
+
+GraphView now owns canonical immutable membership over the shared read pin, with
+explicit native/Python factories and edge-scoped nested selections. It has no
+working mutation owner. Existing adapters still need migration; do not relabel
+their live reads. Read-state incidence/index cost is measured and documented in
+`immutable-selection-contract-2026-10-22.md` and its benchmark note.

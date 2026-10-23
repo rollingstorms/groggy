@@ -35,10 +35,16 @@ impl ExistenceIndex {
     }
 }
 #[derive(Debug)]
+struct Adjacency {
+    neighbors: Vec<NodeId>,
+    edges: Vec<EdgeId>,
+}
+#[derive(Debug)]
 struct ReadData {
     snapshot: GraphSnapshot,
     existence: ExistenceIndex,
-    adjacency: HashMap<NodeId, Vec<NodeId>>,
+    adjacency: HashMap<NodeId, Adjacency>,
+    incident: HashMap<NodeId, Vec<EdgeId>>,
 }
 /// Cheap clones share frozen topology and values; no writable graph owner is exposed.
 /// Capturing current state does not create a checkpoint or record a mutation.
@@ -57,25 +63,42 @@ impl PinnedReadState {
         let edges = snapshot.edges.keys().copied().collect();
         let mut adjacency: HashMap<_, Vec<_>> =
             nodes.iter().map(|&node| (node, Vec::new())).collect();
-        for &(source, target) in snapshot.edges.values() {
+        let mut incident: HashMap<_, Vec<_>> =
+            nodes.iter().map(|&node| (node, Vec::new())).collect();
+        for (&edge, &(source, target)) in &snapshot.edges {
             if !nodes.contains(&source) || !nodes.contains(&target) {
                 return Err(GraphError::InvalidInput(
                     "Read snapshot edge has an inactive endpoint".into(),
                 ));
             }
-            adjacency.entry(source).or_default().push(target);
+            incident.entry(source).or_default().push(edge);
+            if source != target {
+                incident.entry(target).or_default().push(edge);
+            }
+            adjacency.entry(source).or_default().push((target, edge));
             if snapshot.graph_type == GraphType::Undirected && source != target {
-                adjacency.entry(target).or_default().push(source);
+                adjacency.entry(target).or_default().push((source, edge));
             }
         }
         for neighbors in adjacency.values_mut() {
             neighbors.sort_unstable();
         }
+        for edges in incident.values_mut() {
+            edges.sort_unstable();
+        }
+        let adjacency = adjacency
+            .into_iter()
+            .map(|(node, pairs)| {
+                let (neighbors, edges) = pairs.into_iter().unzip();
+                (node, Adjacency { neighbors, edges })
+            })
+            .collect();
         Ok(Self {
             data: Arc::new(ReadData {
                 snapshot,
                 existence: ExistenceIndex::new(nodes, edges),
                 adjacency,
+                incident,
             }),
         })
     }
@@ -114,6 +137,14 @@ impl PinnedReadState {
     }
     /// Sorted neighbor occurrences; parallel edges repeat neighbors, self-loops occur once.
     pub fn neighbors(&self, id: NodeId) -> Option<&Vec<NodeId>> {
-        self.data.adjacency.get(&id)
+        self.data.adjacency.get(&id).map(|entry| &entry.neighbors)
+    }
+    /// Edge IDs aligned with neighbor occurrences, enabling edge-scoped views.
+    pub fn neighbor_edges(&self, id: NodeId) -> Option<&Vec<EdgeId>> {
+        self.data.adjacency.get(&id).map(|entry| &entry.edges)
+    }
+    /// Incident edge instances in stable ID order; loops occur once.
+    pub fn incident_edges(&self, id: NodeId) -> Option<&Vec<EdgeId>> {
+        self.data.incident.get(&id)
     }
 }

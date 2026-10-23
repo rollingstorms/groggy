@@ -2470,6 +2470,11 @@ impl Graph {
         Ok(())
     }
 
+    /// Capture a full immutable read selection of the current working graph.
+    pub fn read_view(&self) -> GraphResult<crate::subgraphs::GraphView> {
+        Ok(crate::subgraphs::GraphView::all(self.pin_current_state()?))
+    }
+
     /// Capture immutable current read state, including uncheckpointed property edits.
     /// No commit/delta is created; clones of the result share its frozen values.
     pub fn pin_current_state(&self) -> GraphResult<crate::state::PinnedReadState> {

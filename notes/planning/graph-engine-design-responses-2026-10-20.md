@@ -788,3 +788,16 @@ without a checkpoint/delta and rejects dangling referents. Clone/read-worker
 transfer retains frozen values. Do not use checkpoint ID/topology version as a
 property-sensitive read cache key. Ordinary graph/table view read/write ownership
 remains open; see `pinned-read-state-foundation-2026-10-22.md`.
+
+### AR7.5b — Immutable scoped selections and Python read API
+
+GraphView shares frozen state and membership across copies/children; parent edge
+scope is preserved for non-induced and parallel facts. Edge-aligned adjacency/
+incidence gives degree-proportional scoped reads with explicit directed/loop
+counts. Graph.read_view/Subgraph.pin_view are native-backed Python entry points;
+null presence, out-of-scope errors, owner lifetime and read-worker behavior are
+covered by native tests and 176 rebuilt Python regressions (one existing skip).
+Strict core Clippy passes; both documented examples execute. Record indexed
+capture cost versus cheap pin/view sharing in the immutable graph-view benchmark
+note. Ordinary Subgraph/table/algorithm read-owner migration remains open; see
+`immutable-selection-contract-2026-10-22.md`.

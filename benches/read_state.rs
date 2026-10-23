@@ -26,6 +26,19 @@ fn read_state(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("clone", count), &pin, |b, pin| {
             b.iter(|| black_box(pin.clone()));
         });
+        group.bench_with_input(BenchmarkId::new("full_view", count), &pin, |b, pin| {
+            b.iter(|| black_box(groggy::GraphView::all(pin.clone())));
+        });
+        let selected = groggy::GraphView::all(pin.clone())
+            .select_nodes(&nodes[..count / 2])
+            .unwrap();
+        group.bench_with_input(
+            BenchmarkId::new("selected_clone", count),
+            &selected,
+            |b, view| {
+                b.iter(|| black_box(view.clone()));
+            },
+        );
     }
     group.finish();
 }

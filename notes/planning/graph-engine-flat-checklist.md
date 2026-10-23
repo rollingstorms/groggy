@@ -38,9 +38,11 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 6 | Finish presentation/API consolidation, differential/failure/scale evidence, operational tooling and core release documentation. | AR5, AR7.6, AR7.11; 01.2, 09.5, 19.2, 31.3–31.4, 32.1–32.3, 33.2–33.3, 34.1–34.2 | Tests/docs run throughout. Service/scale commitments require A15; complete embedded and multi-user milestones separately. |
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
-**Immediate next task:** numerical closeout after completed AR7.2/AR7.3: a finite
-supported-surface finding list, wider size/fill/dispatch measurements, public API
-and strict lint review. Then AR7.4/entity handles and AR7.5/pinned ownership.
+**Immediate next task:** migrate existing graph/table adapters and algorithm/query
+read consumers onto the shared immutable state/membership representation, while
+keeping their working mutation owner separate. AR7.2–AR7.4 and numerical findings
+29.60–29.63 are implemented; AR7.5a–b supply shared pins and explicit immutable
+selections. Broader numerical capability/production gates retain their own scope.
 Preserve current APIs and compatibility re-exports. A finding is resolved by
 implementation/evidence or an explicit owner-approved deferral, not by silently
 weakening a promised capability or adding every optional enhancement as a blocker.
@@ -212,6 +214,7 @@ weakening a promised capability or adding every optional enhancement as a blocke
 - [x] **AR7.4 — One entity-handle family.** Consolidate EntityNode/EntityEdge and Node/Edge graph-backed wrappers under entities; preserve ID/trait/mutation/history behavior and compatibility names. Keep pooled value storage separate from entity handles; migrate every actual caller. Canonical Node/Edge state is now under entities; explicit legacy adapters preserve constructor/trait policies and storage imports are facades. See `entity-handle-consolidation-2026-10-22.md`.
 - [ ] **AR7.5 — Shared view state and membership ownership.** Consolidate common membership, state/time pins, cache validity and adjacency scope across subgraph variants. Retain filter/component/neighborhood metadata and efficient specialized algorithms. Complete AR4/26 contracts rather than treating code movement as proof that a view is immutable.
 - [x] **AR7.5a — Shared immutable current/historical read payload.** Native current-state capture includes dirty typed values without recording history; TemporalSnapshot delegates to the same Arc-owned values/membership/adjacency. No topology-version cache. `pinned-read-state-foundation-2026-10-22.md`; ordinary Subgraph/table read and mutation-owner migration remains open in AR7.5/AR4/26.1.
+- [x] **AR7.5b — Canonical immutable selection and native/Python read API.** GraphView shares frozen values and Arc membership, respects parent edge scope in nested selections, indexes edge instances for directed/loop/parallel topology, distinguishes null/absent, and outlives its owner. `Graph.read_view()`/`Subgraph.pin_view()` are explicit entry points; existing Subgraph/table migration remains open. Evidence: `immutable-selection-contract-2026-10-22.md`.
 - [ ] **AR7.6 — One display foundation.** Consolidate display/viz-display configuration, data formatting and truncation; use thin Python/interactive adapters. Preserve intentional presentation differences and examples. Move presentation responsibilities out of misleading core compatibility exports after callers migrate.
 - [ ] **AR7.7 — Shared expression/query semantics.** Inventory array filters, graph query parsing and builder expressions; share supported scalar predicate/value semantics and explicit lowering. Preserve distinct graph traversal planning and documented language features; test current APIs before retiring parallel parsing paths.
 - [ ] **AR7.8 — Coherent algorithm execution boundary.** Map algorithm pipelines, steps, Python IR and batch plans to one validation/lowering/execution contract, retaining distinct composition levels. Remove overlapping execution paths only after feature parity/cancellation/state ownership evidence; resolve A14 before changing naming/history policy.

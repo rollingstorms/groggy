@@ -184,6 +184,14 @@ impl PySubgraph {
         self.inner.node_count() // SubgraphOperations::node_count()
     }
 
+    /// Explicit frozen read selection of the current working state.
+    fn pin_view(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        self.inner
+            .pin_view()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     /// Node count property
     fn node_count(&self) -> usize {
         self.inner.node_count() // SubgraphOperations::node_count()
