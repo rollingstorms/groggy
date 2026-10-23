@@ -47,6 +47,15 @@ Preserve current APIs and compatibility re-exports. A finding is resolved by
 implementation/evidence or an explicit owner-approved deferral, not by silently
 weakening a promised capability or adding every optional enhancement as a blocker.
 
+## Owner answer update — 2026-10-22
+
+[Workbook answers](workbook-answers-2026-10-22.md) now authorize f64 defaults,
+per-revision group references, same-time accepted-version ordering, endpoint
+validity rejection and other recorded changes. Implementation boxes remain open
+until those changes are built/verified. Publication defaults, restore source and
+purge protections await clarification; omitted answers are not accepted policies.
+Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
+
 ## Flat implementation checklist
 
 - [x] **01.1 — Established graph baseline.** Verify empty construction, undirected default, explicit directed creation, and the one-node/no-edge minimum in Rust and Python. Evidence: `engine_contract` suites.
@@ -66,6 +75,8 @@ weakening a promised capability or adding every optional enhancement as a blocke
 - [x] **07.1 — Logical property bridge.** Preserve existing scalar, binary, typed-vector, and structured values across Rust/Python reads, columns, table cells, and recorded snapshots; repair equality/hash/order and corrupt-value errors.
 - [x] **07.2 — Typed active export.** Versioned active export preserves inline logical types and float bits, accepts legacy reads, and rejects unsupported pooled references explicitly.
 - [ ] **07.3 — Partial: complete intended property types.** Add native temporal types and settle/verify numeric widths beyond current i64/f32 properties; support pooled/meta references portably across history and storage.
+- [ ] **07.3a — Accepted: f64 floating defaults and property representation.** Change ordinary Python float/default numerical precision to f64, add lossless typed representation across scalar/vector bridges as applicable, schema, history, codecs/journal, queries and algorithms. Preserve explicitly typed existing f32 data and verify old-format reads; widening cannot recover lost bits. Workbook A06.2/A13.2 are confirmed; implementation remains open.
+- [ ] **07.3b — Accepted: native UTC instant, calendar date and duration.** Implement distinct first-class types with versioned encoding and Rust/Python/history/schema round trips. Local/timezone calendar types require precise follow-on rules; do not infer them from strings. Workbook A06.1.
 - [ ] **07.4 — Partial: finish value-change semantics.** Verify null versus absence, unset versus removal, type changes, structured/vector changes, and all logical values through every history/storage path. Decide large-value deduplication rather than assume it exists.
 - [x] **08.1 — Semantic kinds.** Version multiple node labels independently of base/meta identity and support optional edge relationship types; validate shapes before checked writes.
 - [x] **08.2 — Schema auditing and checked enforcement.** Audit required/nullable/type rules; validate the complete proposed checked-batch result; support an installed durable schema policy and schema revisions.
@@ -92,13 +103,13 @@ weakening a promised capability or adding every optional enhancement as a blocke
 - [ ] **15.1 — Open: destructive retention policy.** Define explicit branch deletion/pruning, shared-referent reachability, audit retention, and when inactive identities/attributes may finally be purged.
 - [ ] **15.2 — Open: real garbage collection.** Replace no-op gc_history/optimize behavior with tested reachability, compaction, and crash-safe reclamation; preserve every retained snapshot/provenance reference.
 - [x] **16.1 — Effective-time write metadata.** Checked changes accept explicit effective timestamps or batch defaults; the engine separately records acceptance time.
-- [ ] **16.2 — Open: reconstructed effective-time graph.** Resolve branch-scoped state at T using the published head pinned at view creation, including topology and property changes between checkpoints. Existing whole-second commit timestamp selection is insufficient.
+- [ ] **16.2 — Open: reconstructed effective-time graph.** Resolve branch-scoped state at T using the published head pinned at view creation, including topology and property changes between checkpoints. Equal-time assignments use later accepted version order; invalid endpoint timelines reject atomically (A04). Existing whole-second commit timestamp selection is insufficient.
 - [ ] **16.3 — Open: optional recorded cutoff.** Apply recorded_by=U only when explicitly requested; propagate state/time pins into derived subgraphs and tables. Verify one property value per effective timestamp and correction ordering.
 - [ ] **17.1 — Open: first-class provenance.** Represent episodes/meta nodes, repeated evidence for a fact, retained raw content, and links among sources/entities/facts.
 - [ ] **17.2 — Open: evidence correction and withdrawal.** Record corrections/invalidation as historical changes without erasing retained evidence; define how provenance participates in recovery and pruning.
 - [x] **18.1 — Managed identity index.** Index allocation-lifetime external IDs with active/group checks; persist reservations for supported durable writes. Historical identity lookup currently scans pinned properties.
 - [ ] **18.2 — Open: remaining indexes.** Implement/verify global label, relationship type, endpoint, property equality/range, group, and time-window selection with the chosen explicit index lifecycle.
-- [ ] **18.3 — Open: index consistency.** Specify delta-driven maintenance versus explicit rebuild; test updates, deactivation, branch switches, historical reads, failed publication, and recovery. Avoid hidden rebuild semantics.
+- [ ] **18.3 — Open: index consistency.** Specify delta-driven maintenance versus explicit rebuild; test updates, deactivation, branch switches, historical reads, failed publication, and recovery. Unavailable requested indexes fail unless a scan is explicit (A11.2); do not infer automatic rebuild/recovery policy from that answer.
 - [x] **19.1 — Python coverage for repaired slices.** Rebuild and test property conversion, identity, checked batches/writer, schema, supported durability/history, and repaired numerical/graph algorithms across the bridge.
 - [ ] **19.2 — Partial: one complete Python contract.** Finish temporal/query/view/table APIs, consistent errors/types, view-versus-copy documentation, API compatibility rules, and safe GIL release where supported by ownership.
 - [ ] **20.1 — Deferred: Graphiti ingest adapter.** After core completion, select a compatibility release and round-trip episodes/entities/facts, IDs/groups, attributes, embeddings, time fields, and provenance losslessly.
@@ -191,7 +202,7 @@ weakening a promised capability or adding every optional enhancement as a blocke
 - [x] **31.2 — Focused independent computation references.** Repaired slices include direct mathematical/path/reachability references and numerical comparisons; these are narrower than a full external-backend suite.
 - [ ] **31.3 — Open: Neo4j/NetworkX comparisons.** Use shared fixtures with explicit direction, weight, loop, parallel-edge, history, and query semantics; report divergence rather than claim untested parity.
 - [ ] **31.4 — Open: extend failure injection.** Cover secondary indexes, pooled/meta writes, checkpoints/compaction/migrations, concurrent conflicts, and later adapter/driver workflows.
-- [ ] **32.1 — Partial: representative benchmark corpus.** Existing bounded debug profiles are evidence for their fixtures only. Define sizes, degree distributions, property payloads, history depth, latency targets, and memory budgets.
+- [ ] **32.1 — Partial: representative benchmark corpus.** Existing bounded debug profiles are evidence for their fixtures only. Define sizes, degree distributions, property payloads, history depth, latency targets, and memory budgets. Initial A02/A15 warm journal-opening wall/CPU baseline: `notes/benchmarks/journal-open-development-2026-10-22.md`; no production budget chosen.
 - [ ] **32.2 — Open: ingestion/query/history scale.** Measure bulk writes, indexed lookups, temporal reconstruction, neighborhoods, recovery, and retained-state growth, including million/billion-scale goals where feasible.
 - [ ] **32.3 — Open: analytics scale.** Measure vector/dense/sparse operations and graph kernels with repeatable allocation/memory/time reports; optimize measured bottlenecks. Embeddings do not replace all retained text or remove memory budgeting.
 - [ ] **32.4 — Deferred: retrieval benchmarks.** Measure lexical/vector/hybrid relevance and latency after those features exist; no zero-latency guarantee is assumed.

@@ -870,3 +870,29 @@ preparation/search/path assembly release the GIL. Full native suites and strict
 core Clippy pass; rebuilt weighted-path/read/history Python gate: 325 passed,
 five existing skips. Eight examples execute. Scope, edge assembly and costs:
 `frozen-astar-contract-2026-10-22.md`. Broader algorithms remain open.
+
+## Owner workbook answers — 2026-10-22
+
+The owner supplied appendix answers and confirmed three clarifications: f64 means
+64-bit floating point/default Python floats; later accepted writes win same-key/
+effective-time ties; explicit group membership/source-pin revisions receive new
+immutable references. Distributed subnode and meta-node property edits retain
+their own mutation targets. Selected-state copy is the default; history transfer
+is explicit. Invalid endpoint validity rejects (overriding retain-and-hide), unset
+stays absent, and the first temporal types are UTC instant/date/duration.
+
+Other answers address checkpoint measurement/deferred scheduling, verified format
+conversion, immediate terminology migration, staged schema migration, table mixed
+atomic writeback, explicit index failure, compatible component modes, one optimal
+path, transient pipelines, timing metrics, explicit duplicate coalescing and a
+synthetic future integration fixture. The complete question-by-question record,
+qualifications, unfilled questions and pending clarification requests are in
+`workbook-answers-2026-10-22.md`; the appendix source now contains the answers.
+
+These are implementation directions, not completed code. In particular, f64
+matrix operations do not mean property storage has stopped narrowing to f32.
+Existing typed storage must remain readable; no historical precision can be
+recovered after prior narrowing. Publication default/restore-source/purge
+clarifications and all omitted fields remain unchosen. No destructive maintenance
+is authorized by an ambiguous answer. The opening benchmark is a bounded warm
+in-tree development baseline, not a production budget or checkpoint schedule.

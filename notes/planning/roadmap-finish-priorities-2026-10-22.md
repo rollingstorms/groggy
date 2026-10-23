@@ -22,6 +22,28 @@ remain separate from the completed owned table projections. Ordinary legacy
 Subgraph/table reads are not yet certified frozen. Stages 3–6 retain their existing
 partial/open work and specific workbook dependencies; no blank policy is accepted.
 
+## Owner answers received — 2026-10-22
+
+See [the answer record](workbook-answers-2026-10-22.md) and updated appendix.
+Group revision references/selected-state copying, same-effective-time ordering,
+endpoint validity rejection, persistent absence after unset, f64 floating defaults,
+UTC instant/date/duration types, staged schema migration, mixed table writeback,
+explicit index failure, component/path defaults and transient pipeline runs now
+have recorded directions. These decisions are not implementation completion.
+
+The accepted f64 default intentionally supersedes earlier preserve-f32-default
+recommendations. Implement tagged f64 properties and bridge/codec/history/schema/
+numerical/query migration before declaring the final property format complete;
+keep existing tagged data readable. Native matrix f64 support alone does not do
+this. Endpoint validity now rejects invalid timelines rather than silently hiding
+an edge. No generic silent index-to-scan fallback is authorized.
+
+Automatic-publication defaults, the exact restore source and purge protections
+have clarification requests pending. A07.1 is tentative; A08 and other unanswered
+fields remain open. Checkpoint scheduling is explicitly deferred until MVP/first
+use; opening-time measurement can proceed now without inventing a log budget.
+A10.1 concerns duplicated source rows, not automatic creation of graph entities.
+
 ## Immediate work, without waiting for the whole workbook
 
 1. **AR7.2 — one matrix module.** Use the current 455 Python regressions, full
@@ -100,8 +122,8 @@ fields as approval.
 
 | Priority | Appendix | What the answers unlock |
 | --- | --- | --- |
-| First | A01, A03–A06 | Retained group/meta identity/copy rules; migration of legacy writes/names; same-time corrections and endpoint validity; unset/restore semantics; temporal types and property float precision. These are the next substantial core history decisions. |
-| Next | A02, A07–A11 | Checkpoint/upgrade budgets, schema evolution, merge conflicts, retention/purge, table writeback and index loading/fallback. Needed before corresponding durable/lifecycle behavior is finalized. |
+| First | A01, A03–A06 | Retained group/meta identity/copy rules; migration of legacy writes/names; same-time corrections and endpoint validity; unset/restore semantics; temporal types and property float precision. Most now have owner answers; see the answer record for the remaining publication/restore clarifications. |
+| Next | A02, A07–A11 | Checkpoint/upgrade budgets, schema evolution, merge conflicts, retention/purge, table writeback and index loading/fallback. Some answered; schema-branch/merge/purge/rebuild choices still need resolution before their lifecycle behavior is finalized. |
 | Alongside algorithm/numerical closure | A12–A13, A16 | Compatibility choices, numerical guarantees and duplicate/retry extensions. Preserve existing established direction, exact-shape, checked precision and rejection rules until an explicit change is accepted. |
 | Before pipeline/service commitments | A14–A15 | Intermediate naming/run provenance and actual scale/service budgets. These do not block module moves or independent correctness work. |
 | After core, before Graphiti integration | A17 | Compatibility release and correction-versus-parallel-fact adapter identity. |

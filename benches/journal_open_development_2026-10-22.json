@@ -1,0 +1,90 @@
+{
+  "profile": "development in-tree native Python extension",
+  "platform": "macOS-26.3.1-arm64-arm-64bit",
+  "python": "3.9.6",
+  "sample_count": 7,
+  "scope": "Warm filesystem cache, fixed one-node graph, growing checked journal. Open includes lock/header/checksum/replay through API return; setup, validation and close excluded. Process CPU is not kernel-only compute. No cold-open, release, memory, scale or SLA claim.",
+  "cases": [
+    {
+      "live_nodes": 1,
+      "live_edges": 0,
+      "property_updates": 0,
+      "accepted_batches": 1,
+      "journal_bytes": 1052,
+      "open_wall_ns": [
+        161833,
+        136417,
+        132166,
+        129667,
+        124916,
+        120250,
+        119209
+      ],
+      "open_process_cpu_ns": [
+        168000,
+        138000,
+        133000,
+        130000,
+        125000,
+        120000,
+        120000
+      ],
+      "median_wall_ns": 129667,
+      "median_process_cpu_ns": 130000
+    },
+    {
+      "live_nodes": 1,
+      "live_edges": 0,
+      "property_updates": 100,
+      "accepted_batches": 101,
+      "journal_bytes": 43283,
+      "open_wall_ns": [
+        5927542,
+        5717292,
+        5683584,
+        5679042,
+        5641542,
+        5617000,
+        5686125
+      ],
+      "open_process_cpu_ns": [
+        5932000,
+        5718000,
+        5686000,
+        5679000,
+        5643000,
+        5617000,
+        5681000
+      ],
+      "median_wall_ns": 5683584,
+      "median_process_cpu_ns": 5681000
+    },
+    {
+      "live_nodes": 1,
+      "live_edges": 0,
+      "property_updates": 1000,
+      "accepted_batches": 1001,
+      "journal_bytes": 426218,
+      "open_wall_ns": [
+        56259792,
+        56372833,
+        56496416,
+        55926958,
+        57274541,
+        55980500,
+        55971500
+      ],
+      "open_process_cpu_ns": [
+        56260000,
+        56328000,
+        56492000,
+        55905000,
+        57261000,
+        55977000,
+        55960000
+      ],
+      "median_wall_ns": 56259792,
+      "median_process_cpu_ns": 56260000
+    }
+  ]
+}

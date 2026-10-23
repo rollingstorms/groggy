@@ -2,7 +2,7 @@
 
 Companion to the design workbook. Baseline: `c01f20d4`, branch `groggy-roadmap-2026-10-20`. The PDF has printable/fillable answer fields. Roadmap numbers below use the staged 1-34 list.
 
-**Status:** these are unresolved choices and provisional suggestions, not new accepted decisions. Existing owner decisions remain authoritative. Blank answers do not authorize a new direction. Core implementation can continue where accepted decisions already provide enough guidance.
+**Status (updated 2026-10-22):** owner answers and explicit clarifications are recorded below and in [the answer record](workbook-answers-2026-10-22.md). Unanswered choices and suggestions remain provisional. An accepted answer authorizes implementation; it does not mark that implementation complete. Existing owner decisions remain authoritative. Blank answers do not authorize a new direction. Core implementation can continue where accepted decisions already provide enough guidance.
 
 ## Reading order
 
@@ -17,7 +17,7 @@ policies. A12–A13/A16 accompany relevant compatibility/verification work;
 A14–A15 precede pipeline/service commitments; A17 stays behind core completion.
 Module consolidation and accepted read/ownership/numerical correctness work can
 continue now. This reading order does not supply answers or override established
-choices; all blank decision fields below remain unchanged.
+choices; unanswered decision fields below remain unchanged.
 
 ## Established constraints
 
@@ -43,13 +43,13 @@ Roadmap: 10, 12, 26 / AR1, AR4, AR6. Timing: NEXT CORE DEPENDENCY.
 
 Suggested: a new reference per revision; add stable group identity only where useful.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: subnode/meta property edits target their own entities. Group membership/source-pin revisions receive new immutable references; old references remain readable.
 
 ### A01.2 - When a subgraph is copied into another graph, should copying include its retained source history, or materialize only the selected state?
 
 Suggested: materialize the selected state by default; history transfer is explicit.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: materialize selected state by default; retained history transfer is explicit.
 
 Notes / conditions: ____________________
 
@@ -74,13 +74,13 @@ Roadmap: 10, 12, 33 / AR6. Timing: BEFORE COMPACT RECOVERY.
 
 Suggested: measure first; set an opening-time target and a maximum log budget.
 
-Decision: ____________________
+Decision (2026-10-22): Measure opening/recovery time. Defer checkpoint schedule and mandatory budget thresholds until MVP/first use.
 
 ### A02.2 - For a storage-format upgrade, is a verified side-by-side conversion acceptable before switching the manifest, even if it temporarily needs a second copy?
 
 Suggested: side-by-side conversion, preserving the original until verification succeeds.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: verified side-by-side conversion; preserve original until verified. Checkpoint compression is optional, not its definition.
 
 Notes / conditions: ____________________
 
@@ -111,7 +111,7 @@ Decision: ____________________
 
 Suggested: collect your real examples and test them before deprecating any names.
 
-Decision: ____________________
+Decision (2026-10-22): Audit real examples/fixtures; proceed with terminology/API changes now. A03.1 default publication awaits separate clarification.
 
 Notes / conditions: ____________________
 
@@ -136,13 +136,13 @@ Roadmap: 11, 16 / AR3. Timing: BEFORE EFFECTIVE-TIME READS.
 
 Suggested: later accepted version wins; an explicit recorded cutoff can reveal the earlier value.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: explicit effective-time mutation events; later accepted version wins same-key/effective-time ties. Reads/computation do not create changes.
 
 ### A04.2 - If an edge is effective before one endpoint exists, should ingestion reject that combination or retain it but hide the edge outside endpoint validity?
 
 Suggested: retain the record and expose only topology with active endpoints; provide a diagnostic.
 
-Decision: ____________________
+Decision (2026-10-22): Reject unsupported endpoint validity, overriding the retain-and-hide suggestion. Validate proposed timelines atomically.
 
 Notes / conditions: ____________________
 
@@ -167,13 +167,13 @@ Roadmap: 7, 11, 16. Timing: BEFORE PROPERTY-HISTORY COMPLETION.
 
 Suggested: absence persists until another set; never silently resurrect an old value.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: remain absent until another explicit assignment.
 
 ### A05.2 - When an entity is explicitly restored, should its previous properties return automatically, or must the caller choose a retained state/payload?
 
 Suggested: restore from an explicit retained state, with an optional patch.
 
-Decision: ____________________
+Decision (2026-10-22): Restore previous properties by default unless explicitly overridden; default retained cutoff awaits clarification.
 
 Notes / conditions: ____________________
 
@@ -198,13 +198,13 @@ Roadmap: 7, 29. Timing: BEFORE FINAL PROPERTY FORMAT.
 
 Suggested: UTC instant, calendar date and duration first; add local/timezone types with precise rules.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed suggestion: UTC instant, calendar date and duration first; distinct typed/versioned representations.
 
 ### A06.2 - Should ordinary Python floats continue mapping to f32 for compatibility, with an explicit f64 constructor, or change default in a major release?
 
 Suggested: preserve f32 compatibility and expose f64 explicitly before changing defaults.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: change ordinary Python float default to f64. Preserve existing typed data during migration; see answer record for memory discussion.
 
 Notes / conditions: ____________________
 
@@ -229,13 +229,13 @@ Roadmap: 8, 10, 14. Timing: BEFORE ONTOLOGY MIGRATION.
 
 Suggested: retain a global write policy initially; add branch schema identity only with a concrete need.
 
-Decision: ____________________
+Decision (2026-10-22): Tentative owner answer: “You could, I guess.” Global versus branch schema policy remains unresolved.
 
 ### A07.2 - When a migration cannot validate a whole graph, should it remain unpublished until complete, or use explicitly named intermediate compatible revisions?
 
 Suggested: explicit compatible migration stages, each atomic and separately recorded.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: explicit compatible migration stages, each atomic and recorded.
 
 Notes / conditions: ____________________
 
@@ -291,13 +291,13 @@ Roadmap: 15, 33 / AR1, AR6. Timing: BEFORE DESTRUCTIVE MAINTENANCE.
 
 Suggested: named checkpoints pin history; optional explicit audit pins use the same retention mechanism.
 
-Decision: ____________________
+Decision (2026-10-22): Owner rejects proposal (“no”); exact checkpoint/audit retention interaction awaits clarification. No implicit purge.
 
 ### A09.2 - What grace period and backup requirement should protect an explicit destructive purge, and should strict audit retention be an optional graph policy?
 
 Suggested: configurable grace period and an optional strict audit policy; preview the affected states.
 
-Decision: ____________________
+Decision (2026-10-22): Owner rejects combined proposal (“no”); exact grace/backup/audit rule awaits clarification. No destructive change authorized here.
 
 Notes / conditions: ____________________
 
@@ -322,13 +322,13 @@ Roadmap: 26, 27 / AR4. Timing: BEFORE CONNECTED TABLE MIGRATION.
 
 Suggested: reject ambiguous writeback; allow explicit mapping/reduction with validation.
 
-Decision: ____________________
+Decision (2026-10-22): Conditional yes: reject repeated-target/aggregated ambiguity without explicit mapping/reduction. Joins duplicate rows, not graph entities; see answer record.
 
 ### A10.2 - Should a table writeback be able to update nodes and edges together in one mixed batch, or should each source kind require a separate command?
 
 Suggested: allow one mixed atomic writeback when every row has an unambiguous source identity.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: one mixed atomic node/edge writeback batch.
 
 Notes / conditions: ____________________
 
@@ -359,7 +359,7 @@ Decision: ____________________
 
 Suggested: correct scan fallback with inspectable execution status and an optional require-index mode.
 
-Decision: ____________________
+Decision (2026-10-22): Fail when the requested index is unavailable; scanning must be explicitly selected, not a silent fallback.
 
 Notes / conditions: ____________________
 
@@ -384,13 +384,13 @@ Roadmap: 3, 21, 28 / AR2. Timing: DURING CORE ALGORITHM AUDIT.
 
 Suggested: preserve compatibility with a clear default and add explicit weak/strong names.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed suggestion: retain a documented compatibility default and add explicit weak/strong modes.
 
 ### A12.2 - Should shortest-path APIs return one deterministic optimum by default, with all equal optima available only through a separately bounded operation?
 
 Suggested: one deterministic path by default; all-path enumeration requires caller bounds.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: one deterministic optimum by default; all-optima enumeration is separate and bounded.
 
 Notes / conditions: ____________________
 
@@ -421,7 +421,7 @@ Decision: ____________________
 
 Suggested: explicit f64 support, documented tolerances and residual-based verification; no placeholder answers.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed f64 floating-point defaults/support (“S64/X64” clarified as f64); keep explicit errors and tolerance/residual verification.
 
 Notes / conditions: ____________________
 
@@ -452,7 +452,7 @@ Decision: ____________________
 
 Suggested: transient by default; persisting results or provenance is explicit.
 
-Decision: ____________________
+Decision (2026-10-22): Confirmed: transient runs by default; result/provenance persistence is explicit.
 
 Notes / conditions: ____________________
 
@@ -477,7 +477,7 @@ Roadmap: 32, 33. Timing: BEFORE SCALE AND MULTIUSER CLAIMS.
 
 Suggested: start with a measured million-node tier, plus tiny and stress fixtures; set budgets from your hardware.
 
-Decision: ____________________
+Decision (2026-10-22): Add compute elapsed time and end-to-end wall time; label CPU time separately. Exact workload/hardware/budgets remain open.
 
 ### A15.2 - Which limits should the first service enforce: maximum queued writes, timeout/cancellation rules, graph access boundaries and acceptable stale-read behavior?
 
@@ -508,7 +508,7 @@ Roadmap: 5, 6, 9, 10. Timing: POLICY REVIEW / RETRY DESIGN.
 
 Suggested: reject by default; any coalescing is explicit and conflicting values still fail.
 
-Decision: ____________________
+Decision (2026-10-22): Recorded interpretation: reject duplicates by default; coalescing identical repeats is explicit and conflicts still fail.
 
 ### A16.2 - Should generic mixed batches gain an explicit durable request key for safe retries, or should callers reconcile accepted state and external IDs themselves?
 
@@ -539,7 +539,7 @@ Roadmap: 17, 20, 22-25. Timing: DEFERRED - NOT A CORE BLOCKER.
 
 Suggested: pin a released version at integration start and run its actual operation tests.
 
-Decision: ____________________
+Decision (2026-10-22): Use a synthetic documented test example initially; select the real use case/release later. Graphiti remains deferred.
 
 ### A17.2 - What adapter-level identity rule distinguishes correcting an existing fact from adding a parallel fact, especially when its endpoints change?
 
