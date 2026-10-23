@@ -306,6 +306,13 @@ impl GraphView {
     pub fn algorithm_input(&self) -> GraphResult<crate::algorithms::AlgorithmRead> {
         crate::algorithms::AlgorithmRead::new(self.clone())
     }
+    /// Captured component views, ordered by smallest node ID, without writes.
+    pub fn connected_components(
+        &self,
+        mode: crate::algorithms::community::ComponentMode,
+    ) -> GraphResult<Vec<Self>> {
+        self.algorithm_input()?.connected_components(mode, None)
+    }
     /// Reachable hop distances as owned (node ID, distance) rows in ascending ID order.
     pub fn bfs_distances(&self, start: NodeId) -> GraphResult<Vec<(NodeId, i64)>> {
         self.algorithm_input()?.bfs_distances(start, None)

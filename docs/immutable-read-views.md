@@ -257,3 +257,36 @@ Owned cost remains f64; the call writes no graph properties or history. The
 legacy pipeline retains marker-based inputs and its path-index/telemetry API,
 while sharing the same heuristic checks/search kernel. No checked view-writeback
 or whole-pipeline immutable ownership is implied.
+
+## Connected components
+
+`connected_components(mode="undirected")` returns immutable `GraphView` objects
+sharing the input's captured state. The default preserves the existing algorithm
+contract: ignore orientation. `weak` also ignores orientation; `strong` respects
+orientation on directed graphs. On undirected graphs all three modes give the
+same partition. Components are ordered by smallest node ID, with node/edge IDs
+sorted inside each view. Isolates are singleton components and empty inputs return
+an empty list. Cross-component edges are omitted; internal selected parallel
+edges and loops remain separate edge instances.
+
+```python
+components_graph = gr.Graph(directed=True)
+x, y, z, isolated = components_graph.add_nodes(4)
+xy = components_graph.add_edge(x, y)
+yx = components_graph.add_edge(y, x)
+yz = components_graph.add_edge(y, z)
+component_source = components_graph.read_view()
+components_graph.add_edge(z, x)  # Changes the writer, not the captured input.
+strong = component_source.connected_components("strong")
+assert [part.node_ids for part in strong] == [[x, y], [z], [isolated]]
+assert strong[0].edge_ids == [xy, yx]
+assert len(component_source.connected_components()) == 2
+```
+
+Native callers can reuse `AlgorithmRead::connected_components(mode, cancel)` to
+reuse prepared topology. Directed weak/undirected reads build a symmetric CSR;
+strong reads reuse outgoing CSR. Python convenience calls prepare per call and
+release the GIL during computation. These reads write no component property,
+delta, checkpoint, or live component cache. Results remain valid after the writer
+changes or is dropped. Other legacy algorithm wrappers retain their existing
+output/persistence behavior.

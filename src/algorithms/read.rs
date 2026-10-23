@@ -76,6 +76,88 @@ impl AlgorithmRead {
     pub fn csr(&self) -> &Csr {
         &self.csr
     }
+    /// Immutable component selections, ordered by smallest node ID. The default
+    /// undirected mode and weak mode ignore orientation; strong respects it.
+    /// Every result retains only its parent's selected edge instances.
+    pub fn connected_components(
+        &self,
+        mode: super::community::ComponentMode,
+        cancel: Option<&AtomicBool>,
+    ) -> GraphResult<Vec<GraphView>> {
+        use super::community::{components, ComponentMode};
+        let cancelled = || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed));
+        let check = || {
+            if cancelled() {
+                Err(GraphError::InvalidInput("components cancelled".into()))
+            } else {
+                Ok(())
+            }
+        };
+        check()?;
+        if self.nodes.len() >= u32::MAX as usize {
+            return Err(GraphError::InvalidInput(
+                "Components require fewer than u32::MAX nodes".into(),
+            ));
+        }
+        let mut symmetric = Csr::default();
+        let csr = if self.view.is_directed() && mode != ComponentMode::Strong {
+            let edges = self.view.edge_ids();
+            build_csr_from_edges_with_scratch(
+                &mut symmetric,
+                self.nodes.len(),
+                edges.into_iter(),
+                |id| self.index.get(&id).copied(),
+                |edge| self.view.edge_endpoints(edge).ok(),
+                CsrOptions {
+                    add_reverse_edges: true,
+                    sort_neighbors: true,
+                },
+            );
+            &symmetric
+        } else {
+            &self.csr
+        };
+        let mut labels = vec![0; self.nodes.len()];
+        // Local telemetry has no writer, cache, or publication side effects.
+        let mut context = super::Context::default();
+        let count = if mode == ComponentMode::Strong {
+            components::tarjan_components(csr, &mut labels, &mut context, cancel)
+                .map(|groups| groups.len())
+        } else {
+            components::bfs_components(csr, &mut labels, &mut context, cancel)
+                .map(|count| count as usize)
+        }
+        .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+        check()?;
+        let mut groups = vec![Vec::new(); count];
+        for (row, &node) in self.nodes.iter().enumerate() {
+            groups[labels[row] as usize].push(node);
+        }
+        // Group edges in one pass, avoiding one full edge scan per component.
+        let mut edges = vec![Vec::new(); count];
+        for edge in self.view.edge_ids() {
+            check()?;
+            let (source, target) = self.view.edge_endpoints(edge)?;
+            let group = labels[self.index[&source]] as usize;
+            if group == labels[self.index[&target]] as usize {
+                edges[group].push(edge);
+            }
+        }
+        let mut members: Vec<_> = groups.into_iter().zip(edges).collect();
+        members.sort_by_key(|(nodes, _)| nodes[0]);
+        let result = members
+            .into_iter()
+            .map(|(nodes, edges)| {
+                GraphView::from_membership(
+                    self.view.read_state().clone(),
+                    nodes.into_iter().collect(),
+                    edges.into_iter().collect(),
+                )
+            })
+            .collect::<GraphResult<Vec<_>>>()?;
+        check()?;
+        Ok(result)
+    }
     fn source(&self, start: NodeId) -> GraphResult<usize> {
         self.index.get(&start).copied().ok_or_else(|| {
             GraphError::InvalidInput(format!(

@@ -132,6 +132,27 @@ fn read_state(c: &mut Criterion) {
                 )
             });
         });
+        for (name, mode) in [
+            (
+                "components_weak",
+                groggy::algorithms::community::ComponentMode::Weak,
+            ),
+            (
+                "components_strong",
+                groggy::algorithms::community::ComponentMode::Strong,
+            ),
+        ] {
+            group.bench_with_input(
+                BenchmarkId::new(format!("prepared_{name}"), count),
+                &algorithm_input,
+                |b, input| b.iter(|| black_box(input.connected_components(mode, None).unwrap())),
+            );
+            group.bench_with_input(
+                BenchmarkId::new(format!("frozen_{name}"), count),
+                &view,
+                |b, view| b.iter(|| black_box(view.connected_components(mode).unwrap())),
+            );
+        }
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

@@ -137,6 +137,15 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Immutable components sharing captured state; ignores orientation by default.
+    #[pyo3(signature = (mode="undirected"))]
+    fn connected_components(&self, py: Python, mode: &str) -> PyResult<Vec<Self>> {
+        let mode = groggy::algorithms::community::ComponentMode::parse(mode)
+            .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+        py.allow_threads(|| self.inner.connected_components(mode))
+            .map(|views| views.into_iter().map(|inner| Self { inner }).collect())
+            .map_err(graph_error_to_py_err)
+    }
     /// Frozen hop distances as (node ID, distance) rows; writes no properties.
     fn bfs_distances(&self, py: Python, start: NodeId) -> PyResult<Vec<(NodeId, i64)>> {
         py.allow_threads(|| self.inner.bfs_distances(start))

@@ -139,3 +139,13 @@ A* kernel. Search no longer performs a linear node-ID lookup on each heap pop.
 Frozen results reuse query::Path and retain actual selected edge instances;
 Python GraphPath only translates immutable owned data. The legacy pipeline keeps
 its marker/path-index/telemetry adapter. See `frozen-astar-contract-2026-10-22.md`.
+
+
+## AR7.5i — Frozen component reads (2026-10-22)
+
+Completed shared BFS/Tarjan component reads over AlgorithmRead/GraphView, with
+immutable component views and exact selected edge identity. Preserve undirected
+default and explicit weak/strong modes (accepted A12.1); no properties, deltas,
+checkpoints or live caches are written. Native/Python and independent closure
+checks cover scope, orientation and lifetime. See
+`frozen-components-contract-2026-10-22.md`. Centrality and broad AR7.5 remain open.

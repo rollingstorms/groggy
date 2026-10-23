@@ -17,7 +17,10 @@
 //! - Tracks node/edge processing statistics
 //! - Per-component metrics for bottleneck analysis
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -46,7 +49,8 @@ pub enum ComponentMode {
 }
 
 impl ComponentMode {
-    fn from_str(s: &str) -> Result<Self> {
+    /// Parse a component orientation mode, case insensitively.
+    pub fn parse(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "undirected" => Ok(Self::Undirected),
             "weak" => Ok(Self::Weak),
@@ -175,7 +179,12 @@ impl NodeIndexer {
 /// - Records per-component statistics for bottleneck analysis
 ///
 /// Returns the total number of components discovered.
-fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Result<u32> {
+pub(crate) fn bfs_components(
+    csr: &Csr,
+    labels: &mut [u32],
+    ctx: &mut Context,
+    cancel: Option<&AtomicBool>,
+) -> Result<u32> {
     let n = csr.node_count();
 
     // Track allocation time
@@ -213,7 +222,7 @@ fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Result<u3
         let mut component_edges = 0;
 
         while idx < queue.len() {
-            if ctx.is_cancelled() {
+            if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
                 return Err(anyhow!("connected components cancelled"));
             }
             let v = queue[idx];
@@ -262,7 +271,12 @@ fn bfs_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Result<u3
 /// - Records nodes/edges processed and stack operations
 ///
 /// Returns components as vectors of node indices (in reverse topological order).
-fn tarjan_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Result<Vec<Vec<usize>>> {
+pub(crate) fn tarjan_components(
+    csr: &Csr,
+    labels: &mut [u32],
+    ctx: &mut Context,
+    cancel: Option<&AtomicBool>,
+) -> Result<Vec<Vec<usize>>> {
     let n = csr.node_count();
 
     // Track allocation time
@@ -305,7 +319,7 @@ fn tarjan_components(csr: &Csr, labels: &mut [u32], ctx: &mut Context) -> Result
 
         // Iterative DFS with explicit stack
         while let Some(mut frame) = call_stack.pop() {
-            if ctx.is_cancelled() {
+            if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
                 return Err(anyhow!("connected components cancelled"));
             }
             let v = frame.v as usize;
@@ -536,7 +550,7 @@ impl ConnectedComponents {
         let mut labels = vec![0u32; nodes.len()];
         ctx.record_call("cc.alloc_labels", start.elapsed());
 
-        let component_count = bfs_components(csr_arc.as_ref(), &mut labels, ctx)?;
+        let component_count = bfs_components(csr_arc.as_ref(), &mut labels, ctx, None)?;
 
         // Build component node lists
         let start = Instant::now();
@@ -740,7 +754,7 @@ impl ConnectedComponents {
         ctx.record_call("cc.strong.alloc_labels", start.elapsed());
 
         // Run optimized Tarjan's algorithm with profiling
-        let components_idx = tarjan_components(csr_arc.as_ref(), &mut labels, ctx)?;
+        let components_idx = tarjan_components(csr_arc.as_ref(), &mut labels, ctx, None)?;
 
         // Convert index-based components to NodeId-based
         let start = Instant::now();
@@ -915,7 +929,7 @@ pub fn register(registry: &Registry) -> Result<()> {
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
         // Parse mode
         let mode_str = spec.params.get_text("mode").unwrap_or("undirected");
-        let mode = ComponentMode::from_str(mode_str)?;
+        let mode = ComponentMode::parse(mode_str)?;
 
         // Parse output_attr
         let output_attr = spec
