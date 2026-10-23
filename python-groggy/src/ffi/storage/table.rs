@@ -2764,10 +2764,10 @@ impl PyBaseTable {
     ///
     /// # Returns
     /// BaseTable containing detailed statistics and quality metrics for each column
-    pub fn profile(&self) -> PyResult<Self> {
-        let result = self
-            .table
-            .profile()
+    pub fn profile(&self, py: Python<'_>) -> PyResult<Self> {
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.profile())
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseTable {

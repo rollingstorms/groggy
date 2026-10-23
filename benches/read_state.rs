@@ -1,6 +1,6 @@
 //! Bounded current-state capture versus shared read-pin clone scaling.
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use groggy::{AttrValue, Graph};
+use groggy::{storage::table::Table, AttrValue, Graph};
 use std::time::Duration;
 fn read_state(c: &mut Criterion) {
     let mut group = c.benchmark_group("read_state");
@@ -337,6 +337,19 @@ fn read_state(c: &mut Criterion) {
             &numeric_tables,
             |b, tables| b.iter(|| black_box(tables.sum_column("x").unwrap())),
         );
+        for (name, values) in [
+            ("profile_f64", predicate_values.clone()),
+            ("profile_high_integer", (0..count).map(|i| AttrValue::Int(i64::MAX - count as i64 + i as i64)).collect()),
+        ] {
+            let table = groggy::storage::table::BaseTable::from_columns(
+                std::collections::HashMap::from([("x".into(), groggy::storage::array::BaseArray::new(values))]),
+            ).unwrap();
+            let result = table.profile().unwrap();
+            assert!(matches!(result.column("mean").unwrap().data()[0], AttrValue::Float64(v) if v.is_finite()));
+            group.bench_with_input(BenchmarkId::new(name, count), &table, |b, table| {
+                b.iter(|| black_box(table.profile().unwrap()));
+            });
+        }
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

@@ -3268,39 +3268,36 @@ impl BaseTable {
                 column_names.push(AttrValue::Text(column_name.clone()));
 
                 // Analyze data types and nulls
-                let mut type_counts: HashMap<String, usize> = HashMap::new();
+                let mut type_counts: HashMap<&str, usize> = HashMap::new();
                 let mut null_count = 0;
-                let mut unique_values: std::collections::HashSet<String> =
+                let mut unique_values: std::collections::HashSet<&AttrValue> =
                     std::collections::HashSet::new();
 
                 for value in column.data() {
                     match value {
                         AttrValue::Null => null_count += 1,
-                        AttrValue::Int(_) => {
-                            *type_counts.entry("integer".to_string()).or_insert(0) += 1
-                        }
+                        AttrValue::Int(_) => *type_counts.entry("integer").or_insert(0) += 1,
                         AttrValue::SmallInt(_) => {
-                            *type_counts.entry("small_integer".to_string()).or_insert(0) += 1
+                            *type_counts.entry("small_integer").or_insert(0) += 1
                         }
-                        AttrValue::Float(_) => {
-                            *type_counts.entry("float".to_string()).or_insert(0) += 1
+                        AttrValue::Float(_) => *type_counts.entry("float").or_insert(0) += 1,
+                        AttrValue::Float64(_) => *type_counts.entry("float64").or_insert(0) += 1,
+                        AttrValue::FloatVec(_) => *type_counts.entry("float_vec").or_insert(0) += 1,
+                        AttrValue::Float64Vec(_) => {
+                            *type_counts.entry("float64_vec").or_insert(0) += 1
                         }
-                        AttrValue::Bool(_) => {
-                            *type_counts.entry("boolean".to_string()).or_insert(0) += 1
+                        AttrValue::Bool(_) => *type_counts.entry("boolean").or_insert(0) += 1,
+                        AttrValue::Text(_) => {
+                            *type_counts.entry("text").or_insert(0) += 1;
                         }
-                        AttrValue::Text(s) => {
-                            *type_counts.entry("text".to_string()).or_insert(0) += 1;
-                            unique_values.insert(s.clone());
+                        AttrValue::CompactText(_) => {
+                            *type_counts.entry("compact_text").or_insert(0) += 1;
                         }
-                        AttrValue::CompactText(s) => {
-                            *type_counts.entry("compact_text".to_string()).or_insert(0) += 1;
-                            unique_values.insert(s.as_str().to_string());
-                        }
-                        _ => *type_counts.entry("other".to_string()).or_insert(0) += 1,
+                        _ => *type_counts.entry("other").or_insert(0) += 1,
                     }
 
                     // Add to unique values for all types
-                    unique_values.insert(format!("{:?}", value));
+                    unique_values.insert(value);
                 }
 
                 let total_count = column.len();
@@ -3309,75 +3306,36 @@ impl BaseTable {
                 // Determine primary data type
                 let primary_type = type_counts
                     .iter()
-                    .max_by_key(|(_, count)| *count)
-                    .map(|(type_name, _)| type_name.clone())
+                    .max_by(|(a, ac), (b, bc)| ac.cmp(bc).then_with(|| b.cmp(a)))
+                    .map(|(type_name, _)| (*type_name).to_string())
                     .unwrap_or_else(|| "unknown".to_string());
 
                 data_types.push(AttrValue::Text(primary_type));
                 non_null_counts.push(AttrValue::Int(non_null_count as i64));
                 null_counts.push(AttrValue::Int(null_count as i64));
-                null_percentages.push(AttrValue::Float(
-                    (null_count as f32 / total_count as f32) * 100.0,
-                ));
-                unique_counts.push(AttrValue::Int(unique_values.len() as i64));
-                cardinalities.push(AttrValue::Float(
-                    unique_values.len() as f32 / total_count as f32,
-                ));
-
-                // Statistical analysis for numeric columns
-                let numeric_values: Vec<f64> = column
-                    .data()
-                    .iter()
-                    .filter_map(|val| match val {
-                        AttrValue::Int(i) => Some(*i as f64),
-                        AttrValue::SmallInt(i) => Some(*i as f64),
-                        AttrValue::Float(f) => Some(*f as f64),
-                        _ => None,
-                    })
-                    .collect();
-
-                if !numeric_values.is_empty() {
-                    let mean_val = numeric_values.iter().sum::<f64>() / numeric_values.len() as f64;
-                    means.push(AttrValue::Float(mean_val as f32));
-
-                    // Calculate median
-                    let mut sorted_values = numeric_values.clone();
-                    sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                    let median_val = if sorted_values.len().is_multiple_of(2) {
-                        (sorted_values[sorted_values.len() / 2 - 1]
-                            + sorted_values[sorted_values.len() / 2])
-                            / 2.0
+                let ratio = |numerator: usize| {
+                    if total_count == 0 {
+                        AttrValue::Null
                     } else {
-                        sorted_values[sorted_values.len() / 2]
-                    };
-                    medians.push(AttrValue::Float(median_val as f32));
+                        AttrValue::Float64(numerator as f64 / total_count as f64)
+                    }
+                };
+                null_percentages.push(if total_count == 0 {
+                    AttrValue::Null
+                } else {
+                    AttrValue::Float64(100.0 * null_count as f64 / total_count as f64)
+                });
+                unique_counts.push(AttrValue::Int(unique_values.len() as i64));
+                cardinalities.push(ratio(unique_values.len()));
 
-                    // Calculate standard deviation
-                    let variance = numeric_values
-                        .iter()
-                        .map(|x| (x - mean_val).powi(2))
-                        .sum::<f64>()
-                        / numeric_values.len() as f64;
-                    stds.push(AttrValue::Float(variance.sqrt() as f32));
-
-                    // Min and Max
-                    let min_val = numeric_values.iter().cloned().fold(f64::INFINITY, f64::min);
-                    let max_val = numeric_values
-                        .iter()
-                        .cloned()
-                        .fold(f64::NEG_INFINITY, f64::max);
-                    mins.push(AttrValue::Float(min_val as f32));
-                    maxs.push(AttrValue::Float(max_val as f32));
-
-                    // Quartiles
-                    let q25_idx = (sorted_values.len() as f64 * 0.25) as usize;
-                    let q75_idx = (sorted_values.len() as f64 * 0.75) as usize;
-                    q25s.push(AttrValue::Float(
-                        *sorted_values.get(q25_idx).unwrap_or(&0.0) as f32,
-                    ));
-                    q75s.push(AttrValue::Float(
-                        *sorted_values.get(q75_idx).unwrap_or(&0.0) as f32,
-                    ));
+                if let Some(stats) = super::numeric::profile(column.data())? {
+                    means.push(stats.mean);
+                    medians.push(stats.median);
+                    stds.push(stats.std);
+                    mins.push(stats.min);
+                    maxs.push(stats.max);
+                    q25s.push(stats.q25);
+                    q75s.push(stats.q75);
                 } else {
                     // Non-numeric columns
                     means.push(AttrValue::Null);

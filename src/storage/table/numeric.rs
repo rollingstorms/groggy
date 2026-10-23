@@ -87,3 +87,61 @@ pub(super) fn aggregate(
         _ => column.max(),
     }
 }
+
+/// Numeric subset of a profile row. Extrema and rank quartiles retain source types.
+pub(super) struct NumericProfile {
+    pub mean: AttrValue,
+    pub median: AttrValue,
+    pub std: AttrValue,
+    pub min: AttrValue,
+    pub max: AttrValue,
+    pub q25: AttrValue,
+    pub q75: AttrValue,
+}
+
+/// Preserve profile's population dispersion and floor(n*q) rank convention.
+/// Text, vectors, Boolean and null cells are not numeric observations.
+pub(super) fn profile(input: &[AttrValue]) -> GraphResult<Option<NumericProfile>> {
+    let mut values = Vec::new();
+    for source in input {
+        if let Some(number) = Value::parse(source) {
+            if !number.as_f64().is_finite() {
+                return Err(invalid(
+                    "Table profile requires finite numeric observations",
+                ));
+            }
+            values.push((source, number));
+        }
+    }
+    if values.is_empty() {
+        return Ok(None);
+    }
+    let mean = crate::storage::array::reductions::mean_iter(values.iter().map(|(v, _)| *v))?;
+    let std = crate::storage::numeric::reductions::population_std_iter(
+        values.iter().map(|(_, number)| *number),
+    )
+    .ok_or_else(|| invalid("Table profile has no numeric observations"))?;
+    values.sort_by(|(_, a), (_, b)| a.numeric_cmp(*b));
+    let n = values.len();
+    let middle = n / 2;
+    let median = if n.is_multiple_of(2) {
+        let mut sum = Dot::new();
+        for index in [middle - 1, middle] {
+            let (hi, lo) = values[index].1.parts();
+            sum.add(hi, 0.5);
+            sum.add(lo, 0.5);
+        }
+        attributes::float_output(sum.total())?
+    } else {
+        attributes::float_output(values[middle].1.as_f64())?
+    };
+    Ok(Some(NumericProfile {
+        mean: attributes::float_output(mean)?,
+        median,
+        std: attributes::float_output(std)?,
+        min: values[0].0.clone(),
+        max: values[n - 1].0.clone(),
+        q25: values[n / 4].0.clone(),
+        q75: values[n - 1 - (n - 1) / 4].0.clone(),
+    }))
+}

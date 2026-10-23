@@ -583,3 +583,11 @@ exact accumulations before final rounding and rescale wide moment roots. Preserv
 finite/error and empty policies; use f64 tolerances for approximate statistics.
 See `float64-numerical-outputs-2026-10-23.md`. Remaining consumers and ordinary
 Python default inference stay open.
+
+## 2026-10-23 — checked table profiling (07.3a.2c)
+
+Table profiles now include f64 and use shared checked numeric kernels, preserve
+source extrema/rank quartiles and f64 statistics, reject nonfinite observations,
+and fix text uniqueness/empty ratios. Existing population/rank conventions stay
+explicit. See `table-profiles-2026-10-23.md` and `docs/api/table-profiles.md`.
+Remaining property consumers and ordinary float-default migration remain open.
