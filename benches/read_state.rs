@@ -358,6 +358,18 @@ fn read_state(c: &mut Criterion) {
             BenchmarkId::new("materialize_f64_properties", count), &materialized,
             |b, array| b.iter(|| black_box(array.to_attributes().unwrap())),
         );
+        let grouped_source = groggy::storage::table::BaseTable::from_columns(
+            std::collections::HashMap::from([
+                ("key".into(), groggy::storage::array::BaseArray::new((0..count).map(|i| AttrValue::Float64(1.0 + (i % 17) as f64 * 2f64.powi(-40))).collect())),
+                ("value".into(), groggy::storage::array::BaseArray::new(vec![AttrValue::Int(1); count])),
+            ]),
+        ).unwrap();
+        let keys = vec!["key".to_string()];
+        let specs = std::collections::HashMap::from([("value".into(), "sum".into())]);
+        assert_eq!(grouped_source.group_by_agg(&keys, specs.clone()).unwrap().column("key").unwrap().len(), 17);
+        group.bench_with_input(BenchmarkId::new("group_f64_keys", count), &grouped_source, |b, table| {
+            b.iter(|| black_box(table.group_by_agg(&keys, specs.clone()).unwrap()));
+        });
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

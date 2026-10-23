@@ -8,19 +8,16 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 ## Current execution checkpoint
 
-Implemented: AR7.2 matrix consolidation, AR7.3 canonical arrays/shared numeric
-foundations, 29.60–29.63 finite numerical fixes/receipts, AR7.4 entity ownership,
-and AR7.5a–h shared read state, explicit immutable selections, frozen matrix/table
-exports, scoped query predicates, prepared BFS/DFS and checked Dijkstra/A* reads. Evidence is
-linked from the flat checklist. Supported-scope implementation is distinct from
-remaining broad capability and production gates (including A13/A15).
+Implemented: AR7.2–AR7.4 consolidation, numerical completion slices and receipts,
+AR7.5a–l immutable reads through components and centralities, AR7.9a canonical
+logical change records, and 07.3a.1/07.3a.2a–f f64 representation and successive
+consumer migrations. See the flat checklist for each supported scope and evidence.
 
-Next: migrate component and centrality readers
-onto the prepared immutable algorithm input,
-retaining a separate working mutation owner. Source-preserving table adapters
-remain separate from the completed owned table projections. Ordinary legacy
-Subgraph/table reads are not yet certified frozen. Stages 3–6 retain their existing
-partial/open work and specific workbook dependencies; no blank policy is accepted.
+Next: finish remaining f64 scalar/vector/view/step adapters, then switch ordinary
+Python float inference and certify compatibility (07.3a.3). Follow with accepted
+native temporal types (07.3b), mutation/publication migration and reconstructed
+effective-time states. Source-preserving table adapters and broader legacy frozen
+read guarantees remain open; owned projections do not complete those parents.
 
 ## Owner answers received — 2026-10-22
 
@@ -38,8 +35,11 @@ keep existing tagged data readable. Native matrix f64 support alone does not do
 this. Endpoint validity now rejects invalid timelines rather than silently hiding
 an edge. No generic silent index-to-scan fallback is authorized.
 
-Automatic-publication defaults, the exact restore source and purge protections
-have clarification requests pending. A07.1 is tentative; A08 and other unanswered
+On 2026-10-23 the owner confirmed migrating checked automatic-publication
+defaults now, requiring an explicit retained restoration state, and explicit purge
+preserving shared branches/open immutable views without extra permanent audit/
+checkpoint pins or mandatory grace/backup. Current scope is a data science library.
+A07.1 is tentative; A08 and other unanswered
 fields remain open. Checkpoint scheduling is explicitly deferred until MVP/first
 use; opening-time measurement can proceed now without inventing a log budget.
 A10.1 concerns duplicated source rows, not automatic creation of graph entities.
@@ -122,8 +122,8 @@ fields as approval.
 
 | Priority | Appendix | What the answers unlock |
 | --- | --- | --- |
-| First | A01, A03–A06 | Retained group/meta identity/copy rules; migration of legacy writes/names; same-time corrections and endpoint validity; unset/restore semantics; temporal types and property float precision. Most now have owner answers; see the answer record for the remaining publication/restore clarifications. |
-| Next | A02, A07–A11 | Checkpoint/upgrade budgets, schema evolution, merge conflicts, retention/purge, table writeback and index loading/fallback. Some answered; schema-branch/merge/purge/rebuild choices still need resolution before their lifecycle behavior is finalized. |
+| First | A01, A03–A06 | Retained group/meta identity/copy rules; migration of legacy writes/names; same-time corrections and endpoint validity; unset/restore semantics; temporal types and property float precision. Most now have owner answers, including publication defaults and explicit restoration state; see the answer record. |
+| Next | A02, A07–A11 | Checkpoint/upgrade budgets, schema evolution, merge conflicts, retention/purge, table writeback and index loading/fallback. Some answered; schema-branch/merge/rebuild choices still need resolution before their lifecycle behavior is finalized. |
 | Alongside algorithm/numerical closure | A12–A13, A16 | Compatibility choices, numerical guarantees and duplicate/retry extensions. Preserve existing established direction, exact-shape, checked precision and rejection rules until an explicit change is accepted. |
 | Before pipeline/service commitments | A14–A15 | Intermediate naming/run provenance and actual scale/service budgets. These do not block module moves or independent correctness work. |
 | After core, before Graphiti integration | A17 | Compatibility release and correction-versus-parallel-fact adapter identity. |

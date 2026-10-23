@@ -8,6 +8,7 @@ pub mod nodes;
 mod numeric;
 pub mod projection;
 pub mod table_array;
+mod text;
 pub mod traits;
 
 // Re-export core types

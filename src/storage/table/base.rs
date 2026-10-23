@@ -3711,13 +3711,6 @@ impl BaseTable {
         use std::io::Write;
 
         let path = path.as_ref();
-        let mut file = File::create(path).map_err(|e| {
-            crate::errors::GraphError::InvalidInput(format!(
-                "Failed to create JSON file '{}': {}",
-                path.display(),
-                e
-            ))
-        })?;
 
         // Create JSON structure with metadata
         let mut json_data = serde_json::Map::new();
@@ -3744,7 +3737,7 @@ impl BaseTable {
             for col_name in &self.column_order {
                 if let Some(column) = self.columns.get(col_name) {
                     let value = if let Some(attr_value) = column.get(i) {
-                        self.attr_value_to_json(attr_value)
+                        self.attr_value_to_json(attr_value)?
                     } else {
                         serde_json::Value::Null
                     };
@@ -3758,6 +3751,14 @@ impl BaseTable {
         // Write to file
         let json_string = serde_json::to_string_pretty(&json_data).map_err(|e| {
             crate::errors::GraphError::InvalidInput(format!("Failed to serialize to JSON: {}", e))
+        })?;
+
+        let mut file = File::create(path).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Failed to create JSON file '{}': {}",
+                path.display(),
+                e
+            ))
         })?;
 
         file.write_all(json_string.as_bytes()).map_err(|e| {
@@ -3858,42 +3859,7 @@ impl BaseTable {
 
     /// Helper method to convert AttrValue to CSV string representation
     fn attr_value_to_csv_string(&self, value: &crate::types::AttrValue) -> String {
-        match value {
-            crate::types::AttrValue::Int(i) => i.to_string(),
-            crate::types::AttrValue::SmallInt(i) => i.to_string(),
-            crate::types::AttrValue::Float(f) => f.to_string(),
-            crate::types::AttrValue::Text(s) => {
-                // Escape quotes by doubling them, and wrap in quotes if contains comma/quote/newline
-                if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
-                    format!("\"{}\"", s.replace("\"", "\"\""))
-                } else {
-                    s.clone()
-                }
-            }
-            crate::types::AttrValue::CompactText(s) => {
-                let text = s.as_str();
-                if text.contains(',')
-                    || text.contains('"')
-                    || text.contains('\n')
-                    || text.contains('\r')
-                {
-                    format!("\"{}\"", text.replace("\"", "\"\""))
-                } else {
-                    text.to_string()
-                }
-            }
-            crate::types::AttrValue::Bool(b) => b.to_string(),
-            crate::types::AttrValue::Null => String::new(),
-            crate::types::AttrValue::FloatVec(v) => format!(
-                "[{}]",
-                v.iter()
-                    .map(|f| f.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            ),
-            crate::types::AttrValue::Bytes(b) => format!("bytes:{}", b.len()),
-            _ => format!("{:?}", value), // Fallback for other types
-        }
+        super::text::csv_field(value)
     }
 
     /// Helper method to parse CSV field to AttrValue
@@ -3916,8 +3882,8 @@ impl BaseTable {
         }
 
         // 3. Float
-        if let Ok(f) = field.parse::<f32>() {
-            return crate::types::AttrValue::Float(f);
+        if let Ok(f) = field.parse::<f64>() {
+            return crate::types::AttrValue::Float64(f);
         }
 
         // 4. Default to text
@@ -3925,35 +3891,11 @@ impl BaseTable {
     }
 
     /// Helper method to convert AttrValue to JSON value
-    fn attr_value_to_json(&self, value: &crate::types::AttrValue) -> serde_json::Value {
-        match value {
-            crate::types::AttrValue::Int(i) => {
-                serde_json::Value::Number(serde_json::Number::from(*i))
-            }
-            crate::types::AttrValue::SmallInt(i) => {
-                serde_json::Value::Number(serde_json::Number::from(*i))
-            }
-            crate::types::AttrValue::Float(f) => serde_json::Value::Number(
-                serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0)),
-            ),
-            crate::types::AttrValue::Text(s) => serde_json::Value::String(s.clone()),
-            crate::types::AttrValue::CompactText(s) => {
-                serde_json::Value::String(s.as_str().to_string())
-            }
-            crate::types::AttrValue::Bool(b) => serde_json::Value::Bool(*b),
-            crate::types::AttrValue::Null => serde_json::Value::Null,
-            crate::types::AttrValue::FloatVec(v) => serde_json::Value::Array(
-                v.iter()
-                    .map(|f| {
-                        serde_json::Value::Number(
-                            serde_json::Number::from_f64(*f as f64)
-                                .unwrap_or(serde_json::Number::from(0)),
-                        )
-                    })
-                    .collect(),
-            ),
-            _ => serde_json::Value::String(format!("{:?}", value)), // Fallback
-        }
+    fn attr_value_to_json(
+        &self,
+        value: &crate::types::AttrValue,
+    ) -> GraphResult<serde_json::Value> {
+        super::text::json_field(value)
     }
 
     /// Helper method to convert JSON value to AttrValue  
@@ -3965,7 +3907,7 @@ impl BaseTable {
                 if let Some(i) = n.as_i64() {
                     crate::types::AttrValue::Int(i)
                 } else if let Some(f) = n.as_f64() {
-                    crate::types::AttrValue::Float(f as f32)
+                    crate::types::AttrValue::Float64(f)
                 } else {
                     crate::types::AttrValue::Null
                 }
@@ -3973,13 +3915,13 @@ impl BaseTable {
             serde_json::Value::String(s) => crate::types::AttrValue::Text(s.clone()),
             serde_json::Value::Array(arr) => {
                 // Try to convert to float vector
-                let floats: Result<Vec<f32>, _> = arr
+                let floats: Result<Vec<f64>, _> = arr
                     .iter()
-                    .map(|v| v.as_f64().map(|f| f as f32).ok_or("Not a number"))
+                    .map(|v| v.as_f64().ok_or("Not a number"))
                     .collect();
 
                 if let Ok(float_vec) = floats {
-                    crate::types::AttrValue::FloatVec(float_vec)
+                    crate::types::AttrValue::Float64Vec(float_vec)
                 } else {
                     // Fallback to string representation
                     crate::types::AttrValue::Text(format!("{:?}", arr))
@@ -4013,19 +3955,19 @@ impl BaseTable {
         }
 
         // Create groups
-        let mut groups: HashMap<Vec<String>, Vec<usize>> = HashMap::new();
+        let mut groups: HashMap<Vec<&AttrValue>, Vec<usize>> = HashMap::new();
 
         for row_idx in 0..self.nrows {
             let mut key = Vec::new();
             for col_name in group_cols {
                 if let Some(column) = self.columns.get(col_name) {
                     if let Some(value) = column.get(row_idx) {
-                        key.push(format!("{:?}", value));
+                        key.push(value);
                     } else {
-                        key.push("NULL".to_string());
+                        key.push(&AttrValue::Null);
                     }
                 } else {
-                    key.push("NULL".to_string());
+                    key.push(&AttrValue::Null);
                 }
             }
             groups.entry(key).or_insert_with(Vec::new).push(row_idx);
@@ -4051,21 +3993,7 @@ impl BaseTable {
             // Add group key values
             for (i, col_name) in group_cols.iter().enumerate() {
                 if let Some(column) = result_columns.get_mut(col_name) {
-                    let key_value = &group_key[i];
-                    if key_value == "NULL" {
-                        column.push(crate::types::AttrValue::Null);
-                    } else {
-                        // Parse key value back - simplified for now
-                        if let Ok(int_val) = key_value.parse::<i64>() {
-                            column.push(crate::types::AttrValue::Int(int_val));
-                        } else if let Ok(float_val) = key_value.parse::<f64>() {
-                            column.push(crate::types::AttrValue::Float(float_val as f32));
-                        } else {
-                            // Remove quotes from debug format
-                            let clean_str = key_value.trim_matches('"');
-                            column.push(crate::types::AttrValue::Text(clean_str.to_string()));
-                        }
-                    }
+                    column.push(group_key[i].clone());
                 }
             }
 

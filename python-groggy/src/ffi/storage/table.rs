@@ -874,16 +874,17 @@ impl PyBaseTable {
     }
 
     /// Export BaseTable to CSV file
-    pub fn to_csv(&self, path: &str) -> PyResult<()> {
-        self.table
-            .to_csv(path)
+    pub fn to_csv(&self, path: &str, py: Python<'_>) -> PyResult<()> {
+        let table = &self.table;
+        py.allow_threads(|| table.to_csv(path))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
     /// Import BaseTable from CSV file
     #[staticmethod]
-    pub fn from_csv(path: &str) -> PyResult<PyBaseTable> {
-        let table = groggy::storage::table::BaseTable::from_csv(path)
+    pub fn from_csv(path: &str, py: Python<'_>) -> PyResult<PyBaseTable> {
+        let table = py
+            .allow_threads(|| groggy::storage::table::BaseTable::from_csv(path))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(PyBaseTable::from_table(table))
     }
@@ -904,16 +905,17 @@ impl PyBaseTable {
     }
 
     /// Export BaseTable to JSON file
-    pub fn to_json(&self, path: &str) -> PyResult<()> {
-        self.table
-            .to_json(path)
+    pub fn to_json(&self, path: &str, py: Python<'_>) -> PyResult<()> {
+        let table = &self.table;
+        py.allow_threads(|| table.to_json(path))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
     /// Import BaseTable from JSON file
     #[staticmethod]
-    pub fn from_json(path: &str) -> PyResult<PyBaseTable> {
-        let table = groggy::storage::table::BaseTable::from_json(path)
+    pub fn from_json(path: &str, py: Python<'_>) -> PyResult<PyBaseTable> {
+        let table = py
+            .allow_threads(|| groggy::storage::table::BaseTable::from_json(path))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(PyBaseTable::from_table(table))
     }
@@ -1556,10 +1558,11 @@ impl PyBaseTable {
         &self,
         group_cols: Vec<String>,
         agg_specs: HashMap<String, String>,
+        py: Python<'_>,
     ) -> PyResult<Self> {
-        let result = self
-            .table
-            .group_by_agg(&group_cols, agg_specs)
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.group_by_agg(&group_cols, agg_specs))
             .map_err(|e| {
                 pyo3::exceptions::PyRuntimeError::new_err(format!(
                     "Group by aggregation failed: {}",

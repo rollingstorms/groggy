@@ -998,3 +998,12 @@ diagonal semantics come from the shared column kernel. Matrix display and array
 materialization share one typed scalar converter, with checked reads and no
 intermediate scalar-input buffer. See `table-numeric-dispatch-2026-10-23.md`.
 Remaining text/vector/step/view adapters and ordinary defaults stay open.
+
+## 2026-10-23 — f64 table interchange and typed grouping (07.3a.2f)
+
+Plain CSV/JSON floating inference retains f64; JSON rejects nonfinite values
+before destination creation and CSV quotes through its writer once. Group-by
+uses borrowed typed identities and emits actual keys rather than parsed debug
+text. BaseTable Python calls release the GIL. See `table-interchange-2026-10-23.md`
+and `docs/api/table-interchange.md`; untyped interchange is not the graph codec.
+Remaining consumers and default inference stay open.
