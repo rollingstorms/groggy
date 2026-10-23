@@ -76,6 +76,42 @@ impl AlgorithmRead {
     pub fn csr(&self) -> &Csr {
         &self.csr
     }
+    /// Owned PageRank scores and explicit finite-budget convergence status.
+    /// Uses captured personalization and selected edge occurrences; writes nothing.
+    pub fn pagerank(
+        &self,
+        algorithm: &super::centrality::PageRank,
+        cancel: Option<&AtomicBool>,
+    ) -> GraphResult<super::centrality::PageRankResult> {
+        use super::centrality::pagerank::{personalization, personalization_value};
+        let values = personalization(&self.nodes, |node| {
+            if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+                return Err(anyhow::anyhow!("pagerank cancelled"));
+            }
+            match algorithm.personalization_attr() {
+                Some(attr) => personalization_value(
+                    node,
+                    self.view
+                        .read_state()
+                        .snapshot()
+                        .node_attributes
+                        .get(&node)
+                        .and_then(|values| values.get(attr)),
+                ),
+                None => Ok(1.0),
+            }
+        })
+        .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+        algorithm
+            .compute(
+                &self.csr,
+                &self.nodes,
+                &values,
+                &mut super::Context::default(),
+                cancel,
+            )
+            .map_err(|error| GraphError::InvalidInput(error.to_string()))
+    }
     /// Immutable component selections, ordered by smallest node ID. The default
     /// undirected mode and weak mode ignore orientation; strong respects it.
     /// Every result retains only its parent's selected edge instances.

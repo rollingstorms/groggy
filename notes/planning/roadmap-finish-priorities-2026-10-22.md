@@ -154,3 +154,11 @@ Connected component views now share captured state and existing kernels, with th
 accepted default/weak/strong modes. See `frozen-components-contract-2026-10-22.md`.
 Next independent read migration: centrality. Restore/purge/publication policy
 questions remain pending; this slice does not choose them.
+
+
+### AR7.5j completed — frozen PageRank
+
+Captured PageRank now shares one validated power-iteration kernel with the live
+wrapper. Owned results expose finite-budget convergence status. See
+`frozen-pagerank-contract-2026-10-22.md`. Next independent read migrations:
+closeness and betweenness; broader AR7.5 remains open.

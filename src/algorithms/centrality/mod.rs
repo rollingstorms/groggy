@@ -1,11 +1,11 @@
 mod betweenness;
 mod closeness;
-mod pagerank;
+pub(crate) mod pagerank;
 mod traversal_utils;
 
 pub use betweenness::BetweennessCentrality;
 pub use closeness::{ClosenessCentrality, ClosenessDirection};
-pub use pagerank::PageRank;
+pub use pagerank::{PageRank, PageRankResult};
 
 use crate::algorithms::registry::Registry;
 

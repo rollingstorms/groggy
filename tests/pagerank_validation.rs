@@ -115,6 +115,18 @@ fn all_three_node_graphs_match_a_direct_linear_solve() {
                 }
                 for alpha in [0., 0.85] {
                     let want = solve(p, alpha, reset);
+                    let frozen = g
+                        .borrow()
+                        .read_view()
+                        .unwrap()
+                        .pagerank(alpha, 1000, 1e-13, personal.then(|| "p".into()))
+                        .unwrap();
+                    assert!(frozen.converged);
+                    assert!(frozen.max_update <= 1e-13);
+                    assert!(frozen.iterations > 0 && frozen.iterations <= 1000);
+                    for ((_, actual), expected) in frozen.scores.iter().zip(want) {
+                        assert!((actual - expected).abs() < 2e-12);
+                    }
                     let (scores, ctx) = run(&g, alpha, personal, 1000);
                     assert_eq!(ctx.stat_snapshot()["pr.converged"], 1.);
                     assert!((scores.iter().map(|(_, s)| s).sum::<f64>() - 1.).abs() < 1e-14);

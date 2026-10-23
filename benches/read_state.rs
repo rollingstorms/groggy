@@ -153,6 +153,36 @@ fn read_state(c: &mut Criterion) {
                 |b, view| b.iter(|| black_box(view.connected_components(mode).unwrap())),
             );
         }
+        for (name, personalization) in [
+            ("pagerank_uniform", None),
+            ("pagerank_personalized", Some("value".to_string())),
+        ] {
+            let algorithm = groggy::algorithms::centrality::PageRank::new(
+                0.85,
+                50,
+                1e-6,
+                personalization.clone(),
+                "unused".into(),
+            )
+            .unwrap();
+            group.bench_with_input(
+                BenchmarkId::new(format!("prepared_{name}"), count),
+                &algorithm_input,
+                |b, input| b.iter(|| black_box(input.pagerank(&algorithm, None).unwrap())),
+            );
+            group.bench_with_input(
+                BenchmarkId::new(format!("frozen_{name}"), count),
+                &view,
+                |b, view| {
+                    b.iter(|| {
+                        black_box(
+                            view.pagerank(0.85, 50, 1e-6, personalization.clone())
+                                .unwrap(),
+                        )
+                    })
+                },
+            );
+        }
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

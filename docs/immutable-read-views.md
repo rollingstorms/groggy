@@ -290,3 +290,48 @@ release the GIL during computation. These reads write no component property,
 delta, checkpoint, or live component cache. Results remain valid after the writer
 changes or is dropped. Other legacy algorithm wrappers retain their existing
 output/persistence behavior.
+
+## PageRank
+
+`pagerank(damping=0.85, max_iter=50, tolerance=1e-6,
+personalization_attr=None)` computes unweighted PageRank from the captured
+selected topology, returning an owned immutable `PageRankResult`. Its `scores`
+property returns `(node_id, f64_score)` rows in ascending node-ID order. Parallel
+edges count as separate transition occurrences. Directed edges follow their
+orientation; undirected edges allow both directions, with a loop counted once.
+
+```python
+rank_graph = gr.Graph(directed=True)
+source, sink = rank_graph.add_nodes(2)
+rank_graph.add_edge(source, sink)
+rank_view = rank_graph.read_view()
+rank_graph.add_edge(sink, source)  # Captured PageRank still has a sink.
+rank_result = rank_view.pagerank(max_iter=1000, tolerance=1e-13)
+assert rank_result.converged
+assert rank_result.max_update <= 1e-13
+assert abs(dict(rank_result.scores)[source] - 1 / 2.85) < 1e-12
+assert abs(sum(score for _, score in rank_result.scores) - 1) < 1e-14
+assert "pagerank" not in rank_graph.read_view().node_attribute_keys(source)
+limited = rank_view.pagerank(max_iter=1, tolerance=1e-13)
+assert not limited.converged and limited.iterations == 1
+```
+
+Always inspect `converged` when convergence is required. A finite iteration
+budget can produce approximate scores with `converged=False`. `max_update` is the
+last maximum coordinate change **before** final probability-mass normalization;
+it is the stopping metric, not an independently computed fixed-point residual or
+an error bound. Nonempty results sum to one. Empty input returns empty scores,
+`converged=True`, zero iterations and zero update.
+
+Reset and dangling-node mass use uniform personalization by default. An explicit
+personalization attribute accepts finite nonnegative numeric values; absent
+values default to one, explicit null/Boolean/text/vector values fail, and the
+total must be finite and positive. Parameters require `0 <= damping < 1`, a
+positive iteration budget, and finite positive tolerance, even on empty inputs.
+No edge-weight attribute is used by this API.
+
+Native callers can reuse `AlgorithmRead::pagerank(&PageRank, cancel)`. Python
+releases the GIL during preparation/computation. Reads write no properties,
+deltas or checkpoints. The existing live algorithm wrapper shares validation and
+the iteration kernel; its explicit persistence and telemetry behavior remain.
+This does not change the current f32 property-storage format.

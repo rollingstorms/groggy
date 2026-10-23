@@ -515,3 +515,14 @@ default and explicit weak/strong modes (accepted A12.1); no properties, deltas,
 checkpoints or live caches are written. Native/Python and independent closure
 checks cover scope, orientation and lifetime. See
 `frozen-components-contract-2026-10-22.md`. Centrality and broad AR7.5 remain open.
+
+
+## AR7.5j — Frozen PageRank (2026-10-22)
+
+Completed captured PageRank using shared personalization validation and the
+existing power-iteration kernel. Owned f64 results explicitly report convergence,
+iterations and the final maximum update before mass normalization. Preserve live
+persistence/telemetry, selected parallel occurrences and frozen properties;
+Python releases the GIL and reads publish no mutation. See
+`frozen-pagerank-contract-2026-10-22.md`. Closeness/betweenness and broad AR7.5
+remain open; ordinary f64 property migration is separate.

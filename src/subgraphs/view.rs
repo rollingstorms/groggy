@@ -306,6 +306,24 @@ impl GraphView {
     pub fn algorithm_input(&self) -> GraphResult<crate::algorithms::AlgorithmRead> {
         crate::algorithms::AlgorithmRead::new(self.clone())
     }
+    /// Owned f64 PageRank scores with explicit convergence information.
+    pub fn pagerank(
+        &self,
+        damping: f64,
+        max_iter: usize,
+        tolerance: f64,
+        personalization_attr: Option<AttrName>,
+    ) -> GraphResult<crate::algorithms::centrality::PageRankResult> {
+        let algorithm = crate::algorithms::centrality::PageRank::new(
+            damping,
+            max_iter,
+            tolerance,
+            personalization_attr,
+            "pagerank".into(),
+        )
+        .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+        self.algorithm_input()?.pagerank(&algorithm, None)
+    }
     /// Captured component views, ordered by smallest node ID, without writes.
     pub fn connected_components(
         &self,

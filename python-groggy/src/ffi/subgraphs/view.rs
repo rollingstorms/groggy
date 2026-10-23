@@ -137,6 +137,22 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Captured unweighted PageRank, including explicit convergence status.
+    #[pyo3(signature = (damping=0.85, max_iter=50, tolerance=1e-6, personalization_attr=None))]
+    fn pagerank(
+        &self,
+        py: Python,
+        damping: f64,
+        max_iter: usize,
+        tolerance: f64,
+        personalization_attr: Option<String>,
+    ) -> PyResult<PyPageRankResult> {
+        py.allow_threads(|| {
+            self.inner.pagerank(damping, max_iter, tolerance, personalization_attr)
+        })
+        .map(|inner| PyPageRankResult { inner })
+        .map_err(graph_error_to_py_err)
+    }
     /// Immutable components sharing captured state; ignores orientation by default.
     #[pyo3(signature = (mode="undirected"))]
     fn connected_components(&self, py: Python, mode: &str) -> PyResult<Vec<Self>> {
@@ -285,5 +301,30 @@ impl PyGraphPath {
     #[getter]
     fn algorithm(&self) -> String {
         self.inner.metadata.algorithm.clone()
+    }
+}
+
+/// Owned scores and convergence information from the native PageRank kernel.
+#[pyclass(name = "PageRankResult", frozen)]
+pub struct PyPageRankResult {
+    inner: groggy::algorithms::centrality::PageRankResult,
+}
+#[pymethods]
+impl PyPageRankResult {
+    #[getter]
+    fn scores(&self) -> Vec<(NodeId, f64)> {
+        self.inner.scores.clone()
+    }
+    #[getter]
+    fn converged(&self) -> bool {
+        self.inner.converged
+    }
+    #[getter]
+    fn iterations(&self) -> usize {
+        self.inner.iterations
+    }
+    #[getter]
+    fn max_update(&self) -> f64 {
+        self.inner.max_update
     }
 }

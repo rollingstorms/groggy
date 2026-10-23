@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -74,6 +77,53 @@ impl NodeIndexer {
     }
 }
 
+/// Owned f64 scores and convergence information from a captured PageRank read.
+#[derive(Clone, Debug)]
+pub struct PageRankResult {
+    /// Node-ID ordered scores, normalized to total mass one for nonempty inputs.
+    pub scores: Vec<(NodeId, f64)>,
+    /// Whether the final maximum coordinate update met the requested tolerance.
+    pub converged: bool,
+    /// Power iterations performed; empty input uses zero iterations.
+    pub iterations: usize,
+    /// Maximum coordinate update before final mass normalization (zero if empty).
+    pub max_update: f64,
+}
+
+pub(crate) fn personalization_value(node: NodeId, value: Option<&AttrValue>) -> Result<f64> {
+    let value = match value {
+        None => 1.0,
+        Some(AttrValue::Float(value)) => *value as f64,
+        Some(AttrValue::Int(value)) => *value as f64,
+        Some(AttrValue::SmallInt(value)) => *value as f64,
+        Some(_) => return Err(anyhow!("node {node}: personalization must be numeric")),
+    };
+    if !value.is_finite() || value < 0.0 {
+        return Err(anyhow!(
+            "node {node}: personalization must be finite and nonnegative"
+        ));
+    }
+    Ok(value)
+}
+
+pub(crate) fn personalization(
+    nodes: &[NodeId],
+    mut value: impl FnMut(NodeId) -> Result<f64>,
+) -> Result<Vec<f64>> {
+    let mut weights = nodes
+        .iter()
+        .map(|&node| value(node))
+        .collect::<Result<Vec<_>>>()?;
+    let total: f64 = weights.iter().sum();
+    if !weights.is_empty() && (!total.is_finite() || total <= 0.0) {
+        return Err(anyhow!("personalization must have a finite positive total"));
+    }
+    for weight in &mut weights {
+        *weight /= total;
+    }
+    Ok(weights)
+}
+
 #[derive(Clone, Debug)]
 pub struct PageRank {
     damping: f64,
@@ -106,6 +156,140 @@ impl PageRank {
             tolerance,
             personalization_attr,
             output_attr,
+        })
+    }
+
+    /// Captured property used for personalization, or uniform reset if absent.
+    pub fn personalization_attr(&self) -> Option<&AttrName> {
+        self.personalization_attr.as_ref()
+    }
+
+    pub(crate) fn compute(
+        &self,
+        csr: &Csr,
+        nodes: &[NodeId],
+        personalization: &[f64],
+        ctx: &mut Context,
+        cancel: Option<&AtomicBool>,
+    ) -> Result<PageRankResult> {
+        if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+            return Err(anyhow!("pagerank cancelled"));
+        }
+        let n = nodes.len();
+        if n == 0 {
+            return Ok(PageRankResult {
+                scores: Vec::new(),
+                converged: true,
+                iterations: 0,
+                max_update: 0.0,
+            });
+        }
+        let damping = self.damping;
+        let teleport = 1.0 - damping;
+        // === PHASE 6: Precompute Out-Degrees from CSR ===
+        let mut out_degree: Vec<f64> = Vec::with_capacity(csr.node_count());
+        for u_idx in 0..csr.node_count() {
+            out_degree.push(csr.neighbors(u_idx).len() as f64);
+        }
+
+        // === PHASE 7: Initialize Rank Vectors ===
+        let init_rank = 1.0 / n as f64;
+        let mut rank: Vec<f64> = vec![init_rank; n];
+        let mut next_rank: Vec<f64> = vec![0.0; n];
+
+        // === PHASE 8: Power Iteration ===
+        let compute_start = Instant::now();
+        let mut converged = false;
+        let mut final_iteration = 0;
+        let mut max_update = 0.0;
+
+        for iteration in 0..self.max_iter {
+            if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+                return Err(anyhow!("pagerank cancelled"));
+            }
+
+            let iter_start = Instant::now();
+
+            // Zero out next_rank buffer
+            next_rank.fill(0.0);
+
+            // Aggregate sink mass in one pass
+            let mut sink_mass = 0.0;
+            for idx in 0..n {
+                if out_degree[idx] == 0.0 {
+                    sink_mass += rank[idx];
+                }
+            }
+            let reset_mass = teleport + damping * sink_mass;
+
+            // Distribute rank from non-sink nodes using CSR
+            for idx in 0..csr.node_count() {
+                if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+                    return Err(anyhow!("pagerank cancelled"));
+                }
+                if out_degree[idx] > 0.0 {
+                    let contrib = damping * rank[idx] / out_degree[idx];
+                    // CSR.neighbors returns a slice - no allocation
+                    for &neighbor_idx in csr.neighbors(idx) {
+                        next_rank[neighbor_idx] += contrib;
+                    }
+                }
+            }
+
+            // Add teleport and sink contributions, compute residual
+            let mut max_diff = 0.0;
+            for idx in 0..n {
+                let new_rank = reset_mass * personalization[idx] + next_rank[idx];
+                if !new_rank.is_finite() || new_rank < 0.0 {
+                    return Err(anyhow!(
+                        "nonfinite or negative PageRank score at node {}",
+                        nodes[idx]
+                    ));
+                }
+                let diff = (new_rank - rank[idx]).abs();
+                if diff > max_diff {
+                    max_diff = diff;
+                }
+                next_rank[idx] = new_rank;
+            }
+
+            // Swap buffers instead of copying
+            std::mem::swap(&mut rank, &mut next_rank);
+
+            ctx.record_call("pr.compute.iter", iter_start.elapsed());
+            ctx.record_stat("pr.count.iteration", (iteration + 1) as f64);
+            ctx.emit_iteration(iteration, 0);
+
+            ctx.record_stat("pr.max_update", max_diff);
+            final_iteration = iteration + 1;
+            max_update = max_diff;
+            if max_diff <= self.tolerance {
+                converged = true;
+                break;
+            }
+        }
+
+        ctx.record_call("pr.compute", compute_start.elapsed());
+        ctx.record_stat("pr.converged", if converged { 1.0 } else { 0.0 });
+        ctx.record_stat("pr.iterations_to_converge", final_iteration as f64);
+
+        if ctx.is_cancelled() || cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+            return Err(anyhow!("pagerank cancelled"));
+        }
+        let total: f64 = rank.iter().sum();
+        if !total.is_finite() || total <= 0.0 {
+            return Err(anyhow!("invalid PageRank probability mass"));
+        }
+        for value in &mut rank {
+            *value /= total;
+        }
+        ctx.record_stat("pr.mass", rank.iter().sum());
+
+        Ok(PageRankResult {
+            scores: nodes.iter().copied().zip(rank).collect(),
+            converged,
+            iterations: final_iteration,
+            max_update,
         })
     }
 
@@ -247,140 +431,22 @@ impl Algorithm for PageRank {
         ctx.record_stat("pr.count.csr_nodes", csr.node_count() as f64);
         ctx.record_stat("pr.count.csr_edges", csr.neighbors.len() as f64);
 
-        // === PHASE 5: Precompute Personalization Weights ===
-        let damping = self.damping;
-        let teleport = 1.0 - damping;
-        let mut personalization = vec![1.0 / n as f64; n];
-        if let Some(attr) = &self.personalization_attr {
-            let mut total = 0.0;
-            for (idx, &node) in nodes.iter().enumerate() {
-                let value = match subgraph.get_node_attribute(node, attr)? {
-                    None => 1.0, // Preserve the established missing-property default.
-                    Some(AttrValue::Float(value)) => value as f64,
-                    Some(AttrValue::Int(value)) => value as f64,
-                    Some(AttrValue::SmallInt(value)) => value as f64,
-                    Some(_) => return Err(anyhow!("node {node}: personalization must be numeric")),
-                };
-                if !value.is_finite() || value < 0.0 {
-                    return Err(anyhow!(
-                        "node {node}: personalization must be finite and nonnegative"
-                    ));
-                }
-                personalization[idx] = value;
-                total += value;
+        // === PHASE 5: Shared captured/live value validation and power iteration ===
+        let personalization = personalization(&nodes, |node| match &self.personalization_attr {
+            Some(attr) => {
+                personalization_value(node, subgraph.get_node_attribute(node, attr)?.as_ref())
             }
-            if !total.is_finite() || total <= 0.0 {
-                return Err(anyhow!("personalization must have a finite positive total"));
-            }
-            for weight in &mut personalization {
-                *weight /= total;
-            }
-        }
-
-        // === PHASE 6: Precompute Out-Degrees from CSR ===
-        let mut out_degree: Vec<f64> = Vec::with_capacity(csr.node_count());
-        for u_idx in 0..csr.node_count() {
-            out_degree.push(csr.neighbors(u_idx).len() as f64);
-        }
-
-        // === PHASE 7: Initialize Rank Vectors ===
-        let init_rank = 1.0 / n as f64;
-        let mut rank: Vec<f64> = vec![init_rank; n];
-        let mut next_rank: Vec<f64> = vec![0.0; n];
-
-        // === PHASE 8: Power Iteration ===
-        let compute_start = Instant::now();
-        let mut converged = false;
-        let mut final_iteration = 0;
-
-        for iteration in 0..self.max_iter {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("pagerank cancelled"));
-            }
-
-            let iter_start = Instant::now();
-
-            // Zero out next_rank buffer
-            next_rank.fill(0.0);
-
-            // Aggregate sink mass in one pass
-            let mut sink_mass = 0.0;
-            for idx in 0..n {
-                if out_degree[idx] == 0.0 {
-                    sink_mass += rank[idx];
-                }
-            }
-            let reset_mass = teleport + damping * sink_mass;
-
-            // Distribute rank from non-sink nodes using CSR
-            for idx in 0..csr.node_count() {
-                if ctx.is_cancelled() {
-                    return Err(anyhow!("pagerank cancelled"));
-                }
-                if out_degree[idx] > 0.0 {
-                    let contrib = damping * rank[idx] / out_degree[idx];
-                    // CSR.neighbors returns a slice - no allocation
-                    for &neighbor_idx in csr.neighbors(idx) {
-                        next_rank[neighbor_idx] += contrib;
-                    }
-                }
-            }
-
-            // Add teleport and sink contributions, compute residual
-            let mut max_diff = 0.0;
-            for idx in 0..n {
-                let new_rank = reset_mass * personalization[idx] + next_rank[idx];
-                if !new_rank.is_finite() || new_rank < 0.0 {
-                    return Err(anyhow!(
-                        "nonfinite or negative PageRank score at node {}",
-                        nodes[idx]
-                    ));
-                }
-                let diff = (new_rank - rank[idx]).abs();
-                if diff > max_diff {
-                    max_diff = diff;
-                }
-                next_rank[idx] = new_rank;
-            }
-
-            // Swap buffers instead of copying
-            std::mem::swap(&mut rank, &mut next_rank);
-
-            ctx.record_call("pr.compute.iter", iter_start.elapsed());
-            ctx.record_stat("pr.count.iteration", (iteration + 1) as f64);
-            ctx.emit_iteration(iteration, 0);
-
-            ctx.record_stat("pr.max_update", max_diff);
-            final_iteration = iteration + 1;
-            if max_diff <= self.tolerance {
-                converged = true;
-                break;
-            }
-        }
-
-        ctx.record_call("pr.compute", compute_start.elapsed());
-        ctx.record_stat("pr.converged", if converged { 1.0 } else { 0.0 });
-        ctx.record_stat("pr.iterations_to_converge", final_iteration as f64);
-
-        if ctx.is_cancelled() {
-            return Err(anyhow!("pagerank cancelled"));
-        }
-        let total: f64 = rank.iter().sum();
-        if !total.is_finite() || total <= 0.0 {
-            return Err(anyhow!("invalid PageRank probability mass"));
-        }
-        for value in &mut rank {
-            *value /= total;
-        }
-        ctx.record_stat("pr.mass", rank.iter().sum());
+            None => Ok(1.0),
+        })?;
+        let result = self.compute(&csr, &nodes, &personalization, ctx, None)?;
 
         // === PHASE 9: Emit Results ===
         if ctx.persist_results() {
             let write_start = Instant::now();
-            let attr_values: Vec<(NodeId, AttrValue)> = nodes
-                .iter()
-                .enumerate()
-                .map(|(idx, &node)| (node, AttrValue::Float(rank[idx] as f32)))
+            let attr_values: Vec<(NodeId, AttrValue)> = result
+                .scores
+                .into_iter()
+                .map(|(node, value)| (node, AttrValue::Float(value as f32)))
                 .collect();
 
             subgraph
@@ -392,7 +458,7 @@ impl Algorithm for PageRank {
             let store_start = Instant::now();
             ctx.add_output(
                 format!("{}.scores", self.id()),
-                AlgorithmOutput::NodeScores(nodes.iter().copied().zip(rank).collect()),
+                AlgorithmOutput::NodeScores(result.scores),
             );
             ctx.record_call("pr.store_output", store_start.elapsed());
         }
