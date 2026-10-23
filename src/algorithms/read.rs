@@ -156,4 +156,115 @@ impl AlgorithmRead {
         )
         .map_err(|error| GraphError::InvalidInput(error.to_string()))
     }
+    /// Owned A* path over captured values; goal heuristic must be zero and all
+    /// selected heuristics finite/nonnegative and consistent with selected weights.
+    pub fn astar_path(
+        &self,
+        start: NodeId,
+        goal: NodeId,
+        weight_attr: Option<&str>,
+        heuristic_attr: Option<&str>,
+        cancel: Option<&AtomicBool>,
+    ) -> GraphResult<crate::query::Path> {
+        let source = self.source(start)?;
+        let target = self.index.get(&goal).copied().ok_or_else(|| {
+            GraphError::InvalidInput(format!(
+                "A* goal {goal} does not belong to the captured selection"
+            ))
+        })?;
+        let cancelled = || cancel.is_some_and(|token| token.load(Ordering::Relaxed));
+        if cancelled() {
+            return Err(GraphError::InvalidInput("astar cancelled".into()));
+        }
+        let weights = self.checked_weights(weight_attr)?;
+        let heuristics = if let Some(attr) = heuristic_attr {
+            crate::query::weights::checked_heuristics(&self.nodes, |node| {
+                Ok(self
+                    .view
+                    .read_state()
+                    .snapshot()
+                    .node_attributes
+                    .get(&node)
+                    .and_then(|attrs| attrs.get(attr)))
+            })?
+        } else {
+            std::collections::HashMap::new()
+        };
+        let result = super::pathfinding::astar::search(
+            cancelled,
+            super::pathfinding::astar::SearchInput {
+                nodes: &self.nodes,
+                csr: &self.csr,
+                weights: &weights,
+                heuristics: &heuristics,
+            },
+            source,
+            target,
+        )
+        .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+        let nodes: Vec<_> = result.rows.into_iter().map(|(id, _)| id).collect();
+        // Resolve path instances from selected IDs only, independent of unrelated
+        // captured adjacency. Ascending edge order establishes the equal-cost tie.
+        let positions: std::collections::HashMap<_, _> = nodes
+            .windows(2)
+            .enumerate()
+            .map(|(index, pair)| ((pair[0], pair[1]), index))
+            .collect();
+        let mut selected_edges = vec![None; nodes.len().saturating_sub(1)];
+        for edge in self.view.edge_ids() {
+            if cancelled() {
+                return Err(GraphError::InvalidInput("astar cancelled".into()));
+            }
+            let (s, t) = self.view.edge_endpoints(edge)?;
+            let position = positions.get(&(s, t)).or_else(|| {
+                if self.view.is_directed() {
+                    None
+                } else {
+                    positions.get(&(t, s))
+                }
+            });
+            if let Some(&index) = position {
+                if selected_edges[index].is_some() {
+                    continue;
+                }
+                let pair = (nodes[index], nodes[index + 1]);
+                let weight = weights.get(&pair).ok_or_else(|| {
+                    GraphError::InvalidInput("Missing checked path weight".into())
+                })?;
+                let value = weight_attr.and_then(|name| {
+                    self.view
+                        .read_state()
+                        .snapshot()
+                        .edge_attributes
+                        .get(&edge)
+                        .and_then(|attrs| attrs.get(name))
+                });
+                if crate::query::weights::dijkstra_weight(value, edge)? == *weight {
+                    selected_edges[index] = Some(edge);
+                }
+            }
+        }
+        let edges = selected_edges
+            .into_iter()
+            .map(|edge| {
+                edge.ok_or_else(|| {
+                    GraphError::InvalidInput("Missing selected path edge instance".into())
+                })
+            })
+            .collect::<GraphResult<Vec<_>>>()?;
+        if cancelled() {
+            return Err(GraphError::InvalidInput("astar cancelled".into()));
+        }
+        let length = edges.len();
+        Ok(crate::query::Path {
+            nodes,
+            edges,
+            total_weight: result.cost,
+            metadata: crate::query::PathMetadata {
+                algorithm: "astar".into(),
+                is_simple: true,
+                length,
+            },
+        })
+    }
 }

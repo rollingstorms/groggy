@@ -107,175 +107,209 @@ impl AStarPathfinding {
     }
 
     fn heuristics_map(&self, subgraph: &Subgraph) -> Result<HashMap<NodeId, f64>> {
-        let mut map = HashMap::new();
-        if let Some(attr) = &self.heuristic_attr {
-            for &node in subgraph.ordered_nodes().iter() {
-                let cost = match subgraph.get_node_attribute(node, attr)? {
-                    None => 0.0,
-                    Some(AttrValue::Float(f)) => f as f64,
-                    Some(AttrValue::Int(i)) => i as f64,
-                    Some(AttrValue::SmallInt(i)) => i as f64,
-                    _ => return Err(anyhow!("heuristic at node {node} must be numeric")),
-                };
-                if !cost.is_finite() || cost < 0.0 {
-                    return Err(anyhow!(
-                        "heuristic at node {node} must be finite and nonnegative"
-                    ));
-                }
-                map.insert(node, cost);
-            }
-        }
-        Ok(map)
+        let Some(attr) = &self.heuristic_attr else {
+            return Ok(HashMap::new());
+        };
+        let reference = subgraph.graph();
+        let graph = reference.borrow();
+        let pool = graph.pool();
+        Ok(crate::query::weights::checked_heuristics(
+            &subgraph.ordered_nodes(),
+            |node| {
+                graph
+                    .space()
+                    .get_node_attr_index(node, attr)
+                    .map(|index| {
+                        pool.get_attr_by_index(attr, index, true).ok_or_else(|| {
+                            crate::GraphError::InvalidInput(format!(
+                                "Invalid heuristic reference at node {node}"
+                            ))
+                        })
+                    })
+                    .transpose()
+            },
+        )?)
     }
-
     fn run(
         &self,
         ctx: &mut Context,
         subgraph: &Subgraph,
-        weight_map: &HashMap<(NodeId, NodeId), f64>,
+        weights: &HashMap<(NodeId, NodeId), f64>,
     ) -> Result<Vec<(NodeId, i64)>> {
         let start = self.resolve_node(subgraph, &self.start_attr)?;
         let goal = self.resolve_node(subgraph, &self.goal_attr)?;
-        let heuristic_map = self.heuristics_map(subgraph)?;
-        if heuristic_map.get(&goal).copied().unwrap_or(0.0) != 0.0 {
-            return Err(anyhow!("heuristic at goal must be zero"));
-        }
-        for (&(u, v), &weight) in weight_map {
-            let hu = heuristic_map.get(&u).copied().unwrap_or(0.0);
-            let hv = heuristic_map.get(&v).copied().unwrap_or(0.0);
-            if hu > weight + hv {
-                return Err(anyhow!(
-                    "inconsistent heuristic on selected edge {u} -> {v}"
-                ));
-            }
-        }
-        if start == goal {
-            ctx.record_stat("astar.path_cost", 0.0);
-            return Ok(vec![(start, 0)]);
-        }
+        let nodes = subgraph.ordered_nodes();
+        let source = nodes
+            .binary_search(&start)
+            .map_err(|_| anyhow!("A* start outside selection"))?;
+        let target = nodes
+            .binary_search(&goal)
+            .map_err(|_| anyhow!("A* goal outside selection"))?;
+        let heuristics = self.heuristics_map(subgraph)?;
+        let add_reverse = subgraph.graph().borrow().is_undirected();
+        let csr = subgraph
+            .csr_cache_get(add_reverse)
+            .ok_or_else(|| anyhow!("Missing prepared A* topology"))?;
+        let result = search(
+            || ctx.is_cancelled(),
+            SearchInput {
+                nodes: &nodes,
+                csr: &csr,
+                weights,
+                heuristics: &heuristics,
+            },
+            source,
+            target,
+        )?;
+        ctx.record_stat("astar.path_cost", result.cost);
+        Ok(result.rows)
+    }
+}
 
-        #[derive(Copy, Clone, Debug)]
-        struct State {
-            estimated: f64,
-            cost: f64,
-            node: NodeId,
+/// Prepared read-only topology, weights and heuristic values for the shared A* kernel.
+pub(crate) struct SearchInput<'a> {
+    pub nodes: &'a [NodeId],
+    pub csr: &'a Csr,
+    pub weights: &'a HashMap<(NodeId, NodeId), f64>,
+    pub heuristics: &'a HashMap<NodeId, f64>,
+}
+pub(crate) struct SearchResult {
+    pub rows: Vec<(NodeId, i64)>,
+    pub cost: f64,
+}
+pub(crate) fn search(
+    is_cancelled: impl Fn() -> bool,
+    input: SearchInput<'_>,
+    source: usize,
+    goal: usize,
+) -> Result<SearchResult> {
+    if is_cancelled() {
+        return Err(anyhow!("astar cancelled"));
+    }
+    let SearchInput {
+        nodes,
+        csr,
+        weights,
+        heuristics,
+    } = input;
+    let heuristic = |row: usize| heuristics.get(&nodes[row]).copied().unwrap_or(0.0);
+    if heuristic(goal) != 0.0 {
+        return Err(anyhow!("heuristic at goal must be zero"));
+    }
+    for (&(u, v), &weight) in weights {
+        if is_cancelled() {
+            return Err(anyhow!("astar cancelled"));
         }
-        impl Eq for State {}
-        impl PartialEq for State {
-            fn eq(&self, other: &Self) -> bool {
-                self.node == other.node
-                    && self.estimated.total_cmp(&other.estimated).is_eq()
-                    && self.cost.total_cmp(&other.cost).is_eq()
-            }
-        }
-        impl Ord for State {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                other
-                    .estimated
-                    .total_cmp(&self.estimated)
-                    .then_with(|| other.cost.total_cmp(&self.cost))
-                    .then_with(|| self.node.cmp(&other.node))
-            }
-        }
-        impl PartialOrd for State {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        let mut open = BinaryHeap::new();
-        open.push(State {
-            estimated: heuristic_map.get(&start).copied().unwrap_or(0.0),
-            cost: 0.0,
-            node: start,
-        });
-
-        let mut came_from: HashMap<NodeId, NodeId> = HashMap::new();
-        let mut g_score: HashMap<NodeId, f64> = HashMap::new();
-        g_score.insert(start, 0.0);
-
-        while let Some(State {
-            estimated: _,
-            cost,
-            node,
-        }) = open.pop()
+        if heuristics.get(&u).copied().unwrap_or(0.0)
+            > weight + heuristics.get(&v).copied().unwrap_or(0.0)
         {
-            if ctx.is_cancelled() {
+            return Err(anyhow!(
+                "inconsistent heuristic on selected edge {u} -> {v}"
+            ));
+        }
+    }
+    #[derive(Copy, Clone, Debug)]
+    struct State {
+        estimated: f64,
+        cost: f64,
+        row: usize,
+    }
+    impl Eq for State {}
+    impl PartialEq for State {
+        fn eq(&self, other: &Self) -> bool {
+            self.row == other.row
+                && self.estimated.total_cmp(&other.estimated).is_eq()
+                && self.cost.total_cmp(&other.cost).is_eq()
+        }
+    }
+    impl Ord for State {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            other
+                .estimated
+                .total_cmp(&self.estimated)
+                .then_with(|| other.cost.total_cmp(&self.cost))
+                .then_with(|| self.row.cmp(&other.row))
+        }
+    }
+    impl PartialOrd for State {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+    let mut open = BinaryHeap::new();
+    let mut distances = vec![f64::INFINITY; nodes.len()];
+    let mut previous = vec![None; nodes.len()];
+    distances[source] = 0.0;
+    open.push(State {
+        estimated: heuristic(source),
+        cost: 0.0,
+        row: source,
+    });
+    while let Some(State { cost, row, .. }) = open.pop() {
+        if is_cancelled() {
+            return Err(anyhow!("astar cancelled"));
+        }
+        if cost > distances[row] {
+            continue;
+        }
+        if row == goal {
+            break;
+        }
+        for &neighbor in csr.neighbors(row) {
+            if is_cancelled() {
                 return Err(anyhow!("astar cancelled"));
             }
-            if cost > g_score.get(&node).copied().unwrap_or(f64::INFINITY) {
-                continue;
-            }
-            if node == goal {
-                break;
-            }
-
-            // Try CSR path for optimal performance
-            let add_reverse = subgraph.graph().borrow().is_undirected();
-            let neighbors: Vec<NodeId> = if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
-                let nodes = subgraph.ordered_nodes();
-                if let Some(node_idx) = nodes.iter().position(|&n| n == node) {
-                    csr.neighbors(node_idx)
-                        .iter()
-                        .map(|&idx| nodes[idx])
-                        .collect()
-                } else {
-                    subgraph.neighbors(node)?
-                }
-            } else {
-                subgraph.neighbors(node)?
-            };
-
-            for neighbor in neighbors {
-                let edge_weight = weight_map.get(&(node, neighbor)).copied().unwrap_or(1.0);
-                let tentative = cost + edge_weight;
-                if !tentative.is_finite() {
-                    return Err(anyhow!("nonfinite A* distance"));
-                }
-                let current_best = g_score.get(&neighbor).copied().unwrap_or(f64::INFINITY);
-                if tentative < current_best {
-                    came_from.insert(neighbor, node);
-                    g_score.insert(neighbor, tentative);
-                    let heuristic = heuristic_map.get(&neighbor).copied().unwrap_or(0.0);
-                    let estimated = tentative + heuristic;
-                    if !estimated.is_finite() {
-                        return Err(anyhow!("nonfinite A* priority"));
-                    }
-                    open.push(State {
-                        estimated,
-                        cost: tentative,
-                        node: neighbor,
-                    });
-                }
-            }
-        }
-
-        if !came_from.contains_key(&goal) && start != goal {
-            return Err(anyhow!("goal unreachable from start"));
-        }
-
-        let mut path = Vec::new();
-        let mut current = goal;
-        path.push(current);
-        while current != start {
-            current = came_from
-                .get(&current)
+            let weight = weights
+                .get(&(nodes[row], nodes[neighbor]))
                 .copied()
-                .ok_or_else(|| anyhow!("failed to reconstruct path"))?;
-            path.push(current);
+                .ok_or_else(|| anyhow!("missing checked A* weight"))?;
+            let candidate = cost + weight;
+            if !candidate.is_finite() {
+                return Err(anyhow!("nonfinite A* distance"));
+            }
+            if candidate < distances[neighbor] {
+                let estimated = candidate + heuristic(neighbor);
+                if !estimated.is_finite() {
+                    return Err(anyhow!("nonfinite A* priority"));
+                }
+                distances[neighbor] = candidate;
+                previous[neighbor] = Some(row);
+                open.push(State {
+                    estimated,
+                    cost: candidate,
+                    row: neighbor,
+                });
+            }
         }
-        path.reverse();
-
-        let path_cost = g_score
-            .get(&goal)
-            .copied()
-            .ok_or_else(|| anyhow!("missing A* goal distance"))?;
-        ctx.record_stat("astar.path_cost", path_cost);
-        path.into_iter()
-            .enumerate()
-            .map(|(index, node)| Ok((node, i64::try_from(index)?)))
-            .collect()
     }
+    if !distances[goal].is_finite() {
+        return Err(anyhow!("goal unreachable from start"));
+    }
+    let mut path = vec![goal];
+    let mut current = goal;
+    while current != source {
+        if is_cancelled() {
+            return Err(anyhow!("astar cancelled"));
+        }
+        current = previous[current].ok_or_else(|| anyhow!("failed to reconstruct path"))?;
+        path.push(current);
+        if path.len() > nodes.len() {
+            return Err(anyhow!("cycle in A* predecessor path"));
+        }
+    }
+    path.reverse();
+    let rows = path
+        .into_iter()
+        .enumerate()
+        .map(|(order, row)| Ok((nodes[row], i64::try_from(order)?)))
+        .collect::<Result<_>>()?;
+    if is_cancelled() {
+        return Err(anyhow!("astar cancelled"));
+    }
+    Ok(SearchResult {
+        rows,
+        cost: distances[goal],
+    })
 }
 
 impl Algorithm for AStarPathfinding {

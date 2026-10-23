@@ -1,4 +1,4 @@
-mod astar;
+pub(crate) mod astar;
 pub(crate) mod bfs_dfs;
 pub(crate) mod dijkstra;
 pub mod utils;

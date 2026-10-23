@@ -111,6 +111,27 @@ fn read_state(c: &mut Criterion) {
                 b.iter(|| black_box(view.dijkstra_distances(nodes[0], None).unwrap()));
             },
         );
+        group.bench_with_input(
+            BenchmarkId::new("prepared_astar", count),
+            &algorithm_input,
+            |b, input| {
+                b.iter(|| {
+                    black_box(
+                        input
+                            .astar_path(nodes[0], nodes[count / 2], None, None, None)
+                            .unwrap(),
+                    )
+                });
+            },
+        );
+        group.bench_with_input(BenchmarkId::new("frozen_astar", count), &view, |b, view| {
+            b.iter(|| {
+                black_box(
+                    view.astar_path(nodes[0], nodes[count / 2], None, None)
+                        .unwrap(),
+                )
+            });
+        });
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

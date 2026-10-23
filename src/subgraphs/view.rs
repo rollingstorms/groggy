@@ -323,6 +323,17 @@ impl GraphView {
         self.algorithm_input()?
             .dijkstra_distances(start, weight_attr, None)
     }
+    /// Owned shortest path with actual selected edge IDs and captured total weight.
+    pub fn astar_path(
+        &self,
+        start: NodeId,
+        goal: NodeId,
+        weight_attr: Option<&str>,
+        heuristic_attr: Option<&str>,
+    ) -> GraphResult<crate::query::Path> {
+        self.algorithm_input()?
+            .astar_path(start, goal, weight_attr, heuristic_attr, None)
+    }
     /// Owned adjacency from captured edge instances and captured weights.
     /// Missing weights are one; explicit values follow the shared graph conversion policy.
     pub fn adjacency_matrix<

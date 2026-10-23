@@ -46,3 +46,32 @@ pub(crate) fn checked_pairs<'a>(
     }
     Ok(weights)
 }
+
+/// Shared A* heuristic domain: absent is zero, present is finite nonnegative numeric.
+pub(crate) fn checked_heuristics<'a>(
+    nodes: &[crate::NodeId],
+    mut value: impl FnMut(crate::NodeId) -> GraphResult<Option<&'a AttrValue>>,
+) -> GraphResult<std::collections::HashMap<crate::NodeId, f64>> {
+    nodes
+        .iter()
+        .map(|&node| {
+            let cost = match value(node)? {
+                None => 0.0,
+                Some(AttrValue::Float(v)) => f64::from(*v),
+                Some(AttrValue::Int(v)) => *v as f64,
+                Some(AttrValue::SmallInt(v)) => f64::from(*v),
+                _ => {
+                    return Err(GraphError::InvalidInput(format!(
+                        "heuristic at node {node} must be numeric"
+                    )))
+                }
+            };
+            if !cost.is_finite() || cost < 0.0 {
+                return Err(GraphError::InvalidInput(format!(
+                    "heuristic at node {node} must be finite and nonnegative"
+                )));
+            }
+            Ok((node, cost))
+        })
+        .collect()
+}

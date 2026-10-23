@@ -66,7 +66,7 @@ instances in stable edge order.
 `copy()` shares the captured state and membership. Views support concurrent
 readers; the working graph retains its existing writer model. GraphView currently
 provides property, membership, topology, filtering and owned matrix/table exports.
-BFS/DFS integer-row reads are supported; broader algorithm adapters remain under
+BFS/DFS and weighted Dijkstra/A* reads are supported; broader algorithm adapters remain under
 migration. This API does not promise inherited algorithm methods
 or reconstruction at arbitrary mutation timestamps.
 
@@ -224,3 +224,36 @@ the captured values. Python releases the GIL for the complete read. Numeric
 weights follow the existing f64 conversion contract; this is not a promise of
 exact arbitrary-size integer path sums. Weighted shortest paths and matrix
 exports have distinct null/text policies.
+
+
+## Find an owned path through captured weights
+
+`astar_path(start, goal, weight_attr=None, heuristic_attr=None)` returns a
+`GraphPath`: ordered `nodes`, actual selected `edges`, `total_weight`, edge-count
+`length`, and `algorithm`. It reuses the native Path representation and checked
+A* kernel. An unreachable goal raises an error. Equal-cost parallel instances
+resolve to the lowest selected edge ID; the result retains that identity after
+the graph changes. Returned lists are independent copies and the result is read-only.
+
+```python
+path = view.astar_path(a, b, weight_attr="weight")
+assert isinstance(path, gr.GraphPath)
+assert path.nodes == [a, b]
+assert path.edges == [edge]
+assert path.total_weight == 2.0
+assert path.length == 1
+assert view.astar_path(a, a).edges == []
+```
+
+Weight rules are the same as Dijkstra above. Missing heuristics are zero. Present
+heuristics must be numeric, finite and nonnegative; the goal must be zero, and
+`h(u) <= weight(u, v) + h(v)` must hold for each selected traversable pair. Every
+selected heuristic/weight is checked, including isolated/unreachable entities
+and a start-equals-goal request. Undirected consistency applies both ways.
+
+Python releases the GIL through captured preparation/search/path assembly. Native
+`AlgorithmRead.astar_path` reuses topology and accepts optional cancellation.
+Owned cost remains f64; the call writes no graph properties or history. The
+legacy pipeline retains marker-based inputs and its path-index/telemetry API,
+while sharing the same heuristic checks/search kernel. No checked view-writeback
+or whole-pipeline immutable ownership is implied.

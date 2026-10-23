@@ -66,6 +66,7 @@ if not _DISPLAY_AVAILABLE:
 
 __version__ = "0.5.1"
 GraphView = _groggy.GraphView
+GraphPath = _groggy.GraphPath
 TemporalSnapshot = _groggy.TemporalSnapshot
 ExistenceIndex = _groggy.ExistenceIndex
 
@@ -174,6 +175,7 @@ __all__ = [
     "AlgorithmBuilder",
     "VarHandle",
     "GraphView",
+    "GraphPath",
     "TemporalSnapshot",
     "ExistenceIndex",
 ]

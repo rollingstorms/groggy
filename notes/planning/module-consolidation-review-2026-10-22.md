@@ -131,3 +131,11 @@ CSR, with owned f64 rows and no property writes. Python releases the GIL; legacy
 pipeline marker/writeback behavior remains intact. Full native suites, strict
 core Clippy and 316 rebuilt Python tests pass (five existing skips). Seven read
 examples execute. Scope and costs: `frozen-dijkstra-contract-2026-10-22.md`.
+
+## AR7.5h shared A* search and owned path bridge
+
+Live and captured inputs share heuristic domains/consistency and one CSR-indexed
+A* kernel. Search no longer performs a linear node-ID lookup on each heap pop.
+Frozen results reuse query::Path and retain actual selected edge instances;
+Python GraphPath only translates immutable owned data. The legacy pipeline keeps
+its marker/path-index/telemetry adapter. See `frozen-astar-contract-2026-10-22.md`.

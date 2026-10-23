@@ -495,3 +495,13 @@ CSR, with owned f64 rows and no property writes. Python releases the GIL; legacy
 pipeline marker/writeback behavior remains intact. Full native suites, strict
 core Clippy and 316 rebuilt Python tests pass (five existing skips). Seven read
 examples execute. Scope and costs: `frozen-dijkstra-contract-2026-10-22.md`.
+
+### AR7.5h — Shared checked frozen A* paths
+
+Live/frozen readers share heuristic validation and one CSR-indexed A* kernel.
+Frozen paths reuse native Path and preserve actual selected edge IDs, deterministic
+parallel ties and owned f64 cost. Python GraphPath is immutable data; captured
+preparation/search/path assembly release the GIL. Full native suites and strict
+core Clippy pass; rebuilt weighted-path/read/history Python gate: 325 passed,
+five existing skips. Eight examples execute. Scope, edge assembly and costs:
+`frozen-astar-contract-2026-10-22.md`. Broader algorithms remain open.

@@ -158,6 +158,27 @@ impl PyGraphView {
         py.allow_threads(|| self.inner.dijkstra_distances(start, weight_attr.as_deref()))
             .map_err(graph_error_to_py_err)
     }
+    /// Owned captured A* path, including selected parallel-edge identity and cost.
+    #[pyo3(signature = (start, goal, weight_attr=None, heuristic_attr=None))]
+    fn astar_path(
+        &self,
+        py: Python,
+        start: NodeId,
+        goal: NodeId,
+        weight_attr: Option<String>,
+        heuristic_attr: Option<String>,
+    ) -> PyResult<PyGraphPath> {
+        py.allow_threads(|| {
+            self.inner.astar_path(
+                start,
+                goal,
+                weight_attr.as_deref(),
+                heuristic_attr.as_deref(),
+            )
+        })
+        .map(|inner| PyGraphPath { inner })
+        .map_err(graph_error_to_py_err)
+    }
     /// Owned adjacency operator from this selection's captured weights/topology.
     #[pyo3(signature = (sparse=true, weight_attr=None))]
     fn adjacency_matrix(
@@ -226,4 +247,34 @@ fn owned_matrix(
         .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
     let matrix = data.into_matrix().map_err(graph_error_to_py_err)?;
     Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(matrix))
+}
+
+/// Owned native path result; IDs and weight remain independent of working graphs.
+#[pyclass(name = "GraphPath", frozen)]
+#[derive(Clone)]
+pub struct PyGraphPath {
+    inner: groggy::query::Path,
+}
+#[pymethods]
+impl PyGraphPath {
+    #[getter]
+    fn nodes(&self) -> Vec<NodeId> {
+        self.inner.nodes.clone()
+    }
+    #[getter]
+    fn edges(&self) -> Vec<EdgeId> {
+        self.inner.edges.clone()
+    }
+    #[getter]
+    fn total_weight(&self) -> f64 {
+        self.inner.total_weight
+    }
+    #[getter]
+    fn length(&self) -> usize {
+        self.inner.metadata.length
+    }
+    #[getter]
+    fn algorithm(&self) -> String {
+        self.inner.metadata.algorithm.clone()
+    }
 }
