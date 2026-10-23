@@ -48,6 +48,7 @@ mod decomposition_derivatives;
 mod derivative_linalg;
 pub(crate) mod dot_product;
 mod factorization;
+pub(crate) mod graph_projection;
 mod least_squares;
 mod linear_system;
 pub mod matrix_core;

@@ -65,6 +65,43 @@ instances in stable edge order.
 
 `copy()` shares the captured state and membership. Views support concurrent
 readers; the working graph retains its existing writer model. GraphView currently
-provides property, membership and topology reads. Algorithm/query/table adapters
+provides property, membership, topology and owned matrix exports. Algorithm/query/table adapters
 are the next migration step; this API does not promise inherited algorithm methods
 or reconstruction at arbitrary mutation timestamps.
+
+
+## Export matrices from captured state
+
+`adjacency_matrix(sparse=True, weight_attr=None)` exports only the view's selected
+edge instances and nodes, including selected isolates. Rows and columns follow
+sorted node IDs. Directed orientation, parallel edge sums and loops follow the
+existing graph matrix rules. Missing weights are one; explicit null weights are
+zero. Numeric text weights use the same conversion regardless of text encoding;
+invalid numeric text raises an error.
+
+`to_matrix()` exports scalar feature columns in sorted attribute order. A column
+is included if at least one selected node has a numeric scalar or Boolean value.
+Missing, null and nonnumeric cells are zero, following the existing graph export
+policy. Vector/text-only columns are excluded. Both methods return owned matrices;
+editing the graph or the output cannot change the view. Python exports release
+the GIL during native projection and return f64 matrices.
+
+```python
+graph = gr.Graph(directed=True)
+a, b = graph.add_nodes(2)
+edge = graph.add_edge(a, b)
+graph.set_edge_attr(edge, "weight", 2)
+graph.set_node_attr(a, "score", 7)
+view = graph.read_view()
+graph.set_edge_attr(edge, "weight", 99)
+
+adjacency = view.adjacency_matrix(weight_attr="weight")
+features = view.to_matrix()
+assert adjacency.shape == (2, 2)
+assert adjacency.to_numpy()[0, 1] == 2
+assert features.columns == ["score"]
+assert features.to_numpy()[0, 0] == 7
+```
+
+Exports do not capture the graph again, create a checkpoint or record a delta.
+Live `Graph` exports share the projection kernels but read their current owner.

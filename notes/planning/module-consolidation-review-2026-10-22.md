@@ -83,3 +83,12 @@ explicit native/Python factories and edge-scoped nested selections. It has no
 working mutation owner. Existing adapters still need migration; do not relabel
 their live reads. Read-state incidence/index cost is measured and documented in
 `immutable-selection-contract-2026-10-22.md` and its benchmark note.
+
+## AR7.5c frozen numerical projections
+
+Live Graph and immutable GraphView now share matrix feature/adjacency projection
+kernels. The view adapter reads selected captured values, with no working owner;
+Python transfers owned numerical data across the GIL boundary. Storage encoding
+no longer changes numeric text conversion. See
+`frozen-matrix-export-contract-2026-10-22.md` for policies, tests and receipts.
+Existing table/query/algorithm consumers still require migration.

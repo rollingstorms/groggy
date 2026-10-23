@@ -101,8 +101,41 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Owned adjacency operator from this selection's captured weights/topology.
+    #[pyo3(signature = (sparse=true, weight_attr=None))]
+    fn adjacency_matrix(
+        &self,
+        py: Python,
+        sparse: bool,
+        weight_attr: Option<String>,
+    ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        owned_matrix(py, &self.inner, move |view| {
+            view.adjacency_matrix::<f64>(sparse, weight_attr.as_deref())
+        })
+    }
+    /// Owned scalar feature matrix using the graph API's shared conversion policy.
+    fn to_matrix(&self, py: Python) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        owned_matrix(py, &self.inner, |view| view.to_matrix::<f64>())
+    }
     /// Cheap ownership copy; the frozen state and selected membership remain shared.
     fn copy(&self) -> Self {
         self.clone()
     }
+}
+
+// Only immutable input and owned Send numerical data cross the GIL boundary.
+fn owned_matrix(
+    py: Python,
+    view: &GraphView,
+    operation: impl FnOnce(&GraphView) -> groggy::GraphResult<groggy::storage::GraphMatrix> + Send,
+) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+    let data = py
+        .allow_threads(move || {
+            operation(view)
+                .and_then(|matrix| matrix.numerical_data())
+                .map_err(|error| error.to_string())
+        })
+        .map_err(pyo3::exceptions::PyRuntimeError::new_err)?;
+    let matrix = data.into_matrix().map_err(graph_error_to_py_err)?;
+    Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(matrix))
 }

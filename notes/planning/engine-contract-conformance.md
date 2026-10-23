@@ -436,3 +436,17 @@ Strict core Clippy passes; both documented examples execute. Record indexed
 capture cost versus cheap pin/view sharing in the immutable graph-view benchmark
 note. Ordinary Subgraph/table/algorithm read-owner migration remains open; see
 `immutable-selection-contract-2026-10-22.md`.
+
+### AR7.5c — Frozen matrix exports and shared graph projection
+
+GraphView.to_matrix/adjacency_matrix use the selected captured state, including
+weights, directed/parallel/loop semantics, sorted node identity and isolates.
+Live Graph exports share the native kernels. Matrix results are owned; Python
+releases the GIL for projection and transfers numerical data without a working
+graph reference. Existing null/missing/nonnumeric policies remain explicit.
+Numeric text conversion now supports compact/compressed encodings, rejecting
+invalid text or corrupted compression. Full native suites and strict all-target
+core Clippy pass; the rebuilt Python numerical/read/history gate has 671 passed
+and one existing skip. All three documented examples execute. Bounded export
+costs and remaining adapter migration are recorded in
+`frozen-matrix-export-contract-2026-10-22.md`.

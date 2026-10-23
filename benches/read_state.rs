@@ -29,6 +29,28 @@ fn read_state(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("full_view", count), &pin, |b, pin| {
             b.iter(|| black_box(groggy::GraphView::all(pin.clone())));
         });
+        let view = groggy::GraphView::all(pin.clone());
+        group.bench_with_input(
+            BenchmarkId::new("live_features", count),
+            &graph,
+            |b, graph| {
+                b.iter(|| black_box(graph.to_matrix::<f64>().unwrap()));
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("frozen_features", count),
+            &view,
+            |b, view| {
+                b.iter(|| black_box(view.to_matrix::<f64>().unwrap()));
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("frozen_sparse_adjacency", count),
+            &view,
+            |b, view| {
+                b.iter(|| black_box(view.adjacency_matrix::<f64>(true, None).unwrap()));
+            },
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

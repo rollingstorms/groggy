@@ -12,6 +12,22 @@ pub trait FromAttrValue<T: NumericType> {
     fn from_attr_value(value: &AttrValue) -> GraphResult<T>;
 }
 
+fn numeric_text(value: &AttrValue) -> GraphResult<std::borrow::Cow<'_, str>> {
+    match value {
+        AttrValue::Text(value) => Ok(std::borrow::Cow::Borrowed(value)),
+        AttrValue::CompactText(value) => Ok(std::borrow::Cow::Borrowed(value.as_str())),
+        AttrValue::CompressedText(value) => value
+            .decompress_text()
+            .map(std::borrow::Cow::Owned)
+            .map_err(|error| {
+                GraphError::InvalidInput(format!("Cannot decode numeric text: {error}"))
+            }),
+        _ => Err(GraphError::InvalidInput(
+            "Unsupported numeric text attribute".into(),
+        )),
+    }
+}
+
 impl FromAttrValue<f64> for f64 {
     fn from_attr_value(value: &AttrValue) -> GraphResult<f64> {
         match value {
@@ -19,9 +35,14 @@ impl FromAttrValue<f64> for f64 {
             AttrValue::Int(i) => Ok(*i as f64),
             AttrValue::SmallInt(i) => Ok(*i as f64),
             AttrValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
-            AttrValue::Text(s) => s
-                .parse()
-                .map_err(|_| GraphError::InvalidInput(format!("Cannot convert '{}' to f64", s))),
+            value @ (AttrValue::Text(_)
+            | AttrValue::CompactText(_)
+            | AttrValue::CompressedText(_)) => {
+                let text = numeric_text(value)?;
+                text.parse().map_err(|_| {
+                    GraphError::InvalidInput(format!("Cannot convert '{text}' to f64"))
+                })
+            }
             AttrValue::Null => Ok(0.0),
             _ => Err(GraphError::InvalidInput(
                 "Unsupported attribute type for f64".into(),
@@ -47,9 +68,14 @@ impl FromAttrValue<i64> for i64 {
                 GraphError::InvalidInput("Attribute is not finite or exceeds i64 range".into())
             }),
             AttrValue::Bool(b) => Ok(if *b { 1 } else { 0 }),
-            AttrValue::Text(s) => s
-                .parse()
-                .map_err(|_| GraphError::InvalidInput(format!("Cannot convert '{}' to i64", s))),
+            value @ (AttrValue::Text(_)
+            | AttrValue::CompactText(_)
+            | AttrValue::CompressedText(_)) => {
+                let text = numeric_text(value)?;
+                text.parse().map_err(|_| {
+                    GraphError::InvalidInput(format!("Cannot convert '{text}' to i64"))
+                })
+            }
             AttrValue::Null => Ok(0),
             _ => Err(GraphError::InvalidInput(
                 "Unsupported attribute type for i64".into(),
@@ -73,14 +99,19 @@ impl FromAttrValue<bool> for bool {
             AttrValue::Int(i) => Ok(*i != 0),
             AttrValue::SmallInt(i) => Ok(*i != 0),
             AttrValue::Float(f) => Ok(*f != 0.0),
-            AttrValue::Text(s) => match s.to_lowercase().as_str() {
-                "true" | "1" | "yes" | "on" => Ok(true),
-                "false" | "0" | "no" | "off" => Ok(false),
-                _ => Err(GraphError::InvalidInput(format!(
-                    "Cannot convert '{}' to bool",
-                    s
-                ))),
-            },
+            value @ (AttrValue::Text(_)
+            | AttrValue::CompactText(_)
+            | AttrValue::CompressedText(_)) => {
+                let s = numeric_text(value)?;
+                match s.to_lowercase().as_str() {
+                    "true" | "1" | "yes" | "on" => Ok(true),
+                    "false" | "0" | "no" | "off" => Ok(false),
+                    _ => Err(GraphError::InvalidInput(format!(
+                        "Cannot convert '{}' to bool",
+                        s
+                    ))),
+                }
+            }
             AttrValue::Null => Ok(false),
             _ => Err(GraphError::InvalidInput(
                 "Unsupported attribute type for bool".into(),

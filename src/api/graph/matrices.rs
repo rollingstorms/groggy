@@ -13,69 +13,22 @@ impl Graph {
         nodes.sort_unstable();
         let pool = self.pool.borrow();
         let (names, _) = pool.attribute_names();
-        let mut names: Vec<_> = names.into_iter().collect();
-        names.sort_unstable();
-        let mut columns = Vec::new();
-        for name in names {
-            let column = pool.get_node_attribute_column(&name);
-            let mut numeric = false;
-            for &node in &nodes {
-                if let Some(index) = self.space.get_node_attr_index(node, &name) {
-                    let value = column.and_then(|values| values.get(index)).ok_or_else(|| {
-                        GraphError::InvalidInput(format!(
-                            "Invalid feature reference for node {node}, attribute {name}"
-                        ))
-                    })?;
-                    numeric |= matches!(
-                        value,
-                        AttrValue::Int(_)
-                            | AttrValue::SmallInt(_)
-                            | AttrValue::Float(_)
-                            | AttrValue::Bool(_)
-                    );
-                }
-            }
-            if numeric {
-                columns.push((name, column));
-            }
-        }
-        let count = nodes
-            .len()
-            .checked_mul(columns.len())
-            .ok_or_else(|| GraphError::InvalidInput("Feature matrix shape overflow".into()))?;
-        let mut data = Vec::new();
-        data.try_reserve_exact(count)
-            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
-        for &node in &nodes {
-            for (name, column) in &columns {
-                let value = match self.space.get_node_attr_index(node, name) {
-                    Some(index) => {
-                        column.and_then(|values| values.get(index)).ok_or_else(|| {
+        crate::storage::matrix::graph_projection::features(
+            &nodes,
+            names.into_iter().collect(),
+            |node, name| {
+                self.space
+                    .get_node_attr_index(node, name)
+                    .map(|index| {
+                        pool.get_attr_by_index(name, index, true).ok_or_else(|| {
                             GraphError::InvalidInput(format!(
                                 "Invalid feature reference for node {node}, attribute {name}"
                             ))
-                        })?
-                    }
-                    None => &AttrValue::Null,
-                };
-                data.push(match value {
-                    AttrValue::Int(_)
-                    | AttrValue::SmallInt(_)
-                    | AttrValue::Float(_)
-                    | AttrValue::Bool(_) => T::from_attr_value(value)?,
-                    _ => T::from_attr_value(&AttrValue::Null)?,
-                });
-            }
-        }
-        let mut matrix =
-            GraphMatrix::from_row_major_data(data, nodes.len(), columns.len(), Some(&nodes))?;
-        matrix.set_column_names(
-            columns
-                .into_iter()
-                .map(|(name, _)| name.to_string())
-                .collect(),
-        );
-        Ok(matrix)
+                        })
+                    })
+                    .transpose()
+            },
+        )
     }
 
     /// Build an owned operator from exactly these entity IDs, retaining node order.
@@ -94,38 +47,27 @@ impl Graph {
                 )));
             }
         }
-        let mut seen = HashSet::new();
-        let attr = weight_attr.map(str::to_owned);
         let pool = self.pool.borrow();
-        let column = attr
-            .as_ref()
-            .and_then(|name| pool.get_edge_attribute_column(name));
-        GraphMatrix::adjacency_from_edge_iter(
+        let attr = weight_attr.map(str::to_owned);
+        crate::storage::matrix::graph_projection::adjacency(
             nodes,
-            edges.iter().map(|&edge| {
-                if !seen.insert(edge) {
-                    return Err(GraphError::InvalidInput(format!(
-                        "Duplicate adjacency edge ID {edge}"
-                    )));
-                }
-                let (source, target) = self.edge_endpoints(edge)?;
-                let weight = match attr
-                    .as_ref()
-                    .and_then(|name| self.space.get_edge_attr_index(edge, name))
-                {
-                    Some(index) => T::from_attr_value(
-                        column.and_then(|values| values.get(index)).ok_or_else(|| {
+            edges,
+            sparse,
+            attr.as_ref(),
+            self.is_directed(),
+            |edge| self.edge_endpoints(edge),
+            |edge, name| {
+                self.space
+                    .get_edge_attr_index(edge, name)
+                    .map(|index| {
+                        pool.get_attr_by_index(name, index, false).ok_or_else(|| {
                             GraphError::InvalidInput(format!(
                                 "Invalid weight reference for edge {edge}"
                             ))
-                        })?,
-                    )?,
-                    None => T::one(),
-                };
-                Ok((source, target, weight))
-            }),
-            self.is_directed(),
-            sparse,
+                        })
+                    })
+                    .transpose()
+            },
         )
     }
     fn adjacency_for_nodes<T: NumericType>(

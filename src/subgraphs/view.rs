@@ -281,6 +281,63 @@ impl GraphView {
         }
         Self::from_membership(self.state.clone(), nodes, edges)
     }
+    /// Owned adjacency from captured edge instances and captured weights.
+    /// Missing weights are one; explicit values follow the shared graph conversion policy.
+    pub fn adjacency_matrix<
+        T: crate::storage::matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
+    >(
+        &self,
+        sparse: bool,
+        weight_attr: Option<&str>,
+    ) -> GraphResult<crate::storage::matrix::GraphMatrix<T>> {
+        let nodes = self.node_ids();
+        let edges = self.edge_ids();
+        let attr = weight_attr.map(str::to_owned);
+        crate::storage::matrix::graph_projection::adjacency(
+            &nodes,
+            &edges,
+            sparse,
+            attr.as_ref(),
+            self.is_directed(),
+            |edge| self.edge_endpoints(edge),
+            |edge, name| {
+                Ok(self
+                    .state
+                    .snapshot()
+                    .edge_attributes
+                    .get(&edge)
+                    .and_then(|attrs| attrs.get(name)))
+            },
+        )
+    }
+    /// Owned scalar feature matrix in stable node/attribute order.
+    /// Missing/null/nonnumeric cells retain the graph API's zero-imputation policy.
+    pub fn to_matrix<
+        T: crate::storage::matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
+    >(
+        &self,
+    ) -> GraphResult<crate::storage::matrix::GraphMatrix<T>> {
+        let nodes = self.node_ids();
+        let mut names = std::collections::BTreeSet::new();
+        for &node in &nodes {
+            if let Some(attrs) = self.state.snapshot().node_attributes.get(&node) {
+                names.extend(attrs.keys());
+            }
+        }
+        crate::storage::matrix::graph_projection::features(
+            &nodes,
+            names.into_iter().cloned().collect(),
+            |node, name| {
+                Ok(self
+                    .state
+                    .snapshot()
+                    .node_attributes
+                    .get(&node)
+                    .and_then(|attrs| attrs.get(name)))
+            },
+        )
+    }
+
     /// Explicit owned projection for consumers that require materialized state.
     /// Does not recover retained meta-group payloads or create history.
     pub fn to_snapshot(&self) -> GraphSnapshot {

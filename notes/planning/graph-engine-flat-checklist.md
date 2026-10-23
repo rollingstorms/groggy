@@ -41,8 +41,8 @@ subtasks passed. Detailed dependencies and workbook gates are in
 **Immediate next task:** migrate existing graph/table adapters and algorithm/query
 read consumers onto the shared immutable state/membership representation, while
 keeping their working mutation owner separate. AR7.2–AR7.4 and numerical findings
-29.60–29.63 are implemented; AR7.5a–b supply shared pins and explicit immutable
-selections. Broader numerical capability/production gates retain their own scope.
+29.60–29.63 are implemented; AR7.5a–c supply shared pins, explicit immutable
+selections and frozen matrix exports. Broader numerical capability/production gates retain their own scope.
 Preserve current APIs and compatibility re-exports. A finding is resolved by
 implementation/evidence or an explicit owner-approved deferral, not by silently
 weakening a promised capability or adding every optional enhancement as a blocker.
@@ -215,6 +215,7 @@ weakening a promised capability or adding every optional enhancement as a blocke
 - [ ] **AR7.5 — Shared view state and membership ownership.** Consolidate common membership, state/time pins, cache validity and adjacency scope across subgraph variants. Retain filter/component/neighborhood metadata and efficient specialized algorithms. Complete AR4/26 contracts rather than treating code movement as proof that a view is immutable.
 - [x] **AR7.5a — Shared immutable current/historical read payload.** Native current-state capture includes dirty typed values without recording history; TemporalSnapshot delegates to the same Arc-owned values/membership/adjacency. No topology-version cache. `pinned-read-state-foundation-2026-10-22.md`; ordinary Subgraph/table read and mutation-owner migration remains open in AR7.5/AR4/26.1.
 - [x] **AR7.5b — Canonical immutable selection and native/Python read API.** GraphView shares frozen values and Arc membership, respects parent edge scope in nested selections, indexes edge instances for directed/loop/parallel topology, distinguishes null/absent, and outlives its owner. `Graph.read_view()`/`Subgraph.pin_view()` are explicit entry points; existing Subgraph/table migration remains open. Evidence: `immutable-selection-contract-2026-10-22.md`.
+- [x] **AR7.5c — Frozen graph matrix exports with shared projection kernels.** GraphView adjacency/feature exports use captured selected IDs, typed values and weights; live Graph exports share the Rust conversion/projection implementation. Python releases the GIL over owned numerical transfer. Numeric text conversion now handles compact/compressed storage consistently. Evidence: `frozen-matrix-export-contract-2026-10-22.md`. Legacy table/query/algorithm migration remains open.
 - [ ] **AR7.6 — One display foundation.** Consolidate display/viz-display configuration, data formatting and truncation; use thin Python/interactive adapters. Preserve intentional presentation differences and examples. Move presentation responsibilities out of misleading core compatibility exports after callers migrate.
 - [ ] **AR7.7 — Shared expression/query semantics.** Inventory array filters, graph query parsing and builder expressions; share supported scalar predicate/value semantics and explicit lowering. Preserve distinct graph traversal planning and documented language features; test current APIs before retiring parallel parsing paths.
 - [ ] **AR7.8 — Coherent algorithm execution boundary.** Map algorithm pipelines, steps, Python IR and batch plans to one validation/lowering/execution contract, retaining distinct composition levels. Remove overlapping execution paths only after feature parity/cancellation/state ownership evidence; resolve A14 before changing naming/history policy.
