@@ -46,6 +46,27 @@ pub fn from_scalar<T: NumericType>(value: T) -> NumericInput {
         NumericInput::Float(value.to_f64())
     }
 }
+/// Materialize one typed numeric scalar without changing its explicit width.
+pub(crate) fn attribute_from_scalar<T: NumericType>(
+    value: T,
+    policy: ConversionPolicy,
+) -> GraphResult<crate::AttrValue> {
+    use crate::AttrValue;
+    match from_scalar(value) {
+        NumericInput::Bool(v) => Ok(AttrValue::Bool(v)),
+        NumericInput::Integer(v) if T::DTYPE == DType::Int32 => i32::try_from(v)
+            .map(AttrValue::SmallInt)
+            .map_err(|_| invalid("Integer attribute range exceeded")),
+        NumericInput::Integer(v) => i64::try_from(v)
+            .map(AttrValue::Int)
+            .map_err(|_| invalid("Integer attribute range exceeded")),
+        v @ NumericInput::Float(_) if T::DTYPE == DType::Float32 => {
+            convert::<f32>(v, policy).map(AttrValue::Float)
+        }
+        v @ NumericInput::Float(_) => convert::<f64>(v, policy).map(AttrValue::Float64),
+    }
+}
+
 pub fn inputs<T: NumericType>(values: &[T]) -> Vec<NumericInput> {
     values.iter().copied().map(from_scalar).collect()
 }

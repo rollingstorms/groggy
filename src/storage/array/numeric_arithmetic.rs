@@ -1,7 +1,7 @@
 //! Native numeric conversion and checked vector arithmetic policies.
 use super::NumArray;
 pub use crate::storage::numeric::scalar::*;
-use crate::storage::numeric::{DType, NumericType};
+use crate::storage::numeric::NumericType;
 fn invalid(message: &str) -> GraphError {
     GraphError::InvalidInput(message.into())
 }
@@ -161,22 +161,9 @@ impl<T: NumericType> NumArray<T> {
         &self,
         policy: ConversionPolicy,
     ) -> GraphResult<Vec<crate::types::AttrValue>> {
-        use crate::types::AttrValue;
-        inputs(self.as_slice())
-            .into_iter()
-            .map(|v| match v {
-                NumericInput::Bool(v) => Ok(AttrValue::Bool(v)),
-                NumericInput::Integer(v) if T::DTYPE == DType::Int32 => i32::try_from(v)
-                    .map(AttrValue::SmallInt)
-                    .map_err(|_| invalid("Integer attribute range exceeded")),
-                NumericInput::Integer(v) => i64::try_from(v)
-                    .map(AttrValue::Int)
-                    .map_err(|_| invalid("Integer attribute range exceeded")),
-                NumericInput::Float(_) if T::DTYPE == DType::Float32 => {
-                    convert::<f32>(v, policy).map(AttrValue::Float)
-                }
-                NumericInput::Float(_) => convert::<f64>(v, policy).map(AttrValue::Float64),
-            })
+        self.iter()
+            .copied()
+            .map(|v| attribute_from_scalar(v, policy))
             .collect()
     }
 }

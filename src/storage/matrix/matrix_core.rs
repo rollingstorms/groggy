@@ -446,10 +446,10 @@ impl<T: NumericType> GraphMatrix<T> {
         for col_idx in 0..cols {
             let mut column_data = Vec::new();
             for row_idx in 0..rows {
-                let value = self.get(row_idx, col_idx).unwrap_or(T::zero());
-                // Convert to AttrValue for table storage
-                let attr_value = AttrValue::Float(value.to_f64() as f32);
-                column_data.push(attr_value);
+                column_data.push(crate::storage::numeric::scalar::attribute_from_scalar(
+                    self.get_checked(row_idx, col_idx)?,
+                    crate::storage::numeric::scalar::ConversionPolicy::Round,
+                )?);
             }
             let col_name = format!("col_{}", col_idx);
             let array = crate::storage::array::BaseArray::from_attr_values(column_data);
@@ -2741,5 +2741,34 @@ impl<T: NumericType> GraphMatrix<T> {
         self.reduce_axis(Axis::Columns, |values, count| {
             Ok(super::reductions::extended_mean(values, count))
         })
+    }
+}
+
+#[cfg(test)]
+mod property_display_tests {
+    use super::*;
+    use crate::storage::table::Table;
+
+    #[test]
+    fn display_materialization_preserves_source_numeric_types() {
+        let matrix =
+            GraphMatrix::from_row_major_data(vec![1. + 2f64.powi(-40), 1e300], 2, 1, None).unwrap();
+        assert_eq!(
+            matrix.to_table().unwrap().column("col_0").unwrap().data(),
+            &[
+                AttrValue::Float64(1. + 2f64.powi(-40)),
+                AttrValue::Float64(1e300)
+            ]
+        );
+        let matrix = GraphMatrix::from_row_major_data(vec![i64::MAX], 1, 1, None).unwrap();
+        assert_eq!(
+            matrix.to_table().unwrap().column("col_0").unwrap().data(),
+            &[AttrValue::Int(i64::MAX)]
+        );
+        let matrix = GraphMatrix::from_row_major_data(vec![0.25f32], 1, 1, None).unwrap();
+        assert_eq!(
+            matrix.to_table().unwrap().column("col_0").unwrap().data(),
+            &[AttrValue::Float(0.25)]
+        );
     }
 }

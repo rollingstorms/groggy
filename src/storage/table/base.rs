@@ -1422,7 +1422,9 @@ impl BaseTable {
                 match value {
                     crate::types::AttrValue::Int(_) => return DataType::Integer,
                     crate::types::AttrValue::SmallInt(_) => return DataType::Integer,
-                    crate::types::AttrValue::Float(_) => return DataType::Float,
+                    crate::types::AttrValue::Float(_) | crate::types::AttrValue::Float64(_) => {
+                        return DataType::Float
+                    }
                     crate::types::AttrValue::Bool(_) => return DataType::Boolean,
                     crate::types::AttrValue::Text(_) => return DataType::String,
                     crate::types::AttrValue::CompactText(_) => return DataType::String,
@@ -1926,7 +1928,8 @@ impl BaseTable {
                 match value {
                     crate::types::AttrValue::Int(_)
                     | crate::types::AttrValue::SmallInt(_)
-                    | crate::types::AttrValue::Float(_) => {
+                    | crate::types::AttrValue::Float(_)
+                    | crate::types::AttrValue::Float64(_) => {
                         value_indices.push((value.clone(), i));
                     }
                     _ => {} // Skip non-numeric values
@@ -1974,7 +1977,8 @@ impl BaseTable {
                 match value {
                     crate::types::AttrValue::Int(_)
                     | crate::types::AttrValue::SmallInt(_)
-                    | crate::types::AttrValue::Float(_) => {
+                    | crate::types::AttrValue::Float(_)
+                    | crate::types::AttrValue::Float64(_) => {
                         value_indices.push((value.clone(), i));
                     }
                     _ => {} // Skip non-numeric values
@@ -2642,7 +2646,10 @@ impl BaseTable {
                 let has_numeric = column.iter().any(|val| {
                     matches!(
                         val,
-                        AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
+                        AttrValue::Int(_)
+                            | AttrValue::SmallInt(_)
+                            | AttrValue::Float(_)
+                            | AttrValue::Float64(_)
                     )
                 });
                 if has_numeric {
@@ -2678,11 +2685,7 @@ impl BaseTable {
 
             for col2 in &numeric_columns {
                 let array2 = self.column(col2).unwrap();
-                let corr_value = if col1 == col2 {
-                    AttrValue::Float(1.0) // Self-correlation is always 1
-                } else {
-                    array1.corr(array2, method).unwrap_or(AttrValue::Null)
-                };
+                let corr_value = array1.corr(array2, method)?;
                 correlations.push(corr_value);
             }
 
@@ -2751,7 +2754,10 @@ impl BaseTable {
                 let has_numeric = column.iter().any(|val| {
                     matches!(
                         val,
-                        AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
+                        AttrValue::Int(_)
+                            | AttrValue::SmallInt(_)
+                            | AttrValue::Float(_)
+                            | AttrValue::Float64(_)
                     )
                 });
                 if has_numeric {
@@ -2787,7 +2793,7 @@ impl BaseTable {
 
             for col2 in &numeric_columns {
                 let array2 = self.column(col2).unwrap();
-                let cov_value = array1.cov(array2, ddof).unwrap_or(AttrValue::Null);
+                let cov_value = array1.cov(array2, ddof)?;
                 covariances.push(cov_value);
             }
 
@@ -3190,7 +3196,7 @@ impl BaseTable {
                 let is_numeric = column
                     .data()
                     .iter()
-                    .any(|val| matches!(val, AttrValue::Int(_) | AttrValue::Float(_)));
+                    .any(|val| crate::storage::numeric::scalar::attribute_number(val).is_some());
 
                 if is_numeric {
                     let rolling_result = column.rolling(window, operation)?;
@@ -3224,7 +3230,7 @@ impl BaseTable {
                 let is_numeric = column
                     .data()
                     .iter()
-                    .any(|val| matches!(val, AttrValue::Int(_) | AttrValue::Float(_)));
+                    .any(|val| crate::storage::numeric::scalar::attribute_number(val).is_some());
 
                 if is_numeric {
                     let expanding_result = column.expanding(operation)?;
@@ -4868,7 +4874,10 @@ impl BaseTable {
                     column.data().iter().any(|v| {
                         matches!(
                             v,
-                            AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
+                            AttrValue::Int(_)
+                                | AttrValue::SmallInt(_)
+                                | AttrValue::Float(_)
+                                | AttrValue::Float64(_)
                         )
                     })
                 } else {

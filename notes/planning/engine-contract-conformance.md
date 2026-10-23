@@ -599,3 +599,11 @@ scores, replacing prior f32-only output bounds. Shared edge weight/capacity
 access recognizes f64, and compatibility handles inherit the canonical policy.
 See `algorithm-float64-properties-2026-10-23.md`. This is a property-tag migration,
 not completion of remaining consumer/default or publication-policy work.
+
+## 2026-10-23 — whole-table dispatch and typed display (07.3a.2e)
+
+F64 participates in whole-table ranking/statistics/windows; pairwise errors and
+diagonal semantics come from the shared column kernel. Matrix display and array
+materialization share one typed scalar converter, with checked reads and no
+intermediate scalar-input buffer. See `table-numeric-dispatch-2026-10-23.md`.
+Remaining text/vector/step/view adapters and ordinary defaults stay open.

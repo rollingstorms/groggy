@@ -350,6 +350,14 @@ fn read_state(c: &mut Criterion) {
                 b.iter(|| black_box(table.profile().unwrap()));
             });
         }
+        let materialized = groggy::storage::array::NumArray::new(
+            (0..count).map(|i| 1.0 + i as f64 * 2f64.powi(-40)).collect(),
+        );
+        assert!(matches!(materialized.to_attributes().unwrap()[count - 1], AttrValue::Float64(v) if v == 1.0 + (count - 1) as f64 * 2f64.powi(-40)));
+        group.bench_with_input(
+            BenchmarkId::new("materialize_f64_properties", count), &materialized,
+            |b, array| b.iter(|| black_box(array.to_attributes().unwrap())),
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();
