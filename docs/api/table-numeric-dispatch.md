@@ -30,5 +30,6 @@ assert "x" in source.describe().columns
 assert source.expanding_all("mean").column("x_expanding_mean").to_list()[0] == x
 ```
 
-CSV/JSON text adapters, outlier classification, other table/view/step/vector
-consumers and ordinary Python float defaults remain separate migration work.
+CSV/JSON interchange and outlier classification now have their own checked
+adapters; see table-interchange.md and table-outliers.md. Other table/view/step/
+vector consumers and ordinary Python float defaults remain separate migration work.

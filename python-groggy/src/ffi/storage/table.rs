@@ -2791,10 +2791,11 @@ impl PyBaseTable {
         &self,
         column: &str,
         factor: Option<f64>,
+        py: Python<'_>,
     ) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
-        let result = self
-            .table
-            .check_outliers(column, factor)
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.check_outliers(column, factor))
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(crate::ffi::storage::array::PyBaseArray { inner: result })

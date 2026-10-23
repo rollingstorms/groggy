@@ -91,6 +91,32 @@ impl Dot {
             limb += 1;
         }
     }
+    fn normalize_bins(&mut self) {
+        for bins in [&mut self.positive, &mut self.negative] {
+            for i in 0..LIMBS - 1 {
+                bins[i + 1] += bins[i] >> 32;
+                bins[i] &= MASK;
+            }
+        }
+    }
+    /// Compare the exact accumulated value with zero without rounding or overflow.
+    pub(crate) fn partial_cmp_zero(mut self) -> Option<std::cmp::Ordering> {
+        use std::cmp::Ordering;
+        if self.nan || (self.positive_infinity && self.negative_infinity) {
+            return None;
+        }
+        if self.positive_infinity {
+            return Some(Ordering::Greater);
+        }
+        if self.negative_infinity {
+            return Some(Ordering::Less);
+        }
+        if let Some(integer) = self.integer {
+            return Some(integer.cmp(&0));
+        }
+        self.normalize_bins();
+        Some(self.positive.iter().rev().cmp(self.negative.iter().rev()))
+    }
     pub(crate) fn total(self) -> f64 {
         self.total_divided_by(1)
     }
@@ -134,12 +160,7 @@ impl Dot {
             }
             self.flush_integer();
         }
-        for bins in [&mut self.positive, &mut self.negative] {
-            for i in 0..LIMBS - 1 {
-                bins[i + 1] += bins[i] >> 32;
-                bins[i] &= MASK;
-            }
-        }
+        self.normalize_bins();
         let negative = self
             .positive
             .iter()
@@ -231,5 +252,26 @@ mod division_tests {
         let mut tie = Dot::new();
         tie.add(-f64::from_bits(1), 1.0);
         assert_eq!(tie.total_divided_by(2).to_bits(), (-0.0_f64).to_bits());
+    }
+    #[test]
+    fn exact_sign_survives_underflow_overflow_and_cancellation() {
+        use std::cmp::Ordering;
+        let tiny = f64::from_bits(1);
+        let mut value = Dot::new();
+        value.add(tiny, tiny);
+        assert_eq!(value.clone().total(), 0.0);
+        assert_eq!(value.partial_cmp_zero(), Some(Ordering::Greater));
+        let mut value = Dot::new();
+        value.add(f64::MAX, f64::MAX);
+        value.add(-f64::MAX, f64::MAX);
+        value.add(-tiny, tiny);
+        assert_eq!(value.partial_cmp_zero(), Some(Ordering::Less));
+        let mut value = Dot::new();
+        value.add(1., 1.);
+        value.add(-1., 1.);
+        assert_eq!(value.partial_cmp_zero(), Some(Ordering::Equal));
+        let mut value = Dot::new();
+        value.add(f64::NAN, 1.);
+        assert_eq!(value.partial_cmp_zero(), None);
     }
 }

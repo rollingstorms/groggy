@@ -370,6 +370,14 @@ fn read_state(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("group_f64_keys", count), &grouped_source, |b, table| {
             b.iter(|| black_box(table.group_by_agg(&keys, specs.clone()).unwrap()));
         });
+        for (name, values) in [
+            ("outliers_f64", (0..count).map(|i| AttrValue::Float64(if i == 0 { -1e300 } else { 1.0 + i as f64 * 2f64.powi(-40) })).collect()),
+            ("outliers_high_integer", (0..count).map(|i| AttrValue::Int(i64::MAX - if i == 0 { count as i64 * 100 } else { count as i64 - i as i64 })).collect()),
+        ] {
+            let table = groggy::storage::table::BaseTable::from_columns(std::collections::HashMap::from([("x".into(), groggy::storage::array::BaseArray::new(values))])).unwrap();
+            assert_eq!(table.check_outliers("x", None).unwrap().data().iter().filter(|v| matches!(v, AttrValue::Bool(true))).count(), 1);
+            group.bench_with_input(BenchmarkId::new(name, count), &table, |b, table| b.iter(|| black_box(table.check_outliers("x", None).unwrap())));
+        }
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

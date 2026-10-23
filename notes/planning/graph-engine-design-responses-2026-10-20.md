@@ -1007,3 +1007,11 @@ uses borrowed typed identities and emits actual keys rather than parsed debug
 text. BaseTable Python calls release the GIL. See `table-interchange-2026-10-23.md`
 and `docs/api/table-interchange.md`; untyped interchange is not the graph codec.
 Remaining consumers and default inference stay open.
+
+## 2026-10-23 — checked table outliers (07.3a.2g)
+
+F64-aware typed ordering and exact IQR fence comparisons retain high-integer
+precision and handle extreme finite products without materializing rounded f64
+fences. Invalid factors/nonfinite cells fail; row alignment/rank conventions
+remain. Python releases the GIL. See `table-outliers-2026-10-23.md`. Remaining
+consumer/default inference work stays open.

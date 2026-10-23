@@ -145,3 +145,65 @@ pub(super) fn profile(input: &[AttrValue]) -> GraphResult<Option<NumericProfile>
         q75: values[n - 1 - (n - 1) / 4].0.clone(),
     }))
 }
+
+/// Row-aligned Tukey fences with the existing floor(n*q) rank quartiles.
+pub(super) fn outliers(input: &[AttrValue], factor: f64) -> GraphResult<BaseArray<AttrValue>> {
+    if !factor.is_finite() || factor < 0.0 {
+        return Err(invalid("Outlier factor must be finite and nonnegative"));
+    }
+    let mut numbers = attributes::values(input)?;
+    if numbers.is_empty() {
+        return Err(invalid("Outlier column contains no numeric values"));
+    }
+    numbers.sort_by(|a, b| a.numeric_cmp(*b));
+    let n = numbers.len();
+    let q1 = numbers[n / 4];
+    let q3 = numbers[n - 1 - (n - 1) / 4];
+    // x - q1 + factor*(q3-q1) and x - q3 - factor*(q3-q1).
+    // Splitting integer values keeps their low bits; accumulate finite products
+    // exactly so large or subnormal fences need not be materialized as f64.
+    let difference = |value: Value, base: Value, scale: f64| {
+        let mut difference = Dot::new();
+        for (value, coefficient) in [(value, 1.0), (base, -1.0), (q3, scale), (q1, -scale)] {
+            let (hi, lo) = value.parts();
+            difference.add(hi, coefficient);
+            difference.add(lo, coefficient);
+        }
+        difference
+    };
+    let lower = -difference(Value::Float(0.0), q1, factor).total();
+    let upper = -difference(Value::Float(0.0), q3, -factor).total();
+    let compare_fence = |value: Value, base: Value, scale: f64, rounded_bound: f64| {
+        let rounded_value = value.as_f64();
+        // Round-to-nearest is monotone: unequal rounded values certify the
+        // original ordering. Equal rounded values need the exact residual,
+        // including i64 low bits and subnormal products. Bounds may be infinite.
+        if rounded_value < rounded_bound {
+            return Ok(Ordering::Less);
+        }
+        if rounded_value > rounded_bound {
+            return Ok(Ordering::Greater);
+        }
+        difference(value, base, scale)
+            .partial_cmp_zero()
+            .ok_or_else(|| invalid("Invalid outlier fence comparison"))
+    };
+    let direct = factor == 0.0 || q1.numeric_cmp(q3).is_eq();
+    input
+        .iter()
+        .map(|value| {
+            let flag = if let Some(value) = Value::parse(value) {
+                if direct {
+                    value.numeric_cmp(q1).is_lt() || value.numeric_cmp(q3).is_gt()
+                } else {
+                    compare_fence(value, q1, factor, lower)?.is_lt()
+                        || compare_fence(value, q3, -factor, upper)?.is_gt()
+                }
+            } else {
+                false
+            };
+            Ok(AttrValue::Bool(flag))
+        })
+        .collect::<GraphResult<Vec<_>>>()
+        .map(BaseArray::new)
+}

@@ -10,7 +10,7 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 Implemented: AR7.2–AR7.4 consolidation, numerical completion slices and receipts,
 AR7.5a–l immutable reads through components and centralities, AR7.9a canonical
-logical change records, and 07.3a.1/07.3a.2a–f f64 representation and successive
+logical change records, and 07.3a.1/07.3a.2a–g f64 representation and successive
 consumer migrations. See the flat checklist for each supported scope and evidence.
 
 Next: finish remaining f64 scalar/vector/view/step adapters, then switch ordinary
@@ -243,3 +243,11 @@ diagonal semantics come from the shared column kernel. Matrix display and array
 materialization share one typed scalar converter, with checked reads and no
 intermediate scalar-input buffer. See `table-numeric-dispatch-2026-10-23.md`.
 Remaining text/vector/step/view adapters and ordinary defaults stay open.
+
+## 2026-10-23 — checked table outliers (07.3a.2g)
+
+F64-aware typed ordering and exact IQR fence comparisons retain high-integer
+precision and handle extreme finite products without materializing rounded f64
+fences. Invalid factors/nonfinite cells fail; row alignment/rank conventions
+remain. Python releases the GIL. See `table-outliers-2026-10-23.md`. Remaining
+consumer/default inference work stays open.

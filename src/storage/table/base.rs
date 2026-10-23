@@ -3405,67 +3405,10 @@ impl BaseTable {
         column: &str,
         factor: Option<f64>,
     ) -> GraphResult<BaseArray<AttrValue>> {
-        let factor = factor.unwrap_or(1.5);
-
         let column_data = self.column(column).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column))
         })?;
-
-        // Extract numeric values
-        let numeric_values: Vec<f64> = column_data
-            .data()
-            .iter()
-            .filter_map(|val| match val {
-                AttrValue::Int(i) => Some(*i as f64),
-                AttrValue::SmallInt(i) => Some(*i as f64),
-                AttrValue::Float(f) => Some(*f as f64),
-                _ => None,
-            })
-            .collect();
-
-        if numeric_values.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Column '{}' contains no numeric values",
-                column
-            )));
-        }
-
-        // Calculate quartiles
-        let mut sorted_values = numeric_values.clone();
-        sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        let q1_idx = (sorted_values.len() as f64 * 0.25) as usize;
-        let q3_idx = (sorted_values.len() as f64 * 0.75) as usize;
-
-        let q1 = sorted_values[q1_idx];
-        let q3 = sorted_values[q3_idx];
-        let iqr = q3 - q1;
-
-        let lower_bound = q1 - factor * iqr;
-        let upper_bound = q3 + factor * iqr;
-
-        // Mark outliers
-        let mut outlier_flags = Vec::new();
-        for val in column_data.data() {
-            let is_outlier = match val {
-                AttrValue::Int(i) => {
-                    let v = *i as f64;
-                    v < lower_bound || v > upper_bound
-                }
-                AttrValue::SmallInt(i) => {
-                    let v = *i as f64;
-                    v < lower_bound || v > upper_bound
-                }
-                AttrValue::Float(f) => {
-                    let v = *f as f64;
-                    v < lower_bound || v > upper_bound
-                }
-                _ => false, // Non-numeric values are not outliers
-            };
-            outlier_flags.push(AttrValue::Bool(is_outlier));
-        }
-
-        Ok(BaseArray::from_attr_values(outlier_flags))
+        super::numeric::outliers(column_data.data(), factor.unwrap_or(1.5))
     }
 
     /// Validate table schema against expected schema
