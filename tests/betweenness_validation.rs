@@ -1,5 +1,5 @@
 use groggy::algorithms::centrality::BetweennessCentrality;
-use groggy::algorithms::{Algorithm, Context};
+use groggy::algorithms::{Algorithm, AlgorithmOutput, Context};
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
 use std::{cell::RefCell, rc::Rc};
@@ -140,6 +140,40 @@ fn directed_and_undirected_scores_match_exhaustive_edge_path_reference() {
                 .map(|&(u, v, w)| (u, v, if weighted { w } else { 1. }))
                 .collect();
             let expected = reference(6, &reference_edges, directed, normalized);
+            let frozen = g
+                .borrow()
+                .read_view()
+                .unwrap()
+                .betweenness(normalized, weighted.then(|| "w".into()))
+                .unwrap();
+            let mut ctx = Context::default();
+            ctx.set_persist_results(false);
+            BetweennessCentrality::new(
+                normalized,
+                weighted.then(|| "w".into()),
+                "not_written".into(),
+            )
+            .execute(&mut ctx, selected(&g))
+            .unwrap();
+            let AlgorithmOutput::NodeScores(transient) = ctx
+                .take_outputs()
+                .remove("centrality.betweenness.scores")
+                .unwrap()
+            else {
+                panic!("expected scores")
+            };
+            assert_eq!(transient.len(), expected.len());
+            for (rows, want) in [frozen, transient]
+                .iter()
+                .flat_map(|rows| rows.iter().zip(&expected))
+            {
+                assert!((rows.1 - want).abs() < 1e-12);
+                assert!(g
+                    .borrow()
+                    .get_node_attr(rows.0, &"not_written".into())
+                    .unwrap()
+                    .is_none());
+            }
             for (node, want) in expected.iter().enumerate() {
                 assert!((score(&g,node)-want).abs() < 1e-6, "directed={directed} weighted={weighted} normalized={normalized} node={node}: {} != {want}",score(&g,node));
             }
@@ -231,5 +265,56 @@ fn rounded_away_distance_and_path_count_overflow_reject() {
             .get_node_attr(0, &"score".into())
             .unwrap()
             .is_none());
+    }
+}
+
+#[test]
+fn captured_small_multigraphs_match_independent_edge_path_enumeration() {
+    let pairs = [
+        (0, 1),
+        (0, 1),
+        (1, 2),
+        (0, 2),
+        (2, 0),
+        (1, 0),
+        (2, 2),
+        (2, 1),
+    ];
+    for directed in [false, true] {
+        for mask in 0..256 {
+            let mut graph = if directed {
+                Graph::new_directed()
+            } else {
+                Graph::new()
+            };
+            graph.add_nodes(4); // Includes an isolate.
+            let mut edges = Vec::new();
+            for (bit, &(source, target)) in pairs.iter().enumerate() {
+                if mask & (1 << bit) != 0 {
+                    let edge = graph.add_edge(source, target).unwrap();
+                    let weight = (bit % 3 + 1) as f64;
+                    graph
+                        .set_edge_attr(edge, "w".into(), AttrValue::Int(weight as i64))
+                        .unwrap();
+                    edges.push((source, target, weight));
+                }
+            }
+            let view = graph.read_view().unwrap();
+            for weighted in [false, true] {
+                let reference_edges: Vec<_> = edges
+                    .iter()
+                    .map(|&(s, t, w)| (s, t, if weighted { w } else { 1. }))
+                    .collect();
+                for normalized in [false, true] {
+                    let expected = reference(4, &reference_edges, directed, normalized);
+                    let result = view
+                        .betweenness(normalized, weighted.then(|| "w".into()))
+                        .unwrap();
+                    for ((node, actual), want) in result.iter().zip(expected) {
+                        assert!((actual-want).abs()<1e-12,"mask={mask}, directed={directed}, weighted={weighted}, normalized={normalized}, node={node}");
+                    }
+                }
+            }
+        }
     }
 }

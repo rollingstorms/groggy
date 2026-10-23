@@ -76,6 +76,14 @@ impl AlgorithmRead {
     pub fn csr(&self) -> &Csr {
         &self.csr
     }
+    /// Captured Brandes node betweenness, preserving parallel shortest instances.
+    pub fn betweenness(
+        &self,
+        algorithm: &super::centrality::BetweennessCentrality,
+        cancel: Option<&AtomicBool>,
+    ) -> GraphResult<Vec<(NodeId, f64)>> {
+        algorithm.compute_read(self, cancel)
+    }
     /// Captured classic/harmonic closeness scores, with no property writes.
     pub fn closeness(
         &self,

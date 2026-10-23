@@ -210,6 +210,28 @@ fn read_state(c: &mut Criterion) {
                 })
             },
         );
+        for (name, weight_attr) in [
+            ("betweenness", None),
+            ("betweenness_weighted", Some("length".to_string())),
+        ] {
+            let algorithm = groggy::algorithms::centrality::BetweennessCentrality::new(
+                true,
+                weight_attr.clone(),
+                "unused".into(),
+            );
+            group.bench_with_input(
+                BenchmarkId::new(format!("prepared_{name}"), count / 10),
+                &centrality_input,
+                |b, input| b.iter(|| black_box(input.betweenness(&algorithm, None).unwrap())),
+            );
+            group.bench_with_input(
+                BenchmarkId::new(format!("frozen_{name}"), count / 10),
+                &centrality_view,
+                |b, view| {
+                    b.iter(|| black_box(view.betweenness(true, weight_attr.clone()).unwrap()))
+                },
+            );
+        }
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

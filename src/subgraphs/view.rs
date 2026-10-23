@@ -306,6 +306,19 @@ impl GraphView {
     pub fn algorithm_input(&self) -> GraphResult<crate::algorithms::AlgorithmRead> {
         crate::algorithms::AlgorithmRead::new(self.clone())
     }
+    /// Owned captured Brandes scores, with optional positive edge lengths.
+    pub fn betweenness(
+        &self,
+        normalized: bool,
+        weight_attr: Option<AttrName>,
+    ) -> GraphResult<Vec<(NodeId, f64)>> {
+        let algorithm = crate::algorithms::centrality::BetweennessCentrality::new(
+            normalized,
+            weight_attr,
+            "betweenness".into(),
+        );
+        self.algorithm_input()?.betweenness(&algorithm, None)
+    }
     /// Captured closeness scores; outgoing, unnormalized distances by default.
     pub fn closeness(
         &self,

@@ -366,3 +366,35 @@ score zero. Reads preserve selected edge scope and captured values, publish no
 properties/deltas/checkpoints, and release the Python GIL. Native callers can
 reuse `AlgorithmRead::closeness(&ClosenessCentrality, cancel)`. Live and captured
 reads share the scoring kernel and the CSR transpose used for incoming mode.
+
+## Betweenness
+
+`betweenness(normalized=True, weight_attr=None)` returns owned f64 node scores
+using the shared Brandes kernel. Parallel shortest edge instances count as
+distinct paths. Explicit lengths must be finite, numeric and strictly positive
+on every selected edge; missing lengths are one. Weighted paths keep every
+minimum-length parallel instance, excluding more expensive instances. Positive
+loops cannot lie on a shortest path. Without a requested length attribute,
+selected edge instances all have unit length.
+
+```python
+between_graph = gr.Graph(directed=True)
+left, bridge, right = between_graph.add_nodes(3)
+between_graph.add_edge(left, bridge)
+between_graph.add_edge(bridge, right)
+between_view = between_graph.read_view()
+assert between_view.betweenness(normalized=False) == [(left, 0.0), (bridge, 1.0), (right, 0.0)]
+assert between_view.betweenness() == [(left, 0.0), (bridge, 0.5), (right, 0.0)]
+assert "betweenness" not in between_graph.read_view().node_attribute_keys(bridge)
+```
+
+Raw undirected scores divide the ordered-pair accumulation by two. Normalized
+scores use `1/((n-1)(n-2))` for directed graphs, and twice that factor after the
+undirected division, when n>2. All selected nodes, including isolates, determine
+n. Empty input has no rows; isolated and endpoint-only nodes have zero scores.
+Results are ordered by node ID and remain independent of later owner changes.
+Native callers can reuse `AlgorithmRead::betweenness(&BetweennessCentrality,
+cancel)`; weighted reads prepare a private minimum-instance CSR. Python releases
+the GIL. These reads publish no attributes, deltas, checkpoints or live caches.
+The legacy nonpersistent wrapper now exposes its computed rows through
+`centrality.betweenness.scores`, matching the other centrality algorithms.

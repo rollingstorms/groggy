@@ -926,3 +926,12 @@ scoring kernel and a shared compact incoming CSR transpose. Preserve defaults,
 normalization and strict selected weight rules; return owned f64 rows without
 publication. See `frozen-closeness-contract-2026-10-22.md`. Betweenness and broad
 AR7.5 remain open.
+
+
+## AR7.5l — Frozen Brandes betweenness (2026-10-23)
+
+Completed captured node betweenness over shared Brandes kernels, preserving
+parallel shortest-instance counts, selected isolates and normalization. Repaired
+dropped live transient outputs and indexer overflow; strengthened cancellation.
+See `frozen-betweenness-contract-2026-10-23.md`. The centrality read slices are
+complete; remaining algorithms, registry/pipeline and broad AR7.5 stay open.

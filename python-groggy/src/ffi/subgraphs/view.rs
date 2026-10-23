@@ -137,6 +137,17 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Captured Brandes node betweenness as owned f64 rows.
+    #[pyo3(signature = (normalized=true, weight_attr=None))]
+    fn betweenness(
+        &self,
+        py: Python,
+        normalized: bool,
+        weight_attr: Option<String>,
+    ) -> PyResult<Vec<(NodeId, f64)>> {
+        py.allow_threads(|| self.inner.betweenness(normalized, weight_attr))
+            .map_err(graph_error_to_py_err)
+    }
     /// Captured classic or harmonic closeness, returned as owned f64 rows.
     #[pyo3(signature = (harmonic=true, weight_attr=None, direction="outgoing", normalized=false))]
     fn closeness(
