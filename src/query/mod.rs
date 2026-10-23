@@ -5,6 +5,7 @@
 //! - Query parser
 //! - Traversal algorithms
 
+pub(crate) mod filtering;
 pub mod query;
 pub mod query_parser;
 pub mod traversal;

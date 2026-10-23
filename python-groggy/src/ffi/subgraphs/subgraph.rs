@@ -17,7 +17,6 @@ use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use pyo3::{Py, PyCell, PyObject};
-use std::collections::HashSet;
 use std::time::Instant;
 
 // Import FFI types we need to preserve compatibility
@@ -432,26 +431,11 @@ impl PySubgraph {
             ));
         };
 
-        // Delegate to core Graph.find_nodes method
-        let graph_ref = self.inner.graph();
-        let filtered_nodes = graph_ref
-            .borrow_mut()
-            .find_nodes(node_filter)
-            .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("{:?}", e)))?;
-
-        // Create induced subgraph using core Subgraph
-        let filtered_node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
-        let induced_edges = Subgraph::calculate_induced_edges(&graph_ref, &filtered_node_set)
-            .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("{:?}", e)))?;
-
-        let new_subgraph = Subgraph::new(
-            graph_ref.clone(),
-            filtered_node_set,
-            induced_edges,
-            format!("{}_filtered_nodes", self.inner.subgraph_type()),
-        );
-
-        PySubgraph::from_core_subgraph(new_subgraph)
+        let subgraph = self
+            .inner
+            .filter_nodes(&node_filter)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        PySubgraph::from_core_subgraph(subgraph)
     }
 
     /// Filter edges and return new subgraph
@@ -473,33 +457,11 @@ impl PySubgraph {
             ));
         };
 
-        // Delegate to core Graph.find_edges method
-        let graph_ref = self.inner.graph();
-        let filtered_edges = graph_ref
-            .borrow_mut()
-            .find_edges(edge_filter)
-            .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("{:?}", e)))?;
-
-        // Create subgraph with filtered edges and their incident nodes
-        let filtered_edge_set: HashSet<EdgeId> = filtered_edges.iter().copied().collect();
-        let mut incident_nodes = HashSet::new();
-
-        // Collect all nodes incident to the filtered edges
-        for &edge_id in &filtered_edge_set {
-            if let Ok((source, target)) = graph_ref.borrow().edge_endpoints(edge_id) {
-                incident_nodes.insert(source);
-                incident_nodes.insert(target);
-            }
-        }
-
-        let new_subgraph = Subgraph::new(
-            graph_ref.clone(),
-            incident_nodes,
-            filtered_edge_set,
-            format!("{}_filtered_edges", self.inner.subgraph_type()),
-        );
-
-        PySubgraph::from_core_subgraph(new_subgraph)
+        let subgraph = self
+            .inner
+            .filter_edges(&edge_filter)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        PySubgraph::from_core_subgraph(subgraph)
     }
 
     // === Graph Conversion Methods ===

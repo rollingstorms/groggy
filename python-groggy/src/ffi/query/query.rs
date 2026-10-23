@@ -104,6 +104,25 @@ impl PyNodeFilter {
     }
 
     #[staticmethod]
+    fn degree_range(min: usize, max: usize) -> Self {
+        Self {
+            inner: NodeFilter::DegreeRange { min, max },
+        }
+    }
+    #[staticmethod]
+    fn has_neighbor(neighbor_id: NodeId) -> Self {
+        Self {
+            inner: NodeFilter::HasNeighbor { neighbor_id },
+        }
+    }
+    #[staticmethod]
+    fn node_set(ids: Vec<NodeId>) -> Self {
+        Self {
+            inner: NodeFilter::NodeSet(ids.into_iter().collect()),
+        }
+    }
+
+    #[staticmethod]
     fn and_filters(filters: Vec<PyRef<PyNodeFilter>>) -> Self {
         let rust_filters: Vec<NodeFilter> = filters.iter().map(|f| f.inner.clone()).collect();
         Self {

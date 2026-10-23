@@ -65,8 +65,8 @@ instances in stable edge order.
 
 `copy()` shares the captured state and membership. Views support concurrent
 readers; the working graph retains its existing writer model. GraphView currently
-provides property, membership, topology and owned matrix/table exports. Algorithm/query adapters
-are the next migration step; this API does not promise inherited algorithm methods
+provides property, membership, topology, filtering and owned matrix/table exports.
+Algorithm adapters remain the next migration step; this API does not promise inherited algorithm methods
 or reconstruction at arbitrary mutation timestamps.
 
 
@@ -130,3 +130,41 @@ unreadable value references and properties colliding with structural column name
 raise errors. Exports preserve IDs; a table does not carry a writeback owner or an
 implicit graph join policy. Editing an exported table cannot change its source.
 Python releases the GIL while projecting captured column data.
+
+
+## Filter captured nodes and edge instances
+
+`filter_nodes(filter)` and `filter_edges(filter)` accept the existing NodeFilter/
+EdgeFilter objects or query strings. Each returns a frozen child sharing the same
+state. Node filtering induces edges only within its parent's existing edge scope;
+edge filtering retains matching instances and their endpoints. A nested query
+cannot bring back an excluded parallel edge or an outside node.
+
+```python
+filtered = view.filter_nodes("score >= 7")
+assert filtered.node_ids == [a]
+assert filtered.edge_ids == []
+assert view.filter_edges("weight == 2").edge_ids == [edge]
+assert view.filter_edges("weight == 99").edge_ids == []
+assert view.filter_nodes(gr.NodeFilter.degree_range(1, 1)).node_ids == [a, b]
+```
+
+Range comparisons retain exact integer ordering, including large i64 values.
+HasAttribute includes explicit null; a missing property does not match an
+attribute predicate. Not negates within the current candidate selection. Existing
+Boolean conventions are preserved: empty node And/Or and edge Or match nothing;
+empty edge And matches every candidate edge instance.
+
+DegreeRange counts selected incident instances (each loop once). HasNeighbor
+keeps the query engine's existing incident-neighbor meaning in directed graphs:
+either endpoint orientation qualifies, and querying a node as its own neighbor
+requires a self-loop. This differs from outgoing `neighbors()`. ConnectsNodes
+matches both orientations only for undirected graphs. Python filtering releases
+the GIL over captured state. Legacy Subgraph filters share these predicates and
+respect their selection, but still read current working values.
+
+This reuses the current parser and filter types. It does not add a new query
+language, certify placeholder endpoint-attribute conveniences, or implement
+inherited graph algorithms on GraphView. Unknown attributes follow the native
+predicate rules here; the legacy Graph Python facade retains its existing
+attribute-name validation.

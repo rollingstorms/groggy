@@ -101,6 +101,42 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Filter captured selected nodes using a native filter or the existing query syntax.
+    fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<Self> {
+        let filter = if let Ok(filter) = filter.extract::<crate::ffi::query::query::PyNodeFilter>()
+        {
+            filter.inner
+        } else if let Ok(query) = filter.extract::<String>() {
+            groggy::query::QueryParser::new()
+                .parse_node_query(&query)
+                .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "filter must be a NodeFilter or query string",
+            ));
+        };
+        py.allow_threads(|| self.inner.filter_nodes(&filter))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    /// Filter captured selected edge instances using the shared native executor.
+    fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<Self> {
+        let filter = if let Ok(filter) = filter.extract::<crate::ffi::query::query::PyEdgeFilter>()
+        {
+            filter.inner
+        } else if let Ok(query) = filter.extract::<String>() {
+            groggy::query::QueryParser::new()
+                .parse_edge_query(&query)
+                .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "filter must be an EdgeFilter or query string",
+            ));
+        };
+        py.allow_threads(|| self.inner.filter_edges(&filter))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
     /// Owned adjacency operator from this selection's captured weights/topology.
     #[pyo3(signature = (sparse=true, weight_attr=None))]
     fn adjacency_matrix(

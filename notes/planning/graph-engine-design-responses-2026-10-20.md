@@ -828,3 +828,15 @@ Full native suites and strict all-target core Clippy pass; rebuilt Python
 numerical/read/history/table gate: 677 passed, one existing skip. All four
 read-view examples execute. Policy boundaries, regressions and measured costs:
 `frozen-table-export-contract-2026-10-22.md`. AR7.5/26.1/27.1 remain open.
+
+### AR7.5e — Shared scoped live/frozen query predicates
+
+QueryEngine, Subgraph and GraphView share column-oriented node/edge predicates.
+Legacy nested queries stay inside the parent selection and preserve excluded
+parallel-edge scope. Frozen results share the captured pin. Range comparisons
+retain exact integer/mixed ordering; incident/Boolean conventions remain explicit.
+Full native suites plus five focused native fixtures pass; strict all-target
+core Clippy passes. Rebuilt Python core/subgraph/read/history/property/algorithm
+gate: 255 passed, five existing skips. All five read-view examples execute.
+`frozen-query-contract-2026-10-22.md` records boundaries and measured costs.
+Broader query-language/index and algorithm migration remain open.

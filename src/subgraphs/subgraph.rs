@@ -524,72 +524,109 @@ impl Subgraph {
 /// Core Graph operations implemented for Subgraph through delegation
 /// This makes Subgraph truly behave like a Graph
 impl Subgraph {
-    /// Filter nodes within this subgraph using attribute filters
-    /// This enables infinite composability: subgraph.filter_nodes().filter_nodes()
+    fn validate_query_scope(&self, graph: &Graph) -> GraphResult<()> {
+        for &node in self.nodes.iter() {
+            if !graph.space().contains_node(node) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Inactive query node {node}"
+                )));
+            }
+        }
+        for &edge in self.edges.iter() {
+            let (source, target) = graph.edge_endpoints(edge)?;
+            if !self.nodes.contains(&source) || !self.nodes.contains(&target) {
+                return Err(GraphError::InvalidInput(
+                    "Query edge endpoints must belong to the selection".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+    /// Filter the current selection without reintroducing excluded nodes or edges.
+    pub fn filter_nodes(&self, filter: &crate::query::NodeFilter) -> GraphResult<Self> {
+        self.filter_nodes_named(filter, "filtered_nodes")
+    }
+    fn filter_nodes_named(
+        &self,
+        filter: &crate::query::NodeFilter,
+        suffix: &str,
+    ) -> GraphResult<Self> {
+        let graph = self.graph.borrow();
+        self.validate_query_scope(&graph)?;
+        let pool = graph.pool();
+        let source = crate::query::filtering::Live::new(&pool, graph.space(), Some(&self.edges));
+        let nodes: HashSet<_> =
+            crate::query::filtering::nodes(&source, &self.ordered_nodes(), filter)?
+                .into_iter()
+                .collect();
+        let mut edges = HashSet::new();
+        for &edge in self.edges.iter() {
+            let (s, t) = graph.edge_endpoints(edge)?;
+            if nodes.contains(&s) && nodes.contains(&t) {
+                edges.insert(edge);
+            }
+        }
+        Ok(Self::new(
+            self.graph.clone(),
+            nodes,
+            edges,
+            format!("{}_{suffix}", self.subgraph_type),
+        ))
+    }
+    /// Filter current selected edge instances, keeping only their selected endpoints.
+    pub fn filter_edges(&self, filter: &crate::query::EdgeFilter) -> GraphResult<Self> {
+        let graph = self.graph.borrow();
+        self.validate_query_scope(&graph)?;
+        let pool = graph.pool();
+        let source = crate::query::filtering::Live::new(&pool, graph.space(), Some(&self.edges));
+        let edges: HashSet<_> =
+            crate::query::filtering::edges(&source, &self.ordered_edges(), filter)?
+                .into_iter()
+                .collect();
+        let mut nodes = HashSet::new();
+        for &edge in &edges {
+            let (s, t) = graph.edge_endpoints(edge)?;
+            nodes.extend([s, t]);
+        }
+        Ok(Self::new(
+            self.graph.clone(),
+            nodes,
+            edges,
+            format!("{}_filtered_edges", self.subgraph_type),
+        ))
+    }
+    /// Conjoin attribute predicates within the current selection; an empty map keeps it.
     pub fn filter_nodes_by_attributes(
         &self,
-        filters: &std::collections::HashMap<AttrName, crate::query::query::AttributeFilter>,
-    ) -> GraphResult<Subgraph> {
-        let mut filtered_nodes = HashSet::new();
-        let graph_borrow = self.graph.borrow();
-
-        // Only consider nodes that are already in this subgraph
-        for &node_id in self.nodes.iter() {
-            let mut matches_all = true;
-
-            // Check all filters
-            for (attr_name, filter) in filters {
-                if let Some(attr_value) = graph_borrow.get_node_attr(node_id, attr_name)? {
-                    if !filter.matches(&attr_value) {
-                        matches_all = false;
-                        break;
-                    }
-                } else {
-                    // Node doesn't have the attribute, so it doesn't match
-                    matches_all = false;
-                    break;
-                }
-            }
-
-            if matches_all {
-                filtered_nodes.insert(node_id);
-            }
-        }
-        drop(graph_borrow); // Release borrow before creating new subgraph
-
-        // Create new subgraph with filtered nodes
-        Self::from_nodes(
-            self.graph.clone(),
-            filtered_nodes,
-            format!("{}_attr_filtered", self.subgraph_type),
-        )
+        filters: &HashMap<AttrName, crate::query::AttributeFilter>,
+    ) -> GraphResult<Self> {
+        let filter = if filters.is_empty() {
+            crate::query::NodeFilter::NodeSet(self.nodes.as_ref().clone())
+        } else {
+            crate::query::NodeFilter::And(
+                filters
+                    .iter()
+                    .map(|(name, filter)| crate::query::NodeFilter::AttributeFilter {
+                        name: name.clone(),
+                        filter: filter.clone(),
+                    })
+                    .collect(),
+            )
+        };
+        self.filter_nodes_named(&filter, "attr_filtered")
     }
-
-    /// Filter nodes within this subgraph by a simple attribute value match
-    /// This is a convenience method for the most common case
+    /// Filter by a property value without expanding the parent edge scope.
     pub fn filter_nodes_by_attribute(
         &self,
-        attr_name: &AttrName,
-        attr_value: &AttrValue,
-    ) -> GraphResult<Subgraph> {
-        let mut filtered_nodes = HashSet::new();
-        let graph_borrow = self.graph.borrow();
-
-        // Only consider nodes that are already in this subgraph
-        for &node_id in self.nodes.iter() {
-            if let Some(node_attr_value) = graph_borrow.get_node_attr(node_id, attr_name)? {
-                if &node_attr_value == attr_value {
-                    filtered_nodes.insert(node_id);
-                }
-            }
-        }
-        drop(graph_borrow); // Release borrow before creating new subgraph
-
-        // Create new subgraph with filtered nodes
-        Self::from_nodes(
-            self.graph.clone(),
-            filtered_nodes,
-            format!("{}_value_filtered", self.subgraph_type),
+        name: &AttrName,
+        value: &AttrValue,
+    ) -> GraphResult<Self> {
+        self.filter_nodes_named(
+            &crate::query::NodeFilter::AttributeEquals {
+                name: name.clone(),
+                value: value.clone(),
+            },
+            "value_filtered",
         )
     }
 

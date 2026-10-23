@@ -75,6 +75,33 @@ fn read_state(c: &mut Criterion) {
                 b.iter(|| black_box(view.clone()));
             },
         );
+        let live = groggy::subgraphs::Subgraph::new(
+            std::rc::Rc::new(std::cell::RefCell::new(graph)),
+            nodes.iter().copied().collect(),
+            pin.existence().edges().clone(),
+            "query_fixture".into(),
+        );
+        let attribute = groggy::query::NodeFilter::AttributeFilter {
+            name: "value".into(),
+            filter: groggy::query::AttributeFilter::GreaterThan(AttrValue::Int((count / 2) as i64)),
+        };
+        let degree = groggy::query::NodeFilter::DegreeRange { min: 2, max: 2 };
+        for (name, predicate) in [("attribute_query", attribute), ("degree_query", degree)] {
+            group.bench_with_input(
+                BenchmarkId::new(format!("live_{name}"), count),
+                &live,
+                |b, live| {
+                    b.iter(|| black_box(live.filter_nodes(&predicate).unwrap()));
+                },
+            );
+            group.bench_with_input(
+                BenchmarkId::new(format!("frozen_{name}"), count),
+                &view,
+                |b, view| {
+                    b.iter(|| black_box(view.filter_nodes(&predicate).unwrap()));
+                },
+            );
+        }
     }
     group.finish();
 }

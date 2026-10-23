@@ -185,7 +185,10 @@ impl GraphView {
             .zip(edges.iter().copied())
             .filter(move |(_, edge)| selected.contains(edge)))
     }
-    fn selected_incident(&self, id: NodeId) -> GraphResult<impl Iterator<Item = EdgeId> + '_> {
+    pub(crate) fn selected_incident(
+        &self,
+        id: NodeId,
+    ) -> GraphResult<impl Iterator<Item = EdgeId> + '_> {
         self.require_node(id)?;
         let edges = self
             .state
@@ -280,6 +283,24 @@ impl GraphView {
             edges.insert(id);
         }
         Self::from_membership(self.state.clone(), nodes, edges)
+    }
+    /// Filter selected captured nodes; the child cannot expand its parent's edge scope.
+    pub fn filter_nodes(&self, filter: &crate::query::NodeFilter) -> GraphResult<Self> {
+        let ids = crate::query::filtering::nodes(
+            &crate::query::filtering::Frozen(self),
+            &self.node_ids(),
+            filter,
+        )?;
+        self.select_nodes(&ids)
+    }
+    /// Filter selected captured edge instances and retain their endpoints.
+    pub fn filter_edges(&self, filter: &crate::query::EdgeFilter) -> GraphResult<Self> {
+        let ids = crate::query::filtering::edges(
+            &crate::query::filtering::Frozen(self),
+            &self.edge_ids(),
+            filter,
+        )?;
+        self.select_edges(&ids)
     }
     /// Owned adjacency from captured edge instances and captured weights.
     /// Missing weights are one; explicit values follow the shared graph conversion policy.

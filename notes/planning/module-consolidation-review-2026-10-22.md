@@ -102,3 +102,13 @@ This repairs sparse-property row alignment in legacy Subgraph exports and makes
 ordering/error policy consistent. Source-pin propagation through table selections/
 joins and graph writeback remain separate; see
 `frozen-table-export-contract-2026-10-22.md`.
+
+## AR7.5e shared query read source
+
+QueryEngine/Subgraph/GraphView use one predicate executor and live/frozen read
+adapters. Attribute matching is column-oriented and borrows values; live incident
+topology is constructed lazily once per query. Subgraph FFI now delegates scoped
+selection construction to Rust, fixing whole-parent leakage. Scalar ranges use
+the canonical exact comparison helper. This does not consolidate the separate
+array expression language, algorithm pipeline IR or pending query-language scope.
+See `frozen-query-contract-2026-10-22.md`.
