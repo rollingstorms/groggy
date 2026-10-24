@@ -137,6 +137,9 @@ pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
     if value.is_none() {
         return Ok(RustAttrValue::Null);
     }
+    if let Some(value) = super::temporal::from_python(value)? {
+        return Ok(value);
+    }
     if value.is_instance_of::<PyBool>() {
         return Ok(RustAttrValue::Bool(value.extract()?));
     }
@@ -228,6 +231,9 @@ pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
 pub fn attr_value_to_python_value(py: Python, attr_value: &RustAttrValue) -> PyResult<PyObject> {
     use pyo3::types::PyBytes;
     Ok(match attr_value {
+        RustAttrValue::UtcInstant(value) => super::temporal::instant_to_python(py, *value)?,
+        RustAttrValue::Date(value) => super::temporal::date_to_python(py, *value)?,
+        RustAttrValue::Duration(value) => super::temporal::duration_to_python(py, *value)?,
         RustAttrValue::Int(value) => value.to_object(py),
         RustAttrValue::SmallInt(value) => value.to_object(py),
         RustAttrValue::Float(value) => value.to_object(py),

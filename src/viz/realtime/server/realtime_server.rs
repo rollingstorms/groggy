@@ -671,6 +671,9 @@ impl RealtimeServer {
                                     let simple_value = match attr_value {
                                         crate::types::AttrValue::Float(f) => f.to_string(),
                                         crate::types::AttrValue::Float64(f) => f.to_string(),
+                                        crate::types::AttrValue::UtcInstant(f) => f.to_string(),
+                                        crate::types::AttrValue::Date(f) => f.to_string(),
+                                        crate::types::AttrValue::Duration(f) => f.to_string(),
                                         crate::types::AttrValue::Float64Vec(v) => format!("[{} f64 values]", v.len()),
                                         crate::types::AttrValue::Int(i) => i.to_string(),
                                         crate::types::AttrValue::Text(s) => s.clone(),
@@ -774,6 +777,9 @@ impl RealtimeServer {
                                     let simple_value = match attr_value {
                                         crate::types::AttrValue::Float(f) => f.to_string(),
                                         crate::types::AttrValue::Float64(f) => f.to_string(),
+                                        crate::types::AttrValue::UtcInstant(f) => f.to_string(),
+                                        crate::types::AttrValue::Date(f) => f.to_string(),
+                                        crate::types::AttrValue::Duration(f) => f.to_string(),
                                         crate::types::AttrValue::Float64Vec(v) => format!("[{} f64 values]", v.len()),
                                         crate::types::AttrValue::Int(i) => i.to_string(),
                                         crate::types::AttrValue::Text(s) => s.clone(),

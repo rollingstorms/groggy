@@ -299,6 +299,9 @@ impl BaseTable {
                     AttrValue::SmallInt(_) => AttrValueType::SmallInt,
                     AttrValue::Float(_) => AttrValueType::Float,
                     AttrValue::Float64(_) => AttrValueType::Float64,
+                    AttrValue::UtcInstant(_) => AttrValueType::UtcInstant,
+                    AttrValue::Date(_) => AttrValueType::Date,
+                    AttrValue::Duration(_) => AttrValueType::Duration,
                     AttrValue::Text(_) => AttrValueType::Text,
                     AttrValue::CompactText(_) => AttrValueType::CompactText,
                     AttrValue::Bool(_) => AttrValueType::Bool,
@@ -353,6 +356,9 @@ impl BaseTable {
                 AttrValue::SmallInt(_) => AttrValueType::SmallInt,
                 AttrValue::Float(_) => AttrValueType::Float,
                 AttrValue::Float64(_) => AttrValueType::Float64,
+                AttrValue::UtcInstant(_) => AttrValueType::UtcInstant,
+                AttrValue::Date(_) => AttrValueType::Date,
+                AttrValue::Duration(_) => AttrValueType::Duration,
                 AttrValue::Text(_) => AttrValueType::Text,
                 AttrValue::CompactText(_) => AttrValueType::CompactText,
                 AttrValue::Bool(_) => AttrValueType::Bool,
@@ -3298,6 +3304,11 @@ impl BaseTable {
                         AttrValue::Float64Vec(_) => {
                             *type_counts.entry("float64_vec").or_insert(0) += 1
                         }
+                        AttrValue::UtcInstant(_) => {
+                            *type_counts.entry("utc_instant").or_insert(0) += 1
+                        }
+                        AttrValue::Date(_) => *type_counts.entry("date").or_insert(0) += 1,
+                        AttrValue::Duration(_) => *type_counts.entry("duration").or_insert(0) += 1,
                         AttrValue::Bool(_) => *type_counts.entry("boolean").or_insert(0) += 1,
                         AttrValue::Text(_) => {
                             *type_counts.entry("text").or_insert(0) += 1;
@@ -3446,6 +3457,9 @@ impl BaseTable {
                         AttrValue::SmallInt(_) => "small_integer",
                         AttrValue::Float(_) => "float",
                         AttrValue::Float64(_) => "float64",
+                        AttrValue::UtcInstant(_) => "utc_instant",
+                        AttrValue::Date(_) => "date",
+                        AttrValue::Duration(_) => "duration",
                         AttrValue::FloatVec(_) => "float_vec",
                         AttrValue::Float64Vec(_) => "float64_vec",
                         AttrValue::Bool(_) => "boolean",
@@ -3501,6 +3515,9 @@ impl BaseTable {
                             AttrValue::SmallInt(_) => "small_integer",
                             AttrValue::Float(_) => "float",
                             AttrValue::Float64(_) => "float64",
+                            AttrValue::UtcInstant(_) => "utc_instant",
+                            AttrValue::Date(_) => "date",
+                            AttrValue::Duration(_) => "duration",
                             AttrValue::FloatVec(_) => "float_vec",
                             AttrValue::Float64Vec(_) => "float64_vec",
                             AttrValue::Bool(_) => "boolean",

@@ -11,10 +11,11 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 Implemented: AR7.2–AR7.4 consolidation, numerical completion slices and receipts,
 AR7.5a–l immutable reads through components and centralities, AR7.9a canonical
 logical change records, and 07.3a f64 representation, supported consumer migration
-and ordinary Python default switching. See the flat checklist for each supported scope and evidence.
+and ordinary Python default switching, plus 07.3b native temporal properties.
+See the flat checklist for each supported scope and evidence.
 
-Next: accepted native temporal types (07.3b), then mutation/publication migration
-and reconstructed effective-time states. Source-preserving table adapters and broader legacy frozen
+Next: ordinary Graph mutation/publication migration (09.4) and explicit
+checkpoint semantics (12.3), followed by reconstructed effective-time states. Source-preserving table adapters and broader legacy frozen
 read guarantees remain open; owned projections do not complete those parents.
 
 ## Owner answers received — 2026-10-22
@@ -272,3 +273,18 @@ examples passed. See `float64-defaults-2026-10-23.md` for scope and evidence.
 07.3a is complete. Next is 07.3b native UTC instant/date/duration; the wider 07.3
 property-format parent, publication migration and legacy immutable-view work stay
 open. Earlier dated default-migration gates above record intermediate states.
+
+## 2026-10-23 — native temporal properties (07.3b)
+
+UTC instants, calendar dates and fixed durations now have distinct native types,
+checked constructors/deserializers and version-1 tagged payloads. Python aware
+datetime normalizes to UTC; naive datetime rejects. Exact microseconds, shared
+calendar limits and full timedelta range round trip through direct/bulk writes,
+tables, retained snapshots, schemas, export and checked journal recovery.
+Typed same-domain comparisons preserve identity and numeric exclusion. Shared
+Rust/Python fixtures, limits, fractional offsets and DST folds have coverage.
+See `temporal-properties-2026-10-23.md` and `docs/api/temporal-properties.md`.
+
+This closes 07.3b, not the broader property-format/pooled-reference parent or
+mutation effective-time reconstruction. Next: 09.4 ordinary checked publication
+and 12.3 explicit checkpoint semantics under the confirmed owner decision.

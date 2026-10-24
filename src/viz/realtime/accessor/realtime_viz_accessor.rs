@@ -79,6 +79,9 @@ impl DataSourceRealtimeAccessor {
                 // This prevents the {"Text": "value"} wrapper issue
                 AttrValue::Float(f) => AttrValue::Text(f.to_string()),
                 AttrValue::Float64(f) => AttrValue::Text(f.to_string()),
+                AttrValue::UtcInstant(f) => AttrValue::Text(f.to_string()),
+                AttrValue::Date(f) => AttrValue::Text(f.to_string()),
+                AttrValue::Duration(f) => AttrValue::Text(f.to_string()),
                 AttrValue::Float64Vec(v) => AttrValue::Text(format!("[{} f64 values]", v.len())),
                 AttrValue::Int(i) => AttrValue::Text(i.to_string()),
                 AttrValue::Text(s) => AttrValue::Text(s),

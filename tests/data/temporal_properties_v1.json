@@ -1,0 +1,11 @@
+{
+  "format": "groggy.graph",
+  "version": 2,
+  "config": {"graph_type": "undirected"},
+  "nodes": [{"id": 0, "attributes": {
+    "p0": {"type": "utc_instant", "value": {"version": 1, "seconds": -1, "microseconds": 999999}},
+    "p1": {"type": "date", "value": {"version": 1, "year": 2000, "month": 2, "day": 29}},
+    "p2": {"type": "duration", "value": {"version": 1, "days": -1, "seconds": 86399, "microseconds": 999999}}
+  }}],
+  "edges": []
+}

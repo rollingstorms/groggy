@@ -143,19 +143,23 @@ impl BaseArray<AttrValue> {
                     let equal = value == other;
                     return Ok(if operator == "==" { equal } else { !equal });
                 }
-                let order = match (value, other) {
-                    (AttrValue::Null, AttrValue::Null) => Ordering::Equal,
-                    (AttrValue::Null, _) => Ordering::Less,
-                    (_, AttrValue::Null) => Ordering::Greater,
-                    (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
-                    _ => match (value.get_text(), other.get_text()) {
-                        (Some(a), Some(b)) => a.cmp(&b),
-                        _ => {
-                            return Err(crate::GraphError::InvalidInput(format!(
-                                "Comparison not supported between {value:?} and {other:?}"
-                            )))
-                        }
-                    },
+                let order = if let Some(order) = value.temporal_cmp(other) {
+                    order
+                } else {
+                    match (value, other) {
+                        (AttrValue::Null, AttrValue::Null) => Ordering::Equal,
+                        (AttrValue::Null, _) => Ordering::Less,
+                        (_, AttrValue::Null) => Ordering::Greater,
+                        (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
+                        _ => match (value.get_text(), other.get_text()) {
+                            (Some(a), Some(b)) => a.cmp(&b),
+                            _ => {
+                                return Err(crate::GraphError::InvalidInput(format!(
+                                    "Comparison not supported between {value:?} and {other:?}"
+                                )))
+                            }
+                        },
+                    }
                 };
                 Ok(match operator {
                     ">" => order.is_gt(),

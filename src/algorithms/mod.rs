@@ -365,7 +365,10 @@ impl AlgorithmParamValue {
                 AlgorithmParamValue::FloatList(vals.into_iter().map(f64::from).collect())
             }),
             AttrValue::Null => Some(AlgorithmParamValue::None),
-            AttrValue::Bytes(_)
+            AttrValue::UtcInstant(_)
+            | AttrValue::Date(_)
+            | AttrValue::Duration(_)
+            | AttrValue::Bytes(_)
             | AttrValue::SubgraphRef(_)
             | AttrValue::NodeArray(_)
             | AttrValue::EdgeArray(_) => None,

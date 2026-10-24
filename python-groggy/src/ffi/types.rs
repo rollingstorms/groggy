@@ -46,6 +46,43 @@ impl PyAttrValue {
         Self::from_py_value(value)
     }
 
+    /// Explicit utc_instant property from the corresponding Python datetime type.
+    #[staticmethod]
+    fn utc_instant(value: &PyAny) -> PyResult<Self> {
+        let result = Self::from_py_value(value)?;
+        if matches!(result.inner, RustAttrValue::UtcInstant(_)) {
+            Ok(result)
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "Expected utc_instant input",
+            ))
+        }
+    }
+    /// Explicit date property from the corresponding Python datetime type.
+    #[staticmethod]
+    fn date(value: &PyAny) -> PyResult<Self> {
+        let result = Self::from_py_value(value)?;
+        if matches!(result.inner, RustAttrValue::Date(_)) {
+            Ok(result)
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "Expected date input",
+            ))
+        }
+    }
+    /// Explicit duration property from the corresponding Python datetime type.
+    #[staticmethod]
+    fn duration(value: &PyAny) -> PyResult<Self> {
+        let result = Self::from_py_value(value)?;
+        if matches!(result.inner, RustAttrValue::Duration(_)) {
+            Ok(result)
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "Expected duration input",
+            ))
+        }
+    }
+
     /// Explicit f32 storage with native checked rounding; finite overflow rejects.
     #[staticmethod]
     fn float32(value: f64) -> PyResult<Self> {
@@ -100,6 +137,9 @@ impl PyAttrValue {
     #[getter]
     fn type_name(&self) -> &'static str {
         match &self.inner {
+            RustAttrValue::UtcInstant(_) => "utc_instant",
+            RustAttrValue::Date(_) => "date",
+            RustAttrValue::Duration(_) => "duration",
             RustAttrValue::Int(_) => "int",
             RustAttrValue::Float(_) => "float",
             RustAttrValue::Float64(_) => "float64",
@@ -130,6 +170,9 @@ impl PyAttrValue {
                 RustAttrValue::Int(i) => i.to_string(),
                 RustAttrValue::Float(f) => f.to_string(),
                 RustAttrValue::Float64(f) => f.to_string(),
+                RustAttrValue::UtcInstant(value) => value.to_string(),
+                RustAttrValue::Date(value) => value.to_string(),
+                RustAttrValue::Duration(value) => value.to_string(),
                 RustAttrValue::Float64Vec(v) => format!("{:?}", v),
                 RustAttrValue::Text(s) => format!("\"{}\"", s),
                 RustAttrValue::Bool(b) => b.to_string(),
@@ -166,6 +209,9 @@ impl PyAttrValue {
             RustAttrValue::Int(i) => i.to_string(),
             RustAttrValue::Float(f) => f.to_string(),
             RustAttrValue::Float64(f) => f.to_string(),
+            RustAttrValue::UtcInstant(value) => value.to_string(),
+            RustAttrValue::Date(value) => value.to_string(),
+            RustAttrValue::Duration(value) => value.to_string(),
             RustAttrValue::Float64Vec(v) => format!("{:?}", v),
             RustAttrValue::Text(s) => s.clone(),
             RustAttrValue::Bool(b) => b.to_string(),

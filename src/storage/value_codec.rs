@@ -18,6 +18,9 @@ enum StoredValue {
     Float(u32),
     Float64(u64),
     Float64Vec(Vec<u64>),
+    UtcInstant(crate::types::UtcInstant),
+    Date(crate::types::CalendarDate),
+    Duration(crate::types::FixedDuration),
     Bool(bool),
     Text(String),
     FloatVec(Vec<u32>),
@@ -53,6 +56,9 @@ pub(crate) fn encode(value: &AttrValue) -> Result<Value, GraphError> {
             Float(v) => StoredValue::Float(v.to_bits()),
             Float64(v) => StoredValue::Float64(v.to_bits()),
             Float64Vec(v) => StoredValue::Float64Vec(v.iter().map(|f| f.to_bits()).collect()),
+            UtcInstant(v) => StoredValue::UtcInstant(*v),
+            Date(v) => StoredValue::Date(*v),
+            Duration(v) => StoredValue::Duration(*v),
             Bool(v) => StoredValue::Bool(*v),
             Text(v) => StoredValue::Text(v.clone()),
             CompactText(v) => StoredValue::Text(v.as_str().to_owned()),
@@ -92,6 +98,9 @@ pub(crate) fn decode(value: Value) -> Result<AttrValue, GraphError> {
         StoredValue::Float64Vec(v) => {
             AttrValue::Float64Vec(v.into_iter().map(f64::from_bits).collect())
         }
+        StoredValue::UtcInstant(v) => AttrValue::UtcInstant(v),
+        StoredValue::Date(v) => AttrValue::Date(v),
+        StoredValue::Duration(v) => AttrValue::Duration(v),
         StoredValue::Bool(v) => AttrValue::Bool(v),
         StoredValue::Text(v) => AttrValue::Text(v),
         StoredValue::FloatVec(v) => {

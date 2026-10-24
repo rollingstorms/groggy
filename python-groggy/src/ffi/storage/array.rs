@@ -605,6 +605,9 @@ impl PyBaseArray {
                         groggy::AttrValue::FloatVec(_) => "float_vec",
                         groggy::AttrValue::Float64Vec(_) => "float64_vec",
                         groggy::AttrValue::Bytes(_) => "bytes",
+                        groggy::AttrValue::UtcInstant(_) => "utc_instant",
+                        groggy::AttrValue::Date(_) => "date",
+                        groggy::AttrValue::Duration(_) => "duration",
                         _ => "other",
                     };
                     *type_counts.entry(type_name.to_string()).or_insert(0) += 1;

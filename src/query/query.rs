@@ -97,6 +97,7 @@ impl AttributeFilter {
             attribute_number(value)
                 .zip(attribute_number(target))
                 .and_then(|(a, b)| compare_inputs(a, b))
+                .or_else(|| value.temporal_cmp(target))
         };
         match self {
             Self::Equals(target) => value == target,

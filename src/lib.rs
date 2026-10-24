@@ -178,7 +178,8 @@ pub use state::publication::{ChangeKey, PublicationMetadata, TimestampMicros};
 pub use state::{HistoricalView, HistoryForest, ViewSummary};
 pub use storage::journal::DurableGraph;
 pub use types::{
-    AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, NumericType, StateId,
+    AttrName, AttrValue, AttrValueType, BranchName, CalendarDate, EdgeId, FixedDuration, NodeId,
+    NumericType, StateId, UtcInstant,
 };
 pub use utils::{convert::*, GraphConfig};
 // pub use query::{

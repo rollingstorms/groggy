@@ -200,6 +200,8 @@ Suggested: UTC instant, calendar date and duration first; add local/timezone typ
 
 Decision (2026-10-22): Confirmed suggestion: UTC instant, calendar date and duration first; distinct typed/versioned representations.
 
+Implementation (2026-10-23): 07.3b complete with exact microseconds, UTC normalization, distinct native types, typed schemas and lossless history/export/journal round trips. See [implementation record](temporal-properties-2026-10-23.md) for domains and verification.
+
 ### A06.2 - Should ordinary Python floats continue mapping to f32 for compatibility, with an explicit f64 constructor, or change default in a major release?
 
 Suggested: preserve f32 compatibility and expose f64 explicitly before changing defaults.

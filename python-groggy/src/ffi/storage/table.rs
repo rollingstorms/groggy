@@ -102,6 +102,9 @@ impl PyBaseTable {
                     AttrValue::SmallInt(_) => AttrValueType::SmallInt,
                     AttrValue::Float(_) => AttrValueType::Float,
                     AttrValue::Float64(_) => AttrValueType::Float64,
+                    AttrValue::UtcInstant(_) => AttrValueType::UtcInstant,
+                    AttrValue::Date(_) => AttrValueType::Date,
+                    AttrValue::Duration(_) => AttrValueType::Duration,
                     AttrValue::Text(_) => AttrValueType::Text,
                     AttrValue::CompactText(_) => AttrValueType::CompactText,
                     AttrValue::Bool(_) => AttrValueType::Bool,
@@ -1399,6 +1402,18 @@ impl PyBaseTable {
                         AttrValue::Float64(_) => {
                             numeric_type = Some(NumericType::Float64);
                             "float64"
+                        }
+                        AttrValue::UtcInstant(_) => {
+                            is_all_numeric = false;
+                            "utc_instant"
+                        }
+                        AttrValue::Date(_) => {
+                            is_all_numeric = false;
+                            "date"
+                        }
+                        AttrValue::Duration(_) => {
+                            is_all_numeric = false;
+                            "duration"
                         }
                         AttrValue::Float64Vec(_) => {
                             is_all_numeric = false;
@@ -2880,6 +2895,9 @@ impl PyBaseTable {
                             groggy::AttrValue::SmallInt(i) => {
                                 Value::Number(serde_json::Number::from(*i as i64))
                             }
+                            groggy::AttrValue::UtcInstant(v) => Value::String(v.to_string()),
+                            groggy::AttrValue::Date(v) => Value::String(v.to_string()),
+                            groggy::AttrValue::Duration(v) => Value::String(v.to_string()),
                             groggy::AttrValue::Float64(f) => serde_json::Number::from_f64(*f)
                                 .map(Value::Number)
                                 .unwrap_or(Value::Null),

@@ -5,6 +5,9 @@
 
 use std::hash::{Hash, Hasher};
 
+pub mod temporal;
+pub use temporal::{CalendarDate, FixedDuration, UtcInstant};
+
 /*
 === FUNDAMENTAL TYPES ===
 These are the core primitives that everything else builds on.
@@ -166,6 +169,12 @@ pub enum AttrValue {
     Float64(f64),
     /// Lossless 64-bit floating property vector.
     Float64Vec(Vec<f64>),
+    /// UTC instant with exact microsecond precision.
+    UtcInstant(UtcInstant),
+    /// Calendar date without timezone or time of day.
+    Date(CalendarDate),
+    /// Fixed elapsed duration with exact microsecond precision.
+    Duration(FixedDuration),
 }
 
 /// Custom PartialEq implementation that compares logical content across storage variants
@@ -238,6 +247,9 @@ impl Hash for AttrValue {
                     canonical_float64_bits(*value).hash(state);
                 }
             }
+            Self::UtcInstant(value) => value.hash(state),
+            Self::Date(value) => value.hash(state),
+            Self::Duration(value) => value.hash(state),
             Self::Int(value) => value.hash(state),
             Self::SmallInt(value) => (*value as i64).hash(state),
             Self::Text(value) => {
@@ -348,6 +360,9 @@ impl Ord for AttrValue {
             return kind;
         }
         match (self, other) {
+            (UtcInstant(left), UtcInstant(right)) => left.cmp(right),
+            (Date(left), Date(right)) => left.cmp(right),
+            (Duration(left), Duration(right)) => left.cmp(right),
             (Int(left), Int(right)) => left.cmp(right),
             (SmallInt(left), SmallInt(right)) => left.cmp(right),
             (Int(left), SmallInt(right)) => left.cmp(&(*right as i64)),
@@ -423,6 +438,9 @@ impl AttrValue {
             AttrValue::Json(_) => 13,
             AttrValue::Float64(_) => 14,
             AttrValue::Float64Vec(_) => 15,
+            AttrValue::UtcInstant(_) => 16,
+            AttrValue::Date(_) => 17,
+            AttrValue::Duration(_) => 18,
         }
     }
 }
@@ -873,6 +891,9 @@ pub enum AttrValueType {
     Json,
     Float64,
     Float64Vec,
+    UtcInstant,
+    Date,
+    Duration,
 }
 
 impl AttrValueType {
@@ -900,6 +921,9 @@ impl std::fmt::Display for AttrValue {
             }
             AttrValue::Float64(val) => write!(f, "{}", val),
             AttrValue::Float64Vec(val) => write!(f, "{:?}", val),
+            AttrValue::UtcInstant(val) => write!(f, "{}", val),
+            AttrValue::Date(val) => write!(f, "{}", val),
+            AttrValue::Duration(val) => write!(f, "{}", val),
             AttrValue::Int(val) => write!(f, "{}", val),
             AttrValue::Text(val) => write!(f, "{}", val),
             AttrValue::Bool(val) => write!(f, "{}", val),
@@ -928,6 +952,16 @@ impl std::fmt::Display for AttrValue {
 }
 
 impl AttrValue {
+    /// Ordering within a temporal domain; distinct temporal kinds are incomparable.
+    pub fn temporal_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::UtcInstant(a), Self::UtcInstant(b)) => Some(a.cmp(b)),
+            (Self::Date(a), Self::Date(b)) => Some(a.cmp(b)),
+            (Self::Duration(a), Self::Duration(b)) => Some(a.cmp(b)),
+            _ => None,
+        }
+    }
+
     /// Scalar floating value widened to f64 without narrowing.
     pub fn as_f64(&self) -> Option<f64> {
         match self {
@@ -950,6 +984,9 @@ impl AttrValue {
             AttrValue::Float(_) => "Float",
             AttrValue::Float64(_) => "Float64",
             AttrValue::Float64Vec(_) => "Float64Vec",
+            AttrValue::UtcInstant(_) => "UtcInstant",
+            AttrValue::Date(_) => "Date",
+            AttrValue::Duration(_) => "Duration",
             AttrValue::Int(_) => "Int",
             AttrValue::Text(_) => "Text",
             AttrValue::FloatVec(_) => "FloatVec",
@@ -976,6 +1013,9 @@ impl AttrValue {
             AttrValue::Float(_) => AttrValueType::Float,
             AttrValue::Float64(_) => AttrValueType::Float64,
             AttrValue::Float64Vec(_) => AttrValueType::Float64Vec,
+            AttrValue::UtcInstant(_) => AttrValueType::UtcInstant,
+            AttrValue::Date(_) => AttrValueType::Date,
+            AttrValue::Duration(_) => AttrValueType::Duration,
             AttrValue::Int(_) => AttrValueType::Int,
             AttrValue::Text(_) => AttrValueType::Text,
             AttrValue::FloatVec(_) => AttrValueType::FloatVec,
@@ -1004,6 +1044,9 @@ impl AttrValue {
             AttrValue::Float64Vec(v) => {
                 std::mem::size_of::<Vec<f64>>() + v.capacity() * std::mem::size_of::<f64>()
             }
+            AttrValue::UtcInstant(_) => std::mem::size_of::<UtcInstant>(),
+            AttrValue::Date(_) => std::mem::size_of::<CalendarDate>(),
+            AttrValue::Duration(_) => std::mem::size_of::<FixedDuration>(),
             AttrValue::Int(_) => std::mem::size_of::<i64>(),
             AttrValue::Text(s) => std::mem::size_of::<String>() + s.capacity(),
             AttrValue::FloatVec(v) => {

@@ -71,7 +71,11 @@ pub fn content_hash<T: Hash>(data: &T) -> [u8; 32] {
 /// we know the structure of AttrValue and can optimize accordingly
 pub fn attr_value_hash(value: &AttrValue) -> u64 {
     match value {
-        AttrValue::Float64(_) | AttrValue::Float64Vec(_) => {
+        AttrValue::Float64(_)
+        | AttrValue::Float64Vec(_)
+        | AttrValue::UtcInstant(_)
+        | AttrValue::Date(_)
+        | AttrValue::Duration(_) => {
             let mut hasher = DefaultHasher::new();
             value.hash(&mut hasher);
             hasher.finish()

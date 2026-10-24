@@ -25,12 +25,18 @@ pub enum PropertyKind {
     Float64,
     Float32Vec,
     Float64Vec,
+    UtcInstant,
+    Date,
+    Duration,
 }
 impl PropertyKind {
     fn matches(self, value: &AttrValue) -> bool {
         use AttrValue::*;
         match self {
             Self::Any => true,
+            Self::UtcInstant => matches!(value, UtcInstant(_)),
+            Self::Date => matches!(value, Date(_)),
+            Self::Duration => matches!(value, Duration(_)),
             Self::Int => matches!(value, Int(_) | SmallInt(_)),
             Self::Float => matches!(value, Float(_) | Float64(_)),
             Self::Float32 => matches!(value, Float(_)),

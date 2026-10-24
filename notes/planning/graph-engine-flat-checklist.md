@@ -38,14 +38,12 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 6 | Finish presentation/API consolidation, differential/failure/scale evidence, operational tooling and core release documentation. | AR5, AR7.6, AR7.11; 01.2, 09.5, 19.2, 31.3–31.4, 32.1–32.3, 33.2–33.3, 34.1–34.2 | Tests/docs run throughout. Service/scale commitments require A15; complete embedded and multi-user milestones separately. |
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
-**Immediate next task:** migrate existing graph/table adapters and algorithm/query
-read consumers onto the shared immutable state/membership representation, while
-keeping their working mutation owner separate. AR7.2–AR7.4 and numerical findings
-29.60–29.63 are implemented; AR7.5a–h supply shared pins, explicit immutable
-selections, frozen matrix/table exports, scoped queries, prepared BFS/DFS and checked Dijkstra/A* reads. Broader numerical capability/production gates retain their own scope.
-Preserve current APIs and compatibility re-exports. A finding is resolved by
-implementation/evidence or an explicit owner-approved deferral, not by silently
-weakening a promised capability or adding every optional enhancement as a blocker.
+**Immediate next task:** migrate ordinary Graph mutations to checked automatic
+publication (09.4), with explicit checkpoint semantics (12.3), using the shared
+logical change model (AR7.9). F64 property migration (07.3a) and native temporal
+properties (07.3b) are complete. Broader immutable legacy-view, retained pool/meta
+recovery and effective-time reconstruction gates remain open. Preserve existing
+APIs through the documented migration and keep Graphiti deferred behind the core.
 
 ## Owner answer update — 2026-10-22
 
@@ -90,7 +88,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **07.3a.2h — f64 graph query literals and complete-input validation.** Decimal/scientific syntax defaults to f64; f32/f64 suffixes preserve explicit equality widths. Retain typed graph equality and shared cross-width ordering. Reject malformed/overflowing literals, unterminated strings and ignored trailing tokens for live/frozen node/edge queries. See `graph-query-literals-2026-10-23.md`; broader AR7.7 work stays open.
 - [x] **07.3a.2i — Remaining supported consumer migration.** Native array masks/sorting/inference and shared legacy aggregation kernels replace f32-only FFI logic. F64 metadata, callbacks, numeric lookups/imports, auxiliary paths and scalar/vector position adapters work; explicit f32 constructors remain checked. Root API baseline: 967 pass/1 existing skip before defaults. See `float-consumer-completion-2026-10-23.md`; default glue/certification completed in 07.3a.3.
 - [x] **07.3a.3 — Switch ordinary Python float inference and certify compatibility.** Default scalars/numeric float collections to f64 after consumer migration; preserve explicit f32 constructors/tags, old-format reads, numerical and history/schema/journal contracts, tests and docs.
-- [ ] **07.3b — Accepted: native UTC instant, calendar date and duration.** Implement distinct first-class types with versioned encoding and Rust/Python/history/schema round trips. Local/timezone calendar types require precise follow-on rules; do not infer them from strings. Workbook A06.1.
+- [x] **07.3b — Accepted: native UTC instant, calendar date and duration.** Implement distinct first-class types with versioned encoding and Rust/Python/history/schema round trips. Local/timezone calendar types require precise follow-on rules; do not infer them from strings. Workbook A06.1 implemented with exact microseconds, UTC normalization, validated versioned payloads and distinct typed predicates; see `temporal-properties-2026-10-23.md`.
 - [ ] **07.4 — Partial: finish value-change semantics.** Verify null versus absence, unset versus removal, type changes, structured/vector changes, and all logical values through every history/storage path. Decide large-value deduplication rather than assume it exists.
 - [x] **08.1 — Semantic kinds.** Version multiple node labels independently of base/meta identity and support optional edge relationship types; validate shapes before checked writes.
 - [x] **08.2 — Schema auditing and checked enforcement.** Audit required/nullable/type rules; validate the complete proposed checked-batch result; support an installed durable schema policy and schema revisions.

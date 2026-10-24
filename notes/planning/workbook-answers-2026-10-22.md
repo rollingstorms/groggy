@@ -112,3 +112,12 @@ for 1 / 101 / 1,001 accepted batches. Seven samples per case; process CPU is
 recorded separately. The current in-tree development extension replays the whole
 journal. This is not release/cold-device/large-graph performance or a production
 budget. Checkpoint scheduling and maximum-log limits remain deferred as requested.
+
+## A06.1 implementation — 2026-10-23
+
+07.3b now implements distinct native UTC instant, calendar date and fixed elapsed
+duration properties. Rust/Python share exact microseconds, calendar years 1..9999
+and the full Python timedelta domain. Aware datetimes normalize to UTC; naive
+datetimes reject. Versioned payloads retain values through history, export and
+checked journal recovery. See [implementation and verification](temporal-properties-2026-10-23.md).
+Local/zoned calendar types and temporal arithmetic remain separate future scope.
