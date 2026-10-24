@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use anyhow::{anyhow, Result};
 
 use crate::traits::SubgraphOperations;
-use crate::types::{AttrName, NodeId};
+use crate::types::{AttrName, AttrValue, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope};
@@ -26,6 +26,10 @@ impl NodeDegreeStep {
 }
 
 impl Step for NodeDegreeStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.node_degree"
     }
@@ -38,52 +42,66 @@ impl Step for NodeDegreeStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("node_degree cancelled"));
+        }
         let subgraph = scope.subgraph();
-
-        // Determine which nodes to evaluate, preserving deterministic ordering when possible.
-        let nodes: Vec<NodeId> = if let Some(ref source_name) = self.source {
-            if let Ok(column) = scope.variables().node_column(source_name) {
+        let nodes = if let Some(source) = &self.source {
+            if let Ok(column) = scope.variables().node_column(source) {
                 column.nodes().to_vec()
-            } else if let Ok(map) = scope.variables().node_map(source_name) {
-                let mut keys: Vec<NodeId> = map.keys().copied().collect();
-                keys.sort_unstable();
-                keys
             } else {
-                subgraph.ordered_nodes().as_ref().to_vec()
+                let mut nodes: Vec<_> = scope
+                    .variables()
+                    .node_map(source)?
+                    .keys()
+                    .copied()
+                    .collect();
+                nodes.sort_unstable();
+                nodes
             }
         } else {
-            subgraph.ordered_nodes().as_ref().to_vec()
+            subgraph.ordered_nodes().to_vec()
         };
-
-        let mut map = HashMap::with_capacity(nodes.len());
-
-        let is_directed = {
-            let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            graph_ref.is_directed()
-        };
-
-        if is_directed {
-            let mut out_counts: HashMap<NodeId, usize> = HashMap::new();
-            for &edge_id in scope.edge_ids() {
-                if let Ok((source, _)) = subgraph.edge_endpoints(edge_id) {
-                    *out_counts.entry(source).or_insert(0) += 1;
+        let graph = subgraph.graph();
+        let graph = graph.borrow();
+        let mut counts = HashMap::with_capacity(nodes.len());
+        for node in nodes {
+            if !subgraph.has_node(node) || !graph.has_node(node) {
+                return Err(anyhow!(
+                    "node_degree source node {} is outside the active selection",
+                    node
+                ));
+            }
+            counts.insert(node, 0i64);
+        }
+        for &edge in subgraph.ordered_edges().iter() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("node_degree cancelled"));
+            }
+            let (source, target) = subgraph.edge_endpoints(edge)?;
+            for endpoint in [
+                Some(source),
+                (!graph.is_directed() && target != source).then_some(target),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if let Some(count) = counts.get_mut(&endpoint) {
+                    *count = count
+                        .checked_add(1)
+                        .ok_or_else(|| anyhow!("node degree exceeds i64"))?;
                 }
             }
-
-            for node in nodes {
-                let degree = out_counts.get(&node).copied().unwrap_or(0);
-                map.insert(node, AlgorithmParamValue::Int(degree as i64));
-            }
-        } else {
-            for node in nodes {
-                let degree = subgraph.degree(node).unwrap_or(0);
-                map.insert(node, AlgorithmParamValue::Int(degree as i64));
-            }
         }
-
-        scope.variables_mut().set_node_map(self.target.clone(), map);
+        drop(graph);
+        scope.variables_mut().set_node_map(
+            self.target.clone(),
+            counts
+                .into_iter()
+                .map(|(node, count)| (node, AlgorithmParamValue::Int(count)))
+                .collect(),
+        );
         Ok(())
     }
 }
@@ -104,6 +122,10 @@ impl WeightedDegreeStep {
 }
 
 impl Step for WeightedDegreeStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.weighted_degree"
     }
@@ -117,42 +139,10 @@ impl Step for WeightedDegreeStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map = HashMap::with_capacity(scope.subgraph().node_set().len());
-
-        // Initialize all nodes with 0.0
-        for &node in scope.node_ids() {
-            map.insert(node, AlgorithmParamValue::Float(0.0));
-        }
-
-        // Sum edge weights for each node
-        for &edge in scope.edge_ids() {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("weighted_degree cancelled"));
-            }
-
-            let (source, target) = scope.subgraph().edge_endpoints(edge)?;
-            let weight = scope
-                .subgraph()
-                .get_edge_attribute(edge, &self.weight_attr)?
-                .and_then(AlgorithmParamValue::from_attr_value)
-                .unwrap_or(AlgorithmParamValue::Float(1.0));
-
-            let weight_f64 = match weight {
-                AlgorithmParamValue::Float(v) => v,
-                AlgorithmParamValue::Int(v) => v as f64,
-                _ => 1.0,
-            };
-
-            // Add weight to both endpoints (undirected)
-            if let Some(AlgorithmParamValue::Float(val)) = map.get_mut(&source) {
-                *val += weight_f64;
-            }
-            if let Some(AlgorithmParamValue::Float(val)) = map.get_mut(&target) {
-                *val += weight_f64;
-            }
-        }
-
-        scope.variables_mut().set_node_map(self.target.clone(), map);
+        let result = incident_weight_sums(ctx, scope, &self.weight_attr)?;
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), result);
         Ok(())
     }
 }
@@ -327,6 +317,10 @@ impl EdgeWeightSumStep {
 }
 
 impl Step for EdgeWeightSumStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.edge_weight_sum"
     }
@@ -340,49 +334,161 @@ impl Step for EdgeWeightSumStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map: HashMap<NodeId, f64> = HashMap::new();
-
-        // Initialize all nodes with 0.0
-        for &node in scope.node_ids() {
-            map.insert(node, 0.0);
-        }
-
-        // Sum edge weights for each node
-        for &edge in scope.edge_ids() {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("edge_weight_sum cancelled"));
-            }
-
-            let (source, target) = scope.subgraph().edge_endpoints(edge)?;
-            let weight = scope
-                .subgraph()
-                .get_edge_attribute(edge, &self.weight_attr)?
-                .and_then(AlgorithmParamValue::from_attr_value)
-                .unwrap_or(AlgorithmParamValue::Float(1.0));
-
-            let weight_f64 = match weight {
-                AlgorithmParamValue::Float(v) => v,
-                AlgorithmParamValue::Int(v) => v as f64,
-                _ => 1.0,
-            };
-
-            // Add weight to both endpoints
-            if let Some(val) = map.get_mut(&source) {
-                *val += weight_f64;
-            }
-            if let Some(val) = map.get_mut(&target) {
-                *val += weight_f64;
-            }
-        }
-
-        let result: HashMap<NodeId, AlgorithmParamValue> = map
-            .into_iter()
-            .map(|(k, v)| (k, AlgorithmParamValue::Float(v)))
-            .collect();
-
+        let result = incident_weight_sums(ctx, scope, &self.weight_attr)?;
         scope
             .variables_mut()
             .set_node_map(self.target.clone(), result);
         Ok(())
+    }
+}
+
+/// Total incidence weight: both endpoints contribute, even on directed graphs;
+/// self-loops contribute twice. Missing weights default to one; present values
+/// must be finite numeric scalars. Signed weights are valid for this sum.
+fn incident_weight_sums(
+    ctx: &Context,
+    scope: &StepScope<'_>,
+    weight_attr: &AttrName,
+) -> Result<HashMap<NodeId, AlgorithmParamValue>> {
+    if ctx.is_cancelled() {
+        return Err(anyhow!("incident weight sum cancelled"));
+    }
+    let subgraph = scope.subgraph();
+    let mut sums = HashMap::with_capacity(subgraph.node_count());
+    {
+        let graph = subgraph.graph();
+        let graph = graph.borrow();
+        for &node in subgraph.ordered_nodes().iter() {
+            if !graph.has_node(node) {
+                return Err(anyhow!(
+                    "incident weight node {} is outside the active graph",
+                    node
+                ));
+            }
+            sums.insert(node, 0.0f64);
+        }
+    }
+    for &edge in subgraph.ordered_edges().iter() {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("incident weight sum cancelled"));
+        }
+        let (source, target) = subgraph.edge_endpoints(edge)?;
+        let weight = match scope.edge_attribute(ctx, edge, weight_attr)? {
+            None => 1.0,
+            Some(AttrValue::Int(value)) => value as f64,
+            Some(AttrValue::SmallInt(value)) => f64::from(value),
+            Some(AttrValue::Float(value)) => f64::from(value),
+            Some(AttrValue::Float64(value)) => value,
+            Some(_) => {
+                return Err(anyhow!(
+                    "edge {} weight '{}' must be numeric",
+                    edge,
+                    weight_attr
+                ))
+            }
+        };
+        if !weight.is_finite() {
+            return Err(anyhow!(
+                "edge {} weight '{}' must be finite",
+                edge,
+                weight_attr
+            ));
+        }
+        for node in [source, target] {
+            let sum = sums.get_mut(&node).ok_or_else(|| {
+                anyhow!(
+                    "edge {} endpoint {} is outside the selected graph",
+                    edge,
+                    node
+                )
+            })?;
+            *sum += weight;
+            if !sum.is_finite() {
+                return Err(anyhow!(
+                    "incident weight sum at node {} is not finite",
+                    node
+                ));
+            }
+        }
+    }
+    Ok(sums
+        .into_iter()
+        .map(|(node, value)| (node, AlgorithmParamValue::Float(value)))
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        algorithms::steps::{core::NodeColumn, StepVariables},
+        api::graph::Graph,
+        subgraphs::Subgraph,
+    };
+    use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn degree_uses_selected_edges_and_rejects_foreign_source_nodes() {
+        let mut graph = Graph::new_directed();
+        graph.add_nodes(3);
+        for (u, v) in [(0, 1), (0, 1), (0, 0), (2, 0)] {
+            graph.add_edge(u, v).expect("edge");
+        }
+        let selection = Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            [0, 1].into_iter().collect(),
+            "selected".into(),
+        )
+        .expect("selection");
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&selection, &mut vars);
+        NodeDegreeStep::new("degrees", None)
+            .apply(&mut Context::new(), &mut scope)
+            .expect("degrees");
+        assert_eq!(
+            scope.variables().node_map("degrees").expect("map").get(&0),
+            Some(&AlgorithmParamValue::Int(3))
+        );
+        scope.variables_mut().set_node_column(
+            "foreign",
+            NodeColumn::new(vec![2], vec![AlgorithmParamValue::Int(0)]),
+        );
+        assert!(NodeDegreeStep::new("degrees", Some("foreign".into()))
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+        assert_eq!(
+            scope
+                .variables()
+                .node_map("degrees")
+                .expect("unchanged")
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn cancelled_degree_leaves_existing_result_intact() {
+        use std::sync::{atomic::AtomicBool, Arc};
+        let selection = Subgraph::from_nodes(
+            Rc::new(RefCell::new(Graph::new())),
+            Default::default(),
+            "empty".into(),
+        )
+        .expect("selection");
+        let mut vars = StepVariables::default();
+        vars.set_node_map(
+            "result",
+            [(99, AlgorithmParamValue::Int(7))].into_iter().collect(),
+        );
+        let mut scope = StepScope::new(&selection, &mut vars);
+        let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+        assert!(NodeDegreeStep::new("result", None)
+            .apply(&mut ctx, &mut scope)
+            .is_err());
+        assert!(scope
+            .variables()
+            .node_map("result")
+            .expect("original")
+            .contains_key(&99));
     }
 }

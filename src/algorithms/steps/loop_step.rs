@@ -402,7 +402,7 @@ mod tests {
         ]);
         assert!(LoopStep::new(2, supported, registry).supports_atomic_properties());
         for body in [
-            serde_json::json!([{"id": "core.node_degree", "params": {}}]),
+            serde_json::json!([{"id": "core.triangle_count", "params": {"target": "triangles"}}]),
             serde_json::json!([{"params": {}}]),
             serde_json::json!({"value": [], "batch_plan": {}}),
         ] {

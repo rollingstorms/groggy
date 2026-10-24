@@ -243,3 +243,14 @@ leave source variables intact and atomic runs discard prefix writes. Synchronous
 block semantics are no longer open; streaming and remaining unsupported families,
 optimizer effects and defaults remain parent work. Details and verification:
 `synchronous-message-pass-2026-10-24.md`.
+
+### Atomic degree and incident-weight steps — 2026-10-24
+
+Implemented 09.4b.2l: node_degree, weighted_degree and edge_weight_sum now compose
+with atomic staging and nested loops. Weighted paths share one overlay-aware
+validated kernel; malformed/nonfinite values and sum overflow error. Degree
+retains its directional/loop convention, uses one edge pass and rejects invalid
+source variables. Weighted total incidence retains double self-loop contribution.
+Triangle/k-core certification and remaining execution-boundary parent work stay
+open. Details, compatibility changes and evidence:
+`atomic-structural-builder-steps-2026-10-24.md`.

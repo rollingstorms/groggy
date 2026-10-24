@@ -95,3 +95,7 @@ harness = false
 [[bench]]
 name = "atomic_builder_blocks"
 harness = false
+
+[[bench]]
+name = "structural_builder_steps"
+harness = false

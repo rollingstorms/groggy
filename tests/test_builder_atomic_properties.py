@@ -85,12 +85,13 @@ def test_atomic_mixed_edge_node_columns_read_prior_edge_attachments():
 def test_unsupported_step_rejects_before_any_attachment_executes():
     graph = Graph()
     graph.add_node()
-    builder = AlgorithmBuilder("unsupported")
-    values = builder.init_nodes(default=2)
-    builder.attach_as("prefix", values)
-    builder.node_degrees(values)
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "values", "value": 2}},
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "prefix"}},
+        {"id": "core.triangle_count", "params": {"target": "triangles"}},
+    ]
     with pytest.raises(RuntimeError, match="does not yet support atomic"):
-        graph.view().apply(builder.build(atomic=True), persist=True)
+        graph.view().apply(AtomicSteps(steps), persist=True)
     assert graph.current_state_id == 1
     assert graph.get_node_attr(0, "prefix") is None
 
@@ -166,7 +167,7 @@ def test_nested_atomic_loops_read_prior_iterations_and_publish_once():
 
 
 @pytest.mark.parametrize("body", [
-    [{"id": "core.node_degree", "params": {}}],
+    [{"id": "core.triangle_count", "params": {"target": "triangles"}}],
     [{"params": {}}],
 ])
 def test_zero_iteration_nested_loop_still_rejects_unsupported_or_malformed_body(body):
@@ -558,3 +559,110 @@ def test_empty_synchronous_body_preserves_values_and_empty_graph_creates_no_stat
     assert graph.current_state_id == before + (0 if empty else 1)
     if not empty:
         assert graph.get_node_attr(0, "answer") == "retained"
+
+
+@pytest.mark.parametrize("directed,expected", [(True, [3, 0, 1]), (False, [4, 2, 1])])
+def test_atomic_node_degree_preserves_parallel_loop_and_direction_conventions(directed, expected):
+    graph = Graph(directed=directed)
+    graph.add_nodes(3)
+    graph.add_edges([(0, 1), (0, 1), (0, 0), (2, 0)])
+    before = graph.current_state_id
+    builder = AlgorithmBuilder("atomic degree")
+    builder.attach_as("degree", builder.node_degrees(builder.init_nodes(default=0)))
+    graph.view().apply(builder.build(atomic=True), persist=True)
+    assert [graph.get_node_attr(n, "degree") for n in range(3)] == expected
+    assert graph.current_state_id == before + 1
+
+
+@pytest.mark.parametrize("kernel", ["core.weighted_degree", "core.edge_weight_sum"])
+@pytest.mark.parametrize("persist", [False, True])
+def test_weighted_builder_steps_read_staged_edge_properties(kernel, persist):
+    graph = Graph(directed=True)
+    graph.add_nodes(3)
+    graph.add_edge(0, 1, weight=7)
+    graph.add_edge(0, 0, weight=7)
+    before = graph.current_state_id
+    weight = 2.5000000001
+    steps = [
+        {"id": "core.init_edges", "params": {"target": "weights", "value": weight}},
+        {"id": "core.attach_edge_attr", "params": {"source": "weights", "attr": "weight"}},
+        {"id": kernel, "params": {"target": "sums", "weight_attr": "weight"}},
+        {"id": "core.attach_node_attr", "params": {"source": "sums", "attr": "answer"}},
+    ]
+    _, profile = graph.view().apply(AtomicSteps([loop_step(steps, 2)]), persist=persist, return_profile=True)
+    expected = [3 * weight, weight, 0] if persist else [21, 7, 0]
+    if persist:
+        assert [graph.get_node_attr(n, "answer") for n in range(3)] == pytest.approx(expected)
+        assert graph.get_edge_attr(0, "weight") == weight
+    else:
+        assert dict(profile["outputs"]["node_attributes.answer"]) == dict(enumerate(expected))
+        assert graph.get_edge_attr(0, "weight") == 7
+    assert graph.current_state_id == before + (1 if persist else 0)
+
+
+@pytest.mark.parametrize("kernel", ["core.weighted_degree", "core.edge_weight_sum"])
+@pytest.mark.parametrize("invalid", [None, True, "bad", [1]])
+def test_invalid_staged_weight_discards_edge_and_prefix_node_writes(kernel, invalid):
+    graph = Graph()
+    graph.add_nodes(2)
+    graph.add_edge(0, 1, weight=7)
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "prefix", "value": 1}},
+        {"id": "core.attach_node_attr", "params": {"source": "prefix", "attr": "prefix"}},
+        {"id": "core.init_edges", "params": {"target": "weights", "value": invalid}},
+        {"id": "core.attach_edge_attr", "params": {"source": "weights", "attr": "weight"}},
+        {"id": kernel, "params": {"target": "result", "weight_attr": "weight"}},
+    ]
+    with pytest.raises(RuntimeError, match="weight.*must be numeric"):
+        graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == before
+    assert graph.get_edge_attr(0, "weight") == 7
+    assert graph.get_node_attr(0, "prefix") is None
+    assert not graph.has_uncommitted_changes()
+
+
+@pytest.mark.parametrize("kernel", ["core.weighted_degree", "core.edge_weight_sum"])
+@pytest.mark.parametrize("weight", [float("nan"), float("inf"), 1e308])
+def test_nonfinite_weights_or_sum_overflow_fail_atomically(kernel, weight):
+    graph = Graph()
+    graph.add_node()
+    graph.add_edge(0, 0, weight=weight)
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "n", "value": 1}},
+        {"id": "core.attach_node_attr", "params": {"source": "n", "attr": "prefix"}},
+        {"id": kernel, "params": {"target": "result", "weight_attr": "weight"}},
+    ]
+    with pytest.raises(RuntimeError, match="finite"):
+        graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == before
+    assert graph.get_node_attr(0, "prefix") is None
+
+
+@pytest.mark.parametrize("kernel", ["core.weighted_degree", "core.edge_weight_sum"])
+def test_incident_weight_defaults_and_signed_values(kernel):
+    graph = Graph()
+    graph.add_nodes(3)
+    graph.add_edge(0, 1)
+    graph.add_edge(0, 0, weight=-2)
+    steps = [
+        {"id": kernel, "params": {"target": "result", "weight_attr": "weight"}},
+        {"id": "core.attach_node_attr", "params": {"source": "result", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert [graph.get_node_attr(n, "answer") for n in range(3)] == [-3, 1, 0]
+
+
+def test_missing_degree_source_is_an_error_and_discards_prefix():
+    graph = Graph()
+    graph.add_node()
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "n", "value": 1}},
+        {"id": "core.attach_node_attr", "params": {"source": "n", "attr": "prefix"}},
+        {"id": "core.node_degree", "params": {"source": "missing", "target": "result"}},
+    ]
+    with pytest.raises(RuntimeError, match="missing"):
+        graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "prefix") is None

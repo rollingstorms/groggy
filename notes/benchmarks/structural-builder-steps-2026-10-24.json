@@ -1,0 +1,167 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "mode": "core.node_degree",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002747042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003285834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002482041,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0029855,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002757708,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "core.weighted_degree",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002805084,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002622958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002603709,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002541375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002420083,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "core.edge_weight_sum",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002379833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00236675,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002284417,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002286125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002168791,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "core.node_degree",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.023939792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.024449042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023616541,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.022499875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.02278675,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "core.weighted_degree",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.023209792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023342209,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023607875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023605875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.022858083,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "core.edge_weight_sum",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.022309416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.022565083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023588875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023364125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023397417,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release ring workloads; fixture and algorithm construction excluded; includes one structural calculation, staged edge weight assignment, node result staging and one publication. Five samples per case. No before/after speedup, FFI, RSS/allocation or production budget claim."
+}

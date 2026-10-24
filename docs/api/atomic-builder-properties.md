@@ -50,7 +50,8 @@ Native steps declare `supports_atomic_properties()`. The default is false, so
 custom or unmigrated steps cannot accidentally bypass the staging contract.
 Current supported families are initialization/counts, property loads/attachments,
 scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
-fused arithmetic/neighbor kernels and ordered or synchronous message-pass blocks.
+fused arithmetic/neighbor kernels, node degree and incident-weight sums, and
+ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
 the native pipeline, before any step executes. Nested `iter.loop` bodies are also supported when every descendant is certified.
@@ -226,3 +227,46 @@ assert synchronous_graph.current_state_id == synchronous_before + 1
 - Synchronous mode adds one output buffer proportional to the target node count.
   It does not clone the graph or publish per-node states. Streaming and outer
   pipeline transactions remain separate work.
+
+## Degree and incident-weight steps
+
+`core.node_degree`, `core.weighted_degree` and `core.edge_weight_sum` now support
+atomic execution, including nested loops. They return temporary node variables;
+attachments enter the shared outer batch. Weighted steps read staged edge
+properties before falling back to owner values. In transient mode they continue
+to read owner properties and return owned output columns.
+
+```python
+degree_graph = Graph(directed=True)
+degree_graph.add_nodes(3)
+degree_graph.add_edges([(0, 1), (0, 1), (0, 0), (2, 0)])
+degree_builder = AlgorithmBuilder("atomic degree")
+degree_values = degree_builder.node_degrees(degree_builder.init_nodes(default=0))
+degree_builder.attach_as("degree", degree_values)
+degree_before = degree_graph.current_state_id
+degree_graph.view().apply(degree_builder.build(atomic=True), persist=True)
+assert [degree_graph.get_node_attr(n, "degree") for n in range(3)] == [3, 0, 1]
+assert degree_graph.current_state_id == degree_before + 1
+```
+
+Degree retains its existing selected-topology convention: outgoing degree on a
+directed graph; both endpoints on an undirected graph, with each stored self-loop
+counted once. Parallel edges count separately. An explicit source map/column selects
+which nodes receive results; a missing or incorrectly typed source variable now
+errors rather than falling back to all nodes. Source nodes outside the active
+selection reject. Native results are checked i64 counts.
+
+Both weighted primitives retain **total incidence weight** on directed and
+undirected graphs: add each selected edge's weight to both endpoints, counting
+self-loops twice. This is their existing definition; it differs from unweighted
+self-loop counting above. The duplicate implementations now use one shared
+native kernel. Missing weight properties default to 1; explicit null, booleans,
+text, vectors and other nonnumeric values now error rather than silently becoming
+1. Signed finite scalar weights are accepted. Nonfinite weights and overflowing
+nonfinite sums reject, preserving atomic rollback. Float64 inputs retain f64
+precision; integer weights convert to f64 for summation.
+
+Selected edges are processed in cached ID order. The first ordering preparation
+may sort edges; subsequent calls reuse it. Degree performs one selected-edge pass;
+weighted primitives share one incidence pass. Triangle and k-core step migration
+remain separate work and are still rejected in atomic builders.
