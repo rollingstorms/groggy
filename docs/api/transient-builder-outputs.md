@@ -58,7 +58,9 @@ migration; this slice repairs the previously ignored explicit False flag.
 Persistent multi-step pipelines are not yet one atomic mutation: an attachment can
 publish before a later step fails. Full staging/read-after-write and compound
 failure semantics remain 09.4b.2 / AR7.8 / 30. Per-step checks do not certify the
-entire run. This change adds no pipeline-run/provenance history entities.
+entire run. [Explicit atomic property builders](atomic-builder-properties.md) now
+provide a bounded supported mode; existing defaults and arbitrary-step pipelines
+remain separate. No pipeline-run/provenance history entities are added.
 
 Native `AlgorithmOutput` adds `NodeAttributes` and `EdgeAttributes` owned column
 variants. The shared `StepScope` attachment methods select persistence versus

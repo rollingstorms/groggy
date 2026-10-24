@@ -732,13 +732,21 @@ class AlgorithmBuilder:
         )
         return handle
 
-    def build(self, validate: bool = True, optimize: bool = True) -> AlgorithmHandle:
+    def build(
+        self,
+        validate: bool = True,
+        optimize: bool = True,
+        *,
+        atomic: bool = False,
+    ) -> AlgorithmHandle:
         """
         Build the algorithm from accumulated steps.
 
         Args:
             validate: If True, validate pipeline before building (default: True)
             optimize: If True, apply IR optimization passes (default: True)
+            atomic: Stage supported property writes and accept once on success.
+                Uses original step order; IR optimization is bypassed in this mode.
 
         Returns:
             AlgorithmHandle ready for execution
@@ -750,7 +758,9 @@ class AlgorithmBuilder:
         steps = self.steps
         has_aliases = any(step.get("type") == "alias" for step in self.steps)
 
-        if optimize and self.use_ir and self.ir_graph is not None:
+        # Atomic property reads depend on original attachment order. The current
+        # IR optimizer has no graph-property effect edges, so keep that order.
+        if optimize and not atomic and self.use_ir and self.ir_graph is not None:
             from groggy.builder.ir.optimizer import optimize_ir
 
             # Ensure IR reflects latest step list before optimization
@@ -806,7 +816,7 @@ class AlgorithmBuilder:
             steps = self._merge_steps_topologically(ir_steps, alias_steps)
             steps.extend(side_effect_steps)
 
-        algo = BuiltAlgorithm(self.name, steps)
+        algo = BuiltAlgorithm(self.name, steps, atomic=atomic)
 
         if validate:
             errors, warnings = algo._validate()

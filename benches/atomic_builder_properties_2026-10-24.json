@@ -1,0 +1,109 @@
+{
+  "cases": [
+    {
+      "attachment_columns": 2,
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.005508291,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004325583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003854791,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003572417,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002708625,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "attachment_columns": 8,
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.013361958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011599708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.010478208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009853583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0095515,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "attachment_columns": 2,
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.023477208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.022532709,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.022437292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.022344875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.022414625,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "attachment_columns": 8,
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.111580125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.104317,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.103599959,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.100585,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.101656125,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release property-only atomic builder runs, five observations. Fixture/algorithm construction excluded; includes staging, read-after-write, validation and one accepted version. No before/after speedup, FFI, RSS/allocation or production budget claim."
+}

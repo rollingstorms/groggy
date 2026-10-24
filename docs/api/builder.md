@@ -51,3 +51,10 @@ With `persist=False, return_profile=True`, node/edge attachment and smoothing
 return owned typed columns instead of graph writes. See
 [transient builder outputs](transient-builder-outputs.md) for keys, validation,
 read semantics and the remaining persistent pipeline boundary.
+
+## Atomic property runs
+
+`build(atomic=True)` stages supported property-only steps and accepts one mixed
+mutation on success. It preserves original step order and rejects unmigrated step
+families. See [atomic builder properties](atomic-builder-properties.md) for
+read-after-write semantics, compatibility and limits.

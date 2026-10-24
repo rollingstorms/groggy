@@ -1,10 +1,15 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **153 checked and 79 unchecked entries**. Entries overlap:
+currently contains **158 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
+
+Count correction: the earlier summary omitted three already checked A* entries
+because its heading parser treated the literal asterisk as formatting. This pass
+adds two new checked slices; the other three are a counting correction, not new
+implementation work. Counts now use checkbox markers independently of headings.
 
 ## Recent completed slices
 
@@ -17,6 +22,8 @@ not a completion percentage or an estimate of remaining implementation effort.
 | 09.4b.2d / 05.3a | Subgraph/algorithm bulk writes reject complete inputs with inactive targets; all-edge convenience writes publish once. |
 | 09.4b.2e / 27.2b | Table graph materialization preserves supported typed values/identities, remaps references and rejects unsupported data without silent downgrade/loss. |
 | 09.4b.2f / 30.1a | Builder node/edge attachment and smoothing honor persist=False and return owned typed columns without graph mutation. |
+| 09.4b.2g / 30.1b | Explicit atomic property builders stage touched columns, read staged values and accept once; errors/cancellation discard the buffer. |
+
 
 
 These are extensions and repairs to an already substantial graph engine. They do
@@ -54,8 +61,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest transient-builder change: **932 native tests passed, 52 ignored; 1,076 root
-Python API tests passed, 1 skipped; 36 executable documentation examples passed;
+Latest atomic-builder change: **936 native tests passed, 52 ignored; 1,084 root
+Python API tests passed, 1 skipped; 37 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

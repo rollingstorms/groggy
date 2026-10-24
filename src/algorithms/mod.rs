@@ -17,6 +17,7 @@ use crate::subgraphs::Subgraph;
 use crate::types::{AttrValue, NodeId};
 
 pub mod builder;
+mod property_batch;
 pub mod centrality;
 pub mod community;
 pub mod execution;
@@ -477,6 +478,7 @@ pub struct Context {
     cancel_token: Option<Arc<AtomicBool>>,
     temporal_scope: Option<temporal::TemporalScope>,
     persist_results: bool,
+    pub(crate) property_batch: Option<property_batch::PropertyBatch>,
     outputs: HashMap<String, AlgorithmOutput>,
 }
 
@@ -798,6 +800,7 @@ impl Default for Context {
             cancel_token: None,
             temporal_scope: None,
             persist_results: true,
+            property_batch: None,
             outputs: HashMap::new(),
         }
     }

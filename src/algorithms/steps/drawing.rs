@@ -2,7 +2,6 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
 use crate::algorithms::Context;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 use super::{Step, StepMetadata, StepScope};
@@ -47,6 +46,10 @@ impl SmoothStrokeAttrsStep {
 }
 
 impl Step for SmoothStrokeAttrsStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "drot.smooth_strokes"
     }
@@ -64,8 +67,7 @@ impl Step for SmoothStrokeAttrsStep {
 
         for &node in scope.subgraph().nodes().iter() {
             let stroke_val = scope
-                .subgraph()
-                .get_node_attribute(node, &self.attr_stroke)
+                .node_attribute(ctx, node, &self.attr_stroke)
                 .map_err(|err| anyhow!(err))?;
             let stroke_id = match stroke_val.and_then(attr_to_i64) {
                 Some(value) => value,
@@ -78,14 +80,12 @@ impl Step for SmoothStrokeAttrsStep {
             }
 
             let t = scope
-                .subgraph()
-                .get_node_attribute(node, &self.attr_t)
+                .node_attribute(ctx, node, &self.attr_t)
                 .map_err(|err| anyhow!(err))?
                 .and_then(attr_to_f64)
                 .unwrap_or(0.0);
             let x = match scope
-                .subgraph()
-                .get_node_attribute(node, &self.attr_x)
+                .node_attribute(ctx, node, &self.attr_x)
                 .map_err(|err| anyhow!(err))?
                 .and_then(attr_to_f64)
             {
@@ -93,8 +93,7 @@ impl Step for SmoothStrokeAttrsStep {
                 None => continue,
             };
             let y = match scope
-                .subgraph()
-                .get_node_attribute(node, &self.attr_y)
+                .node_attribute(ctx, node, &self.attr_y)
                 .map_err(|err| anyhow!(err))?
                 .and_then(attr_to_f64)
             {

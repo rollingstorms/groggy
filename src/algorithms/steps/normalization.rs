@@ -51,6 +51,10 @@ impl NormalizeValuesStep {
 }
 
 impl Step for NormalizeValuesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.normalize_values"
     }
@@ -200,6 +204,10 @@ impl NormalizeNodeValuesStep {
 }
 
 impl Step for NormalizeNodeValuesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.normalize_node_values"
     }
@@ -235,6 +243,10 @@ impl StandardizeStep {
 }
 
 impl Step for StandardizeStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.standardize"
     }
@@ -340,6 +352,10 @@ impl ClipValuesStep {
 }
 
 impl Step for ClipValuesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.clip"
     }

@@ -41,6 +41,10 @@ impl FlowUpdateStep {
 }
 
 impl Step for FlowUpdateStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.flow_update"
     }
@@ -139,6 +143,10 @@ impl ResidualCapacityStep {
 }
 
 impl Step for ResidualCapacityStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.residual_capacity"
     }
@@ -360,6 +368,10 @@ impl AliasStep {
 }
 
 impl Step for AliasStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "alias"
     }

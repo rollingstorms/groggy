@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has 153 checked / 79 unchecked entries, including overlapping
+The checklist has 158 checked / 79 unchecked entries, including overlapping
 parents and repair slices; this is not a completion percentage.
 
 ## Execution priority — remaining work
@@ -115,10 +115,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.4b.2d — Whole-input subgraph bulk and algorithm attachment validation.** Native node multi-column/column setters no longer discard inactive targets before validation. Map/column algorithm attachment propagates whole-operation rejection with original row positions. The native all-edges convenience setter stages one column instead of publishing per edge. Publishing/manual failure, success and empty paths are covered; see `subgraph-write-validation-2026-10-23.md`.
 - [x] **09.4b.2e — Checked table graph materialization.** Native/Python factories stage complete topology and supported properties as one publishing batch, map IDs/reference arrays by row, register managed external IDs, preserve typed values and explicit direction, and reject malformed/dangling/pooled/meta data without warning-only loss or downgrade. Null edge IDs use shared checked assignment; empty graphs remain clean. See `table-materialization-2026-10-24.md`.
 - [x] **09.4b.2f — Honor nonpersistent builder attachment.** Node-map/column, edge and smoothing attachment steps respect persist=False, validate prospective columns and return owned typed profile outputs without graph mutations/versions. Persistent behavior remains compatible; full atomic runs and accepted transient-default migration remain open. See `transient-builder-outputs-2026-10-24.md`.
-
-
-
-
+- [x] **09.4b.2g — Explicit atomic property builder runs.** Supported steps can stage touched columns, read earlier staged values and publish one mixed batch on success; failures/cancellation discard staging and stale/dirty heads reject. Unsupported steps fail before execution. `build(atomic=True)` keeps original order and bypasses effect-unaware IR optimization; normal defaults, unsupported families and outer pipeline atomicity remain open. See `atomic-builder-properties-2026-10-24.md`.
 
 - [ ] **09.5 — Open: service transaction/concurrency contract.** Define reader snapshots, writer serialization/conflicts, multi-user boundaries, and episode/meta-node grouping before calling the embedded checked writer a multi-client database.
 - [x] **10.1 — Recoverable checked journal.** Versioned checksummed CBOR preserves supported inline checked writes, IDs/reservations, schema/configuration, branches, typed history, and original clocks; restart/corruption/truncation/subprocess tests exist.
@@ -164,7 +161,6 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **27.2 — Open: connected table updates.** Complete columnar filters/aggregations/conversions and checked bulk edits that generate typed deltas. Table joins remain views unless explicitly persisted; coordinate this with item 26.
 - [x] **27.2a — Explicit mapped mixed property updates.** Native/Python graph tables can update selected node and edge columns atomically through 09.4b.2c. Explicit mapping is the target-identity assertion; automatic source lineage, connected views and graph materialization remain outside this slice.
 - [x] **27.2b — Checked materialization into an independent graph.** Complete columnar preparation, typed inline/reference remapping, identity registration and one accepted state replace the lossy legacy row loop (09.4b.2e). Source direction is explicit; portable pooled/history copying and connected source pins remain open.
-
 
 - [x] **28.01 — Core traversal validation.** Graph BFS/DFS/path methods reject unknown/inactive starts and endpoints and honor graph direction.
 - [x] **28.02 — Checked Dijkstra.** Validate active selections and nonnegative finite numeric weights, decode compact integers, handle reverse/parallel minimum distances, preserve tiny improvements, and reject result overflow before persistence.
@@ -238,6 +234,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **29.42 — Typed vector arithmetic/conversions/order and native matrix casts.** Shared native checked arithmetic/dots, floating true division, stable norms, exact mixed scalar comparisons, typed first-occurrence unique and conversion policies. Move Python constructor/to_type conversion rules into Rust, retain explicit rounding while rejecting wrap/saturation, expose exact casts and preserve matrix CSR/identity. Native generic statistics retain integer hints; scalar reads no longer copy whole vectors. Native limit/dtype/shape/precision/cast fixtures and Python scalar/array/reference checks pass. Remaining matrix helpers, automatic derivative routes, statistics/materialization and release/GIL gates continue in the completion pass.
 - [ ] **30.1 — Partial: pipeline builder.** Inventory existing builder/step capabilities and finish typed graph/table intermediates, naming/caching, repeatability, cancellation, and pinned historical inputs.
 - [x] **30.1a — Typed transient attachment outputs.** Canonical native StepScope attachment paths and owned node/edge AlgorithmOutput columns make explicit persist=False meaningful across supported builder property-writing steps (09.4b.2f). Naming/default and whole-pipeline state/publication work remain in the parent.
+- [x] **30.1b — Staged property execution boundary.** Native Context/StepScope property overlays, step capability checks and one mixed acceptance support explicit atomic builders (09.4b.2g). No whole-graph clone is used. Nested/loop/fused/other graph step migration, effect-aware optimization and default policy remain parent work.
 
 - [ ] **30.2 — Open: pipeline history policy.** Decide whether runs/intermediate outputs themselves become retained graph history; avoid conflating compute diagnostics with mutation deltas.
 - [x] **31.1 — Supported durability failure tests.** Exercise checked journal restart, truncation/corruption, process exit, and injected I/O/publication failures in the current storage domain.

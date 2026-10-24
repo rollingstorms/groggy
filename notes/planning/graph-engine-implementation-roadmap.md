@@ -346,3 +346,13 @@ or versions. Canonical target/kind validation and per-attachment cancellation
 remain active. Both map/column routes use one native boundary; the FFI only
 translates results. Persistent multi-step atomicity and the accepted default
 migration remain open. See `transient-builder-outputs-2026-10-24.md`.
+
+## 2026-10-24 — atomic property builder boundary (09.4b.2g / 30.1b)
+
+Explicit build(atomic=True) stages supported property writes, serves later loads
+from staged values, and publishes one checked mixed batch after success. Ordinary
+errors/cancellation discard the buffer; stale/dirty heads reject; empty writes
+publish nothing. Unsupported steps reject before execution. Atomic builds preserve
+original order by bypassing the current effect-unaware IR optimizer. This adds no
+whole graph clone or FFI graph logic. Existing defaults and broader step/pipeline
+migration remain open. See `atomic-builder-properties-2026-10-24.md`.

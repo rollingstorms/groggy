@@ -87,3 +87,7 @@ harness = false
 [[bench]]
 name = "table_materialization"
 harness = false
+
+[[bench]]
+name = "atomic_builder_properties"
+harness = false

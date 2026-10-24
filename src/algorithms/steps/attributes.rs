@@ -28,6 +28,10 @@ impl LoadNodeAttrStep {
 }
 
 impl Step for LoadNodeAttrStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.load_node_attr"
     }
@@ -40,12 +44,11 @@ impl Step for LoadNodeAttrStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let mut map = HashMap::with_capacity(scope.subgraph().node_set().len());
         for &node in scope.node_ids() {
             let value = match scope
-                .subgraph()
-                .get_node_attribute(node, &self.attr)?
+                .node_attribute(ctx, node, &self.attr)?
                 .and_then(AlgorithmParamValue::from_attr_value)
             {
                 Some(attr_value) => attr_value,
@@ -77,6 +80,10 @@ impl AttachNodeAttrStep {
 }
 
 impl Step for AttachNodeAttrStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.attach_node_attr"
     }
@@ -158,6 +165,10 @@ impl LoadEdgeAttrStep {
 }
 
 impl Step for LoadEdgeAttrStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.load_edge_attr"
     }
@@ -170,12 +181,11 @@ impl Step for LoadEdgeAttrStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let mut map = HashMap::with_capacity(scope.subgraph().edge_set().len());
         for &edge in scope.edge_ids() {
             let value = scope
-                .subgraph()
-                .get_edge_attribute(edge, &self.attr)?
+                .edge_attribute(ctx, edge, &self.attr)?
                 .and_then(AlgorithmParamValue::from_attr_value)
                 .unwrap_or_else(|| self.default.clone());
             map.insert(edge, value);
@@ -201,6 +211,10 @@ impl AttachEdgeAttrStep {
 }
 
 impl Step for AttachEdgeAttrStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.attach_edge_attr"
     }
@@ -258,6 +272,10 @@ impl EdgeWeightScaleStep {
 }
 
 impl Step for EdgeWeightScaleStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.edge_weight_scale"
     }
@@ -279,8 +297,7 @@ impl Step for EdgeWeightScaleStep {
             }
 
             let weight = scope
-                .subgraph()
-                .get_edge_attribute(edge, &self.attr)?
+                .edge_attribute(ctx, edge, &self.attr)?
                 .and_then(AlgorithmParamValue::from_attr_value)
                 .unwrap_or(AlgorithmParamValue::Float(1.0));
 

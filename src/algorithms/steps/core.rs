@@ -18,6 +18,12 @@ use super::super::{AlgorithmParamValue, AlgorithmParams, Context, CostHint};
 
 /// Trait implemented by all step primitives.
 pub trait Step: Send + Sync {
+    /// Whether graph reads/writes follow the property-only atomic scope contract.
+    /// Custom/unsupported steps reject before an atomic run executes any step.
+    fn supports_atomic_properties(&self) -> bool {
+        false
+    }
+
     fn id(&self) -> &'static str;
     fn metadata(&self) -> StepMetadata {
         StepMetadata {
@@ -357,6 +363,39 @@ impl<'a> StepScope<'a> {
         self.subgraph
     }
 
+    /// Read a node property, including prior accepted attachments in this run.
+    pub fn node_attribute(
+        &self,
+        ctx: &Context,
+        id: NodeId,
+        name: &AttrName,
+    ) -> crate::GraphResult<Option<AttrValue>> {
+        if let Some(value) = ctx
+            .property_batch
+            .as_ref()
+            .and_then(|batch| batch.get(true, id, name))
+        {
+            return Ok(Some(value.clone()));
+        }
+        self.subgraph.get_node_attribute(id, name)
+    }
+    /// Read an edge property through the same property-only overlay.
+    pub fn edge_attribute(
+        &self,
+        ctx: &Context,
+        id: EdgeId,
+        name: &AttrName,
+    ) -> crate::GraphResult<Option<AttrValue>> {
+        if let Some(value) = ctx
+            .property_batch
+            .as_ref()
+            .and_then(|batch| batch.get(false, id, name))
+        {
+            return Ok(Some(value.clone()));
+        }
+        self.subgraph.get_edge_attribute(id, name)
+    }
+
     /// Publish a property column or return an owned output according to Context.
     /// Transient columns still use canonical target/kind validation.
     pub fn attach_node_column(
@@ -368,7 +407,7 @@ impl<'a> StepScope<'a> {
         if ctx.is_cancelled() {
             return Err(anyhow!("node attribute attachment cancelled"));
         }
-        if ctx.persist_results() {
+        if ctx.persist_results() && ctx.property_batch.is_none() {
             return self
                 .subgraph
                 .set_node_attr_column(name, values)
@@ -386,7 +425,7 @@ impl<'a> StepScope<'a> {
         if ctx.is_cancelled() {
             return Err(anyhow!("node attribute attachment cancelled"));
         }
-        if ctx.persist_results() {
+        if ctx.persist_results() && ctx.property_batch.is_none() {
             return self
                 .subgraph
                 .set_node_attrs(attrs)
@@ -396,6 +435,9 @@ impl<'a> StepScope<'a> {
             .graph()
             .borrow()
             .validate_node_attrs(&attrs, None)?;
+        if let Some(batch) = ctx.property_batch.as_mut() {
+            return batch.stage(true, attrs).map_err(|err| anyhow!(err));
+        }
         for (name, mut values) in attrs {
             values.sort_unstable_by_key(|(id, _)| *id);
             ctx.add_output(
@@ -415,7 +457,7 @@ impl<'a> StepScope<'a> {
         if ctx.is_cancelled() {
             return Err(anyhow!("edge attribute attachment cancelled"));
         }
-        if ctx.persist_results() {
+        if ctx.persist_results() && ctx.property_batch.is_none() {
             return self
                 .subgraph
                 .set_edge_attrs(attrs)
@@ -425,6 +467,9 @@ impl<'a> StepScope<'a> {
             .graph()
             .borrow()
             .validate_edge_attrs(&attrs, None)?;
+        if let Some(batch) = ctx.property_batch.as_mut() {
+            return batch.stage(false, attrs).map_err(|err| anyhow!(err));
+        }
         for (name, mut values) in attrs {
             values.sort_unstable_by_key(|(id, _)| *id);
             ctx.add_output(

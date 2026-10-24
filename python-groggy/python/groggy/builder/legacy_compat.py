@@ -183,14 +183,16 @@ def finalize_legacy_loop_steps(builder: Any, start_step: int, iterations: int, l
 class BuiltAlgorithm(AlgorithmHandle):
     """Algorithm built from composed steps."""
 
-    def __init__(self, name: str, steps: list):
+    def __init__(self, name: str, steps: list, atomic: bool = False):
         """
         Create a built algorithm.
 
         Args:
             name: Algorithm name
             steps: List of step specifications
+            atomic: Request native property-only atomic execution.
         """
+        self._atomic = atomic
         self._id = f"custom.{name}"
         self._name = name
         self._steps = steps
@@ -234,6 +236,9 @@ class BuiltAlgorithm(AlgorithmHandle):
             "name": self._name,
             "steps": encoded_steps,
         }
+
+        if self._atomic:
+            pipeline_definition["atomic"] = True
 
         # Serialize pipeline_definition to JSON string for AttrValue
         pipeline_json = json.dumps(pipeline_definition)

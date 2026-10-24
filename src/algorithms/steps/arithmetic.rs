@@ -74,6 +74,10 @@ impl BinaryArithmeticStep {
 }
 
 impl Step for BinaryArithmeticStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         self.id
     }
@@ -410,6 +414,10 @@ impl RecipStep {
 }
 
 impl Step for RecipStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.recip"
     }
@@ -578,6 +586,10 @@ impl CompareStep {
 }
 
 impl Step for CompareStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.compare"
     }
@@ -760,6 +772,10 @@ impl WhereStep {
 }
 
 impl Step for WhereStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.where"
     }
@@ -985,6 +1001,10 @@ impl ReduceScalarStep {
 }
 
 impl Step for ReduceScalarStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.reduce_scalar"
     }
@@ -1067,6 +1087,10 @@ impl BroadcastScalarStep {
 }
 
 impl Step for BroadcastScalarStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.broadcast_scalar"
     }
@@ -1215,6 +1239,10 @@ impl ModeListStep {
 }
 
 impl Step for ModeListStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.mode_list"
     }
@@ -1384,6 +1412,10 @@ impl CollectNeighborValuesStep {
 }
 
 impl Step for CollectNeighborValuesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.collect_neighbor_values"
     }

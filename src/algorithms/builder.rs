@@ -48,6 +48,7 @@ pub fn validate_pipeline(steps: &[StepSpec]) -> ValidationReport {
 struct StepPipelineAlgorithm {
     display_name: String,
     steps: Vec<Box<dyn Step>>,
+    atomic: bool,
 }
 
 impl StepPipelineAlgorithm {
@@ -102,9 +103,20 @@ impl StepPipelineAlgorithm {
                 .to_string()
         };
 
+        if definition.atomic {
+            for step in &instantiated_steps {
+                if !step.supports_atomic_properties() {
+                    return Err(anyhow!(
+                        "Step '{}' does not yet support atomic property execution",
+                        step.id()
+                    ));
+                }
+            }
+        }
         Ok(Self {
             display_name: name,
             steps: instantiated_steps,
+            atomic: definition.atomic,
         })
     }
 }
@@ -130,68 +142,94 @@ impl Algorithm for StepPipelineAlgorithm {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let execution_id = EXECUTION_COUNTER.fetch_add(1, Ordering::SeqCst);
-        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
-            eprintln!(
-                "[exec_{}] Pipeline '{}' starting with {} steps",
-                execution_id,
-                self.display_name,
-                self.steps.len()
-            );
+        let staged = self.atomic && ctx.persist_results();
+        if ctx.property_batch.is_some() {
+            return Err(anyhow!("Nested atomic property execution is unsupported"));
         }
-
-        let mut variables = StepVariables::default();
-
-        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
-            eprintln!(
-                "[exec_{}] Initial variables size: {}",
-                execution_id,
-                variables.count()
-            );
+        if staged {
+            let binding = subgraph.graph();
+            let graph = binding.borrow();
+            let state = graph.current_state_id();
+            graph.validate_write_head(state)?;
+            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(state));
         }
+        let result: Result<()> = (|| {
+            let execution_id = EXECUTION_COUNTER.fetch_add(1, Ordering::SeqCst);
+            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                eprintln!(
+                    "[exec_{}] Pipeline '{}' starting with {} steps",
+                    execution_id,
+                    self.display_name,
+                    self.steps.len()
+                );
+            }
 
-        for (index, step) in self.steps.iter().enumerate() {
+            let mut variables = StepVariables::default();
+
+            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                eprintln!(
+                    "[exec_{}] Initial variables size: {}",
+                    execution_id,
+                    variables.count()
+                );
+            }
+
+            for (index, step) in self.steps.iter().enumerate() {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("builder pipeline cancelled before step {index}"));
+                }
+
+                if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                    eprintln!(
+                        "[exec_{}] Step {} ({}): variables before = {}",
+                        execution_id,
+                        index,
+                        step.id(),
+                        variables.count()
+                    );
+                }
+
+                ctx.begin_step(index, step.id());
+                let result = {
+                    let mut scope = StepScope::new(&subgraph, &mut variables);
+                    step.apply(ctx, &mut scope)
+                };
+                ctx.finish_step();
+                result?;
+
+                if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                    eprintln!(
+                        "[exec_{}] Step {} ({}): variables after = {}",
+                        execution_id,
+                        index,
+                        step.id(),
+                        variables.count()
+                    );
+                }
+            }
+
+            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                eprintln!(
+                    "[exec_{}] Pipeline complete, final variables: {}",
+                    execution_id,
+                    variables.count()
+                );
+            }
+
             if ctx.is_cancelled() {
-                return Err(anyhow!("builder pipeline cancelled before step {index}"));
+                return Err(anyhow!("builder pipeline cancelled before publication"));
             }
-
-            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
-                eprintln!(
-                    "[exec_{}] Step {} ({}): variables before = {}",
-                    execution_id,
-                    index,
-                    step.id(),
-                    variables.count()
-                );
-            }
-
-            ctx.begin_step(index, step.id());
-            let result = {
-                let mut scope = StepScope::new(&subgraph, &mut variables);
-                step.apply(ctx, &mut scope)
-            };
-            ctx.finish_step();
+            Ok(())
+        })();
+        if staged {
+            let pending = ctx.property_batch.take();
             result?;
-
-            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
-                eprintln!(
-                    "[exec_{}] Step {} ({}): variables after = {}",
-                    execution_id,
-                    index,
-                    step.id(),
-                    variables.count()
-                );
+            if let Some(pending) = pending {
+                pending.accept(&mut subgraph.graph().borrow_mut())?;
             }
+        } else {
+            result?;
         }
-
-        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
-            eprintln!(
-                "[exec_{}] Pipeline complete, final variables: {}",
-                execution_id,
-                variables.count()
-            );
-        }
-
         Ok(subgraph)
     }
 }
@@ -206,6 +244,11 @@ impl StepSamplePipeline {
         ensure_core_steps_registered();
 
         let definition = extract_definition(spec)?;
+        if definition.atomic {
+            return Err(anyhow!(
+                "Atomic property mode is not supported by sampler pipelines"
+            ));
+        }
 
         let mut step_specs = Vec::with_capacity(definition.steps.len());
         for raw_step in &definition.steps {
@@ -280,6 +323,8 @@ impl StepSamplePipeline {
 #[derive(Debug, Deserialize)]
 struct StepPipelineDefinition {
     #[serde(default)]
+    atomic: bool,
+    #[serde(default)]
     name: String,
     steps: Vec<RawStep>,
 }
@@ -315,6 +360,7 @@ fn extract_definition(spec: &AlgorithmSpec) -> Result<StepPipelineDefinition> {
     if json_value.is_array() {
         // Backwards compatibility: allow passing steps array directly.
         Ok(StepPipelineDefinition {
+            atomic: false,
             name: spec.params.get_text("name").unwrap_or_default().to_string(),
             steps: serde_json::from_value(json_value)?,
         })
@@ -401,6 +447,56 @@ mod tests {
     use std::cell::RefCell;
     use std::collections::HashSet;
     use std::rc::Rc;
+
+    #[test]
+    fn cancellation_after_attachment_discards_staging_and_context_can_be_reused() {
+        use crate::algorithms::steps::{AttachNodeAttrStep, InitNodesStep};
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+        struct Cancel(Arc<AtomicBool>);
+        impl Step for Cancel {
+            fn supports_atomic_properties(&self) -> bool {
+                true
+            }
+            fn id(&self) -> &'static str {
+                "test.cancel"
+            }
+            fn apply(&self, _: &mut Context, _: &mut StepScope<'_>) -> Result<()> {
+                self.0.store(true, Ordering::Relaxed);
+                Ok(())
+            }
+        }
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(1).expect("node");
+        let shared = Rc::new(RefCell::new(graph));
+        let sg = Subgraph::from_nodes(shared.clone(), [0].into_iter().collect(), "cancel".into())
+            .expect("selection");
+        let token = Arc::new(AtomicBool::new(false));
+        let mut ctx = Context::with_cancel_token(token.clone());
+        let mut algorithm = StepPipelineAlgorithm {
+            display_name: "cancel".into(),
+            atomic: true,
+            steps: vec![
+                Box::new(InitNodesStep::new("values", AlgorithmParamValue::Int(2))),
+                Box::new(AttachNodeAttrStep::new("values", "x".into())),
+                Box::new(Cancel(token.clone())),
+            ],
+        };
+        assert!(algorithm.execute(&mut ctx, sg.clone()).is_err());
+        assert!(ctx.property_batch.is_none());
+        assert_eq!(shared.borrow().current_state_id(), 1);
+        assert_eq!(
+            shared.borrow().get_node_attr(0, &"x".into()).expect("x"),
+            None
+        );
+        token.store(false, Ordering::Relaxed);
+        algorithm.steps.pop();
+        algorithm.execute(&mut ctx, sg).expect("reuse context");
+        assert!(ctx.property_batch.is_none());
+        assert_eq!(shared.borrow().current_state_id(), 2);
+    }
 
     #[test]
     fn json_array_inference_detects_ints() {

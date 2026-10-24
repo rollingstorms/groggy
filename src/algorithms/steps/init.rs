@@ -23,6 +23,10 @@ impl InitNodesStep {
 }
 
 impl Step for InitNodesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.init_nodes"
     }
@@ -61,6 +65,10 @@ impl InitNodesWithIndexStep {
 }
 
 impl Step for InitNodesWithIndexStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.init_nodes_with_index"
     }
@@ -102,6 +110,10 @@ impl InitScalarStep {
 }
 
 impl Step for InitScalarStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.init_scalar"
     }
@@ -138,6 +150,10 @@ impl InitEdgesStep {
 }
 
 impl Step for InitEdgesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.init_edges"
     }
@@ -174,6 +190,10 @@ impl GraphNodeCountStep {
 }
 
 impl Step for GraphNodeCountStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.graph_node_count"
     }
@@ -209,6 +229,10 @@ impl GraphEdgeCountStep {
 }
 
 impl Step for GraphEdgeCountStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.graph_edge_count"
     }
