@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-10-23 on `groggy-roadmap-2026-10-20`.
+Updated 2026-10-24 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -20,6 +20,10 @@ An explicit snapshot/checkpoint and a reconstructed effective-time view are
 separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
+Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
+The checklist has 151 checked / 79 unchecked entries, including overlapping
+parents and repair slices; this is not a completion percentage.
+
 ## Execution priority — remaining work
 
 The stable 01–34 and AR IDs below are retained. Consolidation is now tracked as
@@ -38,10 +42,11 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 6 | Finish presentation/API consolidation, differential/failure/scale evidence, operational tooling and core release documentation. | AR5, AR7.6, AR7.11; 01.2, 09.5, 19.2, 31.3–31.4, 32.1–32.3, 33.2–33.3, 34.1–34.2 | Tests/docs run throughout. Service/scale commitments require A15; complete embedded and multi-user milestones separately. |
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
-**Immediate next task:** migrate ordinary Graph mutations to checked automatic
-publication compatibility and compound boundaries (09.4b.2), using the completed
-Python default switch (09.4b.1), checkpoint boundary (12.3a), and shared
-logical change model (AR7.9). F64 property migration (07.3a) and native temporal
+**Immediate next task:** finish native publication compatibility, mutable storage
+escape auditing and whole-pipeline boundaries (09.4b.2). Ordinary Python defaults,
+compound collapse, explicit table writeback, strict subgraph bulk setters and
+checked table materialization now have completed slices (09.4b.1/09.4b.2a,c–e).
+Use the checkpoint boundary (12.3a) and shared logical change model (AR7.9). F64 property migration (07.3a) and native temporal
 properties (07.3b) are complete. Broader immutable legacy-view, retained pool/meta
 recovery and effective-time reconstruction gates remain open. Preserve existing
 APIs through the documented migration and keep Graphiti deferred behind the core.
@@ -108,6 +113,8 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **09.4b.2b — Remaining composer semantics.** Implement real `contract_all` external path contraction, define preset/custom identity versus labels, and expose a selector for the native explicit meta-edge policy (currently a clear pre-mutation rejection). These previously incomplete behaviors are not certified by the atomicity slice.
 - [x] **09.4b.2c — Explicit mixed graph-table property writeback.** `GraphTable.update_graph` stages selected columns into one checked native batch with explicit one-to-one node/edge mappings, expected-state checks, endpoint verification and no silent row filtering. Duplicate join rows, inactive/missing/ambiguous targets and unsupported reference/identity writes reject before mutation. Clock defaults/explicit times, Null, typed values and manual compatibility are covered; source provenance/pins and legacy materialization remain open. See `table-writeback-2026-10-23.md`.
 - [x] **09.4b.2d — Whole-input subgraph bulk and algorithm attachment validation.** Native node multi-column/column setters no longer discard inactive targets before validation. Map/column algorithm attachment propagates whole-operation rejection with original row positions. The native all-edges convenience setter stages one column instead of publishing per edge. Publishing/manual failure, success and empty paths are covered; see `subgraph-write-validation-2026-10-23.md`.
+- [x] **09.4b.2e — Checked table graph materialization.** Native/Python factories stage complete topology and supported properties as one publishing batch, map IDs/reference arrays by row, register managed external IDs, preserve typed values and explicit direction, and reject malformed/dangling/pooled/meta data without warning-only loss or downgrade. Null edge IDs use shared checked assignment; empty graphs remain clean. See `table-materialization-2026-10-24.md`.
+
 
 
 
@@ -154,6 +161,8 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **27.1 — Review: graph/table identity.** Audit current graph tables, projections, joins, and copies; preserve source identity and pins through selections and joins unless the caller explicitly materializes a new graph.
 - [ ] **27.2 — Open: connected table updates.** Complete columnar filters/aggregations/conversions and checked bulk edits that generate typed deltas. Table joins remain views unless explicitly persisted; coordinate this with item 26.
 - [x] **27.2a — Explicit mapped mixed property updates.** Native/Python graph tables can update selected node and edge columns atomically through 09.4b.2c. Explicit mapping is the target-identity assertion; automatic source lineage, connected views and graph materialization remain outside this slice.
+- [x] **27.2b — Checked materialization into an independent graph.** Complete columnar preparation, typed inline/reference remapping, identity registration and one accepted state replace the lossy legacy row loop (09.4b.2e). Source direction is explicit; portable pooled/history copying and connected source pins remain open.
+
 
 - [x] **28.01 — Core traversal validation.** Graph BFS/DFS/path methods reject unknown/inactive starts and endpoints and honor graph direction.
 - [x] **28.02 — Checked Dijkstra.** Validate active selections and nonnegative finite numeric weights, decode compact integers, handle reverse/parallel minimum distances, preserve tiny improvements, and reject result overflow before persistence.

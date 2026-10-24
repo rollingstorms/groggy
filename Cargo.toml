@@ -83,3 +83,7 @@ harness = false
 [[bench]]
 name = "subgraph_bulk_writes"
 harness = false
+
+[[bench]]
+name = "table_materialization"
+harness = false

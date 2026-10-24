@@ -242,52 +242,14 @@ impl EdgesTable {
 
     /// Auto-assign edge IDs for null values (useful for meta nodes)
     pub fn auto_assign_edge_ids(mut self) -> GraphResult<Self> {
-        let edge_id_column = self
-            .base
-            .column("edge_id")
-            .ok_or_else(|| GraphError::InvalidInput("Missing edge_id column".to_string()))?;
-
-        // Find null edge_id values
-        let mut null_indices = Vec::new();
-        for i in 0..edge_id_column.len() {
-            if let Some(AttrValue::Null) = edge_id_column.get(i) {
-                null_indices.push(i);
-            }
+        let ids = super::structural::materialized_edge_ids(&self.base)?;
+        let has_nulls = super::structural::column(&self.base, "edge_id")?
+            .iter()
+            .any(|value| matches!(value, AttrValue::Null));
+        if has_nulls {
+            let values = crate::storage::array::BaseArray::try_from_node_ids(ids)?;
+            self.base = self.base.with_column("edge_id".into(), values)?;
         }
-
-        if null_indices.is_empty() {
-            return Ok(self); // No nulls to fix
-        }
-
-        // Find the maximum existing edge_id to avoid conflicts
-        let mut max_edge_id = 0i64;
-        for i in 0..edge_id_column.len() {
-            if let Some(AttrValue::Int(id)) = edge_id_column.get(i) {
-                max_edge_id = max_edge_id.max(*id);
-            }
-        }
-
-        // Create new column data with auto-assigned IDs
-        let mut new_edge_ids = Vec::new();
-        let mut next_id = max_edge_id + 1;
-
-        for i in 0..edge_id_column.len() {
-            if null_indices.contains(&i) {
-                new_edge_ids.push(AttrValue::Int(next_id));
-                next_id += 1;
-            } else if let Some(value) = edge_id_column.get(i) {
-                new_edge_ids.push(value.clone());
-            } else {
-                new_edge_ids.push(AttrValue::Null);
-            }
-        }
-
-        // Replace the edge_id column
-        let new_edge_id_array = crate::storage::array::BaseArray::from_attr_values(new_edge_ids);
-        self.base = self
-            .base
-            .with_column("edge_id".to_string(), new_edge_id_array)?;
-
         Ok(self)
     }
 

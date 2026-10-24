@@ -5339,17 +5339,19 @@ impl PyGraphTable {
             .map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
-    /// Convert back to Graph
-    pub fn to_graph(&self) -> PyResult<crate::ffi::api::graph::PyGraph> {
+    /// Materialize a checked graph with fresh IDs in table row order.
+    #[pyo3(signature = (*, directed=false))]
+    pub fn to_graph(&self, directed: bool) -> PyResult<crate::ffi::api::graph::PyGraph> {
+        let mut config = groggy::GraphConfig::new();
+        config.graph_type = if directed {
+            groggy::types::GraphType::Directed
+        } else {
+            groggy::types::GraphType::Undirected
+        };
         let graph = self
             .table
-            .clone()
-            .to_graph()
+            .to_graph_with_config(config)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-
-        let graph = graph
-            .into_publishing()
-            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
         Ok(crate::ffi::api::graph::PyGraph {
             inner: graph.into_shared(),
             cached_view: std::cell::RefCell::new(None),

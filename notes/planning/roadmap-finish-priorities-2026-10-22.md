@@ -353,3 +353,13 @@ writes stage one column, producing one accepted version with no per-edge partial
 publication. Manual compatibility and valid empty operations keep their existing
 behavior. See `subgraph-write-validation-2026-10-23.md`; broader native migration,
 pipeline boundaries and legacy table materialization remain open.
+
+## 2026-10-24 — checked table materialization (09.4b.2e / 27.2b)
+
+Table-to-graph conversion now prepares all rows/properties in one native batch,
+returns one clean publishing state, remaps row IDs/reference arrays and registers
+managed external IDs. Invalid/dangling rows, kind errors, identity conflicts and
+missing pooled/meta contents reject instead of logging losses or creating base
+fallbacks. Null edge-ID assignment is checked and shared with the explicit helper.
+Direction is selectable with the undirected default retained. Portable pool/history
+recovery and connected source pins remain open. See `table-materialization-2026-10-24.md`.

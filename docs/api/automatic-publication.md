@@ -86,7 +86,9 @@ membership, boundary edges and removals as one checked operation; see
 [meta composition](meta-composition.md) for semantics and limits. Remaining
 compound algorithm/table writeback routines still need an audit. Explicit mapped
 [table property writeback](table-writeback.md) now accepts mixed selected columns
-as one checked batch; connected provenance and legacy materialization remain open. Mutable native
+as one checked batch. [Table materialization](table-materialization.md) now accepts
+supported active rows/properties into a new publishing graph; connected provenance
+and portable retained pool/history copying remain open. Mutable native
 pool/space escape hatches and the infallible Rust compatibility surface remain
 outside this step. Native [subgraph bulk writes](subgraph-writes.md) now preserve
 complete inputs for owner validation, including algorithm output attachment;

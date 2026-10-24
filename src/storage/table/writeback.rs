@@ -1,5 +1,5 @@
 //! Explicit, columnar table property updates through the checked graph coordinator.
-use super::{BaseTable, GraphTable, Table};
+use super::{structural::ids, BaseTable, GraphTable, Table};
 use crate::{
     api::graph::Graph, AttrName, AttrValue, BatchEdgeRef, BatchNodeRef, BatchResult, EdgeId,
     GraphBatch, GraphError, GraphResult, NodeId, StateId, TimestampMicros,
@@ -115,34 +115,6 @@ impl GraphTable {
 
 fn invalid(message: String) -> GraphError {
     GraphError::InvalidInput(message)
-}
-
-fn ids(table: &BaseTable, name: &str) -> GraphResult<Vec<usize>> {
-    let column = table
-        .column(name)
-        .ok_or_else(|| invalid(format!("Missing structural column {name}")))?;
-    if column.len() != table.nrows() {
-        return Err(invalid(format!("{name}: inconsistent column length")));
-    }
-    column
-        .iter()
-        .enumerate()
-        .map(|(row, value)| {
-            let value = match value {
-                AttrValue::Int(value) => Some(*value),
-                AttrValue::SmallInt(value) => Some(i64::from(*value)),
-                _ => None,
-            };
-            value
-                .and_then(|value| usize::try_from(value).ok())
-                .filter(|id| *id != usize::MAX)
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "{name} row {row}: expected a nonnegative integer ID"
-                    ))
-                })
-        })
-        .collect()
 }
 
 fn validate_mapping(

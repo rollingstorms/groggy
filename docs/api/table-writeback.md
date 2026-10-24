@@ -82,6 +82,6 @@ request and returns `BatchResult`; the FFI only constructs that request and
 translates the result/errors. Bulk values remain columnar. This borrowed graph
 mutation currently retains the GIL, like the existing borrowed graph setters.
 
-The separate `to_graph()` conversion materializes a new graph; it is not
-writeback. Its legacy conversion/portability gaps and full pipeline publication
-boundaries are not closed by this API.
+The separate [checked `to_graph()` conversion](table-materialization.md)
+materializes an independent graph. It does not update the source graph or restore
+its retained pool/history. Full pipeline publication remains separate work.

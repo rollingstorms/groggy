@@ -1,0 +1,149 @@
+{
+  "cases": [
+    {
+      "nodes": 1000,
+      "property_columns_per_component": 1,
+      "samples": [
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.003931292,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.003510125,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.003587583,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.003587958,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.003575,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "nodes": 1000,
+      "property_columns_per_component": 4,
+      "samples": [
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.010584625,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.010265917,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.010529459,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.010234459,
+          "state_id": 1
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.010242042,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "nodes": 10000,
+      "property_columns_per_component": 1,
+      "samples": [
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.03876325,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.03621675,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.036495583,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.035746917,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.036148083,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "nodes": 10000,
+      "property_columns_per_component": 4,
+      "samples": [
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.112860709,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.10799675,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.110149542,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.10846,
+          "state_id": 1
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.110313458,
+          "state_id": 1
+        }
+      ]
+    }
+  ],
+  "scope": "Native release checked materialization from owned tables with descending sparse source IDs and directed chain edges; fixture construction excluded. Five observations per case. Verifies remapped topology/typed property and one clean accepted version. No before/after speedup, FFI latency, RSS/allocation or production budget claim."
+}
