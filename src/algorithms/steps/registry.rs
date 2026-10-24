@@ -124,6 +124,34 @@ fn parse_body_steps(value: &AlgorithmParamValue) -> Result<Vec<super::core::Step
     Ok(specs)
 }
 
+fn sampling_seed(params: &AlgorithmParams) -> Result<Option<u64>> {
+    params
+        .get("seed")
+        .map(|_| {
+            let seed = params.expect_int("seed")?;
+            u64::try_from(seed).map_err(|_| anyhow!("seed must be non-negative"))
+        })
+        .transpose()
+}
+
+fn sampling_spec(params: &AlgorithmParams) -> Result<super::sampling::SampleSpec> {
+    use super::sampling::SampleSpec;
+    match (params.get("count"), params.get("fraction")) {
+        (Some(_), None) => Ok(SampleSpec::Count {
+            count: usize::try_from(params.expect_int("count")?)
+                .map_err(|_| anyhow!("count must be non-negative and fit usize"))?,
+        }),
+        (None, Some(_)) => {
+            let fraction = params.expect_float("fraction")?;
+            if !fraction.is_finite() || !(0.0..=1.0).contains(&fraction) {
+                return Err(anyhow!("fraction must be finite and between 0 and 1"));
+            }
+            Ok(SampleSpec::Fraction { fraction })
+        }
+        _ => Err(anyhow!("Exactly one of count or fraction is required")),
+    }
+}
+
 /// Register the core steps that ship with the engine.
 pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
     registry.register(
@@ -1352,26 +1380,10 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Linear,
         },
         |spec| {
-            use super::sampling::{SampleNodesStep, SampleSpec};
-
+            use super::sampling::SampleNodesStep;
             let target = spec.params.expect_text("target")?.to_string();
-            let seed = spec.params.get_int("seed").map(|s| s as u64);
-
-            // Parse sampling spec
-            let sample_spec = if let Some(fraction) = spec.params.get_float("fraction") {
-                SampleSpec::Fraction { fraction }
-            } else if let Some(count) = spec.params.get_int("count") {
-                if count < 0 {
-                    return Err(anyhow!("count must be non-negative, got {}", count));
-                }
-                SampleSpec::Count {
-                    count: count as usize,
-                }
-            } else {
-                return Err(anyhow!(
-                    "Either 'fraction' or 'count' parameter is required"
-                ));
-            };
+            let seed = sampling_seed(&spec.params)?;
+            let sample_spec = sampling_spec(&spec.params)?;
 
             Ok(Box::new(SampleNodesStep::new(sample_spec, seed, target)))
         },
@@ -1385,25 +1397,10 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Linear,
         },
         |spec| {
-            use super::sampling::{SampleEdgesStep, SampleSpec};
-
+            use super::sampling::SampleEdgesStep;
             let target = spec.params.expect_text("target")?.to_string();
-            let seed = spec.params.get_int("seed").map(|s| s as u64);
-
-            let sample_spec = if let Some(fraction) = spec.params.get_float("fraction") {
-                SampleSpec::Fraction { fraction }
-            } else if let Some(count) = spec.params.get_int("count") {
-                if count < 0 {
-                    return Err(anyhow!("count must be non-negative, got {}", count));
-                }
-                SampleSpec::Count {
-                    count: count as usize,
-                }
-            } else {
-                return Err(anyhow!(
-                    "Either 'fraction' or 'count' parameter is required"
-                ));
-            };
+            let seed = sampling_seed(&spec.params)?;
+            let sample_spec = sampling_spec(&spec.params)?;
 
             Ok(Box::new(SampleEdgesStep::new(sample_spec, seed, target)))
         },
@@ -1519,22 +1516,19 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             if k < 0 {
                 return Err(anyhow!("k must be non-negative, got {}", k));
             }
-            let seed = spec.params.get_int("seed").map(|s| s as u64);
-
-            let entity_type = match spec.params.get_text("entity_type") {
-                Some("nodes") | None => EntityType::Nodes,
-                Some("edges") => EntityType::Edges,
-                Some(other) => {
-                    return Err(anyhow!(
-                        "unknown entity_type: {}, expected 'nodes' or 'edges'",
-                        other
-                    ))
-                }
+            let seed = sampling_seed(&spec.params)?;
+            let entity_type = match spec.params.get("entity_type") {
+                None => EntityType::Nodes,
+                Some(_) => match spec.params.expect_text("entity_type")? {
+                    "nodes" => EntityType::Nodes,
+                    "edges" => EntityType::Edges,
+                    other => return Err(anyhow!("unknown entity_type: {}", other)),
+                },
             };
 
             Ok(Box::new(ReservoirSampleStep::new(
                 source,
-                k as usize,
+                usize::try_from(k).map_err(|_| anyhow!("k must fit usize"))?,
                 seed,
                 target,
                 entity_type,

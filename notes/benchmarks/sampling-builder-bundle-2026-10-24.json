@@ -1,0 +1,329 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "mode": "nodes_count",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000254541,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000237667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000198042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000198667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000194708,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "nodes_fraction",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000194792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000171542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000175167,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000171583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000172334,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "edges_count",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000246333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000241917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000240375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000214917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000212917,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "edges_fraction",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00021475,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00021175,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000216833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000213208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00019625,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "nodes_reservoir",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000216042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000190917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000188083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000179125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000174584,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "edges_reservoir",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000287834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000289792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000286291,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000260875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00024725,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "nodes_count",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.001369041,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001314792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001257958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001270416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001274334,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "nodes_fraction",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.0012555,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001262958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001245416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001274125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001269,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "edges_count",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.001766292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00177,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001789875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001761833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001729666,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "edges_fraction",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.001745083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00185375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001866292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001760542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001760459,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "nodes_reservoir",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.001598875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001637791,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001628041,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001647208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001609208,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "edges_reservoir",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.002512959,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002542459,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002363625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002457042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002450916,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release directed rings, 10% mask sampling plus property attachment and one checked publication. Fixture/spec construction excluded. Five observations per workload; all mask cells, cardinality and publication checked. No before/after speedup, FFI/RSS/allocation or production-scale claim."
+}

@@ -458,3 +458,16 @@ optimizer effects, native escapes/default compatibility and outer transaction
 parents stay open. See `atomic-transformation-builder-bundle-2026-10-24.md` and
 `../../docs/api/builder-transformations.md` for details, compatibility changes,
 costs and verification evidence.
+
+### Combined mask sampling bundle — 2026-10-24
+
+Completed 09.4b.2u–2w together: node/edge count/fraction masks and map-key reservoir
+sampling now support property-atomic builders and nested loops. Stable ID order,
+local seeded RNGs, strict controls, selected identity/endpoint validation and
+cancellation replace nondeterministic shared RNG state and unchecked paths.
+Reservoir capacity is capped to available keys, including oversized k; zero/null
+source values remain eligible. Existing sparse attachments do not clear previous
+unsampled rows. Subgraph-producing sampling and whole sampler transactions remain
+open, alongside community/temporal/path audits and broader execution parents.
+See `atomic-sampling-builder-bundle-2026-10-24.md` and
+`../../docs/api/builder-sampling.md` for contracts, costs and verification.

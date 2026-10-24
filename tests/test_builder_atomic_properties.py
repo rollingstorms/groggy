@@ -89,7 +89,7 @@ def test_unsupported_step_rejects_before_any_attachment_executes():
     steps = [
         {"id": "core.init_nodes", "params": {"target": "values", "value": 2}},
         {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "prefix"}},
-        {"id": "core.sample_nodes", "params": {"target": "sample", "count": 1}},
+        {"id": "sample.iterate_nodes", "params": {"target": "sample"}},
     ]
     with pytest.raises(RuntimeError, match="does not yet support atomic"):
         graph.view().apply(AtomicSteps(steps), persist=True)
@@ -168,7 +168,7 @@ def test_nested_atomic_loops_read_prior_iterations_and_publish_once():
 
 
 @pytest.mark.parametrize("body", [
-    [{"id": "core.sample_nodes", "params": {"target": "sample", "count": 1}}],
+    [{"id": "sample.iterate_nodes", "params": {"target": "sample"}}],
     [{"params": {}}],
 ])
 def test_zero_iteration_nested_loop_still_rejects_unsupported_or_malformed_body(body):

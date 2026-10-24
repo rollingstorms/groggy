@@ -111,3 +111,7 @@ harness = false
 [[bench]]
 name = "transformation_builder_steps"
 harness = false
+
+[[bench]]
+name = "sampling_builder_steps"
+harness = false

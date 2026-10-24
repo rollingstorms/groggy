@@ -34,7 +34,7 @@ impl SampleSpec {
     fn calculate_sample_size(&self, total: usize) -> Result<usize> {
         match self {
             SampleSpec::Fraction { fraction } => {
-                if *fraction < 0.0 || *fraction > 1.0 {
+                if !fraction.is_finite() || *fraction < 0.0 || *fraction > 1.0 {
                     bail!("Fraction must be between 0.0 and 1.0, got {}", fraction);
                 }
                 Ok((total as f64 * fraction).round() as usize)
@@ -47,6 +47,77 @@ impl SampleSpec {
             }
         }
     }
+}
+
+/// Stable selected IDs, checked against the active owner and endpoint closure.
+fn checked_population(ctx: &Context, scope: &StepScope<'_>, edges: bool) -> Result<Vec<usize>> {
+    check_cancelled(ctx)?;
+    let selection = scope.subgraph();
+    let graph = selection.graph();
+    let graph = graph.borrow();
+    for &node in selection.ordered_nodes().iter() {
+        check_cancelled(ctx)?;
+        if !graph.has_node(node) {
+            bail!("Sampling node {} is inactive", node);
+        }
+    }
+    if !edges {
+        return Ok(selection.ordered_nodes().to_vec());
+    }
+    let ids = selection.ordered_edges().to_vec();
+    for &edge in &ids {
+        check_cancelled(ctx)?;
+        if !graph.has_edge(edge) {
+            bail!("Sampling edge {} is inactive", edge);
+        }
+        let (source, target) = graph.edge_endpoints(edge)?;
+        if !selection.node_set().contains(&source) || !selection.node_set().contains(&target) {
+            bail!("Sampling edge {} endpoint is outside selection", edge);
+        }
+    }
+    Ok(ids)
+}
+
+fn check_cancelled(ctx: &Context) -> Result<()> {
+    if ctx.is_cancelled() {
+        bail!("sampling cancelled");
+    }
+    Ok(())
+}
+
+/// Algorithm R over stable IDs; one local RNG, bounded by available candidates.
+fn sample_mask(
+    ctx: &Context,
+    ids: &[usize],
+    count: usize,
+    seed: Option<u64>,
+) -> Result<HashMap<usize, AlgorithmParamValue>> {
+    check_cancelled(ctx)?;
+    let count = count.min(ids.len());
+    let mut rng = seed.map(fastrand::Rng::with_seed).unwrap_or_default();
+    let mut reservoir = Vec::new();
+    reservoir.try_reserve_exact(count)?;
+    if count != 0 {
+        for (index, &id) in ids.iter().enumerate() {
+            check_cancelled(ctx)?;
+            if index < count {
+                reservoir.push(id);
+            } else {
+                let replacement = rng.usize(0..=index);
+                if replacement < count {
+                    reservoir[replacement] = id;
+                }
+            }
+        }
+    }
+    let mut result = HashMap::new();
+    result.try_reserve(reservoir.len())?;
+    for id in reservoir {
+        check_cancelled(ctx)?;
+        result.insert(id, AlgorithmParamValue::Int(1));
+    }
+    check_cancelled(ctx)?;
+    Ok(result)
 }
 
 /// Sample nodes randomly from the subgraph.
@@ -70,6 +141,10 @@ impl SampleNodesStep {
 }
 
 impl Step for SampleNodesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.sample_nodes"
     }
@@ -82,45 +157,11 @@ impl Step for SampleNodesStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        // Initialize RNG with seed if provided
-        if let Some(seed) = self.seed {
-            fastrand::seed(seed);
-        }
-
-        let all_nodes: Vec<NodeId> = scope.node_ids().copied().collect();
-        let total = all_nodes.len();
-        let sample_size = self.spec.calculate_sample_size(total)?;
-
-        // Use reservoir sampling for efficiency
-        let mut result = HashMap::new();
-
-        if sample_size == 0 {
-            scope.variables_mut().set_node_map(&self.target, result);
-            return Ok(());
-        }
-
-        // Reservoir sampling algorithm
-        let mut reservoir: Vec<NodeId> = Vec::with_capacity(sample_size);
-
-        for (i, &node) in all_nodes.iter().enumerate() {
-            if i < sample_size {
-                // Fill reservoir
-                reservoir.push(node);
-            } else {
-                // Randomly replace elements
-                let j = fastrand::usize(0..=i);
-                if j < sample_size {
-                    reservoir[j] = node;
-                }
-            }
-        }
-
-        // Mark sampled nodes
-        for node in reservoir {
-            result.insert(node, AlgorithmParamValue::Int(1));
-        }
-
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        let ids = checked_population(ctx, scope, false)?;
+        let count = self.spec.calculate_sample_size(ids.len())?;
+        let result = sample_mask(ctx, &ids, count, self.seed)?;
+        check_cancelled(ctx)?;
         scope.variables_mut().set_node_map(&self.target, result);
         Ok(())
     }
@@ -147,6 +188,10 @@ impl SampleEdgesStep {
 }
 
 impl Step for SampleEdgesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.sample_edges"
     }
@@ -159,42 +204,11 @@ impl Step for SampleEdgesStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        // Initialize RNG with seed if provided
-        if let Some(seed) = self.seed {
-            fastrand::seed(seed);
-        }
-
-        let all_edges: Vec<EdgeId> = scope.edge_ids().copied().collect();
-        let total = all_edges.len();
-        let sample_size = self.spec.calculate_sample_size(total)?;
-
-        let mut result = HashMap::new();
-
-        if sample_size == 0 {
-            scope.variables_mut().set_edge_map(&self.target, result);
-            return Ok(());
-        }
-
-        // Reservoir sampling algorithm
-        let mut reservoir: Vec<EdgeId> = Vec::with_capacity(sample_size);
-
-        for (i, &edge) in all_edges.iter().enumerate() {
-            if i < sample_size {
-                reservoir.push(edge);
-            } else {
-                let j = fastrand::usize(0..=i);
-                if j < sample_size {
-                    reservoir[j] = edge;
-                }
-            }
-        }
-
-        // Mark sampled edges
-        for edge in reservoir {
-            result.insert(edge, AlgorithmParamValue::Int(1));
-        }
-
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        let ids = checked_population(ctx, scope, true)?;
+        let count = self.spec.calculate_sample_size(ids.len())?;
+        let result = sample_mask(ctx, &ids, count, self.seed)?;
+        check_cancelled(ctx)?;
         scope.variables_mut().set_edge_map(&self.target, result);
         Ok(())
     }
@@ -650,6 +664,10 @@ impl ReservoirSampleStep {
 }
 
 impl Step for ReservoirSampleStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.reservoir_sample"
     }
@@ -662,98 +680,34 @@ impl Step for ReservoirSampleStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        // Initialize RNG with seed if provided
-        if let Some(seed) = self.seed {
-            fastrand::seed(seed);
-        }
-
-        match self.entity_type {
-            EntityType::Nodes => self.sample_nodes(scope),
-            EntityType::Edges => self.sample_edges(scope),
-        }
-    }
-}
-
-impl ReservoirSampleStep {
-    fn sample_nodes(&self, scope: &mut StepScope) -> Result<()> {
-        let source_map = scope.variables().node_map(&self.source)?;
-
-        let mut result = HashMap::new();
-
-        if self.k == 0 {
-            scope.variables_mut().set_node_map(&self.target, result);
-            return Ok(());
-        }
-
-        // Collect all nodes from source (those with any value)
-        let source_nodes: Vec<NodeId> = source_map.keys().copied().collect();
-
-        if source_nodes.is_empty() {
-            scope.variables_mut().set_node_map(&self.target, result);
-            return Ok(());
-        }
-
-        // Reservoir sampling
-        let mut reservoir: Vec<NodeId> = Vec::with_capacity(self.k);
-
-        for (i, &node) in source_nodes.iter().enumerate() {
-            if i < self.k {
-                reservoir.push(node);
-            } else {
-                let j = fastrand::usize(0..=i);
-                if j < self.k {
-                    reservoir[j] = node;
-                }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        let edges = matches!(self.entity_type, EntityType::Edges);
+        let population = checked_population(ctx, scope, edges)?;
+        let source = if edges {
+            scope.variables().edge_map(&self.source)?
+        } else {
+            scope.variables().node_map(&self.source)?
+        };
+        let mut ids: Vec<_> = source.keys().copied().collect();
+        ids.sort_unstable();
+        // Validate every source ID even for k=0; never silently drop foreign rows.
+        let mut eligible = population.iter().peekable();
+        for &id in &ids {
+            check_cancelled(ctx)?;
+            while eligible.peek().is_some_and(|&&candidate| candidate < id) {
+                eligible.next();
+            }
+            if eligible.peek().copied().copied() != Some(id) {
+                bail!("Reservoir source ID {} is outside active selection", id);
             }
         }
-
-        // Mark sampled nodes
-        for node in reservoir {
-            result.insert(node, AlgorithmParamValue::Int(1));
-        }
-
-        scope.variables_mut().set_node_map(&self.target, result);
-        Ok(())
-    }
-
-    fn sample_edges(&self, scope: &mut StepScope) -> Result<()> {
-        let source_map = scope.variables().edge_map(&self.source)?;
-
-        let mut result = HashMap::new();
-
-        if self.k == 0 {
+        let result = sample_mask(ctx, &ids, self.k, self.seed)?;
+        check_cancelled(ctx)?;
+        if edges {
             scope.variables_mut().set_edge_map(&self.target, result);
-            return Ok(());
+        } else {
+            scope.variables_mut().set_node_map(&self.target, result);
         }
-
-        let source_edges: Vec<EdgeId> = source_map.keys().copied().collect();
-
-        if source_edges.is_empty() {
-            scope.variables_mut().set_edge_map(&self.target, result);
-            return Ok(());
-        }
-
-        // Reservoir sampling
-        let mut reservoir: Vec<EdgeId> = Vec::with_capacity(self.k);
-
-        for (i, &edge) in source_edges.iter().enumerate() {
-            if i < self.k {
-                reservoir.push(edge);
-            } else {
-                let j = fastrand::usize(0..=i);
-                if j < self.k {
-                    reservoir[j] = edge;
-                }
-            }
-        }
-
-        // Mark sampled edges
-        for edge in reservoir {
-            result.insert(edge, AlgorithmParamValue::Int(1));
-        }
-
-        scope.variables_mut().set_edge_map(&self.target, result);
         Ok(())
     }
 }
@@ -798,5 +752,154 @@ mod tests {
         // Just verify specs are equal for now
         assert!(matches!(spec1, SampleSpec::Fraction { fraction: 0.5 }));
         assert!(matches!(spec2, SampleSpec::Fraction { fraction: 0.5 }));
+    }
+}
+
+#[cfg(test)]
+mod checked_tests {
+    use super::*;
+    use crate::Graph;
+    use std::{
+        cell::RefCell,
+        rc::Rc,
+        sync::{atomic::AtomicBool, Arc},
+    };
+
+    fn selection() -> Subgraph {
+        let mut graph = Graph::new_directed();
+        graph.add_nodes(6);
+        for (source, target) in [(1, 3), (1, 3), (3, 3), (5, 1), (0, 1)] {
+            graph.add_edge(source, target).expect("edge");
+        }
+        Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            [1, 3, 5].into_iter().collect(),
+            "selection".into(),
+        )
+        .expect("selection")
+    }
+
+    #[test]
+    fn seeded_sampling_is_repeatable_isolated_and_keeps_selected_entity_identity() {
+        let selection = selection();
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&selection, &mut vars);
+        let step = SampleNodesStep::new(SampleSpec::Count { count: 2 }, Some(19), "sample");
+        fastrand::seed(43);
+        let expected = fastrand::u64(..);
+        fastrand::seed(43);
+        step.apply(&mut Context::new(), &mut scope).expect("sample");
+        assert_eq!(
+            fastrand::u64(..),
+            expected,
+            "seeded sampler must not reseed or consume shared RNG"
+        );
+        let first = scope
+            .variables()
+            .node_map("sample")
+            .expect("sample")
+            .clone();
+        step.apply(&mut Context::new(), &mut scope).expect("repeat");
+        assert_eq!(
+            scope.variables().node_map("sample").expect("sample"),
+            &first
+        );
+        assert_eq!(first.len(), 2);
+        assert!(first.keys().all(|id| [1, 3, 5].contains(id)));
+        SampleEdgesStep::new(SampleSpec::Fraction { fraction: 1.0 }, Some(19), "edges")
+            .apply(&mut Context::new(), &mut scope)
+            .expect("edges");
+        let edges = scope.variables().edge_map("edges").expect("edges");
+        assert_eq!(edges.len(), 4);
+        assert!(!edges.contains_key(&4));
+        assert!(edges.contains_key(&0) && edges.contains_key(&1) && edges.contains_key(&2));
+    }
+
+    #[test]
+    fn reservoir_order_is_stable_caps_allocation_and_validates_even_zero_requests() {
+        let selection = selection();
+        let mut vars = StepVariables::default();
+        let source: HashMap<_, _> = [5, 1, 3]
+            .into_iter()
+            .map(|id| (id, AlgorithmParamValue::Int(0)))
+            .collect();
+        vars.set_node_map("source", source.clone());
+        let mut scope = StepScope::new(&selection, &mut vars);
+        let step = ReservoirSampleStep::new("source", 2, Some(7), "sample", EntityType::Nodes);
+        step.apply(&mut Context::new(), &mut scope).expect("sample");
+        let expected = scope
+            .variables()
+            .node_map("sample")
+            .expect("sample")
+            .clone();
+        scope.variables_mut().set_node_map(
+            "source",
+            [1, 3, 5]
+                .into_iter()
+                .map(|id| (id, AlgorithmParamValue::None))
+                .collect(),
+        );
+        step.apply(&mut Context::new(), &mut scope).expect("repeat");
+        assert_eq!(
+            scope.variables().node_map("sample").expect("repeat"),
+            &expected
+        );
+        ReservoirSampleStep::new("source", usize::MAX, Some(7), "source", EntityType::Nodes)
+            .apply(&mut Context::new(), &mut scope)
+            .expect("oversized cap");
+        assert_eq!(
+            scope.variables().node_map("source").expect("source").len(),
+            3
+        );
+        scope
+            .variables_mut()
+            .set_node_map("source", HashMap::from([(0, AlgorithmParamValue::Int(1))]));
+        assert!(
+            ReservoirSampleStep::new("source", 0, Some(7), "sample", EntityType::Nodes)
+                .apply(&mut Context::new(), &mut scope)
+                .is_err()
+        );
+        assert_eq!(
+            scope.variables().node_map("sample").expect("unchanged"),
+            &expected
+        );
+    }
+
+    #[test]
+    fn invalid_fraction_inactive_selection_and_cancellation_never_replace_outputs() {
+        for fraction in [f64::NAN, f64::INFINITY, -0.1, 1.1] {
+            assert!(SampleSpec::Fraction { fraction }
+                .calculate_sample_size(0)
+                .is_err());
+        }
+        let selection = selection();
+        let mut vars = StepVariables::default();
+        let original = HashMap::from([(1, AlgorithmParamValue::Int(9))]);
+        vars.set_node_map("sample", original.clone());
+        let mut scope = StepScope::new(&selection, &mut vars);
+        let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+        assert!(
+            SampleNodesStep::new(SampleSpec::Count { count: 0 }, None, "sample")
+                .apply(&mut ctx, &mut scope)
+                .is_err()
+        );
+        assert_eq!(
+            scope.variables().node_map("sample").expect("unchanged"),
+            &original
+        );
+        selection
+            .graph()
+            .borrow_mut()
+            .remove_node(5)
+            .expect("remove");
+        assert!(
+            SampleNodesStep::new(SampleSpec::Count { count: 0 }, None, "sample")
+                .apply(&mut Context::new(), &mut scope)
+                .is_err()
+        );
+        assert_eq!(
+            scope.variables().node_map("sample").expect("unchanged"),
+            &original
+        );
     }
 }

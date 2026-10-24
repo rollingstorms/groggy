@@ -129,6 +129,10 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.4b.2r — Checked expression operators and literals.** Check integer overflow/zero division/nonfinite results, exact mixed numeric comparisons, shared array reductions and lazy branches; accept native tagged and Python literal constants and consume the full supported parser input. See `atomic-transformation-builder-bundle-2026-10-24.md`.
 - [x] **09.4b.2s — Scoped synchronous/asynchronous node mapping.** Certify declarative maps with staged property reads, checked selected topology and private async source overlays; preserve public ExprContext and reject callback errors while keeping opaque callbacks uncertified. Same bundle note.
 - [x] **09.4b.2t — Deterministic neighbor labels and checked copy updates.** Certify label/copy transformations with selected outgoing/bidirectional incidence, typed exact deterministic ties, strict controls, checked sparse source IDs and private target installation on success. Same bundle note.
+- [x] **09.4b.2u — Checked deterministic node mask sampling.** Certify count/fraction sampling with sorted active identities, isolated seeded RNG, strict finite/nonnegative controls, cancellation and staged publication. See `atomic-sampling-builder-bundle-2026-10-24.md`.
+- [x] **09.4b.2v — Checked edge mask sampling.** Share the reservoir kernel; validate active selected nodes/edges and endpoint closure while retaining distinct parallel/self-loop edge identities and transient/persistent attachment semantics. Same bundle note.
+- [x] **09.4b.2w — Bounded map-key reservoir sampling.** Certify node/edge source-key sampling with stable sorted input, checked identity membership even for k=0, capped allocation, strict selectors/seeds and safe source/target aliasing. Same bundle note.
+
 
 
 - [ ] **09.5 — Open: service transaction/concurrency contract.** Define reader snapshots, writer serialization/conflicts, multi-user boundaries, and episode/meta-node grouping before calling the embedded checked writer a multi-client database.
