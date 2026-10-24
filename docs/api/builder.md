@@ -44,3 +44,10 @@ implemented in Rust.
 - [Builder User Guide](../guide/builder.md)
 - [Pipeline API](pipeline.md)
 - [Architecture Appendix](../appendices/graph-maintenance-rollup.md)
+
+## Nonpersistent attachment results
+
+With `persist=False, return_profile=True`, node/edge attachment and smoothing
+return owned typed columns instead of graph writes. See
+[transient builder outputs](transient-builder-outputs.md) for keys, validation,
+read semantics and the remaining persistent pipeline boundary.

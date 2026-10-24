@@ -820,6 +820,10 @@ pub struct IterationEvent {
 /// Structured payload returned by algorithm execution when persistence is disabled.
 #[derive(Clone, Debug)]
 pub enum AlgorithmOutput {
+    /// Owned typed node property column produced without a graph mutation.
+    NodeAttributes(Vec<(NodeId, crate::types::AttrValue)>),
+    /// Owned typed edge property column produced without a graph mutation.
+    EdgeAttributes(Vec<(crate::types::EdgeId, crate::types::AttrValue)>),
     Components(Vec<Vec<NodeId>>),
     /// Owned full-precision node scores for nonpersistent algorithm execution.
     NodeScores(Vec<(NodeId, f64)>),

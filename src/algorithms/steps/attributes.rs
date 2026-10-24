@@ -106,13 +106,9 @@ impl Step for AttachNodeAttrStep {
                 }
             }
 
-            if !values.is_empty() {
-                scope
-                    .subgraph()
-                    .set_node_attr_column(self.attr.clone(), values)
-                    .map_err(|err| anyhow!("failed to set node attributes: {err}"))?;
-            }
-            return Ok(());
+            return scope
+                .attach_node_column(ctx, self.attr.clone(), values)
+                .map_err(|err| anyhow!("failed to set node attributes: {err}"));
         }
 
         let map = scope.variables().node_map(&self.source)?;
@@ -135,15 +131,10 @@ impl Step for AttachNodeAttrStep {
             }
         }
 
-        if values.is_empty() {
-            return Ok(());
-        }
-
         let mut attrs = HashMap::new();
         attrs.insert(self.attr.clone(), values);
         scope
-            .subgraph()
-            .set_node_attrs(attrs)
+            .attach_node_attrs(ctx, attrs)
             .map_err(|err| anyhow!("failed to set node attributes: {err}"))?;
         Ok(())
     }
@@ -222,7 +213,7 @@ impl Step for AttachEdgeAttrStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let map = scope.variables().edge_map(&self.source)?;
         let mut entries: Vec<(EdgeId, &AlgorithmParamValue)> =
             map.iter().map(|(edge, value)| (*edge, value)).collect();
@@ -241,14 +232,9 @@ impl Step for AttachEdgeAttrStep {
             }
         }
 
-        if values.is_empty() {
-            return Ok(());
-        }
-
         attrs.insert(self.attr.clone(), values);
         scope
-            .subgraph()
-            .set_edge_attrs(attrs)
+            .attach_edge_attrs(ctx, attrs)
             .map_err(|err| anyhow!("failed to set edge attributes: {err}"))?;
         Ok(())
     }

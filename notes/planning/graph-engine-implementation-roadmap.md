@@ -337,3 +337,12 @@ missing pooled/meta contents reject instead of logging losses or creating base
 fallbacks. Null edge-ID assignment is checked and shared with the explicit helper.
 Direction is selectable with the undirected default retained. Portable pool/history
 recovery and connected source pins remain open. See `table-materialization-2026-10-24.md`.
+
+## 2026-10-24 — nonpersistent builder attachment (09.4b.2f / 30.1a)
+
+Native node/edge attachment and smoothing now honor persist=False and expose
+owned typed output columns without changing graph properties, pending mutations
+or versions. Canonical target/kind validation and per-attachment cancellation
+remain active. Both map/column routes use one native boundary; the FFI only
+translates results. Persistent multi-step atomicity and the accepted default
+migration remain open. See `transient-builder-outputs-2026-10-24.md`.

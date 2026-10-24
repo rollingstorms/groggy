@@ -59,7 +59,7 @@ impl Step for SmoothStrokeAttrsStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let mut by_stroke: HashMap<i64, Vec<(f64, NodeId, f64, f64)>> = HashMap::new();
 
         for &node in scope.subgraph().nodes().iter() {
@@ -136,8 +136,7 @@ impl Step for SmoothStrokeAttrsStep {
         }
 
         scope
-            .subgraph()
-            .set_node_attrs(attrs_by_name)
+            .attach_node_attrs(ctx, attrs_by_name)
             .map_err(|err| anyhow!(err))?;
 
         Ok(())

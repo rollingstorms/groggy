@@ -229,6 +229,17 @@ pub fn py_run_pipeline(
     let py_outputs = PyDict::new(py);
     for (key, output) in outputs {
         match output {
+            groggy::algorithms::AlgorithmOutput::NodeAttributes(values)
+            | groggy::algorithms::AlgorithmOutput::EdgeAttributes(values) => {
+                let rows = PyList::empty(py);
+                for (id, value) in values {
+                    rows.append((
+                        id,
+                        crate::ffi::utils::attr_value_to_python_value(py, &value)?,
+                    ))?;
+                }
+                py_outputs.set_item(key, rows)?;
+            }
             groggy::algorithms::AlgorithmOutput::NodeIntegers(values) => {
                 py_outputs.set_item(key, values)?;
             }

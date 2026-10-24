@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has 151 checked / 79 unchecked entries, including overlapping
+The checklist has 153 checked / 79 unchecked entries, including overlapping
 parents and repair slices; this is not a completion percentage.
 
 ## Execution priority — remaining work
@@ -114,6 +114,8 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.4b.2c — Explicit mixed graph-table property writeback.** `GraphTable.update_graph` stages selected columns into one checked native batch with explicit one-to-one node/edge mappings, expected-state checks, endpoint verification and no silent row filtering. Duplicate join rows, inactive/missing/ambiguous targets and unsupported reference/identity writes reject before mutation. Clock defaults/explicit times, Null, typed values and manual compatibility are covered; source provenance/pins and legacy materialization remain open. See `table-writeback-2026-10-23.md`.
 - [x] **09.4b.2d — Whole-input subgraph bulk and algorithm attachment validation.** Native node multi-column/column setters no longer discard inactive targets before validation. Map/column algorithm attachment propagates whole-operation rejection with original row positions. The native all-edges convenience setter stages one column instead of publishing per edge. Publishing/manual failure, success and empty paths are covered; see `subgraph-write-validation-2026-10-23.md`.
 - [x] **09.4b.2e — Checked table graph materialization.** Native/Python factories stage complete topology and supported properties as one publishing batch, map IDs/reference arrays by row, register managed external IDs, preserve typed values and explicit direction, and reject malformed/dangling/pooled/meta data without warning-only loss or downgrade. Null edge IDs use shared checked assignment; empty graphs remain clean. See `table-materialization-2026-10-24.md`.
+- [x] **09.4b.2f — Honor nonpersistent builder attachment.** Node-map/column, edge and smoothing attachment steps respect persist=False, validate prospective columns and return owned typed profile outputs without graph mutations/versions. Persistent behavior remains compatible; full atomic runs and accepted transient-default migration remain open. See `transient-builder-outputs-2026-10-24.md`.
+
 
 
 
@@ -235,6 +237,8 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **29.41 — Sparse LU/Cholesky/direct solve.** Sparse row maps/column adjacency retain fill-in without dense coefficients; return canonical sparse P/L/U/Cholesky, row-equilibrated multiple-RHS solves and sparse pivot-log determinant. Preserve finite square floating, singular-LU versus solve, symmetry/range and coordinate conventions; compare sparse saved input values without dense copies. Native 10,000-square diagonal/range/domain fixtures and independent seeded Python references pass. Dense-reference spectral/QR/refinement/gradient storage policies, remaining vector/matrix routines and release gates remain in the completion queue.
 - [x] **29.42 — Typed vector arithmetic/conversions/order and native matrix casts.** Shared native checked arithmetic/dots, floating true division, stable norms, exact mixed scalar comparisons, typed first-occurrence unique and conversion policies. Move Python constructor/to_type conversion rules into Rust, retain explicit rounding while rejecting wrap/saturation, expose exact casts and preserve matrix CSR/identity. Native generic statistics retain integer hints; scalar reads no longer copy whole vectors. Native limit/dtype/shape/precision/cast fixtures and Python scalar/array/reference checks pass. Remaining matrix helpers, automatic derivative routes, statistics/materialization and release/GIL gates continue in the completion pass.
 - [ ] **30.1 — Partial: pipeline builder.** Inventory existing builder/step capabilities and finish typed graph/table intermediates, naming/caching, repeatability, cancellation, and pinned historical inputs.
+- [x] **30.1a — Typed transient attachment outputs.** Canonical native StepScope attachment paths and owned node/edge AlgorithmOutput columns make explicit persist=False meaningful across supported builder property-writing steps (09.4b.2f). Naming/default and whole-pipeline state/publication work remain in the parent.
+
 - [ ] **30.2 — Open: pipeline history policy.** Decide whether runs/intermediate outputs themselves become retained graph history; avoid conflating compute diagnostics with mutation deltas.
 - [x] **31.1 — Supported durability failure tests.** Exercise checked journal restart, truncation/corruption, process exit, and injected I/O/publication failures in the current storage domain.
 - [x] **31.2 — Focused independent computation references.** Repaired slices include direct mathematical/path/reachability references and numerical comparisons; these are narrower than a full external-backend suite.

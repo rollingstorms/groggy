@@ -246,6 +246,118 @@ mod tests {
     }
 
     #[test]
+    fn transient_node_attachment_returns_owned_typed_map_and_column_results() {
+        for column in [false, true] {
+            let mut graph = Graph::new_publishing();
+            graph.insert_nodes(2).expect("nodes");
+            let shared = Rc::new(RefCell::new(graph));
+            let sg = Subgraph::from_nodes(
+                shared.clone(),
+                [0, 1].into_iter().collect(),
+                "output".into(),
+            )
+            .expect("selection");
+            let state = shared.borrow().current_state_id();
+            let mut vars = StepVariables::default();
+            let values = vec![
+                AlgorithmParamValue::Float(1.0000000001),
+                AlgorithmParamValue::None,
+            ];
+            if column {
+                vars.set_node_column("scores", core::NodeColumn::new(vec![1, 0], values));
+            } else {
+                vars.set_node_map(
+                    "scores",
+                    [(1, values[0].clone()), (0, values[1].clone())]
+                        .into_iter()
+                        .collect(),
+                );
+            }
+            let mut ctx = Context::new();
+            ctx.set_persist_results(false);
+            AttachNodeAttrStep::new("scores", "score".into())
+                .apply(&mut ctx, &mut StepScope::new(&sg, &mut vars))
+                .expect("transient attach");
+            let outputs = ctx.take_outputs();
+            let crate::algorithms::AlgorithmOutput::NodeAttributes(rows) =
+                &outputs["node_attributes.score"]
+            else {
+                panic!("typed node output");
+            };
+            assert_eq!(
+                rows,
+                &vec![(0, AttrValue::Null), (1, AttrValue::Float64(1.0000000001))]
+            );
+            assert_eq!(shared.borrow().current_state_id(), state);
+            assert!(!shared.borrow().has_uncommitted_changes());
+            assert_eq!(
+                shared
+                    .borrow()
+                    .get_node_attr(1, &"score".into())
+                    .expect("score"),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn transient_edge_attachment_validates_targets_without_graph_changes() {
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(2).expect("nodes");
+        graph.add_edge(0, 1).expect("edge");
+        let shared = Rc::new(RefCell::new(graph));
+        let sg = Subgraph::from_nodes(
+            shared.clone(),
+            [0, 1].into_iter().collect(),
+            "output".into(),
+        )
+        .expect("selection");
+        let state = shared.borrow().current_state_id();
+        let mut vars = StepVariables::default();
+        vars.set_edge_map(
+            "weights",
+            HashMap::from([(0, AlgorithmParamValue::Text("typed".into()))]),
+        );
+        let mut ctx = Context::new();
+        ctx.set_persist_results(false);
+        let step = AttachEdgeAttrStep::new("weights", "result".into());
+        step.apply(&mut ctx, &mut StepScope::new(&sg, &mut vars))
+            .expect("transient attach");
+        assert!(
+            matches!(&ctx.take_outputs()["edge_attributes.result"], crate::algorithms::AlgorithmOutput::EdgeAttributes(rows) if rows == &vec![(0, AttrValue::Text("typed".into()))])
+        );
+        shared.borrow_mut().remove_edge(0).expect("remove");
+        assert!(step
+            .apply(&mut ctx, &mut StepScope::new(&sg, &mut vars))
+            .is_err());
+        assert!(ctx.take_outputs().is_empty());
+        assert_eq!(shared.borrow().current_state_id(), state + 1);
+        assert!(!shared.borrow().has_uncommitted_changes());
+    }
+
+    #[test]
+    fn transient_multiple_columns_validate_together_and_cancellation_emits_nothing() {
+        let (sg, nodes) = sample_subgraph();
+        let mut vars = StepVariables::default();
+        let scope = StepScope::new(&sg, &mut vars);
+        let mut ctx = Context::new();
+        ctx.set_persist_results(false);
+        let attrs = HashMap::from([
+            ("ok".into(), vec![(nodes[0], AttrValue::Int(1))]),
+            ("invalid".into(), vec![(99, AttrValue::Int(2))]),
+        ]);
+        assert!(scope.attach_node_attrs(&mut ctx, attrs).is_err());
+        assert!(ctx.take_outputs().is_empty());
+        let token = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let mut ctx = Context::with_cancel_token(token);
+        ctx.set_persist_results(false);
+        assert!(scope
+            .attach_node_column(&mut ctx, "ok".into(), vec![(nodes[0], AttrValue::Int(1))])
+            .is_err());
+        assert!(ctx.take_outputs().is_empty());
+    }
+
+    #[test]
     fn attach_node_attr_persists_values() {
         let (sg, nodes) = sample_subgraph();
         let mut vars = StepVariables::default();

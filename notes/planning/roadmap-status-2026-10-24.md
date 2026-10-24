@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **151 checked and 79 unchecked entries**. Entries overlap:
+currently contains **153 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -16,6 +16,8 @@ not a completion percentage or an estimate of remaining implementation effort.
 | 09.4b.2c / 27.2a | Explicitly mapped mixed node/edge table property updates validate identity/endpoints and publish one batch. |
 | 09.4b.2d / 05.3a | Subgraph/algorithm bulk writes reject complete inputs with inactive targets; all-edge convenience writes publish once. |
 | 09.4b.2e / 27.2b | Table graph materialization preserves supported typed values/identities, remaps references and rejects unsupported data without silent downgrade/loss. |
+| 09.4b.2f / 30.1a | Builder node/edge attachment and smoothing honor persist=False and return owned typed columns without graph mutation. |
+
 
 These are extensions and repairs to an already substantial graph engine. They do
 not represent building its basic engine contract from scratch.
@@ -52,8 +54,13 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest materialization change: **929 native tests passed, 52 ignored; 1,063 root
-Python API tests passed, 1 skipped; 35 executable documentation examples passed;
+Latest transient-builder change: **932 native tests passed, 52 ignored; 1,076 root
+Python API tests passed, 1 skipped; 36 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.
+
+The matched before/after performance comparison remains follow-up under the
+existing performance gates. As requested, implementation priorities continue
+first; comparison must match workload, precision and history semantics and record
+time, allocations, peak memory and retained-history growth.

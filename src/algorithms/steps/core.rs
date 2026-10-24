@@ -12,7 +12,7 @@ static STEP_VARIABLES_COUNTER: AtomicU64 = AtomicU64::new(0);
 use crate::subgraphs::Subgraph;
 use crate::temporal::{TemporalIndex, TemporalSnapshot};
 use crate::traits::SubgraphOperations;
-use crate::types::{EdgeId, NodeId};
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, AlgorithmParams, Context, CostHint};
 
@@ -355,6 +355,84 @@ impl<'a> StepScope<'a> {
 
     pub fn subgraph(&self) -> &Subgraph {
         self.subgraph
+    }
+
+    /// Publish a property column or return an owned output according to Context.
+    /// Transient columns still use canonical target/kind validation.
+    pub fn attach_node_column(
+        &self,
+        ctx: &mut Context,
+        name: AttrName,
+        values: Vec<(NodeId, AttrValue)>,
+    ) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("node attribute attachment cancelled"));
+        }
+        if ctx.persist_results() {
+            return self
+                .subgraph
+                .set_node_attr_column(name, values)
+                .map_err(|err| anyhow!(err));
+        }
+        self.attach_node_attrs(ctx, HashMap::from([(name, values)]))
+    }
+
+    /// Attach multiple node columns through one validated persistence boundary.
+    pub fn attach_node_attrs(
+        &self,
+        ctx: &mut Context,
+        attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
+    ) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("node attribute attachment cancelled"));
+        }
+        if ctx.persist_results() {
+            return self
+                .subgraph
+                .set_node_attrs(attrs)
+                .map_err(|err| anyhow!(err));
+        }
+        self.subgraph
+            .graph()
+            .borrow()
+            .validate_node_attrs(&attrs, None)?;
+        for (name, mut values) in attrs {
+            values.sort_unstable_by_key(|(id, _)| *id);
+            ctx.add_output(
+                format!("node_attributes.{name}"),
+                super::super::AlgorithmOutput::NodeAttributes(values),
+            );
+        }
+        Ok(())
+    }
+
+    /// Attach edge columns or expose owned results without changing graph state.
+    pub fn attach_edge_attrs(
+        &self,
+        ctx: &mut Context,
+        attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
+    ) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("edge attribute attachment cancelled"));
+        }
+        if ctx.persist_results() {
+            return self
+                .subgraph
+                .set_edge_attrs(attrs)
+                .map_err(|err| anyhow!(err));
+        }
+        self.subgraph
+            .graph()
+            .borrow()
+            .validate_edge_attrs(&attrs, None)?;
+        for (name, mut values) in attrs {
+            values.sort_unstable_by_key(|(id, _)| *id);
+            ctx.add_output(
+                format!("edge_attributes.{name}"),
+                super::super::AlgorithmOutput::EdgeAttributes(values),
+            );
+        }
+        Ok(())
     }
 
     pub fn variables(&self) -> &StepVariables {
