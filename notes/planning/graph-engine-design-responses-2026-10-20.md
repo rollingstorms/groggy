@@ -1096,3 +1096,14 @@ and standalone staged meta-edge helpers are covered. Manual mode remains deferre
 See `atomic-meta-composition-2026-10-23.md` and the API example for evidence/limits.
 Native compatibility, algorithm/table boundaries and portable pool state remain
 open; 09.4b.2b records real contraction/custom identity/explicit-selector gaps.
+
+## 2026-10-23 — explicit mixed table writeback (09.4b.2c / 27.2a)
+
+Implements A10's one-batch update direction with `GraphTable.update_graph`:
+explicit one-to-one row-ID mappings, selected property columns, expected-state
+and mapped-endpoint checks, and one checked native publication. Ambiguous join
+rows, invalid/inactive targets and late property errors reject before mutation.
+Null is explicit, omitted columns stay unchanged, and clock defaults/explicit
+times are shared by the batch. Source graph/pin propagation is not inferred;
+27.1, connected table views, legacy materialization, native compatibility and
+whole-pipeline boundaries remain open. See `table-writeback-2026-10-23.md`.

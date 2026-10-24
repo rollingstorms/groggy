@@ -10,6 +10,8 @@ pub mod projection;
 pub mod table_array;
 mod text;
 pub mod traits;
+mod writeback;
+pub use writeback::TableWriteback;
 
 // Re-export core types
 pub use base::BaseTable;

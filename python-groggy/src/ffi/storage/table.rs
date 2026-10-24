@@ -5313,6 +5313,32 @@ impl PyGraphTable {
         Ok(Self { table: fixed_table })
     }
 
+    /// Write explicitly mapped property columns to existing graph entities in one batch.
+    #[pyo3(signature = (graph, expected_state, *, node_mapping, edge_mapping, node_columns, edge_columns, effective_at=None))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_graph(
+        &self,
+        graph: &crate::ffi::api::graph::PyGraph,
+        expected_state: groggy::StateId,
+        node_mapping: HashMap<NodeId, NodeId>,
+        edge_mapping: HashMap<EdgeId, EdgeId>,
+        node_columns: Vec<String>,
+        edge_columns: Vec<String>,
+        effective_at: Option<groggy::TimestampMicros>,
+    ) -> PyResult<groggy::StateId> {
+        let update = groggy::storage::table::TableWriteback {
+            node_mapping,
+            edge_mapping,
+            node_columns,
+            edge_columns,
+            effective_at,
+        };
+        self.table
+            .update_graph(&mut graph.inner.borrow_mut(), expected_state, &update)
+            .map(|result| result.state_id)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     /// Convert back to Graph
     pub fn to_graph(&self) -> PyResult<crate::ffi::api::graph::PyGraph> {
         let graph = self

@@ -84,7 +84,9 @@ classification accepts all logical text storage representations, including
 compact text. Higher-level collapse plans now stage their aggregations, retained
 membership, boundary edges and removals as one checked operation; see
 [meta composition](meta-composition.md) for semantics and limits. Remaining
-compound algorithm/table writeback routines still need an audit. Mutable native
+compound algorithm/table writeback routines still need an audit. Explicit mapped
+[table property writeback](table-writeback.md) now accepts mixed selected columns
+as one checked batch; connected provenance and legacy materialization remain open. Mutable native
 pool/space escape hatches and the infallible Rust compatibility surface remain
 outside this step.
 

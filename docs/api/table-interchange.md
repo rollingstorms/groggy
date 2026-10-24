@@ -41,3 +41,7 @@ with TemporaryDirectory() as directory:
     source.to_json(path)
     assert BaseTable.from_json(path).column("key").to_list() == [x, x]
 ```
+
+For explicit mixed node/edge property updates of an existing graph, see
+[table writeback](table-writeback.md). Interchange and grouping alone do not mutate
+the source graph or supply verified graph provenance.
