@@ -1221,3 +1221,16 @@ ID ties, null/absent-last behavior and explicit incomparable-domain/NaN rejectio
 Sparse masks and rank-map outputs are preserved. Statistical/neighbor aggregation
 review remains next; other execution-boundary parent work stays open. Details,
 compatibility notes and evidence: `atomic-filtering-builder-steps-2026-10-24.md`.
+
+### Combined aggregation builder bundle — 2026-10-24
+
+Owner requested approximately 3x larger slices. This batch completes 09.4b.2o–2q
+together: shared checked statistical reductions and public scalar methods; stable
+mode/entropy and owned histogram vectors; all five checked standalone neighbor
+reducers with direction/weight lowering parity. Histogram bin/node identity aliasing
+and an invalid optimizer output-scaling rewrite are repaired. Histogram-containing
+programs retain ordered observable outputs until optimizer effects support them.
+Message-pass weighted/non-sum requests reject explicitly; broader execution parents
+remain partial. Verified with 953 native tests, 1,312 root Python tests, 48 doc
+examples, strict Clippy and 28 release workloads. Details and compatibility changes:
+`atomic-aggregation-builder-bundle-2026-10-24.md`.

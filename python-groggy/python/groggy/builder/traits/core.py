@@ -282,6 +282,30 @@ class CoreOps:
         false_var = self._ensure_var(if_false)
         return self._add_op("where", [condition.name, true_var, false_var])
 
+    def std(self, values: VarHandle) -> VarHandle:
+        """Sample standard deviation; empty=None and singleton=0."""
+        return self._add_op("std", [values.name])
+
+    def median(self, values: VarHandle) -> VarHandle:
+        """Checked linear median of finite numeric node values."""
+        return self._add_op("median", [values.name])
+
+    def quantile(self, values: VarHandle, q: float) -> VarHandle:
+        """Checked linear quantile with q in [0, 1]."""
+        return self._add_op("quantile", [values.name], {"q": q})
+
+    def mode_values(self, values: VarHandle) -> VarHandle:
+        """Global typed mode; ties choose the smallest contributor node ID."""
+        return self._add_op("mode_values", [values.name])
+
+    def entropy(self, values: VarHandle) -> VarHandle:
+        """Shannon entropy in bits over typed categories; empty=0."""
+        return self._add_op("entropy", [values.name])
+
+    def reduce_nodes(self, values: VarHandle, reducer: str = "sum") -> VarHandle:
+        """Checked sum/mean/min/max; empty=None, unlike reduce_scalar."""
+        return self._add_op("reduce_nodes", [values.name], {"reducer": reducer})
+
     def reduce_scalar(self, values: VarHandle, op: str = "sum") -> VarHandle:
         """
         Reduce node/edge map to a single scalar value.
@@ -553,15 +577,15 @@ class CoreOps:
         Compute histogram of node values.
 
         Divides the value range into bins and counts how many values
-        fall into each bin. Returns a map where keys are bin indices
-        and values are counts.
+        fall into each bin. Returns an owned count vector, exposed under
+        profile outputs as histograms.<variable name>; bin indices are not node IDs.
 
         Args:
             values: Node values to histogram
             bins: Number of bins (default: 10)
 
         Returns:
-            VarHandle for histogram (bin_index -> count)
+            VarHandle for a scalar count vector (not attachable as node IDs)
 
         Example:
             >>> # Compute degree distribution

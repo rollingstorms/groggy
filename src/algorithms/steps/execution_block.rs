@@ -281,6 +281,16 @@ impl ExecutionBlockStep {
             if body_node.op_type == "compare" {
                 comparison_op(body_node)?;
             }
+            if body_node.op_type == "neighbor_agg"
+                && (body_node.inputs.len() != 1
+                    || body_node.metadata.contains_key("weights")
+                    || body_node
+                        .metadata
+                        .get("agg")
+                        .is_some_and(|value| value.as_str() != Some("sum")))
+            {
+                return Err(anyhow!("Message-pass neighbor_agg supports unweighted sum only; use a standalone aggregation step"));
+            }
             match body_node.op_type.as_str() {
                 // Supported operations
                 "collect_neighbor_values"

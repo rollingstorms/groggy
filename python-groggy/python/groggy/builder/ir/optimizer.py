@@ -364,22 +364,18 @@ class IROptimizer:
         Fuse graph neighbor operations with arithmetic.
 
         Patterns detected:
-        1. neighbor_agg(values) -> mul(scalars) -> FusedNeighborMulAgg
-        2. mul(a, x) -> add(mul(b, y)) -> FusedAXPY (a*x + b*y)
-        3. mul(a, b) -> add(c) -> FusedMADD (a*b + c)
+        1. mul(a, x) -> add(mul(b, y)) -> FusedAXPY (a*x + b*y)
+        2. mul(a, b) -> add(c) -> FusedMADD (a*b + c)
+
+        Neighbor aggregation followed by output scaling remains ordered: the
+        fused neighbor kernel multiplies contributor values before aggregation.
 
         Returns:
             True if any operations were fused
         """
         modified = False
 
-        # Pattern 1: neighbor_agg -> mul -> fused_neighbor_mul_agg
-        if self._fuse_neighbor_mul_pattern():
-            modified = True
-            # Rebuild tracking immediately so next pass sees updated graph
-            self.ir.rebuild_var_tracking()
-
-        # Pattern 2 & 3: arithmetic chains
+        # Fuse the remaining arithmetic chains
         if self._fuse_arithmetic_chains():
             modified = True
             # Rebuild tracking after arithmetic fusion too
@@ -470,81 +466,6 @@ class IROptimizer:
         # Tracking will be rebuilt after fusion completes
 
         return broadcast_var
-
-    def _fuse_neighbor_mul_pattern(self) -> bool:
-        """
-        Detect: neighbor_agg(values) -> mul(result, scalars) -> fused_neighbor_mul_agg(values, scalars)
-        This is the critical PageRank/LPA pattern.
-
-        If scalars is a scalar value, insert a broadcast before fusion.
-        """
-        modified = False
-
-        for node in list(self.ir.nodes):
-            if node.domain != IRDomain.GRAPH or node.op_type != "neighbor_agg":
-                continue
-
-            if not node.output:
-                continue
-
-            # Check if result is used by a multiplication
-            uses = self.ir.var_uses.get(node.output, [])
-            if len(uses) != 1:
-                continue
-
-            mul_node = uses[0]
-            if mul_node.domain != IRDomain.CORE or mul_node.op_type != "mul":
-                continue
-
-            # mul_node.inputs should be [neighbor_agg_output, scalars]
-            # Find the scalar input (the one that's not the neighbor_agg output)
-            scalar_var = None
-            for inp in mul_node.inputs:
-                if inp != node.output:
-                    scalar_var = inp
-                    break
-
-            if not scalar_var:
-                continue
-
-            # CRUCIAL FIX: Ensure scalar operand is a node-map (broadcast if needed)
-            # The fused kernel expects both operands to be node-maps
-            # Use the VALUES input as reference (it's stable and won't change during fusion)
-            reference_var = node.inputs[0] if len(node.inputs) >= 1 else node.output
-            scalar_var = self._ensure_node_map(scalar_var, reference_var, node)
-
-            # Update mul_node's inputs to use the broadcast variable
-            # This is important so when we remove mul_node later, references are correct
-            for i, inp in enumerate(mul_node.inputs):
-                if inp != node.output and inp != scalar_var:
-                    mul_node.inputs[i] = scalar_var
-
-            # Replace with fused operation
-            # Track the rename: old neighbor_agg output -> mul's output
-            # This is important for alias steps that reference intermediate variables
-            old_output = node.output
-            new_output = mul_node.output
-            if old_output != new_output:
-                self.variable_renames[old_output] = new_output
-
-            # Change neighbor_agg node to fused_neighbor_mul_agg
-            node.op_type = "fused_neighbor_mul_agg"
-            # inputs[0] is values, add scalars as second input
-            if len(node.inputs) >= 1:
-                node.inputs = [node.inputs[0], scalar_var]
-            node.output = new_output  # Take over mul's output
-            node.metadata["fused"] = True
-            node.metadata["direction"] = node.metadata.get("direction", "in")
-
-            # Remove the mul node
-            if mul_node in self.ir.nodes:
-                self.ir.nodes.remove(mul_node)
-                if mul_node.id in self.ir.node_map:
-                    del self.ir.node_map[mul_node.id]
-
-            modified = True
-
-        return modified
 
     def _fuse_arithmetic_chains(self) -> bool:
         """

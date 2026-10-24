@@ -1,32 +1,113 @@
 //! Aggregation and reduction step primitives.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use anyhow::{anyhow, Result};
 
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
+use crate::storage::numeric::{
+    attributes::{self, Value},
+    dot_product::Dot,
+    reductions::{self, Scalar},
+};
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope};
 use super::direction::NeighborDirection;
 
-/// Extract numeric values from a map, returning f64 values.
-fn extract_numeric_values(map: &HashMap<NodeId, AlgorithmParamValue>) -> Result<Vec<f64>> {
-    let mut values = Vec::new();
-    for value in map.values() {
-        match value {
-            AlgorithmParamValue::Int(v) => values.push(*v as f64),
-            AlgorithmParamValue::Float(v) => values.push(*v),
-            _ => {
-                return Err(anyhow!(
-                    "operation requires numeric values, found {:?}",
-                    value
-                ))
-            }
-        }
+fn ordered_values(
+    map: &HashMap<NodeId, AlgorithmParamValue>,
+) -> Vec<(NodeId, &AlgorithmParamValue)> {
+    let mut rows: Vec<_> = map.iter().map(|(&id, value)| (id, value)).collect();
+    rows.sort_unstable_by_key(|(id, _)| *id);
+    rows
+}
+pub(super) fn numeric_value(value: &AlgorithmParamValue) -> Result<Value> {
+    match value {
+        AlgorithmParamValue::Int(value) => Ok(Value::Integer(*value)),
+        AlgorithmParamValue::Float(value) if value.is_finite() => Ok(Value::Float(*value)),
+        _ => Err(anyhow!(
+            "Aggregation requires finite numeric values, found {:?}",
+            value
+        )),
     }
-    Ok(values)
+}
+fn numeric_values(map: &HashMap<NodeId, AlgorithmParamValue>) -> Result<Vec<Value>> {
+    ordered_values(map)
+        .into_iter()
+        .map(|(_, value)| numeric_value(value))
+        .collect()
+}
+#[cfg(test)]
+fn extract_numeric_values(map: &HashMap<NodeId, AlgorithmParamValue>) -> Result<Vec<f64>> {
+    Ok(numeric_values(map)?
+        .into_iter()
+        .map(Scalar::as_f64)
+        .collect())
+}
+fn float_result(value: f64) -> Result<AlgorithmParamValue> {
+    if !value.is_finite() {
+        return Err(anyhow!("Aggregation result exceeds finite numeric range"));
+    }
+    Ok(AlgorithmParamValue::Float(value))
+}
+fn accumulated(values: &[Value], mean: bool) -> Result<AlgorithmParamValue> {
+    let mut sum = Dot::new();
+    for value in values {
+        let (hi, lo) = value.parts();
+        sum.add(hi, 1.0);
+        sum.add(lo, 1.0);
+    }
+    float_result(sum.total_divided_by(if mean { values.len() } else { 1 }))
+}
+fn categorical_key(value: &AlgorithmParamValue) -> Result<String> {
+    if matches!(value, AlgorithmParamValue::Float(value) if !value.is_finite())
+        || matches!(value, AlgorithmParamValue::FloatList(values) if values.iter().any(|v| !v.is_finite()))
+    {
+        return Err(anyhow!(
+            "Categorical aggregation requires finite floating values"
+        ));
+    }
+    // Typed serialization keeps categories distinct and avoids debug-format keys.
+    Ok(serde_json::to_string(value)?)
+}
+fn frequencies<'a>(
+    rows: impl IntoIterator<Item = (NodeId, &'a AlgorithmParamValue)>,
+) -> Result<BTreeMap<String, (usize, NodeId, AlgorithmParamValue)>> {
+    let mut counts = BTreeMap::new();
+    for (node, value) in rows {
+        let entry = counts
+            .entry(categorical_key(value)?)
+            .or_insert((0usize, node, value.clone()));
+        entry.0 = entry
+            .0
+            .checked_add(1)
+            .ok_or_else(|| anyhow!("Category count overflow"))?;
+        entry.1 = entry.1.min(node);
+    }
+    Ok(counts)
+}
+fn modal_value(
+    counts: &BTreeMap<String, (usize, NodeId, AlgorithmParamValue)>,
+) -> AlgorithmParamValue {
+    counts
+        .values()
+        .max_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)))
+        .map(|(_, _, value)| value.clone())
+        .unwrap_or(AlgorithmParamValue::None)
+}
+fn install_scalar(
+    ctx: &Context,
+    scope: &mut StepScope<'_>,
+    target: &str,
+    value: AlgorithmParamValue,
+) -> Result<()> {
+    if ctx.is_cancelled() {
+        return Err(anyhow!("Aggregation cancelled before installing result"));
+    }
+    scope.variables_mut().set_scalar(target, value);
+    Ok(())
 }
 
 /// Supported reduction strategies.
@@ -43,22 +124,24 @@ impl Reduction {
         &self,
         map: &HashMap<NodeId, AlgorithmParamValue>,
     ) -> Result<AlgorithmParamValue> {
-        let values = extract_numeric_values(map)?;
+        let values = numeric_values(map)?;
+        self.apply_values(&values)
+    }
+
+    pub(super) fn apply_values(&self, values: &[Value]) -> Result<AlgorithmParamValue> {
         if values.is_empty() {
             return Ok(AlgorithmParamValue::None);
         }
-
-        let result = match self {
-            Reduction::Sum => values.iter().sum(),
-            Reduction::Min => values.iter().copied().reduce(f64::min).unwrap_or(0.0),
-            Reduction::Max => values.iter().copied().reduce(f64::max).unwrap_or(0.0),
-            Reduction::Mean => {
-                let sum: f64 = values.iter().sum();
-                sum / values.len() as f64
-            }
-        };
-
-        Ok(AlgorithmParamValue::Float(result))
+        match self {
+            Reduction::Sum => accumulated(values, false),
+            Reduction::Mean => accumulated(values, true),
+            Reduction::Min => float_result(
+                reductions::extremum(values, true).ok_or_else(|| anyhow!("Missing minimum"))?,
+            ),
+            Reduction::Max => float_result(
+                reductions::extremum(values, false).ok_or_else(|| anyhow!("Missing maximum"))?,
+            ),
+        }
     }
 }
 
@@ -80,6 +163,9 @@ impl ReduceNodeValuesStep {
 }
 
 impl Step for ReduceNodeValuesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.reduce_nodes"
     }
@@ -93,13 +179,13 @@ impl Step for ReduceNodeValuesStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().node_map(&self.source)?;
         if ctx.is_cancelled() {
-            return Err(anyhow!("reduce_nodes cancelled"));
+            return Err(anyhow!("Aggregation cancelled"));
         }
-        let value = self.reducer.apply(map)?;
-        scope.variables_mut().set_scalar(self.target.clone(), value);
-        Ok(())
+        let value = self
+            .reducer
+            .apply(scope.variables().node_map(&self.source)?)?;
+        install_scalar(ctx, scope, &self.target, value)
     }
 }
 
@@ -119,6 +205,9 @@ impl StdDevStep {
 }
 
 impl Step for StdDevStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.std"
     }
@@ -132,35 +221,15 @@ impl Step for StdDevStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().node_map(&self.source)?;
         if ctx.is_cancelled() {
-            return Err(anyhow!("std cancelled"));
+            return Err(anyhow!("Aggregation cancelled"));
         }
-
-        let values = extract_numeric_values(map)?;
-        if values.is_empty() {
-            scope
-                .variables_mut()
-                .set_scalar(self.target.clone(), AlgorithmParamValue::None);
-            return Ok(());
-        }
-
-        // Compute mean
-        let mean: f64 = values.iter().sum::<f64>() / values.len() as f64;
-
-        // Compute variance (sample variance: divide by n-1)
-        let variance = if values.len() > 1 {
-            let sum_sq_diff: f64 = values.iter().map(|v| (v - mean).powi(2)).sum();
-            sum_sq_diff / (values.len() - 1) as f64
-        } else {
-            0.0
+        let values = numeric_values(scope.variables().node_map(&self.source)?)?;
+        let result = match reductions::std_dev(&values) {
+            Some(value) => float_result(value)?,
+            None => AlgorithmParamValue::None,
         };
-
-        let std_dev = variance.sqrt();
-        scope
-            .variables_mut()
-            .set_scalar(self.target.clone(), AlgorithmParamValue::Float(std_dev));
-        Ok(())
+        install_scalar(ctx, scope, &self.target, result)
     }
 }
 
@@ -180,6 +249,9 @@ impl MedianStep {
 }
 
 impl Step for MedianStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.median"
     }
@@ -193,33 +265,21 @@ impl Step for MedianStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().node_map(&self.source)?;
         if ctx.is_cancelled() {
-            return Err(anyhow!("median cancelled"));
+            return Err(anyhow!("Aggregation cancelled"));
         }
-
-        let mut values = extract_numeric_values(map)?;
-        if values.is_empty() {
-            scope
-                .variables_mut()
-                .set_scalar(self.target.clone(), AlgorithmParamValue::None);
-            return Ok(());
-        }
-
-        // Sort values for median computation
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        let median = if values.len() % 2 == 0 {
-            let mid = values.len() / 2;
-            (values[mid - 1] + values[mid]) / 2.0
-        } else {
-            values[values.len() / 2]
-        };
-
-        scope
-            .variables_mut()
-            .set_scalar(self.target.clone(), AlgorithmParamValue::Float(median));
-        Ok(())
+        let values = numeric_values(scope.variables().node_map(&self.source)?)?;
+        let input: Vec<_> = values
+            .into_iter()
+            .map(|value| match value {
+                Value::Integer(value) => crate::AttrValue::Int(value),
+                Value::Float(value) => crate::AttrValue::Float64(value),
+            })
+            .collect();
+        let result =
+            AlgorithmParamValue::from_attr_value(attributes::quantile(&input, 0.5, "linear")?)
+                .ok_or_else(|| anyhow!("Invalid quantile output"))?;
+        install_scalar(ctx, scope, &self.target, result)
     }
 }
 
@@ -239,6 +299,9 @@ impl ModeStep {
 }
 
 impl Step for ModeStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.mode"
     }
@@ -252,42 +315,11 @@ impl Step for ModeStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().node_map(&self.source)?;
         if ctx.is_cancelled() {
-            return Err(anyhow!("mode cancelled"));
+            return Err(anyhow!("Aggregation cancelled"));
         }
-
-        if map.is_empty() {
-            scope
-                .variables_mut()
-                .set_scalar(self.target.clone(), AlgorithmParamValue::None);
-            return Ok(());
-        }
-
-        // Count occurrences of each value
-        let mut counts: HashMap<String, usize> = HashMap::new();
-        for value in map.values() {
-            let key = format!("{:?}", value);
-            *counts.entry(key).or_insert(0) += 1;
-        }
-
-        // Find the value with the highest count
-        let (mode_key, _) = counts
-            .iter()
-            .max_by_key(|(_, &count)| count)
-            .ok_or_else(|| anyhow!("mode computation failed"))?;
-
-        // Find and clone the first value that matches (for type preservation)
-        let mode_value = map
-            .values()
-            .find(|value| format!("{:?}", value) == *mode_key)
-            .cloned()
-            .unwrap_or(AlgorithmParamValue::None);
-
-        scope
-            .variables_mut()
-            .set_scalar(self.target.clone(), mode_value);
-        Ok(())
+        let counts = frequencies(ordered_values(scope.variables().node_map(&self.source)?))?;
+        install_scalar(ctx, scope, &self.target, modal_value(&counts))
     }
 }
 
@@ -309,6 +341,9 @@ impl QuantileStep {
 }
 
 impl Step for QuantileStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.quantile"
     }
@@ -322,42 +357,21 @@ impl Step for QuantileStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().node_map(&self.source)?;
         if ctx.is_cancelled() {
-            return Err(anyhow!("quantile cancelled"));
+            return Err(anyhow!("Aggregation cancelled"));
         }
-
-        if self.q < 0.0 || self.q > 1.0 {
-            return Err(anyhow!("quantile q must be in [0, 1], got {}", self.q));
-        }
-
-        let mut values = extract_numeric_values(map)?;
-        if values.is_empty() {
-            scope
-                .variables_mut()
-                .set_scalar(self.target.clone(), AlgorithmParamValue::None);
-            return Ok(());
-        }
-
-        // Sort values for quantile computation
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Linear interpolation method
-        let index = self.q * (values.len() - 1) as f64;
-        let lower_idx = index.floor() as usize;
-        let upper_idx = index.ceil() as usize;
-
-        let quantile = if lower_idx == upper_idx {
-            values[lower_idx]
-        } else {
-            let weight = index - lower_idx as f64;
-            values[lower_idx] * (1.0 - weight) + values[upper_idx] * weight
-        };
-
-        scope
-            .variables_mut()
-            .set_scalar(self.target.clone(), AlgorithmParamValue::Float(quantile));
-        Ok(())
+        let values = numeric_values(scope.variables().node_map(&self.source)?)?;
+        let input: Vec<_> = values
+            .into_iter()
+            .map(|value| match value {
+                Value::Integer(value) => crate::AttrValue::Int(value),
+                Value::Float(value) => crate::AttrValue::Float64(value),
+            })
+            .collect();
+        let result =
+            AlgorithmParamValue::from_attr_value(attributes::quantile(&input, self.q, "linear")?)
+                .ok_or_else(|| anyhow!("Invalid quantile output"))?;
+        install_scalar(ctx, scope, &self.target, result)
     }
 }
 
@@ -377,6 +391,9 @@ impl EntropyStep {
 }
 
 impl Step for EntropyStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.entropy"
     }
@@ -390,43 +407,18 @@ impl Step for EntropyStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().node_map(&self.source)?;
         if ctx.is_cancelled() {
-            return Err(anyhow!("entropy cancelled"));
+            return Err(anyhow!("Aggregation cancelled"));
         }
-
-        if map.is_empty() {
-            scope
-                .variables_mut()
-                .set_scalar(self.target.clone(), AlgorithmParamValue::Float(0.0));
-            return Ok(());
+        let map = scope.variables().node_map(&self.source)?;
+        let counts = frequencies(ordered_values(map))?;
+        let mut entropy = Dot::new();
+        for (count, _, _) in counts.values() {
+            let probability = *count as f64 / map.len() as f64;
+            entropy.add(-probability, probability.log2());
         }
-
-        // Count occurrences of each unique value
-        let mut counts: HashMap<String, usize> = HashMap::new();
-        for value in map.values() {
-            let key = format!("{:?}", value);
-            *counts.entry(key).or_insert(0) += 1;
-        }
-
-        // Compute entropy: H = -Σ p(x) * log2(p(x))
-        let total = map.len() as f64;
-        let entropy: f64 = counts
-            .values()
-            .map(|&count| {
-                let p = count as f64 / total;
-                if p > 0.0 {
-                    -p * p.log2()
-                } else {
-                    0.0
-                }
-            })
-            .sum();
-
-        scope
-            .variables_mut()
-            .set_scalar(self.target.clone(), AlgorithmParamValue::Float(entropy));
-        Ok(())
+        let result = float_result(entropy.total())?;
+        install_scalar(ctx, scope, &self.target, result)
     }
 }
 
@@ -448,6 +440,9 @@ impl HistogramStep {
 }
 
 impl Step for HistogramStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.histogram"
     }
@@ -461,63 +456,52 @@ impl Step for HistogramStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().node_map(&self.source)?;
         if ctx.is_cancelled() {
-            return Err(anyhow!("histogram cancelled"));
+            return Err(anyhow!("Aggregation cancelled"));
         }
-
         if self.bins == 0 {
-            return Err(anyhow!("histogram bins must be > 0"));
+            return Err(anyhow!("Histogram bins must be positive"));
         }
-
-        let values = extract_numeric_values(map)?;
-        if values.is_empty() {
-            // Return empty histogram as node map
-            scope
-                .variables_mut()
-                .set_node_map(self.target.clone(), HashMap::new());
-            return Ok(());
-        }
-
-        // Find min and max
-        let min = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
-        let max = values.iter().copied().reduce(f64::max).unwrap_or(0.0);
-
-        // Handle edge case where all values are the same
-        if (max - min).abs() < 1e-10 {
-            let mut result = HashMap::new();
-            result.insert(0, AlgorithmParamValue::Int(values.len() as i64));
-            scope
-                .variables_mut()
-                .set_node_map(self.target.clone(), result);
-            return Ok(());
-        }
-
-        // Initialize bins
-        let mut bin_counts = vec![0i64; self.bins];
-        let bin_width = (max - min) / self.bins as f64;
-
-        // Assign values to bins
-        for value in values {
-            let mut bin_idx = ((value - min) / bin_width).floor() as usize;
-            // Handle edge case where value == max
-            if bin_idx >= self.bins {
-                bin_idx = self.bins - 1;
-            }
-            bin_counts[bin_idx] += 1;
-        }
-
-        // Convert to node map (using bin index as NodeId)
-        let mut result = HashMap::new();
-        for (idx, count) in bin_counts.iter().enumerate() {
-            if *count > 0 {
-                result.insert(idx, AlgorithmParamValue::Int(*count));
+        let values = numeric_values(scope.variables().node_map(&self.source)?)?;
+        let mut counts = Vec::new();
+        counts
+            .try_reserve_exact(self.bins)
+            .map_err(|_| anyhow!("Histogram allocation exceeds supported capacity"))?;
+        counts.resize(self.bins, 0i64);
+        if let (Some(min), Some(max)) = (
+            values.iter().copied().min_by(|a, b| a.numeric_cmp(*b)),
+            values.iter().copied().max_by(|a, b| a.numeric_cmp(*b)),
+        ) {
+            let span = max.difference(min);
+            let scale = min.as_f64().abs().max(max.as_f64().abs());
+            for value in values {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("Histogram cancelled"));
+                }
+                let fraction = if min.numeric_cmp(max).is_eq() {
+                    0.0
+                } else if span.is_finite() {
+                    value.difference(min) / span
+                } else {
+                    (value.as_f64() / scale - min.as_f64() / scale)
+                        / (max.as_f64() / scale - min.as_f64() / scale)
+                };
+                let index = ((fraction * self.bins as f64).floor() as usize).min(self.bins - 1);
+                counts[index] = counts[index]
+                    .checked_add(1)
+                    .ok_or_else(|| anyhow!("Histogram count exceeds i64"))?;
             }
         }
-
-        scope
-            .variables_mut()
-            .set_node_map(self.target.clone(), result);
+        install_scalar(
+            ctx,
+            scope,
+            &self.target,
+            AlgorithmParamValue::IntList(counts.clone()),
+        )?;
+        ctx.add_output(
+            format!("histograms.{}", self.target),
+            super::super::AlgorithmOutput::Histogram(counts),
+        );
         Ok(())
     }
 }
@@ -581,6 +565,9 @@ impl NeighborAggregationStep {
 }
 
 impl Step for NeighborAggregationStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.neighbor_agg"
     }
@@ -594,220 +581,130 @@ impl Step for NeighborAggregationStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        use std::time::Instant;
-
-        let start = Instant::now();
-
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Aggregation cancelled"));
+        }
+        let started = std::time::Instant::now();
+        if self.weights.is_some() && !matches!(self.agg_type, NeighborAggType::Sum) {
+            return Err(anyhow!("Neighbor weights are supported only for sum"));
+        }
         let subgraph = scope.subgraph();
         let nodes = subgraph.ordered_nodes();
-        ctx.record_stat("neighbor_agg.count.nodes", nodes.len() as f64);
-
-        // Build CSR with specified direction
-        let mut node_to_idx = HashMap::new();
-        for (idx, &node_id) in nodes.iter().enumerate() {
-            node_to_idx.insert(node_id, idx);
-        }
-
+        let positions: HashMap<_, _> = nodes
+            .iter()
+            .enumerate()
+            .map(|(index, &node)| (node, index))
+            .collect();
+        let edges = subgraph.ordered_edges();
         let mut csr = Csr::default();
         {
             let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            let pool = graph_ref.pool();
-            let edges = subgraph.edges();
-
-            let _build_time = match self.direction {
-                NeighborDirection::In => build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| {
-                        pool.get_edge_endpoints(eid)
-                            .map(|(source, target)| (target, source))
-                    },
-                    CsrOptions {
-                        add_reverse_edges: false,
-                        sort_neighbors: false,
-                    },
-                ),
-                NeighborDirection::Out => build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid),
-                    CsrOptions {
-                        add_reverse_edges: false,
-                        sort_neighbors: false,
-                    },
-                ),
-                NeighborDirection::Undirected => build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid),
-                    CsrOptions {
-                        add_reverse_edges: true,
-                        sort_neighbors: false,
-                    },
-                ),
-            };
-        }
-
-        // Get source values
-        let source_map = scope.variables().node_map(&self.source)?;
-
-        // Get optional weights
-        let weights_map = if let Some(ref weights_name) = self.weights {
-            Some(scope.variables().node_map(weights_name)?)
-        } else {
-            None
-        };
-
-        // Pre-allocate result map
-        let mut result = HashMap::with_capacity(nodes.len());
-
-        for (idx, &node) in nodes.iter().enumerate() {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("neighbor_agg cancelled"));
+            let graph = graph.borrow();
+            for &node in nodes.iter() {
+                if !graph.has_node(node) {
+                    return Err(anyhow!("Neighbor source node {} is inactive", node));
+                }
             }
-
-            let neighbor_indices = csr.neighbors(idx);
-
-            // Aggregate neighbor values
-            let agg_value = match self.agg_type {
-                NeighborAggType::Sum => {
-                    let sum: f64 = if let Some(weights) = weights_map {
-                        // Weighted sum: sum(values[neighbor] * weights[neighbor])
-                        neighbor_indices
-                            .iter()
-                            .filter_map(|&nbr_idx| {
-                                let nbr_node = nodes[nbr_idx];
-                                let value = source_map.get(&nbr_node).and_then(|v| match v {
-                                    AlgorithmParamValue::Float(f) => Some(*f),
-                                    AlgorithmParamValue::Int(i) => Some(*i as f64),
-                                    _ => None,
-                                })?;
-                                let weight = weights.get(&nbr_node).and_then(|w| match w {
-                                    AlgorithmParamValue::Float(f) => Some(*f),
-                                    AlgorithmParamValue::Int(i) => Some(*i as f64),
-                                    _ => None,
-                                })?;
-                                Some(value * weight)
-                            })
-                            .sum()
-                    } else {
-                        // Unweighted sum: sum(values[neighbor])
-                        neighbor_indices
-                            .iter()
-                            .filter_map(|&nbr_idx| {
-                                let nbr_node = nodes[nbr_idx];
-                                source_map.get(&nbr_node).and_then(|v| match v {
-                                    AlgorithmParamValue::Float(f) => Some(*f),
-                                    AlgorithmParamValue::Int(i) => Some(*i as f64),
-                                    _ => None,
-                                })
-                            })
-                            .sum()
-                    };
-                    AlgorithmParamValue::Float(sum)
+            for &edge in edges.iter() {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("Neighbor aggregation cancelled"));
                 }
-
-                NeighborAggType::Mean => {
-                    let mut sum = 0.0;
-                    let mut count = 0;
-                    for &nbr_idx in neighbor_indices {
-                        let nbr_node = nodes[nbr_idx];
-                        if let Some(value) = source_map.get(&nbr_node) {
-                            match value {
-                                AlgorithmParamValue::Float(f) => {
-                                    sum += f;
-                                    count += 1;
-                                }
-                                AlgorithmParamValue::Int(i) => {
-                                    sum += *i as f64;
-                                    count += 1;
-                                }
-                                _ => {}
-                            }
+                if !graph.has_edge(edge) {
+                    return Err(anyhow!("Neighbor edge {} is inactive", edge));
+                }
+                let (u, v) = graph.edge_endpoints(edge)?;
+                if !positions.contains_key(&u) || !positions.contains_key(&v) {
+                    return Err(anyhow!("Neighbor edge escapes selection"));
+                }
+            }
+            let mapping = self.direction.edge_mapping();
+            build_csr_from_edges_with_scratch(
+                &mut csr,
+                nodes.len(),
+                edges.iter().copied(),
+                |id| positions.get(&id).copied(),
+                |edge| graph.pool().get_edge_endpoints(edge).map(mapping),
+                CsrOptions {
+                    add_reverse_edges: self.direction.add_reverse_edges(),
+                    sort_neighbors: true,
+                },
+            );
+        }
+        let source = scope.variables().node_map(&self.source)?;
+        let weights = self
+            .weights
+            .as_ref()
+            .map(|name| scope.variables().node_map(name))
+            .transpose()?;
+        let mut result = HashMap::with_capacity(nodes.len());
+        for (index, &node) in nodes.iter().enumerate() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Neighbor aggregation cancelled"));
+            }
+            let rows: Vec<_> = csr
+                .neighbors(index)
+                .iter()
+                .filter_map(|&index| {
+                    let neighbor = nodes[index];
+                    source.get(&neighbor).map(|value| (neighbor, value))
+                })
+                .collect();
+            let value = if matches!(self.agg_type, NeighborAggType::Mode) {
+                modal_value(&frequencies(rows)?)
+            } else {
+                let mut values = Vec::with_capacity(rows.len());
+                let mut weighted = weights.map(|_| Dot::new());
+                for (neighbor, value) in rows {
+                    if ctx.is_cancelled() {
+                        return Err(anyhow!("Neighbor aggregation cancelled"));
+                    }
+                    let value = numeric_value(value)?;
+                    if let Some(weights) = weights {
+                        let weight = numeric_value(weights.get(&neighbor).ok_or_else(|| {
+                            anyhow!("Missing neighbor weight for node {}", neighbor)
+                        })?)?;
+                        let (a, b) = value.parts();
+                        let (c, d) = weight.parts();
+                        for (left, right) in [(a, c), (a, d), (b, c), (b, d)] {
+                            weighted
+                                .as_mut()
+                                .ok_or_else(|| anyhow!("Missing weighted accumulator"))?
+                                .add(left, right);
                         }
                     }
-                    if count > 0 {
-                        AlgorithmParamValue::Float(sum / count as f64)
-                    } else {
-                        AlgorithmParamValue::Float(0.0)
-                    }
+                    values.push(value);
                 }
-
-                NeighborAggType::Min => {
-                    let min = neighbor_indices
-                        .iter()
-                        .filter_map(|&nbr_idx| {
-                            let nbr_node = nodes[nbr_idx];
-                            source_map.get(&nbr_node).and_then(|v| match v {
-                                AlgorithmParamValue::Float(f) => Some(*f),
-                                AlgorithmParamValue::Int(i) => Some(*i as f64),
-                                _ => None,
-                            })
-                        })
-                        .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-                    min.map(AlgorithmParamValue::Float)
-                        .unwrap_or(AlgorithmParamValue::None)
-                }
-
-                NeighborAggType::Max => {
-                    let max = neighbor_indices
-                        .iter()
-                        .filter_map(|&nbr_idx| {
-                            let nbr_node = nodes[nbr_idx];
-                            source_map.get(&nbr_node).and_then(|v| match v {
-                                AlgorithmParamValue::Float(f) => Some(*f),
-                                AlgorithmParamValue::Int(i) => Some(*i as f64),
-                                _ => None,
-                            })
-                        })
-                        .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-                    max.map(AlgorithmParamValue::Float)
-                        .unwrap_or(AlgorithmParamValue::None)
-                }
-
-                NeighborAggType::Mode => {
-                    // Count occurrences of each value
-                    let mut counts: HashMap<String, usize> = HashMap::new();
-                    for &nbr_idx in neighbor_indices {
-                        let nbr_node = nodes[nbr_idx];
-                        if let Some(value) = source_map.get(&nbr_node) {
-                            let key = format!("{:?}", value);
-                            *counts.entry(key).or_insert(0) += 1;
-                        }
-                    }
-
-                    // Find most common value
-                    if let Some((mode_key, _)) = counts.iter().max_by_key(|(_, &count)| count) {
-                        // Find the original value
-                        neighbor_indices
-                            .iter()
-                            .filter_map(|&nbr_idx| {
-                                let nbr_node = nodes[nbr_idx];
-                                source_map.get(&nbr_node)
-                            })
-                            .find(|value| format!("{:?}", value) == *mode_key)
-                            .cloned()
-                            .unwrap_or(AlgorithmParamValue::None)
-                    } else {
-                        AlgorithmParamValue::None
+                match self.agg_type {
+                    NeighborAggType::Sum if weights.is_some() => float_result(
+                        weighted
+                            .take()
+                            .ok_or_else(|| anyhow!("Missing weighted accumulator"))?
+                            .total(),
+                    )?,
+                    NeighborAggType::Sum => accumulated(&values, false)?,
+                    NeighborAggType::Mean if values.is_empty() => AlgorithmParamValue::Float(0.0),
+                    NeighborAggType::Mean => accumulated(&values, true)?,
+                    NeighborAggType::Min | NeighborAggType::Max => match reductions::extremum(
+                        &values,
+                        matches!(self.agg_type, NeighborAggType::Min),
+                    ) {
+                        Some(value) => float_result(value)?,
+                        None => AlgorithmParamValue::None,
+                    },
+                    NeighborAggType::Mode => {
+                        return Err(anyhow!("Unexpected numeric mode dispatch"))
                     }
                 }
             };
-
-            result.insert(node, agg_value);
+            result.insert(node, value);
         }
-
-        ctx.record_duration("neighbor_agg.total", start.elapsed());
-
+        if ctx.is_cancelled() {
+            return Err(anyhow!(
+                "Neighbor aggregation cancelled before installing result"
+            ));
+        }
+        ctx.record_duration("neighbor_agg.total", started.elapsed());
+        ctx.record_stat("neighbor_agg.count.nodes", nodes.len() as f64);
         scope
             .variables_mut()
             .set_node_map(self.target.clone(), result);
@@ -818,6 +715,148 @@ impl Step for NeighborAggregationStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn evaluate(
+        step: &dyn Step,
+        values: Vec<AlgorithmParamValue>,
+    ) -> (super::super::core::StepVariables, Context) {
+        use crate::{api::graph::Graph, subgraphs::Subgraph};
+        use std::{cell::RefCell, rc::Rc};
+        let mut graph = Graph::new();
+        graph.add_nodes(values.len());
+        let selection = Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            (0..values.len()).collect(),
+            "stats".into(),
+        )
+        .expect("selection");
+        let mut vars = super::super::core::StepVariables::default();
+        vars.set_node_map("values", values.into_iter().enumerate().collect());
+        let mut ctx = Context::new();
+        step.apply(&mut ctx, &mut StepScope::new(&selection, &mut vars))
+            .expect("step");
+        (vars, ctx)
+    }
+
+    #[test]
+    fn checked_statistics_preserve_mixed_residuals_and_empty_policies() {
+        let map = [
+            (0, AlgorithmParamValue::Int((1i64 << 53) + 1)),
+            (1, AlgorithmParamValue::Float(-(1i64 << 53) as f64)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            Reduction::Sum.apply(&map).expect("sum"),
+            AlgorithmParamValue::Float(1.0)
+        );
+        let samples: Vec<(Box<dyn Step>, AlgorithmParamValue)> = vec![
+            (
+                Box::new(StdDevStep::new("values", "out")),
+                AlgorithmParamValue::None,
+            ),
+            (
+                Box::new(MedianStep::new("values", "out")),
+                AlgorithmParamValue::None,
+            ),
+            (
+                Box::new(QuantileStep::new("values", 0.25, "out")),
+                AlgorithmParamValue::None,
+            ),
+            (
+                Box::new(ModeStep::new("values", "out")),
+                AlgorithmParamValue::None,
+            ),
+            (
+                Box::new(EntropyStep::new("values", "out")),
+                AlgorithmParamValue::Float(0.0),
+            ),
+        ];
+        for (step, expected) in samples {
+            let (vars, _) = evaluate(step.as_ref(), vec![]);
+            assert_eq!(vars.scalar("out").expect("scalar"), &expected);
+        }
+        let (vars, _) = evaluate(
+            &StdDevStep::new("values", "out"),
+            vec![AlgorithmParamValue::Int(7)],
+        );
+        assert_eq!(
+            vars.scalar("out").expect("singleton"),
+            &AlgorithmParamValue::Float(0.0)
+        );
+    }
+
+    #[test]
+    fn histogram_bins_are_scalar_counts_and_owned_output() {
+        let (vars, mut ctx) = evaluate(
+            &HistogramStep::new("values", 3, "hist"),
+            vec![AlgorithmParamValue::Int(1), AlgorithmParamValue::Int(1)],
+        );
+        assert_eq!(
+            vars.scalar("hist").expect("scalar"),
+            &AlgorithmParamValue::IntList(vec![2, 0, 0])
+        );
+        assert!(vars.node_map("hist").is_err());
+        assert!(
+            matches!(&ctx.take_outputs()["histograms.hist"], super::super::super::AlgorithmOutput::Histogram(counts) if counts == &vec![2,0,0])
+        );
+        let (vars, _) = evaluate(
+            &HistogramStep::new("values", 2, "hist"),
+            vec![
+                AlgorithmParamValue::Float(-1e308),
+                AlgorithmParamValue::Float(1e308),
+            ],
+        );
+        assert_eq!(
+            vars.scalar("hist").expect("wide range"),
+            &AlgorithmParamValue::IntList(vec![1, 1])
+        );
+    }
+
+    #[test]
+    fn neighbor_selection_and_missing_weights_are_checked_without_overwriting_results() {
+        use crate::{api::graph::Graph, subgraphs::Subgraph};
+        use std::{cell::RefCell, rc::Rc};
+        let mut graph = Graph::new_directed();
+        graph.add_nodes(3);
+        graph.add_edge(0, 2).expect("edge");
+        graph.add_edge(1, 2).expect("outside edge");
+        let selection = Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            [0, 2].into_iter().collect(),
+            "scope".into(),
+        )
+        .expect("selection");
+        let mut vars = super::super::core::StepVariables::default();
+        vars.set_node_map(
+            "values",
+            [
+                (0, AlgorithmParamValue::Int(2)),
+                (2, AlgorithmParamValue::Int(7)),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        vars.set_node_map("weights", HashMap::new());
+        let mut scope = StepScope::new(&selection, &mut vars);
+        let step = NeighborAggregationStep::new("values", "out", NeighborAggType::Sum);
+        step.apply(&mut Context::new(), &mut scope)
+            .expect("selected sum");
+        assert_eq!(
+            scope.variables().node_map("out").expect("out")[&2],
+            AlgorithmParamValue::Float(2.0)
+        );
+        let step = step.with_weights("weights");
+        assert!(step
+            .apply(&mut Context::new(), &mut scope)
+            .expect_err("missing weight")
+            .to_string()
+            .contains("Missing neighbor weight"));
+        assert_eq!(
+            scope.variables().node_map("out").expect("unchanged")[&2],
+            AlgorithmParamValue::Float(2.0)
+        );
+    }
 
     #[test]
     fn test_std_dev() {

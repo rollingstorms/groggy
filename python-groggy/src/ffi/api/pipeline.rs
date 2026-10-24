@@ -229,6 +229,9 @@ pub fn py_run_pipeline(
     let py_outputs = PyDict::new(py);
     for (key, output) in outputs {
         match output {
+            groggy::algorithms::AlgorithmOutput::Histogram(counts) => {
+                py_outputs.set_item(key, counts)?;
+            }
             groggy::algorithms::AlgorithmOutput::NodeAttributes(values)
             | groggy::algorithms::AlgorithmOutput::EdgeAttributes(values) => {
                 let rows = PyList::empty(py);

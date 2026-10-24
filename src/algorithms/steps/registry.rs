@@ -703,7 +703,12 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.reduce_nodes requires 'target' param"))?;
-            let reducer = match spec.params.get_text("reducer") {
+            let reducer_name = if spec.params.get("reducer").is_some() {
+                Some(spec.params.expect_text("reducer")?)
+            } else {
+                None
+            };
+            let reducer = match reducer_name {
                 Some("sum") | None => Reduction::Sum,
                 Some("min") => Reduction::Min,
                 Some("max") => Reduction::Max,
@@ -734,7 +739,12 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.neighbor_agg requires 'target' param"))?;
-            let agg_type = match spec.params.get_text("agg") {
+            let aggregation = if spec.params.get("agg").is_some() {
+                Some(spec.params.expect_text("agg")?)
+            } else {
+                None
+            };
+            let agg_type = match aggregation {
                 Some("sum") | None => NeighborAggType::Sum,
                 Some("mean") => NeighborAggType::Mean,
                 Some("mode") => NeighborAggType::Mode,
@@ -746,8 +756,18 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let mut step =
                 NeighborAggregationStep::new(source.to_string(), target.to_string(), agg_type);
 
-            // Add optional weights
-            if let Some(weights) = spec.params.get_text("weights") {
+            if spec.params.get("direction").is_some() {
+                let direction = spec.params.expect_text("direction")?;
+                step = step.with_direction(
+                    super::direction::NeighborDirection::from_str(direction)
+                        .ok_or_else(|| anyhow!("Invalid neighbor direction: {}", direction))?,
+                );
+            }
+            if spec.params.get("weights").is_some() {
+                let weights = spec.params.expect_text("weights")?;
+                if !matches!(agg_type, NeighborAggType::Sum) {
+                    return Err(anyhow!("Neighbor weights are supported only for sum"));
+                }
                 step = step.with_weights(weights.to_string());
             }
 
@@ -845,6 +865,9 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 Some(AlgorithmParamValue::Int(v)) => *v as f64,
                 _ => return Err(anyhow!("core.quantile requires 'q' float param")),
             };
+            if !(0.0..=1.0).contains(&q) {
+                return Err(anyhow!("Quantile q must be finite and in [0,1]"));
+            }
             Ok(Box::new(QuantileStep::new(
                 source.to_string(),
                 q,
@@ -893,8 +916,14 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .get_text("target")
                 .ok_or_else(|| anyhow!("core.histogram requires 'target' param"))?;
             let bins = match spec.params.get("bins") {
-                Some(AlgorithmParamValue::Int(v)) => *v as usize,
-                _ => return Err(anyhow!("core.histogram requires 'bins' integer param")),
+                Some(AlgorithmParamValue::Int(v)) if *v > 0 => {
+                    usize::try_from(*v).map_err(|_| anyhow!("Histogram bins exceed usize"))?
+                }
+                _ => {
+                    return Err(anyhow!(
+                        "core.histogram requires positive 'bins' integer param"
+                    ))
+                }
             };
             Ok(Box::new(HistogramStep::new(
                 source.to_string(),

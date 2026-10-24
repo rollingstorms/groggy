@@ -476,7 +476,9 @@ hist = sG.builder.core.histogram(values, bins=20)
 - `values`: VarHandle
 - `bins`: Number of histogram bins
 
-**Returns:** VarHandle (histogram data structure)
+**Returns:** VarHandle for an owned count vector. Retrieve it from
+`profile["outputs"][f"histograms.{hist.name}"]` using `return_profile=True`.
+Bin indices are not node IDs; do not attach this handle as a node map.
 
 **Example:**
 ```python

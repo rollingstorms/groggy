@@ -51,7 +51,8 @@ custom or unmigrated steps cannot accidentally bypass the staging contract.
 Current supported families are initialization/counts, property loads/attachments,
 scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
 fused arithmetic/neighbor kernels, node degree and incident-weight sums,
-undirected triangle/k-core calculations, property filtering and ordering, and
+undirected triangle/k-core calculations, property filtering and ordering, checked
+statistical/category/neighbor aggregations, and
 ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
@@ -388,5 +389,6 @@ Ordering validates values before sorting. Cancellation is checked during reads,
 around sorting and before installing results; comparison sorting itself is not
 interruptible. Failure leaves existing result variables intact and atomic runs
 discard earlier staged writes. Sort/top-k still perform a full O(n log n) sort;
-no heap-selection optimization is claimed. Statistical and neighbor aggregation
-families remain uncertified pending their own review.
+no heap-selection optimization is claimed. Statistical and neighbor aggregations are now supported as described in
+[Checked builder aggregations](builder-aggregations.md), including the histogram
+ownership correction and the standalone/message-pass distinction.

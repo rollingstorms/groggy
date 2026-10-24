@@ -967,23 +967,6 @@ impl ReductionOp {
             ReductionOp::Max => "Max reduction",
         }
     }
-
-    fn apply(self, values: &[f64]) -> Option<f64> {
-        if values.is_empty() {
-            return None;
-        }
-
-        match self {
-            ReductionOp::Sum => Some(values.iter().sum()),
-            ReductionOp::Mean => Some(values.iter().sum::<f64>() / values.len() as f64),
-            ReductionOp::Min => values.iter().copied().fold(f64::INFINITY, f64::min).into(),
-            ReductionOp::Max => values
-                .iter()
-                .copied()
-                .fold(f64::NEG_INFINITY, f64::max)
-                .into(),
-        }
-    }
 }
 
 /// Reduce a node or edge map to a single scalar value.
@@ -1055,17 +1038,24 @@ where
         return Ok(AlgorithmParamValue::Float(0.0));
     }
 
-    let mut values = Vec::with_capacity(map.len());
-    let mut keys: Vec<K> = map.keys().copied().collect();
+    let mut keys: Vec<_> = map.keys().copied().collect();
     keys.sort_unstable();
-    for key in keys {
-        let value = map.get(&key).expect("key must exist");
-        let num = NumericValue::from(value, map_name)?;
-        values.push(num.as_f64());
-    }
-
-    let result = op.apply(&values).unwrap_or(0.0);
-    Ok(AlgorithmParamValue::Float(result))
+    let values = keys
+        .into_iter()
+        .map(|key| {
+            super::aggregations::numeric_value(
+                map.get(&key)
+                    .ok_or_else(|| anyhow!("Missing value in '{}'", map_name))?,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let reducer = match op {
+        ReductionOp::Sum => super::aggregations::Reduction::Sum,
+        ReductionOp::Mean => super::aggregations::Reduction::Mean,
+        ReductionOp::Min => super::aggregations::Reduction::Min,
+        ReductionOp::Max => super::aggregations::Reduction::Max,
+    };
+    reducer.apply_values(&values)
 }
 
 /// Broadcast a scalar value to all nodes/edges in a reference map.

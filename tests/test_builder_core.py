@@ -607,37 +607,17 @@ if __name__ == "__main__":
 
 
 def test_builder_core_histogram():
-    """Test histogram computation."""
+    """Histogram bins are owned counts and never graph IDs."""
     from groggy import Graph
     from groggy.builder import AlgorithmBuilder
 
-    # Create test graph with known value distribution
-    g = Graph()
-    for i in range(10):
-        g.add_node(value=float(i))  # Allocated IDs and values are both 0-9.
-
-    # Build histogram algorithm
+    graph = Graph()
+    graph.add_nodes([{"value": float(i)} for i in range(10)])
+    before = graph.current_state_id
     builder = AlgorithmBuilder("test_histogram")
     values = builder.load_attr("value", default=0.0)
-    hist = builder.core.histogram(values, bins=5)
-    builder.attach_as("histogram", hist)
-
-    # Execute
-    algo = builder.build()
-    result = g.apply(algo)
-
-    # Histogram returns a map where keys are bin indices and values are counts
-    # Since we have 10 values (0-9) in 5 bins, each bin should have ~2 values
-    # The map will only have entries for bin indices 0-4
-    hist_data = {}
-    for node in result.nodes:
-        if hasattr(node, "histogram"):
-            # Node ID corresponds to bin index, value is the count
-            hist_data[node.id] = node.histogram
-
-    # Should have 5 bins (0-4)
-    assert len(hist_data) == 5
-    # Each bin should have approximately 2 values
-    for bin_idx, count in hist_data.items():
-        assert 0 <= bin_idx < 5
-        assert count == 2
+    histogram = builder.core.histogram(values, bins=5)
+    _, profile = graph.view().apply(builder.build(atomic=True), persist=False, return_profile=True)
+    assert profile["outputs"][f"histograms.{histogram.name}"] == [2, 2, 2, 2, 2]
+    assert graph.current_state_id == before
+    assert all(graph.get_node_attr(node, "histogram") is None for node in range(10))

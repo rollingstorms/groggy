@@ -162,6 +162,14 @@ class CoreIRNode(IRNode):
             if self.inputs:
                 step["source"] = self.inputs[0]
             step["tie_break"] = self.metadata.get("tie_break", "lowest")
+        elif self.op_type in {"std", "median", "quantile", "mode_values", "mode", "entropy", "reduce_nodes"}:
+            if self.inputs:
+                step["source"] = self.inputs[0]
+            if self.op_type == "mode_values":
+                step["type"] = "core.mode"
+            for name in ("q", "reducer"):
+                if name in self.metadata:
+                    step[name] = self.metadata[name]
         elif self.op_type == "histogram":
             if self.inputs:
                 step["source"] = self.inputs[0]
@@ -265,7 +273,9 @@ class GraphIRNode(IRNode):
             if len(self.inputs) >= 1:
                 step["source"] = self.inputs[0]
             step["agg"] = self.metadata.get("agg", "sum")
-            if "weights" in self.metadata:
+            if len(self.inputs) >= 2:
+                step["weights"] = self.inputs[1]
+            elif "weights" in self.metadata:
                 step["weights"] = self.metadata["weights"]
             if "direction" in self.metadata:
                 step["direction"] = self.metadata["direction"]

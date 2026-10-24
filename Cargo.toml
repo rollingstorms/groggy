@@ -103,3 +103,7 @@ harness = false
 [[bench]]
 name = "filtering_builder_steps"
 harness = false
+
+[[bench]]
+name = "aggregation_builder_steps"
+harness = false

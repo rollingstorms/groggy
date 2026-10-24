@@ -76,7 +76,8 @@ class GraphOps:
         return self.degree(nodes)
 
     def neighbor_agg(
-        self, values: VarHandle, agg: str = "sum", weights: Optional[VarHandle] = None
+        self, values: VarHandle, agg: str = "sum", weights: Optional[VarHandle] = None,
+        *, direction: str = "in",
     ) -> VarHandle:
         """
         Aggregate neighbor values for each node.
@@ -87,7 +88,8 @@ class GraphOps:
         Args:
             values: Node values to aggregate
             agg: Aggregation type: 'sum', 'mean', 'min', 'max', 'mode'
-            weights: Optional weights to apply to neighbor values
+            weights: Optional per-node multipliers for sum aggregation
+            direction: Standalone traversal direction: in, out, or undirected
 
         Returns:
             VarHandle for aggregated neighbor values
@@ -102,7 +104,7 @@ class GraphOps:
             >>> neighbor_sum = G @ contrib
             >>>
             >>> # With weights
-            >>> weighted = builder.graph.neighbor_agg(ranks, "sum", weights=edge_weights)
+            >>> weighted = builder.graph.neighbor_agg(ranks, "sum", weights=node_weights)
         """
         var = self.builder._new_var("neighbor_agg")
 
@@ -119,6 +121,8 @@ class GraphOps:
                 inputs=inputs,
                 output=var.name,
                 agg=agg,
+                direction=direction,
+                **({"weights": weights.name} if weights is not None else {}),
             )
             self.builder._add_ir_node(node)
         else:
@@ -126,6 +130,7 @@ class GraphOps:
                 "type": "core.neighbor_agg",
                 "source": values.name,
                 "agg": agg,
+                "direction": direction,
                 "output": var.name,
             }
             if weights is not None:

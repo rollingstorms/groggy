@@ -14,6 +14,15 @@ from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
 
 
+def _has_histogram_output(rows: List[Dict[str, Any]]) -> bool:
+    """Whether an ordered program contains observable owned histogram output."""
+    return any(
+        row.get("type") in {"core.histogram", "histogram"}
+        or (isinstance(row.get("body"), list) and _has_histogram_output(row["body"]))
+        for row in rows
+    )
+
+
 class LoopContext:
     """Context manager for loop body."""
 
@@ -466,6 +475,8 @@ class BuiltAlgorithm(AlgorithmHandle):
                 "agg": step.get("agg", "sum"),
                 "target": step["output"],
             }
+            if "direction" in step:
+                params["direction"] = step["direction"]
             if "weights" in step:
                 params["weights"] = self._resolve_operand(step["weights"], alias_map)
             return {"id": "core.neighbor_agg", "params": params}
@@ -736,6 +747,21 @@ class BuiltAlgorithm(AlgorithmHandle):
             }
             return {"id": "sample.for_each", "params": params}
 
+        if step_type in {
+            "std", "core.std", "median", "core.median", "quantile", "core.quantile",
+            "mode_values", "core.mode_values", "core.mode", "entropy", "core.entropy",
+            "reduce_nodes", "core.reduce_nodes",
+        }:
+            native = step_type.split(".")[-1]
+            params = {
+                "source": self._resolve_operand(step.get("source", step.get("left")), alias_map),
+                "target": step["output"],
+            }
+            for name in ("q", "reducer"):
+                if name in step:
+                    params[name] = step[name]
+            return {"id": "core.mode" if native == "mode_values" else f"core.{native}", "params": params}
+
         if step_type == "core.histogram":
             # Handle both 'source' and 'input' field names (IR may change them)
             source_val = step.get(
@@ -940,7 +966,7 @@ class BuiltAlgorithm(AlgorithmHandle):
 
         # Check if anything is attached
         has_attach = any(s.get("type") == "attach_attr" for s in self._steps)
-        if not has_attach:
+        if not has_attach and not _has_histogram_output(self._steps):
             warnings.append("Pipeline doesn't attach any output attributes")
 
         return errors, warnings

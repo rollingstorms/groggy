@@ -17,12 +17,12 @@ use crate::subgraphs::Subgraph;
 use crate::types::{AttrValue, NodeId};
 
 pub mod builder;
-mod property_batch;
 pub mod centrality;
 pub mod community;
 pub mod execution;
 pub mod pathfinding;
 pub mod pipeline;
+mod property_batch;
 pub mod read;
 pub mod registry;
 pub mod steps;
@@ -820,9 +820,11 @@ pub struct IterationEvent {
     pub updates: usize,
 }
 
-/// Structured payload returned by algorithm execution when persistence is disabled.
+/// Structured owned payload returned by algorithm execution.
 #[derive(Clone, Debug)]
 pub enum AlgorithmOutput {
+    /// Owned bin counts, never graph entity IDs.
+    Histogram(Vec<i64>),
     /// Owned typed node property column produced without a graph mutation.
     NodeAttributes(Vec<(NodeId, crate::types::AttrValue)>),
     /// Owned typed edge property column produced without a graph mutation.

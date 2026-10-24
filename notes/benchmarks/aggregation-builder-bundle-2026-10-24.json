@@ -1,0 +1,761 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "mode": "sum",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00175425,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002590709,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002154959,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0013125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001926166,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "mean",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002021042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001804875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0017295,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001522792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001522292,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "std",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001422834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001404041,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001419417,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001407292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001332167,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "median",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001292916,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001300625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001246416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00122775,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001206166,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "quantile",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001187583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00115975,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001184166,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001152542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001149875,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "mode",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001225375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001213833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001217042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001207125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00122125,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "entropy",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001213042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001188,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001194084,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001195458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001215792,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "histogram",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000174125,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000175292,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000176583,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000176333,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000176833,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbor_sum",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001436375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001420833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001397958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001411916,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001467708,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbor_mean",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001474416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001458292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00151575,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001482208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001488375,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbor_min",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001337291,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0012735,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00128275,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001289625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001303917,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbor_max",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00130475,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001294291,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001284709,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001280792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001286583,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbor_mode",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001379792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001356667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001373167,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001330458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001336375,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbor_weighted_sum",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001457541,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001457333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001429875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001438167,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001460625,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "sum",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.012170625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011868125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011887667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011857209,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011876041,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "mean",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.011879791,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011813417,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011839584,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.01174,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011854333,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "std",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.01181825,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011651834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012870625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.01184725,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011734916,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "median",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.011729375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011776209,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011734,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011812166,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011719958,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "quantile",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.011872042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012151083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011793917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012646666,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.011858791,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "mode",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.012346209,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012328,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012327625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012319917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012342958,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "entropy",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.012233458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012298,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012369834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012342709,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012359834,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "histogram",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.0018515,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001852125,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001963875,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001861166,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00189475,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbor_sum",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.014610542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014576334,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014326917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014654125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014485167,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbor_mean",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.014597875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014284292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014438375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014280292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014593,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbor_min",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.013127917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013091625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.01306925,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013462875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013107833,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbor_max",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.01314675,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013147875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.01324675,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013178667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013164125,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbor_mode",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.013914917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013888708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013888917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013921625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013906208,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbor_weighted_sum",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.01476875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014820709,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014774042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014734,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014706,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release ring workloads; fixture/spec construction excluded. Includes reduction or neighbor calculation, owned histogram or property attachment and checked publication. Five samples per workload; all outputs checked. No matched speedup, FFI, RSS/allocation or production budget claim."
+}

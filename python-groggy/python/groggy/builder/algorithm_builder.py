@@ -11,8 +11,10 @@ from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
 from groggy.builder.execution import MessagePassContext
 from groggy.builder.ir import IRGraph, IRNode
-from groggy.builder.legacy_compat import (BuiltAlgorithm, BuiltSampler,
-                                          LoopContext, finalize_legacy_loop_steps)
+from groggy.builder.legacy_compat import (
+    BuiltAlgorithm, BuiltSampler, LoopContext, _has_histogram_output,
+    finalize_legacy_loop_steps,
+)
 from groggy.builder.traits.attr import AttrOps
 from groggy.builder.traits.core import CoreOps
 from groggy.builder.traits.graph import GraphOps
@@ -761,7 +763,15 @@ class AlgorithmBuilder:
 
         # Atomic property reads depend on original attachment order. The current
         # IR optimizer has no graph-property effect edges, so keep that order.
-        if optimize and not atomic and self.use_ir and self.ir_graph is not None:
+        # Owned histogram outputs are observable even without an attachment.
+        # Until IR effects cover them, preserve their original ordered program.
+        if (
+            optimize
+            and not atomic
+            and not _has_histogram_output(steps)
+            and self.use_ir
+            and self.ir_graph is not None
+        ):
             from groggy.builder.ir.optimizer import optimize_ir
 
             # Ensure IR reflects latest step list before optimization
