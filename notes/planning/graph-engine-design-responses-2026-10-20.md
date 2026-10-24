@@ -1156,3 +1156,15 @@ cancellation is checked between child steps and iterations. Alternate batch plan
 reject until their executor honors staging. This follows existing workbook
 authority; remaining step families and automatic atomic defaults stay open.
 Details: `atomic-builder-loops-2026-10-24.md`.
+
+### Atomic fused kernels and message-pass blocks — 2026-10-24
+
+Implemented 09.4b.2i under the existing staged property contract. Certified fused
+kernels and ordered supported message-pass blocks compose with nested loops and
+accept once. Block options now honor the JSON payload, direction uses selected
+CSR, and arithmetic overflow/zero division return errors. Streaming/unordered/
+placeholder-where blocks reject before atomic execution. Legacy where condition
+semantics remain an explicit 30.1/AR7.8 repair; effect-aware optimization, alternate
+batch plans, remaining families and atomic defaults stay open. Verification:
+940 native tests, 1,112 root Python tests, 39 doc examples and strict Clippy;
+four release ring workload receipts. See `atomic-builder-blocks-2026-10-24.md`.

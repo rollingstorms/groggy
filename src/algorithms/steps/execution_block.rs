@@ -10,7 +10,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::traits::SubgraphOperations;
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context};
@@ -140,7 +140,11 @@ impl ExecutionBlockStep {
             .options
             .direction
             .as_deref()
-            .and_then(NeighborDirection::from_str)
+            .map(|value| {
+                NeighborDirection::from_str(value)
+                    .ok_or_else(|| anyhow!("Invalid execution block direction: {}", value))
+            })
+            .transpose()?
             .unwrap_or(NeighborDirection::In);
 
         // Message-pass: iterate through nodes in order (Gauss-Seidel)
@@ -159,40 +163,53 @@ impl ExecutionBlockStep {
             ));
         }
 
-        // For each node, evaluate the block body and update in-place
-        for &node_id in &nodes {
-            // Get neighbors with the specified direction
-            let neighbors: Vec<NodeId> = {
-                let subgraph = scope.subgraph();
-                let mut nbrs = match direction {
-                    NeighborDirection::In => {
-                        // Incoming edges: find nodes that point to this node
-                        subgraph
-                            .neighbors(node_id)
-                            .map_err(|e| anyhow!("Failed to get neighbors: {}", e))?
-                    }
-                    NeighborDirection::Out => {
-                        // Outgoing edges: find nodes this node points to
-                        subgraph
-                            .neighbors(node_id)
-                            .map_err(|e| anyhow!("Failed to get neighbors: {}", e))?
-                    }
-                    NeighborDirection::Undirected => {
-                        // All connected nodes
-                        subgraph
-                            .neighbors(node_id)
-                            .map_err(|e| anyhow!("Failed to get neighbors: {}", e))?
-                    }
-                };
+        // Build the selected topology once, respecting direction and edge multiplicity.
+        let selected_nodes = scope.subgraph().ordered_nodes();
+        let positions: HashMap<_, _> = selected_nodes
+            .iter()
+            .enumerate()
+            .map(|(index, &node)| (node, index))
+            .collect();
+        let mut csr = Csr::default();
+        {
+            let graph = scope.subgraph().graph();
+            let graph = graph.borrow();
+            let pool = graph.pool();
+            let mapping = direction.edge_mapping();
+            build_csr_from_edges_with_scratch(
+                &mut csr,
+                selected_nodes.len(),
+                scope.subgraph().edges().iter().copied(),
+                |node| positions.get(&node).copied(),
+                |edge| pool.get_edge_endpoints(edge).map(mapping),
+                CsrOptions {
+                    add_reverse_edges: direction.add_reverse_edges(),
+                    sort_neighbors: true,
+                },
+            );
+        }
 
-                if self.options.include_self && !nbrs.contains(&node_id) {
-                    nbrs.push(node_id);
-                }
-
-                // Sort neighbors for deterministic execution
-                nbrs.sort_unstable();
-                nbrs
-            };
+        // Gauss-Seidel updates use temporary values; property writes happen only
+        // through a later attachment step, sharing the outer run's overlay.
+        for (column_index, &node_id) in nodes.iter().enumerate() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Execution block cancelled"));
+            }
+            let index = positions.get(&node_id).ok_or_else(|| {
+                anyhow!(
+                    "Execution block target node {} is outside the selected graph",
+                    node_id
+                )
+            })?;
+            let mut neighbors: Vec<_> = csr
+                .neighbors(*index)
+                .iter()
+                .map(|&index| selected_nodes[index])
+                .collect();
+            if self.options.include_self && !neighbors.contains(&node_id) {
+                neighbors.push(node_id);
+            }
+            neighbors.sort_unstable();
 
             // Evaluate block body for this node
             let update_value = if body.nodes.is_empty() {
@@ -207,9 +224,7 @@ impl ExecutionBlockStep {
             };
 
             // Update in-place
-            if let Some(idx) = node_column.nodes().iter().position(|&n| n == node_id) {
-                node_column.values_mut()[idx] = update_value;
-            }
+            node_column.values_mut()[column_index] = update_value;
         }
 
         // Store updated values back using the original storage type
@@ -285,6 +300,9 @@ impl ExecutionBlockStep {
 
         // Evaluate each body node in topological order
         for body_node in &body.nodes {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Execution block cancelled"));
+            }
             let result = self.evaluate_body_node(
                 body_node,
                 node_id,
@@ -508,6 +526,20 @@ impl ExecutionBlockStep {
 }
 
 impl Step for ExecutionBlockStep {
+    fn supports_atomic_properties(&self) -> bool {
+        matches!(self.mode, ExecutionMode::MessagePass)
+            && self.options.ordered
+            && self
+                .options
+                .direction
+                .as_deref()
+                .is_none_or(|value| NeighborDirection::from_str(value).is_some())
+            && self.body().is_ok_and(|body| {
+                self.validate_body_support(body).is_ok()
+                    && body.nodes.iter().all(|node| node.op_type != "where")
+            })
+    }
+
     fn id(&self) -> &'static str {
         "core.execution_block"
     }
@@ -521,6 +553,14 @@ impl Step for ExecutionBlockStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if ctx.property_batch.is_some() && !self.supports_atomic_properties() {
+            return Err(anyhow!(
+                "Execution block does not support this atomic property body"
+            ));
+        }
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Execution block cancelled"));
+        }
         match self.mode {
             ExecutionMode::MessagePass => self.execute_message_pass(ctx, scope),
             ExecutionMode::Streaming => {
@@ -540,17 +580,18 @@ fn apply_arithmetic(
     match (left, right) {
         (AlgorithmParamValue::Int(l), AlgorithmParamValue::Int(r)) => {
             let result = match op {
-                "add" => l + r,
-                "sub" => l - r,
-                "mul" => l * r,
+                "add" => l.checked_add(*r),
+                "sub" => l.checked_sub(*r),
+                "mul" => l.checked_mul(*r),
                 "div" => {
                     if *r == 0 {
                         return Err(anyhow!("Division by zero"));
                     }
-                    l / r
+                    l.checked_div(*r)
                 }
                 _ => return Err(anyhow!("Unknown arithmetic op: {}", op)),
-            };
+            }
+            .ok_or_else(|| anyhow!("Integer overflow in execution block {}", op))?;
             Ok(AlgorithmParamValue::Int(result))
         }
         (AlgorithmParamValue::Float(l), AlgorithmParamValue::Float(r)) => {
@@ -558,7 +599,12 @@ fn apply_arithmetic(
                 "add" => l + r,
                 "sub" => l - r,
                 "mul" => l * r,
-                "div" => l / r,
+                "div" => {
+                    if *r == 0.0 {
+                        return Err(anyhow!("Division by zero"));
+                    }
+                    l / r
+                }
                 _ => return Err(anyhow!("Unknown arithmetic op: {}", op)),
             };
             Ok(AlgorithmParamValue::Float(result))
@@ -740,5 +786,71 @@ impl ExecutionBlockStep {
             var_name,
             node_id
         ))
+    }
+}
+
+#[cfg(test)]
+mod atomic_tests {
+    use super::*;
+
+    #[test]
+    fn integer_boundaries_and_zero_divisors_return_errors() {
+        for (op, left, right) in [
+            ("add", i64::MAX, 1),
+            ("sub", i64::MIN, 1),
+            ("mul", i64::MAX, 2),
+            ("div", i64::MIN, -1),
+            ("div", 1, 0),
+        ] {
+            assert!(apply_arithmetic(
+                op,
+                &AlgorithmParamValue::Int(left),
+                &AlgorithmParamValue::Int(right)
+            )
+            .is_err());
+        }
+        assert!(apply_arithmetic(
+            "div",
+            &AlgorithmParamValue::Float(1.0),
+            &AlgorithmParamValue::Float(0.0)
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn atomic_blocks_reject_unimplemented_modes_and_operations() {
+        let empty = serde_json::json!({"nodes": []});
+        assert!(ExecutionBlockStep::new(
+            ExecutionMode::MessagePass,
+            "x".into(),
+            BlockOptions::default(),
+            empty.clone()
+        )
+        .supports_atomic_properties());
+        assert!(!ExecutionBlockStep::new(
+            ExecutionMode::Streaming,
+            "x".into(),
+            BlockOptions::default(),
+            empty.clone()
+        )
+        .supports_atomic_properties());
+        let options = BlockOptions {
+            ordered: false,
+            ..Default::default()
+        };
+        assert!(
+            !ExecutionBlockStep::new(ExecutionMode::MessagePass, "x".into(), options, empty)
+                .supports_atomic_properties()
+        );
+        for op in ["where", "attach_node_attr", "unknown"] {
+            let body = serde_json::json!({"nodes": [{"id": "n", "domain": "core", "op_type": op, "inputs": [], "output": "x"}]});
+            assert!(!ExecutionBlockStep::new(
+                ExecutionMode::MessagePass,
+                "x".into(),
+                BlockOptions::default(),
+                body
+            )
+            .supports_atomic_properties());
+        }
     }
 }

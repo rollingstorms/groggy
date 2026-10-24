@@ -1814,11 +1814,13 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get("options")
                 .ok_or_else(|| anyhow!("core.execution_block requires 'options' param"))?;
-            let options: BlockOptions = serde_json::from_value(
-                serde_json::to_value(options_value)
+            let options_json = match options_value {
+                AlgorithmParamValue::Json(value) => value.clone(),
+                other => serde_json::to_value(other)
                     .map_err(|e| anyhow!("Failed to convert options: {}", e))?,
-            )
-            .map_err(|e| anyhow!("Failed to parse options: {}", e))?;
+            };
+            let options: BlockOptions = serde_json::from_value(options_json)
+                .map_err(|e| anyhow!("Failed to parse options: {}", e))?;
 
             // Parse body
             let body_value = spec

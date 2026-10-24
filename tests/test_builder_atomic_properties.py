@@ -227,3 +227,164 @@ def test_public_builder_iteration_uses_atomic_loop_boundary():
     graph.view().apply(builder.build(atomic=True), persist=True)
     assert graph.get_node_attr(0, "score") == 3
     assert graph.current_state_id == 2
+
+
+def block_step(nodes, *, direction="in", mode="message_pass", **options):
+    return {"id": "core.execution_block", "params": {
+        "mode": mode, "target": "values",
+        "options": {"include_self": False, "direction": direction, **options},
+        "body": {"nodes": nodes},
+    }}
+
+
+def body_node(op, inputs, output="result", **metadata):
+    return {"id": output, "domain": "core", "op_type": op,
+            "inputs": inputs, "output": output, "metadata": metadata}
+
+
+@pytest.mark.parametrize("kernel,params,expected", [
+    ("core.fused_axpy", {"a": "two", "x": "values", "b": "four", "y": "two"}, 14),
+    ("core.fused_madd", {"a": "values", "b": "two", "c": "four"}, 10),
+])
+def test_atomic_fused_arithmetic_consumes_staged_property_loads(kernel, params, expected):
+    graph = Graph()
+    graph.add_nodes([{"score": 99}, {"score": 88}])
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "staged", "value": 3}},
+        {"id": "core.attach_node_attr", "params": {"source": "staged", "attr": "score"}},
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        {"id": "core.init_nodes", "params": {"target": "two", "value": 2}},
+        {"id": "core.init_nodes", "params": {"target": "four", "value": 4}},
+        {"id": kernel, "params": {**params, "target": "result"}},
+        {"id": "core.attach_node_attr", "params": {"source": "result", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == 2
+    assert [graph.get_node_attr(n, "answer") for n in [0, 1]] == [expected, expected]
+
+
+@pytest.mark.parametrize("direction,expected", [
+    ("in", [8, 8, 0]), ("out", [12, 0, 4]), ("undirected", [16, 8, 4]),
+])
+def test_atomic_fused_neighbors_respect_direction(direction, expected):
+    graph = Graph(directed=True)
+    graph.add_nodes(3)
+    graph.add_edges([(0, 1), (0, 1), (0, 0), (2, 0)])
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "values", "value": 2}},
+        {"id": "graph.fused_neighbor_mul_agg", "params": {
+            "values": "values", "scalars": "values", "target": "result", "direction": direction}},
+        {"id": "core.attach_node_attr", "params": {"source": "result", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps([loop_step(steps, 1)]), persist=True)
+    assert graph.current_state_id == before + 1
+    assert [graph.get_node_attr(n, "answer") for n in range(3)] == expected
+
+
+@pytest.mark.parametrize("direction,expected", [
+    ("in", [0, 0, 0]), ("out", [5, 0, 0]), ("undirected", [5, 5, 5]),
+])
+def test_atomic_message_pass_respects_direction_and_order(direction, expected):
+    graph = Graph(directed=True)
+    graph.add_nodes([{"score": 1}, {"score": 2}, {"score": 3}])
+    graph.add_edges([(0, 1), (0, 2)])
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        block_step([body_node("neighbor_agg", ["values"], agg="sum")], direction=direction),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == before + 1
+    assert [graph.get_node_attr(n, "answer") for n in range(3)] == expected
+
+
+@pytest.mark.parametrize("block", [
+    block_step([body_node("where", ["a", "b"])]),
+    block_step([], mode="streaming"),
+    block_step([], ordered=False),
+    block_step([], direction="typo"),
+    block_step([body_node("attach_node_attr", [])]),
+])
+def test_atomic_block_rejects_uncertified_behavior_before_prefix_writes(block):
+    graph = Graph()
+    graph.add_node(score=0)
+    with pytest.raises(RuntimeError, match="does not yet support atomic"):
+        graph.view().apply(AtomicSteps(increment_body() + [block]), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "score") == 0
+
+
+def test_atomic_block_overflow_discards_prefix_attachments():
+    graph = Graph()
+    graph.add_node(score=2**63 - 1)
+    steps = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "prefix"}},
+        block_step([body_node("constant", [], "one", value=1), body_node("add", ["values", "one"])]),
+    ]
+    with pytest.raises(RuntimeError, match="Integer overflow"):
+        graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "prefix") is None
+    assert graph.get_node_attr(0, "score") == 2**63 - 1
+
+
+@pytest.mark.parametrize("persist", [False, True])
+def test_nested_block_reads_staged_loads_and_preserves_transient_owner_reads(persist):
+    graph = Graph()
+    graph.add_node(score=2)
+    steps = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        block_step([body_node("constant", [], "one", value=1), body_node("add", ["values", "one"])]),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "score"}},
+    ]
+    _, profile = graph.view().apply(AtomicSteps([loop_step(steps, 3)]), persist=persist, return_profile=True)
+    assert graph.current_state_id == (2 if persist else 1)
+    assert graph.get_node_attr(0, "score") == (5 if persist else 2)
+    if not persist:
+        assert profile["outputs"]["node_attributes.score"] == [(0, 3)]
+
+
+def test_invalid_fused_direction_rejects_before_prefix_writes():
+    graph = Graph()
+    graph.add_node(score=0)
+    step = {"id": "graph.fused_neighbor_mul_agg", "params": {
+        "values": "values", "scalars": "values", "target": "result", "direction": "typo"}}
+    with pytest.raises(RuntimeError, match="Invalid fused neighbor direction"):
+        graph.view().apply(AtomicSteps(increment_body() + [step]), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "score") == 0
+
+
+@pytest.mark.parametrize("direction,expected", [
+    ("in", [4, 8, 0]), ("out", [5, 0, 5]), ("undirected", [8, 16, 8]),
+])
+def test_message_pass_counts_parallel_edges_and_self_loop_once(direction, expected):
+    graph = Graph(directed=True)
+    graph.add_nodes([{"score": 1}, {"score": 2}, {"score": 3}])
+    graph.add_edges([(0, 1), (0, 1), (0, 0), (2, 0)])
+    steps = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        block_step([body_node("neighbor_agg", ["values"], agg="sum")], direction=direction),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert [graph.get_node_attr(n, "answer") for n in range(3)] == expected
+
+
+def test_public_message_pass_builder_supports_atomic_attachment():
+    graph = Graph(directed=True)
+    graph.add_nodes([{"label": 9}, {"label": 2}, {"label": 2}])
+    graph.add_edges([(0, 1), (0, 2)])
+    before = graph.current_state_id
+    builder = AlgorithmBuilder("atomic messages")
+    labels = builder.load_attr("label")
+    with builder.message_pass(target=labels, include_self=True, direction="out") as messages:
+        update = builder.core.mode(messages.pull(labels), tie_break="lowest")
+        messages.apply(update)
+    builder.attach_as("label", labels)
+    graph.view().apply(builder.build(atomic=True), persist=True)
+    assert graph.current_state_id == before + 1
+    assert [graph.get_node_attr(n, "label") for n in range(3)] == [2, 2, 2]

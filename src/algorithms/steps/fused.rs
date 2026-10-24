@@ -16,8 +16,8 @@ use super::direction::NeighborDirection;
 /// Fused neighbor aggregation with element-wise multiplication.
 ///
 /// Replaces the pattern:
-///   temp = neighbor_agg(values)
-///   result = temp * scalars
+///   temp = values * scalars
+///   result = neighbor_agg(temp)
 ///
 /// With a single pass:
 ///   result[node] = sum(values[neighbor] * scalars[neighbor] for neighbor in neighbors(node))
@@ -70,7 +70,11 @@ impl FusedNeighborMulAgg {
         let direction = spec
             .params
             .get_text("direction")
-            .and_then(NeighborDirection::from_str)
+            .map(|value| {
+                NeighborDirection::from_str(value)
+                    .ok_or_else(|| anyhow!("Invalid fused neighbor direction: {}", value))
+            })
+            .transpose()?
             .unwrap_or_default();
 
         Ok(Self {
@@ -83,6 +87,11 @@ impl FusedNeighborMulAgg {
 }
 
 impl Step for FusedNeighborMulAgg {
+    fn supports_atomic_properties(&self) -> bool {
+        // Inputs and outputs are run variables; graph access is topology-only.
+        true
+    }
+
     fn id(&self) -> &'static str {
         "graph.fused_neighbor_mul_agg"
     }
@@ -272,6 +281,11 @@ impl FusedAXPY {
 }
 
 impl Step for FusedAXPY {
+    fn supports_atomic_properties(&self) -> bool {
+        // Inputs and outputs are run variables; graph access is topology-only.
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.fused_axpy"
     }
@@ -430,6 +444,11 @@ impl FusedMADD {
 }
 
 impl Step for FusedMADD {
+    fn supports_atomic_properties(&self) -> bool {
+        // Inputs and outputs are run variables; graph access is topology-only.
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.fused_madd"
     }

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **159 checked and 79 unchecked entries**. Entries overlap:
+currently contains **160 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -9,7 +9,7 @@ not a completion percentage or an estimate of remaining implementation effort.
 Count correction: the earlier summary omitted three already checked A* entries
 because its heading parser treated the literal asterisk as formatting. The earlier atomic-builder pass
 added two checked slices; three other entries were a counting correction. The
-nested-loop extension adds one further checked slice. Counts now use checkbox markers independently of headings.
+nested-loop and fused/block extensions add two further checked slices. Counts now use checkbox markers independently of headings.
 
 ## Recent completed slices
 
@@ -24,6 +24,7 @@ nested-loop extension adds one further checked slice. Counts now use checkbox ma
 | 09.4b.2f / 30.1a | Builder node/edge attachment and smoothing honor persist=False and return owned typed columns without graph mutation. |
 | 09.4b.2g / 30.1b | Explicit atomic property builders stage touched columns, read staged values and accept once; errors/cancellation discard the buffer. |
 | 09.4b.2h | Nested property loops recursively validate descendants, share staged values across iterations and discard the whole run on failure. |
+| 09.4b.2i | Fused variable kernels and supported ordered message-pass blocks compose with atomic staging; options/direction and arithmetic errors are checked. |
 
 
 
@@ -62,8 +63,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest atomic-loop change: **938 native tests passed, 52 ignored; 1,091 root
-Python API tests passed, 1 skipped; 38 executable documentation examples passed;
+Latest atomic-block change: **940 native tests passed, 52 ignored; 1,112 root
+Python API tests passed, 1 skipped; 39 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

@@ -49,15 +49,15 @@ assert not graph.has_uncommitted_changes()
 Native steps declare `supports_atomic_properties()`. The default is false, so
 custom or unmigrated steps cannot accidentally bypass the staging contract.
 Current supported families are initialization/counts, property loads/attachments,
-scalar/vector arithmetic, normalization, variable flow/alias and stroke smoothing.
+scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
+fused arithmetic/neighbor kernels and ordered message-pass execution blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
 the native pipeline, before any step executes. Nested `iter.loop` bodies are also supported when every descendant is certified.
 The complete body is checked even with zero iterations. Each iteration reads prior
 staged assignments; a later failure discards the entire outer run. Loops check
 cancellation between iterations and child steps. An alternate `batch_plan` rejects
-in atomic mode because its executor bypasses property staging. Fused/sampling/
-temporal and other graph-dependent families still require migration/certification.
+in atomic mode because its executor bypasses property staging. Sampling/temporal and other graph-dependent families still require migration/certification.
 Sampler pipelines reject an atomic property request rather than ignoring it.
 
 Atomic mode uses the builder's original ordered steps. The current IR optimizer
@@ -103,3 +103,50 @@ graph.view().apply(loop_builder.build(atomic=True), persist=True)
 assert graph.get_node_attr(0, "score") == 7.0
 assert graph.current_state_id == before_loop + 1
 ```
+
+## Fused kernels and message passing
+
+Explicit `core.fused_axpy`, `core.fused_madd` and
+`graph.fused_neighbor_mul_agg` steps operate on run variables. Attach their results
+through the usual property steps. Neighbor multiplication happens **before**
+aggregation: sum each neighbor's value times that neighbor's scalar.
+
+Ordered `message_pass` blocks also update temporary variables. Property loads before
+a block see prior staged attachments. A subsequent attachment enters the same outer
+batch. Nodes run in ID order for node maps and existing column order for columns;
+updates become visible to later nodes in the block (Gauss-Seidel).
+
+```python
+message_graph = Graph(directed=True)
+message_graph.add_nodes([{"label": 9}, {"label": 2}, {"label": 2}])
+message_graph.add_edges([(0, 1), (0, 2)])
+message_builder = AlgorithmBuilder("atomic messages")
+labels = message_builder.load_attr("label")
+with message_builder.message_pass(target=labels, include_self=True, direction="out") as messages:
+    update = message_builder.core.mode(messages.pull(labels), tie_break="lowest")
+    messages.apply(update)
+message_builder.attach_as("label", labels)
+message_before = message_graph.current_state_id
+message_graph.view().apply(message_builder.build(atomic=True), persist=True)
+assert message_graph.current_state_id == message_before + 1
+assert [message_graph.get_node_attr(n, "label") for n in range(3)] == [2, 2, 2]
+```
+
+- Directions are explicit traversal choices: `in` (default), `out`, or
+  `undirected`/`both`. Invalid names reject. Selected parallel edges contribute
+  repeatedly; each stored self-loop contributes once. `include_self` adds one
+  self contribution only when no selected self-loop already supplies it.
+- Block options are now read from their JSON payload. Earlier wrapped options
+  could silently use defaults. Direction now controls the selected CSR rather
+  than sharing an outgoing-neighbor call for every direction. These fixes also
+  apply to ordinary non-atomic blocks.
+- Integer block arithmetic retains integer results and truncating integer
+  division, with explicit overflow and zero-division errors. Floating division
+  by zero also errors. These errors discard the outer atomic run's staged writes.
+- Atomic blocks reject streaming, `ordered=False`, unsupported body operations,
+  and the legacy placeholder `where` operation before any pipeline step executes.
+  Legacy `where` still requires a separate semantic repair; it is not certified.
+- A block builds a selected directional CSR once per invocation, then evaluates
+  its body in order. Repeated blocks rebuild that CSR; directional cache reuse
+  remains a possible optimization. These paths do not enable the IR optimizer
+  for atomic builds or change the default `atomic=False` policy.

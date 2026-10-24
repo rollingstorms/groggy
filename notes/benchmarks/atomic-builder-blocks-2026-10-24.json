@@ -1,0 +1,117 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "iterations": 5,
+      "mode": "fused",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.003379292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004615209,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002627458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002402667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003451125,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "iterations": 5,
+      "mode": "message_pass",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.004732708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00535625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004929834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00458225,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004503958,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "iterations": 5,
+      "mode": "fused",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.025278292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023571625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023597042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023700625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.023446333,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "iterations": 5,
+      "mode": "message_pass",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.041082584,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.039933167,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.039792458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.040320667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.039583666,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release ring workloads; fixture and algorithm construction excluded; includes five ordered iterations, topology preparation, property staging and one publication. Five samples per case. No before/after speedup, FFI, RSS/allocation or production budget claim."
+}
