@@ -50,7 +50,7 @@ Native steps declare `supports_atomic_properties()`. The default is false, so
 custom or unmigrated steps cannot accidentally bypass the staging contract.
 Current supported families are initialization/counts, property loads/attachments,
 scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
-fused arithmetic/neighbor kernels and ordered message-pass execution blocks.
+fused arithmetic/neighbor kernels and ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
 the native pipeline, before any step executes. Nested `iter.loop` bodies are also supported when every descendant is certified.
@@ -111,10 +111,11 @@ Explicit `core.fused_axpy`, `core.fused_madd` and
 through the usual property steps. Neighbor multiplication happens **before**
 aggregation: sum each neighbor's value times that neighbor's scalar.
 
-Ordered `message_pass` blocks also update temporary variables. Property loads before
+Both ordered and synchronous `message_pass` blocks update temporary variables. Property loads before
 a block see prior staged attachments. A subsequent attachment enters the same outer
 batch. Nodes run in ID order for node maps and existing column order for columns;
-updates become visible to later nodes in the block (Gauss-Seidel).
+with `ordered=True`, updates become visible to later nodes (Gauss-Seidel).
+With `ordered=False`, every node reads the same block input (Jacobi).
 
 ```python
 message_graph = Graph(directed=True)
@@ -143,7 +144,7 @@ assert [message_graph.get_node_attr(n, "label") for n in range(3)] == [2, 2, 2]
 - Integer block arithmetic retains integer results and truncating integer
   division, with explicit overflow and zero-division errors. Floating division
   by zero also errors. These errors discard the outer atomic run's staged writes.
-- Atomic blocks reject streaming, `ordered=False` and unsupported body operations
+- Atomic blocks reject streaming and unsupported body operations
   before any pipeline step executes. Supported conditional operations are described
   below; malformed conditional inputs also reject during preparation.
 - A block builds a selected directional CSR once per invocation, then evaluates
@@ -188,3 +189,40 @@ raises an error and discards the outer atomic run's staged writes. Incorrect
 input counts and unknown/non-text comparison operators reject before any outer
 step executes, including for an empty graph. Old two-input placeholder `where`
 specifications now reject explicitly.
+
+## Synchronous message passing
+
+`ordered=False` now means Jacobi updates for both ordinary and atomic builders.
+All target reads, including self and neighbor reads, use the target values captured
+at block entry. Results are buffered separately and installed after all nodes
+succeed. Later blocks/iterations see the completed result. Synchronous evaluation
+currently runs serially; this option does not promise parallel execution.
+
+```python
+synchronous_graph = Graph(directed=True)
+synchronous_graph.add_nodes([{"score": 1}, {"score": 2}, {"score": 3}])
+synchronous_graph.add_edges([(0, 1), (1, 2)])
+synchronous_builder = AlgorithmBuilder("synchronous messages")
+synchronous_values = synchronous_builder.load_attr("score")
+with synchronous_builder.message_pass(
+    target=synchronous_values, ordered=False, include_self=False, direction="in"
+) as messages:
+    messages.apply(synchronous_builder.graph_ops.neighbor_agg(synchronous_values, "sum"))
+synchronous_builder.attach_as("answer", synchronous_values)
+synchronous_before = synchronous_graph.current_state_id
+synchronous_graph.view().apply(synchronous_builder.build(atomic=True), persist=True)
+assert [synchronous_graph.get_node_attr(n, "answer") for n in range(3)] == [0, 1, 2]
+assert synchronous_graph.current_state_id == synchronous_before + 1
+```
+
+- Target maps retain their map type; columns retain their original node order and
+  column type. Direction, parallel-edge, self-loop, conditional and include-self
+  behavior is shared with ordered mode.
+- An empty body preserves the target values; an empty graph produces no property
+  assignments or accepted state. A later node failure discards pending block
+  outputs and leaves the source variable intact. Atomic runs additionally discard
+  any earlier staged property attachments. Cancellation checks remain between
+  nodes/body operations and immediately before installing the completed results.
+- Synchronous mode adds one output buffer proportional to the target node count.
+  It does not clone the graph or publish per-node states. Streaming and outer
+  pipeline transactions remain separate work.

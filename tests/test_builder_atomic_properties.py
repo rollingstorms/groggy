@@ -303,7 +303,6 @@ def test_atomic_message_pass_respects_direction_and_order(direction, expected):
 @pytest.mark.parametrize("block", [
     block_step([body_node("where", ["a", "b"])]),
     block_step([], mode="streaming"),
-    block_step([], ordered=False),
     block_step([], direction="typo"),
     block_step([body_node("attach_node_attr", [])]),
 ])
@@ -475,3 +474,87 @@ def test_block_where_resolves_only_selected_value_and_rolls_back_errors(mask, ex
         assert graph.current_state_id == 2
         assert graph.get_node_attr(0, "answer") == expected
     assert graph.get_node_attr(0, "mask") == mask
+
+
+@pytest.mark.parametrize("atomic", [False, True])
+@pytest.mark.parametrize("ordered,expected", [(True, [0, 0, 0]), (False, [0, 1, 2])])
+def test_public_message_pass_distinguishes_ordered_and_synchronous_updates(atomic, ordered, expected):
+    graph = Graph(directed=True)
+    graph.add_nodes([{"score": 1}, {"score": 2}, {"score": 3}])
+    graph.add_edges([(0, 1), (1, 2)])
+    before = graph.current_state_id
+    builder = AlgorithmBuilder("message visibility")
+    values = builder.load_attr("score")
+    with builder.message_pass(target=values, ordered=ordered, include_self=False, direction="in") as messages:
+        messages.apply(builder.graph_ops.neighbor_agg(values, "sum"))
+    builder.attach_as("answer", values)
+    graph.view().apply(builder.build(atomic=atomic, optimize=False), persist=True)
+    assert [graph.get_node_attr(n, "answer") for n in range(3)] == expected
+    assert [graph.get_node_attr(n, "score") for n in range(3)] == [1, 2, 3]
+    assert graph.current_state_id == before + 1
+
+
+@pytest.mark.parametrize("direction,expected", [
+    ("in", [4, 2, 0]), ("out", [5, 0, 1]), ("undirected", [8, 2, 1]),
+])
+def test_synchronous_message_pass_counts_parallel_edges_and_self_loop_once(direction, expected):
+    graph = Graph(directed=True)
+    graph.add_nodes([{"score": 1}, {"score": 2}, {"score": 3}])
+    graph.add_edges([(0, 1), (0, 1), (0, 0), (2, 0)])
+    steps = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        block_step([body_node("neighbor_agg", ["values"], agg="sum")], direction=direction, ordered=False),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert [graph.get_node_attr(n, "answer") for n in range(3)] == expected
+
+
+def test_nested_synchronous_iterations_use_prior_staged_state_once_per_iteration():
+    graph = Graph(directed=True)
+    graph.add_nodes([{"score": 1}, {"score": 2}, {"score": 3}])
+    graph.add_edges([(0, 1), (1, 2)])
+    before = graph.current_state_id
+    body = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        block_step([body_node("neighbor_agg", ["values"], agg="sum")], ordered=False),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "score"}},
+    ]
+    graph.view().apply(AtomicSteps([loop_step(body, 2)]), persist=True)
+    assert [graph.get_node_attr(n, "score") for n in range(3)] == [0, 0, 1]
+    assert graph.current_state_id == before + 1
+
+
+def test_synchronous_block_late_node_failure_discards_prefix_and_partial_results():
+    graph = Graph()
+    graph.add_nodes([{"score": 1}, {"score": 2**63 - 1}])
+    steps = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "score"}},
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "prefix"}},
+        block_step([body_node("constant", [], "one", value=1),
+                    body_node("add", ["values", "one"])], ordered=False),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "answer"}},
+    ]
+    with pytest.raises(RuntimeError, match="Integer overflow"):
+        graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == 1
+    assert [graph.get_node_attr(n, "score") for n in range(2)] == [1, 2**63 - 1]
+    assert all(graph.get_node_attr(n, "prefix") is None for n in range(2))
+    assert all(graph.get_node_attr(n, "answer") is None for n in range(2))
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_empty_synchronous_body_preserves_values_and_empty_graph_creates_no_state(empty):
+    graph = Graph()
+    if not empty:
+        graph.add_node()
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "values", "value": "retained"}},
+        block_step([], ordered=False),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == before + (0 if empty else 1)
+    if not empty:
+        assert graph.get_node_attr(0, "answer") == "retained"

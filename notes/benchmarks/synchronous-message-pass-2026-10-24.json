@@ -1,0 +1,173 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "iterations": 5,
+      "mode": "fused",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.004346459,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003822833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003430708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003426084,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003053334,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "iterations": 5,
+      "mode": "message_pass",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.004694083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004656292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004682,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004351125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.004057833,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "iterations": 5,
+      "mode": "synchronous",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.004168416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003957417,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00388675,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003990334,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003879083,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "iterations": 5,
+      "mode": "fused",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.026508791,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.025258542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.025613,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.025172292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.025369958,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "iterations": 5,
+      "mode": "message_pass",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.041011708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.041823459,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.040993625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.040911333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.041036333,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "iterations": 5,
+      "mode": "synchronous",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.040223333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.040957125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.041650458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.041738958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.040972375,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release ring workloads; fixture and algorithm construction excluded; includes five iterations (synchronous mode uses buffered outputs), topology preparation, property staging and one publication. Five samples per case. No before/after speedup, FFI, RSS/allocation or production budget claim."
+}

@@ -110,7 +110,8 @@ class AlgorithmBuilder:
         Args:
             target: Variable being updated in this block
             include_self: Whether to include self-loops in neighbor aggregation
-            ordered: Whether to process nodes in order (Gauss-Seidel) or parallel (Jacobi)
+            ordered: True for Gauss-Seidel updates; False for synchronous Jacobi
+                updates from the block input (currently evaluated serially)
             name: Optional name for this block (for debugging/profiling)
             **options: Additional options (tie_break, direction, etc.)
 

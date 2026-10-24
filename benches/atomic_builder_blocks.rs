@@ -14,12 +14,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     register_algorithms(&registry)?;
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
-        for mode in ["fused", "message_pass"] {
+        for mode in ["fused", "message_pass", "synchronous"] {
             let operation = if mode == "fused" {
                 json!({"id":"graph.fused_neighbor_mul_agg","params":{"values":"values","scalars":"ones","target":"values","direction":"in"}})
             } else {
                 json!({"id":"core.execution_block","params":{
-                    "mode":"message_pass","target":"values","options":{"include_self":false,"direction":"in"},
+                    "mode":"message_pass","target":"values","options":{"include_self":false,"direction":"in","ordered":mode != "synchronous"},
                     "body":{"nodes":[{"id":"sum","domain":"core","op_type":"neighbor_agg","inputs":["values"],"output":"sum","metadata":{"agg":"sum"}}]}
                 }})
             };
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(
         &path,
         serde_json::to_vec_pretty(&json!({
-            "scope":"Native release ring workloads; fixture and algorithm construction excluded; includes five ordered iterations, topology preparation, property staging and one publication. Five samples per case. No before/after speedup, FFI, RSS/allocation or production budget claim.", "cases":cases
+            "scope":"Native release ring workloads; fixture and algorithm construction excluded; includes five iterations (synchronous mode uses buffered outputs), topology preparation, property staging and one publication. Five samples per case. No before/after speedup, FFI, RSS/allocation or production budget claim.", "cases":cases
         }))?,
     )?;
     println!("Wrote atomic block receipt to {path}");

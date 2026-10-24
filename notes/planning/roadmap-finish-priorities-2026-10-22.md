@@ -414,3 +414,14 @@ atomic run. This supersedes the previous placeholder-where gap. Existing numeric
 tolerance is preserved; synchronous/unordered execution, remaining step families,
 effect-aware optimization and atomic defaults remain parent work. Details and
 verification: `atomic-builder-conditionals-2026-10-24.md`.
+
+### Synchronous message passing — 2026-10-24
+
+Implemented 09.4b.2k: ordered=False now evaluates every node against fixed block
+input and installs buffered outputs after success. This is serial Jacobi, distinct
+from ordered Gauss-Seidel, and works in ordinary and atomic builders. Types, column
+order, selected topology and outer staging remain consistent. Later-node failures
+leave source variables intact and atomic runs discard prefix writes. Synchronous
+block semantics are no longer open; streaming and remaining unsupported families,
+optimizer effects and defaults remain parent work. Details and verification:
+`synchronous-message-pass-2026-10-24.md`.

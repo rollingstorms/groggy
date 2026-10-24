@@ -2,7 +2,7 @@
 //!
 //! This module implements the runtime execution of execution blocks created by the Python builder.
 //! Execution blocks encapsulate a sub-computation with special semantics like:
-//! - Message-pass: Gauss-Seidel style neighbor updates with in-place writes
+//! - Message-pass: ordered Gauss-Seidel or synchronous Jacobi neighbor updates
 //! - Streaming: Incremental/transactional updates (future)
 
 use anyhow::{anyhow, Result};
@@ -22,7 +22,7 @@ use super::direction::NeighborDirection;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionMode {
-    /// Message-passing / Gauss-Seidel: ordered node updates with in-place writes
+    /// Message-passing: ordered updates or synchronous updates from a fixed input
     MessagePass,
     /// Streaming: incremental/transactional updates (future)
     Streaming,
@@ -109,7 +109,7 @@ impl ExecutionBlockStep {
         })
     }
 
-    /// Execute message-pass mode (Gauss-Seidel style updates).
+    /// Execute message passing with ordered or synchronous visibility.
     fn execute_message_pass(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         // Get the target variable (what we're updating)
         // Remember the original storage type so we can preserve it
@@ -148,7 +148,7 @@ impl ExecutionBlockStep {
             .transpose()?
             .unwrap_or(NeighborDirection::In);
 
-        // Message-pass: iterate through nodes in order (Gauss-Seidel)
+        // Validate before evaluating either message-pass mode.
         let body = self.body()?;
 
         // Check if we can execute this block - detect unsupported operations early
@@ -190,8 +190,10 @@ impl ExecutionBlockStep {
             );
         }
 
-        // Gauss-Seidel updates use temporary values; property writes happen only
-        // through a later attachment step, sharing the outer run's overlay.
+        // Synchronous outputs stay separate so every node reads the original
+        // column. Ordered mode updates the local column after each node.
+        let mut pending = (!self.options.ordered).then(|| Vec::with_capacity(nodes.len()));
+        // Property writes happen only through a later attachment step.
         for (column_index, &node_id) in nodes.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("Execution block cancelled"));
@@ -224,8 +226,21 @@ impl ExecutionBlockStep {
                 self.evaluate_body_for_node(node_id, &neighbors, &node_column, body, ctx, scope)?
             };
 
-            // Update in-place
-            node_column.values_mut()[column_index] = update_value;
+            if let Some(outputs) = &mut pending {
+                outputs.push(update_value);
+            } else {
+                node_column.values_mut()[column_index] = update_value;
+            }
+        }
+        if ctx.is_cancelled() {
+            return Err(anyhow!(
+                "Execution block cancelled before installing results"
+            ));
+        }
+        if let Some(outputs) = pending {
+            for (slot, value) in node_column.values_mut().iter_mut().zip(outputs) {
+                *slot = value;
+            }
         }
 
         // Store updated values back using the original storage type
@@ -533,7 +548,6 @@ impl ExecutionBlockStep {
 impl Step for ExecutionBlockStep {
     fn supports_atomic_properties(&self) -> bool {
         matches!(self.mode, ExecutionMode::MessagePass)
-            && self.options.ordered
             && self
                 .options
                 .direction
@@ -831,6 +845,102 @@ mod atomic_tests {
         .is_err());
     }
 
+    fn chain_selection() -> crate::subgraphs::Subgraph {
+        use std::{cell::RefCell, rc::Rc};
+        let mut graph = crate::api::graph::Graph::new_directed();
+        graph.add_nodes(3);
+        graph.add_edge(0, 1).expect("edge");
+        graph.add_edge(1, 2).expect("edge");
+        crate::subgraphs::Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            [0, 1, 2].into_iter().collect(),
+            "chain".into(),
+        )
+        .expect("selection")
+    }
+
+    #[test]
+    fn synchronous_columns_keep_input_order_and_read_original_neighbors() {
+        use super::super::core::{NodeColumn, StepVariables};
+        let selection = chain_selection();
+        for order in [vec![0, 1, 2], vec![2, 0, 1]] {
+            let mut variables = StepVariables::default();
+            let values = order
+                .iter()
+                .map(|id| AlgorithmParamValue::Int(*id as i64 + 1))
+                .collect();
+            variables.set_node_column("values", NodeColumn::new(order.clone(), values));
+            let mut scope = StepScope::new(&selection, &mut variables);
+            let options = BlockOptions {
+                ordered: false,
+                include_self: false,
+                ..Default::default()
+            };
+            let step = ExecutionBlockStep::new(
+                ExecutionMode::MessagePass,
+                "values".into(),
+                options,
+                serde_json::json!({"nodes":[{"id":"sum","domain":"core","op_type":"neighbor_agg","inputs":["values"],"output":"sum","metadata":{"agg":"sum"}}]}),
+            );
+            step.apply(&mut Context::new(), &mut scope)
+                .expect("synchronous block");
+            let column = scope
+                .variables()
+                .node_column("values")
+                .expect("column retained");
+            assert_eq!(column.nodes(), order.as_slice());
+            for node in 0..3 {
+                assert_eq!(
+                    column.get(node),
+                    Some(&AlgorithmParamValue::Float(node as f64))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn failed_synchronous_block_leaves_original_variable_intact() {
+        use super::super::core::{NodeColumn, StepVariables};
+        let selection = chain_selection();
+        let mut variables = StepVariables::default();
+        let values = vec![
+            AlgorithmParamValue::Int(1),
+            AlgorithmParamValue::Int(i64::MAX),
+            AlgorithmParamValue::Int(3),
+        ];
+        variables.set_node_column("values", NodeColumn::new(vec![0, 1, 2], values.clone()));
+        let mut scope = StepScope::new(&selection, &mut variables);
+        let options = BlockOptions {
+            ordered: false,
+            ..Default::default()
+        };
+        let step = ExecutionBlockStep::new(
+            ExecutionMode::MessagePass,
+            "values".into(),
+            options,
+            serde_json::json!({"nodes":[
+                {"id":"one","domain":"core","op_type":"constant","inputs":[],"output":"one","metadata":{"value":1}},
+                {"id":"sum","domain":"core","op_type":"add","inputs":["values","one"],"output":"sum"}
+            ]}),
+        );
+        assert!(step
+            .apply(&mut Context::new(), &mut scope)
+            .expect_err("overflow")
+            .to_string()
+            .contains("overflow"));
+        let column = scope
+            .variables()
+            .node_column("values")
+            .expect("unchanged column");
+        assert_eq!(
+            column
+                .iter()
+                .map(|(_, value)| value.clone())
+                .collect::<Vec<_>>(),
+            values
+        );
+    }
+
     #[test]
     fn conditional_validation_checks_arity_and_comparison_operator() {
         let block = |nodes| {
@@ -894,7 +1004,7 @@ mod atomic_tests {
             ..Default::default()
         };
         assert!(
-            !ExecutionBlockStep::new(ExecutionMode::MessagePass, "x".into(), options, empty)
+            ExecutionBlockStep::new(ExecutionMode::MessagePass, "x".into(), options, empty)
                 .supports_atomic_properties()
         );
         for op in ["attach_node_attr", "unknown"] {

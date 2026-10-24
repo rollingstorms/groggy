@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **161 checked and 79 unchecked entries**. Entries overlap:
+currently contains **162 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -9,7 +9,7 @@ not a completion percentage or an estimate of remaining implementation effort.
 Count correction: the earlier summary omitted three already checked A* entries
 because its heading parser treated the literal asterisk as formatting. The earlier atomic-builder pass
 added two checked slices; three other entries were a counting correction. The
-nested-loop, fused/block and conditional extensions add three further checked slices. Counts now use checkbox markers independently of headings.
+nested-loop, fused/block, conditional and synchronous extensions add four further checked slices. Counts now use checkbox markers independently of headings.
 
 ## Recent completed slices
 
@@ -26,6 +26,7 @@ nested-loop, fused/block and conditional extensions add three further checked sl
 | 09.4b.2h | Nested property loops recursively validate descendants, share staged values across iterations and discard the whole run on failure. |
 | 09.4b.2i | Fused variable kernels and supported ordered message-pass blocks compose with atomic staging; options/direction and arithmetic errors are checked. |
 | 09.4b.2j | Conditional blocks honor compare/where semantics with shared masks, early input/operator validation and atomic rollback. |
+| 09.4b.2k | Synchronous message passing reads fixed block input and installs buffered outputs together, preserving column order and outer atomic staging. |
 
 
 
@@ -64,8 +65,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest conditional-block change: **941 native tests passed, 52 ignored; 1,126 root
-Python API tests passed, 1 skipped; 40 executable documentation examples passed;
+Latest synchronous-block change: **943 native tests passed, 52 ignored; 1,136 root
+Python API tests passed, 1 skipped; 41 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.
