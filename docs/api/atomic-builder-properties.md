@@ -51,7 +51,7 @@ custom or unmigrated steps cannot accidentally bypass the staging contract.
 Current supported families are initialization/counts, property loads/attachments,
 scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
 fused arithmetic/neighbor kernels, node degree and incident-weight sums,
-undirected triangle/k-core calculations, and
+undirected triangle/k-core calculations, property filtering and ordering, and
 ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
@@ -332,3 +332,61 @@ orients the simple projection by node ID and intersects forward lists, visiting
 each triangle once; dense workloads can still require cubic work. Temporary
 memory scales with selected topology plus node results. This is not a constant
 memory or production throughput guarantee.
+
+## Property filters, sorting and top-k
+
+`core.filter_nodes_by_attr`, `core.filter_edges_by_attr`,
+`core.sort_nodes_by_attr` and `core.top_k` now support atomic execution and nested
+loops. Property readers use the shared overlay; transient execution keeps reading
+the owner graph. Filters return sparse maps containing 1 for matching IDs. Sorting
+returns a rank for every selected node, and top-k returns ranks for at most k
+source IDs. These operations do not change the graph's selected topology or
+preserve original scores in their rank output. Attach explicitly to publish.
+
+```python
+class FilteringSteps(AlgorithmHandle):
+    @property
+    def id(self):
+        return "builder.step_pipeline"
+
+    def to_spec(self):
+        steps = [
+            {"id": "core.init_nodes", "params": {"target": "scores", "value": 10}},
+            {"id": "core.attach_node_attr", "params": {"source": "scores", "attr": "score"}},
+            {"id": "core.filter_nodes_by_attr", "params": {"attr": "score", "target": "mask", "predicate": {"type": "gt", "value": {"type": "Int", "value": 5}}}},
+            {"id": "core.top_k", "params": {"source": "scores", "target": "top", "k": 2}},
+            {"id": "core.attach_node_attr", "params": {"source": "mask", "attr": "selected"}},
+            {"id": "core.attach_node_attr", "params": {"source": "top", "attr": "rank"}},
+        ]
+        return {"id": self.id, "params": {"steps": AttrValue(json.dumps({"atomic": True, "steps": steps}))}}
+
+filter_graph = Graph()
+filter_graph.add_nodes([{"score": 2}, {"score": 0}, {"score": 1}])
+filter_before = filter_graph.current_state_id
+filter_graph.view().apply(FilteringSteps(), persist=True)
+assert [filter_graph.get_node_attr(n, "selected") for n in range(3)] == [1, 1, 1]
+assert [filter_graph.get_node_attr(n, "rank") for n in range(3)] == [0, 1, None]
+assert filter_graph.current_state_id == filter_before + 1
+```
+
+Predicates are decoded from their JSON payload, repairing the earlier tagged-wrapper
+failure. Eq/Ne retain typed equality; e.g. integer 1 differs from floating 1.0.
+Relational and range comparisons share the exact numeric comparator used by the
+numerical core, avoiding mixed integer/float rounding near 2**53. Missing properties
+do not match; present null can match an explicit None equality predicate. Other
+property types retain their existing predicate support; values that cannot be
+converted to step values do not match. Read errors propagate instead of silently
+becoming nonmatches. Reversed or NaN range bounds reject during preparation.
+
+Sort/top-k accept one comparable domain at a time: numeric scalars (including
+ordered infinities), text, or booleans. Missing/null sort last in either direction.
+NaNs, collections, unsupported property conversions and mixed domains reject
+rather than being treated as equal. Equal values use ascending entity ID as a
+stable tie-break in either direction. Source IDs must belong to the active selection.
+
+Ordering validates values before sorting. Cancellation is checked during reads,
+around sorting and before installing results; comparison sorting itself is not
+interruptible. Failure leaves existing result variables intact and atomic runs
+discard earlier staged writes. Sort/top-k still perform a full O(n log n) sort;
+no heap-selection optimization is claimed. Statistical and neighbor aggregation
+families remain uncertified pending their own review.

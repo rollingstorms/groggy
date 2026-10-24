@@ -447,3 +447,13 @@ definitions are implemented; prior directed behavior was inconsistent. This
 supersedes the undirected triangle/k-core migration gap, while directed support
 and remaining execution-boundary parent work remain open. Details and evidence:
 `atomic-triangle-core-steps-2026-10-24.md`.
+
+### Atomic property filtering and ordering — 2026-10-24
+
+Implemented 09.4b.2n: node/edge predicate filtering, property sorting and top-k now
+support staged reads and atomic loops. Predicate payload decoding and range
+validation are repaired; read errors propagate. Sorting uses exact numeric order,
+ID ties, null/absent-last behavior and explicit incomparable-domain/NaN rejection.
+Sparse masks and rank-map outputs are preserved. Statistical/neighbor aggregation
+review remains next; other execution-boundary parent work stays open. Details,
+compatibility notes and evidence: `atomic-filtering-builder-steps-2026-10-24.md`.

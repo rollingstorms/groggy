@@ -1217,10 +1217,14 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get("predicate")
                 .ok_or_else(|| anyhow!("'predicate' parameter is required"))?;
-            let json_value = serde_json::to_value(pred_value)
-                .map_err(|e| anyhow!("failed to convert predicate to JSON: {}", e))?;
+            let json_value = match pred_value {
+                AlgorithmParamValue::Json(value) => value.clone(),
+                other => serde_json::to_value(other)
+                    .map_err(|e| anyhow!("failed to convert predicate to JSON: {}", e))?,
+            };
             let predicate: Predicate = serde_json::from_value(json_value)
                 .map_err(|e| anyhow!("failed to parse predicate: {}", e))?;
+            predicate.validate()?;
 
             Ok(Box::new(FilterNodesByAttrStep::new(
                 attr, predicate, target,
@@ -1244,10 +1248,14 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get("predicate")
                 .ok_or_else(|| anyhow!("'predicate' parameter is required"))?;
-            let json_value = serde_json::to_value(pred_value)
-                .map_err(|e| anyhow!("failed to convert predicate to JSON: {}", e))?;
+            let json_value = match pred_value {
+                AlgorithmParamValue::Json(value) => value.clone(),
+                other => serde_json::to_value(other)
+                    .map_err(|e| anyhow!("failed to convert predicate to JSON: {}", e))?,
+            };
             let predicate: Predicate = serde_json::from_value(json_value)
                 .map_err(|e| anyhow!("failed to parse predicate: {}", e))?;
+            predicate.validate()?;
 
             Ok(Box::new(FilterEdgesByAttrStep::new(
                 attr, predicate, target,

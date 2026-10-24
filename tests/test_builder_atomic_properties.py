@@ -748,3 +748,106 @@ def test_empty_structural_step_creates_no_state(kernel, params):
     ]
     graph.view().apply(AtomicSteps(steps), persist=True)
     assert graph.current_state_id == 0
+
+
+def predicate(operation, value, kind="Int"):
+    return {"type": operation, "value": {"type": kind, "value": value}}
+
+
+@pytest.mark.parametrize("persist", [False, True])
+def test_property_filters_and_sort_read_staged_values_without_changing_selection(persist):
+    graph = Graph()
+    graph.add_nodes([{"score": 3}, {"score": 2}, {"score": 1}])
+    graph.add_edges([(0, 1), (1, 2)])
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "n", "value": 10}},
+        {"id": "core.attach_node_attr", "params": {"source": "n", "attr": "score"}},
+        {"id": "core.init_edges", "params": {"target": "e", "value": 10}},
+        {"id": "core.attach_edge_attr", "params": {"source": "e", "attr": "score"}},
+        {"id": "core.filter_nodes_by_attr", "params": {"attr": "score", "predicate": predicate("gt", 5), "target": "nodes"}},
+        {"id": "core.filter_edges_by_attr", "params": {"attr": "score", "predicate": predicate("gt", 5), "target": "edges"}},
+        {"id": "core.sort_nodes_by_attr", "params": {"attr": "score", "order": "asc", "target": "ranks"}},
+        {"id": "core.attach_node_attr", "params": {"source": "nodes", "attr": "selected"}},
+        {"id": "core.attach_edge_attr", "params": {"source": "edges", "attr": "selected"}},
+        {"id": "core.attach_node_attr", "params": {"source": "ranks", "attr": "rank"}},
+    ]
+    _, profile = graph.view().apply(AtomicSteps([loop_step(steps, 2)]), persist=persist, return_profile=True)
+    if persist:
+        assert [graph.get_node_attr(n, "selected") for n in range(3)] == [1, 1, 1]
+        assert [graph.get_edge_attr(e, "selected") for e in range(2)] == [1, 1]
+        assert [graph.get_node_attr(n, "rank") for n in range(3)] == [0, 1, 2]
+    else:
+        assert profile["outputs"]["node_attributes.selected"] == []
+        assert profile["outputs"]["edge_attributes.selected"] == []
+        assert dict(profile["outputs"]["node_attributes.rank"]) == {0: 2, 1: 1, 2: 0}
+    assert graph.current_state_id == before + int(persist)
+    assert graph.node_count() == 3
+    assert graph.edge_count() == 2
+
+
+@pytest.mark.parametrize("order,expected", [("asc", [1, 2, 0, 3]), ("desc", [0, 2, 1, 3])])
+def test_sort_ranks_put_absent_and_null_last_with_id_ties(order, expected):
+    graph = Graph()
+    graph.add_nodes([{"score": 2}, {"score": None}, {"score": 1}, {}])
+    steps = [
+        {"id": "core.sort_nodes_by_attr", "params": {"attr": "score", "order": order, "target": "ranks"}},
+        {"id": "core.attach_node_attr", "params": {"source": "ranks", "attr": "rank"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert [graph.get_node_attr(n, "rank") for n in range(4)] == expected
+
+
+def test_exact_top_k_and_range_preserve_large_integer_float_order():
+    graph = Graph()
+    base = 2**53
+    graph.add_nodes([{"score": base + 1}, {"score": float(base)}, {"score": base + 2}, {"score": float(base)}])
+    steps = [
+        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "values"}},
+        {"id": "core.top_k", "params": {"source": "values", "k": 3, "order": "asc", "target": "top"}},
+        {"id": "core.filter_nodes_by_attr", "params": {"attr": "score", "predicate": {"type": "range", "min": float(base), "max": float(base)}, "target": "equal"}},
+        {"id": "core.attach_node_attr", "params": {"source": "top", "attr": "rank"}},
+        {"id": "core.attach_node_attr", "params": {"source": "equal", "attr": "equal"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert [graph.get_node_attr(n, "rank") for n in range(4)] == [2, 0, None, 1]
+    assert [graph.get_node_attr(n, "equal") for n in range(4)] == [None, 1, None, 1]
+
+
+@pytest.mark.parametrize("kernel", ["core.sort_nodes_by_attr", "core.top_k"])
+@pytest.mark.parametrize("values", [[1, "two"], [1, True], [[1], [2]], [float("nan"), 1]])
+def test_invalid_ordering_discards_prefix_without_inventing_equal_values(kernel, values):
+    graph = Graph()
+    graph.add_nodes([{"score": value} for value in values])
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "n", "value": 1}},
+        {"id": "core.attach_node_attr", "params": {"source": "n", "attr": "prefix"}},
+        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "values"}},
+        {"id": kernel, "params": {"attr": "score", "source": "values", "k": 2, "target": "result"}},
+    ]
+    with pytest.raises(RuntimeError, match="Ordering"):
+        graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "prefix") is None
+
+
+def test_null_filter_distinguishes_absent_and_present_null_and_returns_sparse_mask():
+    graph = Graph()
+    graph.add_nodes([{}, {"score": None}, {"score": 1}])
+    steps = [
+        {"id": "core.filter_nodes_by_attr", "params": {"attr": "score", "predicate": {"type": "eq", "value": {"type": "None"}}, "target": "mask"}},
+        {"id": "core.attach_node_attr", "params": {"source": "mask", "attr": "selected"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert [graph.get_node_attr(n, "selected") for n in range(3)] == [None, 1, None]
+
+
+def test_reversed_range_rejects_before_prefix_execution():
+    graph = Graph()
+    graph.add_node(score=0)
+    with pytest.raises(RuntimeError, match="range requires ordered"):
+        graph.view().apply(AtomicSteps(increment_body() + [
+            {"id": "core.filter_nodes_by_attr", "params": {"attr": "score", "target": "mask", "predicate": {"type": "range", "min": 2, "max": 1}}},
+        ]), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "score") == 0

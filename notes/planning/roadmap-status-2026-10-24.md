@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **164 checked and 79 unchecked entries**. Entries overlap:
+currently contains **165 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -9,7 +9,7 @@ not a completion percentage or an estimate of remaining implementation effort.
 Count correction: the earlier summary omitted three already checked A* entries
 because its heading parser treated the literal asterisk as formatting. The earlier atomic-builder pass
 added two checked slices; three other entries were a counting correction. The
-nested-loop, fused/block, conditional, synchronous and two structural extensions add six further checked slices. Counts now use checkbox markers independently of headings.
+nested-loop, fused/block, conditional, synchronous, two structural and filtering extensions add seven further checked slices. Counts now use checkbox markers independently of headings.
 
 ## Recent completed slices
 
@@ -29,6 +29,7 @@ nested-loop, fused/block, conditional, synchronous and two structural extensions
 | 09.4b.2k | Synchronous message passing reads fixed block input and installs buffered outputs together, preserving column order and outer atomic staging. |
 | 09.4b.2l | Degree and incident-weight primitives honor selected topology, staged weights and checked input/output rules. |
 | 09.4b.2m | Undirected triangle and k-core primitives use checked selected topology, corrected counting/peeling and atomic staging; directed variants reject explicitly. |
+| 09.4b.2n | Property filters and ordering honor staged values, exact numeric order, deterministic ties and explicit validation. |
 
 
 
@@ -67,8 +68,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest triangle/core-builder change: **947 native tests passed, 52 ignored; 1,172 root
-Python API tests passed, 1 skipped; 43 executable documentation examples passed;
+Latest filtering-builder change: **950 native tests passed, 52 ignored; 1,187 root
+Python API tests passed, 1 skipped; 44 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.
