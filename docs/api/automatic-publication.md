@@ -88,7 +88,9 @@ compound algorithm/table writeback routines still need an audit. Explicit mapped
 [table property writeback](table-writeback.md) now accepts mixed selected columns
 as one checked batch; connected provenance and legacy materialization remain open. Mutable native
 pool/space escape hatches and the infallible Rust compatibility surface remain
-outside this step.
+outside this step. Native [subgraph bulk writes](subgraph-writes.md) now preserve
+complete inputs for owner validation, including algorithm output attachment;
+the all-edge convenience setter publishes one complete column.
 
 Automatic publication retains more mutation history than deferred writes.
 Prefer bulk operations for bulk workloads. The native receipt in

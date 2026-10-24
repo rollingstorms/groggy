@@ -739,7 +739,8 @@ pub trait SubgraphOperations: GraphEntity {
 
     // === BULK ATTRIBUTE OPERATIONS (OPTIMIZED) ===
 
-    /// Set node attributes in bulk using optimized vectorized operations
+    /// Set node attributes in bulk using the owner's whole-input validation.
+    /// Inactive, unknown and duplicate targets reject the entire operation.
     ///
     /// # Arguments
     /// * `attrs_values` - HashMap mapping attribute names to vectors of (NodeId, AttrValue) pairs
@@ -752,52 +753,19 @@ pub trait SubgraphOperations: GraphEntity {
     ) -> GraphResult<()> {
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
-
-        // Filter out nodes that no longer exist (e.g., removed during collapse workflows)
-        let mut filtered_attrs = HashMap::new();
-        for (attr_name, node_values) in attrs_values.into_iter() {
-            let filtered_values: Vec<(NodeId, AttrValue)> = node_values
-                .into_iter()
-                .filter(|(node_id, _)| graph.space().contains_node(*node_id))
-                .collect();
-
-            if !filtered_values.is_empty() {
-                filtered_attrs.insert(attr_name, filtered_values);
-            }
-        }
-
-        if filtered_attrs.is_empty() {
-            return Ok(());
-        }
-
-        graph.set_node_attrs(filtered_attrs)
+        graph.set_node_attrs(attrs_values)
     }
 
-    /// Optimized variant for setting a single node attribute column
+    /// Set a node column without dropping inactive or unknown targets.
+    /// The owner validates the entire input before writing any assignment.
     fn set_node_attr_column(
         &self,
         attr_name: AttrName,
         node_values: Vec<(NodeId, AttrValue)>,
     ) -> GraphResult<()> {
-        if node_values.is_empty() {
-            return Ok(());
-        }
-
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
-
-        // Filter out nodes that no longer exist
-        let filtered: Vec<(NodeId, AttrValue)> = node_values
-            .into_iter()
-            .filter(|(node_id, _)| graph.space().contains_node(*node_id))
-            .collect();
-
-        if filtered.is_empty() {
-            return Ok(());
-        }
-
-        graph.set_node_attr_column(attr_name, filtered)?;
-        Ok(())
+        graph.set_node_attr_column(attr_name, node_values)
     }
 
     /// Set edge attributes in bulk using optimized vectorized operations

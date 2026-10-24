@@ -79,3 +79,7 @@ harness = false
 [[bench]]
 name = "meta_composition"
 harness = false
+
+[[bench]]
+name = "subgraph_bulk_writes"
+harness = false

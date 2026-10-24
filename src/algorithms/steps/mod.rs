@@ -198,6 +198,54 @@ mod tests {
     }
 
     #[test]
+    fn attach_node_results_reject_removed_targets_in_map_and_column_paths() {
+        for column in [false, true] {
+            let mut graph = Graph::new_publishing();
+            graph.insert_nodes(2).expect("nodes");
+            let shared = Rc::new(RefCell::new(graph));
+            let selection =
+                Subgraph::from_nodes(shared.clone(), [0, 1].into_iter().collect(), "stale".into())
+                    .expect("selection");
+            shared.borrow_mut().remove_node(1).expect("deactivate");
+            let state = shared.borrow().current_state_id();
+            let mut vars = StepVariables::default();
+            if column {
+                vars.set_node_column(
+                    "scores",
+                    core::NodeColumn::new(
+                        vec![0, 1],
+                        vec![
+                            AlgorithmParamValue::Float(0.5),
+                            AlgorithmParamValue::Float(0.7),
+                        ],
+                    ),
+                );
+            } else {
+                vars.set_node_map(
+                    "scores",
+                    HashMap::from([
+                        (0, AlgorithmParamValue::Float(0.5)),
+                        (1, AlgorithmParamValue::Float(0.7)),
+                    ]),
+                );
+            }
+            let mut scope = StepScope::new(&selection, &mut vars);
+            let error = AttachNodeAttrStep::new("scores", "score".into())
+                .apply(&mut Context::new(), &mut scope)
+                .expect_err("inactive output target")
+                .to_string();
+            assert!(error.contains("score[1]: node 1"), "{error}");
+            let graph = shared.borrow();
+            assert_eq!(graph.current_state_id(), state);
+            assert!(!graph.has_uncommitted_changes());
+            assert_eq!(
+                graph.get_node_attr(0, &"score".into()).expect("score"),
+                None
+            );
+        }
+    }
+
+    #[test]
     fn attach_node_attr_persists_values() {
         let (sg, nodes) = sample_subgraph();
         let mut vars = StepVariables::default();

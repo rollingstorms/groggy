@@ -1107,3 +1107,13 @@ Null is explicit, omitted columns stay unchanged, and clock defaults/explicit
 times are shared by the batch. Source graph/pin propagation is not inferred;
 27.1, connected table views, legacy materialization, native compatibility and
 whole-pipeline boundaries remain open. See `table-writeback-2026-10-23.md`.
+
+## 2026-10-23 — whole-input subgraph write validation (09.4b.2d / 05.3a)
+
+Native subgraph node bulk/column setters now preserve all supplied rows for the
+owner validator. Inactive/unknown/duplicate targets reject the complete write,
+including both algorithm attachment representations. Native all-edge convenience
+writes stage one column, producing one accepted version with no per-edge partial
+publication. Manual compatibility and valid empty operations keep their existing
+behavior. See `subgraph-write-validation-2026-10-23.md`; broader native migration,
+pipeline boundaries and legacy table materialization remain open.

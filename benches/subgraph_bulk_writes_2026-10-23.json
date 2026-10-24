@@ -1,0 +1,129 @@
+{
+  "cases": [
+    {
+      "nodes": 1000,
+      "samples": [
+        {
+          "assignments": 1000,
+          "seconds": 0.001069,
+          "state_id": 3
+        },
+        {
+          "assignments": 1000,
+          "seconds": 0.001025125,
+          "state_id": 3
+        },
+        {
+          "assignments": 1000,
+          "seconds": 0.001021208,
+          "state_id": 3
+        },
+        {
+          "assignments": 1000,
+          "seconds": 0.001051375,
+          "state_id": 3
+        },
+        {
+          "assignments": 1000,
+          "seconds": 0.001039417,
+          "state_id": 3
+        }
+      ],
+      "workload": "node_bulk"
+    },
+    {
+      "nodes": 1000,
+      "samples": [
+        {
+          "assignments": 999,
+          "seconds": 0.001065208,
+          "state_id": 3
+        },
+        {
+          "assignments": 999,
+          "seconds": 0.001070042,
+          "state_id": 3
+        },
+        {
+          "assignments": 999,
+          "seconds": 0.001041875,
+          "state_id": 3
+        },
+        {
+          "assignments": 999,
+          "seconds": 0.001057417,
+          "state_id": 3
+        },
+        {
+          "assignments": 999,
+          "seconds": 0.001082417,
+          "state_id": 3
+        }
+      ],
+      "workload": "edge_bulk"
+    },
+    {
+      "nodes": 10000,
+      "samples": [
+        {
+          "assignments": 10000,
+          "seconds": 0.01135125,
+          "state_id": 3
+        },
+        {
+          "assignments": 10000,
+          "seconds": 0.01098825,
+          "state_id": 3
+        },
+        {
+          "assignments": 10000,
+          "seconds": 0.011030167,
+          "state_id": 3
+        },
+        {
+          "assignments": 10000,
+          "seconds": 0.010980416,
+          "state_id": 3
+        },
+        {
+          "assignments": 10000,
+          "seconds": 0.011056917,
+          "state_id": 3
+        }
+      ],
+      "workload": "node_bulk"
+    },
+    {
+      "nodes": 10000,
+      "samples": [
+        {
+          "assignments": 9999,
+          "seconds": 0.011668417,
+          "state_id": 3
+        },
+        {
+          "assignments": 9999,
+          "seconds": 0.011373292,
+          "state_id": 3
+        },
+        {
+          "assignments": 9999,
+          "seconds": 0.011264875,
+          "state_id": 3
+        },
+        {
+          "assignments": 9999,
+          "seconds": 0.011319208,
+          "state_id": 3
+        },
+        {
+          "assignments": 9999,
+          "seconds": 0.011327625,
+          "state_id": 3
+        }
+      ],
+      "workload": "edge_bulk"
+    }
+  ],
+  "scope": "Native release chain graph bulk property writes; fixture construction excluded. Five observations; verifies one accepted state and a typed result. No before/after speedup, FFI latency, allocation/RSS or production budget claim. Previous edge helper retained one version per edge, so its history semantics differ."
+}

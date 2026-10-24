@@ -898,13 +898,12 @@ impl Subgraph {
         attr_name: &AttrName,
         attr_value: AttrValue,
     ) -> GraphResult<()> {
-        let mut graph_borrow = self.graph.borrow_mut();
-
-        for &edge_id in self.edges.iter() {
-            graph_borrow.set_edge_attr(edge_id, attr_name.clone(), attr_value.clone())?;
-        }
-
-        Ok(())
+        let values = self
+            .edges
+            .iter()
+            .map(|&edge| (edge, attr_value.clone()))
+            .collect();
+        self.set_edge_attrs(HashMap::from([(attr_name.clone(), values)]))
     }
 
     // === STRUCTURAL METRICS ===
@@ -1696,6 +1695,156 @@ mod tests {
     use super::*;
     use crate::api::graph::Graph;
     use crate::types::AttrValue;
+
+    fn mutation_fixture(publishing: bool) -> (Rc<RefCell<Graph>>, Subgraph) {
+        let mut graph = if publishing {
+            Graph::new_publishing()
+        } else {
+            Graph::new()
+        };
+        graph.insert_nodes(3).expect("nodes");
+        graph.add_edges(&[(0, 1), (1, 2)]).expect("edges");
+        if !publishing {
+            graph
+                .commit("fixture".into(), "test".into())
+                .expect("initial state");
+        }
+        let shared = Rc::new(RefCell::new(graph));
+        let selection = Subgraph::from_nodes(
+            shared.clone(),
+            [0, 1, 2].into_iter().collect(),
+            "mutation".into(),
+        )
+        .expect("selection");
+        (shared, selection)
+    }
+
+    #[test]
+    fn node_bulk_and_column_reject_inactive_rows_without_partial_changes() {
+        for publishing in [false, true] {
+            let (shared, selection) = mutation_fixture(publishing);
+            shared.borrow_mut().remove_node(2).expect("deactivate");
+            if !publishing {
+                shared
+                    .borrow_mut()
+                    .commit("remove".into(), "test".into())
+                    .expect("publish removal");
+            }
+            let state = shared.borrow().current_state_id();
+            for column in [false, true] {
+                let values = vec![
+                    (0, AttrValue::Int(10)),
+                    (2, AttrValue::Int(20)),
+                    (0, AttrValue::Int(30)),
+                    (99, AttrValue::Int(40)),
+                ];
+                let error = if column {
+                    selection.set_node_attr_column("score".into(), values)
+                } else {
+                    selection.set_node_attrs(HashMap::from([
+                        ("score".into(), values),
+                        ("valid".into(), vec![(1, AttrValue::Int(50))]),
+                    ]))
+                }
+                .expect_err("whole operation must reject")
+                .to_string();
+                assert!(error.contains("score[1]: node 2"), "{error}");
+                assert!(error.contains("score[2]: duplicate node"), "{error}");
+                assert!(error.contains("score[3]: node 99"), "{error}");
+                let graph = shared.borrow();
+                assert_eq!(graph.current_state_id(), state);
+                assert!(!graph.has_uncommitted_changes());
+                assert_eq!(
+                    graph.get_node_attr(0, &"score".into()).expect("score"),
+                    None
+                );
+                assert_eq!(
+                    graph.get_node_attr(1, &"valid".into()).expect("valid"),
+                    None
+                );
+            }
+            assert!(selection
+                .set_node_attr_column("score".into(), vec![(2, AttrValue::Int(1))])
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn convenience_node_and_edge_writes_reject_stale_membership_as_a_whole() {
+        for publishing in [false, true] {
+            let (shared, selection) = mutation_fixture(publishing);
+            shared.borrow_mut().remove_node(2).expect("deactivate");
+            if !publishing {
+                shared
+                    .borrow_mut()
+                    .commit("remove".into(), "test".into())
+                    .expect("publish removal");
+            }
+            let state = shared.borrow().current_state_id();
+            assert!(selection
+                .set_node_attribute_bulk(&"x".into(), AttrValue::Int(1))
+                .is_err());
+            assert!(selection
+                .set_node_attributes_for_nodes(&[0, 2], &"x".into(), AttrValue::Int(1))
+                .is_err());
+            assert!(selection
+                .set_node_attributes_bulk(HashMap::from([
+                    ("x".into(), AttrValue::Int(1)),
+                    ("y".into(), AttrValue::Int(2))
+                ]))
+                .is_err());
+            assert!(selection
+                .set_edge_attribute_bulk(&"w".into(), AttrValue::Int(1))
+                .is_err());
+            let graph = shared.borrow();
+            assert_eq!(graph.get_node_attr(0, &"x".into()).expect("x"), None);
+            assert_eq!(graph.get_edge_attr(0, &"w".into()).expect("w"), None);
+            assert_eq!(graph.current_state_id(), state);
+            assert!(!graph.has_uncommitted_changes());
+        }
+    }
+
+    #[test]
+    fn valid_convenience_bulk_writes_accept_once_and_empty_writes_are_noops() {
+        let (shared, selection) = mutation_fixture(true);
+        let before = shared.borrow().current_state_id();
+        selection
+            .set_edge_attribute_bulk(&"w".into(), AttrValue::Int(7))
+            .expect("bulk edges");
+        assert_eq!(shared.borrow().current_state_id(), before + 1);
+        selection
+            .set_node_attributes_bulk(HashMap::from([
+                ("x".into(), AttrValue::Int(1)),
+                ("y".into(), AttrValue::Int(2)),
+            ]))
+            .expect("bulk columns");
+        assert_eq!(shared.borrow().current_state_id(), before + 2);
+        let graph = shared.borrow();
+        assert!(!graph.has_uncommitted_changes());
+        for edge in [0, 1] {
+            assert_eq!(
+                graph.get_edge_attr(edge, &"w".into()).expect("w"),
+                Some(AttrValue::Int(7))
+            );
+        }
+        drop(graph);
+        selection
+            .set_node_attrs(HashMap::new())
+            .expect("empty attributes");
+        selection
+            .set_node_attr_column("x".into(), Vec::new())
+            .expect("empty column");
+        let empty = Subgraph::new(
+            shared.clone(),
+            HashSet::new(),
+            HashSet::new(),
+            "empty".into(),
+        );
+        empty
+            .set_edge_attribute_bulk(&"w".into(), AttrValue::Int(8))
+            .expect("empty edges");
+        assert_eq!(shared.borrow().current_state_id(), before + 2);
+    }
 
     #[test]
     fn test_subgraph_creation() {
