@@ -42,7 +42,7 @@ def parse_expression(expr_str: str) -> Dict[str, Any]:
     expr_str = expr_str.strip()
 
     # Handle aggregation functions: sum(...), mean(...), mode(...)
-    agg_match = re.match(
+    agg_match = re.fullmatch(
         r"(sum|mean|mode|count)\s*\(\s*(.+)\s*\)", expr_str, re.IGNORECASE
     )
     if agg_match:
@@ -50,7 +50,7 @@ def parse_expression(expr_str: str) -> Dict[str, Any]:
         inner_expr = agg_match.group(2).strip()
 
         # Parse the inner expression
-        inner = _parse_inner_expression(inner_expr)
+        inner = parse_expression(inner_expr)
 
         return {"type": "call", "func": func_name, "args": [inner]}
 
@@ -63,7 +63,7 @@ def _parse_inner_expression(expr_str: str) -> Dict[str, Any]:
     expr_str = expr_str.strip()
 
     # Handle: var[neighbors(node)]
-    neighbor_val_match = re.match(
+    neighbor_val_match = re.fullmatch(
         r"(\w+)\s*\[\s*neighbors\s*\(\s*node\s*\)\s*\]", expr_str
     )
     if neighbor_val_match:
@@ -75,11 +75,11 @@ def _parse_inner_expression(expr_str: str) -> Dict[str, Any]:
         }
 
     # Handle: neighbors(node)
-    if re.match(r"neighbors\s*\(\s*node\s*\)", expr_str):
+    if re.fullmatch(r"neighbors\s*\(\s*node\s*\)", expr_str):
         return {"type": "call", "func": "neighbors", "args": []}
 
     # Handle arithmetic operations: var * 2, var + 1, etc.
-    arith_match = re.match(r"(\w+)\s*([+\-*/])\s*(\d+\.?\d*)", expr_str)
+    arith_match = re.fullmatch(r"(\w+)\s*([+\-*/])\s*(\d+\.?\d*)", expr_str)
     if arith_match:
         var_name = arith_match.group(1)
         op = arith_match.group(2)
@@ -91,19 +91,18 @@ def _parse_inner_expression(expr_str: str) -> Dict[str, Any]:
             "type": "binary_op",
             "op": op_map[op],
             "left": {"type": "var", "name": var_name},
-            "right": {"type": "const", "value": float(value)},
+            "right": {"type": "const", "value": float(value) if "." in value else int(value)},
         }
 
-    # Handle plain variable reference
-    if re.match(r"^\w+$", expr_str):
-        return {"type": "var", "name": expr_str}
-
-    # Handle constants
+    # Numeric literals precede identifiers and preserve integer precision.
     try:
-        value = float(expr_str)
+        value = float(expr_str) if any(c in expr_str.lower() for c in ".e") else int(expr_str)
         return {"type": "const", "value": value}
     except ValueError:
         pass
+
+    if re.fullmatch(r"[A-Za-z_]\w*", expr_str):
+        return {"type": "var", "name": expr_str}
 
     raise ValueError(f"Unable to parse expression: {expr_str}")
 

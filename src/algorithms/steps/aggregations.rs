@@ -52,7 +52,7 @@ fn float_result(value: f64) -> Result<AlgorithmParamValue> {
     }
     Ok(AlgorithmParamValue::Float(value))
 }
-fn accumulated(values: &[Value], mean: bool) -> Result<AlgorithmParamValue> {
+pub(super) fn accumulated(values: &[Value], mean: bool) -> Result<AlgorithmParamValue> {
     let mut sum = Dot::new();
     for value in values {
         let (hi, lo) = value.parts();

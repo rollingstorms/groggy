@@ -91,7 +91,7 @@ impl Predicate {
     }
 }
 
-fn compare_values(a: &AlgorithmParamValue, b: &AlgorithmParamValue) -> Option<Ordering> {
+pub(super) fn compare_values(a: &AlgorithmParamValue, b: &AlgorithmParamValue) -> Option<Ordering> {
     use AlgorithmParamValue as APV;
 
     match (a, b) {

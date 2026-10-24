@@ -52,7 +52,8 @@ Current supported families are initialization/counts, property loads/attachments
 scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
 fused arithmetic/neighbor kernels, node degree and incident-weight sums,
 undirected triangle/k-core calculations, property filtering and ordering, checked
-statistical/category/neighbor aggregations, and
+statistical/category/neighbor aggregations, declarative expression maps and
+neighbor/in-place label transformations, and
 ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
@@ -392,3 +393,5 @@ discard earlier staged writes. Sort/top-k still perform a full O(n log n) sort;
 no heap-selection optimization is claimed. Statistical and neighbor aggregations are now supported as described in
 [Checked builder aggregations](builder-aggregations.md), including the histogram
 ownership correction and the standalone/message-pass distinction.
+
+Expression and transformation semantics, examples and costs: [checked builder transformations](builder-transformations.md).

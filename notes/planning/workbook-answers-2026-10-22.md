@@ -288,3 +288,17 @@ Message-pass weighted/non-sum requests reject explicitly; broader execution pare
 remain partial. Verified with 953 native tests, 1,312 root Python tests, 48 doc
 examples, strict Clippy and 28 release workloads. Details and compatibility changes:
 `atomic-aggregation-builder-bundle-2026-10-24.md`.
+
+### Combined expression/transformation bundle — 2026-10-24
+
+Completed 09.4b.2r–2t together at the requested larger cadence: checked expression
+operators/literals and Python parsing parity; staged property reads and private
+async source overlays; deterministic selected neighbor label updates and checked
+sparse copies. Native callback errors propagate, but opaque callbacks remain
+uncertified. Preserve the public ExprContext shape and the distinct incidence
+versus unique-neighbor APIs. Scalar maps/copies avoid edge scans; async maps copy
+only their source column. Remaining community/sampling/temporal/path certification,
+optimizer effects, native escapes/default compatibility and outer transaction
+parents stay open. See `atomic-transformation-builder-bundle-2026-10-24.md` and
+`../../docs/api/builder-transformations.md` for details, compatibility changes,
+costs and verification evidence.

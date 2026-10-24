@@ -1,18 +1,74 @@
 //! Transformation step primitives that map values.
 
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
-use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::arithmetic::ModeTieBreak;
 use super::core::{Step, StepInput, StepMetadata, StepScope};
 use super::expression::{Expr, ExprContext};
+use super::filtering::compare_values;
+
+fn selected_nodes(subgraph: &crate::subgraphs::Subgraph, ctx: &Context) -> Result<Vec<NodeId>> {
+    if ctx.is_cancelled() {
+        return Err(anyhow!("transformation cancelled"));
+    }
+    let nodes = subgraph.ordered_nodes().to_vec();
+    let graph = subgraph.graph();
+    let graph = graph.borrow();
+    for &node in &nodes {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("transformation cancelled"));
+        }
+        if !graph.has_node(node) {
+            return Err(anyhow!("Transformation node {} is inactive", node));
+        }
+    }
+    Ok(nodes)
+}
+
+/// Checked selected outgoing adjacency; undirected edges contribute both ways,
+/// with a stored self-loop contributing once. Preserve parallel incidences.
+pub(super) fn selected_neighbors(
+    subgraph: &crate::subgraphs::Subgraph,
+    ctx: &Context,
+) -> Result<(Vec<NodeId>, HashMap<NodeId, Vec<NodeId>>)> {
+    let nodes = selected_nodes(subgraph, ctx)?;
+    let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
+    let graph = subgraph.graph();
+    let graph = graph.borrow();
+    for &edge in subgraph.ordered_edges().iter() {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("transformation cancelled"));
+        }
+        if !graph.has_edge(edge) {
+            return Err(anyhow!("Transformation edge {} is inactive", edge));
+        }
+        let (source, target) = graph.edge_endpoints(edge)?;
+        if !rows.contains_key(&source) || !rows.contains_key(&target) {
+            return Err(anyhow!(
+                "Transformation edge {} endpoint is outside selection",
+                edge
+            ));
+        }
+        rows.get_mut(&source)
+            .ok_or_else(|| anyhow!("Missing selected endpoint"))?
+            .push(target);
+        if graph.is_undirected() && source != target {
+            rows.get_mut(&target)
+                .ok_or_else(|| anyhow!("Missing selected endpoint"))?
+                .push(source);
+        }
+    }
+    for row in rows.values_mut() {
+        row.sort_unstable();
+    }
+    Ok((nodes, rows))
+}
 
 /// Callback trait for node-wise mapping steps.
 pub trait NodeMapFn: Send + Sync {
@@ -83,10 +139,10 @@ impl Step for MapNodesStep {
 
         let start = Instant::now();
 
-        let input_map = scope.variables().node_map(&self.source)?.clone();
+        scope.variables().node_map(&self.source)?;
 
         // STYLE_ALGO: Use ordered_nodes for determinism
-        let nodes = scope.subgraph().ordered_nodes();
+        let nodes = selected_nodes(scope.subgraph(), ctx)?;
         ctx.record_stat("map_nodes_callback.count.nodes", nodes.len() as f64);
 
         let mut result = HashMap::with_capacity(nodes.len());
@@ -102,16 +158,13 @@ impl Step for MapNodesStep {
                 return Err(anyhow!("map_nodes cancelled"));
             }
 
-            let value = if let Some(existing) = input_map.get(&node) {
-                self.mapper
-                    .map(node, &reader)
-                    .unwrap_or_else(|_| existing.clone())
-            } else {
-                self.mapper.map(node, &reader)?
-            };
+            let value = self.mapper.map(node, &reader)?;
             result.insert(node, value);
         }
 
+        if ctx.is_cancelled() {
+            return Err(anyhow!("map_nodes cancelled"));
+        }
         ctx.record_duration("map_nodes_callback.total", start.elapsed());
 
         scope
@@ -153,6 +206,10 @@ impl NeighborModeUpdateStep {
 }
 
 impl Step for NeighborModeUpdateStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.neighbor_mode_update"
     }
@@ -171,63 +228,12 @@ impl Step for NeighborModeUpdateStep {
             return Err(anyhow!("core.neighbor_mode_update cancelled"));
         }
 
-        let subgraph = scope.subgraph();
-        let nodes = subgraph.ordered_nodes();
-
-        // Determine if we need reverse edges (undirected graphs require bidirectional view).
-        let add_reverse = subgraph.graph().borrow().is_undirected();
-
-        // Reuse CSR cache where possible.
-        let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
-            cached
-        } else {
-            let mut csr = Csr::default();
-            let edges = subgraph.edges();
-
-            let mut node_to_idx = HashMap::new();
-            for (idx, &node_id) in nodes.iter().enumerate() {
-                node_to_idx.insert(node_id, idx);
-            }
-
-            {
-                let graph = subgraph.graph();
-                let graph_ref = graph.borrow();
-                let pool = graph_ref.pool();
-
-                let _build_time = build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid),
-                    CsrOptions {
-                        add_reverse_edges: add_reverse,
-                        sort_neighbors: false,
-                    },
-                );
-            }
-
-            let csr_arc = Arc::new(csr);
-            subgraph.csr_cache_store(add_reverse, csr_arc.clone());
-            csr_arc
-        };
-
-        // Map NodeId -> CSR index for quick lookup.
-        let mut node_to_idx = HashMap::new();
-        for (idx, &node_id) in nodes.iter().enumerate() {
-            node_to_idx.insert(node_id, idx);
-        }
-
-        // Determine iteration order before mutably borrowing variables.
-        let iteration_nodes: Vec<NodeId> = if self.ordered {
-            nodes.iter().copied().collect()
-        } else {
-            scope.node_ids().copied().collect()
-        };
-
-        #[allow(unused_mut)]
-        let mut target_map = scope.variables_mut().node_map_mut(&self.target)?;
-
+        let (nodes, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+        // Work privately: traversal remains asynchronous, but failures never install
+        // a partially updated variable. Both ordering modes use stable ID order.
+        let mut target_map = scope.variables().node_map(&self.target)?.clone();
+        let iteration_nodes = nodes;
+        let _ordered = self.ordered;
         let mut counts: HashMap<String, (usize, AlgorithmParamValue)> = HashMap::new();
         let mut order_keys: Vec<String> = Vec::new();
 
@@ -236,33 +242,30 @@ impl Step for NeighborModeUpdateStep {
                 return Err(anyhow!("core.neighbor_mode_update cancelled"));
             }
 
-            let Some(&csr_idx) = node_to_idx.get(&node_id) else {
-                continue;
-            };
-
             counts.clear();
             order_keys.clear();
 
             // Helper closure to insert value into counts map.
-            let mut record_value = |value: &AlgorithmParamValue| {
-                let key = format!("{:?}", value);
+            let mut record_value = |value: &AlgorithmParamValue| -> Result<()> {
+                super::expression::validate_value(value)?;
+                let key = serde_json::to_string(value)?;
                 order_keys.push(key.clone());
                 counts
                     .entry(key)
                     .and_modify(|(count, _)| *count += 1)
                     .or_insert((1, value.clone()));
+                Ok(())
             };
 
             if self.include_self {
                 if let Some(value) = target_map.get(&node_id) {
-                    record_value(value);
+                    record_value(value)?;
                 }
             }
 
-            for &nbr_idx in csr.neighbors(csr_idx) {
-                let neighbor_node = nodes[nbr_idx];
-                if let Some(value) = target_map.get(&neighbor_node) {
-                    record_value(value);
+            for neighbor_node in &neighbors[&node_id] {
+                if let Some(value) = target_map.get(neighbor_node) {
+                    record_value(value)?;
                 }
             }
 
@@ -278,6 +281,15 @@ impl Step for NeighborModeUpdateStep {
                 .map(|(key, (_, value))| (key.clone(), value.clone()))
                 .collect();
 
+            if !matches!(self.tie_break, ModeTieBreak::Keep) {
+                for (_, value) in &candidates {
+                    if compare_values(value, &candidates[0].1).is_none() {
+                        return Err(anyhow!(
+                            "Neighbor mode ties require comparable scalar labels"
+                        ));
+                    }
+                }
+            }
             let selected = match self.tie_break {
                 ModeTieBreak::Keep => {
                     let mut chosen: Option<AlgorithmParamValue> = None;
@@ -293,11 +305,19 @@ impl Step for NeighborModeUpdateStep {
                     chosen.unwrap_or_else(|| candidates[0].1.clone())
                 }
                 ModeTieBreak::Lowest => {
-                    candidates.sort_by(|(_, a), (_, b)| compare_values(a, b));
+                    candidates.sort_by(|(ak, a), (bk, b)| {
+                        compare_values(a, b)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| ak.cmp(bk))
+                    });
                     candidates[0].1.clone()
                 }
                 ModeTieBreak::Highest => {
-                    candidates.sort_by(|(_, a), (_, b)| compare_values(b, a));
+                    candidates.sort_by(|(ak, a), (bk, b)| {
+                        compare_values(b, a)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| ak.cmp(bk))
+                    });
                     candidates[0].1.clone()
                 }
             };
@@ -305,34 +325,21 @@ impl Step for NeighborModeUpdateStep {
             target_map.insert(node_id, selected);
         }
 
+        if ctx.is_cancelled() {
+            return Err(anyhow!("neighbor mode cancelled"));
+        }
         if let Some(output_var) = &self.output {
             if output_var != &self.target {
-                let final_map = target_map.clone();
                 scope
                     .variables_mut()
-                    .set_node_map(output_var.clone(), final_map);
+                    .set_node_map(output_var.clone(), target_map.clone());
             }
         }
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), target_map);
 
         Ok(())
-    }
-}
-
-fn compare_values(left: &AlgorithmParamValue, right: &AlgorithmParamValue) -> Ordering {
-    match (left, right) {
-        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Int(b)) => a.cmp(b),
-        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Float(b)) => {
-            a.partial_cmp(b).unwrap_or(Ordering::Equal)
-        }
-        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Float(b)) => {
-            (*a as f64).partial_cmp(b).unwrap_or(Ordering::Equal)
-        }
-        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Int(b)) => {
-            a.partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal)
-        }
-        (AlgorithmParamValue::Text(a), AlgorithmParamValue::Text(b)) => a.cmp(b),
-        (AlgorithmParamValue::Bool(a), AlgorithmParamValue::Bool(b)) => a.cmp(b),
-        _ => Ordering::Equal,
     }
 }
 
@@ -375,6 +382,10 @@ impl MapNodesExprStep {
 }
 
 impl Step for MapNodesExprStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.map_nodes"
     }
@@ -388,110 +399,77 @@ impl Step for MapNodesExprStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        use std::time::Instant;
-
-        let start = Instant::now();
-
-        // STYLE_ALGO: Use ordered_nodes for determinism
-        let nodes = scope.subgraph().ordered_nodes();
-        ctx.record_stat("map_nodes.count.nodes", nodes.len() as f64);
-
-        if self.async_update {
-            // Async/in-place update mode: update the source map as we iterate so subsequent
-            // nodes in the same pass observe the new values (matches native LPA semantics).
-            for &node in nodes.iter() {
-                if ctx.is_cancelled() {
-                    return Err(anyhow!("map_nodes cancelled"));
-                }
-
-                // Evaluate expression against the current variable state.
-                let new_value = {
-                    let vars_ref = scope.variables();
-                    let source_map = vars_ref.node_map(&self.source).map_err(|_| {
-                        anyhow!(
-                            "async_update requires source map '{}' to exist",
-                            self.source
-                        )
-                    })?;
-                    let current_value = source_map.get(&node);
-                    let step_input = StepInput {
-                        subgraph: scope.subgraph(),
-                        variables: vars_ref,
-                    };
-                    let expr_ctx = if let Some(value) = current_value {
-                        ExprContext::with_value(node, &step_input, value)
-                    } else {
-                        ExprContext::new(node, &step_input)
-                    };
-                    self.expr.eval(&expr_ctx)?
-                };
-
-                // Write the updated value back immediately.
-                {
-                    let vars_mut = scope.variables_mut();
-                    let source_map = vars_mut.node_map_mut(&self.source).map_err(|_| {
-                        anyhow!(
-                            "async_update requires source map '{}' to exist",
-                            self.source
-                        )
-                    })?;
-                    source_map.insert(node, new_value);
-                }
-            }
-
-            // Mirror the updated source map into the target variable for downstream steps.
-            let updated_map = scope.variables().node_map(&self.source)?.clone();
-            scope
-                .variables_mut()
-                .set_node_map(self.target.clone(), updated_map);
-
-            ctx.record_duration("map_nodes.total", start.elapsed());
+        let start = std::time::Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("map_nodes cancelled"));
+        }
+        let nodes = selected_nodes(scope.subgraph(), ctx)?;
+        let neighbors = if self.expr.needs_neighbors() {
+            Some(selected_neighbors(scope.subgraph(), ctx)?.1)
         } else {
-            // Standard synchronous mode: collect all results then write at end
-
-            // Try to get source map if it exists
-            let source_map = scope.variables().node_map(&self.source).ok();
-
-            // Pre-allocate result map
-            let mut result = HashMap::with_capacity(nodes.len());
-
-            // Prepare step input (reused across iterations)
-            let step_input = StepInput {
+            None
+        };
+        ctx.record_stat("map_nodes.count.nodes", nodes.len() as f64);
+        // Clone only the async source map once. Expressions resolve this local
+        // override while other variables remain borrowed from the original scope.
+        let mut working = if self.async_update {
+            Some(scope.variables().node_map(&self.source)?.clone())
+        } else {
+            None
+        };
+        let mut result = if self.async_update {
+            HashMap::new()
+        } else {
+            HashMap::with_capacity(nodes.len())
+        };
+        for node in nodes {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("map_nodes cancelled"));
+            }
+            let variables = scope.variables();
+            let input = StepInput {
                 subgraph: scope.subgraph(),
-                variables: scope.variables(),
+                variables,
             };
-
-            // STYLE_ALGO: Iterate over ordered nodes (cache-friendly, deterministic)
-            for &node in nodes.iter() {
-                // Check cancellation periodically
-                if ctx.is_cancelled() {
-                    return Err(anyhow!("map_nodes cancelled"));
-                }
-
-                // Create expression context
-                let expr_ctx = if let Some(map) = source_map {
-                    if let Some(value) = map.get(&node) {
-                        ExprContext::with_value(node, &step_input, value)
-                    } else {
-                        ExprContext::new(node, &step_input)
-                    }
-                } else {
-                    ExprContext::new(node, &step_input)
-                };
-
-                // Evaluate expression
-                let value = self.expr.eval(&expr_ctx)?;
+            let source_map = working
+                .as_ref()
+                .or_else(|| variables.node_map(&self.source).ok());
+            let value = source_map.and_then(|map| map.get(&node));
+            let expr_ctx = if let Some(value) = value {
+                ExprContext::with_value(node, &input, value)
+            } else {
+                ExprContext::new(node, &input)
+            };
+            let value = self.expr.eval_scoped(
+                &expr_ctx,
+                ctx.property_batch.as_ref(),
+                neighbors.as_ref().map(|rows| rows[&node].as_slice()),
+                working.as_ref().map(|map| (self.source.as_str(), map)),
+            )?;
+            if let Some(working) = &mut working {
+                working.insert(node, value);
+            } else {
                 result.insert(node, value);
             }
-
-            // Record timing
-            ctx.record_duration("map_nodes.total", start.elapsed());
-
+        }
+        if ctx.is_cancelled() {
+            return Err(anyhow!("map_nodes cancelled"));
+        }
+        if let Some(updated) = working {
+            if self.source != self.target {
+                scope
+                    .variables_mut()
+                    .set_node_map(self.source.clone(), updated.clone());
+            }
+            scope
+                .variables_mut()
+                .set_node_map(self.target.clone(), updated);
+        } else {
             scope
                 .variables_mut()
                 .set_node_map(self.target.clone(), result);
         }
-
+        ctx.record_duration("map_nodes.total", start.elapsed());
         Ok(())
     }
 }
@@ -541,6 +519,10 @@ impl UpdateInPlaceStep {
 }
 
 impl Step for UpdateInPlaceStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.update_in_place"
     }
@@ -563,24 +545,31 @@ impl Step for UpdateInPlaceStep {
         // Get source values (the new values to apply) - clone to avoid borrow issues
         let source_map = scope.variables().node_map(&self.source)?.clone();
 
-        // Determine node order
-        let nodes: Vec<NodeId> = if self.ordered {
-            // Sorted order for deterministic async updates
-            let mut node_ids: Vec<_> = source_map.keys().copied().collect();
-            node_ids.sort_unstable();
-            node_ids
-        } else {
-            // Arbitrary order (still deterministic per HashMap iteration)
-            source_map.keys().copied().collect()
-        };
-
-        // Get mutable access to target map and update in place
-        let target_map = scope.variables_mut().node_map_mut(&self.target)?;
+        let selected = selected_nodes(scope.subgraph(), ctx)?;
+        let selected: std::collections::HashSet<_> = selected.into_iter().collect();
+        if source_map.keys().any(|node| !selected.contains(node)) {
+            return Err(anyhow!(
+                "update_in_place source node is outside active selection"
+            ));
+        }
+        let mut nodes: Vec<_> = source_map.keys().copied().collect();
+        nodes.sort_unstable();
+        let _ordered = self.ordered;
+        let mut target_map = scope.variables().node_map(&self.target)?.clone();
         for node_id in nodes {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("update_in_place cancelled"));
+            }
             if let Some(new_value) = source_map.get(&node_id) {
                 target_map.insert(node_id, new_value.clone());
             }
         }
+        if ctx.is_cancelled() {
+            return Err(anyhow!("update_in_place cancelled"));
+        }
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), target_map);
 
         ctx.record_duration("update_in_place.total", start.elapsed());
 
@@ -595,5 +584,129 @@ impl Step for UpdateInPlaceStep {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        algorithms::steps::{expression::BinaryOp, StepVariables},
+        subgraphs::Subgraph,
+        Graph,
+    };
+    use std::{cell::RefCell, rc::Rc};
+
+    fn path() -> Subgraph {
+        let mut graph = Graph::new_undirected();
+        graph.add_nodes(3);
+        graph.add_edge(0, 1).expect("edge");
+        graph.add_edge(1, 2).expect("edge");
+        Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            (0..3).collect(),
+            "path".into(),
+        )
+        .expect("selection")
+    }
+
+    #[test]
+    fn asynchronous_expression_preserves_visibility_without_partial_install_on_error() {
+        let selection = path();
+        let original = HashMap::from([
+            (0, AlgorithmParamValue::Int(1)),
+            (1, AlgorithmParamValue::Int(2)),
+            (2, AlgorithmParamValue::Int(3)),
+        ]);
+        let expression = Expr::Call {
+            func: "sum".into(),
+            args: vec![Expr::Call {
+                func: "neighbor_values".into(),
+                args: vec![Expr::var("values")],
+            }],
+        };
+        for (asynchronous, expected) in [(false, [2, 4, 2]), (true, [2, 5, 5])] {
+            let mut vars = StepVariables::default();
+            vars.set_node_map("values", original.clone());
+            let mut scope = StepScope::new(&selection, &mut vars);
+            MapNodesExprStep::new("values", "result", expression.clone())
+                .with_async_update(asynchronous)
+                .apply(&mut Context::new(), &mut scope)
+                .expect("map");
+            for (node, expected) in expected.into_iter().enumerate() {
+                assert_eq!(
+                    scope.variables().node_map("result").expect("result")[&node],
+                    AlgorithmParamValue::Int(expected)
+                );
+            }
+        }
+        let mut vars = StepVariables::default();
+        vars.set_node_map("values", original.clone());
+        vars.set_node_map("result", original.clone());
+        let mut scope = StepScope::new(&selection, &mut vars);
+        let invalid = Expr::binary(
+            BinaryOp::Div,
+            Expr::constant(AlgorithmParamValue::Int(1)),
+            Expr::binary(
+                BinaryOp::Sub,
+                Expr::var("value"),
+                Expr::constant(AlgorithmParamValue::Int(2)),
+            ),
+        );
+        assert!(MapNodesExprStep::new("values", "result", invalid)
+            .with_async_update(true)
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+        assert_eq!(
+            scope.variables().node_map("values").expect("source"),
+            &original
+        );
+        assert_eq!(
+            scope.variables().node_map("result").expect("target"),
+            &original
+        );
+    }
+
+    #[test]
+    fn callbacks_propagate_errors_and_remain_uncertified() {
+        let selection = path();
+        let mut vars = StepVariables::default();
+        vars.set_node_map("values", HashMap::from([(0, AlgorithmParamValue::Int(1))]));
+        let mut scope = StepScope::new(&selection, &mut vars);
+        let callback: Arc<dyn NodeMapFn> =
+            Arc::new(|_: NodeId, _: &StepInput<'_>| Err(anyhow!("callback failed")));
+        let step = MapNodesStep::new("values", "result", callback);
+        assert!(!step.supports_atomic_properties());
+        assert!(step.apply(&mut Context::new(), &mut scope).is_err());
+        assert!(scope.variables().node_map("result").is_err());
+    }
+
+    #[test]
+    fn cancellation_and_foreign_update_sources_leave_variables_unchanged() {
+        let selection = path();
+        let mut vars = StepVariables::default();
+        let original = HashMap::from([(0, AlgorithmParamValue::Int(7))]);
+        vars.set_node_map("values", original.clone());
+        vars.set_node_map(
+            "foreign",
+            HashMap::from([(99, AlgorithmParamValue::Int(9))]),
+        );
+        let mut scope = StepScope::new(&selection, &mut vars);
+        assert!(
+            UpdateInPlaceStep::new("foreign".into(), "values".into(), false)
+                .apply(&mut Context::new(), &mut scope)
+                .is_err()
+        );
+        let mut ctx =
+            Context::with_cancel_token(Arc::new(std::sync::atomic::AtomicBool::new(true)));
+        assert!(
+            NeighborModeUpdateStep::new("values", true, ModeTieBreak::Lowest, true)
+                .apply(&mut ctx, &mut scope)
+                .is_err()
+        );
+        assert_eq!(
+            scope.variables().node_map("values").expect("source"),
+            &original
+        );
     }
 }

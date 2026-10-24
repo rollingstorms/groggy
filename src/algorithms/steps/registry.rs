@@ -630,9 +630,17 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .ok_or_else(|| anyhow!("core.update_in_place requires 'target' param"))?
                 .to_string();
 
-            let ordered = spec.params.get_bool("ordered").unwrap_or(false);
+            let ordered = if spec.params.get("ordered").is_some() {
+                spec.params.expect_bool("ordered")?
+            } else {
+                false
+            };
 
-            let output = spec.params.get_text("output").map(|s| s.to_string());
+            let output = if spec.params.get("output").is_some() {
+                Some(spec.params.expect_text("output")?.to_string())
+            } else {
+                None
+            };
 
             let mut step = super::transformations::UpdateInPlaceStep::new(source, target, ordered);
 
@@ -659,21 +667,33 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .ok_or_else(|| anyhow!("core.neighbor_mode_update requires 'target' param"))?
                 .to_string();
 
-            let include_self = spec.params.get_bool("include_self").unwrap_or(true);
+            let include_self = if spec.params.get("include_self").is_some() {
+                spec.params.expect_bool("include_self")?
+            } else {
+                true
+            };
 
-            let tie_break = spec
-                .params
-                .get_text("tie_break")
-                .map(|s| match s {
+            let tie_break = match spec.params.get("tie_break") {
+                None => super::arithmetic::ModeTieBreak::Lowest,
+                Some(_) => match spec.params.expect_text("tie_break")? {
+                    "lowest" => super::arithmetic::ModeTieBreak::Lowest,
                     "highest" => super::arithmetic::ModeTieBreak::Highest,
                     "keep" => super::arithmetic::ModeTieBreak::Keep,
-                    _ => super::arithmetic::ModeTieBreak::Lowest,
-                })
-                .unwrap_or(super::arithmetic::ModeTieBreak::Lowest);
+                    other => return Err(anyhow!("unknown neighbor mode tie_break: {}", other)),
+                },
+            };
 
-            let ordered = spec.params.get_bool("ordered").unwrap_or(false);
+            let ordered = if spec.params.get("ordered").is_some() {
+                spec.params.expect_bool("ordered")?
+            } else {
+                false
+            };
 
-            let output = spec.params.get_text("output").map(|s| s.to_string());
+            let output = if spec.params.get("output").is_some() {
+                Some(spec.params.expect_text("output")?.to_string())
+            } else {
+                None
+            };
 
             let step = super::transformations::NeighborModeUpdateStep::new(
                 target.clone(),
@@ -1201,7 +1221,11 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .map_err(|e| anyhow!("failed to parse expression: {}", e))?;
 
             // Check for async_update flag
-            let async_update = spec.params.get_bool("async_update").unwrap_or(false);
+            let async_update = if spec.params.get("async_update").is_some() {
+                spec.params.expect_bool("async_update")?
+            } else {
+                false
+            };
 
             let step = MapNodesExprStep::new(source, target, expr).with_async_update(async_update);
 
