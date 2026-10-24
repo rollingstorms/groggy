@@ -101,6 +101,32 @@ fn structured_property(value: &PyAny) -> PyResult<RustAttrValue> {
     Ok(RustAttrValue::Json(json.extract()?))
 }
 
+/// Preserve an explicitly typed NumPy float32 scalar/array without importing NumPy.
+fn numpy_float32(value: &PyAny) -> bool {
+    if value.is_instance_of::<pyo3::types::PyFloat>()
+        || value.is_instance_of::<pyo3::types::PyList>()
+        || value.is_instance_of::<pyo3::types::PyTuple>()
+    {
+        return false;
+    }
+    let kind = value.get_type();
+    let numpy = kind
+        .getattr("__module__")
+        .and_then(|v| v.extract::<String>())
+        .is_ok_and(|v| v == "numpy");
+    if !numpy {
+        return false;
+    }
+    kind.getattr("__name__")
+        .and_then(|v| v.extract::<String>())
+        .is_ok_and(|v| v == "float32")
+        || value
+            .getattr("dtype")
+            .and_then(|v| v.getattr("name"))
+            .and_then(|v| v.extract::<String>())
+            .is_ok_and(|v| v == "float32")
+}
+
 /// One translation policy shared by constructors, graph writers and table adapters.
 /// Homogeneous lists retain their element type; heterogeneous containers use Json.
 pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
@@ -131,7 +157,11 @@ pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
     }
     if let Ok(items) = value.extract::<Vec<&PyAny>>() {
         if items.is_empty() {
-            return Ok(RustAttrValue::FloatVec(Vec::new()));
+            return Ok(if numpy_float32(value) {
+                RustAttrValue::FloatVec(Vec::new())
+            } else {
+                RustAttrValue::Float64Vec(Vec::new())
+            });
         }
         if items.iter().all(|item| item.is_instance_of::<PyBool>()) {
             return Ok(RustAttrValue::BoolVec(
@@ -164,10 +194,18 @@ pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
             .iter()
             .all(|item| !item.is_instance_of::<PyBool>() && item.extract::<f64>().is_ok())
         {
-            return Ok(RustAttrValue::FloatVec(
+            if numpy_float32(value) || items.iter().all(|item| numpy_float32(item)) {
+                return Ok(RustAttrValue::FloatVec(
+                    items
+                        .iter()
+                        .map(|item| item.extract::<f32>())
+                        .collect::<PyResult<_>>()?,
+                ));
+            }
+            return Ok(RustAttrValue::Float64Vec(
                 items
                     .iter()
-                    .map(|item| item.extract::<f64>().map(|value| value as f32))
+                    .map(|item| item.extract::<f64>())
                     .collect::<PyResult<_>>()?,
             ));
         }
@@ -177,7 +215,11 @@ pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
         return Ok(RustAttrValue::Int(value.extract()?));
     }
     if let Ok(number) = value.extract::<f64>() {
-        return Ok(RustAttrValue::Float(number as f32));
+        return Ok(if numpy_float32(value) {
+            RustAttrValue::Float(number as f32)
+        } else {
+            RustAttrValue::Float64(number)
+        });
     }
     structured_property(value)
 }

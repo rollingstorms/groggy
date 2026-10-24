@@ -56,7 +56,6 @@ fn algorithm_params_from_python(
     input: &PyAny,
 ) -> PyResult<HashMap<String, groggy::algorithms::AlgorithmParamValue>> {
     use groggy::algorithms::AlgorithmParamValue as Param;
-    use groggy::types::AttrValue as Attr;
     let mut params = HashMap::new();
     if input.is_none() {
         return Ok(params);
@@ -68,27 +67,7 @@ fn algorithm_params_from_python(
             continue;
         }
         let value: PyAttrValue = raw.extract()?;
-        let param = match value.inner {
-            Attr::Int(v) => Param::Int(v),
-            Attr::SmallInt(v) => Param::Int(v as i64),
-            Attr::Float(v) => Param::Float(v as f64),
-            Attr::Bool(v) => Param::Bool(v),
-            Attr::Text(v) => Param::Text(v),
-            Attr::CompactText(v) => Param::Text(v.as_str().to_string()),
-            Attr::CompressedText(v) => v.decompress_text().map(Param::Text).unwrap_or(Param::None),
-            Attr::IntVec(v) => Param::IntList(v),
-            Attr::FloatVec(v) => Param::FloatList(v.into_iter().map(|x| x as f64).collect()),
-            Attr::CompressedFloatVec(v) => v
-                .decompress_float_vec()
-                .map(|values| Param::FloatList(values.into_iter().map(|x| x as f64).collect()))
-                .unwrap_or(Param::None),
-            Attr::BoolVec(v) => Param::BoolList(v),
-            Attr::TextVec(v) => Param::TextList(v),
-            Attr::Json(v) => serde_json::from_str(&v)
-                .map(Param::Json)
-                .unwrap_or(Param::None),
-            _ => Param::None,
-        };
+        let param = Param::from_attr_value(value.inner).unwrap_or(Param::None);
         params.insert(key, param);
     }
     Ok(params)

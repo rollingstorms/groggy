@@ -17,9 +17,11 @@ def test_scalar_algorithm_configuration_keeps_python_float_precision(resolution)
     assert graph.get_node_attr(a, "community") is not None
 
 
-def test_explicit_property_wrapped_parameters_remain_supported():
+@pytest.mark.parametrize("resolution", [1e-300, 1e100, 1.0000000000000002,
+                                        _groggy.AttrValue.float32(1)])
+def test_explicit_property_wrapped_parameters_remain_supported(resolution):
     algo = algorithms.algorithm(
-        "community.louvain", resolution=_groggy.AttrValue(1.0),
+        "community.louvain", resolution=_groggy.AttrValue(resolution),
         max_iter=_groggy.AttrValue(20),
     )
     assert algo.validate()

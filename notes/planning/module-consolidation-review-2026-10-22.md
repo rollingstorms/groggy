@@ -266,3 +266,18 @@ typed equality. Complete-input validation rejects malformed/overflowing tokens,
 incomplete strings and trailing input. Live/frozen node and edge filters share
 the parser without changing property identity or numeric ordering. See
 `graph-query-literals-2026-10-23.md`; broader AR7.7 and defaults remain open.
+
+## 2026-10-23 — f64 consumer/default completion (07.3a.2i–3)
+
+Ordinary Python floats and numeric float collections now default to f64. Explicit
+f32 constructors/NumPy float32 inputs and old tagged f32 data retain their width.
+Remaining supported consumers delegate to checked native kernels; wrapped
+algorithm parameters now share the native converter. Empty labels and table
+schema families handle both widths. Direct/bulk writes, history/export/journal
+recovery and old-format reads are covered. Root API baseline: 976 passed, one
+existing skip; full native suites, strict all-target Clippy and 22 documentation
+examples passed. See `float64-defaults-2026-10-23.md` for scope and evidence.
+
+07.3a is complete. Next is 07.3b native UTC instant/date/duration; the wider 07.3
+property-format parent, publication migration and legacy immutable-view work stay
+open. Earlier dated default-migration gates above record intermediate states.

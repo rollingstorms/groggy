@@ -38,5 +38,5 @@ assert view.filter_nodes("x >= 1E+300").node_ids == [b]
 ```
 
 This is a graph literal/validation migration, not completion of AR7.7 parser or
-compiled query planning unification. Ordinary Python property float defaults
-have not switched yet; old typed f32 stored values remain unchanged.
+compiled query planning unification. Ordinary Python property floats now default
+to f64; old typed f32 stored values remain unchanged.

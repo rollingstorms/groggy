@@ -1,4 +1,4 @@
-"""BaseArray reduction references use exact rationals over stored i64/f32 values."""
+"""BaseArray reduction references use exact rationals over stored i64/f64 values."""
 from fractions import Fraction
 from itertools import permutations
 import math
@@ -10,7 +10,7 @@ from groggy import AttrValue, BaseArray
 
 
 def stored(values):
-    return [float(np.float32(value)) if isinstance(value, float) else value for value in values]
+    return [float(value) if isinstance(value, float) else value for value in values]
 
 
 def exact(values):
@@ -23,12 +23,13 @@ def exact(values):
     [2**63 - 1, -(float(2**63)), 2],
     [1e20, 1.0, -1e20],
     [2**63 - 1, 1, 0.0],
+    [1 + 2**-40, 1e-100],
 ])
 def test_sum_and_mean_keep_cancellation_independent_of_input_order(values):
     for order in permutations(values):
         array = BaseArray(list(order))
         total = sum(exact(order))
-        expected_sum = float(np.float32(float(total))) if any(isinstance(x, float) for x in order) else int(total)
+        expected_sum = float(total) if any(isinstance(x, float) for x in order) else int(total)
         assert array.sum() == expected_sum
         assert array.mean() == float(total / len(order))
 

@@ -1,7 +1,6 @@
-# f64 property representation: foundation
+# f64 property representation
 
-This is the first implementation slice of checklist 07.3a. Native properties now
-have distinct `AttrValue::Float64(f64)` and `Float64Vec(Vec<f64>)` variants. The
+Native properties have distinct `AttrValue::Float64(f64)` and `Float64Vec(Vec<f64>)` variants. The
 existing `Float(f32)`, `FloatVec(Vec<f32>)` and compressed f32 variants retain
 their types. New variants are appended to the public enum, retaining old variant
 indices. Width changes remain visible as typed property changes.
@@ -21,10 +20,9 @@ assert graph.get_node_attr(node, "embedding") == [precise, 1e300]
 
 The explicit Python constructors retain the original f64 values. Historical
 snapshots report `float64`/`float64_vec` type names. The legacy `float_vec`
-constructor continues to request f32 explicitly. Ordinary Python float/list
-inference has **not switched yet**: accepted f64 defaults follow completion of
-consumer migration. Do not infer complete numerical/legacy algorithm support
-from the existence of these tags.
+constructor continues to request f32 explicitly. Ordinary Python floats and
+numeric float collections now infer f64; explicitly typed NumPy float32 inputs
+retain f32. See [default migration](float64-defaults.md) for compatibility rules.
 
 ## Lossless value lifecycle
 
@@ -49,14 +47,11 @@ numeric input inference, checked graph-matrix conversion, native query numeric
 comparison, captured weights/heuristics and PageRank personalization recognize
 f64. Algorithm parameters preserve their f64 values when converted to properties.
 
-## Remaining default-migration gate
+## Default migration completed
 
-Array/table numeric predicates and checked numerical outputs are now migrated.
-Before changing ordinary Python float defaults, finish legacy weight accessors
-and remaining algorithm/step consumers, display/type inference, text/CSV conversion
-and vector consumers.
-Verify dtype, mixed precision, old-format reads, schema, history, full numerical
-and Python compatibility at the final switch. The parent 07.3a remains open.
+Supported numeric consumers, checked outputs, schemas, history and codecs now
+accept f64. The Python default migration and compatibility evidence complete
+07.3a; native temporal types and other roadmap parents remain separate work.
 
 The scalar payload is 8 bytes versus 4 for f32; raw f64 vector payload is twice
 as wide. This does not imply the whole graph's memory doubles. No universal

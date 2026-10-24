@@ -7,7 +7,7 @@ def test_live_and_captured_graph_queries_preserve_f64_literals_and_f32_identity(
     graph = Graph(directed=True)
     nodes = graph.add_nodes(4)
     for node, value in zip(nodes, [AttrValue.float64(1), AttrValue.float64(1 + 2**-40),
-                                   AttrValue.float64(1e300), 1.0]):
+                                   AttrValue.float64(1e300), AttrValue.float32(1.0)]):
         graph.set_node_attr(node, "x", value)
         graph.add_edge(node, node, x=value)
     legacy = graph.induced_subgraph(nodes)

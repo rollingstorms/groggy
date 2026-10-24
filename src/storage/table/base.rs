@@ -3446,6 +3446,8 @@ impl BaseTable {
                         AttrValue::SmallInt(_) => "small_integer",
                         AttrValue::Float(_) => "float",
                         AttrValue::Float64(_) => "float64",
+                        AttrValue::FloatVec(_) => "float_vec",
+                        AttrValue::Float64Vec(_) => "float64_vec",
                         AttrValue::Bool(_) => "boolean",
                         AttrValue::Text(_) => "text",
                         AttrValue::CompactText(_) => "compact_text",
@@ -3462,7 +3464,11 @@ impl BaseTable {
 
                 actual_types.push(AttrValue::Text(actual_type.clone()));
 
-                let matches = actual_type == *expected_type;
+                let matches = actual_type == *expected_type
+                    || (expected_type == "float" && actual_type == "float64")
+                    || (expected_type == "float32" && actual_type == "float")
+                    || (expected_type == "float_vec" && actual_type == "float64_vec")
+                    || (expected_type == "float32_vec" && actual_type == "float_vec");
                 type_matches.push(AttrValue::Bool(matches));
 
                 if matches {
@@ -3495,6 +3501,8 @@ impl BaseTable {
                             AttrValue::SmallInt(_) => "small_integer",
                             AttrValue::Float(_) => "float",
                             AttrValue::Float64(_) => "float64",
+                            AttrValue::FloatVec(_) => "float_vec",
+                            AttrValue::Float64Vec(_) => "float64_vec",
                             AttrValue::Bool(_) => "boolean",
                             AttrValue::Text(_) => "text",
                             AttrValue::CompactText(_) => "compact_text",

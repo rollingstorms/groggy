@@ -41,6 +41,6 @@ assert values.sort(False).to_list() == [x, 1]
 assert AttrValue.float32(0.1).value != 0.1
 ```
 
-The ordinary Python property default switches in a separate verified step. This
-migration does not complete the separate temporal-type, immutable legacy-view,
+Ordinary Python property floats now default to f64; see
+[default migration](float64-defaults.md). This migration does not complete the separate temporal-type, immutable legacy-view,
 compiled-query or module compatibility retirement roadmap items.

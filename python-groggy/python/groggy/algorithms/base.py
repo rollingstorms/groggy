@@ -80,7 +80,7 @@ class RustAlgorithmHandle(AlgorithmHandle):
         attr_params = {}
         for key, value in self._params.items():
             if isinstance(value, float):
-                # Algorithm scalar configuration uses f64, unlike property AttrValue.
+                # Pass ordinary f64 configuration directly to the native bridge.
                 attr_params[key] = value
             elif not isinstance(value, _groggy.AttrValue):
                 # Auto-wrap common types

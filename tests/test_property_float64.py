@@ -1,4 +1,4 @@
-"""Explicit f64 tags are lossless before changing ordinary float defaults."""
+"""Explicit f64 tags are lossless alongside ordinary f64 float defaults."""
 import json
 import math
 import struct

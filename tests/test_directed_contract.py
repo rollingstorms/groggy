@@ -16,13 +16,14 @@ def test_directed_paths_do_not_traverse_an_edge_backward():
     assert len(graph.bfs(target).nodes) == 1
 
 
-def test_directed_adjacency_uses_the_same_node_order_as_graph_ids():
+def test_directed_adjacency_uses_canonical_node_coordinates():
     graph = gr.Graph(directed=True)
     source = graph.add_node()
     target = graph.add_node()
     graph.add_edge(source, target)
 
-    node_ids = list(graph.node_ids)
+    # Adjacency coordinates are ascending IDs; graph IDs are an unordered set.
+    node_ids = sorted(graph.node_ids)
     source_index = node_ids.index(source)
     target_index = node_ids.index(target)
     adjacency = graph.adjacency_matrix().to_numpy()

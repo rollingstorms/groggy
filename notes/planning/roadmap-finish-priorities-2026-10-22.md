@@ -10,13 +10,11 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 Implemented: AR7.2–AR7.4 consolidation, numerical completion slices and receipts,
 AR7.5a–l immutable reads through components and centralities, AR7.9a canonical
-logical change records, and 07.3a.1/07.3a.2a–h f64 representation and successive
-consumer migrations. See the flat checklist for each supported scope and evidence.
+logical change records, and 07.3a f64 representation, supported consumer migration
+and ordinary Python default switching. See the flat checklist for each supported scope and evidence.
 
-Next: finish remaining f64 scalar/vector/view/step adapters, then switch ordinary
-Python float inference and certify compatibility (07.3a.3). Follow with accepted
-native temporal types (07.3b), mutation/publication migration and reconstructed
-effective-time states. Source-preserving table adapters and broader legacy frozen
+Next: accepted native temporal types (07.3b), then mutation/publication migration
+and reconstructed effective-time states. Source-preserving table adapters and broader legacy frozen
 read guarantees remain open; owned projections do not complete those parents.
 
 ## Owner answers received — 2026-10-22
@@ -259,3 +257,18 @@ typed equality. Complete-input validation rejects malformed/overflowing tokens,
 incomplete strings and trailing input. Live/frozen node and edge filters share
 the parser without changing property identity or numeric ordering. See
 `graph-query-literals-2026-10-23.md`; broader AR7.7 and defaults remain open.
+
+## 2026-10-23 — f64 consumer/default completion (07.3a.2i–3)
+
+Ordinary Python floats and numeric float collections now default to f64. Explicit
+f32 constructors/NumPy float32 inputs and old tagged f32 data retain their width.
+Remaining supported consumers delegate to checked native kernels; wrapped
+algorithm parameters now share the native converter. Empty labels and table
+schema families handle both widths. Direct/bulk writes, history/export/journal
+recovery and old-format reads are covered. Root API baseline: 976 passed, one
+existing skip; full native suites, strict all-target Clippy and 22 documentation
+examples passed. See `float64-defaults-2026-10-23.md` for scope and evidence.
+
+07.3a is complete. Next is 07.3b native UTC instant/date/duration; the wider 07.3
+property-format parent, publication migration and legacy immutable-view work stay
+open. Earlier dated default-migration gates above record intermediate states.

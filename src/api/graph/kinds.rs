@@ -21,7 +21,9 @@ pub(crate) fn validate_kind_property(
                 "labels belongs to nodes; use relationship_type for edges".into(),
             ));
         }
-        if matches!(value, AttrValue::FloatVec(values) if values.is_empty()) {
+        if matches!(value, AttrValue::FloatVec(values) if values.is_empty())
+            || matches!(value, AttrValue::Float64Vec(values) if values.is_empty())
+        {
             return Ok(());
         }
         let AttrValue::TextVec(labels) = value else {
@@ -71,7 +73,9 @@ pub(crate) fn normalize_kind_property_in_place(
     if name == LABELS {
         match value {
             AttrValue::TextVec(labels) => labels.sort_unstable(),
-            AttrValue::FloatVec(_) => *value = AttrValue::TextVec(Vec::new()),
+            AttrValue::FloatVec(_) | AttrValue::Float64Vec(_) => {
+                *value = AttrValue::TextVec(Vec::new())
+            }
             _ => {}
         }
     }

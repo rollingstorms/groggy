@@ -9,16 +9,16 @@ from groggy import AttrValue, Graph, GraphBatch
     (None, "null"),
     (True, "bool"),
     (2**40, "int"),
-    (0.5, "float"),
+    (0.5, "float64"),
     ("text with \"quotes\", \\ and unicode λ", "text"),
     ([1, 2, 3], "int_vec"),
-    ([0.5, 1.0, 2], "float_vec"),
+    ([0.5, 1.0, 2], "float64_vec"),
     ([True, False], "bool_vec"),
     (["a", "b\"\\"], "text_vec"),
     (b"\x00\xffbinary", "bytes"),
     ({"nested": [1, None, True, {"name": "value"}]}, "json"),
     ([1, "mixed", None], "json"),
-    ([], "float_vec"),
+    ([], "float64_vec"),
 ])
 def test_values_keep_types_across_graph_columns_tables_and_history(value, kind):
     graph = Graph()
