@@ -18,9 +18,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "core.node_degree",
             "core.weighted_degree",
             "core.edge_weight_sum",
+            "core.triangle_count",
+            "core.k_core_mark",
         ] {
-            let operation = if mode == "core.node_degree" {
+            let operation = if mode == "core.node_degree" || mode == "core.triangle_count" {
                 json!({"id":mode,"params":{"target":"values"}})
+            } else if mode == "core.k_core_mark" {
+                json!({"id":mode,"params":{"target":"values","k":2}})
             } else {
                 json!({"id":mode,"params":{"target":"values","weight_attr":"weight"}})
             };
@@ -41,7 +45,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })?;
             let mut samples = Vec::new();
             for _ in 0..5 {
-                let mut graph = Graph::new_directed();
+                let mut graph = if mode == "core.triangle_count" || mode == "core.k_core_mark" {
+                    Graph::new_undirected()
+                } else {
+                    Graph::new_directed()
+                };
                 graph.add_nodes(count);
                 for node in 0..count {
                     graph.add_edge(node, (node + 1) % count)?;
@@ -60,7 +68,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     return Err("invalid atomic publication".into());
                 }
                 for node in 0..count {
-                    let expected = if mode == "core.node_degree" {
+                    let expected = if mode == "core.triangle_count" {
+                        AttrValue::Int(0)
+                    } else if mode == "core.node_degree" || mode == "core.k_core_mark" {
                         AttrValue::Int(1)
                     } else {
                         AttrValue::Float64(4.0)

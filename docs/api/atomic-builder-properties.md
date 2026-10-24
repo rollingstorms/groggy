@@ -50,7 +50,8 @@ Native steps declare `supports_atomic_properties()`. The default is false, so
 custom or unmigrated steps cannot accidentally bypass the staging contract.
 Current supported families are initialization/counts, property loads/attachments,
 scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
-fused arithmetic/neighbor kernels, node degree and incident-weight sums, and
+fused arithmetic/neighbor kernels, node degree and incident-weight sums,
+undirected triangle/k-core calculations, and
 ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
@@ -268,5 +269,66 @@ precision; integer weights convert to f64 for summation.
 
 Selected edges are processed in cached ID order. The first ordering preparation
 may sort edges; subsequent calls reuse it. Degree performs one selected-edge pass;
-weighted primitives share one incidence pass. Triangle and k-core step migration
-remain separate work and are still rejected in atomic builders.
+weighted primitives share one incidence pass. Undirected triangle and k-core
+execution is described below.
+
+## Undirected triangles and k-core membership
+
+`core.triangle_count` and `core.k_core_mark` now support atomic pipelines and
+nested loops on undirected graphs. Their outputs are temporary node maps; attach
+them to publish with the surrounding run. No topology changes are made.
+
+- Triangles contain three distinct nodes. Parallel edges do not multiply counts,
+  and self-loops do not form triangles. Each triangle contributes one to each of
+  its three nodes. Counts are checked i64 values.
+- K-core repeatedly removes nodes whose remaining selected degree is less than
+  `k`. It retains the existing undirected degree convention: parallel edges count
+  separately and each stored self-loop counts once. `k=0` includes all selected
+  nodes, including isolates. Negative `k` rejects during preparation.
+- Both steps use only selected active nodes/edges and preserve original IDs.
+  Triangle counting uses a simple projection; k-core preserves multiplicities.
+  Cancellation/errors leave existing result variables intact and discard the
+  outer atomic run's earlier staged property writes.
+- Directed calls now explicitly reject. The previous implementation mixed
+  outgoing neighbor counts with incorrect peeling/closure behavior; directed
+  triangle definitions and directed core constraints require separate support.
+  This correction applies to ordinary builders too.
+
+Native step specifications can be composed using the same algorithm handle
+interface as other builder pipelines:
+
+```python
+import json
+from groggy import AttrValue
+from groggy.algorithms.base import AlgorithmHandle
+
+class StructuralSteps(AlgorithmHandle):
+    @property
+    def id(self):
+        return "builder.step_pipeline"
+
+    def to_spec(self):
+        steps = [
+            {"id": "core.triangle_count", "params": {"target": "triangles"}},
+            {"id": "core.k_core_mark", "params": {"k": 2, "target": "core"}},
+            {"id": "core.attach_node_attr", "params": {"source": "triangles", "attr": "triangles"}},
+            {"id": "core.attach_node_attr", "params": {"source": "core", "attr": "core"}},
+        ]
+        return {"id": self.id, "params": {"steps": AttrValue(json.dumps({"atomic": True, "steps": steps}))}}
+
+structural_graph = Graph()
+structural_graph.add_nodes(4)
+structural_graph.add_edges([(0, 1), (1, 2), (2, 0), (0, 1), (0, 0), (2, 3)])
+structural_before = structural_graph.current_state_id
+structural_graph.view().apply(StructuralSteps(), persist=True)
+assert [structural_graph.get_node_attr(n, "triangles") for n in range(4)] == [1, 1, 1, 0]
+assert [structural_graph.get_node_attr(n, "core") for n in range(4)] == [1, 1, 1, 0]
+assert structural_graph.current_state_id == structural_before + 1
+```
+
+Preparation builds a local adjacency list with selected multiedges, then sorts its
+rows. K-core's peeling pass is linear in that adjacency size. Triangle counting
+orients the simple projection by node ID and intersects forward lists, visiting
+each triangle once; dense workloads can still require cubic work. Temporary
+memory scales with selected topology plus node results. This is not a constant
+memory or production throughput guarantee.

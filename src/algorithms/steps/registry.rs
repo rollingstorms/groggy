@@ -1001,7 +1001,8 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Quadratic,
         },
         |spec| {
-            let k = spec.params.expect_int("k")? as usize;
+            let k = usize::try_from(spec.params.expect_int("k")?)
+                .map_err(|_| anyhow!("k_core_mark requires nonnegative k fitting usize"))?;
             let target = spec.params.expect_text("target")?.to_string();
             Ok(Box::new(KCoreMarkStep::new(k, target)))
         },

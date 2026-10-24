@@ -9,8 +9,9 @@ from groggy.builder import AlgorithmBuilder
 
 
 class AtomicSteps(AlgorithmHandle):
-    def __init__(self, steps):
+    def __init__(self, steps, atomic=True):
         self.steps = steps
+        self.atomic = atomic
 
     @property
     def id(self):
@@ -18,7 +19,7 @@ class AtomicSteps(AlgorithmHandle):
 
     def to_spec(self):
         return {"id": self.id, "params": {"steps": AttrValue(json.dumps({
-            "atomic": True, "steps": self.steps,
+            "atomic": self.atomic, "steps": self.steps,
         }))}}
 
 
@@ -88,7 +89,7 @@ def test_unsupported_step_rejects_before_any_attachment_executes():
     steps = [
         {"id": "core.init_nodes", "params": {"target": "values", "value": 2}},
         {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "prefix"}},
-        {"id": "core.triangle_count", "params": {"target": "triangles"}},
+        {"id": "core.histogram", "params": {"source": "n", "target": "hist", "bins": 2}},
     ]
     with pytest.raises(RuntimeError, match="does not yet support atomic"):
         graph.view().apply(AtomicSteps(steps), persist=True)
@@ -167,7 +168,7 @@ def test_nested_atomic_loops_read_prior_iterations_and_publish_once():
 
 
 @pytest.mark.parametrize("body", [
-    [{"id": "core.triangle_count", "params": {"target": "triangles"}}],
+    [{"id": "core.histogram", "params": {"source": "n", "target": "hist", "bins": 2}}],
     [{"params": {}}],
 ])
 def test_zero_iteration_nested_loop_still_rejects_unsupported_or_malformed_body(body):
@@ -666,3 +667,84 @@ def test_missing_degree_source_is_an_error_and_discards_prefix():
         graph.view().apply(AtomicSteps(steps), persist=True)
     assert graph.current_state_id == 1
     assert graph.get_node_attr(0, "prefix") is None
+
+
+@pytest.mark.parametrize("atomic", [False, True])
+@pytest.mark.parametrize("persist", [False, True])
+def test_triangle_step_counts_distinct_nodes_despite_parallel_edges_and_loops(atomic, persist):
+    graph = Graph()
+    graph.add_nodes(5)
+    graph.add_edges([(0, 1), (1, 2), (2, 0), (0, 1), (0, 0), (2, 3)])
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.triangle_count", "params": {"target": "counts"}},
+        {"id": "core.attach_node_attr", "params": {"source": "counts", "attr": "triangles"}},
+    ]
+    _, profile = graph.view().apply(AtomicSteps(steps, atomic=atomic), persist=persist, return_profile=True)
+    expected = [1, 1, 1, 0, 0]
+    if persist:
+        assert [graph.get_node_attr(n, "triangles") for n in range(5)] == expected
+    else:
+        assert dict(profile["outputs"]["node_attributes.triangles"]) == dict(enumerate(expected))
+    assert graph.current_state_id == before + int(persist)
+
+
+@pytest.mark.parametrize("k,expected", [
+    (0, [1, 1, 1, 1, 1]), (1, [1, 1, 1, 1, 0]),
+    (2, [1, 1, 1, 0, 0]), (3, [0, 0, 0, 0, 0]),
+])
+def test_k_core_peels_cascading_nodes_with_multiedges_and_self_loops(k, expected):
+    graph = Graph()
+    graph.add_nodes(5)
+    graph.add_edges([(0, 1), (1, 2), (2, 0), (0, 1), (0, 0), (2, 3)])
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.k_core_mark", "params": {"k": k, "target": "core"}},
+        {"id": "core.attach_node_attr", "params": {"source": "core", "attr": "core"}},
+    ]
+    graph.view().apply(AtomicSteps([loop_step(steps, 2)]), persist=True)
+    assert [graph.get_node_attr(n, "core") for n in range(5)] == expected
+    assert graph.current_state_id == before + 1
+
+
+@pytest.mark.parametrize("kernel,params", [
+    ("core.triangle_count", {}), ("core.k_core_mark", {"k": 2}),
+])
+def test_structural_steps_reject_directed_graph_and_discard_prefix(kernel, params):
+    graph = Graph(directed=True)
+    graph.add_nodes(3)
+    graph.add_edges([(0, 1), (1, 2), (2, 0)])
+    before = graph.current_state_id
+    steps = [
+        {"id": "core.init_nodes", "params": {"target": "n", "value": 1}},
+        {"id": "core.attach_node_attr", "params": {"source": "n", "attr": "prefix"}},
+        {"id": kernel, "params": {**params, "target": "result"}},
+    ]
+    with pytest.raises(RuntimeError, match="require an undirected graph"):
+        graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == before
+    assert graph.get_node_attr(0, "prefix") is None
+
+
+def test_negative_k_rejects_before_prefix_execution():
+    graph = Graph()
+    graph.add_node(score=0)
+    with pytest.raises(RuntimeError, match="nonnegative k"):
+        graph.view().apply(AtomicSteps(increment_body() + [
+            {"id": "core.k_core_mark", "params": {"k": -1, "target": "core"}},
+        ]), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "score") == 0
+
+
+@pytest.mark.parametrize("kernel,params", [
+    ("core.triangle_count", {}), ("core.k_core_mark", {"k": 0}),
+])
+def test_empty_structural_step_creates_no_state(kernel, params):
+    graph = Graph()
+    steps = [
+        {"id": kernel, "params": {**params, "target": "result"}},
+        {"id": "core.attach_node_attr", "params": {"source": "result", "attr": "answer"}},
+    ]
+    graph.view().apply(AtomicSteps(steps), persist=True)
+    assert graph.current_state_id == 0

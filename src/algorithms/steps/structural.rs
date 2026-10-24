@@ -1,6 +1,6 @@
 //! Structural graph operation step primitives.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, VecDeque};
 
 use anyhow::{anyhow, Result};
 
@@ -163,6 +163,10 @@ impl KCoreMarkStep {
 }
 
 impl Step for KCoreMarkStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.k_core_mark"
     }
@@ -176,56 +180,49 @@ impl Step for KCoreMarkStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        // Start with all nodes
-        let mut remaining: HashSet<NodeId> = scope.node_ids().copied().collect();
-        let mut degrees: HashMap<NodeId, usize> = HashMap::new();
-
-        // Compute initial degrees within remaining set
-        for &node in &remaining {
-            let neighbors = scope.subgraph().neighbors(node)?;
-            let degree = neighbors.iter().filter(|n| remaining.contains(n)).count();
-            degrees.insert(node, degree);
+        let topology = undirected_topology(ctx, scope)?;
+        let mut degrees: Vec<_> = topology.neighbors.iter().map(Vec::len).collect();
+        let mut retained = vec![true; degrees.len()];
+        let mut queued = vec![false; degrees.len()];
+        let mut queue = VecDeque::new();
+        for (node, &degree) in degrees.iter().enumerate() {
+            if degree < self.k {
+                queued[node] = true;
+                queue.push_back(node);
+            }
         }
-
-        // Iteratively remove nodes with degree < k
-        let mut changed = true;
-        while changed && !remaining.is_empty() {
+        while let Some(node) = queue.pop_front() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("k_core_mark cancelled"));
             }
-
-            changed = false;
-            let to_remove: Vec<NodeId> = remaining
-                .iter()
-                .filter(|&&node| degrees.get(&node).copied().unwrap_or(0) < self.k)
-                .copied()
-                .collect();
-
-            if !to_remove.is_empty() {
-                changed = true;
-                for node in to_remove {
-                    remaining.remove(&node);
-                    degrees.remove(&node);
-
-                    // Update neighbors' degrees
-                    let neighbors = scope.subgraph().neighbors(node)?;
-                    for neighbor in neighbors {
-                        if let Some(deg) = degrees.get_mut(&neighbor) {
-                            *deg = deg.saturating_sub(1);
-                        }
+            retained[node] = false;
+            for &neighbor in &topology.neighbors[node] {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("k_core_mark cancelled"));
+                }
+                if retained[neighbor] {
+                    degrees[neighbor] = degrees[neighbor]
+                        .checked_sub(1)
+                        .ok_or_else(|| anyhow!("Invalid k-core degree accounting"))?;
+                    if degrees[neighbor] < self.k && !queued[neighbor] {
+                        queued[neighbor] = true;
+                        queue.push_back(neighbor);
                     }
                 }
             }
         }
-
-        // Create result map: 1 for nodes in k-core, 0 otherwise
-        let mut map = HashMap::with_capacity(scope.subgraph().node_set().len());
-        for &node in scope.node_ids() {
-            let in_core = remaining.contains(&node);
-            map.insert(node, AlgorithmParamValue::Int(if in_core { 1 } else { 0 }));
+        if ctx.is_cancelled() {
+            return Err(anyhow!("k_core_mark cancelled"));
         }
-
-        scope.variables_mut().set_node_map(self.target.clone(), map);
+        let result = topology
+            .nodes
+            .into_iter()
+            .enumerate()
+            .map(|(index, node)| (node, AlgorithmParamValue::Int(i64::from(retained[index]))))
+            .collect();
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), result);
         Ok(())
     }
 }
@@ -244,6 +241,10 @@ impl TriangleCountStep {
 }
 
 impl Step for TriangleCountStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.triangle_count"
     }
@@ -257,48 +258,112 @@ impl Step for TriangleCountStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut counts: HashMap<NodeId, i64> = HashMap::new();
-
-        // Initialize all nodes with 0
-        for &node in scope.node_ids() {
-            counts.insert(node, 0);
+        let mut topology = undirected_topology(ctx, scope)?;
+        // Orient the simple projection by node ID: every triangle is visited once.
+        for (node, neighbors) in topology.neighbors.iter_mut().enumerate() {
+            neighbors.dedup();
+            neighbors.retain(|&neighbor| neighbor > node);
         }
-
-        let nodes: Vec<NodeId> = scope.node_ids().copied().collect();
-
-        // For each node, check pairs of neighbors for edges
-        for &node in &nodes {
+        let mut counts = vec![0i64; topology.nodes.len()];
+        for (u, neighbors) in topology.neighbors.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("triangle_count cancelled"));
             }
-
-            let neighbors = scope.subgraph().neighbors(node)?;
-
-            // Check each pair of neighbors
-            for i in 0..neighbors.len() {
-                for j in (i + 1)..neighbors.len() {
-                    let n1 = neighbors[i];
-                    let n2 = neighbors[j];
-
-                    // If n1 and n2 are connected, we have a triangle with node
-                    if scope.subgraph().has_edge_between(n1, n2)? {
-                        // Increment count only for the current node
-                        if let Some(count) = counts.get_mut(&node) {
-                            *count += 1;
+            for (position, &v) in neighbors.iter().enumerate() {
+                let mut left = position + 1;
+                let mut right = 0;
+                let other = &topology.neighbors[v];
+                while left < neighbors.len() && right < other.len() {
+                    if ctx.is_cancelled() {
+                        return Err(anyhow!("triangle_count cancelled"));
+                    }
+                    match neighbors[left].cmp(&other[right]) {
+                        std::cmp::Ordering::Less => left += 1,
+                        std::cmp::Ordering::Greater => right += 1,
+                        std::cmp::Ordering::Equal => {
+                            for node in [u, v, neighbors[left]] {
+                                counts[node] = counts[node]
+                                    .checked_add(1)
+                                    .ok_or_else(|| anyhow!("Triangle count exceeds i64"))?;
+                            }
+                            left += 1;
+                            right += 1;
                         }
                     }
                 }
             }
         }
-
-        let map: HashMap<NodeId, AlgorithmParamValue> = counts
+        if ctx.is_cancelled() {
+            return Err(anyhow!("triangle_count cancelled"));
+        }
+        let result = topology
+            .nodes
             .into_iter()
-            .map(|(k, v)| (k, AlgorithmParamValue::Int(v)))
+            .zip(counts)
+            .map(|(node, count)| (node, AlgorithmParamValue::Int(count)))
             .collect();
-
-        scope.variables_mut().set_node_map(self.target.clone(), map);
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), result);
         Ok(())
     }
+}
+
+struct UndirectedTopology {
+    nodes: Vec<NodeId>,
+    neighbors: Vec<Vec<usize>>,
+}
+
+/// Preserve selected multiedges and once-per-loop incidence. Directed variants
+/// need separate definitions; never infer one from endpoint storage order.
+fn undirected_topology(ctx: &Context, scope: &StepScope<'_>) -> Result<UndirectedTopology> {
+    if ctx.is_cancelled() {
+        return Err(anyhow!("structural topology cancelled"));
+    }
+    let selection = scope.subgraph();
+    let graph = selection.graph();
+    let graph = graph.borrow();
+    if graph.is_directed() {
+        return Err(anyhow!("Triangle and k-core builder steps require an undirected graph; directed definitions are not implemented"));
+    }
+    let nodes = selection.ordered_nodes().to_vec();
+    let positions: HashMap<_, _> = nodes
+        .iter()
+        .enumerate()
+        .map(|(index, &node)| (node, index))
+        .collect();
+    for &node in &nodes {
+        if !graph.has_node(node) {
+            return Err(anyhow!("Structural node {} is inactive", node));
+        }
+    }
+    let mut neighbors = vec![Vec::new(); nodes.len()];
+    for &edge in selection.ordered_edges().iter() {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("structural topology cancelled"));
+        }
+        if !graph.has_edge(edge) {
+            return Err(anyhow!("Structural edge {} is inactive", edge));
+        }
+        let (source, target) = graph.edge_endpoints(edge)?;
+        let source = *positions
+            .get(&source)
+            .ok_or_else(|| anyhow!("Edge {} source is outside selection", edge))?;
+        let target = *positions
+            .get(&target)
+            .ok_or_else(|| anyhow!("Edge {} target is outside selection", edge))?;
+        neighbors[source].push(target);
+        if source != target {
+            neighbors[target].push(source);
+        }
+    }
+    for row in &mut neighbors {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("structural topology cancelled"));
+        }
+        row.sort_unstable();
+    }
+    Ok(UndirectedTopology { nodes, neighbors })
 }
 
 /// Sum edge weights incident to each node.
@@ -464,6 +529,122 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[test]
+    fn structural_steps_match_exhaustive_five_node_simple_graph_references() {
+        let pairs: Vec<_> = (0..5)
+            .flat_map(|u| (u + 1..5).map(move |v| (u, v)))
+            .collect();
+        for mask in 0..(1usize << pairs.len()) {
+            let mut graph = Graph::new_undirected();
+            graph.add_nodes(5);
+            let mut adjacency = [[false; 5]; 5];
+            for (bit, &(u, v)) in pairs.iter().enumerate() {
+                if mask & (1 << bit) != 0 {
+                    adjacency[u][v] = true;
+                    adjacency[v][u] = true;
+                    graph.add_edge(u, v).expect("edge");
+                }
+            }
+            let selection = Subgraph::from_nodes(
+                Rc::new(RefCell::new(graph)),
+                (0..5).collect(),
+                "exhaustive".into(),
+            )
+            .expect("selection");
+            let mut vars = StepVariables::default();
+            let mut scope = StepScope::new(&selection, &mut vars);
+            TriangleCountStep::new("triangles")
+                .apply(&mut Context::new(), &mut scope)
+                .expect("triangles");
+            for node in 0..5 {
+                let mut expected = 0;
+                for u in 0..5 {
+                    for v in u + 1..5 {
+                        if adjacency[node][u] && adjacency[node][v] && adjacency[u][v] {
+                            expected += 1;
+                        }
+                    }
+                }
+                assert_eq!(
+                    scope.variables().node_map("triangles").expect("map")[&node],
+                    AlgorithmParamValue::Int(expected),
+                    "graph {} node {}",
+                    mask,
+                    node
+                );
+            }
+            for k in 0..=5 {
+                let mut expected = [true; 5];
+                loop {
+                    let next = std::array::from_fn(|node| {
+                        expected[node]
+                            && (0..5)
+                                .filter(|&other| expected[other] && adjacency[node][other])
+                                .count()
+                                >= k
+                    });
+                    if next == expected {
+                        break;
+                    }
+                    expected = next;
+                }
+                KCoreMarkStep::new(k, "core")
+                    .apply(&mut Context::new(), &mut scope)
+                    .expect("core");
+                for (node, value) in expected.into_iter().enumerate() {
+                    assert_eq!(
+                        scope.variables().node_map("core").expect("map")[&node],
+                        AlgorithmParamValue::Int(i64::from(value)),
+                        "graph {} k {} node {}",
+                        mask,
+                        k,
+                        node
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn structural_steps_keep_selected_noncontiguous_ids_and_reject_cancellation() {
+        use std::sync::{atomic::AtomicBool, Arc};
+        let mut graph = Graph::new_undirected();
+        graph.add_nodes(5);
+        for (u, v) in [(1, 2), (2, 3), (3, 1), (3, 4)] {
+            graph.add_edge(u, v).expect("edge");
+        }
+        let selection = Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            [1, 2, 3].into_iter().collect(),
+            "selected".into(),
+        )
+        .expect("selection");
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&selection, &mut vars);
+        for step in [
+            Box::new(TriangleCountStep::new("result")) as Box<dyn Step>,
+            Box::new(KCoreMarkStep::new(2, "result")),
+        ] {
+            step.apply(&mut Context::new(), &mut scope)
+                .expect("selected calculation");
+            assert_eq!(scope.variables().node_map("result").expect("map").len(), 3);
+            assert!(scope
+                .variables()
+                .node_map("result")
+                .expect("map")
+                .values()
+                .all(|value| *value == AlgorithmParamValue::Int(1)));
+            let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+            assert!(step.apply(&mut ctx, &mut scope).is_err());
+            assert!(scope
+                .variables()
+                .node_map("result")
+                .expect("unchanged")
+                .values()
+                .all(|value| *value == AlgorithmParamValue::Int(1)));
+        }
     }
 
     #[test]

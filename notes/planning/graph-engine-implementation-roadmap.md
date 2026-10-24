@@ -410,3 +410,14 @@ source variables. Weighted total incidence retains double self-loop contribution
 Triangle/k-core certification and remaining execution-boundary parent work stay
 open. Details, compatibility changes and evidence:
 `atomic-structural-builder-steps-2026-10-24.md`.
+
+### Undirected triangle and k-core steps — 2026-10-24
+
+Implemented 09.4b.2m: distinct-node triangle counting ignores loop/parallel-edge
+artifacts; queue-based k-core peeling retains the established multiedge/once-per-
+loop degree convention. Both support atomic staging, scoped IDs, cancellation and
+empty graphs. Negative k rejects. Directed calls explicitly reject until separate
+definitions are implemented; prior directed behavior was inconsistent. This
+supersedes the undirected triangle/k-core migration gap, while directed support
+and remaining execution-boundary parent work remain open. Details and evidence:
+`atomic-triangle-core-steps-2026-10-24.md`.
