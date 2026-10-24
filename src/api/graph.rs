@@ -12,6 +12,7 @@
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
 mod checkpoints;
+pub(crate) mod composition;
 mod identity;
 pub(crate) mod kinds;
 mod matrices;
@@ -2091,8 +2092,21 @@ impl Graph {
         message: String,
         author: String,
     ) -> GraphResult<BatchResult> {
-        let prepared = publication.batch;
-        let publication = publication.metadata;
+        let (added_nodes, added_edges) = self.execute_prepared_mutation(publication.batch)?;
+        let state_id = self.commit_internal(message, author, Some(publication.metadata))?;
+        Ok(BatchResult {
+            state_id,
+            added_nodes,
+            added_edges,
+        })
+    }
+
+    // Storage-only executor, shared by checked publication and manual compatibility.
+    // Callers must prepare all inputs first and disable ordinary dispatch.
+    fn execute_prepared_mutation(
+        &mut self,
+        prepared: crate::api::batch::PreparedBatch,
+    ) -> GraphResult<(Vec<NodeId>, Vec<EdgeId>)> {
         let added_nodes = if prepared.add_nodes > 0 {
             self.add_nodes(prepared.add_nodes)
         } else {
@@ -2104,12 +2118,7 @@ impl Graph {
         self.remove_edges(&prepared.remove_edges)?;
         self.remove_nodes(&prepared.remove_nodes)?;
         self.identities.reserve_bindings(prepared.identity_bindings);
-        let state_id = self.commit_internal(message, author, Some(publication))?;
-        Ok(BatchResult {
-            state_id,
-            added_nodes,
-            added_edges,
-        })
+        Ok((added_nodes, added_edges))
     }
 
     /// Explicitly checkpoint the current published state, preserving its version ID.

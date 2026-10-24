@@ -9,6 +9,7 @@
 
 pub mod component;
 pub mod composer;
+pub(crate) mod composition;
 pub mod filtered;
 pub mod hierarchical;
 pub mod neighborhood;

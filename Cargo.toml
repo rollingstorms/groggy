@@ -75,3 +75,7 @@ harness = false
 [[bench]]
 name = "automatic_publication"
 harness = false
+
+[[bench]]
+name = "meta_composition"
+harness = false

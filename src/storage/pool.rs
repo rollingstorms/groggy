@@ -319,6 +319,17 @@ pub struct GraphPool {
     next_edge_id: EdgeId,
 }
 
+/// A validated immutable group reference; installation cannot collide or allocate
+/// after prepare has checked and reserved its slot under an exclusive pool borrow.
+pub(crate) struct PreparedStoredSubgraph {
+    pub id: crate::types::SubgraphId,
+    content: (
+        std::collections::HashSet<NodeId>,
+        std::collections::HashSet<EdgeId>,
+        String,
+    ),
+}
+
 impl GraphPool {
     /// Create new empty graph store with default settings (undirected)
     pub fn new() -> Self {
@@ -892,6 +903,23 @@ impl GraphPool {
         edges: std::collections::HashSet<EdgeId>,
         subgraph_type: String,
     ) -> GraphResult<crate::types::SubgraphId> {
+        let prepared = self.prepare_stored_subgraph(nodes, edges, subgraph_type)?;
+        let id = prepared.id;
+        self.install_stored_subgraph(prepared);
+        Ok(id)
+    }
+
+    /// Number of immutable stored group references, independent of active nodes.
+    pub fn subgraph_count(&self) -> usize {
+        self.stored_subgraphs.len()
+    }
+
+    pub(crate) fn prepare_stored_subgraph(
+        &mut self,
+        nodes: std::collections::HashSet<NodeId>,
+        edges: std::collections::HashSet<EdgeId>,
+        subgraph_type: String,
+    ) -> GraphResult<PreparedStoredSubgraph> {
         // Generate a unique subgraph ID using a hash of the content
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -909,19 +937,27 @@ impl GraphPool {
         let subgraph_id = (hasher.finish() as usize) as crate::types::SubgraphId;
 
         let content = (nodes, edges, subgraph_type);
-        match self.stored_subgraphs.entry(subgraph_id) {
-            std::collections::hash_map::Entry::Vacant(slot) => {
-                slot.insert(content);
-            }
-            std::collections::hash_map::Entry::Occupied(slot) if slot.get() == &content => {}
-            std::collections::hash_map::Entry::Occupied(_) => {
+        match self.stored_subgraphs.get(&subgraph_id) {
+            Some(old) if old != &content => {
                 return Err(GraphError::InvalidInput(
                     "Stored subgraph reference collision; retained content was not replaced".into(),
-                ));
+                ))
             }
+            Some(_) => {}
+            None => self.stored_subgraphs.try_reserve(1).map_err(|error| {
+                GraphError::InvalidInput(format!("Cannot reserve stored subgraph: {error}"))
+            })?,
         }
+        Ok(PreparedStoredSubgraph {
+            id: subgraph_id,
+            content,
+        })
+    }
 
-        Ok(subgraph_id)
+    pub(crate) fn install_stored_subgraph(&mut self, prepared: PreparedStoredSubgraph) {
+        self.stored_subgraphs
+            .entry(prepared.id)
+            .or_insert(prepared.content);
     }
 
     /// Get stored subgraph data

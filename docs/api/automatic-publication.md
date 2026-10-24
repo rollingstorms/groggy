@@ -81,10 +81,12 @@ as though they were portable could otherwise produce dangling references.
 
 Meta-node creation publishes its required system attributes together. Meta
 classification accepts all logical text storage representations, including
-compact text. Higher-level collapse plans and remaining compound algorithm/table
-writeback routines still need an audit to guarantee one version and all-or-nothing
-failure for the entire multi-stage operation. Mutable native pool/space escape
-hatches and the infallible Rust compatibility surface remain outside this step.
+compact text. Higher-level collapse plans now stage their aggregations, retained
+membership, boundary edges and removals as one checked operation; see
+[meta composition](meta-composition.md) for semantics and limits. Remaining
+compound algorithm/table writeback routines still need an audit. Mutable native
+pool/space escape hatches and the infallible Rust compatibility surface remain
+outside this step.
 
 Automatic publication retains more mutation history than deferred writes.
 Prefer bulk operations for bulk workloads. The native receipt in

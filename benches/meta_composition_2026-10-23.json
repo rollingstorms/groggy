@@ -1,0 +1,301 @@
+{
+  "cases": [
+    {
+      "graph_nodes": 1000,
+      "samples": [
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000105,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000071541,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000067791,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000062,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000062459,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 1,
+      "strategy": "extract"
+    },
+    {
+      "graph_nodes": 1000,
+      "samples": [
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.000071166,
+          "state_id": 3
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.00007675,
+          "state_id": 3
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.000070167,
+          "state_id": 3
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.000066458,
+          "state_id": 3
+        },
+        {
+          "edges": 999,
+          "nodes": 1000,
+          "seconds": 0.000063875,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 1,
+      "strategy": "collapse"
+    },
+    {
+      "graph_nodes": 1000,
+      "samples": [
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000127666,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000124875,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000119916,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000123958,
+          "state_id": 3
+        },
+        {
+          "edges": 1000,
+          "nodes": 1001,
+          "seconds": 0.000121041,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 500,
+      "strategy": "extract"
+    },
+    {
+      "graph_nodes": 1000,
+      "samples": [
+        {
+          "edges": 500,
+          "nodes": 501,
+          "seconds": 0.001580209,
+          "state_id": 3
+        },
+        {
+          "edges": 500,
+          "nodes": 501,
+          "seconds": 0.001599417,
+          "state_id": 3
+        },
+        {
+          "edges": 500,
+          "nodes": 501,
+          "seconds": 0.001603416,
+          "state_id": 3
+        },
+        {
+          "edges": 500,
+          "nodes": 501,
+          "seconds": 0.001609709,
+          "state_id": 3
+        },
+        {
+          "edges": 500,
+          "nodes": 501,
+          "seconds": 0.001608042,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 500,
+      "strategy": "collapse"
+    },
+    {
+      "graph_nodes": 10000,
+      "samples": [
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.000482125,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.0004655,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.000457833,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.000455917,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.000534667,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 1,
+      "strategy": "extract"
+    },
+    {
+      "graph_nodes": 10000,
+      "samples": [
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.000490083,
+          "state_id": 3
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.000516917,
+          "state_id": 3
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.000478084,
+          "state_id": 3
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.000474458,
+          "state_id": 3
+        },
+        {
+          "edges": 9999,
+          "nodes": 10000,
+          "seconds": 0.000490125,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 1,
+      "strategy": "collapse"
+    },
+    {
+      "graph_nodes": 10000,
+      "samples": [
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.001165708,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.001078167,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.001172917,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.001156333,
+          "state_id": 3
+        },
+        {
+          "edges": 10000,
+          "nodes": 10001,
+          "seconds": 0.001097292,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 5000,
+      "strategy": "extract"
+    },
+    {
+      "graph_nodes": 10000,
+      "samples": [
+        {
+          "edges": 5000,
+          "nodes": 5001,
+          "seconds": 0.104878542,
+          "state_id": 3
+        },
+        {
+          "edges": 5000,
+          "nodes": 5001,
+          "seconds": 0.104518917,
+          "state_id": 3
+        },
+        {
+          "edges": 5000,
+          "nodes": 5001,
+          "seconds": 0.103746458,
+          "state_id": 3
+        },
+        {
+          "edges": 5000,
+          "nodes": 5001,
+          "seconds": 0.104792583,
+          "state_id": 3
+        },
+        {
+          "edges": 5000,
+          "nodes": 5001,
+          "seconds": 0.1042945,
+          "state_id": 3
+        }
+      ],
+      "selected_nodes": 5000,
+      "strategy": "collapse"
+    }
+  ],
+  "scope": "Native release chain graphs; fixture construction excluded. Includes planning, deterministic sorting, retained group storage and checked publication. Five observations per case; no before/after speedup, FFI latency, allocation/RSS or SLA claim."
+}

@@ -1085,3 +1085,14 @@ The remaining Rust default/infallible compatibility surface and higher-level
 compound meta/collapse, algorithm and table writeback boundaries remain 09.4b.2.
 The broad 09.4 parent and pool portability/effective-time reconstruction are not
 closed by this core default migration. Existing owner authorization remains.
+
+## 2026-10-23 — atomic compound meta/collapse publication (09.4b.2a)
+
+Modern plans and legacy collapse routes now stage node aggregations, retained
+membership, boundary edges and optional removals before accepting one version.
+Rejected calls consume no entity IDs or stored group contents. Directed boundary
+orientation, deterministic aggregation, parallel copying, strict/default handling
+and standalone staged meta-edge helpers are covered. Manual mode remains deferred.
+See `atomic-meta-composition-2026-10-23.md` and the API example for evidence/limits.
+Native compatibility, algorithm/table boundaries and portable pool state remain
+open; 09.4b.2b records real contraction/custom identity/explicit-selector gaps.

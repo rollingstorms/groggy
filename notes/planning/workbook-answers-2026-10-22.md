@@ -139,3 +139,14 @@ explicit writer/batch effective timestamps remain available. `commit()` records
 an explicit checkpoint. `Graph(manual=True)` names the legacy deferred path.
 Remaining native infallible/default compatibility and multi-stage operation audits
 are 09.4b.2, already authorized. See [implementation record](automatic-publication-2026-10-23.md).
+
+## 2026-10-23 — atomic compound meta/collapse publication (09.4b.2a)
+
+Modern plans and legacy collapse routes now stage node aggregations, retained
+membership, boundary edges and optional removals before accepting one version.
+Rejected calls consume no entity IDs or stored group contents. Directed boundary
+orientation, deterministic aggregation, parallel copying, strict/default handling
+and standalone staged meta-edge helpers are covered. Manual mode remains deferred.
+See `atomic-meta-composition-2026-10-23.md` and the API example for evidence/limits.
+Native compatibility, algorithm/table boundaries and portable pool state remain
+open; 09.4b.2b records real contraction/custom identity/explicit-selector gaps.
