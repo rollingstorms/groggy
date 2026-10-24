@@ -356,3 +356,13 @@ publish nothing. Unsupported steps reject before execution. Atomic builds preser
 original order by bypassing the current effect-unaware IR optimizer. This adds no
 whole graph clone or FFI graph logic. Existing defaults and broader step/pipeline
 migration remain open. See `atomic-builder-properties-2026-10-24.md`.
+
+### Atomic nested property loops — 2026-10-24
+
+Implemented 09.4b.2h: recursively certified loop descendants share the outer
+property staging context, see earlier iteration writes and accept once. A later
+error discards all iterations; empty/zero-iteration bodies remain checked and
+cancellation is checked between child steps and iterations. Alternate batch plans
+reject until their executor honors staging. This follows existing workbook
+authority; remaining step families and automatic atomic defaults stay open.
+Details: `atomic-builder-loops-2026-10-24.md`.

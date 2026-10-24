@@ -1,15 +1,15 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **158 checked and 79 unchecked entries**. Entries overlap:
+currently contains **159 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
 
 Count correction: the earlier summary omitted three already checked A* entries
-because its heading parser treated the literal asterisk as formatting. This pass
-adds two new checked slices; the other three are a counting correction, not new
-implementation work. Counts now use checkbox markers independently of headings.
+because its heading parser treated the literal asterisk as formatting. The earlier atomic-builder pass
+added two checked slices; three other entries were a counting correction. The
+nested-loop extension adds one further checked slice. Counts now use checkbox markers independently of headings.
 
 ## Recent completed slices
 
@@ -23,6 +23,7 @@ implementation work. Counts now use checkbox markers independently of headings.
 | 09.4b.2e / 27.2b | Table graph materialization preserves supported typed values/identities, remaps references and rejects unsupported data without silent downgrade/loss. |
 | 09.4b.2f / 30.1a | Builder node/edge attachment and smoothing honor persist=False and return owned typed columns without graph mutation. |
 | 09.4b.2g / 30.1b | Explicit atomic property builders stage touched columns, read staged values and accept once; errors/cancellation discard the buffer. |
+| 09.4b.2h | Nested property loops recursively validate descendants, share staged values across iterations and discard the whole run on failure. |
 
 
 
@@ -61,8 +62,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest atomic-builder change: **936 native tests passed, 52 ignored; 1,084 root
-Python API tests passed, 1 skipped; 37 executable documentation examples passed;
+Latest atomic-loop change: **938 native tests passed, 52 ignored; 1,091 root
+Python API tests passed, 1 skipped; 38 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

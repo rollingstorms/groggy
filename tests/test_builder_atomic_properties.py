@@ -137,3 +137,93 @@ def test_nonpersistent_atomic_spec_keeps_existing_transient_read_semantics():
     assert profile["outputs"]["node_attributes.copy"] == [(0, 7)]
     assert graph.current_state_id == 1
     assert graph.get_node_attr(0, "score") == 7
+
+
+def loop_step(body, iterations=2, **params):
+    return {"id": "iter.loop", "params": {
+        "iterations": iterations, "body": body, **params,
+    }}
+
+
+def increment_body():
+    return [
+        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "old"}},
+        {"id": "core.init_nodes", "params": {"value": 1, "target": "one"}},
+        {"id": "core.add", "params": {"left": "old", "right": "one", "target": "next"}},
+        {"id": "core.attach_node_attr", "params": {"attr": "score", "source": "next"}},
+    ]
+
+
+def test_nested_atomic_loops_read_prior_iterations_and_publish_once():
+    graph = Graph()
+    graph.add_node(score=0)
+    prior = graph.read_view()
+    graph.view().apply(AtomicSteps([loop_step([loop_step(increment_body(), 3)], 2)]), persist=True)
+    assert graph.get_node_attr(0, "score") == 6
+    assert prior.node_attr(0, "score") == 0
+    assert graph.current_state_id == 2
+    assert not graph.has_uncommitted_changes()
+
+
+@pytest.mark.parametrize("body", [
+    [{"id": "core.node_degree", "params": {}}],
+    [{"params": {}}],
+])
+def test_zero_iteration_nested_loop_still_rejects_unsupported_or_malformed_body(body):
+    graph = Graph()
+    graph.add_node(score=0)
+    with pytest.raises(RuntimeError, match="does not yet support atomic"):
+        graph.view().apply(AtomicSteps(increment_body() + [loop_step([loop_step(body, 0)], 0)]), persist=True)
+    assert graph.get_node_attr(0, "score") == 0
+    assert graph.current_state_id == 1
+
+
+def test_atomic_loop_rejects_alternate_batch_plan_before_prefix_writes():
+    graph = Graph()
+    graph.add_node(score=0)
+    with pytest.raises(RuntimeError, match="does not yet support atomic"):
+        graph.view().apply(AtomicSteps(increment_body() + [loop_step([], batch_plan={})]), persist=True)
+    assert graph.get_node_attr(0, "score") == 0
+    assert graph.current_state_id == 1
+
+
+def test_empty_atomic_loops_publish_nothing_and_transient_loops_read_owner():
+    graph = Graph()
+    graph.add_node(score=0)
+    graph.view().apply(AtomicSteps([loop_step(increment_body(), 0)]), persist=True)
+    assert graph.current_state_id == 1
+    _, profile = graph.view().apply(AtomicSteps([loop_step(increment_body(), 3)]), persist=False, return_profile=True)
+    assert profile["outputs"]["node_attributes.score"] == [(0, 1)]
+    assert graph.get_node_attr(0, "score") == 0
+    assert graph.current_state_id == 1
+
+
+def test_later_loop_iteration_failure_discards_earlier_iterations():
+    graph = Graph()
+    graph.add_node(score=2)
+    body = [
+        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "old"}},
+        {"id": "core.init_nodes", "params": {"value": 1, "target": "one"}},
+        {"id": "core.sub", "params": {"left": "old", "right": "one", "target": "next"}},
+        {"id": "core.attach_node_attr", "params": {"attr": "score", "source": "next"}},
+        {"id": "core.div", "params": {"left": "one", "right": "next", "target": "ratio"}},
+    ]
+    with pytest.raises(RuntimeError, match="Loop iteration 2/3.*division by zero"):
+        graph.view().apply(AtomicSteps([loop_step(body, 3)]), persist=True)
+    assert graph.get_node_attr(0, "score") == 2
+    assert graph.current_state_id == 1
+    assert not graph.has_uncommitted_changes()
+    graph.view().apply(AtomicSteps([loop_step(increment_body())]), persist=True)
+    assert graph.get_node_attr(0, "score") == 4
+    assert graph.current_state_id == 2
+
+
+def test_public_builder_iteration_uses_atomic_loop_boundary():
+    graph = Graph()
+    graph.add_node(score=0)
+    builder = AlgorithmBuilder("loop properties")
+    with builder.iterate(3):
+        builder.attach_as("score", builder.load_attr("score") + builder.init_nodes(default=1))
+    graph.view().apply(builder.build(atomic=True), persist=True)
+    assert graph.get_node_attr(0, "score") == 3
+    assert graph.current_state_id == 2

@@ -203,12 +203,26 @@ impl LoopStep {
 }
 
 impl Step for LoopStep {
+    fn supports_atomic_properties(&self) -> bool {
+        // Batch plans execute outside StepScope's property overlay. Reject them
+        // even for zero iterations rather than certifying an alternate program.
+        self.body_json.get("batch_plan").is_none()
+            && self
+                .body_steps()
+                .is_ok_and(|steps| steps.iter().all(|step| step.supports_atomic_properties()))
+    }
+
     fn id(&self) -> &'static str {
         "iter.loop"
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let body_steps = self.body_steps()?;
+        if ctx.property_batch.is_some() && !self.supports_atomic_properties() {
+            return Err(anyhow!(
+                "iter.loop does not support this atomic property body"
+            ));
+        }
 
         // Before first iteration, create initial variable bindings
         // loop_vars format: [(initial_var, loop_var), ...]
@@ -286,8 +300,14 @@ impl Step for LoopStep {
 
         // Fallback: Execute the loop body for the specified number of iterations
         for iteration in 0..self.iterations {
-            // Execute each step in the body
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Loop cancelled before iteration {}", iteration + 1));
+            }
+            // All descendants share the outer run's staging context.
             for (step_idx, step) in body_steps.iter().enumerate() {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("Loop cancelled before step {}", step_idx + 1));
+                }
                 step.apply(ctx, scope).map_err(|e| {
                     anyhow!(
                         "Loop iteration {}/{}, step {}/{} ({}) failed: {}",
@@ -370,6 +390,44 @@ pub fn deserialize_loop_step(
 mod tests {
     use super::*;
     use crate::algorithms::steps::core::global_step_registry;
+
+    #[test]
+    fn atomic_capability_checks_descendants_and_alternate_batch_programs() {
+        crate::algorithms::steps::ensure_core_steps_registered();
+        let registry = global_step_registry();
+        let supported = serde_json::json!([
+            {"id": "iter.loop", "params": {"iterations": 0, "body": [
+                {"id": "core.init_nodes", "params": {"target": "x", "value": 1}}
+            ]}}
+        ]);
+        assert!(LoopStep::new(2, supported, registry).supports_atomic_properties());
+        for body in [
+            serde_json::json!([{"id": "core.node_degree", "params": {}}]),
+            serde_json::json!([{"params": {}}]),
+            serde_json::json!({"value": [], "batch_plan": {}}),
+        ] {
+            assert!(!LoopStep::new(0, body, registry).supports_atomic_properties());
+        }
+    }
+
+    #[test]
+    fn cancelled_loop_checks_even_an_empty_body() {
+        use crate::{api::graph::Graph, subgraphs::Subgraph};
+        use std::{
+            cell::RefCell,
+            rc::Rc,
+            sync::{atomic::AtomicBool, Arc},
+        };
+        let graph = Rc::new(RefCell::new(Graph::new_publishing()));
+        let subgraph = Subgraph::from_nodes(graph, Default::default(), "cancel".into())
+            .expect("empty selection");
+        let mut variables = super::super::core::StepVariables::default();
+        let mut scope = StepScope::new(&subgraph, &mut variables);
+        let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+        let step = LoopStep::new(2, serde_json::json!([]), global_step_registry());
+        let error = step.apply(&mut ctx, &mut scope).expect_err("cancelled");
+        assert!(error.to_string().contains("cancelled before iteration 1"));
+    }
 
     #[test]
     fn test_loop_step_creation() {

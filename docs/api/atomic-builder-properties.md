@@ -52,8 +52,12 @@ Current supported families are initialization/counts, property loads/attachments
 scalar/vector arithmetic, normalization, variable flow/alias and stroke smoothing.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
-the native pipeline, before any step executes. Loop/fused/sampling/temporal and
-other graph-dependent families still require their own migration/certification.
+the native pipeline, before any step executes. Nested `iter.loop` bodies are also supported when every descendant is certified.
+The complete body is checked even with zero iterations. Each iteration reads prior
+staged assignments; a later failure discards the entire outer run. Loops check
+cancellation between iterations and child steps. An alternate `batch_plan` rejects
+in atomic mode because its executor bypasses property staging. Fused/sampling/
+temporal and other graph-dependent families still require migration/certification.
 Sampler pipelines reject an atomic property request rather than ignoring it.
 
 Atomic mode uses the builder's original ordered steps. The current IR optimizer
@@ -80,3 +84,22 @@ steps than an optimized legacy build. Temporary memory scales with touched cells
 lookups/insertion are ordered-map operations. No constant-time, memory-budget,
 FFI/GIL or production throughput guarantee is implied. Durable journal integration,
 full arbitrary-step transactions and multi-client service isolation are separate.
+
+## Nested iterations
+
+The builder loop API produces the same native `iter.loop` steps. Atomic mode
+keeps their original ordered body; transient execution still reads the owner graph.
+No intermediate iteration publishes a version. Empty loops publish nothing.
+Recursive validation instantiates loop descendants before any outer step runs;
+large nested definitions therefore have a preparation cost. Loop working variables
+are temporary computation values and are not separately recorded in graph history.
+
+```python
+loop_builder = AlgorithmBuilder("iterated properties")
+with loop_builder.iterate(3):
+    loop_builder.attach_as("score", loop_builder.load_attr("score") + loop_builder.init_nodes(default=1))
+before_loop = graph.current_state_id
+graph.view().apply(loop_builder.build(atomic=True), persist=True)
+assert graph.get_node_attr(0, "score") == 7.0
+assert graph.current_state_id == before_loop + 1
+```
