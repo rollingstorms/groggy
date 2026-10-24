@@ -446,7 +446,7 @@ impl PySubgraphArray {
             ids.push(AttrValue::Int(idx as i64));
             node_counts.push(AttrValue::Int(node_count as i64));
             edge_counts.push(AttrValue::Int(edge_count as i64));
-            densities.push(AttrValue::Float(density as f32));
+            densities.push(AttrValue::Float64(density));
         }
 
         // Create columns
@@ -539,7 +539,6 @@ impl PySubgraphArray {
     /// ```
     fn map(&self, py: Python, func: PyObject) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
         use groggy::storage::array::BaseArray;
-        use groggy::types::AttrValue;
 
         let mut results = Vec::new();
 
@@ -548,19 +547,7 @@ impl PySubgraphArray {
             let result = func.call1(py, (subgraph.clone(),))?;
 
             // Convert result to AttrValue
-            let attr_value = if let Ok(f) = result.extract::<f64>(py) {
-                AttrValue::Float(f as f32)
-            } else if let Ok(i) = result.extract::<i64>(py) {
-                AttrValue::Int(i)
-            } else if let Ok(s) = result.extract::<String>(py) {
-                AttrValue::Text(s)
-            } else if let Ok(b) = result.extract::<bool>(py) {
-                AttrValue::Bool(b)
-            } else {
-                return Err(pyo3::exceptions::PyTypeError::new_err(
-                    "Map function must return int, float, str, or bool",
-                ));
-            };
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(result.as_ref(py))?;
 
             results.push(attr_value);
         }

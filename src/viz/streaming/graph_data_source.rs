@@ -144,12 +144,7 @@ impl DataSource for GraphDataSource {
                 let (x, y) = node
                     .position
                     .as_ref()
-                    .map(|pos| {
-                        (
-                            AttrValue::Float(pos.x as f32),
-                            AttrValue::Float(pos.y as f32),
-                        )
-                    })
+                    .map(|pos| (AttrValue::Float64(pos.x), AttrValue::Float64(pos.y)))
                     .unwrap_or((AttrValue::Null, AttrValue::Null));
 
                 vec![
@@ -341,6 +336,7 @@ fn attr_to_string(value: &AttrValue) -> Option<String> {
         AttrValue::Int(i) => Some(i.to_string()),
         AttrValue::SmallInt(i) => Some(i.to_string()),
         AttrValue::Float(f) => Some(f.to_string()),
+        AttrValue::Float64(f) => Some(f.to_string()),
         AttrValue::Bool(b) => Some(b.to_string()),
         AttrValue::Json(json) => Some(json.clone()),
         _ => None,
@@ -360,6 +356,10 @@ fn extract_position(attributes: &HashMap<String, AttrValue>) -> Option<Position>
     match (x, y) {
         (Some(x), Some(y)) => Some(Position { x, y }),
         _ => attributes.get("position").and_then(|attr| match attr {
+            AttrValue::Float64Vec(values) if values.len() >= 2 => Some(Position {
+                x: values[0],
+                y: values[1],
+            }),
             AttrValue::FloatVec(values) if values.len() >= 2 => Some(Position {
                 x: values[0] as f64,
                 y: values[1] as f64,
@@ -383,6 +383,7 @@ fn extract_weight(attributes: &HashMap<String, AttrValue>) -> Option<f64> {
 fn attr_to_f64(value: &AttrValue) -> Option<f64> {
     match value {
         AttrValue::Float(v) => Some(*v as f64),
+        AttrValue::Float64(v) => Some(*v),
         AttrValue::Int(v) => Some(*v as f64),
         AttrValue::SmallInt(v) => Some(*v as f64),
         _ => None,
@@ -468,5 +469,21 @@ impl GraphDataSource {
     /// Convenience method to access edge data by ID.
     pub fn edge(&self, id: &str) -> Option<&GraphEdge> {
         self.edges.iter().find(|edge| edge.id == id)
+    }
+}
+
+#[cfg(test)]
+mod float_width_tests {
+    use super::*;
+    #[test]
+    fn graph_positions_and_weights_accept_wide_properties() {
+        let x = 1.0 + 2f64.powi(-40);
+        let mut attributes =
+            HashMap::from([("position".into(), AttrValue::Float64Vec(vec![x, 1e300]))]);
+        let position = extract_position(&attributes).unwrap();
+        assert_eq!(position.x, x);
+        assert_eq!(position.y, 1e300);
+        attributes.insert("weight".into(), AttrValue::Float64(x));
+        assert_eq!(extract_weight(&attributes), Some(x));
     }
 }

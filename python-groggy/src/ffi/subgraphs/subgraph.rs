@@ -1849,29 +1849,7 @@ fn parse_enhanced_aggregation_spec(
                 .transpose()?;
 
             let default_value = if let Some(default_item) = dict.get_item("default")? {
-                // Convert Python value to AttrValue using the same logic as before
-                let attr_value = if let Ok(b) = default_item.extract::<bool>() {
-                    AttrValue::Bool(b)
-                } else if let Ok(i) = default_item.extract::<i64>() {
-                    AttrValue::Int(i)
-                } else if let Ok(f) = default_item.extract::<f64>() {
-                    AttrValue::Float(f as f32)
-                } else if let Ok(f) = default_item.extract::<f32>() {
-                    AttrValue::Float(f)
-                } else if let Ok(s) = default_item.extract::<String>() {
-                    AttrValue::Text(s)
-                } else if let Ok(vec) = default_item.extract::<Vec<f32>>() {
-                    AttrValue::FloatVec(vec)
-                } else if let Ok(vec) = default_item.extract::<Vec<f64>>() {
-                    let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
-                    AttrValue::FloatVec(f32_vec)
-                } else if let Ok(bytes) = default_item.extract::<Vec<u8>>() {
-                    AttrValue::Bytes(bytes)
-                } else {
-                    return Err(pyo3::exceptions::PyTypeError::new_err(
-                        "Unsupported default value type. Supported: int, float, str, bool, List[float], bytes"
-                    ));
-                };
+                let attr_value = crate::ffi::utils::python_value_to_attr_value(default_item)?;
                 Some(attr_value)
             } else {
                 None

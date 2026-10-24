@@ -98,99 +98,25 @@ impl AggregationFunction {
     }
 
     fn aggregate_sum(&self, values: &[AttrValue]) -> GraphResult<AttrValue> {
-        let mut sum = 0.0;
-        let mut has_float = false;
-
-        for value in values {
-            match value {
-                AttrValue::Int(i) => sum += *i as f64,
-                AttrValue::Float(f) => {
-                    sum += *f as f64;
-                    has_float = true;
-                }
-                AttrValue::SmallInt(i) => sum += *i as f64,
-                _ => continue, // Skip non-numeric values
-            }
-        }
-
-        if has_float {
-            Ok(AttrValue::Float(sum as f32))
+        let result =
+            crate::storage::array::BaseArray::new(values.to_vec()).aggregate_numeric("sum")?;
+        Ok(if matches!(result, AttrValue::Null) {
+            AttrValue::Int(0)
         } else {
-            Ok(AttrValue::Int(sum as i64))
-        }
+            result
+        })
     }
 
     fn aggregate_mean(&self, values: &[AttrValue]) -> GraphResult<AttrValue> {
-        let sum_result = self.aggregate_sum(values)?;
-        let count = values
-            .iter()
-            .filter(|v| {
-                matches!(
-                    v,
-                    AttrValue::Int(_) | AttrValue::Float(_) | AttrValue::SmallInt(_)
-                )
-            })
-            .count();
-
-        if count == 0 {
-            return Ok(AttrValue::Null);
-        }
-
-        match sum_result {
-            AttrValue::Int(sum) => Ok(AttrValue::Float((sum as f64 / count as f64) as f32)),
-            AttrValue::Float(sum) => Ok(AttrValue::Float(sum / count as f32)),
-            _ => Ok(AttrValue::Null),
-        }
+        crate::storage::array::BaseArray::new(values.to_vec()).aggregate_numeric("mean")
     }
 
     fn aggregate_max(&self, values: &[AttrValue]) -> GraphResult<AttrValue> {
-        let mut max_val: Option<f64> = None;
-        let mut has_float = false;
-
-        for value in values {
-            let num_val = match value {
-                AttrValue::Int(i) => *i as f64,
-                AttrValue::Float(f) => {
-                    has_float = true;
-                    *f as f64
-                }
-                AttrValue::SmallInt(i) => *i as f64,
-                _ => continue,
-            };
-
-            max_val = Some(max_val.map_or(num_val, |current| current.max(num_val)));
-        }
-
-        match max_val {
-            Some(val) if has_float => Ok(AttrValue::Float(val as f32)),
-            Some(val) => Ok(AttrValue::Int(val as i64)),
-            None => Ok(AttrValue::Null),
-        }
+        crate::storage::array::BaseArray::new(values.to_vec()).aggregate_numeric("max")
     }
 
     fn aggregate_min(&self, values: &[AttrValue]) -> GraphResult<AttrValue> {
-        let mut min_val: Option<f64> = None;
-        let mut has_float = false;
-
-        for value in values {
-            let num_val = match value {
-                AttrValue::Int(i) => *i as f64,
-                AttrValue::Float(f) => {
-                    has_float = true;
-                    *f as f64
-                }
-                AttrValue::SmallInt(i) => *i as f64,
-                _ => continue,
-            };
-
-            min_val = Some(min_val.map_or(num_val, |current| current.min(num_val)));
-        }
-
-        match min_val {
-            Some(val) if has_float => Ok(AttrValue::Float(val as f32)),
-            Some(val) => Ok(AttrValue::Int(val as i64)),
-            None => Ok(AttrValue::Null),
-        }
+        crate::storage::array::BaseArray::new(values.to_vec()).aggregate_numeric("min")
     }
 
     fn aggregate_concat(&self, values: &[AttrValue], separator: &str) -> GraphResult<AttrValue> {
@@ -201,6 +127,7 @@ impl AggregationFunction {
                 AttrValue::CompactText(s) => Some(s.as_str().to_string()),
                 AttrValue::Int(i) => Some(i.to_string()),
                 AttrValue::Float(f) => Some(f.to_string()),
+                AttrValue::Float64(f) => Some(f.to_string()),
                 AttrValue::SmallInt(i) => Some(i.to_string()),
                 AttrValue::Bool(b) => Some(b.to_string()),
                 _ => None,
@@ -547,7 +474,7 @@ mod tests {
         let sum_func = AggregationFunction::Sum;
         let result = sum_func.aggregate(&values).unwrap();
         match result {
-            AttrValue::Float(f) => assert!((f - 75.5).abs() < f32::EPSILON),
+            AttrValue::Float64(f) => assert!((f - 75.5).abs() < f64::EPSILON),
             _ => panic!("Expected float result for sum"),
         }
 
@@ -555,7 +482,7 @@ mod tests {
         let mean_func = AggregationFunction::Mean;
         let result = mean_func.aggregate(&values).unwrap();
         match result {
-            AttrValue::Float(f) => assert!((f - 18.875).abs() < f32::EPSILON),
+            AttrValue::Float64(f) => assert!((f - 18.875).abs() < f64::EPSILON),
             _ => panic!("Expected float result for mean"),
         }
 
@@ -563,7 +490,7 @@ mod tests {
         let max_func = AggregationFunction::Max;
         let result = max_func.aggregate(&values).unwrap();
         match result {
-            AttrValue::Float(f) => assert!((f - 30.5).abs() < f32::EPSILON),
+            AttrValue::Float(f) => assert_eq!(f, 30.5),
             _ => panic!("Expected float result for max"),
         }
 
@@ -571,7 +498,7 @@ mod tests {
         let min_func = AggregationFunction::Min;
         let result = min_func.aggregate(&values).unwrap();
         match result {
-            AttrValue::Float(f) => assert!((f - 10.0).abs() < f32::EPSILON),
+            AttrValue::Int(value) => assert_eq!(value, 10),
             _ => panic!("Expected float result for min"),
         }
     }

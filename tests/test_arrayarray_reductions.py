@@ -1,5 +1,4 @@
 import math
-import struct
 import pytest
 from groggy import Graph
 
@@ -15,11 +14,10 @@ def keyed(table, column):
     return dict(zip(table.column('kind').to_list(), table.column(column).to_list()))
 
 
-def test_arrayarray_group_keys_and_documented_f32_results_survive_single_and_multi_aggregation():
+def test_arrayarray_group_keys_and_f64_results_survive_single_and_multi_aggregation():
     groups = grouped_values()
     assert keyed(groups.sum(), 'sum') == {'a': 3., 'b': 10.}
-    f32 = lambda value: struct.unpack('f', struct.pack('f', value))[0]
-    expected = {'a': f32(1 / math.sqrt(2)), 'b': f32(math.sqrt(2))}
+    expected = {'a': 1 / math.sqrt(2), 'b': math.sqrt(2)}
     actual = keyed(groups.std(), 'std')
     for key in expected:
         assert actual[key] == pytest.approx(expected[key], rel=1e-14)

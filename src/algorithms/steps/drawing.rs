@@ -127,11 +127,11 @@ impl Step for SmoothStrokeAttrsStep {
                 attrs_by_name
                     .entry(target_x.clone())
                     .or_default()
-                    .push((*node, AttrValue::Float(*sx as f32)));
+                    .push((*node, AttrValue::Float64(*sx)));
                 attrs_by_name
                     .entry(target_y.clone())
                     .or_default()
-                    .push((*node, AttrValue::Float(*sy as f32)));
+                    .push((*node, AttrValue::Float64(*sy)));
             }
         }
 
@@ -147,6 +147,7 @@ impl Step for SmoothStrokeAttrsStep {
 fn attr_to_f64(value: AttrValue) -> Option<f64> {
     match value {
         AttrValue::Float(v) => Some(v as f64),
+        AttrValue::Float64(v) => Some(v),
         AttrValue::Int(v) => Some(v as f64),
         AttrValue::SmallInt(v) => Some(v as f64),
         AttrValue::Bool(v) => Some(if v { 1.0 } else { 0.0 }),
@@ -159,6 +160,7 @@ fn attr_to_i64(value: AttrValue) -> Option<i64> {
         AttrValue::Int(v) => Some(v),
         AttrValue::SmallInt(v) => Some(v as i64),
         AttrValue::Float(v) => Some(v as i64),
+        AttrValue::Float64(v) => Some(v as i64),
         AttrValue::Text(text) => text.parse::<i64>().ok(),
         _ => None,
     }

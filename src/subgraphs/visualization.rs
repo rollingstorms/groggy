@@ -75,6 +75,7 @@ impl SubgraphDataSource {
                 });
                 let weight = attributes.get("weight").and_then(|v| match v {
                     AttrValue::Float(f) => Some(*f as f64),
+                    AttrValue::Float64(f) => Some(*f),
                     AttrValue::Int(i) => Some(*i as f64),
                     _ => None,
                 });

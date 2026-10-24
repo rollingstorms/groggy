@@ -40,10 +40,8 @@ def test_compact_integer_columns_and_explicit_row_major_constructors():
         GraphMatrix.from_flattened(NumArray([1]), sys.maxsize, 3)
 
 
-def test_attribute_export_checks_f32_narrowing_and_allows_explicit_rounding():
+def test_attribute_export_preserves_f64_width_and_representable_range():
     a = GraphMatrix.from_data([[1. / 3]])
-    with pytest.raises(ValueError):
-        a.to_base_array(exact=True)
-    assert len(a.to_base_array()) == 1
-    with pytest.raises(ValueError):
-        GraphMatrix.from_data([[1e300]]).to_base_array()
+    assert a.to_base_array(exact=True).to_list() == [1. / 3]
+    assert a.to_base_array().to_list() == [1. / 3]
+    assert GraphMatrix.from_data([[1e300]]).to_base_array().to_list() == [1e300]

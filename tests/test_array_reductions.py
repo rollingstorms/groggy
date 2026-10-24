@@ -6,7 +6,7 @@ import statistics
 
 import numpy as np
 import pytest
-from groggy import BaseArray
+from groggy import AttrValue, BaseArray
 
 
 def stored(values):
@@ -65,7 +65,7 @@ def test_even_median_retains_small_result_after_large_cancellation(values):
     assert BaseArray(values).median() == -0.5
 
 
-@pytest.mark.parametrize("values", [[2**63 - 1, 1], [-(2**63), -1], [float(np.finfo(np.float32).max)] * 2])
+@pytest.mark.parametrize("values", [[2**63 - 1, 1], [-(2**63), -1], [AttrValue.float64(float(np.finfo(np.float64).max))] * 2])
 def test_sum_output_overflow_errors_without_preventing_other_statistics(values):
     array = BaseArray(values)
     with pytest.raises(ValueError, match="range"):

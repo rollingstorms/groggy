@@ -530,6 +530,7 @@ impl Step for KShortestPathsStep {
                             if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
                                 if let Some(weight) = match value {
                                     AttrValue::Float(f) => Some(f as f64),
+                                    AttrValue::Float64(f) => Some(f),
                                     AttrValue::Int(i) => Some(i as f64),
                                     _ => None,
                                 } {
@@ -731,6 +732,7 @@ impl Step for RandomWalkStep {
                     if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
                         if let Some(weight) = match value {
                             AttrValue::Float(f) => Some(f as f64),
+                            AttrValue::Float64(f) => Some(f),
                             AttrValue::Int(i) => Some(i as f64),
                             _ => None,
                         } {

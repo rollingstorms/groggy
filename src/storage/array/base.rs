@@ -325,6 +325,7 @@ impl BaseArray {
             .filter_map(|val| match val {
                 AttrValue::Int(i) => Some(*i as f64),
                 AttrValue::Float(f) => Some(*f as f64),
+                AttrValue::Float64(f) => Some(*f),
                 _ => None,
             })
             .collect();

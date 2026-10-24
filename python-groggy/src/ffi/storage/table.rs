@@ -101,10 +101,12 @@ impl PyBaseTable {
                     AttrValue::Int(_) => AttrValueType::Int,
                     AttrValue::SmallInt(_) => AttrValueType::SmallInt,
                     AttrValue::Float(_) => AttrValueType::Float,
+                    AttrValue::Float64(_) => AttrValueType::Float64,
                     AttrValue::Text(_) => AttrValueType::Text,
                     AttrValue::CompactText(_) => AttrValueType::CompactText,
                     AttrValue::Bool(_) => AttrValueType::Bool,
                     AttrValue::FloatVec(_) => AttrValueType::FloatVec,
+                    AttrValue::Float64Vec(_) => AttrValueType::Float64Vec,
                     AttrValue::Bytes(_) => AttrValueType::Bytes,
                     AttrValue::Null => AttrValueType::Null,
                     _ => AttrValueType::Text, // fallback for other types
@@ -2850,7 +2852,7 @@ impl PyBaseTable {
                 let dtype = match column.data().first() {
                     Some(groggy::AttrValue::Int(_)) => "int64",
                     Some(groggy::AttrValue::SmallInt(_)) => "int32",
-                    Some(groggy::AttrValue::Float(_)) => "float64",
+                    Some(groggy::AttrValue::Float(_) | groggy::AttrValue::Float64(_)) => "float64",
                     Some(groggy::AttrValue::Text(_)) => "string",
                     Some(groggy::AttrValue::CompactText(_)) => "string",
                     Some(groggy::AttrValue::Bool(_)) => "bool",
@@ -3867,7 +3869,7 @@ impl PyNodesTable {
                 let dtype = match column.data().first() {
                     Some(groggy::AttrValue::Int(_)) => "int64",
                     Some(groggy::AttrValue::SmallInt(_)) => "int32",
-                    Some(groggy::AttrValue::Float(_)) => "float64",
+                    Some(groggy::AttrValue::Float(_) | groggy::AttrValue::Float64(_)) => "float64",
                     Some(groggy::AttrValue::Text(_)) => "string",
                     Some(groggy::AttrValue::CompactText(_)) => "string",
                     Some(groggy::AttrValue::Bool(_)) => "bool",
@@ -4853,7 +4855,7 @@ impl PyEdgesTable {
                 let dtype = match column.data().first() {
                     Some(groggy::AttrValue::Int(_)) => "int64",
                     Some(groggy::AttrValue::SmallInt(_)) => "int32",
-                    Some(groggy::AttrValue::Float(_)) => "float64",
+                    Some(groggy::AttrValue::Float(_) | groggy::AttrValue::Float64(_)) => "float64",
                     Some(groggy::AttrValue::Text(_)) => "string",
                     Some(groggy::AttrValue::CompactText(_)) => "string",
                     Some(groggy::AttrValue::Bool(_)) => "bool",
@@ -5479,7 +5481,7 @@ impl PyGraphTable {
                 let dtype = match column.data().first() {
                     Some(groggy::AttrValue::Int(_)) => "int64",
                     Some(groggy::AttrValue::SmallInt(_)) => "int32",
-                    Some(groggy::AttrValue::Float(_)) => "float64",
+                    Some(groggy::AttrValue::Float(_) | groggy::AttrValue::Float64(_)) => "float64",
                     Some(groggy::AttrValue::Text(_)) => "string",
                     Some(groggy::AttrValue::CompactText(_)) => "string",
                     Some(groggy::AttrValue::Bool(_)) => "bool",
@@ -6145,93 +6147,10 @@ impl PyTableArray {
                     .count() as i64;
                 Ok(AttrValue::Int(count))
             }
-            "sum" => {
-                let mut sum = 0.0;
-                let mut found_numeric = false;
-                for value in data {
-                    match value {
-                        AttrValue::Int(i) => {
-                            sum += *i as f64;
-                            found_numeric = true;
-                        }
-                        AttrValue::SmallInt(i) => {
-                            sum += *i as f64;
-                            found_numeric = true;
-                        }
-                        AttrValue::Float(f) => {
-                            sum += *f as f64;
-                            found_numeric = true;
-                        }
-                        AttrValue::Null => {} // Skip nulls
-                        _ => {}               // Skip non-numeric
-                    }
-                }
-                if found_numeric {
-                    Ok(AttrValue::Float(sum as f32))
-                } else {
-                    Ok(AttrValue::Null)
-                }
-            }
-            "avg" | "mean" => {
-                let mut sum = 0.0;
-                let mut count = 0;
-                for value in data {
-                    match value {
-                        AttrValue::Int(i) => {
-                            sum += *i as f64;
-                            count += 1;
-                        }
-                        AttrValue::SmallInt(i) => {
-                            sum += *i as f64;
-                            count += 1;
-                        }
-                        AttrValue::Float(f) => {
-                            sum += *f as f64;
-                            count += 1;
-                        }
-                        AttrValue::Null => {} // Skip nulls
-                        _ => {}               // Skip non-numeric
-                    }
-                }
-                if count > 0 {
-                    Ok(AttrValue::Float((sum / count as f64) as f32))
-                } else {
-                    Ok(AttrValue::Null)
-                }
-            }
-            "min" => {
-                let mut min_val: Option<f64> = None;
-                for value in data {
-                    let numeric_val = match value {
-                        AttrValue::Int(i) => Some(*i as f64),
-                        AttrValue::SmallInt(i) => Some(*i as f64),
-                        AttrValue::Float(f) => Some(*f as f64),
-                        _ => None,
-                    };
-                    if let Some(val) = numeric_val {
-                        min_val = Some(min_val.map_or(val, |current| current.min(val)));
-                    }
-                }
-                Ok(min_val
-                    .map(|v| AttrValue::Float(v as f32))
-                    .unwrap_or(AttrValue::Null))
-            }
-            "max" => {
-                let mut max_val: Option<f64> = None;
-                for value in data {
-                    let numeric_val = match value {
-                        AttrValue::Int(i) => Some(*i as f64),
-                        AttrValue::SmallInt(i) => Some(*i as f64),
-                        AttrValue::Float(f) => Some(*f as f64),
-                        _ => None,
-                    };
-                    if let Some(val) = numeric_val {
-                        max_val = Some(max_val.map_or(val, |current| current.max(val)));
-                    }
-                }
-                Ok(max_val
-                    .map(|v| AttrValue::Float(v as f32))
-                    .unwrap_or(AttrValue::Null))
+            "sum" | "avg" | "mean" | "min" | "max" => {
+                groggy::storage::array::BaseArray::new(data.to_vec())
+                    .aggregate_numeric(agg_func.to_lowercase().as_str())
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
             }
             "all" => {
                 let mut encountered_bool = false;
@@ -6323,10 +6242,8 @@ impl PyTableArray {
             // Apply aggregation per eligible column
             for col in &agg_columns {
                 let aggregated = if let Some(column) = group_table.table.column(col) {
-                    match Self::apply_aggregation(column, kind) {
-                        Ok(value) => value,
-                        Err(_) => AttrValue::Null,
-                    }
+                    Self::apply_aggregation(column, kind)
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
                 } else {
                     AttrValue::Null
                 };
@@ -6383,7 +6300,7 @@ impl PyTableArray {
         use groggy::errors::GraphError;
 
         match kind {
-            AggregationKind::Mean => column.mean().map(|m| AttrValue::Float(m as f32)),
+            AggregationKind::Mean => column.mean().map(AttrValue::Float64),
             AggregationKind::Max => column.max(),
             AggregationKind::Min => column.min(),
             AggregationKind::Sum => column.sum(),

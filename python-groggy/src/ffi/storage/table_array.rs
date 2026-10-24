@@ -199,7 +199,6 @@ impl PyTableArray {
     /// ```
     fn map(&self, py: Python, func: PyObject) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
         use groggy::storage::array::BaseArray;
-        use groggy::types::AttrValue;
 
         let mut results = Vec::new();
 
@@ -208,19 +207,7 @@ impl PyTableArray {
             let result = func.call1(py, (table.clone(),))?;
 
             // Convert result to AttrValue
-            let attr_value = if let Ok(f) = result.extract::<f64>(py) {
-                AttrValue::Float(f as f32)
-            } else if let Ok(i) = result.extract::<i64>(py) {
-                AttrValue::Int(i)
-            } else if let Ok(s) = result.extract::<String>(py) {
-                AttrValue::Text(s)
-            } else if let Ok(b) = result.extract::<bool>(py) {
-                AttrValue::Bool(b)
-            } else {
-                return Err(pyo3::exceptions::PyTypeError::new_err(
-                    "Map function must return int, float, str, or bool",
-                ));
-            };
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(result.as_ref(py))?;
 
             results.push(attr_value);
         }

@@ -308,7 +308,7 @@ fn networkx_value_to_attr_value(nx_value: &NetworkXValue) -> GraphResult<AttrVal
     match nx_value {
         NetworkXValue::String(s) => Ok(AttrValue::Text(s.clone())),
         NetworkXValue::Integer(i) => Ok(AttrValue::Int(*i)),
-        NetworkXValue::Float(f) => Ok(AttrValue::Float(*f as f32)),
+        NetworkXValue::Float(f) => Ok(AttrValue::Float64(*f)),
         NetworkXValue::Boolean(b) => Ok(AttrValue::Bool(*b)),
         NetworkXValue::Null => Ok(AttrValue::Null),
     }

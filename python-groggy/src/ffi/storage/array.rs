@@ -138,6 +138,7 @@ impl PyBaseArray {
                     groggy::types::AttrValue::SmallInt(i) => i.to_string(),
                     groggy::types::AttrValue::Int(i) => i.to_string(),
                     groggy::types::AttrValue::Float(f) => format!("{:.2}", f),
+                    groggy::types::AttrValue::Float64(f) => format!("{:.2}", f),
                     groggy::types::AttrValue::Bool(b) => b.to_string(),
                     groggy::types::AttrValue::Null => "None".to_string(),
                     _ => format!("{:?}", v), // Catch-all for other variants
@@ -468,288 +469,62 @@ impl PyBaseArray {
 
     /// Greater than comparison (>) - returns Vec<bool> for boolean masking
     fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
-        let mut result = Vec::new();
-
-        for value in self.inner.iter() {
-            let comparison_result = match (value, &other_value) {
-                // Integer comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a > b,
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a > b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a > b,
-
-                // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a > (*b as i64),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) > *b,
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f32) > *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => *a > (*b as f32),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f32) > *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => *a > (*b as f32),
-
-                // String comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() > b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() > b.as_str()
-                }
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() > b.as_str()
-                }
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
-                    a.as_str() > b.as_str()
-                }
-
-                // Boolean comparisons (false < true)
-                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a > b,
-
-                // Handle nulls - null is less than everything
-                (groggy::AttrValue::Null, _) => false,
-                (_, groggy::AttrValue::Null) => true,
-
-                _ => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-                        "Comparison not supported between {:?} and {:?}",
-                        value, other_value
-                    )))
-                }
-            };
-            result.push(comparison_result);
-        }
-
-        // Convert Vec<bool> to unified NumArray with bool dtype
-        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
-        Ok(py_bool_array.into_py(py))
+        let other = crate::ffi::utils::python_value_to_attr_value(other)?;
+        let column = &self.inner;
+        let result = py
+            .allow_threads(|| column.compare_scalar(&other, ">"))
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
+        Ok(crate::ffi::storage::num_array::PyNumArray::new_bool(result).into_py(py))
     }
 
     /// Less than comparison (<) - returns BoolArray for boolean masking
     fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
-        let mut result = Vec::new();
-
-        for value in self.inner.iter() {
-            let comparison_result = match (value, &other_value) {
-                // Integer comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a < b,
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a < b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a < b,
-
-                // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a < (*b as i64),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) < *b,
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f32) < *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => *a < (*b as f32),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f32) < *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => *a < (*b as f32),
-
-                // String comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() < b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() < b.as_str()
-                }
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() < b.as_str()
-                }
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
-                    a.as_str() < b.as_str()
-                }
-
-                // Boolean comparisons (false < true)
-                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a < b,
-
-                // Handle nulls - null is less than everything
-                (groggy::AttrValue::Null, _) => true,
-                (_, groggy::AttrValue::Null) => false,
-
-                _ => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-                        "Comparison not supported between {:?} and {:?}",
-                        value, other_value
-                    )))
-                }
-            };
-            result.push(comparison_result);
-        }
-
-        // Convert Vec<bool> to unified NumArray with bool dtype
-        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
-        Ok(py_bool_array.into_py(py))
+        let other = crate::ffi::utils::python_value_to_attr_value(other)?;
+        let column = &self.inner;
+        let result = py
+            .allow_threads(|| column.compare_scalar(&other, "<"))
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
+        Ok(crate::ffi::storage::num_array::PyNumArray::new_bool(result).into_py(py))
     }
 
     /// Greater than or equal comparison (>=) - returns BoolArray for boolean masking
     fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
-        let mut result = Vec::new();
-
-        for value in self.inner.iter() {
-            let comparison_result = match (value, &other_value) {
-                // Integer comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a >= b,
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a >= b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a >= b,
-
-                // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a >= (*b as i64),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) >= *b,
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f32) >= *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => *a >= (*b as f32),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f32) >= *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => *a >= (*b as f32),
-
-                // String comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => {
-                    a.as_str() >= b.as_str()
-                }
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() >= b.as_str()
-                }
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() >= b.as_str()
-                }
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
-                    a.as_str() >= b.as_str()
-                }
-
-                // Boolean comparisons (false < true)
-                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a >= b,
-
-                // Handle nulls - null is less than everything
-                (groggy::AttrValue::Null, _) => false,
-                (_, groggy::AttrValue::Null) => true,
-
-                _ => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-                        "Comparison not supported between {:?} and {:?}",
-                        value, other_value
-                    )))
-                }
-            };
-            result.push(comparison_result);
-        }
-
-        // Convert Vec<bool> to unified NumArray with bool dtype
-        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
-        Ok(py_bool_array.into_py(py))
+        let other = crate::ffi::utils::python_value_to_attr_value(other)?;
+        let column = &self.inner;
+        let result = py
+            .allow_threads(|| column.compare_scalar(&other, ">="))
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
+        Ok(crate::ffi::storage::num_array::PyNumArray::new_bool(result).into_py(py))
     }
 
     /// Less than or equal comparison (<=) - returns BoolArray for boolean masking
     fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
-        let mut result = Vec::new();
-
-        for value in self.inner.iter() {
-            let comparison_result = match (value, &other_value) {
-                // Integer comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a <= b,
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a <= b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a <= b,
-
-                // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a <= (*b as i64),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) <= *b,
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f32) <= *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => *a <= (*b as f32),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f32) <= *b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => *a <= (*b as f32),
-
-                // String comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => {
-                    a.as_str() <= b.as_str()
-                }
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() <= b.as_str()
-                }
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() <= b.as_str()
-                }
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
-                    a.as_str() <= b.as_str()
-                }
-
-                // Boolean comparisons (false < true)
-                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a <= b,
-
-                // Handle nulls - null is less than everything
-                (groggy::AttrValue::Null, _) => true,
-                (_, groggy::AttrValue::Null) => false,
-
-                _ => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-                        "Comparison not supported between {:?} and {:?}",
-                        value, other_value
-                    )))
-                }
-            };
-            result.push(comparison_result);
-        }
-
-        // Convert Vec<bool> to unified NumArray with bool dtype
-        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
-        Ok(py_bool_array.into_py(py))
+        let other = crate::ffi::utils::python_value_to_attr_value(other)?;
+        let column = &self.inner;
+        let result = py
+            .allow_threads(|| column.compare_scalar(&other, "<="))
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
+        Ok(crate::ffi::storage::num_array::PyNumArray::new_bool(result).into_py(py))
     }
 
     /// Equality comparison (==) - returns BoolArray for boolean masking
     fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
-        let mut result = Vec::new();
-
-        for value in self.inner.iter() {
-            let comparison_result = match (value, &other_value) {
-                // Exact type matches
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a == b,
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a == b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => {
-                    (a - b).abs() < f32::EPSILON
-                }
-                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a == b,
-                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a == b,
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() == b.as_str()
-                }
-                (groggy::AttrValue::Null, groggy::AttrValue::Null) => true,
-
-                // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a == (*b as i64),
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) == *b,
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => {
-                    (*a as f32 - *b).abs() < f32::EPSILON
-                }
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => {
-                    (*a - *b as f32).abs() < f32::EPSILON
-                }
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => {
-                    (*a as f32 - *b).abs() < f32::EPSILON
-                }
-                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => {
-                    (*a - *b as f32).abs() < f32::EPSILON
-                }
-
-                // Mixed string comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
-                    a.as_str() == b.as_str()
-                }
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
-                    a.as_str() == b.as_str()
-                }
-
-                // Different types are not equal (including nulls with non-nulls)
-                _ => false,
-            };
-            result.push(comparison_result);
-        }
-
-        // Convert Vec<bool> to unified NumArray with bool dtype
-        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
-        Ok(py_bool_array.into_py(py))
+        let other = crate::ffi::utils::python_value_to_attr_value(other)?;
+        let column = &self.inner;
+        let result = py
+            .allow_threads(|| column.compare_scalar(&other, "=="))
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
+        Ok(crate::ffi::storage::num_array::PyNumArray::new_bool(result).into_py(py))
     }
 
     /// Not equal comparison (!=) - returns BoolArray for boolean masking
     fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
-        // Just negate the equality result
-        let eq_result = self.__eq__(py, other)?;
-        let bool_vec: Vec<bool> = eq_result.extract(py)?;
-        let ne_result: Vec<bool> = bool_vec.into_iter().map(|x| !x).collect();
-        // Convert Vec<bool> to unified NumArray with bool dtype
-        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(ne_result);
-        Ok(py_bool_array.into_py(py))
+        let other = crate::ffi::utils::python_value_to_attr_value(other)?;
+        let column = &self.inner;
+        let result = py
+            .allow_threads(|| column.compare_scalar(&other, "!="))
+            .map_err(|e| pyo3::exceptions::PyTypeError::new_err(e.to_string()))?;
+        Ok(crate::ffi::storage::num_array::PyNumArray::new_bool(result).into_py(py))
     }
 
     /// Convert numeric attributes with the native checked conversion policy.
@@ -771,33 +546,9 @@ impl PyBaseArray {
     /// Analyzes all elements to determine the most appropriate NumericType
     /// Returns None if the array contains non-numeric data
     fn infer_numeric_type(&self) -> Option<String> {
-        use groggy::NumericType;
-
-        if self.inner.is_empty() {
-            return None;
-        }
-
-        let mut current_type: Option<NumericType> = None;
-
-        for value in self.inner.iter() {
-            let value_type = match value {
-                groggy::AttrValue::Bool(_) => Some(NumericType::Bool),
-                groggy::AttrValue::SmallInt(_) => Some(NumericType::Int32),
-                groggy::AttrValue::Int(_) => Some(NumericType::Int64),
-                groggy::AttrValue::Float(_) => Some(NumericType::Float32),
-                groggy::AttrValue::Null => continue, // Skip nulls in type inference
-                _ => return None,                    // Non-numeric data found
-            };
-
-            if let Some(vt) = value_type {
-                current_type = Some(match current_type {
-                    None => vt,
-                    Some(ct) => ct.promote_with(vt),
-                });
-            }
-        }
-
-        current_type.map(|t| format!("{:?}", t))
+        self.inner
+            .infer_numeric_type()
+            .map(|dtype| format!("{dtype:?}"))
     }
 
     /// Convert numeric attributes using native promotion; missing values error.
@@ -833,13 +584,15 @@ impl PyBaseArray {
                 groggy::AttrValue::Bool(_)
                 | groggy::AttrValue::SmallInt(_)
                 | groggy::AttrValue::Int(_)
-                | groggy::AttrValue::Float(_) => {
+                | groggy::AttrValue::Float(_)
+                | groggy::AttrValue::Float64(_) => {
                     numeric_count += 1;
                     let type_name = match value {
                         groggy::AttrValue::Bool(_) => "bool",
                         groggy::AttrValue::SmallInt(_) => "int32",
                         groggy::AttrValue::Int(_) => "int64",
                         groggy::AttrValue::Float(_) => "float32",
+                        groggy::AttrValue::Float64(_) => "float64",
                         _ => unreachable!(),
                     };
                     *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
@@ -850,6 +603,7 @@ impl PyBaseArray {
                         groggy::AttrValue::Text(_) => "text",
                         groggy::AttrValue::CompactText(_) => "compact_text",
                         groggy::AttrValue::FloatVec(_) => "float_vec",
+                        groggy::AttrValue::Float64Vec(_) => "float64_vec",
                         groggy::AttrValue::Bytes(_) => "bytes",
                         _ => "other",
                     };
@@ -1246,71 +1000,11 @@ impl PyBaseArray {
     /// sorted_desc = array.sort(ascending=False)
     /// ```
     pub fn sort(&self, ascending: Option<bool>) -> PyResult<Self> {
-        let ascending = ascending.unwrap_or(true);
-
-        let mut indexed_values: Vec<(usize, groggy::types::AttrValue)> = self
-            .inner
-            .data()
-            .iter()
-            .enumerate()
-            .map(|(i, v)| (i, v.clone()))
-            .collect();
-
-        // Sort by AttrValue comparison
-        indexed_values.sort_by(|(_, a), (_, b)| {
-            use std::cmp::Ordering;
-            match (a, b) {
-                // Numeric comparisons
-                (groggy::types::AttrValue::Int(a), groggy::types::AttrValue::Int(b)) => {
-                    if ascending {
-                        a.cmp(b)
-                    } else {
-                        b.cmp(a)
-                    }
-                }
-                (groggy::types::AttrValue::Float(a), groggy::types::AttrValue::Float(b)) => {
-                    let ord = a.partial_cmp(b).unwrap_or(Ordering::Equal);
-                    if ascending {
-                        ord
-                    } else {
-                        ord.reverse()
-                    }
-                }
-                (groggy::types::AttrValue::Int(a), groggy::types::AttrValue::Float(b)) => {
-                    let ord = (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal);
-                    if ascending {
-                        ord
-                    } else {
-                        ord.reverse()
-                    }
-                }
-                (groggy::types::AttrValue::Float(a), groggy::types::AttrValue::Int(b)) => {
-                    let ord = a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal);
-                    if ascending {
-                        ord
-                    } else {
-                        ord.reverse()
-                    }
-                }
-                // String comparisons
-                (groggy::types::AttrValue::Text(a), groggy::types::AttrValue::Text(b)) => {
-                    if ascending {
-                        a.cmp(b)
-                    } else {
-                        b.cmp(a)
-                    }
-                }
-                // Default case - maintain original order
-                _ => Ordering::Equal,
-            }
-        });
-
-        let sorted_values: Vec<groggy::types::AttrValue> =
-            indexed_values.into_iter().map(|(_, v)| v).collect();
-
-        Ok(Self {
-            inner: groggy::storage::array::BaseArray::new(sorted_values),
-        })
+        let indices = self.inner.sort_indices(ascending.unwrap_or(true));
+        self.inner
+            .take_indices(&indices)
+            .map(|inner| Self { inner })
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     /// Reverse the order of elements

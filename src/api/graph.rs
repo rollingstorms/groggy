@@ -3207,6 +3207,7 @@ fn extract_numeric(attr_value: &AttrValue) -> f64 {
     match attr_value {
         AttrValue::Int(i) => *i as f64,
         AttrValue::Float(f) => *f as f64,
+        AttrValue::Float64(f) => *f,
         AttrValue::SmallInt(i) => *i as f64,
         _ => 0.0, // Non-numeric values default to 0
     }

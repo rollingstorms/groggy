@@ -286,61 +286,21 @@ impl PyGraphQuery {
         let dict = PyDict::new(py);
         dict.set_item("count", values.len())?;
 
-        if !values.is_empty() {
-            // Convert first value to determine type for aggregation
-            if let Some(first_val) = values.first() {
-                match first_val {
-                    groggy::AttrValue::Int(_) | groggy::AttrValue::SmallInt(_) => {
-                        let int_values: Vec<i64> = values
-                            .iter()
-                            .filter_map(|v| match v {
-                                groggy::AttrValue::Int(i) => Some(*i),
-                                groggy::AttrValue::SmallInt(i) => Some(*i as i64),
-                                _ => None,
-                            })
-                            .collect();
-
-                        if !int_values.is_empty() {
-                            dict.set_item("sum", int_values.iter().sum::<i64>())?;
-                            dict.set_item("min", *int_values.iter().min().unwrap())?;
-                            dict.set_item("max", *int_values.iter().max().unwrap())?;
-                            dict.set_item(
-                                "mean",
-                                int_values.iter().sum::<i64>() as f64 / int_values.len() as f64,
-                            )?;
-                        }
-                    }
-                    groggy::AttrValue::Float(_) => {
-                        let float_values: Vec<f64> = values
-                            .iter()
-                            .filter_map(|v| match v {
-                                groggy::AttrValue::Float(f) => Some(*f as f64),
-                                _ => None,
-                            })
-                            .collect();
-
-                        if !float_values.is_empty() {
-                            dict.set_item("sum", float_values.iter().sum::<f64>())?;
-                            dict.set_item(
-                                "min",
-                                float_values.iter().fold(f64::INFINITY, |a, &b| a.min(b)),
-                            )?;
-                            dict.set_item(
-                                "max",
-                                float_values
-                                    .iter()
-                                    .fold(f64::NEG_INFINITY, |a, &b| a.max(b)),
-                            )?;
-                            dict.set_item(
-                                "mean",
-                                float_values.iter().sum::<f64>() / float_values.len() as f64,
-                            )?;
-                        }
-                    }
-                    _ => {
-                        // For non-numeric types, just provide count
-                    }
-                }
+        let column = groggy::storage::array::BaseArray::new(values);
+        for (name, operation) in [
+            ("sum", "sum"),
+            ("min", "min"),
+            ("max", "max"),
+            ("mean", "mean"),
+        ] {
+            let value = column
+                .aggregate_numeric(operation)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+            if !matches!(value, groggy::AttrValue::Null) {
+                dict.set_item(
+                    name,
+                    crate::ffi::utils::attr_value_to_python_value(py, &value)?,
+                )?;
             }
         }
 

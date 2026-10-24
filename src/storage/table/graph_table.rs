@@ -1872,9 +1872,11 @@ impl GraphTable {
         match value {
             AttrValue::Int(i) => i.to_string(),
             AttrValue::Float(f) => f.to_string(),
+            AttrValue::Float64(f) => f.to_string(),
             AttrValue::Text(s) => format!("\"{}\"", s.replace("\"", "\"\"")), // Escape quotes
             AttrValue::Bool(b) => b.to_string(),
             AttrValue::Null => "".to_string(),
+            AttrValue::Float64Vec(v) => format!("{v:?}"),
             AttrValue::FloatVec(v) => format!(
                 "[{}]",
                 v.iter()
@@ -2046,8 +2048,8 @@ impl GraphTable {
         if let Ok(i) = field.parse::<i64>() {
             return AttrValue::Int(i);
         }
-        if let Ok(f) = field.parse::<f32>() {
-            return AttrValue::Float(f);
+        if let Ok(f) = field.parse::<f64>() {
+            return AttrValue::Float64(f);
         }
         AttrValue::Text(field.to_string())
     }

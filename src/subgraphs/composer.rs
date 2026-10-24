@@ -392,7 +392,7 @@ impl MetaNodePlan {
                     // Provide sensible defaults based on aggregation function
                     match function_str {
                         "sum" => AttrValue::Int(0),
-                        "mean" | "min" | "max" => AttrValue::Float(0.0),
+                        "mean" | "min" | "max" => AttrValue::Float64(0.0),
                         "first" | "concat" => AttrValue::Text("".to_string()),
                         _ => AttrValue::Int(0),
                     }
@@ -490,7 +490,7 @@ impl MetaNodePlan {
                     // LENIENT MODE: Provide sensible defaults based on aggregation function
                     match function_str {
                         "sum" => AttrValue::Int(0),
-                        "mean" | "min" | "max" => AttrValue::Float(0.0),
+                        "mean" | "min" | "max" => AttrValue::Float64(0.0),
                         "first" | "concat" => AttrValue::Text("".to_string()),
                         _ => AttrValue::Int(0),
                     }

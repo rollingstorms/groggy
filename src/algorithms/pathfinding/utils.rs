@@ -293,6 +293,7 @@ pub fn collect_edge_weights(
             if let Ok(Some(value)) = graph.get_edge_attr(edge_id, attr) {
                 if let Some(weight) = match value {
                     AttrValue::Float(f) => Some(f as f64),
+                    AttrValue::Float64(f) => Some(f),
                     AttrValue::Int(i) => Some(i as f64),
                     _ => None,
                 } {

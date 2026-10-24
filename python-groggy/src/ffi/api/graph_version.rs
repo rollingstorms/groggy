@@ -322,6 +322,7 @@ impl PyGraphVersion {
                     RustAttrValue::Int(i) => i.to_object(py),
                     RustAttrValue::SmallInt(i) => i.to_object(py),
                     RustAttrValue::Float(f) => f.to_object(py),
+                    RustAttrValue::Float64(f) => f.to_object(py),
                     RustAttrValue::Bool(b) => b.to_object(py),
                     _ => continue, // Skip unsupported types
                 };

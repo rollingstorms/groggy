@@ -46,6 +46,14 @@ impl PyAttrValue {
         Self::from_py_value(value)
     }
 
+    /// Explicit f32 storage with native checked rounding; finite overflow rejects.
+    #[staticmethod]
+    fn float32(value: f64) -> PyResult<Self> {
+        RustAttrValue::Float64(value)
+            .to_numeric_type(groggy::NumericType::Float32)
+            .map(Self::new)
+            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Value exceeds float32 range"))
+    }
     /// Explicit lossless f64 scalar property; legacy f32 constructors remain typed.
     #[staticmethod]
     fn float64(value: f64) -> Self {
@@ -59,8 +67,11 @@ impl PyAttrValue {
 
     /// Explicit float32 vector constructor, including empty vectors and numeric casts.
     #[staticmethod]
-    fn float_vec(values: Vec<f32>) -> Self {
-        Self::new(RustAttrValue::FloatVec(values))
+    fn float_vec(values: Vec<f64>) -> PyResult<Self> {
+        groggy::storage::array::NumArray::new(values)
+            .cast_with_policy::<f32>(groggy::storage::numeric::scalar::ConversionPolicy::Round)
+            .map(|array| Self::new(RustAttrValue::FloatVec(array.as_slice().to_vec())))
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     /// Explicit int64 vector constructor.
@@ -262,62 +273,21 @@ impl PyAttributeCollection {
             // Count
             dict.set_item("count", values.len())?;
 
-            // Type-specific statistics
-            if !values.is_empty() {
-                match &values[0] {
-                    RustAttrValue::Int(_) => {
-                        let int_values: Vec<i64> = values
-                            .iter()
-                            .filter_map(|v| {
-                                if let RustAttrValue::Int(i) = v {
-                                    Some(*i)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-
-                        if !int_values.is_empty() {
-                            let sum: i64 = int_values.iter().sum();
-                            let avg = sum as f64 / int_values.len() as f64;
-                            let min = *int_values.iter().min().unwrap();
-                            let max = *int_values.iter().max().unwrap();
-
-                            dict.set_item("sum", sum)?;
-                            dict.set_item("average", avg)?;
-                            dict.set_item("min", min)?;
-                            dict.set_item("max", max)?;
-                        }
-                    }
-                    RustAttrValue::Float(_) => {
-                        let float_values: Vec<f32> = values
-                            .iter()
-                            .filter_map(|v| {
-                                if let RustAttrValue::Float(f) = v {
-                                    Some(*f)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-
-                        if !float_values.is_empty() {
-                            let sum: f32 = float_values.iter().sum();
-                            let avg = sum / float_values.len() as f32;
-                            let min = float_values.iter().fold(f32::INFINITY, |a, &b| a.min(b));
-                            let max = float_values
-                                .iter()
-                                .fold(f32::NEG_INFINITY, |a, &b| a.max(b));
-
-                            dict.set_item("sum", sum)?;
-                            dict.set_item("average", avg)?;
-                            dict.set_item("min", min)?;
-                            dict.set_item("max", max)?;
-                        }
-                    }
-                    _ => {
-                        // For other types, just provide count
-                    }
+            let column = groggy::storage::array::BaseArray::new(values);
+            for (name, operation) in [
+                ("sum", "sum"),
+                ("min", "min"),
+                ("max", "max"),
+                ("average", "mean"),
+            ] {
+                let value = column
+                    .aggregate_numeric(operation)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                if !matches!(value, RustAttrValue::Null) {
+                    dict.set_item(
+                        name,
+                        crate::ffi::utils::attr_value_to_python_value(py, &value)?,
+                    )?;
                 }
             }
 

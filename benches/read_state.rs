@@ -378,6 +378,10 @@ fn read_state(c: &mut Criterion) {
             assert_eq!(table.check_outliers("x", None).unwrap().data().iter().filter(|v| matches!(v, AttrValue::Bool(true))).count(), 1);
             group.bench_with_input(BenchmarkId::new(name, count), &table, |b, table| b.iter(|| black_box(table.check_outliers("x", None).unwrap())));
         }
+        let compare_column = groggy::storage::array::BaseArray::new((0..count).map(|i| AttrValue::Float64(1.0 + i as f64 * 2f64.powi(-40))).collect());
+        assert_eq!(compare_column.compare_scalar(&AttrValue::Float64(1.0), ">").unwrap().iter().filter(|&&v| v).count(), count - 1);
+        group.bench_with_input(BenchmarkId::new("compare_f64_scalar", count), &compare_column, |b, column| b.iter(|| black_box(column.compare_scalar(&AttrValue::Float64(1.0), ">").unwrap())));
+        group.bench_with_input(BenchmarkId::new("sort_f64_indices", count), &compare_column, |b, column| b.iter(|| black_box(column.sort_indices(false))));
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

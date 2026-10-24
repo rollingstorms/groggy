@@ -522,7 +522,8 @@ impl EdgesTable {
         let predicate = match value {
             AttrValue::Text(s) => format!("{} == \"{}\"", attr_name, s),
             AttrValue::Int(i) => format!("{} == {}", attr_name, i),
-            AttrValue::Float(f) => format!("{} == {}", attr_name, f),
+            AttrValue::Float(f) => format!("{} == {}", attr_name, f64::from(*f)),
+            AttrValue::Float64(f) => format!("{} == {}", attr_name, f),
             AttrValue::Bool(b) => format!("{} == {}", attr_name, b),
             _ => format!("{} == null", attr_name),
         };
@@ -764,7 +765,7 @@ impl DataSource for EdgesTable {
                                     data_type = DataType::Integer;
                                     break;
                                 }
-                                Some(AttrValue::Float(_)) => {
+                                Some(AttrValue::Float(_) | AttrValue::Float64(_)) => {
                                     data_type = DataType::Float;
                                     break;
                                 }
@@ -883,6 +884,7 @@ impl DataSource for EdgesTable {
                     .or_else(|| attributes.get("cost"))
                     .and_then(|v| match v {
                         AttrValue::Float(f) => Some(*f as f64),
+                        AttrValue::Float64(f) => Some(*f),
                         AttrValue::Int(i) => Some(*i as f64),
                         _ => None,
                     });
@@ -895,6 +897,7 @@ impl DataSource for EdgesTable {
                         AttrValue::Text(s) => s.clone(),
                         AttrValue::Int(i) => i.to_string(),
                         AttrValue::Float(f) => f.to_string(),
+                        AttrValue::Float64(f) => f.to_string(),
                         _ => edge_id.to_string(),
                     });
 

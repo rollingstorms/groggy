@@ -121,6 +121,90 @@ where
 
 // Specialized implementation for AttrValue (used by table system)
 impl BaseArray<AttrValue> {
+    /// Compare a scalar using exact numeric predicates and separate logical domains.
+    pub fn compare_scalar(
+        &self,
+        other: &AttrValue,
+        operator: &str,
+    ) -> crate::GraphResult<Vec<bool>> {
+        if !["==", "!=", ">", "<", ">=", "<="].contains(&operator) {
+            return Err(crate::GraphError::InvalidInput(
+                "Unknown comparison operator".into(),
+            ));
+        }
+        use crate::storage::numeric::scalar::{attribute_number, compare_operator};
+        use std::cmp::Ordering;
+        self.iter()
+            .map(|value| {
+                if let Some((a, b)) = attribute_number(value).zip(attribute_number(other)) {
+                    return Ok(compare_operator(a, b, operator));
+                }
+                if operator == "==" || operator == "!=" {
+                    let equal = value == other;
+                    return Ok(if operator == "==" { equal } else { !equal });
+                }
+                let order = match (value, other) {
+                    (AttrValue::Null, AttrValue::Null) => Ordering::Equal,
+                    (AttrValue::Null, _) => Ordering::Less,
+                    (_, AttrValue::Null) => Ordering::Greater,
+                    (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
+                    _ => match (value.get_text(), other.get_text()) {
+                        (Some(a), Some(b)) => a.cmp(&b),
+                        _ => {
+                            return Err(crate::GraphError::InvalidInput(format!(
+                                "Comparison not supported between {value:?} and {other:?}"
+                            )))
+                        }
+                    },
+                };
+                Ok(match operator {
+                    ">" => order.is_gt(),
+                    "<" => order.is_lt(),
+                    ">=" => !order.is_lt(),
+                    "<=" => !order.is_gt(),
+                    _ => {
+                        return Err(crate::GraphError::InvalidInput(
+                            "Unknown comparison operator".into(),
+                        ))
+                    }
+                })
+            })
+            .collect()
+    }
+
+    /// Infer the promoted stored numeric type, skipping nulls and rejecting other domains.
+    pub fn infer_numeric_type(&self) -> Option<crate::types::NumericType> {
+        let mut inferred: Option<crate::types::NumericType> = None;
+        for value in self.iter().filter(|v| !matches!(v, AttrValue::Null)) {
+            let dtype = value.numeric_type()?;
+            inferred = Some(inferred.map_or(dtype, |previous| previous.promote_with(dtype)));
+        }
+        inferred
+    }
+
+    /// Numeric-only compatibility aggregation; nonnumeric cells are not observations.
+    pub fn aggregate_numeric(&self, operation: &str) -> crate::GraphResult<AttrValue> {
+        use crate::storage::numeric::scalar::attribute_number;
+        let values: Vec<_> = self
+            .iter()
+            .filter(|v| attribute_number(v).is_some())
+            .cloned()
+            .collect();
+        if values.is_empty() {
+            return Ok(AttrValue::Null);
+        }
+        let column = Self::new(values);
+        match operation {
+            "sum" => column.sum(),
+            "mean" | "avg" => column.mean().map(AttrValue::Float64),
+            "min" => column.min(),
+            "max" => column.max(),
+            _ => Err(crate::GraphError::InvalidInput(format!(
+                "Unknown numeric aggregation {operation}"
+            ))),
+        }
+    }
+
     /// Create a BaseArray from a vector of AttrValues
     pub fn from_attr_values(values: Vec<AttrValue>) -> Self {
         Self::new(values)
@@ -166,7 +250,20 @@ impl BaseArray<AttrValue> {
         let mut indices: Vec<usize> = (0..self.len()).collect();
 
         indices.sort_by(|&a, &b| {
-            let ordering = self.inner[a].cmp(&self.inner[b]);
+            use crate::storage::numeric::scalar::{attribute_number, compare_inputs};
+            let (left, right) = (&self.inner[a], &self.inner[b]);
+            let ordering = match (left, right) {
+                (AttrValue::Null, AttrValue::Null) => std::cmp::Ordering::Equal,
+                (AttrValue::Null, _) => std::cmp::Ordering::Less,
+                (_, AttrValue::Null) => std::cmp::Ordering::Greater,
+                _ => match (attribute_number(left), attribute_number(right)) {
+                    (Some(a), Some(b)) => compare_inputs(a, b)
+                        .unwrap_or_else(|| a.as_f64().is_nan().cmp(&b.as_f64().is_nan())),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    _ => left.cmp(right),
+                },
+            };
             if ascending {
                 ordering
             } else {

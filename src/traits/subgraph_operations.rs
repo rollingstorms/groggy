@@ -122,134 +122,22 @@ impl EdgeAggregationFunction {
         }
 
         match self {
-            Self::Sum => match values.first().unwrap() {
-                AttrValue::Int(_) => {
-                    let sum: i64 = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Int(i) = v {
-                                Some(*i)
-                            } else {
-                                None
-                            }
-                        })
-                        .sum();
-                    Ok(AttrValue::Int(sum))
+            Self::Sum | Self::Mean | Self::Max | Self::Min => {
+                let operation = match self {
+                    Self::Sum => "sum",
+                    Self::Mean => "mean",
+                    Self::Max => "max",
+                    _ => "min",
+                };
+                let result = crate::storage::array::BaseArray::new(values.to_vec())
+                    .aggregate_numeric(operation)?;
+                if matches!(result, AttrValue::Null) {
+                    return Err(GraphError::InvalidInput(
+                        "Numeric aggregation requires numeric observations".into(),
+                    ));
                 }
-                AttrValue::Float(_) => {
-                    let sum: f32 = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Float(f) = v {
-                                Some(*f)
-                            } else {
-                                None
-                            }
-                        })
-                        .sum();
-                    Ok(AttrValue::Float(sum))
-                }
-                _ => Err(GraphError::InvalidInput(
-                    "Sum aggregation only supported for numeric types".to_string(),
-                )),
-            },
-            Self::Mean => match values.first().unwrap() {
-                AttrValue::Int(_) => {
-                    let nums: Vec<i64> = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Int(i) = v {
-                                Some(*i)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    let mean = nums.iter().sum::<i64>() as f32 / nums.len() as f32;
-                    Ok(AttrValue::Float(mean))
-                }
-                AttrValue::Float(_) => {
-                    let nums: Vec<f32> = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Float(f) = v {
-                                Some(*f)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    let mean = nums.iter().sum::<f32>() / nums.len() as f32;
-                    Ok(AttrValue::Float(mean))
-                }
-                _ => Err(GraphError::InvalidInput(
-                    "Mean aggregation only supported for numeric types".to_string(),
-                )),
-            },
-            Self::Max => match values.first().unwrap() {
-                AttrValue::Int(_) => {
-                    let max = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Int(i) = v {
-                                Some(*i)
-                            } else {
-                                None
-                            }
-                        })
-                        .max()
-                        .unwrap();
-                    Ok(AttrValue::Int(max))
-                }
-                AttrValue::Float(_) => {
-                    let max = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Float(f) = v {
-                                Some(*f)
-                            } else {
-                                None
-                            }
-                        })
-                        .fold(f32::NEG_INFINITY, |a, b| a.max(b));
-                    Ok(AttrValue::Float(max))
-                }
-                _ => Err(GraphError::InvalidInput(
-                    "Max aggregation only supported for numeric types".to_string(),
-                )),
-            },
-            Self::Min => match values.first().unwrap() {
-                AttrValue::Int(_) => {
-                    let min = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Int(i) = v {
-                                Some(*i)
-                            } else {
-                                None
-                            }
-                        })
-                        .min()
-                        .unwrap();
-                    Ok(AttrValue::Int(min))
-                }
-                AttrValue::Float(_) => {
-                    let min = values
-                        .iter()
-                        .filter_map(|v| {
-                            if let AttrValue::Float(f) = v {
-                                Some(*f)
-                            } else {
-                                None
-                            }
-                        })
-                        .fold(f32::INFINITY, |a, b| a.min(b));
-                    Ok(AttrValue::Float(min))
-                }
-                _ => Err(GraphError::InvalidInput(
-                    "Min aggregation only supported for numeric types".to_string(),
-                )),
-            },
+                Ok(result)
+            }
             Self::Count => Ok(AttrValue::Int(values.len() as i64)),
             Self::Concat => {
                 let concatenated = values
@@ -850,7 +738,7 @@ pub trait SubgraphOperations: GraphEntity {
         if values.is_empty() {
             let default = match agg_function {
                 "sum" => AttrValue::Int(0),
-                "mean" | "min" | "max" => AttrValue::Float(0.0),
+                "mean" | "min" | "max" => AttrValue::Float64(0.0),
                 "first" | "concat" => AttrValue::Text("".to_string()),
                 _ => AttrValue::Int(0),
             };

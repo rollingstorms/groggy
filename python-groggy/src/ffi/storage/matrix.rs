@@ -1431,7 +1431,7 @@ impl PyGraphMatrix {
 
                 // Get the value from the matrix
                 match self.inner.get(row, col) {
-                    Some(f64_value) => values.push(AttrValue::Float(f64_value as f32)),
+                    Some(f64_value) => values.push(AttrValue::Float64(f64_value)),
                     None => values.push(AttrValue::Null),
                 }
             }
