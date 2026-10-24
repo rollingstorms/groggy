@@ -121,3 +121,12 @@ and the full Python timedelta domain. Aware datetimes normalize to UTC; naive
 datetimes reject. Versioned payloads retain values through history, export and
 checked journal recovery. See [implementation and verification](temporal-properties-2026-10-23.md).
 Local/zoned calendar types and temporal arithmetic remain separate future scope.
+
+## A03.1 checkpoint boundary — 2026-10-23
+
+12.3a now supplies explicit checkpoints of clean published states, including
+writer sessions and durable recovery. Clean `commit()` labels that state without
+a duplicate mutation delta. Dirty legacy `commit()` retains a publication
+compatibility path. 09.4a adds native fallible checked constructors; switching
+ordinary Rust/Python defaults and auditing pooled/meta/compound mutations remains
+09.4b under the existing authorization. See [implementation record](explicit-checkpoints-2026-10-23.md).

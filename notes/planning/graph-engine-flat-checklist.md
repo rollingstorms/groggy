@@ -39,7 +39,7 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
 **Immediate next task:** migrate ordinary Graph mutations to checked automatic
-publication (09.4), with explicit checkpoint semantics (12.3), using the shared
+publication (09.4b), using the completed checkpoint boundary (12.3a) and shared
 logical change model (AR7.9). F64 property migration (07.3a) and native temporal
 properties (07.3b) are complete. Broader immutable legacy-view, retained pool/meta
 recovery and effective-time reconstruction gates remain open. Preserve existing
@@ -97,6 +97,8 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.2 — Checked writer and change clocks.** Rust/Python checked direct/bulk writes use batches, expected-state checks, typed deltas, engine-recorded batch time, batch effective-time defaults, and per-change overrides.
 - [x] **09.3 — Durable checked publication.** Journal sync precedes memory publication; schema and managed identity changes participate; injected write/sync/rollback/publication failures have coverage.
 - [ ] **09.4 — Partial: finish mutation migration.** Migrate ordinary Graph mutations to checked automatic publication now (A03.1); commit denotes an explicit checkpoint. Include pooled/meta writes, visible failures and compatibility fixtures.
+- [x] **09.4a — Fallible publishing constructors.** Native `try_add_node`/`try_add_nodes` use checked publication, retain one bulk delta, consume no IDs on rejection and treat count zero as a no-op. Legacy infallible constructors remain explicit compatibility APIs; this does not switch ordinary mutation defaults.
+- [ ] **09.4b — Ordinary mutation default migration.** Route remaining public Rust/Python mutations, pooled/meta operations and algorithm/table writeback through checked operation boundaries; preserve compound/bulk atomicity and propagate publication failures. Owner already authorized switching defaults.
 - [ ] **09.5 — Open: service transaction/concurrency contract.** Define reader snapshots, writer serialization/conflicts, multi-user boundaries, and episode/meta-node grouping before calling the embedded checked writer a multi-client database.
 - [x] **10.1 — Recoverable checked journal.** Versioned checksummed CBOR preserves supported inline checked writes, IDs/reservations, schema/configuration, branches, typed history, and original clocks; restart/corruption/truncation/subprocess tests exist.
 - [x] **10.2 — Verified full-journal backup.** Sync and verify a temporary backup, publish without overwriting, and restore through ordinary recovery. Active graph export remains a separate narrower format.
@@ -106,7 +108,8 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **11.2 — Partial: complete property history.** Finish coalescing, deletion/unset/null distinctions, effective versus recorded ordering, all value types, and retained value references. Do not confuse property changes with deltas of the encoded value itself.
 - [x] **12.1 — Recorded state switching foundations.** Preserve direction, ID allocation, retained membership/endpoints, and backing column references through branch switches/reset; reject missing referents.
 - [ ] **12.2 — Partial: exact portable snapshots.** Restore all configuration and pinned referents; bound repeated-switch column allocation and verify reads independently of the working head.
-- [ ] **12.3 — Open: explicit checkpoint semantics.** Make an explicit commit/snapshot checkpoint the current published state through a compatible migration. Automatic deltas remain available between checkpoints.
+- [ ] **12.3 — Partial: explicit checkpoint semantics.** Make an explicit commit/snapshot checkpoint the current published state through a compatible migration. Automatic deltas remain available between checkpoints.
+- [x] **12.3a — Checkpoint published states without duplicate deltas.** `checkpoint`, writer checkpoint and clean `commit()` label the current version, preserving state IDs and publication clocks. Durable records sync/replay/backup labels with original timestamps; stale/dirty/schema failures reject, empty/repeated labels work and checkpoints are not permanent retention pins. Legacy dirty `commit()` publishes once for compatibility. See `explicit-checkpoints-2026-10-23.md`; ordinary defaults remain 09.4b.
 - [x] **13.1 — Hard reset foundations.** Restore the recorded state while preserving allocated-ID reservations and retained pool references.
 - [x] **13.2 — State-based diffs.** Compare reconstructed states in either direction with deterministic typed property and topology changes in Rust/Python.
 - [ ] **13.3 — Open: complete reversals and rewiring.** Implement revert and endpoint changes, define destructive versus tracked operations, and cover dirty working-state examples and data preservation.

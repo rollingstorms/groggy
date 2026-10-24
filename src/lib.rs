@@ -174,6 +174,7 @@ pub use api::graph::{
 };
 pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};
+pub use state::checkpoint::Checkpoint;
 pub use state::publication::{ChangeKey, PublicationMetadata, TimestampMicros};
 pub use state::{HistoricalView, HistoryForest, ViewSummary};
 pub use storage::journal::DurableGraph;

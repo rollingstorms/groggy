@@ -5,7 +5,9 @@ from .batch import GraphBatch
 
 
 class GraphWriter:
-    """Each call stages one native batch and publishes exactly one state.
+    """Each mutation stages one native batch and publishes exactly one state.
+
+    Explicit checkpoints label the selected state without publishing a new one.
 
     Keep the owning graph for reads. Another writer advancing its head makes this
     session stale until explicitly refreshed. A private copy of the schema is
@@ -26,6 +28,12 @@ class GraphWriter:
         """Explicitly target the graph's latest published head on the next call."""
         self._state_id = self._graph.current_state_id
         return self._state_id
+
+    def checkpoint(self, message="checkpoint"):
+        """Label this published state without allocating another mutation version."""
+        return self._graph.checkpoint(
+            message, self._author, expected_state=self._state_id, schema=self._schema
+        )
 
     def apply_batch(self, batch, message="write"):
         result = self._graph.apply_batch(

@@ -8,6 +8,23 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+pub(super) fn checkpoints_to_python(
+    py: Python,
+    records: &[groggy::Checkpoint],
+) -> PyResult<PyObject> {
+    let output = pyo3::types::PyList::empty(py);
+    for record in records {
+        let row = PyDict::new(py);
+        row.set_item("state_id", record.state_id)?;
+        row.set_item("branch", &record.branch)?;
+        row.set_item("message", &record.message)?;
+        row.set_item("author", &record.author)?;
+        row.set_item("recorded_at", record.recorded_at)?;
+        output.append(row)?;
+    }
+    Ok(output.to_object(py))
+}
+
 /// Version control operations for graphs
 #[pyclass(name = "GraphVersion")]
 pub struct PyGraphVersion {
@@ -159,6 +176,19 @@ impl PyGraphVersion {
             .commit(message, author)
             .map_err(graph_error_to_py_err);
         commit_result
+    }
+
+    /// Mark an already-published clean state without creating another version.
+    fn checkpoint(&self, py: Python, message: String, author: String) -> PyResult<StateId> {
+        self.graph
+            .borrow(py)
+            .inner
+            .borrow_mut()
+            .checkpoint(message, author)
+            .map_err(graph_error_to_py_err)
+    }
+    fn checkpoints(&self, py: Python) -> PyResult<PyObject> {
+        checkpoints_to_python(py, self.graph.borrow(py).inner.borrow().checkpoints())
     }
 
     /// Create a new branch

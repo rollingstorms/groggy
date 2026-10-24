@@ -16,6 +16,18 @@ pub struct GraphWriter<'a> {
     effective_at: Option<crate::TimestampMicros>,
 }
 impl Graph {
+    /// Checked, automatically published alternative to the legacy infallible constructor.
+    pub fn try_add_node(&mut self) -> GraphResult<NodeId> {
+        self.writer("groggy").add_node(HashMap::new())
+    }
+    /// Add all nodes in one checked publication; an empty input is a no-op.
+    pub fn try_add_nodes(&mut self, count: usize) -> GraphResult<Vec<NodeId>> {
+        if count == 0 {
+            return Ok(Vec::new());
+        }
+        self.writer("groggy").add_nodes(count)
+    }
+
     /// Start a publishing write session at the current head. No state is changed.
     pub fn writer(&mut self, author: impl Into<String>) -> GraphWriter<'_> {
         let expected_state = self.current_state_id();
@@ -29,6 +41,16 @@ impl Graph {
     }
 }
 impl<'a> GraphWriter<'a> {
+    /// Mark this session's selected published state without publishing another delta.
+    pub fn checkpoint(&mut self, message: impl Into<String>) -> GraphResult<StateId> {
+        self.graph.checkpoint_with_schema(
+            self.expected_state,
+            message.into(),
+            self.author.clone(),
+            self.schema,
+        )
+    }
+
     /// Require each resulting graph to satisfy this policy during the session.
     pub fn with_schema(mut self, schema: &'a GraphSchema) -> Self {
         self.schema = Some(schema);

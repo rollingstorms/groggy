@@ -323,6 +323,40 @@ impl PyDurableGraph {
                 .map_err(graph_error_to_py_err)?,
         })
     }
+    #[pyo3(signature=(message,author,*,expected_state=None,schema=None))]
+    fn checkpoint(
+        &mut self,
+        message: String,
+        author: String,
+        expected_state: Option<StateId>,
+        schema: Option<&PyDict>,
+    ) -> PyResult<StateId> {
+        let schema = schema.map(parse_schema).transpose()?;
+        let expected = match expected_state {
+            Some(state) => state,
+            None => self
+                .core()?
+                .graph()
+                .map_err(graph_error_to_py_err)?
+                .current_state_id(),
+        };
+        self.core_mut()?
+            .checkpoint_with_schema(expected, message, author, schema.as_ref())
+            .map_err(graph_error_to_py_err)
+    }
+    /// An explicit checkpoint; durable mutations have already been published.
+    fn commit(&mut self, message: String, author: String) -> PyResult<StateId> {
+        self.checkpoint(message, author, None, None)
+    }
+    fn checkpoints(&self, py: Python) -> PyResult<PyObject> {
+        super::graph_version::checkpoints_to_python(
+            py,
+            self.core()?
+                .graph()
+                .map_err(graph_error_to_py_err)?
+                .checkpoints(),
+        )
+    }
     fn commit_history(&self) -> PyResult<Vec<super::graph_version::PyCommit>> {
         Ok(self
             .core()?

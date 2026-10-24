@@ -1759,6 +1759,26 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    /// Explicitly checkpoint a clean published state, preserving its ID.
+    #[pyo3(signature=(message,author,*,expected_state=None,schema=None))]
+    fn checkpoint(
+        &mut self,
+        message: String,
+        author: String,
+        expected_state: Option<StateId>,
+        schema: Option<&PyDict>,
+    ) -> PyResult<StateId> {
+        let mut graph = self.inner.borrow_mut();
+        let schema = schema.map(parse_schema).transpose()?;
+        let expected = expected_state.unwrap_or_else(|| graph.current_state_id());
+        graph
+            .checkpoint_with_schema(expected, message, author, schema.as_ref())
+            .map_err(graph_error_to_py_err)
+    }
+    fn checkpoints(&self, py: Python) -> PyResult<PyObject> {
+        super::graph_version::checkpoints_to_python(py, self.inner.borrow().checkpoints())
+    }
+
     /// Create a new branch (FFI wrapper around core history system)
     fn create_branch(&mut self, branch_name: String) -> PyResult<()> {
         self.inner

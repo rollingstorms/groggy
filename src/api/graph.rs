@@ -11,6 +11,7 @@
 //! - HistoryForest = Version Control (immutable snapshots, branching)
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
+mod checkpoints;
 mod identity;
 pub(crate) mod kinds;
 mod matrices;
@@ -2006,16 +2007,27 @@ impl Graph {
         })
     }
 
-    /// Commit current changes to history
-    ///
-    /// ALGORITHM:
-    /// 1. Create a snapshot of current changes (ask space)
-    /// 2. pool the snapshot in history system with metadata
-    /// 3. Update current commit pointer
-    /// 4. Clear change tracker
-    /// 5. Return new commit ID
+    /// Explicitly checkpoint the current published state, preserving its version ID.
+    /// For compatibility, pending legacy/manual writes are first published once;
+    /// checked writer changes are already published and do not create a new delta.
     pub fn commit(&mut self, message: String, author: String) -> Result<StateId, GraphError> {
-        self.commit_internal(message, author, None)
+        if !self.has_uncommitted_changes() {
+            return self.checkpoint(message, author);
+        }
+        // Compatibility: publish pending manual writes once, then mark that state.
+        // New checked writes are already published and take the clean path above.
+        self.history.get_branch_head(&self.current_branch)?;
+        let recorded_at = crate::state::publication::now_micros()?;
+        self.history.reserve_checkpoint()?;
+        let state_id = self.commit_internal(message.clone(), author.clone(), None)?;
+        self.history.record_checkpoint(crate::Checkpoint {
+            state_id,
+            branch: self.current_branch.clone(),
+            message,
+            author,
+            recorded_at,
+        });
+        Ok(state_id)
     }
 
     fn commit_internal(

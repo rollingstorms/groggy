@@ -296,3 +296,18 @@ See `temporal-properties-2026-10-23.md` and `docs/api/temporal-properties.md`.
 This closes 07.3b, not the broader property-format/pooled-reference parent or
 mutation effective-time reconstruction. Next: 09.4 ordinary checked publication
 and 12.3 explicit checkpoint semantics under the confirmed owner decision.
+
+## 2026-10-23 — explicit checkpoint boundary (12.3a / 09.4a)
+
+Clean `commit()` and explicit checkpoint/writer operations now label the selected
+published version without allocating another state or changing mutation clocks.
+Legacy dirty `commit()` publishes once for compatibility. Durable checkpoint
+records sync before visibility and recover original metadata through replay and
+backup; stale/dirty/schema failures, crash boundaries and invalid record targets
+have coverage. Checkpoints do not add permanent retention pins or materialized
+recovery images. New native fallible insertion conveniences publish checked bulk
+operations. See `explicit-checkpoints-2026-10-23.md`.
+
+Ordinary mutation defaults, including pooled/meta and compound write paths,
+remain 09.4b. The owner's authorization to migrate them stands; this foundation
+does not close the broad publication/default or storage lifecycle parents.

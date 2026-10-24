@@ -135,6 +135,9 @@ enum Record {
         schema: Option<GraphSchema>,
         revision: u64,
     },
+    Checkpoint {
+        record: crate::Checkpoint,
+    },
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -470,6 +473,7 @@ impl DurableGraph {
                 *schema = policy;
                 *revision = next;
             }
+            Record::Checkpoint { record } => graph.record_checkpoint(record)?,
             Record::Init { .. } => return Err(invalid("duplicate initialization")),
         }
         Ok(())
@@ -677,6 +681,42 @@ impl DurableGraph {
         self.schema_revision = revision;
         Ok(revision)
     }
+    /// Sync an explicit checkpoint annotation before making it visible in memory.
+    /// The checkpoint preserves the selected state ID and its original clocks.
+    pub fn checkpoint(
+        &mut self,
+        expected_state: StateId,
+        message: String,
+        author: String,
+    ) -> GraphResult<StateId> {
+        self.checkpoint_with_schema(expected_state, message, author, None)
+    }
+    /// Check an additional checkpoint policy before writing the durable annotation.
+    pub fn checkpoint_with_schema(
+        &mut self,
+        expected_state: StateId,
+        message: String,
+        author: String,
+        additional_schema: Option<&GraphSchema>,
+    ) -> GraphResult<StateId> {
+        self.ready()?;
+        self.graph.validate_write_head(expected_state)?;
+        if let Some(schema) = additional_schema {
+            self.graph.check_schema_policy(schema)?;
+        }
+        let record = self
+            .graph
+            .prepare_checkpoint(expected_state, message, author)?;
+        self.append(Record::Checkpoint {
+            record: record.clone(),
+        })?;
+        if let Err(error) = self.graph.record_checkpoint(record) {
+            self.poisoned = true;
+            return Err(error);
+        }
+        Ok(expected_state)
+    }
+
     /// Create a durable branch from the selected clean head.
     pub fn create_branch(&mut self, name: String, expected_state: StateId) -> GraphResult<()> {
         self.ready()?;
@@ -744,6 +784,88 @@ mod tests {
             metadata,
         )
     }
+    #[test]
+    fn checkpoint_write_failures_do_not_expose_metadata_or_consume_version_ids() {
+        for failure in [
+            Failure::BeforeHeader,
+            Failure::AfterHeader,
+            Failure::AfterPayload,
+            Failure::AfterSync,
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("checkpoints.ggj");
+            let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+            let original = std::fs::read(&path).unwrap();
+            store.failure = Some(failure);
+            assert!(store
+                .checkpoint(0, "rejected".into(), "test".into())
+                .is_err());
+            assert!(store.graph().unwrap().checkpoints().is_empty());
+            assert_eq!(store.graph().unwrap().current_state_id(), 0);
+            assert_eq!(std::fs::read(&path).unwrap(), original);
+            store.failure = None;
+            assert_eq!(
+                store
+                    .checkpoint(0, "accepted".into(), "test".into())
+                    .unwrap(),
+                0
+            );
+            let result = store
+                .apply_batch(
+                    GraphBatch {
+                        add_nodes: 1,
+                        ..Default::default()
+                    },
+                    0,
+                    "node".into(),
+                    "test".into(),
+                )
+                .unwrap();
+            assert_eq!(result.state_id, 1);
+        }
+    }
+    #[test]
+    fn checkpoint_synced_before_memory_publication_recovers_original_metadata() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("checkpoints.ggj");
+        let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+        let record = store
+            .graph
+            .prepare_checkpoint(0, "empty".into(), "test".into())
+            .unwrap();
+        store
+            .append(Record::Checkpoint {
+                record: record.clone(),
+            })
+            .unwrap();
+        assert!(store.graph.checkpoints().is_empty());
+        drop(store);
+        let recovered = DurableGraph::open(&path).unwrap();
+        assert_eq!(recovered.graph().unwrap().checkpoints(), &[record]);
+        assert_eq!(recovered.graph().unwrap().current_state_id(), 0);
+    }
+
+    #[test]
+    fn recovery_rejects_checkpoint_records_for_a_different_head_or_branch() {
+        for wrong_branch in [false, true] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("bad-checkpoint.ggj");
+            let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+            let mut record = store
+                .graph
+                .prepare_checkpoint(0, "bad".into(), "test".into())
+                .unwrap();
+            if wrong_branch {
+                record.branch = "other".into();
+            } else {
+                record.state_id = 10;
+            }
+            store.append(Record::Checkpoint { record }).unwrap();
+            drop(store);
+            assert!(DurableGraph::open(&path).is_err());
+        }
+    }
+
     #[test]
     fn synced_record_replays_after_crash_before_memory_publication() {
         let directory = tempfile::tempdir().unwrap();

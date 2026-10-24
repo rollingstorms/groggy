@@ -10,6 +10,7 @@
 
 pub mod change;
 pub mod change_tracker;
+pub mod checkpoint;
 pub mod delta;
 pub mod history;
 pub mod publication;

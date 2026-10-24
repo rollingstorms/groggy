@@ -92,9 +92,24 @@ pub struct HistoryForest {
     */
     /// Next available state ID
     next_state_id: StateId,
+    checkpoints: Vec<crate::Checkpoint>,
 }
 
 impl HistoryForest {
+    /// Explicit checkpoints in acceptance order, independent of version IDs.
+    pub fn checkpoints(&self) -> &[crate::Checkpoint] {
+        &self.checkpoints
+    }
+
+    pub(crate) fn reserve_checkpoint(&mut self) -> crate::GraphResult<()> {
+        self.checkpoints.try_reserve(1).map_err(|error| {
+            GraphError::InvalidInput(format!("Cannot reserve checkpoint metadata: {error}"))
+        })
+    }
+    pub(crate) fn record_checkpoint(&mut self, record: crate::Checkpoint) {
+        self.checkpoints.push(record);
+    }
+
     /// Create a new empty history system
     pub fn new() -> Self {
         Self::new_with_type(GraphType::default())
@@ -113,6 +128,7 @@ impl HistoryForest {
             tags: HashMap::new(),
             children: HashMap::new(),
             roots: HashSet::new(),
+            checkpoints: Vec::new(),
             next_state_id: 1, // 0 is reserved for empty state
         }
     }
