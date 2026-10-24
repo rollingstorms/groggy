@@ -237,8 +237,8 @@ def block_step(nodes, *, direction="in", mode="message_pass", **options):
     }}
 
 
-def body_node(op, inputs, output="result", **metadata):
-    return {"id": output, "domain": "core", "op_type": op,
+def body_node(operation, inputs, output="result", **metadata):
+    return {"id": output, "domain": "core", "op_type": operation,
             "inputs": inputs, "output": output, "metadata": metadata}
 
 
@@ -388,3 +388,90 @@ def test_public_message_pass_builder_supports_atomic_attachment():
     graph.view().apply(builder.build(atomic=True), persist=True)
     assert graph.current_state_id == before + 1
     assert [graph.get_node_attr(n, "label") for n in range(3)] == [2, 2, 2]
+
+
+@pytest.mark.parametrize("operator,expected", [
+    ("eq", [-10, 10, -10]), ("ne", [10, -10, 10]),
+    ("lt", [10, -10, -10]), ("le", [10, 10, -10]),
+    ("gt", [-10, -10, 10]), ("ge", [-10, 10, 10]),
+])
+def test_public_conditional_message_pass_matches_normal_builder(operator, expected):
+    graph = Graph()
+    graph.add_nodes([{"score": -1}, {"score": 0}, {"score": 2}])
+    before = graph.current_state_id
+    for blocked in [False, True]:
+        builder = AlgorithmBuilder("conditional block" if blocked else "conditional map")
+        values = builder.load_attr("score")
+        if blocked:
+            with builder.message_pass(target=values) as messages:
+                mask = builder.core.compare(values, operator, 0)
+                chosen = builder.core.where(mask, 10, -10)
+                messages.apply(chosen)
+            chosen = values
+        else:
+            mask = builder.core.compare(values, operator, 0)
+            chosen = builder.core.where(mask, 10, -10)
+        builder.attach_as("blocked" if blocked else "mapped", chosen)
+        graph.view().apply(builder.build(atomic=True), persist=True)
+    assert graph.current_state_id == before + 2
+    assert [graph.get_node_attr(n, "mapped") for n in range(3)] == expected
+    assert [graph.get_node_attr(n, "blocked") for n in range(3)] == expected
+
+
+def test_conditional_block_masks_match_existing_epsilon_rule():
+    graph = Graph()
+    epsilon = 2.220446049250313e-16
+    graph.add_nodes([{"mask": mask} for mask in [0, epsilon / 2, epsilon, epsilon * 2, -1]])
+    for blocked in [False, True]:
+        builder = AlgorithmBuilder("mask parity")
+        mask = builder.load_attr("mask")
+        if blocked:
+            with builder.message_pass(target=mask) as messages:
+                selected = builder.core.where(mask, 7, 9)
+                messages.apply(selected)
+            selected = mask
+        else:
+            selected = builder.core.where(mask, 7, 9)
+        builder.attach_as("blocked" if blocked else "mapped", selected)
+        graph.view().apply(builder.build(atomic=True), persist=True)
+    assert [graph.get_node_attr(n, "blocked") for n in range(5)] == [9, 9, 9, 7, 7]
+    assert [graph.get_node_attr(n, "mapped") for n in range(5)] == [9, 9, 9, 7, 7]
+
+
+@pytest.mark.parametrize("node", [
+    body_node("compare", ["values", "values"], op="unknown"),
+    body_node("compare", ["values", "values"], op=123),
+    body_node("compare", ["values"]),
+    body_node("where", ["values", "values", "values", "extra"]),
+])
+def test_malformed_block_conditionals_reject_before_prefix_writes(node):
+    graph = Graph()
+    graph.add_node(score=0)
+    with pytest.raises(RuntimeError, match="does not yet support atomic"):
+        graph.view().apply(AtomicSteps(increment_body() + [block_step([node])]), persist=True)
+    assert graph.current_state_id == 1
+    assert graph.get_node_attr(0, "score") == 0
+
+
+@pytest.mark.parametrize("mask,expected", [(1, "chosen"), (0, None), ("invalid", None)])
+def test_block_where_resolves_only_selected_value_and_rolls_back_errors(mask, expected):
+    graph = Graph()
+    graph.add_node(mask=mask)
+    steps = [
+        {"id": "core.load_node_attr", "params": {"target": "values", "attr": "mask"}},
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "prefix"}},
+        block_step([body_node("constant", [], "yes", value="chosen"),
+                    body_node("where", ["values", "yes", "missing"])]),
+        {"id": "core.attach_node_attr", "params": {"source": "values", "attr": "answer"}},
+    ]
+    if expected is None:
+        with pytest.raises(RuntimeError, match="missing|expected numeric"):
+            graph.view().apply(AtomicSteps(steps), persist=True)
+        assert graph.current_state_id == 1
+        assert graph.get_node_attr(0, "prefix") is None
+        assert graph.get_node_attr(0, "answer") is None
+    else:
+        graph.view().apply(AtomicSteps(steps), persist=True)
+        assert graph.current_state_id == 2
+        assert graph.get_node_attr(0, "answer") == expected
+    assert graph.get_node_attr(0, "mask") == mask

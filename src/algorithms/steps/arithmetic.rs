@@ -542,7 +542,7 @@ impl CompareOp {
         }
     }
 
-    fn apply(self, left: f64, right: f64) -> bool {
+    pub(crate) fn apply(self, left: f64, right: f64) -> bool {
         match self {
             CompareOp::Eq => (left - right).abs() < f64::EPSILON,
             CompareOp::Ne => (left - right).abs() >= f64::EPSILON,
@@ -737,6 +737,11 @@ where
     Ok(result)
 }
 
+/// Shared builder-mask rule; keep map and execution-block selection identical.
+pub(crate) fn condition_is_true(value: &AlgorithmParamValue, context: &str) -> Result<bool> {
+    Ok(NumericValue::from(value, context)?.as_f64().abs() > f64::EPSILON)
+}
+
 /// Element-wise conditional selection (where/if-then-else).
 pub struct WhereStep {
     condition: String,
@@ -850,8 +855,7 @@ fn where_node_map(
 
     for node in keys {
         let cond_val = condition.get(&node).expect("key must exist");
-        let cond_num = NumericValue::from(cond_val, cond_name)?;
-        let is_true = cond_num.as_f64().abs() > f64::EPSILON;
+        let is_true = condition_is_true(cond_val, cond_name)?;
 
         let selected = if is_true {
             match &if_true {
@@ -902,8 +906,7 @@ fn where_edge_map(
 
     for edge in keys {
         let cond_val = condition.get(&edge).expect("key must exist");
-        let cond_num = NumericValue::from(cond_val, cond_name)?;
-        let is_true = cond_num.as_f64().abs() > f64::EPSILON;
+        let is_true = condition_is_true(cond_val, cond_name)?;
 
         let selected = if is_true {
             match &if_true {

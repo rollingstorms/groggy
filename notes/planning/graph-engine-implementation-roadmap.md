@@ -378,3 +378,13 @@ semantics remain an explicit 30.1/AR7.8 repair; effect-aware optimization, alter
 batch plans, remaining families and atomic defaults stay open. Verification:
 940 native tests, 1,112 root Python tests, 39 doc examples and strict Clippy;
 four release ring workload receipts. See `atomic-builder-blocks-2026-10-24.md`.
+
+### Conditional message-pass execution — 2026-10-24
+
+Implemented 09.4b.2j: compare and three-input where now honor the existing builder
+comparison/mask contract inside ordered message-pass blocks. Malformed arities
+and operators reject before execution; selected-value errors discard the outer
+atomic run. This supersedes the previous placeholder-where gap. Existing numeric
+tolerance is preserved; synchronous/unordered execution, remaining step families,
+effect-aware optimization and atomic defaults remain parent work. Details and
+verification: `atomic-builder-conditionals-2026-10-24.md`.

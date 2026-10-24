@@ -143,10 +143,48 @@ assert [message_graph.get_node_attr(n, "label") for n in range(3)] == [2, 2, 2]
 - Integer block arithmetic retains integer results and truncating integer
   division, with explicit overflow and zero-division errors. Floating division
   by zero also errors. These errors discard the outer atomic run's staged writes.
-- Atomic blocks reject streaming, `ordered=False`, unsupported body operations,
-  and the legacy placeholder `where` operation before any pipeline step executes.
-  Legacy `where` still requires a separate semantic repair; it is not certified.
+- Atomic blocks reject streaming, `ordered=False` and unsupported body operations
+  before any pipeline step executes. Supported conditional operations are described
+  below; malformed conditional inputs also reject during preparation.
 - A block builds a selected directional CSR once per invocation, then evaluates
   its body in order. Repeated blocks rebuild that CSR; directional cache reuse
   remains a possible optimization. These paths do not enable the IR optimizer
   for atomic builds or change the default `atomic=False` policy.
+
+## Conditional message passing
+
+Block `compare` now accepts the same six operators as `core.compare`: `eq`, `ne`,
+`lt`, `le`, `gt`, `ge`. It returns a numeric 0.0/1.0 mask. Block `where` takes
+exactly three inputs in order: condition, true value, false value. It now evaluates
+the condition and selects the corresponding value, preserving that value's type.
+This also repairs ordinary non-atomic blocks that previously returned the first
+input unconditionally.
+
+```python
+conditional_graph = Graph()
+conditional_graph.add_nodes([{"score": -1}, {"score": 0}, {"score": 2}])
+conditional_builder = AlgorithmBuilder("conditional messages")
+values = conditional_builder.load_attr("score")
+with conditional_builder.message_pass(target=values) as messages:
+    mask = conditional_builder.core.compare(values, "gt", 0)
+    messages.apply(conditional_builder.core.where(mask, 10, -10))
+conditional_builder.attach_as("selected", values)
+conditional_graph.view().apply(conditional_builder.build(atomic=True), persist=True)
+assert [conditional_graph.get_node_attr(n, "selected") for n in range(3)] == [-10, -10, 10]
+assert conditional_graph.current_state_id == 2
+```
+
+Block/map mask selection shares one native helper. Existing numeric-mask behavior
+is retained: true means `abs(value) > f64::EPSILON`; zero, values at/below that
+threshold and NaN are false. Non-numeric masks reject. This is the existing
+builder convention, not a new general truthiness rule. Comparison preserves the
+existing f64 conversion/tolerance behavior, including its precision limitations
+for large integers; this change does not introduce exact typed comparisons.
+
+Only the selected `where` value is resolved at that point. Earlier body operations
+still execute eagerly in recorded order; `where` does not skip a division or other
+computation already present in the body. A missing selected value or invalid mask
+raises an error and discards the outer atomic run's staged writes. Incorrect
+input counts and unknown/non-text comparison operators reject before any outer
+step executes, including for an empty graph. Old two-input placeholder `where`
+specifications now reject explicitly.

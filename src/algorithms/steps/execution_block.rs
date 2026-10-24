@@ -14,6 +14,7 @@ use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions}
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context};
+use super::arithmetic::{condition_is_true, CompareOp};
 use super::core::{Step, StepMetadata, StepScope};
 use super::direction::NeighborDirection;
 
@@ -248,6 +249,23 @@ impl ExecutionBlockStep {
     /// Validate that the block body contains only supported operations.
     fn validate_body_support(&self, body: &BlockBody) -> Result<()> {
         for body_node in &body.nodes {
+            let arity = match body_node.op_type.as_str() {
+                "where" => Some(3),
+                "compare" => Some(2),
+                _ => None,
+            };
+            if let Some(arity) = arity {
+                if body_node.inputs.len() != arity {
+                    return Err(anyhow!(
+                        "{} requires exactly {} inputs",
+                        body_node.op_type,
+                        arity
+                    ));
+                }
+            }
+            if body_node.op_type == "compare" {
+                comparison_op(body_node)?;
+            }
             match body_node.op_type.as_str() {
                 // Supported operations
                 "collect_neighbor_values"
@@ -259,6 +277,7 @@ impl ExecutionBlockStep {
                 | "mul"
                 | "div"
                 | "where"
+                | "compare"
                 | "apply" => {
                     // OK
                 }
@@ -433,48 +452,34 @@ impl ExecutionBlockStep {
                 apply_arithmetic(body_node.op_type.as_str(), &left_value, &right_value)
             }
 
-            // Conditional operations
+            "compare" => {
+                let [left, right] = body_node.inputs.as_slice() else {
+                    return Err(anyhow!("compare requires exactly 2 inputs"));
+                };
+                let left =
+                    self.resolve_node_value(left, node_id, node_column, local_values, scope)?;
+                let right =
+                    self.resolve_node_value(right, node_id, node_column, local_values, scope)?;
+                let result =
+                    comparison_op(body_node)?.apply(value_to_f64(&left)?, value_to_f64(&right)?);
+                Ok(AlgorithmParamValue::Float(if result { 1.0 } else { 0.0 }))
+            }
+
+            // Inputs match core.where: condition, true value, false value.
+            // Resolve only the selected value; preceding body operations still
+            // execute eagerly in their recorded order.
             "where" => {
-                let if_true_name = body_node.inputs.get(0).ok_or_else(|| {
-                    anyhow!(
-                        "where requires if_true input (inputs={:?})",
-                        body_node.inputs
-                    )
-                })?;
-                let if_false_name = body_node.inputs.get(1).ok_or_else(|| {
-                    anyhow!(
-                        "where requires if_false input (inputs={:?})",
-                        body_node.inputs
-                    )
-                })?;
-
-                let if_true_value = if let Some(val) = local_values.get(if_true_name) {
-                    val.clone()
-                } else {
-                    self.resolve_node_value(
-                        if_true_name,
-                        node_id,
-                        node_column,
-                        local_values,
-                        scope,
-                    )?
+                let [condition, if_true, if_false] = body_node.inputs.as_slice() else {
+                    return Err(anyhow!("where requires exactly 3 inputs"));
                 };
-
-                let _if_false_value = if let Some(val) = local_values.get(if_false_name) {
-                    val.clone()
+                let condition =
+                    self.resolve_node_value(condition, node_id, node_column, local_values, scope)?;
+                let selected = if condition_is_true(&condition, "execution block condition")? {
+                    if_true
                 } else {
-                    self.resolve_node_value(
-                        if_false_name,
-                        node_id,
-                        node_column,
-                        local_values,
-                        scope,
-                    )?
+                    if_false
                 };
-
-                // Simplified: just return if_true for now
-                // Full implementation would evaluate condition
-                Ok(if_true_value)
+                self.resolve_node_value(selected, node_id, node_column, local_values, scope)
             }
 
             "neighbor_agg" => {
@@ -534,10 +539,9 @@ impl Step for ExecutionBlockStep {
                 .direction
                 .as_deref()
                 .is_none_or(|value| NeighborDirection::from_str(value).is_some())
-            && self.body().is_ok_and(|body| {
-                self.validate_body_support(body).is_ok()
-                    && body.nodes.iter().all(|node| node.op_type != "where")
-            })
+            && self
+                .body()
+                .is_ok_and(|body| self.validate_body_support(body).is_ok())
     }
 
     fn id(&self) -> &'static str {
@@ -569,6 +573,16 @@ impl Step for ExecutionBlockStep {
             }
         }
     }
+}
+
+fn comparison_op(node: &BodyNode) -> Result<CompareOp> {
+    let operator = match node.metadata.get("op") {
+        None => "eq",
+        Some(value) => value
+            .as_str()
+            .ok_or_else(|| anyhow!("compare 'op' must be text"))?,
+    };
+    CompareOp::from_str(operator)
 }
 
 /// Apply arithmetic operation to two values.
@@ -818,6 +832,47 @@ mod atomic_tests {
     }
 
     #[test]
+    fn conditional_validation_checks_arity_and_comparison_operator() {
+        let block = |nodes| {
+            ExecutionBlockStep::new(
+                ExecutionMode::MessagePass,
+                "x".into(),
+                BlockOptions::default(),
+                serde_json::json!({"nodes": nodes}),
+            )
+        };
+        let node = |op, inputs, metadata| {
+            serde_json::json!({
+                "id": "result", "domain": "core", "op_type": op,
+                "inputs": inputs, "output": "result", "metadata": metadata
+            })
+        };
+        assert!(block(vec![node(
+            "where",
+            vec!["mask", "yes", "no"],
+            serde_json::json!({})
+        )])
+        .supports_atomic_properties());
+        assert!(block(vec![node(
+            "compare",
+            vec!["x", "y"],
+            serde_json::json!({"op":"gt"})
+        )])
+        .supports_atomic_properties());
+        for entry in [
+            node("where", vec!["yes", "no"], serde_json::json!({})),
+            node(
+                "compare",
+                vec!["x", "y"],
+                serde_json::json!({"op":"unknown"}),
+            ),
+            node("compare", vec!["x", "y"], serde_json::json!({"op":true})),
+        ] {
+            assert!(!block(vec![entry]).supports_atomic_properties());
+        }
+    }
+
+    #[test]
     fn atomic_blocks_reject_unimplemented_modes_and_operations() {
         let empty = serde_json::json!({"nodes": []});
         assert!(ExecutionBlockStep::new(
@@ -842,7 +897,7 @@ mod atomic_tests {
             !ExecutionBlockStep::new(ExecutionMode::MessagePass, "x".into(), options, empty)
                 .supports_atomic_properties()
         );
-        for op in ["where", "attach_node_attr", "unknown"] {
+        for op in ["attach_node_attr", "unknown"] {
             let body = serde_json::json!({"nodes": [{"id": "n", "domain": "core", "op_type": op, "inputs": [], "output": "x"}]});
             assert!(!ExecutionBlockStep::new(
                 ExecutionMode::MessagePass,
