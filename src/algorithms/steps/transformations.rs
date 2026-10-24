@@ -13,7 +13,7 @@ use super::core::{Step, StepInput, StepMetadata, StepScope};
 use super::expression::{Expr, ExprContext};
 use super::filtering::compare_values;
 
-fn selected_nodes(subgraph: &crate::subgraphs::Subgraph, ctx: &Context) -> Result<Vec<NodeId>> {
+pub(super) fn selected_nodes(subgraph: &crate::subgraphs::Subgraph, ctx: &Context) -> Result<Vec<NodeId>> {
     if ctx.is_cancelled() {
         return Err(anyhow!("transformation cancelled"));
     }

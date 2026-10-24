@@ -53,7 +53,7 @@ scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
 fused arithmetic/neighbor kernels, node degree and incident-weight sums,
 undirected triangle/k-core calculations, property filtering and ordering, checked
 statistical/category/neighbor aggregations, declarative expression maps and
-neighbor/in-place label transformations, node/edge/reservoir mask sampling, and
+neighbor/in-place label transformations, node/edge/reservoir mask sampling, checked community helpers, and
 ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
@@ -397,3 +397,5 @@ ownership correction and the standalone/message-pass distinction.
 Expression and transformation semantics, examples and costs: [checked builder transformations](builder-transformations.md).
 
 Mask sampling controls and examples: [checked builder sampling](builder-sampling.md).
+
+Community seeding, propagation and local gain contracts: [checked community helpers](builder-community.md).

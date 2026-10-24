@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **174 checked and 79 unchecked entries**. Entries overlap:
+currently contains **177 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -9,7 +9,7 @@ not a completion percentage or an estimate of remaining implementation effort.
 Count correction: the earlier summary omitted three already checked A* entries
 because its heading parser treated the literal asterisk as formatting. The earlier atomic-builder pass
 added two checked slices; three other entries were a counting correction. The
-nested-loop, fused/block, conditional, synchronous, two structural, filtering and three aggregation, three transformation and three sampling extensions add sixteen further checked slices. Counts now use checkbox markers independently of headings.
+nested-loop, fused/block, conditional, synchronous, two structural, filtering and three aggregation, three transformation, three sampling and three community extensions add nineteen further checked slices. Counts now use checkbox markers independently of headings.
 
 ## Recent completed slices
 
@@ -33,6 +33,7 @@ nested-loop, fused/block, conditional, synchronous, two structural, filtering an
 | 09.4b.2o–2q | Shared checked statistics, deterministic categories/owned histogram vectors, five neighbor reducers and public/optimizer lowering parity. |
 | 09.4b.2r–2t | Checked expression operators/literals, scoped synchronous/async maps and deterministic selected label/copy transformations; opaque callbacks remain uncertified. |
 | 09.4b.2u–2w | Stable isolated node/edge mask sampling and bounded map-key reservoirs with strict controls, selected identity validation and atomic publication. |
+| 09.4b.2x–2z | Checked seeding, synchronous propagation and actual directed/undirected local modularity gains verified against independent full-objective moves. |
 
 
 
@@ -71,8 +72,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest sampling-bundle change: **961 native tests passed, 52 ignored; 1,452 root
-Python API tests passed, 1 skipped; 56 executable documentation examples passed;
+Latest community-bundle change: **964 native tests passed, 52 ignored; 1,489 root
+Python API tests passed, 1 skipped; 60 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

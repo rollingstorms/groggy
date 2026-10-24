@@ -1739,8 +1739,23 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let strategy_str = spec.params.expect_text("strategy")?;
             let strategy = SeedStrategy::from_str(strategy_str)?;
             let target = spec.params.expect_text("target")?.to_string();
-            let k = spec.params.get_int("k").map(|i| i as usize);
-            let seed = spec.params.get_int("seed").map(|i| i as u64);
+            let k = spec
+                .params
+                .get("k")
+                .map(|_| {
+                    let k = spec.params.expect_int("k")?;
+                    let k = usize::try_from(k)
+                        .map_err(|_| anyhow!("k must be positive and fit usize"))?;
+                    if k == 0 {
+                        return Err(anyhow!("k must be positive"));
+                    }
+                    Ok(k)
+                })
+                .transpose()?;
+            if strategy == SeedStrategy::Random && k.is_none() {
+                return Err(anyhow!("random strategy requires k"));
+            }
+            let seed = sampling_seed(&spec.params)?;
             Ok(Box::new(CommunitySeedStep::new(strategy, target, k, seed)))
         },
     )?;
@@ -1751,7 +1766,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             id: "core.modularity_gain".to_string(),
             description: "Compute modularity change for each node relative to current partition"
                 .to_string(),
-            cost_hint: CostHint::Quadratic,
+            cost_hint: CostHint::Linear,
         },
         |spec| {
             let partition = spec.params.expect_text("partition")?.to_string();

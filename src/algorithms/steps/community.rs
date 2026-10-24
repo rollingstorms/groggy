@@ -4,11 +4,72 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
-use crate::traits::SubgraphOperations;
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{NodeColumn, Step, StepMetadata, StepScope};
+use super::transformations::{selected_neighbors, selected_nodes};
+
+fn check_cancelled(ctx: &Context) -> Result<()> {
+    if ctx.is_cancelled() {
+        return Err(anyhow!("community step cancelled"));
+    }
+    Ok(())
+}
+
+fn node_label(node: NodeId) -> Result<AlgorithmParamValue> {
+    Ok(AlgorithmParamValue::Int(
+        i64::try_from(node).map_err(|_| anyhow!("Community node ID exceeds i64"))?,
+    ))
+}
+
+/// Preserve explicit column order; maps use stable ID order. Accept both layouts.
+fn checked_input(
+    scope: &StepScope<'_>,
+    name: &str,
+    selected: &[NodeId],
+) -> Result<(Vec<NodeId>, HashMap<NodeId, AlgorithmParamValue>)> {
+    let (nodes, values) = if let Ok(column) = scope.variables().node_column(name) {
+        let nodes = column.nodes().to_vec();
+        let values: HashMap<_, _> = column
+            .iter()
+            .map(|(node, value)| (node, value.clone()))
+            .collect();
+        (nodes, values)
+    } else {
+        let values = scope.variables().node_map(name)?.clone();
+        let mut nodes: Vec<_> = values.keys().copied().collect();
+        nodes.sort_unstable();
+        (nodes, values)
+    };
+    if nodes.len() != values.len()
+        || nodes
+            .iter()
+            .any(|node| selected.binary_search(node).is_err())
+    {
+        return Err(anyhow!(
+            "Community input requires unique active selected node IDs"
+        ));
+    }
+    for value in values.values() {
+        super::expression::validate_value(value)?;
+    }
+    Ok((nodes, values))
+}
+
+fn install(
+    ctx: &Context,
+    scope: &mut StepScope<'_>,
+    target: &str,
+    nodes: Vec<NodeId>,
+    values: Vec<AlgorithmParamValue>,
+) -> Result<()> {
+    check_cancelled(ctx)?;
+    scope
+        .variables_mut()
+        .set_node_column(target, NodeColumn::new(nodes, values));
+    Ok(())
+}
 
 /// Community seeding strategy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +129,10 @@ impl CommunitySeedStep {
 }
 
 impl Step for CommunitySeedStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.community_seed"
     }
@@ -81,84 +146,59 @@ impl Step for CommunitySeedStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let nodes: Vec<NodeId> = scope.node_ids().copied().collect();
+        check_cancelled(ctx)?;
+        let k = if self.strategy == SeedStrategy::Random {
+            let k = self
+                .k
+                .ok_or_else(|| anyhow!("random strategy requires k"))?;
+            if k == 0 || i64::try_from(k - 1).is_err() {
+                return Err(anyhow!("k must be positive with labels fitting i64"));
+            }
+            Some(k)
+        } else {
+            None
+        };
+        let nodes = selected_nodes(scope.subgraph(), ctx)?;
         let mut values = Vec::with_capacity(nodes.len());
-
         match self.strategy {
             SeedStrategy::Singleton => {
                 for &node in &nodes {
-                    values.push(AlgorithmParamValue::Int(node as i64));
+                    check_cancelled(ctx)?;
+                    values.push(node_label(node)?);
                 }
             }
             SeedStrategy::DegreeBased => {
-                // Sort nodes by degree (descending)
-                let mut degree_pairs: Vec<(NodeId, usize)> = nodes
-                    .iter()
-                    .map(|&n| {
-                        let deg = scope.subgraph().degree(n).unwrap_or(0);
-                        (n, deg)
-                    })
-                    .collect();
-                degree_pairs.sort_by_key(|pair| std::cmp::Reverse(pair.1));
-
-                // High-degree nodes (top 10% or at least 1) get unique labels
-                let num_hubs = ((nodes.len() as f64 * 0.1).ceil() as usize).max(1);
-                let mut assigned: HashMap<NodeId, i64> = HashMap::new();
-
-                // Assign unique labels to hubs
-                for i in 0..num_hubs.min(degree_pairs.len()) {
-                    let node = degree_pairs[i].0;
-                    assigned.insert(node, node as i64);
+                let (_, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+                let mut hubs = nodes.clone();
+                hubs.sort_by_key(|node| (std::cmp::Reverse(neighbors[node].len()), *node));
+                let hub_count = nodes.len().div_ceil(10).max(1).min(nodes.len());
+                let mut assigned = HashMap::new();
+                for &node in &hubs[..hub_count] {
+                    assigned.insert(node, node_label(node)?);
                 }
-
-                // Assign remaining nodes to a neighbor's community if possible
                 for &node in &nodes {
-                    if assigned.contains_key(&node) {
-                        continue;
+                    check_cancelled(ctx)?;
+                    if !assigned.contains_key(&node) {
+                        let value = neighbors[&node]
+                            .iter()
+                            .find_map(|neighbor| assigned.get(neighbor))
+                            .cloned()
+                            .unwrap_or(node_label(node)?);
+                        assigned.insert(node, value);
                     }
-
-                    if ctx.is_cancelled() {
-                        return Err(anyhow!("community_seed cancelled"));
-                    }
-
-                    let neighbors = scope.subgraph().neighbors(node)?;
-                    let neighbor_label = neighbors
-                        .iter()
-                        .find_map(|&n| assigned.get(&n).copied())
-                        .unwrap_or(node as i64);
-                    assigned.insert(node, neighbor_label);
-                }
-
-                for &node in &nodes {
-                    let label = assigned.get(&node).copied().unwrap_or(node as i64);
-                    values.push(AlgorithmParamValue::Int(label));
+                    values.push(assigned[&node].clone());
                 }
             }
             SeedStrategy::Random => {
-                let k = self
-                    .k
-                    .ok_or_else(|| anyhow!("random strategy requires 'k' parameter"))?;
-                if k == 0 {
-                    return Err(anyhow!("k must be greater than zero"));
-                }
-
-                // Use seed if provided, otherwise system randomness
-                if let Some(seed) = self.seed {
-                    fastrand::seed(seed);
-                }
-
-                // Randomly assign each node to one of k communities
-                for _node in &nodes {
-                    let label = fastrand::usize(0..k) as i64;
-                    values.push(AlgorithmParamValue::Int(label));
+                let mut rng = self.seed.map(fastrand::Rng::with_seed).unwrap_or_default();
+                let k = k.ok_or_else(|| anyhow!("random strategy requires k"))?;
+                for _ in &nodes {
+                    check_cancelled(ctx)?;
+                    values.push(AlgorithmParamValue::Int(i64::try_from(rng.usize(0..k))?));
                 }
             }
         }
-
-        scope
-            .variables_mut()
-            .set_node_column(self.target.clone(), NodeColumn::new(nodes, values));
-        Ok(())
+        install(ctx, scope, &self.target, nodes, values)
     }
 }
 
@@ -185,6 +225,10 @@ impl ModularityGainStep {
 }
 
 impl Step for ModularityGainStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.modularity_gain"
     }
@@ -194,83 +238,102 @@ impl Step for ModularityGainStep {
             id: self.id().to_string(),
             description: "Compute modularity change for each node relative to current partition"
                 .to_string(),
-            cost_hint: CostHint::Quadratic, // Needs neighbor scanning
+            cost_hint: CostHint::Linear,
         }
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let partition = scope.variables().node_column(&self.partition)?.clone();
-        let nodes: Vec<NodeId> = partition.nodes().to_vec();
-        let total_edges = scope.edge_ids().count() as f64;
-        let cache = scope.neighbor_cache()?;
-
-        // Compute total edge weight (2m)
-        if total_edges == 0.0 {
-            let zeros = vec![AlgorithmParamValue::Float(0.0); nodes.len()];
-            scope
-                .variables_mut()
-                .set_node_column(self.target.clone(), NodeColumn::new(nodes, zeros));
-            return Ok(());
+        let (selected, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+        let (nodes, input) = checked_input(scope, &self.partition, &selected)?;
+        let mut labels = HashMap::new();
+        for &node in &selected {
+            check_cancelled(ctx)?;
+            let value = input.get(&node).cloned().unwrap_or(node_label(node)?);
+            let AlgorithmParamValue::Int(label) = value else {
+                return Err(anyhow!("Modularity partition labels must be integers"));
+            };
+            labels.insert(node, label);
         }
-
-        let two_m = total_edges * 2.0;
-
+        let directed = scope.subgraph().graph().borrow().is_directed();
+        let m = scope.subgraph().edges().len() as f64;
+        let mut incoming: HashMap<NodeId, Vec<NodeId>> =
+            selected.iter().map(|&node| (node, Vec::new())).collect();
+        let mut degrees = HashMap::new();
+        let mut totals: HashMap<i64, (f64, f64)> = HashMap::new();
+        for &node in &selected {
+            check_cancelled(ctx)?;
+            for &neighbor in &neighbors[&node] {
+                incoming
+                    .get_mut(&neighbor)
+                    .ok_or_else(|| anyhow!("Missing selected neighbor"))?
+                    .push(node);
+            }
+        }
+        for &node in &selected {
+            let out = neighbors[&node].len() as f64;
+            let ins = incoming[&node].len() as f64;
+            // Undirected stored loops count twice in modularity degree.
+            let degree = out
+                + neighbors[&node]
+                    .iter()
+                    .filter(|&&neighbor| neighbor == node)
+                    .count() as f64;
+            let pair = if directed {
+                (out, ins)
+            } else {
+                (degree, degree)
+            };
+            degrees.insert(node, pair);
+            let total = totals.entry(labels[&node]).or_default();
+            total.0 += pair.0;
+            total.1 += pair.1;
+        }
         let mut gains = Vec::with_capacity(nodes.len());
-
         for &node in &nodes {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("modularity_gain cancelled"));
-            }
-
-            let current_comm = partition
-                .get(node)
-                .and_then(|v| match v {
-                    AlgorithmParamValue::Int(i) => Some(*i),
-                    _ => None,
-                })
-                .unwrap_or(node as i64);
-
-            let neighbors = cache
-                .neighbors(node)
-                .ok_or_else(|| anyhow!("node {node} missing from neighbor cache"))?;
-
-            // Count edges to communities and find best alternative
-            let mut comm_edges: HashMap<i64, f64> = HashMap::new();
-            for &neighbor in neighbors {
-                let neighbor_comm = partition
-                    .get(neighbor)
-                    .and_then(|v| match v {
-                        AlgorithmParamValue::Int(i) => Some(*i),
-                        _ => None,
-                    })
-                    .unwrap_or(neighbor as i64);
-                *comm_edges.entry(neighbor_comm).or_insert(0.0) += 1.0;
-            }
-
-            // Compute gain: deltaQ = (k_i_in - k_i * Sigma_tot / (2m)) / m
-            // Simplified: we compute the relative benefit of moving to the best community
-            let mut best_gain = 0.0;
-
-            for (&comm, &edges_to_comm) in &comm_edges {
-                if comm == current_comm {
-                    continue; // Already in this community
-                }
-
-                // Approximate gain: (edges_to_comm / two_m) - (node_degree * comm_degree / (two_m * two_m))
-                // Simplified: just count the edge fraction as a proxy
-                let gain = edges_to_comm / two_m;
-                if gain > best_gain {
-                    best_gain = gain;
+            check_cancelled(ctx)?;
+            let own = labels[&node];
+            let mut contacts: HashMap<i64, f64> = HashMap::new();
+            for &neighbor in &neighbors[&node] {
+                if neighbor != node {
+                    *contacts.entry(labels[&neighbor]).or_default() += 1.0;
                 }
             }
-
-            gains.push(AlgorithmParamValue::Float(best_gain));
+            if directed {
+                for &neighbor in &incoming[&node] {
+                    if neighbor != node {
+                        *contacts.entry(labels[&neighbor]).or_default() += 1.0;
+                    }
+                }
+            }
+            let own_contacts = contacts.get(&own).copied().unwrap_or(0.0);
+            let (out, ins) = degrees[&node];
+            let (own_out, own_in) = totals[&own];
+            let mut best = 0.0_f64;
+            if m > 0.0 {
+                for (&community, &links) in &contacts {
+                    if community == own {
+                        continue;
+                    }
+                    let (other_out, other_in) = totals[&community];
+                    // Q=sum(L/m-Kout*Kin/m^2), or L/m-(K/2m)^2.
+                    // Remove from the old community and insert in the candidate;
+                    // stored self-loop terms cancel from internal-edge changes.
+                    let null_change = if directed {
+                        (out / m) * ((own_in - other_in - ins) / m)
+                            + (ins / m) * ((own_out - other_out - out) / m)
+                    } else {
+                        (out / m) * ((own_out - other_out - out) / (2.0 * m))
+                    };
+                    let gain = (links - own_contacts) / m + null_change;
+                    if !gain.is_finite() {
+                        return Err(anyhow!("Nonfinite modularity gain"));
+                    }
+                    best = best.max(gain);
+                }
+            }
+            gains.push(AlgorithmParamValue::Float(best));
         }
-
-        scope
-            .variables_mut()
-            .set_node_column(self.target.clone(), NodeColumn::new(nodes, gains));
-        Ok(())
+        install(ctx, scope, &self.target, nodes, gains)
     }
 }
 
@@ -298,6 +361,10 @@ impl LabelPropagateStep {
 }
 
 impl Step for LabelPropagateStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "core.label_propagate_step"
     }
@@ -312,68 +379,37 @@ impl Step for LabelPropagateStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let current_labels = scope.variables().node_column(&self.labels)?.clone();
-        let cache = scope.neighbor_cache()?;
-        let nodes: Vec<NodeId> = current_labels.nodes().to_vec();
+        let (selected, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+        let (nodes, labels) = checked_input(scope, &self.labels, &selected)?;
         let mut new_values = Vec::with_capacity(nodes.len());
-
         for &node in &nodes {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("label_propagate_step cancelled"));
-            }
-
-            let current = current_labels
-                .get(node)
-                .cloned()
-                .unwrap_or(AlgorithmParamValue::Int(node as i64));
-
-            let neighbors = cache
-                .neighbors(node)
-                .ok_or_else(|| anyhow!("node {node} missing from neighbor cache"))?;
-            if neighbors.is_empty() {
-                // No neighbors: keep current label
-                new_values.push(current);
-                continue;
-            }
-
-            // Count neighbor labels (including current node's label with weight 1)
-            let mut counts: HashMap<String, (AlgorithmParamValue, usize)> = HashMap::new();
-            let current_repr = format!("{:?}", current);
-            counts.insert(current_repr.clone(), (current.clone(), 1));
-
-            for &neighbor in neighbors {
-                let neighbor_label = current_labels
-                    .get(neighbor)
+            check_cancelled(ctx)?;
+            let current = labels.get(&node).cloned().unwrap_or(node_label(node)?);
+            let mut counts: std::collections::BTreeMap<String, (AlgorithmParamValue, usize)> =
+                std::collections::BTreeMap::new();
+            // An explicit self vote, in addition to a stored self-loop incidence.
+            for neighbor in std::iter::once(node).chain(neighbors[&node].iter().copied()) {
+                check_cancelled(ctx)?;
+                let label = labels
+                    .get(&neighbor)
                     .cloned()
-                    .unwrap_or(AlgorithmParamValue::Int(neighbor as i64));
-                let repr = format!("{:?}", neighbor_label);
-                let entry = counts.entry(repr).or_insert((neighbor_label, 0));
+                    .unwrap_or(node_label(neighbor)?);
+                let key = serde_json::to_string(&label)?;
+                let entry = counts.entry(key).or_insert((label, 0));
                 entry.1 += 1;
             }
-
-            // Find the most common label (ties broken by lexicographic order for determinism)
-            let mut best_repr = current_repr.clone();
-            let mut best_count = 1usize;
-            for (repr, (_, count)) in &counts {
-                if *count > best_count || (*count == best_count && repr < &best_repr) {
-                    best_repr = repr.clone();
-                    best_count = *count;
+            // Canonical typed-key order breaks equal-frequency ties.
+            let mut best = current;
+            let mut frequency = 0;
+            for (_, (label, count)) in counts {
+                if count > frequency {
+                    best = label;
+                    frequency = count;
                 }
             }
-
-            // Adopt the best label (re-parse from representation)
-            let best_label = counts
-                .get(&best_repr)
-                .map(|(value, _)| value.clone())
-                .unwrap_or(current);
-
-            new_values.push(best_label);
+            new_values.push(best);
         }
-
-        scope
-            .variables_mut()
-            .set_node_column(self.target.clone(), NodeColumn::new(nodes, new_values));
-        Ok(())
+        install(ctx, scope, &self.target, nodes, new_values)
     }
 }
 
@@ -539,5 +575,250 @@ mod tests {
 
         let gains = scope.variables().node_column("gains").unwrap();
         assert_eq!(gains.nodes().len(), nodes.len());
+    }
+}
+
+#[cfg(test)]
+mod checked_tests {
+    use super::*;
+    use crate::{algorithms::steps::StepVariables, subgraphs::Subgraph, Graph};
+    use std::{cell::RefCell, rc::Rc};
+
+    /// Independent full objective recomputation, not the local move equation.
+    fn objective(edges: &[(usize, usize)], labels: &[i64], directed: bool) -> f64 {
+        if edges.is_empty() {
+            return 0.0;
+        }
+        let m = edges.len() as f64;
+        let mut degree = vec![(0.0, 0.0); labels.len()];
+        let mut internal = 0.0;
+        for &(source, target) in edges {
+            if labels[source] == labels[target] {
+                internal += 1.0;
+            }
+            if directed {
+                degree[source].0 += 1.0;
+                degree[target].1 += 1.0;
+            } else {
+                degree[source].0 += 1.0;
+                degree[target].0 += 1.0;
+            }
+        }
+        let mut totals: std::collections::BTreeMap<i64, (f64, f64)> =
+            std::collections::BTreeMap::new();
+        for (index, &label) in labels.iter().enumerate() {
+            let total = totals.entry(label).or_default();
+            total.0 += degree[index].0;
+            total.1 += degree[index].1;
+        }
+        internal / m
+            - totals
+                .values()
+                .map(|&(out, ins)| {
+                    if directed {
+                        out * ins / (m * m)
+                    } else {
+                        (out / (2.0 * m)).powi(2)
+                    }
+                })
+                .sum::<f64>()
+    }
+
+    #[test]
+    fn modularity_gains_match_full_recomputation_for_all_small_graphs_and_binary_partitions() {
+        for directed in [false, true] {
+            let count = if directed { 3 } else { 4 };
+            let pairs: Vec<_> = (0..count)
+                .flat_map(|source| {
+                    (0..count)
+                        .filter(move |&target| directed || source < target)
+                        .map(move |target| (source, target))
+                })
+                .collect();
+            for mask in 0..1usize << pairs.len() {
+                let mut edges: Vec<_> = pairs
+                    .iter()
+                    .enumerate()
+                    .filter(|(bit, _)| mask & (1 << bit) != 0)
+                    .map(|(_, &edge)| edge)
+                    .collect();
+                // Extra cases include multiedges and undirected self-loops.
+                if mask == 0 {
+                    edges.extend([(0, 0), (0, 1), (0, 1), (1, 2)]);
+                }
+                let mut graph = if directed {
+                    Graph::new_directed()
+                } else {
+                    Graph::new_undirected()
+                };
+                graph.add_nodes(count);
+                for &(source, target) in &edges {
+                    graph.add_edge(source, target).expect("edge");
+                }
+                let selected = Subgraph::from_nodes(
+                    Rc::new(RefCell::new(graph)),
+                    (0..count).collect(),
+                    "reference".into(),
+                )
+                .expect("selection");
+                for bits in 0..1usize << count {
+                    let labels: Vec<_> =
+                        (0..count).map(|node| ((bits >> node) & 1) as i64).collect();
+                    let mut vars = StepVariables::default();
+                    vars.set_node_column(
+                        "labels",
+                        NodeColumn::new(
+                            (0..count).collect(),
+                            labels
+                                .iter()
+                                .copied()
+                                .map(AlgorithmParamValue::Int)
+                                .collect(),
+                        ),
+                    );
+                    let mut scope = StepScope::new(&selected, &mut vars);
+                    ModularityGainStep::new("labels", "gain")
+                        .apply(&mut Context::new(), &mut scope)
+                        .expect("gain");
+                    let baseline = objective(&edges, &labels, directed);
+                    for node in 0..count {
+                        let candidates: std::collections::BTreeSet<_> = edges
+                            .iter()
+                            .filter_map(|&(source, target)| {
+                                if source == node && target != node {
+                                    Some(labels[target])
+                                } else if target == node && source != node {
+                                    Some(labels[source])
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        let mut expected = 0.0_f64;
+                        for candidate in candidates {
+                            let mut moved = labels.clone();
+                            moved[node] = candidate;
+                            expected = expected.max(objective(&edges, &moved, directed) - baseline);
+                        }
+                        let AlgorithmParamValue::Float(actual) = scope
+                            .variables()
+                            .node_column("gain")
+                            .expect("gain")
+                            .get(node)
+                            .expect("node")
+                        else {
+                            panic!("float");
+                        };
+                        assert!((actual - expected).abs() < 1e-12, "directed={directed}, edges={edges:?}, labels={labels:?}, node={node}, actual={actual}, expected={expected}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn random_seeds_are_isolated_and_degree_hub_ties_are_stable() {
+        let mut graph = Graph::new_undirected();
+        graph.add_nodes(3);
+        graph.add_edge(0, 1).expect("edge");
+        graph.add_edge(1, 2).expect("edge");
+        graph.add_edge(0, 2).expect("edge");
+        let selected = Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            (0..3).collect(),
+            "triangle".into(),
+        )
+        .expect("selection");
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&selected, &mut vars);
+        fastrand::seed(17);
+        let expected = fastrand::u64(..);
+        fastrand::seed(17);
+        let random = CommunitySeedStep::new(SeedStrategy::Random, "labels", Some(3), Some(91));
+        random.apply(&mut Context::new(), &mut scope).expect("seed");
+        assert_eq!(fastrand::u64(..), expected);
+        let first = scope
+            .variables()
+            .node_column("labels")
+            .expect("column")
+            .clone()
+            .into_pairs();
+        random
+            .apply(&mut Context::new(), &mut scope)
+            .expect("repeat");
+        assert_eq!(
+            scope
+                .variables()
+                .node_column("labels")
+                .expect("column")
+                .clone()
+                .into_pairs(),
+            first
+        );
+        CommunitySeedStep::new(SeedStrategy::DegreeBased, "labels", None, None)
+            .apply(&mut Context::new(), &mut scope)
+            .expect("degree");
+        assert!(scope
+            .variables()
+            .node_column("labels")
+            .expect("column")
+            .iter()
+            .all(|(_, value)| value == &AlgorithmParamValue::Int(0)));
+    }
+
+    #[test]
+    fn sparse_columns_preserve_order_and_foreign_or_cancelled_inputs_preserve_outputs() {
+        let mut graph = Graph::new_undirected();
+        graph.add_nodes(4);
+        graph.add_edge(1, 2).expect("edge");
+        graph.add_edge(2, 3).expect("edge");
+        let selected = Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            [1, 2, 3].into_iter().collect(),
+            "selected".into(),
+        )
+        .expect("selection");
+        let mut vars = StepVariables::default();
+        vars.set_node_column(
+            "labels",
+            NodeColumn::new(
+                vec![3, 1],
+                vec![AlgorithmParamValue::Int(3), AlgorithmParamValue::Int(1)],
+            ),
+        );
+        let mut scope = StepScope::new(&selected, &mut vars);
+        let step = LabelPropagateStep::new("labels", "result");
+        step.apply(&mut Context::new(), &mut scope).expect("sparse");
+        let original = scope
+            .variables()
+            .node_column("result")
+            .expect("column")
+            .clone()
+            .into_pairs();
+        assert_eq!(
+            original.iter().map(|(node, _)| *node).collect::<Vec<_>>(),
+            [3, 1]
+        );
+        scope
+            .variables_mut()
+            .set_node_map("labels", HashMap::from([(0, AlgorithmParamValue::Int(1))]));
+        assert!(step.apply(&mut Context::new(), &mut scope).is_err());
+        let mut ctx = Context::with_cancel_token(std::sync::Arc::new(
+            std::sync::atomic::AtomicBool::new(true),
+        ));
+        assert!(
+            CommunitySeedStep::new(SeedStrategy::Singleton, "result", None, None)
+                .apply(&mut ctx, &mut scope)
+                .is_err()
+        );
+        assert_eq!(
+            scope
+                .variables()
+                .node_column("result")
+                .expect("unchanged")
+                .clone()
+                .into_pairs(),
+            original
+        );
     }
 }

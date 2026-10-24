@@ -1,0 +1,383 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "mode": "singleton",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002936084,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002098708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002114958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001928125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001606458,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "degree",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00223225,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001568208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001624958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001813417,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001890667,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "random",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001276834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001329583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001280584,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001313959,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001181,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "labels_undirected",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00184575,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00177875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001720792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001668542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001619667,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "labels_directed",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00155225,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001465042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001429542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0014055,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001413291,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "modularity_undirected",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001825875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001625292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001688333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001697375,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001759292,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "modularity_directed",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00175625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001718708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00176725,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001745209,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001660708,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "singleton",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.010237292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009972583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009933333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009920959,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009894708,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "degree",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.013053,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012822333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.01297975,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.01311025,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012775333,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "random",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.009749459,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009910333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009963792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009833875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.009904917,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "labels_undirected",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.015049917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014590334,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014916625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014574667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014612,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "labels_directed",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.014110333,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.01417975,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.013782875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014101708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0138885,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "modularity_undirected",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.01758425,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.017625708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.018297125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.018755458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.017933416,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "modularity_directed",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.01980775,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.018274292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.017651833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.017490666,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.017343792,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release rings: seeding, synchronous propagation and directed/undirected local modularity gains, attachment and one checked publication. Fixture/spec construction excluded; five observations per workload. Every result/publication checked. No matched before/after speedup, FFI/RSS/allocation or production-scale claim."
+}

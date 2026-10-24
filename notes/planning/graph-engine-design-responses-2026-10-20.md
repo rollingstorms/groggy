@@ -1261,3 +1261,16 @@ unsampled rows. Subgraph-producing sampling and whole sampler transactions remai
 open, alongside community/temporal/path audits and broader execution parents.
 See `atomic-sampling-builder-bundle-2026-10-24.md` and
 `../../docs/api/builder-sampling.md` for contracts, costs and verification.
+
+### Combined community helper bundle — 2026-10-24
+
+Completed 09.4b.2x–2z: checked deterministic singleton/degree/random seeds;
+synchronous selected label propagation with map/column parity; actual local
+modularity move gains replacing the old edge-fraction proxy. Directed and
+undirected objectives handle stored loops/parallel edges, strict integer partitions
+and neighboring candidate communities; independent exhaustive fixtures recompute
+the full objective after moves. Typed outputs, cancellation and atomic staging
+compose through existing attachment/load paths. Broader execution, composer and
+remaining sampling/temporal/path audits stay open. See
+`atomic-community-builder-bundle-2026-10-24.md` and
+`../../docs/api/builder-community.md` for contracts, costs and verification.
