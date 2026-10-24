@@ -29,10 +29,10 @@ def test_writer_rejects_stale_session_until_explicit_refresh():
     assert second.state_id == 0
     second.refresh()
     assert second.add_node() == 1
-    graph.set_node_attr(0, "legacy", True)
-    with pytest.raises(ValueError, match="uncommitted"):
+    graph.set_node_attr(0, "ordinary", True)
+    with pytest.raises(ValueError, match="Stale"):
         second.add_node()
-    assert graph.get_node_attr(0, "legacy") is True
+    assert graph.get_node_attr(0, "ordinary") is True
 
 
 def test_writer_copies_policy_and_enforces_it_for_each_call():

@@ -353,15 +353,18 @@ impl PyGraph {
     }
 
     #[new]
-    #[pyo3(signature = (directed = None, _config = None))]
-    fn new(directed: Option<bool>, _config: Option<&PyDict>) -> PyResult<Self> {
+    #[pyo3(signature = (directed = None, _config = None, *, manual = false))]
+    fn new(directed: Option<bool>, _config: Option<&PyDict>, manual: bool) -> PyResult<Self> {
         // Create graph with specified directionality (defaults to false/undirected)
         let is_directed = directed.unwrap_or(false);
-        let rust_graph = if is_directed {
+        let mut rust_graph = if is_directed {
             RustGraph::new_directed()
         } else {
             RustGraph::new_undirected()
         };
+        rust_graph
+            .set_automatic_publication(!manual)
+            .map_err(graph_error_to_py_err)?;
         let inner = rust_graph.into_shared();
         Ok(Self {
             inner,
@@ -379,8 +382,14 @@ impl PyGraph {
 
     /// Load a typed active graph export or a legacy unversioned JSON graph.
     #[staticmethod]
-    fn load_from_path(path: std::path::PathBuf) -> PyResult<Self> {
-        let graph = RustGraph::load_from_path(&path).map_err(graph_error_to_py_err)?;
+    #[pyo3(signature=(path,*,manual=false))]
+    fn load_from_path(path: std::path::PathBuf, manual: bool) -> PyResult<Self> {
+        let graph = if manual {
+            RustGraph::load_from_path(&path)
+        } else {
+            RustGraph::load_publishing_from_path(&path)
+        }
+        .map_err(graph_error_to_py_err)?;
         Ok(Self {
             inner: graph.into_shared(),
             cached_view: RefCell::new(None),
@@ -473,6 +482,11 @@ impl PyGraph {
             .to_object(py))
     }
 
+    #[getter]
+    fn automatic_publication(&self) -> bool {
+        self.inner.borrow().automatic_publication()
+    }
+
     /// Check if this graph is directed
     #[getter]
     fn is_directed(&self) -> bool {
@@ -505,14 +519,11 @@ impl PyGraph {
             }
             return Err(PyValueError::new_err(errors.join("; ")));
         }
-        let actual_node_id = if attrs.is_empty() {
-            self.inner.borrow_mut().add_node()
-        } else {
-            self.inner
-                .borrow_mut()
-                .add_nodes_with_attrs(vec![attrs])
-                .map_err(graph_error_to_py_err)?[0]
-        };
+        let actual_node_id = self
+            .inner
+            .borrow_mut()
+            .add_nodes_with_attrs(vec![attrs])
+            .map_err(graph_error_to_py_err)?[0];
 
         Ok(actual_node_id)
     }
@@ -522,7 +533,11 @@ impl PyGraph {
         // Fast path optimization: Check for integer first (most common case)
         if let Ok(count) = data.extract::<usize>() {
             // Old API: add_nodes(5) -> [0, 1, 2, 3, 4] - fastest path
-            let node_ids = self.inner.borrow_mut().add_nodes(count);
+            let node_ids = self
+                .inner
+                .borrow_mut()
+                .insert_nodes(count)
+                .map_err(graph_error_to_py_err)?;
             return Python::with_gil(|py| Ok(node_ids.to_object(py)));
         }
 
@@ -1004,32 +1019,11 @@ impl PyGraph {
             )));
         }
 
-        let edge_pairs: Vec<_> = parsed
-            .iter()
-            .map(|(source, target, _)| (*source, *target))
-            .collect();
         let edge_ids = self
             .inner
             .borrow_mut()
-            .add_edges(&edge_pairs)
+            .add_edges_with_attrs(parsed)
             .map_err(graph_error_to_py_err)?;
-
-        let mut attrs_by_name: std::collections::HashMap<String, Vec<(EdgeId, RustAttrValue)>> =
-            std::collections::HashMap::new();
-        for (edge_id, (_, _, attrs)) in edge_ids.iter().copied().zip(parsed) {
-            for (name, value) in attrs {
-                attrs_by_name
-                    .entry(name)
-                    .or_default()
-                    .push((edge_id, value));
-            }
-        }
-        if !attrs_by_name.is_empty() {
-            self.inner
-                .borrow_mut()
-                .set_edge_attrs(attrs_by_name)
-                .map_err(graph_error_to_py_err)?;
-        }
         if warm_cache.unwrap_or(false) {
             self.warm_caches_after_bulk_operation(py)?;
         }
@@ -1315,18 +1309,8 @@ impl PyGraph {
         let edge_id = self
             .inner
             .borrow_mut()
-            .add_edge(source_id, target_id)
-            .map_err(graph_error_to_py_err)?;
-        if !attrs.is_empty() {
-            let columns = attrs
-                .into_iter()
-                .map(|(name, value)| (name, vec![(edge_id, value)]))
-                .collect();
-            self.inner
-                .borrow_mut()
-                .set_edge_attrs(columns)
-                .map_err(graph_error_to_py_err)?;
-        }
+            .add_edges_with_attrs(vec![(source_id, target_id, attrs)])
+            .map_err(graph_error_to_py_err)?[0];
 
         Ok(edge_id)
     }

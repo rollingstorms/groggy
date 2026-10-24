@@ -1,6 +1,6 @@
 # Publishing writes
 
-`Graph.writer(author="writer", schema=None)` is the checked transition from manually grouped writes to automatic publication. Every successful scalar/bulk writer call stages one batch and publishes one state. Initial properties are published with entity creation. Read through the owning graph; an older recorded snapshot remains unchanged.
+`Graph()` publishes ordinary writes automatically. `Graph.writer(author="writer", schema=None)` adds an explicit optimistic session, author, schema and effective-time controls. Every successful scalar/bulk writer call stages one batch and publishes one state. Initial properties are published with entity creation. Read through the owning graph; an older recorded snapshot remains unchanged.
 
 ```python
 from groggy import Graph, GraphBatch
@@ -18,7 +18,7 @@ assert first.node_attr(nodes[0], "score") is None
 
 Writer column inputs map property names to `{id: value}` mappings or `(id, value)` pairs. The writer also supports scalar setters, kinds, removals, bulk node rows, edge rows, and `apply_batch` for mixed operations. Empty mutation batches reject instead of publishing an empty version. A supplied schema is private to the session and applied to each resulting graph. Python copies the definition so later caller edits do not alter the policy.
 
-Python sessions capture an expected state. A second writer moving the head makes the first stale until `refresh()` explicitly targets the latest head. Dirty legacy writes reject publication until they are resolved. Rust `graph.writer(author).with_schema(&schema)` exclusively borrows the graph; its methods use the same Rust coordinator. Legacy graph methods remain available for compatibility and continue to require manual `commit`; they do not inherit a writer's policy. Raw pool/space access remains a low-level interface outside checked mutation guarantees.
+Python sessions capture an expected state. A second writer moving the head makes the first stale until `refresh()` explicitly targets the latest head. Dirty legacy writes reject publication until they are resolved. Rust `graph.writer(author).with_schema(&schema)` exclusively borrows the graph; its methods use the same Rust coordinator. Explicit `Graph(manual=True)` and legacy native infallible methods remain available for deferred compatibility writes. Ordinary Python writes publish independently and invalidate older sessions; they do not inherit a writer's policy. Raw pool/space access remains a low-level interface outside checked mutation guarantees.
 
 ## Effective and recorded time
 
@@ -57,7 +57,7 @@ assert w.upsert_nodes([{"external_id": "person", "name": "Ada"}])
 assert w.state_id == state
 ```
 
-The writer supports managed node/edge upserts and explicit renames. Idempotent upserts publish no version when their normalized payloads are unchanged; they still check the expected head, dirty-state guard and session schema. Edge upserts preserve endpoints, direction and parallel instance IDs. Python uses native `publish_upsert_nodes` / `publish_upsert_edges` to return both IDs and the exact resulting state, avoiding a separate mutable-head read. Existing `Graph.upsert_nodes` / `upsert_edges` retain legacy manual grouping. Custom input identity keys are consumed into the same managed `external_id` property.
+The writer supports managed node/edge upserts and explicit renames. Idempotent upserts publish no version when their normalized payloads are unchanged; they still check the expected head, dirty-state guard and session schema. Edge upserts preserve endpoints, direction and parallel instance IDs. Python uses native `publish_upsert_nodes` / `publish_upsert_edges` to return both IDs and the exact resulting state, avoiding a separate mutable-head read. Ordinary `Graph.upsert_nodes` / `upsert_edges` now publish once by default; explicit manual graphs retain deferred grouping. Custom input identity keys are consumed into the same managed `external_id` property.
 
 ## Durable publication
 

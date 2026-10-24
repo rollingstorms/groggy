@@ -7,16 +7,18 @@ Graph writers and `groggy.AttrValue` share one conversion policy. Graph getters,
 | `None` | Null | `None` |
 | `bool` | Bool | `bool` |
 | integer fitting i64 | Int | `int` |
-| floating number | Float (f32) | `float` |
+| ordinary floating number | Float64 (f64) | `float` |
+| explicit f32 / NumPy float32 | Float (f32) | `float` |
 | `str` | Text | `str` |
 | `bytes`, `bytearray` | Bytes | `bytes` |
 | homogeneous boolean/integer/text sequence | BoolVec / IntVec / TextVec | `list` |
-| numeric sequence containing floats | FloatVec (f32) | `list` |
+| numeric sequence containing ordinary floats | Float64Vec (f64) | `list` |
+| aware `datetime` / `date` / `timedelta` | UtcInstant / Date / Duration | UTC `datetime` / `date` / `timedelta` |
 | dictionary or heterogeneous JSON-compatible sequence | Json | decoded dictionary/list |
 
-Booleans remain distinct from integers. Integers outside i64 raise rather than silently becoming floats. Floating properties retain the existing f32 precision; Python f64 values may round. Nested structured JSON numbers use JSON's representation rather than the native vector representation.
+Booleans remain distinct from integers. Integers outside i64 raise rather than silently becoming floats. Ordinary floating properties retain f64 precision; explicitly typed f32 values remain f32. Nested structured JSON numbers use JSON's representation rather than the native vector representation.
 
-An empty sequence defaults to FloatVec. Use explicit constructors when type matters:
+An empty ordinary sequence defaults to Float64Vec. Use explicit constructors when type matters:
 
 ```python
 from groggy import AttrValue, Graph
@@ -76,6 +78,6 @@ Unversioned legacy scalar exports remain readable. Untagged legacy arrays/object
 
 Meta-nodes and `SubgraphRef` properties currently reject export because this format does not contain their backing pool contents. Export validation and encoding complete before the destination is opened, so a validation error preserves an existing file. File-write failures can still leave a partial file; atomic replacement and durable synchronization belong to roadmap item 10.
 
-This format contains active topology, typed properties, active external identities and graph direction. It does **not** back up branches, history, inactive entities, old external-ID reservations, discarded allocation counters, subgraph pool contents, indexes or other graph configuration. Entity-ID arrays retain numeric values, not inactive referents. Loading creates an independent graph with ordinary uncommitted creation changes. Durable full-engine storage remains item 10; JSON here is an interchange format, not a commitment to the eventual storage backend.
+This format contains active topology, typed properties, active external identities and graph direction. It does **not** back up branches, history, inactive entities, old external-ID reservations, discarded allocation counters, subgraph pool contents, indexes or other graph configuration. Entity-ID arrays retain numeric values, not inactive referents. Default Python loading accepts an independent graph as one newly published import. `manual=True` retains deferred import compatibility. Checked journals retain their supported history; full pooled/meta recovery and bounded storage lifecycle remain item 10. JSON here is active interchange, not a full engine backup.
 
-Native temporal values remain the next property-model slice.
+Native temporal types are implemented; see [temporal properties](temporal-properties.md) for exact domains, timezone normalization and versioned payloads.

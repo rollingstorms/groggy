@@ -555,17 +555,7 @@ pub trait SubgraphOperations: GraphEntity {
         )?;
 
         // WORF SAFETY: Create meta-node atomically with all required attributes
-        let meta_node_id = graph.add_node();
-        graph.set_node_attr_internal(
-            meta_node_id,
-            "entity_type".to_string(),
-            AttrValue::Text("meta".to_string()),
-        )?;
-        graph.set_node_attr_internal(
-            meta_node_id,
-            "contains_subgraph".to_string(),
-            AttrValue::SubgraphRef(subgraph_id),
-        )?;
+        let meta_node_id = graph.create_meta_node(subgraph_id)?;
 
         // Release borrow for bulk operation
         drop(graph);

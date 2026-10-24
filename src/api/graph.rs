@@ -15,6 +15,7 @@ mod checkpoints;
 mod identity;
 pub(crate) mod kinds;
 mod matrices;
+mod ordinary;
 mod persistence;
 mod publication;
 mod schema;
@@ -143,6 +144,7 @@ pub struct Graph {
     /// Configuration settings
     #[allow(dead_code)]
     config: GraphConfig,
+    automatic_publication: bool,
 }
 
 impl Graph {
@@ -183,6 +185,7 @@ impl Graph {
             self_reference: None,
             identities: ExternalIdentityIndex::default(),
             change_tracker: ChangeTracker::new(),
+            automatic_publication: false,
             config,
         }
     }
@@ -216,6 +219,7 @@ impl Graph {
             self_reference: None,
             identities: ExternalIdentityIndex::default(),
             change_tracker: ChangeTracker::new(),
+            automatic_publication: false,
             config,
         }
     }
@@ -438,8 +442,15 @@ impl Graph {
         &self,
         rows: &[HashMap<AttrName, AttrValue>],
     ) -> GraphResult<()> {
+        self.validate_new_edge_attr_rows(rows.iter())
+    }
+
+    fn validate_new_edge_attr_rows<'a>(
+        &self,
+        rows: impl IntoIterator<Item = &'a HashMap<AttrName, AttrValue>>,
+    ) -> GraphResult<()> {
         let mut errors = Vec::new();
-        for (position, attrs) in rows.iter().enumerate() {
+        for (position, attrs) in rows.into_iter().enumerate() {
             for (name, value) in attrs {
                 if name == EXTERNAL_ID {
                     errors.push(format!("{position}.external_id: use the external-ID API"));
@@ -462,6 +473,13 @@ impl Graph {
         &mut self,
         rows: Vec<HashMap<AttrName, AttrValue>>,
     ) -> GraphResult<Vec<NodeId>> {
+        if rows.is_empty() {
+            return Ok(Vec::new());
+        }
+        if self.automatic_publication {
+            return self.writer("groggy").add_nodes_with_attrs(rows);
+        }
+
         self.validate_new_node_attrs(&rows)?;
         let nodes = self.add_nodes(rows.len());
         let mut columns: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
@@ -483,6 +501,12 @@ impl Graph {
     /// 3. Space tracks it as active
     /// 4. Return edge ID
     pub fn add_edge(&mut self, source: NodeId, target: NodeId) -> Result<EdgeId, GraphError> {
+        if self.automatic_publication {
+            return self
+                .writer("groggy")
+                .add_edge(source, target, HashMap::new());
+        }
+
         if !self.space.contains_node(source) || !self.space.contains_node(target) {
             if !self.space.contains_node(source) {
                 return Err(GraphError::node_not_found(source, "add edge"));
@@ -500,6 +524,15 @@ impl Graph {
     /// Add multiple edges efficiently
     /// OPTIMIZED: True bulk operation with batch validation and vectorized operations
     pub fn add_edges(&mut self, edges: &[(NodeId, NodeId)]) -> GraphResult<Vec<EdgeId>> {
+        if self.automatic_publication {
+            if edges.is_empty() {
+                return Ok(Vec::new());
+            }
+            return self.writer("groggy").add_edges_with_attrs(
+                edges.iter().map(|&(s, t)| (s, t, HashMap::new())).collect(),
+            );
+        }
+
         // Validate the entire batch before allocating any edge ID or changing state.
         let invalid: Vec<_> = edges
             .iter()
@@ -540,6 +573,9 @@ impl Graph {
 
     /// Add all nodes and edges from another graph to this graph
     pub fn add_graph(&mut self, other: &Graph) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            return self.publish_graph_copy(other);
+        }
         if other.node_ids().iter().any(|&id| {
             other
                 .get_node_attr(id, &EXTERNAL_ID.into())
@@ -633,6 +669,10 @@ impl Graph {
     /// ALGORITHM:
     /// 1. Ask space to remove the node (it handles incident edges)
     pub fn remove_node(&mut self, node: NodeId) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            return self.writer("groggy").remove_nodes(vec![node]).map(|_| ());
+        }
+
         if !self.space.contains_node(node) {
             return Err(GraphError::NodeNotFound {
                 node_id: node,
@@ -656,6 +696,10 @@ impl Graph {
 
     /// Remove an edge
     pub fn remove_edge(&mut self, edge: EdgeId) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            return self.writer("groggy").remove_edges(vec![edge]).map(|_| ());
+        }
+
         if !self.space.contains_edge(edge) {
             return Err(GraphError::EdgeNotFound {
                 edge_id: edge,
@@ -672,6 +716,14 @@ impl Graph {
 
     /// Remove an edge if it exists, otherwise silently succeed
     pub fn try_remove_edge(&mut self, edge: EdgeId) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            return if self.has_edge(edge) {
+                self.remove_edge(edge)
+            } else {
+                Ok(())
+            };
+        }
+
         if self.space.contains_edge(edge) {
             self.change_tracker.record_edge_removal(edge);
             self.space.deactivate_edge(edge);
@@ -681,6 +733,17 @@ impl Graph {
 
     /// Remove multiple edges after validating the entire input, including duplicates.
     pub fn remove_edges(&mut self, edges: &[EdgeId]) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            if edges.is_empty() {
+                return Ok(());
+            }
+            self.validate_removal_targets(edges, false)?;
+            return self
+                .writer("groggy")
+                .remove_edges(edges.to_vec())
+                .map(|_| ());
+        }
+
         self.validate_removal_targets(edges, false)?;
         for &edge_id in edges {
             self.remove_edge(edge_id)?;
@@ -690,6 +753,17 @@ impl Graph {
 
     /// Remove multiple nodes and their incident edges after validating the entire input.
     pub fn remove_nodes(&mut self, nodes: &[NodeId]) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            if nodes.is_empty() {
+                return Ok(());
+            }
+            self.validate_removal_targets(nodes, true)?;
+            return self
+                .writer("groggy")
+                .remove_nodes(nodes.to_vec())
+                .map(|_| ());
+        }
+
         self.validate_removal_targets(nodes, true)?;
         for &node_id in nodes {
             self.remove_node(node_id)?;
@@ -745,6 +819,13 @@ impl Graph {
         attr: AttrName,
         value: AttrValue,
     ) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            return self
+                .writer("groggy")
+                .set_node_attr(node, attr, value)
+                .map(|_| ());
+        }
+
         if attr == EXTERNAL_ID {
             return Err(GraphError::InvalidInput(
                 "external_id is system-managed; use set_node_external_id".into(),
@@ -806,6 +887,13 @@ impl Graph {
         attr: AttrName,
         value: AttrValue,
     ) -> Result<(), GraphError> {
+        if self.automatic_publication {
+            return self
+                .writer("groggy")
+                .set_edge_attr(edge, attr, value)
+                .map(|_| ());
+        }
+
         if attr == EXTERNAL_ID {
             return Err(GraphError::InvalidInput(
                 "external_id is system-managed; use set_edge_external_id".into(),
@@ -1065,7 +1153,7 @@ impl Graph {
     /// PERFORMANCE: O(1) using efficient columnar attribute lookup
     pub fn is_meta_node(&self, node_id: NodeId) -> bool {
         match self.get_node_attr(node_id, &"entity_type".into()) {
-            Ok(Some(AttrValue::Text(entity_type))) => entity_type == "meta",
+            Ok(Some(value)) => value.get_text().as_deref() == Some("meta"),
             _ => false,
         }
     }
@@ -1074,7 +1162,7 @@ impl Graph {
     /// PERFORMANCE: O(1) using efficient columnar attribute lookup
     pub fn is_base_node(&self, node_id: NodeId) -> bool {
         match self.get_node_attr(node_id, &"entity_type".into()) {
-            Ok(Some(AttrValue::Text(entity_type))) => entity_type == "base",
+            Ok(Some(value)) => value.get_text().as_deref() == Some("base"),
             Ok(None) => true, // Default to base for nodes without entity_type (migration compatibility)
             _ => false,
         }
@@ -1109,7 +1197,7 @@ impl Graph {
     fn validate_meta_node(&self, node_id: NodeId) -> Result<(), GraphError> {
         // REQUIREMENT 1: Must have entity_type = "meta"
         match self.get_node_attr(node_id, &"entity_type".into())? {
-            Some(AttrValue::Text(entity_type)) if entity_type == "meta" => {}
+            Some(value) if value.get_text().as_deref() == Some("meta") => {}
             _ => {
                 return Err(GraphError::InvalidInput(format!(
                     "Node {} does not have entity_type='meta'",
@@ -1136,7 +1224,7 @@ impl Graph {
     fn validate_base_node(&self, node_id: NodeId) -> Result<(), GraphError> {
         // REQUIREMENT: Must have entity_type = "base" or None (default)
         match self.get_node_attr(node_id, &"entity_type".into())? {
-            Some(AttrValue::Text(entity_type)) if entity_type == "base" => Ok(()),
+            Some(value) if value.get_text().as_deref() == Some("base") => Ok(()),
             None => Ok(()), // Default to base for migration compatibility
             _ => Err(GraphError::InvalidInput(format!(
                 "Node {} has invalid entity_type for base node",
@@ -1148,6 +1236,10 @@ impl Graph {
     /// SAFE: Create a meta-node atomically with required attributes
     /// SAFETY: All-or-nothing creation with validation
     pub fn create_meta_node(&mut self, subgraph_id: SubgraphId) -> Result<NodeId, GraphError> {
+        if self.automatic_publication {
+            return self.publish_meta_node(subgraph_id);
+        }
+
         // Reject a dangling reference before allocating or recording any change.
         self.pool.borrow().get_subgraph(subgraph_id)?;
         // Step 1: Create and activate the node ID
@@ -1981,6 +2073,19 @@ impl Graph {
     }
 
     pub(crate) fn execute_publication(
+        &mut self,
+        publication: crate::api::batch::PreparedPublication,
+        message: String,
+        author: String,
+    ) -> GraphResult<BatchResult> {
+        let policy = self.automatic_publication;
+        self.automatic_publication = false;
+        let result = self.execute_prepared_publication(publication, message, author);
+        self.automatic_publication = policy;
+        result
+    }
+
+    fn execute_prepared_publication(
         &mut self,
         publication: crate::api::batch::PreparedPublication,
         message: String,
@@ -2929,6 +3034,15 @@ impl Graph {
         attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> GraphResult<()> {
         self.validate_node_attrs(&attrs_values, None)?;
+        if self.automatic_publication {
+            if attrs_values.values().all(Vec::is_empty) {
+                return Ok(());
+            }
+            return self
+                .writer("groggy")
+                .set_node_attrs(attrs_values)
+                .map(|_| ());
+        }
         self.write_node_attrs(attrs_values)
     }
 
@@ -2991,6 +3105,10 @@ impl Graph {
         attr_name: AttrName,
         mut node_values: Vec<(NodeId, AttrValue)>,
     ) -> GraphResult<()> {
+        if self.automatic_publication {
+            return self.set_node_attrs(HashMap::from([(attr_name, node_values)]));
+        }
+
         if node_values.is_empty() {
             return Ok(());
         }
@@ -3051,6 +3169,15 @@ impl Graph {
         attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> GraphResult<()> {
         self.validate_edge_attrs(&attrs_values, None)?;
+        if self.automatic_publication {
+            if attrs_values.values().all(Vec::is_empty) {
+                return Ok(());
+            }
+            return self
+                .writer("groggy")
+                .set_edge_attrs(attrs_values)
+                .map(|_| ());
+        }
         self.write_edge_attrs(attrs_values)
     }
 

@@ -160,6 +160,13 @@ impl Graph {
 
     /// Explicitly assign or rename a node's external ID. Old names remain reserved.
     pub fn set_node_external_id(&mut self, node: NodeId, external_id: String) -> GraphResult<()> {
+        if self.automatic_publication {
+            return self
+                .writer("groggy")
+                .set_node_external_id(node, external_id)
+                .map(|_| ());
+        }
+
         if !self.has_node(node) {
             return Err(GraphError::node_not_found(node, "set external ID"));
         }
@@ -179,6 +186,13 @@ impl Graph {
 
     /// Explicitly assign or rename an edge's external ID. Old names remain reserved.
     pub fn set_edge_external_id(&mut self, edge: EdgeId, external_id: String) -> GraphResult<()> {
+        if self.automatic_publication {
+            return self
+                .writer("groggy")
+                .set_edge_external_id(edge, external_id)
+                .map(|_| ());
+        }
+
         if !self.has_edge(edge) {
             return Err(GraphError::edge_not_found(edge, "set external ID"));
         }
@@ -268,6 +282,10 @@ impl Graph {
     /// A repeated identical upsert is a no-op. Like other direct writers, this
     /// records changes for the existing explicit commit API.
     pub fn upsert_nodes(&mut self, rows: Vec<NodeUpsert>) -> GraphResult<Vec<NodeId>> {
+        if self.automatic_publication {
+            return self.writer("groggy").upsert_nodes(rows);
+        }
+
         let resolved = self.prepare_node_upserts(&rows, None)?;
         let count = resolved.iter().filter(|id| id.is_none()).count();
         let mut added = self.add_nodes(count).into_iter();
@@ -348,6 +366,10 @@ impl Graph {
 
     /// Upsert edges without conflating parallel edge identities or changing endpoints.
     pub fn upsert_edges(&mut self, rows: Vec<EdgeUpsert>) -> GraphResult<Vec<EdgeId>> {
+        if self.automatic_publication {
+            return self.writer("groggy").upsert_edges(rows);
+        }
+
         let resolved = self.prepare_edge_upserts(&rows, None)?;
         let pairs: Vec<_> = rows
             .iter()

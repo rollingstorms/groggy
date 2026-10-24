@@ -75,7 +75,7 @@ def test_unknown_or_duplicate_time_overrides_are_not_silently_ignored():
 
 
 def test_legacy_commit_has_no_automatic_publication_metadata():
-    graph = Graph()
+    graph = Graph(manual=True)
     graph.add_node()
     state = graph.commit("legacy", "test")
     assert graph.publication_metadata(state) is None

@@ -130,3 +130,12 @@ a duplicate mutation delta. Dirty legacy `commit()` retains a publication
 compatibility path. 09.4a adds native fallible checked constructors; switching
 ordinary Rust/Python defaults and auditing pooled/meta/compound mutations remains
 09.4b under the existing authorization. See [implementation record](explicit-checkpoints-2026-10-23.md).
+
+## A03.1 ordinary Python defaults — 2026-10-23
+
+09.4b.1 switches ordinary Python creation/mutation defaults to checked publication.
+Bulk calls publish once, ordinary time defaults use the acceptance clock, and
+explicit writer/batch effective timestamps remain available. `commit()` records
+an explicit checkpoint. `Graph(manual=True)` names the legacy deferred path.
+Remaining native infallible/default compatibility and multi-stage operation audits
+are 09.4b.2, already authorized. See [implementation record](automatic-publication-2026-10-23.md).

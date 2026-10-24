@@ -35,7 +35,9 @@ mutation clock or alter history reconstruction.
 
 ## Compatibility while ordinary mutations migrate
 
-Ordinary legacy graph APIs still accumulate unpublished changes. Explicit
+Python `Graph()` now publishes ordinary mutations automatically. Explicit
+`Graph(manual=True)` and legacy native compatibility APIs accumulate unpublished
+changes. Explicit
 `checkpoint()` rejects that dirty state. For compatibility, `commit()` publishes
 pending legacy changes once and records a checkpoint of the resulting state.
 When no changes are pending, `commit()` checkpoints the current state and succeeds
@@ -46,8 +48,8 @@ The existing Rust infallible `add_node`/`add_nodes` signatures remain compatibil
 APIs. New `try_add_node`/`try_add_nodes` publish through the checked coordinator
 and return failures before allocation. The count constructor preserves one bulk
 publication; count zero is a no-op. Writers remain the interface for properties,
-explicit effective timestamps and schema policies. This prerequisite does not
-complete the ordinary API default migration or pooled/meta mutation audit.
+explicit effective timestamps and schema policies. The Python ordinary defaults now use checked publication. Existing native
+infallible compatibility and compound pooled/meta mutation audits remain open.
 
 ## Durable checkpoints
 

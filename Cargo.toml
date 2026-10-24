@@ -71,3 +71,7 @@ harness = false
 [[bench]]
 name = "read_state"
 harness = false
+
+[[bench]]
+name = "automatic_publication"
+harness = false

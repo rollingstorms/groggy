@@ -39,7 +39,8 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
 **Immediate next task:** migrate ordinary Graph mutations to checked automatic
-publication (09.4b), using the completed checkpoint boundary (12.3a) and shared
+publication compatibility and compound boundaries (09.4b.2), using the completed
+Python default switch (09.4b.1), checkpoint boundary (12.3a), and shared
 logical change model (AR7.9). F64 property migration (07.3a) and native temporal
 properties (07.3b) are complete. Broader immutable legacy-view, retained pool/meta
 recovery and effective-time reconstruction gates remain open. Preserve existing
@@ -98,7 +99,9 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.3 — Durable checked publication.** Journal sync precedes memory publication; schema and managed identity changes participate; injected write/sync/rollback/publication failures have coverage.
 - [ ] **09.4 — Partial: finish mutation migration.** Migrate ordinary Graph mutations to checked automatic publication now (A03.1); commit denotes an explicit checkpoint. Include pooled/meta writes, visible failures and compatibility fixtures.
 - [x] **09.4a — Fallible publishing constructors.** Native `try_add_node`/`try_add_nodes` use checked publication, retain one bulk delta, consume no IDs on rejection and treat count zero as a no-op. Legacy infallible constructors remain explicit compatibility APIs; this does not switch ordinary mutation defaults.
-- [ ] **09.4b — Ordinary mutation default migration.** Route remaining public Rust/Python mutations, pooled/meta operations and algorithm/table writeback through checked operation boundaries; preserve compound/bulk atomicity and propagate publication failures. Owner already authorized switching defaults.
+- [ ] **09.4b — Partial: ordinary mutation default migration.** Route remaining public Rust/Python mutations, pooled/meta operations and algorithm/table writeback through checked operation boundaries; preserve compound/bulk atomicity and propagate publication failures. Owner already authorized switching defaults.
+- [x] **09.4b.1 — Ordinary Python automatic publication and native policy.** Python `Graph()` defaults to checked publication; explicit `manual=True` preserves deferred compatibility. Native publishing policy/routes cover node/edge creation with properties, scalar/bulk/column setters, kinds, identity/upserts, removals/cascades and staged base graph copying. Prepared execution avoids recursive publication. Active imports and owned graph factories return clean publishing graphs; meta creation publishes required fields together and logical compact-text classification works. See `automatic-publication-2026-10-23.md` for evidence and scope.
+- [ ] **09.4b.2 — Finish native compatibility and compound mutation boundaries.** Migrate/retire remaining default/infallible Rust compatibility entry points and audit mutable pool/space access, collapse/meta plans and algorithm/table multi-stage writeback for one accepted operation/version and complete failure behavior. Core default publication does not certify an entire multi-stage collapse as atomic.
 - [ ] **09.5 — Open: service transaction/concurrency contract.** Define reader snapshots, writer serialization/conflicts, multi-user boundaries, and episode/meta-node grouping before calling the embedded checked writer a multi-client database.
 - [x] **10.1 — Recoverable checked journal.** Versioned checksummed CBOR preserves supported inline checked writes, IDs/reservations, schema/configuration, branches, typed history, and original clocks; restart/corruption/truncation/subprocess tests exist.
 - [x] **10.2 — Verified full-journal backup.** Sync and verify a temporary backup, publish without overwriting, and restore through ordinary recovery. Active graph export remains a separate narrower format.

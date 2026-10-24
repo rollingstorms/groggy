@@ -44,7 +44,7 @@ def test_empty_state_can_be_checkpointed_and_stale_writers_are_rejected():
 
 
 def test_legacy_pending_writes_require_publication_before_a_clean_checkpoint():
-    graph = Graph()
+    graph = Graph(manual=True)
     graph.add_node(x=1)
     with pytest.raises(ValueError, match="uncommitted"):
         graph.checkpoint("pending", "owner")

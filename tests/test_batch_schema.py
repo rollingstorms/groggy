@@ -132,11 +132,14 @@ def test_schema_is_per_call_and_legacy_or_flexible_paths_stay_explicit():
     flexible.add_node(labels=["Entity"])
     graph.apply_batch(flexible, graph.current_state_id, "flexible", "test")
     assert graph.validate_schema(SCHEMA)
-    graph.set_node_attr(0, "name", "legacy update")
+    graph.set_node_attr(0, "name", "ordinary update")
+    published = graph.current_state_id
     blocked = people_batch()
-    with pytest.raises(ValueError, match="uncommitted"):
+    with pytest.raises(ValueError, match="[Ss]chema"):
         graph.apply_batch(blocked, graph.current_state_id, "blocked", "test", schema=SCHEMA)
-    assert graph.get_node_attr(0, "name") == "legacy update"
+    assert graph.get_node_attr(0, "name") == "ordinary update"
+    assert graph.current_state_id == published
+    assert not graph.has_uncommitted_changes()
 
 
 def test_stale_state_or_invalid_schema_cannot_allocate():

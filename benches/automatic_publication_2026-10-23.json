@@ -1,0 +1,191 @@
+{
+  "cases": [
+    {
+      "count": 1000,
+      "samples": [
+        {
+          "nodes": 1000,
+          "seconds": 0.002093667,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.001025875,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.000995459,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.001002416,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.001002458,
+          "state_id": 1
+        }
+      ],
+      "workload": "bulk_insert"
+    },
+    {
+      "count": 1000,
+      "samples": [
+        {
+          "nodes": 1000,
+          "seconds": 0.000940791,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.000924167,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.000904333,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.000933709,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.000910875,
+          "state_id": 2
+        }
+      ],
+      "workload": "bulk_set"
+    },
+    {
+      "count": 1000,
+      "samples": [
+        {
+          "nodes": 1000,
+          "seconds": 0.002419708,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002262083,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002868209,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002290541,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002277958,
+          "state_id": 1001
+        }
+      ],
+      "workload": "scalar_set"
+    },
+    {
+      "count": 10000,
+      "samples": [
+        {
+          "nodes": 10000,
+          "seconds": 0.011317084,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.010428209,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.010438375,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.010376125,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.010430625,
+          "state_id": 1
+        }
+      ],
+      "workload": "bulk_insert"
+    },
+    {
+      "count": 10000,
+      "samples": [
+        {
+          "nodes": 10000,
+          "seconds": 0.009727375,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009824667,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009506375,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009463708,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009284917,
+          "state_id": 2
+        }
+      ],
+      "workload": "bulk_set"
+    },
+    {
+      "count": 10000,
+      "samples": [
+        {
+          "nodes": 10000,
+          "seconds": 0.025251959,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.024813375,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.026031209,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.023741666,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.025662208,
+          "state_id": 10001
+        }
+      ],
+      "workload": "scalar_set"
+    }
+  ],
+  "scope": "Native release operations; fixture construction excluded except bulk_insert. Bulk and scalar history semantics differ; no speedup/SLA claim. Scalar_set includes its per-call name/column preparation; bulk_set includes column-map construction. No FFI or RSS measurement."
+}

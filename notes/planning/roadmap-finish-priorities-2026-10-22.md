@@ -14,8 +14,9 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Next: ordinary Graph mutation/publication migration (09.4b), using the explicit
-checkpoint boundary (12.3a), followed by reconstructed effective-time states. Source-preserving table adapters and broader legacy frozen
+Next: finish native compatibility and compound mutation boundaries (09.4b.2).
+Python ordinary defaults are publishing (09.4b.1), using the explicit checkpoint
+boundary (12.3a). Reconstructed effective-time states follow. Source-preserving table adapters and broader legacy frozen
 read guarantees remain open; owned projections do not complete those parents.
 
 ## Owner answers received — 2026-10-22
@@ -303,3 +304,20 @@ operations. See `explicit-checkpoints-2026-10-23.md`.
 Ordinary mutation defaults, including pooled/meta and compound write paths,
 remain 09.4b. The owner's authorization to migrate them stands; this foundation
 does not close the broad publication/default or storage lifecycle parents.
+
+## 2026-10-23 — ordinary Python publication defaults (09.4b.1)
+
+Python `Graph()` and active graph imports now return publishing graphs; explicit
+`manual=True` retains compatibility. Native coordinator policy routes supported
+ordinary creation, scalar/bulk/column setters, removals/cascades, kinds and managed
+identities through checked publication. Creation includes initial properties;
+prepared execution suppresses recursive routing and restores the policy. Base
+graph copying stages before allocation; unsafe cross-pool references reject.
+Meta creation publishes required system fields together, and classification now
+accepts logical compact text. Graph-producing factories accept their private
+imports once before return. See `automatic-publication-2026-10-23.md`.
+
+The remaining Rust default/infallible compatibility surface and higher-level
+compound meta/collapse, algorithm and table writeback boundaries remain 09.4b.2.
+The broad 09.4 parent and pool portability/effective-time reconstruction are not
+closed by this core default migration. Existing owner authorization remains.

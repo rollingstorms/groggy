@@ -2,6 +2,10 @@
 
 **Type**: `groggy.Graph`
 
+Ordinary Python mutations now publish checked versions automatically; `commit()`
+labels the published state. See [automatic publication](automatic-publication.md)
+for clocks, bulk boundaries and explicit `manual=True` compatibility.
+
 ---
 
 ## Overview

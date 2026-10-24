@@ -575,7 +575,6 @@ impl PySubgraphArray {
     fn merge(&self, _py: Python) -> PyResult<crate::ffi::api::graph::PyGraph> {
         use std::cell::RefCell;
         use std::collections::HashSet;
-        use std::rc::Rc;
 
         // Create a new graph
         let mut merged_graph = groggy::api::graph::Graph::new();
@@ -631,9 +630,13 @@ impl PySubgraphArray {
             }
         }
 
-        // Wrap in PyGraph by manually constructing the struct
+        let merged_graph = merged_graph
+            .into_publishing()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+
+        // Wrap the independently assembled graph after native publication.
         Ok(crate::ffi::api::graph::PyGraph {
-            inner: Rc::new(RefCell::new(merged_graph)),
+            inner: merged_graph.into_shared(),
             cached_view: RefCell::new(None),
         })
     }
