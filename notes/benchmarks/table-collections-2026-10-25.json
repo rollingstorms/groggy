@@ -1,0 +1,87 @@
+{
+  "cases": [
+    {
+      "groups": 100,
+      "input_rows": 1000,
+      "samples": [
+        {
+          "count_seconds": 0.000069375,
+          "flatten_seconds": 0.000051083,
+          "mean_seconds": 0.000074208,
+          "sum_seconds": 0.000088125,
+          "unique_seconds": 0.000097542
+        },
+        {
+          "count_seconds": 0.000064959,
+          "flatten_seconds": 0.000042958,
+          "mean_seconds": 0.000066083,
+          "sum_seconds": 0.000073458,
+          "unique_seconds": 0.000092833
+        },
+        {
+          "count_seconds": 0.000063458,
+          "flatten_seconds": 0.000041708,
+          "mean_seconds": 0.000071541,
+          "sum_seconds": 0.000071417,
+          "unique_seconds": 0.00008875
+        },
+        {
+          "count_seconds": 0.000063541,
+          "flatten_seconds": 0.000044541,
+          "mean_seconds": 0.000064708,
+          "sum_seconds": 0.000066,
+          "unique_seconds": 0.000089167
+        },
+        {
+          "count_seconds": 0.000066583,
+          "flatten_seconds": 0.000043542,
+          "mean_seconds": 0.000068458,
+          "sum_seconds": 0.000068917,
+          "unique_seconds": 0.000093208
+        }
+      ]
+    },
+    {
+      "groups": 100,
+      "input_rows": 10000,
+      "samples": [
+        {
+          "count_seconds": 0.000121416,
+          "flatten_seconds": 0.000192125,
+          "mean_seconds": 0.000145292,
+          "sum_seconds": 0.000150208,
+          "unique_seconds": 0.00026725
+        },
+        {
+          "count_seconds": 0.000124125,
+          "flatten_seconds": 0.0001185,
+          "mean_seconds": 0.000138834,
+          "sum_seconds": 0.000139042,
+          "unique_seconds": 0.000265333
+        },
+        {
+          "count_seconds": 0.000123792,
+          "flatten_seconds": 0.000208709,
+          "mean_seconds": 0.000137917,
+          "sum_seconds": 0.000137334,
+          "unique_seconds": 0.000350125
+        },
+        {
+          "count_seconds": 0.000127083,
+          "flatten_seconds": 0.000122792,
+          "mean_seconds": 0.000141667,
+          "sum_seconds": 0.000143833,
+          "unique_seconds": 0.000275625
+        },
+        {
+          "count_seconds": 0.00013125,
+          "flatten_seconds": 0.00012225,
+          "mean_seconds": 0.000139125,
+          "sum_seconds": 0.000142958,
+          "unique_seconds": 0.000282916
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized pregrouped two-column collection: sum, mean, non-null count, explicit unique count and lossless flatten. Five observations per size, 100 groups. Metadata validation and complete output construction timed; fixture/group construction and correctness checks excluded. No matched speedup, RSS/allocation, Python bridge or FFI latency claim."
+}

@@ -126,6 +126,7 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'union': 'BaseTable', 'intersect': 'BaseTable',
         },
         'GraphTable': {'update_source_graph': 'Dict[str, Any]'},
+        'TableArray': {name: 'BaseTable' for name in ('sum', 'mean', 'min', 'max', 'all', 'count', 'agg', 'concat')},
         'GraphView': {
             'write_state_id': 'Optional[int]', 'node_ids': 'List[int]', 'edge_ids': 'List[int]',
             'node_count': 'int', 'edge_count': 'int', 'is_directed': 'bool',
@@ -468,6 +469,10 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
             lines.append(f"    def __getattr__(self, name: str) -> Any:")
             if not method_doc:
                 method_doc = "Dynamic attribute access for runtime attribute dictionaries"
+        elif class_name == 'TableArray' and method_name in ('sum', 'mean', 'min', 'max', 'all', 'count', 'concat'):
+            lines.append(f"    def {method_name}(self) -> BaseTable:")
+        elif class_name == 'TableArray' and method_name == 'agg':
+            lines.append("    def agg(self, agg_spec: Dict[str, str]) -> BaseTable:")
         elif class_name == 'BaseTable' and method_name in ('union', 'intersect', 'stack', 'concat'):
             lines.append(f"    def {method_name}(self, other: BaseTable) -> BaseTable:")
         elif class_name == 'BaseTable' and method_name == 'join':

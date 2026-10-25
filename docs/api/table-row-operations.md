@@ -99,5 +99,8 @@ All outputs are eager owned columns; retained sources keep their frozen payloads
 alive. Key hashing includes cell content. Group selection, set indexes and row
 plans allocate memory proportional to their inputs/results; no memory budget,
 streaming or billion-row guarantee is established. Specialized graph-domain
-merges, TableArray aggregation/group-key policies and broader conversions remain
-separate open work under 27/AR7.10.
+merges and broader collection ownership/conversion adapters remain separate open
+work under 27/AR7.10.
+
+[Collection reductions](table-collection-reductions.md) now share native numeric
+kernels, checked group metadata and lossless supplied-table flattening.

@@ -76,6 +76,23 @@ impl Clone for BaseTable {
 }
 
 impl BaseTable {
+    pub(super) fn collection_result(
+        columns: HashMap<String, BaseArray<AttrValue>>,
+        order: Vec<String>,
+        rows: usize,
+        sources: &[BaseTable],
+    ) -> GraphResult<Self> {
+        let mut result = Self::with_column_order(columns, order)?;
+        result.nrows = rows;
+        for table in sources {
+            result.provenance = super::provenance::TableProvenance::joined(
+                result.provenance.as_ref(),
+                table.provenance.as_ref(),
+            );
+        }
+        Ok(result)
+    }
+
     /// Create a new empty BaseTable
     pub fn new() -> Self {
         use std::time::{SystemTime, UNIX_EPOCH};

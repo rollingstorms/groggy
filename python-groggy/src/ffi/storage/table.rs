@@ -4713,7 +4713,10 @@ impl PyEdgesTable {
             })
             .collect::<PyResult<Vec<_>>>()?;
 
-        Ok(PyEdgesTableArray { tables: py_tables })
+        Ok(PyEdgesTableArray {
+            tables: py_tables,
+            group_columns: column_vec,
+        })
     }
 
     /// Get a slice of rows [start, end)
@@ -6121,7 +6124,7 @@ impl PyTableArray {
 
         Ok(Self {
             tables: processed_tables,
-            group_columns: columns.unwrap_or_default(),
+            group_columns: Vec::new(),
         })
     }
 
@@ -6168,329 +6171,67 @@ impl PyTableArray {
         self.tables.clone()
     }
 
-    /// Calculate mean of numeric columns for each group
-    pub fn mean(&self) -> PyResult<PyBaseTable> {
-        self.aggregate_groups(AggregationKind::Mean)
+    /// Calculate mean using the shared native collection reducer.
+    pub fn mean(&self, py: Python<'_>) -> PyResult<PyBaseTable> {
+        self.reduce_native(py, "mean", None)
     }
-
-    /// Calculate maximum of numeric columns for each group
-    pub fn max(&self) -> PyResult<PyBaseTable> {
-        self.aggregate_groups(AggregationKind::Max)
+    /// Sum numeric columns, excluding grouping keys.
+    pub fn sum(&self, py: Python<'_>) -> PyResult<PyBaseTable> {
+        self.reduce_native(py, "sum", None)
     }
-
-    /// Logical ALL across boolean columns for each group
-    pub fn all(&self) -> PyResult<PyBaseTable> {
-        self.aggregate_groups(AggregationKind::All)
+    /// Minimum numeric values, excluding grouping keys.
+    pub fn min(&self, py: Python<'_>) -> PyResult<PyBaseTable> {
+        self.reduce_native(py, "min", None)
     }
-
-    /// Aggregate across all tables in the array
-    ///
-    /// Args:
-    ///     agg_specs: Dictionary mapping column names to aggregation functions
-    ///                Supported functions: "count", "sum", "avg", "mean", "min", "max"
-    ///
-    /// Returns:
-    ///     PyBaseTable: A single table with aggregated results
-    ///
-    /// Examples:
-    /// ```python
-    /// # Group by department, then aggregate salary and count users
-    /// grouped = table.group_by(['department'])
-    /// result = grouped.agg({'salary': 'avg', 'user_id': 'count'})
-    /// ```
-    pub fn agg(&self, agg_specs: HashMap<String, String>) -> PyResult<PyBaseTable> {
-        if self.tables.is_empty() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Cannot aggregate empty table array",
-            ));
-        }
-
-        use groggy::types::AttrValue;
-        use std::collections::HashMap;
-
-        let group_columns = &self.group_columns;
-        let agg_column_names: Vec<String> = agg_specs.keys().cloned().collect();
-
-        // Prepare result columns: group columns + aggregated columns
-        let mut result_columns: HashMap<String, Vec<AttrValue>> = HashMap::new();
-
-        // Initialize columns
-        for col_name in group_columns {
-            result_columns.insert(col_name.clone(), Vec::new());
-        }
-        for col_name in &agg_column_names {
-            result_columns.insert(col_name.clone(), Vec::new());
-        }
-
-        // Process each group (table)
-        for group_table in &self.tables {
-            if group_table.table.nrows() == 0 {
-                continue; // Skip empty groups
-            }
-
-            // Get group key values (first row of the group for group-by columns)
-            for col_name in group_columns {
-                if let Some(column) = group_table.table.column(col_name) {
-                    let group_value = column.get(0).cloned().unwrap_or(AttrValue::Null);
-                    if let Some(col_vec) = result_columns.get_mut(col_name) {
-                        col_vec.push(group_value);
-                    }
-                }
-            }
-
-            // Calculate aggregated values for this group
-            for (col_name, agg_func) in &agg_specs {
-                let agg_value = if let Some(column) = group_table.table.column(col_name) {
-                    self.calculate_aggregation(column.data(), agg_func)?
-                } else {
-                    AttrValue::Null
-                };
-
-                if let Some(col_vec) = result_columns.get_mut(col_name) {
-                    col_vec.push(agg_value);
-                }
-            }
-        }
-
-        // Convert to BaseArray columns and create table
-        let mut final_columns = HashMap::new();
-        for (col_name, values) in result_columns {
-            final_columns.insert(
-                col_name.clone(),
-                groggy::storage::array::BaseArray::from_attr_values(values),
-            );
-        }
-
-        let mut column_order = self.group_columns.clone();
-        column_order.extend(agg_column_names);
-
-        let result_table =
-            groggy::storage::table::BaseTable::with_column_order(final_columns, column_order)
-                .map_err(|e| {
-                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Failed to create aggregated table: {}",
-                        e
-                    ))
-                })?;
-
-        Ok(PyBaseTable::from_table(result_table))
+    /// Maximum numeric values, excluding grouping keys.
+    pub fn max(&self, py: Python<'_>) -> PyResult<PyBaseTable> {
+        self.reduce_native(py, "max", None)
     }
-
-    /// Iterator-style aggregation - applies aggregation functions as if iterating
-    ///
-    /// This is equivalent to calling .iter().agg(), providing a more functional approach
-    pub fn iter_agg(&self, agg_specs: HashMap<String, String>) -> PyResult<PyBaseTable> {
-        // For now, delegate to the regular agg method
-        // In the future, this could have different semantics (e.g., streaming)
-        self.agg(agg_specs)
+    /// Count non-null values, excluding grouping keys.
+    pub fn count(&self, py: Python<'_>) -> PyResult<PyBaseTable> {
+        self.reduce_native(py, "count", None)
+    }
+    /// Logical all over boolean columns with complete native validation.
+    pub fn all(&self, py: Python<'_>) -> PyResult<PyBaseTable> {
+        self.reduce_native(py, "all", None)
+    }
+    /// Explicit shared native reductions by column name.
+    pub fn agg(&self, agg_specs: HashMap<String, String>, py: Python<'_>) -> PyResult<PyBaseTable> {
+        self.reduce_native(py, "agg", Some(agg_specs))
+    }
+    /// Alias for agg using the same eager native implementation.
+    pub fn iter_agg(
+        &self,
+        agg_specs: HashMap<String, String>,
+        py: Python<'_>,
+    ) -> PyResult<PyBaseTable> {
+        self.agg(agg_specs, py)
     }
 }
-
-// Implementation block for non-Python methods
 impl PyTableArray {
-    /// Helper method to calculate aggregation on a column's data
-    /// Note: This method is not exposed to Python (no #[pyo3] annotation)
-    fn calculate_aggregation(&self, data: &[AttrValue], agg_func: &str) -> PyResult<AttrValue> {
-        match agg_func.to_lowercase().as_str() {
-            "count" => {
-                // Count non-null values
-                let count = data
-                    .iter()
-                    .filter(|v| !matches!(v, AttrValue::Null))
-                    .count() as i64;
-                Ok(AttrValue::Int(count))
+    fn reduce_native(
+        &self,
+        py: Python<'_>,
+        operation: &str,
+        specs: Option<HashMap<String, String>>,
+    ) -> PyResult<PyBaseTable> {
+        let tables = self.tables.iter().map(|t| t.table.clone()).collect();
+        let keys = self.group_columns.clone();
+        py.allow_threads(move || {
+            let collection = groggy::storage::table::TableArray::from_group_columns(tables, &keys)?;
+            match operation {
+                "sum" => collection.sum(),
+                "mean" => collection.mean(),
+                "min" => collection.min(),
+                "max" => collection.max(),
+                "count" => collection.count(),
+                "all" => collection.all(),
+                _ => collection.agg(specs.unwrap_or_default()),
             }
-            "sum" | "avg" | "mean" | "min" | "max" => {
-                groggy::storage::array::BaseArray::new(data.to_vec())
-                    .aggregate_numeric(agg_func.to_lowercase().as_str())
-                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
-            }
-            "all" => {
-                let mut encountered_bool = false;
-                for value in data {
-                    match value {
-                        AttrValue::Bool(false) => return Ok(AttrValue::Bool(false)),
-                        AttrValue::Bool(true) => encountered_bool = true,
-                        AttrValue::Null => {}
-                        _ => {
-                            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                                "'all' aggregation only supports boolean columns",
-                            ))
-                        }
-                    }
-                }
-                if encountered_bool {
-                    Ok(AttrValue::Bool(true))
-                } else {
-                    Ok(AttrValue::Null)
-                }
-            }
-            _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Unsupported aggregation function: {}",
-                agg_func
-            ))),
-        }
+        })
+        .map(PyBaseTable::from_table)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
-}
-
-// Helpers for PyTableArray aggregations
-impl PyTableArray {
-    fn aggregate_groups(&self, kind: AggregationKind) -> PyResult<PyBaseTable> {
-        use groggy::storage::array::BaseArray;
-        use groggy::types::AttrValue;
-
-        if self.tables.is_empty() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Cannot aggregate empty table array",
-            ));
-        }
-
-        // Identify columns eligible for aggregation
-        let mut agg_columns = Vec::new();
-        if let Some(sample) = self.tables.iter().find(|table| table.table.nrows() > 0) {
-            for column_name in sample.table.column_names() {
-                if self.group_columns.contains(column_name) {
-                    continue;
-                }
-
-                if self.is_column_eligible(column_name, kind) {
-                    agg_columns.push(column_name.clone());
-                }
-            }
-        }
-
-        if agg_columns.is_empty() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "No columns eligible for {:?} aggregation",
-                kind
-            )));
-        }
-
-        let mut result_columns: std::collections::HashMap<String, Vec<AttrValue>> =
-            std::collections::HashMap::new();
-
-        for key in &self.group_columns {
-            result_columns.insert(key.clone(), Vec::new());
-        }
-        for col in &agg_columns {
-            result_columns.insert(col.clone(), Vec::new());
-        }
-
-        for group_table in &self.tables {
-            if group_table.table.nrows() == 0 {
-                continue;
-            }
-
-            // Capture group key values (first row of each grouping column)
-            for key in &self.group_columns {
-                if let Some(column) = group_table.table.column(key) {
-                    let value = column.get(0).cloned().unwrap_or(AttrValue::Null);
-                    result_columns
-                        .get_mut(key)
-                        .expect("group key column should exist")
-                        .push(value);
-                }
-            }
-
-            // Apply aggregation per eligible column
-            for col in &agg_columns {
-                let aggregated = if let Some(column) = group_table.table.column(col) {
-                    Self::apply_aggregation(column, kind)
-                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?
-                } else {
-                    AttrValue::Null
-                };
-
-                result_columns
-                    .get_mut(col)
-                    .expect("aggregated column should exist")
-                    .push(aggregated);
-            }
-        }
-
-        // Convert to BaseTable preserving column order (group keys first)
-        let mut base_columns = std::collections::HashMap::new();
-        for (name, values) in result_columns {
-            base_columns.insert(name.clone(), BaseArray::from_attr_values(values));
-        }
-
-        let mut column_order = self.group_columns.clone();
-        column_order.extend(agg_columns.clone());
-
-        let base_table =
-            groggy::storage::table::BaseTable::with_column_order(base_columns, column_order)
-                .map_err(|e| {
-                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Failed to build aggregation table: {}",
-                        e
-                    ))
-                })?;
-
-        Ok(PyBaseTable::from_table(base_table))
-    }
-
-    fn is_column_eligible(&self, column_name: &str, kind: AggregationKind) -> bool {
-        for table in &self.tables {
-            if let Some(column) = table.table.column(column_name) {
-                if let Some(value) = column.data().iter().find(|v| !matches!(v, AttrValue::Null)) {
-                    return match kind {
-                        AggregationKind::Mean
-                        | AggregationKind::Max
-                        | AggregationKind::Min
-                        | AggregationKind::Sum => value.is_numeric(),
-                        AggregationKind::All => matches!(value, AttrValue::Bool(_)),
-                    };
-                }
-            }
-        }
-        false
-    }
-
-    fn apply_aggregation(
-        column: &groggy::storage::array::BaseArray<AttrValue>,
-        kind: AggregationKind,
-    ) -> groggy::errors::GraphResult<AttrValue> {
-        use groggy::errors::GraphError;
-
-        match kind {
-            AggregationKind::Mean => column.mean().map(AttrValue::Float64),
-            AggregationKind::Max => column.max(),
-            AggregationKind::Min => column.min(),
-            AggregationKind::Sum => column.sum(),
-            AggregationKind::All => {
-                let mut encountered_bool = false;
-                for value in column.data() {
-                    match value {
-                        AttrValue::Bool(false) => return Ok(AttrValue::Bool(false)),
-                        AttrValue::Bool(true) => encountered_bool = true,
-                        AttrValue::Null => {}
-                        _ => {
-                            return Err(GraphError::InvalidInput(
-                                "'all' aggregation only supports boolean columns".to_string(),
-                            ))
-                        }
-                    }
-                }
-
-                if encountered_bool {
-                    Ok(AttrValue::Bool(true))
-                } else {
-                    Ok(AttrValue::Null)
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AggregationKind {
-    Mean,
-    Max,
-    #[allow(dead_code)]
-    Min,
-    #[allow(dead_code)]
-    Sum,
-    All,
 }
 
 /// Iterator for PyTableArray
@@ -6713,6 +6454,7 @@ impl PyNodesTableArrayIterator {
 #[derive(Clone)]
 pub struct PyEdgesTableArray {
     tables: Vec<PyEdgesTable>,
+    group_columns: Vec<String>,
 }
 
 #[pymethods]
@@ -6771,7 +6513,7 @@ impl PyEdgesTableArray {
 
         let table_array = PyTableArray {
             tables: base_tables,
-            group_columns: Vec::new(), // Empty group columns for delegation
+            group_columns: self.group_columns.clone(),
         };
         let array_obj = table_array.into_py(py);
         array_obj.getattr(py, name)

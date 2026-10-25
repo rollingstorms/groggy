@@ -64,3 +64,7 @@ aggregation and group-key policies, and broader conversion adapters remain under
 27/AR7.10. Legacy connected reads remain under 26.1. Existing broad checklist
 count stays 191 checked / 77 unchecked; these completed families reduce the
 remaining implementation inventory without manufacturing parent completion.
+
+Follow-up: [collection conformance](table-collection-conformance-2026-10-25.md)
+closes TableArray reduction/group-key validation and supplied-table flattening.
+Specialized merges and broader collection ownership/conversion adapters stay open.

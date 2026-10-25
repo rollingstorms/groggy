@@ -547,3 +547,25 @@ Evidence: `table-row-conformance-2026-10-25.md`, seven native regressions includ
 Checklist remains 191 checked / 77 unchecked with no added rows. Specialized
 GraphTable domain merges, TableArray aggregate/group-key policies and broader
 conversion adapters remain open; generic joins and this row family are complete.
+
+
+## 2026-10-25 — TableArray reductions and supplied-table flattening (27 / AR7.10)
+
+Closed the existing collection reduction/group-key validation/flatten inventory.
+A Rust coordinator now emits each key once, validates constant/consistent group
+metadata, uses sorted explicit specs and checks collisions/missing/unknown specs.
+Grouped collections emit one row per group; native/core ungrouped collections
+reduce all observations, with correctly weighted means. Legacy Python constructor
+per-table behavior remains; its columns= projection no longer acts as grouping.
+Both Python wrappers and specialized node/edge adapters delegate numeric/logical
+reductions to Rust with the GIL released. Edge group metadata now survives.
+Flattening retains later-only columns, pads missing values, preserves zero-column
+row counts and retains supplied source captures without guessed writeback IDs.
+
+Evidence: `table-collection-conformance-2026-10-25.md`, seven native regressions,
+twelve Python cases, 1,061 native / 1,789 root Python tests, 103 executable docs
+and strict all-target Clippy. Receipt: `notes/benchmarks/table-collections-2026-10-25.json`.
+Native kernel timings exclude the legacy bridge's BaseTable cloning cost; no
+matched speedup, memory or FFI latency guarantee is claimed. Checklist stays
+191 checked / 77 unchecked, with no new rows. Specialized merges and broader
+collection ownership/conversion adapters remain open; this family is complete.

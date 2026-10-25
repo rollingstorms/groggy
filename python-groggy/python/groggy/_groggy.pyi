@@ -9966,9 +9966,16 @@ class TableArray:
         """
         ...
 
-    def agg(self, *args, **kwargs) -> Any:
+    def agg(self, agg_spec: Dict[str, str]) -> BaseTable:
         """
-        Generic aggregation with function specifications
+        Explicit native reductions with sorted output columns.
+        """
+        ...
+
+
+    def all(self) -> BaseTable:
+        """
+        Native boolean column all, validating every cell.
         """
         ...
 
@@ -9996,17 +10003,19 @@ class TableArray:
         """
         ...
 
-    def concat(self, *args, **kwargs) -> Any:
+    def concat(self) -> BaseTable:
         """
         Concatenate all tables into one
         """
         ...
 
-    def count(self, *args, **kwargs) -> Any:
+
+    def count(self) -> BaseTable:
         """
-        Count aggregation across all tables
+        Native non-null column counts.
         """
         ...
+
 
     def describe(self, *args, **kwargs) -> Any:
         """
@@ -10050,21 +10059,34 @@ class TableArray:
         """
         ...
 
+    def max(self) -> BaseTable:
+        """
+        Native numeric column maxima.
+        """
+        ...
+
     def max_column(self, *args, **kwargs) -> Any:
         """
         Maximum value in a column across all tables
         """
         ...
 
-    def mean(self, *args, **kwargs) -> Any:
+    def mean(self) -> BaseTable:
         """
-        Mean aggregation across all tables
+        Native means weighted by individual observations.
         """
         ...
+
 
     def mean_column(self, *args, **kwargs) -> Any:
         """
         Mean of values in a column across all tables
+        """
+        ...
+
+    def min(self) -> BaseTable:
+        """
+        Native numeric column minima.
         """
         ...
 
@@ -10122,11 +10144,12 @@ class TableArray:
         """
         ...
 
-    def sum(self, *args, **kwargs) -> Any:
+    def sum(self) -> BaseTable:
         """
-        Sum aggregation across all tables
+        Native numeric column sums, excluding group keys.
         """
         ...
+
 
     def sum_column(self, *args, **kwargs) -> Any:
         """

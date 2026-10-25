@@ -87,7 +87,7 @@ not represent building its basic engine contract from scratch.
 | Numerical core and architecture | Canonical matrix/array foundations, entity handles, many arithmetic/statistical/solver/factorization/sparse/operator and algorithm repairs, bounded release receipts. | Remaining promised derivative/composition domains, uncovered consumers and representative performance/memory/scale gates; broad numerical parents remain partial. |
 | Mutation/publication | Checked mixed batches, ordinary Python defaults, property clocks, checkpoints, compound collapse and recent table/subgraph boundaries. | Remaining native default/infallible compatibility, mutable pool/space escapes, whole-pipeline boundaries and broader pipeline semantics. |
 | Properties, state and history | f64 defaults, typed temporal properties, shared logical change records, retained snapshots and immutable read APIs. | Complete value lifecycle, effective-time reconstruction/validation, rewiring/revert, exact portable snapshots and portable pooled/meta contents. |
-| Views and tables | Explicit pinned read views, frozen matrix/table exports, mapped writeback and checked independent materialization. | Migrate legacy connected reads, specialized GraphTable domain merges and TableArray adapters. Frozen BaseTable selections/projections and generic joins now retain source pins; direct/mixed source property writeback is checked. Generic joins, grouping, dedup and set operations share typed keys and stable ordering; row combinations retain source context, and concat rejects name collisions. Specialized TableArray reductions/conversions and broad table parents remain partial. |
+| Views and tables | Explicit pinned read views, frozen matrix/table exports, mapped writeback and checked independent materialization. | Migrate legacy connected reads, specialized GraphTable domain merges and TableArray adapters. Frozen BaseTable selections/projections and generic joins now retain source pins; direct/mixed source property writeback is checked. Generic joins, grouping, dedup and set operations share typed keys and stable ordering; row combinations retain source context, and concat rejects name collisions. TableArray reductions/group-key validation and lossless supplied-table flatten now share a Rust coordinator. Specialized graph merges, broader collection ownership/conversions and broad table parents remain partial. |
 | Storage, branches and schema | Checked journal/recovery foundations, checkpoint annotations, existing branch/identity behavior and explicit schema checks. | Full pooled retention, lifecycle/compaction/format migration, complete branch lifecycle, three-way merge, purge and schema evolution. |
 | Queries, indexes and pipelines | Existing native filter/query/index/builder machinery and many repaired algorithm paths. | Consistent index lifecycle, pinned temporal query results, shared expression/execution boundaries, pipeline intermediates/history and complete algorithm certification. |
 | Integration and service | Existing embedded engine and test/benchmark infrastructure. | Graphiti ingest/driver/provenance/retrieval remain deferred behind core; service concurrency, multi-user deployment and broad comparison/scale gates remain open. |
@@ -112,8 +112,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest table-row slice (2026-10-25): **1,054 native tests passed, 51 ignored; 1,777 root
-Python API tests passed, 1 skipped; 100 executable documentation examples passed;
+Latest table-collection slice (2026-10-25): **1,061 native tests passed, 51 ignored; 1,789 root
+Python API tests passed, 1 skipped; 103 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

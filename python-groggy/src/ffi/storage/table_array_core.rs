@@ -72,52 +72,59 @@ impl PyTableArrayCore {
         format!("TableArray({} tables)", self.inner.len())
     }
 
-    /// Sum aggregation across all tables
-    fn sum(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let result = self
-            .inner
-            .sum()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Sum failed: {}", e)))?;
-
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    /// Native numeric column sums, excluding group keys.
+    fn sum(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let inner = &self.inner;
+        py.allow_threads(|| inner.sum())
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
-
-    /// Mean aggregation across all tables
-    fn mean(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let result = self
-            .inner
-            .mean()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Mean failed: {}", e)))?;
-
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    /// Native means weighted by individual observations.
+    fn mean(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let inner = &self.inner;
+        py.allow_threads(|| inner.mean())
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
-
-    /// Count aggregation across all tables
-    fn count(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let result = self
-            .inner
-            .count()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Count failed: {}", e)))?;
-
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    /// Native non-null column counts.
+    fn count(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let inner = &self.inner;
+        py.allow_threads(|| inner.count())
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
-
-    /// Generic aggregation with function specifications
-    fn agg(&self, agg_spec: &PyDict) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let mut agg_functions = HashMap::new();
-
-        for (key, value) in agg_spec.iter() {
-            let col_name: String = key.extract()?;
-            let func_name: String = value.extract()?;
-            agg_functions.insert(col_name, func_name);
-        }
-
-        let result = self
-            .inner
-            .agg(agg_functions)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Agg failed: {}", e)))?;
-
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    /// Native numeric column minima.
+    fn min(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let inner = &self.inner;
+        py.allow_threads(|| inner.min())
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+    /// Native numeric column maxima.
+    fn max(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let inner = &self.inner;
+        py.allow_threads(|| inner.max())
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+    /// Native boolean column all, validating every cell.
+    fn all(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let inner = &self.inner;
+        py.allow_threads(|| inner.all())
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+    /// Explicit native reductions with sorted output columns.
+    fn agg(
+        &self,
+        agg_spec: &PyDict,
+        py: Python<'_>,
+    ) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let functions = agg_spec.extract::<HashMap<String, String>>()?;
+        let inner = &self.inner;
+        py.allow_threads(|| inner.agg(functions))
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     /// Take first n tables
@@ -135,12 +142,11 @@ impl PyTableArrayCore {
     }
 
     /// Concatenate all tables into one
-    fn concat(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let result = self.inner.concat().map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Concat failed: {}", e))
-        })?;
-
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    fn concat(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let inner = &self.inner;
+        py.allow_threads(|| inner.concat())
+            .map(crate::ffi::storage::table::PyBaseTable::from_table)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     /// Get shape (num_tables, avg_rows_per_table)

@@ -344,16 +344,26 @@ pub(super) fn median(values: &[AttrValue]) -> GraphResult<f64> {
 
 /// Select an original numeric scalar using exact mixed ordering; ties keep first.
 pub(super) fn numeric_extremum(values: &[AttrValue], minimum: bool) -> GraphResult<AttrValue> {
-    extremum(values, minimum, false)
+    extremum(values.iter(), minimum, false)
 }
 /// Preserve legacy text/boolean extrema alongside the shared numeric domain.
 pub(super) fn legacy_extremum(values: &[AttrValue], minimum: bool) -> GraphResult<AttrValue> {
-    extremum(values, minimum, true)
+    extremum(values.iter(), minimum, true)
 }
-fn extremum(values: &[AttrValue], minimum: bool, legacy: bool) -> GraphResult<AttrValue> {
+pub(crate) fn numeric_extremum_iter<'a>(
+    values: impl Iterator<Item = &'a AttrValue>,
+    minimum: bool,
+) -> GraphResult<AttrValue> {
+    extremum(values, minimum, false)
+}
+fn extremum<'a>(
+    values: impl Iterator<Item = &'a AttrValue>,
+    minimum: bool,
+    legacy: bool,
+) -> GraphResult<AttrValue> {
     let operation = if minimum { "min" } else { "max" };
     let mut selected: Option<&AttrValue> = None;
-    for (index, value) in values.iter().enumerate() {
+    for (index, value) in values.enumerate() {
         if matches!(value, AttrValue::Null) {
             continue;
         }
