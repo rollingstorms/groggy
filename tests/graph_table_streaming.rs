@@ -1,7 +1,7 @@
 use groggy::{
     storage::{
         array::BaseArray,
-        table::{EdgesTable, GraphTable, NodesTable},
+        table::{EdgesTable, GraphTable, NodesTable, Table},
     },
     viz::{display::DataType, streaming::DataSource},
     AttrValue as V,
@@ -155,4 +155,47 @@ fn derived_branches_and_explicit_edge_id_assignment_cannot_alias_cache_keys() {
     let assigned = original.clone().auto_assign_edge_ids().unwrap();
     assert_ne!(assigned.get_cache_key(0, 2), original.get_cache_key(0, 2));
     assert_eq!(original.to_nodes().node_ids().unwrap(), vec![7, 30]);
+}
+
+#[test]
+fn compatibility_layout_keeps_a_single_node_and_all_isolates_with_original_ids() {
+    use groggy::viz::streaming::data_source::LayoutAlgorithm;
+    for table in [
+        GraphTable::new(NodesTable::new(vec![70]), EdgesTable::new(vec![])),
+        GraphTable::new(
+            NodesTable::new(vec![70, 12, 99]),
+            EdgesTable::new(vec![(900, 70, 12)]),
+        ),
+    ] {
+        let positions = table.compute_layout(LayoutAlgorithm::Grid {
+            columns: 2,
+            cell_size: 1.0,
+        });
+        assert_eq!(
+            positions
+                .iter()
+                .map(|p| p.node_id.parse::<usize>().unwrap())
+                .collect::<Vec<_>>(),
+            table.nodes().node_ids().unwrap()
+        );
+        assert_eq!(positions.len(), table.nodes().nrows());
+    }
+}
+
+#[test]
+fn compatibility_metadata_does_not_guess_direction_from_edge_reciprocity() {
+    let table = fixture();
+    assert!(!table.get_graph_metadata().is_directed);
+    assert!(
+        table
+            .to_viz_data_source(true)
+            .unwrap()
+            .get_graph_metadata()
+            .is_directed
+    );
+    let reciprocal = GraphTable::new(
+        NodesTable::new(vec![7, 30]),
+        EdgesTable::new(vec![(1, 7, 30), (2, 30, 7)]),
+    );
+    assert!(!reciprocal.get_graph_metadata().is_directed);
 }

@@ -173,46 +173,23 @@ impl DataSource for GraphTable {
         // Check if any edges have weights
         let has_weights = edges.iter().any(|e| e.weight.is_some());
 
-        // Check if graph is directed (heuristic: if any edge has different source/target relationships)
-        let mut edge_pairs = HashSet::new();
-        let mut reverse_pairs = HashSet::new();
-        let mut is_directed = false;
-
-        for edge in &edges {
-            let pair = (&edge.source, &edge.target);
-            let reverse_pair = (&edge.target, &edge.source);
-
-            if edge_pairs.contains(&reverse_pair) {
-                // We found a bidirectional edge
-                continue;
-            } else if reverse_pairs.contains(&pair) {
-                // We found the reverse of an edge we've seen
-                continue;
-            } else {
-                edge_pairs.insert(pair);
-                reverse_pairs.insert(reverse_pair);
-
-                // Check if we have evidence this is directed
-                if !edges
-                    .iter()
-                    .any(|e| e.source == edge.target && e.target == edge.source)
-                {
-                    is_directed = true;
-                }
-            }
-        }
-
+        // A table bundle has no direction setting. Keep the established
+        // undirected default; directed capture is explicit through to_viz_data_source.
         GraphMetadata {
             node_count: nodes.len(),
             edge_count: edges.len(),
-            is_directed,
+            is_directed: false,
             has_weights,
             attribute_types,
         }
     }
 
     fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
-        // Use the edges table implementation which considers edge structure
-        self.edges.compute_layout(algorithm)
+        // Use the complete checked node/edge capture, including isolated nodes.
+        // DataSource cannot return a graph error; callers requiring diagnostics
+        // should use the fallible to_viz_data_source boundary directly.
+        self.to_viz_data_source(false)
+            .map(|source| source.compute_layout(algorithm))
+            .unwrap_or_default()
     }
 }

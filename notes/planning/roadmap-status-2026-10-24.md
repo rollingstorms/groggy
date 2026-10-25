@@ -410,3 +410,24 @@ awaiting the owner choice (explicit column groups / connected components /
 deferral). Native legacy graph-data/layout adapters are unchanged and remain in
 existing AR7.6/28.15 scope. Broader 26.1 and portable-history work remain separate.
 Inventory **193 checked / 75 unchecked**, with no new rows.
+
+### Native graph-table layouts preserve isolated nodes — 2026-10-25
+
+Fixed the existing 28.15/AR7.6 compatibility layout adapter: using the complete
+checked table capture retains isolated nodes, including a one-node graph, with
+original IDs/order. Metadata no longer infers direction by reciprocal-edge
+heuristics; the native table compatibility path defaults undirected and the
+checked capture offers explicit direction. Removed the quadratic guess without
+claiming all legacy graph readers, layout options or solver quality are certified.
+
+Evidence: `graph-table-native-layout-2026-10-25.md`; two native cases. Full gate:
+**1,163 native passed / 51 ignored; 1,890 root Python passed / 1 skipped;
+134 executable docs; strict all-target Clippy passed**. Native current grid case
+on 100k nodes (chain plus isolate, no properties) costs about 43ms including
+complete capture, not a speedup versus the old incomplete node set. Receipt:
+`notes/benchmarks/graph-table-native-layout-2026-10-25.json`.
+
+The immediate remaining table decision is to_subgraphs grouping/ownership;
+the three earlier owner answers are implemented and recorded. Original wider
+workbook questions and 16.2 effective-time reconstruction remain open.
+Inventory **193 checked / 75 unchecked**, no added rows.

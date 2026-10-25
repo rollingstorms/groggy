@@ -131,3 +131,10 @@ explicit edge-ID assignment also invalidate it. This does not record a graph
 delta, publish history or make a live connection to the parent graph. Existing
 native graph-layout/graph-data compatibility adapters are separately scoped;
 use checked `.viz` for graph capture validation.
+
+The native compatibility layout now uses the complete checked node/edge capture,
+so isolated nodes (including a one-node graph) receive positions. Its metadata
+uses the undirected table default; directed captures require the explicit native
+argument. The legacy DataSource layout signature cannot return an error and
+returns an empty result on rejected input; use to_viz_data_source for diagnostics.
+These repairs do not certify every legacy graph reader or layout option.
