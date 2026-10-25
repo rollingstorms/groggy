@@ -4146,10 +4146,8 @@ class EdgesTable:
         """
         ...
 
-    def edge_ids(self, *args, **kwargs) -> Any:
-        """
-        Get edge IDs
-        """
+    def edge_ids(self) -> NumArray:
+        """Read aligned, exact int64 entity IDs; malformed IDs reject."""
         ...
 
     def filter(self, *args, **kwargs) -> Any:
@@ -4355,10 +4353,8 @@ class EdgesTable:
         """
         ...
 
-    def sources(self, *args, **kwargs) -> Any:
-        """
-        Get source node IDs
-        """
+    def sources(self) -> NumArray:
+        """Read aligned, exact int64 entity IDs; malformed IDs reject."""
         ...
 
     def tail(self, *args, **kwargs) -> Any:
@@ -4367,10 +4363,8 @@ class EdgesTable:
         """
         ...
 
-    def targets(self, *args, **kwargs) -> Any:
-        """
-        Get target node IDs
-        """
+    def targets(self) -> NumArray:
+        """Read aligned, exact int64 entity IDs; malformed IDs reject."""
         ...
 
     def to_csv(self, *args, **kwargs) -> Any:
@@ -4395,6 +4389,10 @@ class EdgesTable:
         """
         Export EdgesTable to Parquet file
         """
+        ...
+
+    def with_attributes(self, attr_name: str, attributes: Union[Dict[int, Any], List[Dict[str, Any]]]) -> "EdgesTable":
+        """Replace an ID-mapped property column; unspecified rows become null."""
         ...
 
     def unique_attr_values(self, *args, **kwargs) -> Any:
@@ -8362,23 +8360,9 @@ class NodesTable:
         """
         ...
 
-    def with_attributes(self, *args, **kwargs) -> Any:
-        """
-        Add node attributes - flexible input format
-
-        Args:
-            attr_name: Name of the attribute column to add
-            attributes: Can be:
-                - Dictionary mapping node_id to value: {0: "Alice", 1: "Bob"}
-                - List of {"id": node_id, "value": value} dicts: [{"id": 0, "value": "Alice"}]
-                - HashMap<NodeId, PyAttrValue> (advanced usage)
-
-        Returns:
-            PyNodesTable: A new table with the attributes added
-        """
+    def with_attributes(self, attr_name: str, attributes: Union[Dict[int, Any], List[Dict[str, Any]]]) -> "NodesTable":
+        """Replace an ID-mapped property column; unspecified rows become null."""
         ...
-
-
 
     @staticmethod
     def from_base_table(table: BaseTable) -> NodesTable:

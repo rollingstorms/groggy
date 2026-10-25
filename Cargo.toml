@@ -199,3 +199,7 @@ harness = false
 [[bench]]
 name = "graph_table_bundles"
 harness = false
+
+[[bench]]
+name = "entity_table_adapters"
+harness = false

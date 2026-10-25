@@ -1,0 +1,104 @@
+{
+  "cases": [
+    {
+      "operation": "tuples",
+      "rows": 1000,
+      "seconds": [
+        0.000024709,
+        0.000010708,
+        5.417e-6,
+        5.25e-6,
+        5.292e-6
+      ]
+    },
+    {
+      "operation": "attribute_column",
+      "rows": 1000,
+      "seconds": [
+        0.000127584,
+        0.000117375,
+        0.000104167,
+        0.000103875,
+        0.000106
+      ]
+    },
+    {
+      "operation": "source_filter",
+      "rows": 1000,
+      "seconds": [
+        0.000017834,
+        0.000015959,
+        0.000018875,
+        0.000031125,
+        0.000017292
+      ]
+    },
+    {
+      "operation": "tuples",
+      "rows": 10000,
+      "seconds": [
+        0.000063542,
+        0.000045042,
+        0.000045041,
+        0.00004425,
+        0.000044209
+      ]
+    },
+    {
+      "operation": "attribute_column",
+      "rows": 10000,
+      "seconds": [
+        0.001058542,
+        0.000971,
+        0.000969083,
+        0.000967709,
+        0.000959292
+      ]
+    },
+    {
+      "operation": "source_filter",
+      "rows": 10000,
+      "seconds": [
+        0.000119167,
+        0.000115834,
+        0.000115708,
+        0.000115958,
+        0.000116
+      ]
+    },
+    {
+      "operation": "tuples",
+      "rows": 100000,
+      "seconds": [
+        0.000992583,
+        0.000737,
+        0.000734458,
+        0.0007215,
+        0.000641167
+      ]
+    },
+    {
+      "operation": "attribute_column",
+      "rows": 100000,
+      "seconds": [
+        0.016093542,
+        0.013225333,
+        0.012298416,
+        0.011243792,
+        0.010586583
+      ]
+    },
+    {
+      "operation": "source_filter",
+      "rows": 100000,
+      "seconds": [
+        0.001328916,
+        0.001162875,
+        0.001106083,
+        0.001103458,
+        0.001107084
+      ]
+    }
+  ],
+  "scope": "Native optimized validated tuple reading, ID-mapped property-column replacement (half IDs supplied), and two-source filtering. Five observations. Fixture/entry construction, result assertions and destruction excluded. Complete validation and output allocation timed. Current costs, no matched speedup, RSS or FFI latency claim."
+}

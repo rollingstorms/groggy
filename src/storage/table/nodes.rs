@@ -61,30 +61,28 @@ impl NodesTable {
 
     /// Get the node IDs as a typed array
     pub fn node_ids(&self) -> GraphResult<Vec<NodeId>> {
-        let node_id_column = self.base.column("node_id").ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput("node_id column not found".to_string())
-        })?;
-
-        node_id_column.as_node_ids()
+        super::structural::ids(&self.base, "node_id")
     }
 
-    /// Add node attributes from a HashMap
+    /// Replace a property column by node ID; unspecified rows become null.
     pub fn with_attributes(
-        mut self,
+        self,
         attr_name: String,
         attributes: HashMap<NodeId, AttrValue>,
     ) -> GraphResult<Self> {
-        let node_ids = self.node_ids()?;
-        let mut attr_values = Vec::new();
+        self.with_attribute_entries(attr_name, attributes.into_iter().collect())
+    }
 
-        for node_id in &node_ids {
-            attr_values.push(attributes.get(node_id).cloned().unwrap_or(AttrValue::Null));
-        }
-
-        let attr_column = BaseArray::from_attr_values(attr_values);
-        self.base = self.base.with_column(attr_name, attr_column)?;
-
-        Ok(self)
+    /// ID-mapped attribute input preserving duplicate entries for checked rejection.
+    pub fn with_attribute_entries(
+        &self,
+        attr_name: String,
+        entries: Vec<(NodeId, AttrValue)>,
+    ) -> GraphResult<Self> {
+        Self::from_base_table(
+            self.base
+                .with_identity_attributes("node_id", attr_name, entries)?,
+        )
     }
 
     /// Filter nodes by attribute value
@@ -122,35 +120,14 @@ impl NodesTable {
 
     /// Validate that all UIDs (node_ids) are unique and not null
     pub fn validate_uids(&self) -> GraphResult<()> {
-        let node_id_column = self
-            .base
-            .column("node_id")
-            .ok_or_else(|| GraphError::InvalidInput("node_id column required".to_string()))?;
-
-        let mut seen_ids = HashSet::new();
-        for i in 0..node_id_column.len() {
-            match node_id_column.get(i) {
-                Some(AttrValue::Int(id)) => {
-                    if !seen_ids.insert((*id) as NodeId) {
-                        return Err(GraphError::InvalidInput(format!(
-                            "Duplicate node_id found: {}",
-                            id
-                        )));
-                    }
-                }
-                Some(AttrValue::Null) => {
-                    return Err(GraphError::InvalidInput(
-                        "Null node_id found - all node IDs must be non-null".to_string(),
-                    ));
-                }
-                _ => {
-                    return Err(GraphError::InvalidInput(
-                        "Invalid node_id type - must be integer".to_string(),
-                    ));
-                }
+        let mut seen = HashSet::new();
+        for id in self.node_ids()? {
+            if !seen.insert(id) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Duplicate node_id found: {id}"
+                )));
             }
         }
-
         Ok(())
     }
 
@@ -198,7 +175,7 @@ impl NodesTable {
         // Find the row with matching node_id
         for i in 0..node_id_column.len() {
             match node_id_column.get(i) {
-                Some(AttrValue::Int(id)) if (*id) as NodeId == uid => {
+                Some(value) if super::structural::id(value, "node_id", i).ok() == Some(uid) => {
                     // Found the row, collect all column values
                     let mut row = HashMap::new();
                     for col_name in self.column_names() {
@@ -223,10 +200,7 @@ impl NodesTable {
 
         (0..self.nrows()).filter_map(move |i| {
             // Get node_id for this row
-            let node_id = match node_id_column?.get(i) {
-                Some(AttrValue::Int(id)) => (*id) as NodeId,
-                _ => return None,
-            };
+            let node_id = super::structural::id(node_id_column?.get(i)?, "node_id", i).ok()?;
 
             // Collect row data
             let mut row = HashMap::new();

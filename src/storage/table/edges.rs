@@ -112,76 +112,36 @@ impl EdgesTable {
         Ok(Self { base })
     }
 
-    /// Get the edge IDs as a typed array (only returns valid integer edge IDs)
+    /// Read complete edge IDs in physical row order, rejecting malformed IDs.
     pub fn edge_ids(&self) -> GraphResult<Vec<EdgeId>> {
-        let edge_id_column = self.base.column("edge_id").ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput("edge_id column not found".to_string())
-        })?;
-
-        let (edge_ids, _) = edge_id_column.as_edge_ids_filtered();
-        Ok(edge_ids)
+        super::structural::ids(&self.base, "edge_id")
     }
 
-    /// Get the source node IDs (only returns valid integer node IDs)
+    /// Read complete source IDs in physical row order, rejecting malformed IDs.
     pub fn sources(&self) -> GraphResult<Vec<NodeId>> {
-        let source_column = self.base.column("source").ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput("source column not found".to_string())
-        })?;
-
-        let (sources, _) = source_column.as_node_ids_filtered();
-        Ok(sources)
+        super::structural::ids(&self.base, "source")
     }
 
-    /// Get the target node IDs (only returns valid integer node IDs)
+    /// Read complete target IDs in physical row order, rejecting malformed IDs.
     pub fn targets(&self) -> GraphResult<Vec<NodeId>> {
-        let target_column = self.base.column("target").ok_or_else(|| {
-            crate::errors::GraphError::InvalidInput("target column not found".to_string())
-        })?;
-
-        let (targets, _) = target_column.as_node_ids_filtered();
-        Ok(targets)
+        super::structural::ids(&self.base, "target")
     }
 
-    /// Get edges as tuples (edge_id, source, target) - only returns complete rows
+    /// Read aligned edge tuples in linear time; malformed structural values reject.
     pub fn as_tuples(&self) -> GraphResult<Vec<(EdgeId, NodeId, NodeId)>> {
-        let edge_id_column = self.base.column("edge_id").unwrap();
-        let source_column = self.base.column("source").unwrap();
-        let target_column = self.base.column("target").unwrap();
-
-        let (edge_ids, edge_indices) = edge_id_column.as_edge_ids_filtered();
-        let (sources, source_indices) = source_column.as_node_ids_filtered();
-        let (targets, target_indices) = target_column.as_node_ids_filtered();
-
-        // Find rows where all three columns have valid values
-        let valid_indices: Vec<usize> = edge_indices
-            .iter()
-            .filter(|&&i| source_indices.contains(&i) && target_indices.contains(&i))
-            .cloned()
-            .collect();
-
-        let mut result = Vec::new();
-        for &index in &valid_indices {
-            let edge_id_pos = edge_indices.iter().position(|&i| i == index).unwrap();
-            let source_pos = source_indices.iter().position(|&i| i == index).unwrap();
-            let target_pos = target_indices.iter().position(|&i| i == index).unwrap();
-
-            result.push((
-                edge_ids[edge_id_pos],
-                sources[source_pos],
-                targets[target_pos],
-            ));
-        }
-
-        Ok(result)
+        let ids = self.edge_ids()?;
+        let sources = self.sources()?;
+        let targets = self.targets()?;
+        Ok(ids
+            .into_iter()
+            .zip(sources)
+            .zip(targets)
+            .map(|((id, source), target)| (id, source, target))
+            .collect())
     }
 
     /// Filter edges by source nodes
     pub fn filter_by_sources(&self, source_nodes: &[NodeId]) -> GraphResult<Self> {
-        // Create a simple predicate for now - could be optimized
-        let source_strings: Vec<String> = source_nodes.iter().map(|id| id.to_string()).collect();
-        let _predicate = format!("source IN [{}]", source_strings.join(", "));
-
-        // For now, use a simpler approach - filter manually
         let sources = self.sources()?;
         let source_set: std::collections::HashSet<_> = source_nodes.iter().collect();
 
@@ -202,23 +162,25 @@ impl EdgesTable {
         Self::from_base_table(filtered_base)
     }
 
-    /// Add edge attributes from a HashMap
+    /// Replace a property column by edge ID; unspecified rows become null.
     pub fn with_attributes(
-        mut self,
+        self,
         attr_name: String,
         attributes: HashMap<EdgeId, AttrValue>,
     ) -> GraphResult<Self> {
-        let edge_ids = self.edge_ids()?;
-        let mut attr_values = Vec::new();
+        self.with_attribute_entries(attr_name, attributes.into_iter().collect())
+    }
 
-        for edge_id in &edge_ids {
-            attr_values.push(attributes.get(edge_id).cloned().unwrap_or(AttrValue::Null));
-        }
-
-        let attr_column = BaseArray::from_attr_values(attr_values);
-        self.base = self.base.with_column(attr_name, attr_column)?;
-
-        Ok(self)
+    /// ID-mapped attribute input preserving duplicate entries for checked rejection.
+    pub fn with_attribute_entries(
+        &self,
+        attr_name: String,
+        entries: Vec<(EdgeId, AttrValue)>,
+    ) -> GraphResult<Self> {
+        Self::from_base_table(
+            self.base
+                .with_identity_attributes("edge_id", attr_name, entries)?,
+        )
     }
 
     /// Convert back to BaseTable (loses edge-specific typing)
@@ -375,7 +337,7 @@ impl EdgesTable {
         // Find the row with matching edge_id
         for i in 0..edge_id_column.len() {
             match edge_id_column.get(i) {
-                Some(AttrValue::Int(id)) if (*id) as EdgeId == edge_id => {
+                Some(value) if super::structural::id(value, "edge_id", i).ok() == Some(edge_id) => {
                     // Found the row, collect all column values
                     let mut row = HashMap::new();
                     for col_name in self.column_names() {
@@ -404,20 +366,11 @@ impl EdgesTable {
 
         (0..self.nrows()).filter_map(move |i| {
             // Get edge info for this row
-            let edge_id = match edge_id_column?.get(i) {
-                Some(AttrValue::Int(id)) => (*id) as EdgeId,
-                _ => return None,
-            };
+            let edge_id = super::structural::id(edge_id_column?.get(i)?, "edge_id", i).ok()?;
 
-            let source = match source_column?.get(i) {
-                Some(AttrValue::Int(id)) => (*id) as NodeId,
-                _ => return None,
-            };
+            let source = super::structural::id(source_column?.get(i)?, "source", i).ok()?;
 
-            let target = match target_column?.get(i) {
-                Some(AttrValue::Int(id)) => (*id) as NodeId,
-                _ => return None,
-            };
+            let target = super::structural::id(target_column?.get(i)?, "target", i).ok()?;
 
             // Collect row data
             let mut row = HashMap::new();

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **191 checked and 77 unchecked entries**. Entries overlap:
+currently contains **192 checked and 76 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -184,3 +184,23 @@ all-target Clippy passed**. Benchmark receipt:
 `notes/benchmarks/graph-table-bundles-2026-10-25.json`. No new checklist rows;
 191 checked / 77 unchecked. Composite adapters and separate full retained-pool,
 history and storage lifecycle requirements remain open.
+
+
+### Entity table adapters and 27.2 completion — 2026-10-25
+
+Completed node/edge ID-mapped property attachment, typed structural readers,
+linear tuple extraction, exact Python integer ID arrays and source-aware
+attribute publication. Unknown/duplicate attribute IDs reject; malformed
+structural reads no longer compact rows independently. Existing source capture,
+head, schema and durable publication gates are reused.
+
+27.2 is now checked: the immutable source-bound explicit table update contract
+is complete, including Python mixed property updates with one delta and explicit
+effective time. Remaining legacy live-view migration and composite conversions
+stay in 26.1/27.1/AR7.10; full retained-pool portability keeps its original items.
+
+Evidence: `entity-table-adapters-2026-10-25.md`; six native and thirteen Python
+regressions. Gate: **1,104 native passed / 51 ignored; 1,843 root Python passed /
+1 skipped; 118 executable docs passed; strict all-target Clippy passed**.
+Receipt: `notes/benchmarks/entity-table-adapters-2026-10-25.json`.
+No new checklist rows: **192 checked / 76 unchecked** after closing 27.2.

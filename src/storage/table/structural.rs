@@ -94,3 +94,37 @@ pub(super) fn validate_reshape(table: &BaseTable, required: &[&str]) -> GraphRes
     }
     Ok(())
 }
+
+impl BaseTable {
+    /// Prepare a complete ID-mapped property column; all validation precedes output.
+    pub(super) fn with_identity_attributes(
+        &self,
+        id_column: &str,
+        name: String,
+        entries: Vec<(usize, AttrValue)>,
+    ) -> GraphResult<Self> {
+        let ids = ids(self, id_column)?;
+        let mut row_ids = std::collections::HashSet::new();
+        if ids.iter().any(|id| !row_ids.insert(*id)) {
+            return Err(GraphError::InvalidInput(format!("Duplicate {id_column}")));
+        }
+        let mut values = std::collections::HashMap::new();
+        for (id, value) in entries {
+            if !row_ids.contains(&id) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Unknown {id_column} {id}"
+                )));
+            }
+            if values.insert(id, value).is_some() {
+                return Err(GraphError::InvalidInput(format!(
+                    "Duplicate attribute input ID {id}"
+                )));
+            }
+        }
+        let column = ids
+            .into_iter()
+            .map(|id| values.remove(&id).unwrap_or(AttrValue::Null))
+            .collect();
+        self.with_column(name, BaseArray::from_attr_values(column))
+    }
+}

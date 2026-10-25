@@ -3402,20 +3402,18 @@ impl PyNodesTable {
     ///
     /// Returns:
     ///     PyNodesTable: A new table with the attributes added
-    pub fn with_attributes(&self, attr_name: &PyAny, attributes: &PyAny) -> PyResult<Self> {
-        // Handle attr_name (can be string or other types)
-        let attr_name_str = if let Ok(name) = attr_name.extract::<String>() {
-            name
-        } else {
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Attribute name must be a string",
-            ));
-        };
-
-        // TODO: Implement attribute conversion (temporarily disabled to fix compilation)
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "with_attributes method temporarily disabled - under development",
-        ))
+    pub fn with_attributes(
+        &self,
+        py: Python<'_>,
+        attr_name: &str,
+        attributes: &PyAny,
+    ) -> PyResult<Self> {
+        let entries = identity_attribute_entries(attributes)?;
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.with_attribute_entries(attr_name.to_string(), entries))
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(Self { table: result })
     }
 
     /// Filter nodes by attribute value
@@ -4338,68 +4336,74 @@ impl PyEdgesTable {
     }
 
     /// Get edge IDs
-    pub fn edge_ids(&self) -> PyResult<PyNumArray> {
-        let edge_ids = self
-            .table
-            .edge_ids()
+    pub fn edge_ids(&self, py: Python<'_>) -> PyResult<PyNumArray> {
+        let table = &self.table;
+        let edge_ids = py
+            .allow_threads(|| table.edge_ids())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
-        // Convert to NumArray for numerical operations on IDs
-        let values: Vec<f64> = edge_ids.into_iter().map(|id| id as f64).collect();
-
-        Ok(PyNumArray::new(values))
+        PyNumArray::from_node_ids(edge_ids)
     }
 
     /// Get source node IDs
-    pub fn sources(&self) -> PyResult<PyNumArray> {
-        let sources = self
-            .table
-            .sources()
+    pub fn sources(&self, py: Python<'_>) -> PyResult<PyNumArray> {
+        let table = &self.table;
+        let sources = py
+            .allow_threads(|| table.sources())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
-        // Convert to NumArray for numerical operations on source IDs
-        let values: Vec<f64> = sources.into_iter().map(|id| id as f64).collect();
-
-        Ok(PyNumArray::new(values))
+        PyNumArray::from_node_ids(sources)
     }
 
     /// Get target node IDs  
-    pub fn targets(&self) -> PyResult<PyNumArray> {
-        let targets = self
-            .table
-            .targets()
+    pub fn targets(&self, py: Python<'_>) -> PyResult<PyNumArray> {
+        let table = &self.table;
+        let targets = py
+            .allow_threads(|| table.targets())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
-        // Convert to NumArray for numerical operations on target IDs
-        let values: Vec<f64> = targets.into_iter().map(|id| id as f64).collect();
-
-        Ok(PyNumArray::new(values))
+        PyNumArray::from_node_ids(targets)
     }
 
     /// Get edges as tuples (edge_id, source, target)
-    pub fn as_tuples(&self) -> PyResult<Vec<(EdgeId, NodeId, NodeId)>> {
-        self.table
-            .as_tuples()
+    pub fn as_tuples(&self, py: Python<'_>) -> PyResult<Vec<(EdgeId, NodeId, NodeId)>> {
+        let table = &self.table;
+        py.allow_threads(|| table.as_tuples())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 
     /// Filter edges by source nodes
-    pub fn filter_by_sources(&self, source_nodes: Vec<NodeId>) -> PyResult<Self> {
-        let result = self
-            .table
-            .filter_by_sources(&source_nodes)
+    pub fn filter_by_sources(&self, py: Python<'_>, source_nodes: Vec<NodeId>) -> PyResult<Self> {
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.filter_by_sources(&source_nodes))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(Self { table: result })
     }
 
     /// Filter edges by target nodes
-    pub fn filter_by_targets(&self, target_nodes: Vec<NodeId>) -> PyResult<Self> {
-        let result = self
-            .table
-            .filter_by_targets(&target_nodes)
+    pub fn filter_by_targets(&self, py: Python<'_>, target_nodes: Vec<NodeId>) -> PyResult<Self> {
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.filter_by_targets(&target_nodes))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
+        Ok(Self { table: result })
+    }
+
+    /// Replace an edge property column from an ID mapping or id/value records.
+    pub fn with_attributes(
+        &self,
+        py: Python<'_>,
+        attr_name: &str,
+        attributes: &PyAny,
+    ) -> PyResult<Self> {
+        let entries = identity_attribute_entries(attributes)?;
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.with_attribute_entries(attr_name.to_string(), entries))
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
         Ok(Self { table: result })
     }
 
@@ -6431,4 +6435,39 @@ impl PyEdgesTableArrayIterator {
             None
         }
     }
+}
+
+fn identity_attribute_entries(attributes: &PyAny) -> PyResult<Vec<(usize, AttrValue)>> {
+    fn entry(id: &PyAny, value: &PyAny) -> PyResult<(usize, AttrValue)> {
+        if id.is_instance_of::<pyo3::types::PyBool>() {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Entity IDs must be integers, not bool",
+            ));
+        }
+        Ok((
+            id.extract::<usize>()?,
+            crate::ffi::types::PyAttrValue::from_py_value(value)?.inner,
+        ))
+    }
+    if let Ok(mapping) = attributes.downcast::<PyDict>() {
+        return mapping.iter().map(|(id, value)| entry(id, value)).collect();
+    }
+    if let Ok(records) = attributes.downcast::<PyList>() {
+        return records
+            .iter()
+            .map(|record| {
+                let record = record.downcast::<PyDict>()?;
+                let id = record.get_item("id")?.ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("Attribute record requires id")
+                })?;
+                let value = record.get_item("value")?.ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("Attribute record requires value")
+                })?;
+                entry(id, value)
+            })
+            .collect();
+    }
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "Attributes must be an ID mapping or a list of id/value records",
+    ))
 }
