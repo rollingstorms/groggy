@@ -719,7 +719,7 @@ impl Context {
         prev: &crate::temporal::TemporalSnapshot,
         cur: &crate::temporal::TemporalSnapshot,
     ) -> Result<temporal::TemporalDelta> {
-        temporal::TemporalDelta::compute(prev, cur)
+        temporal::TemporalDelta::compute_cancellable(prev, cur, || self.is_cancelled())
             .map_err(|e| anyhow!("delta computation failed: {}", e))
     }
 

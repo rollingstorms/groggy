@@ -2451,6 +2451,10 @@ impl Graph {
         HistoricalView::new(&self.history, commit_id)
     }
 
+    pub(crate) fn owns_temporal_snapshot(&self, snapshot: &TemporalSnapshot) -> bool {
+        snapshot.belongs_to_history(&self.history)
+    }
+
     /// Build an immutable snapshot of the graph at a given commit.
     pub fn snapshot_at_commit(&self, commit_id: StateId) -> Result<TemporalSnapshot, GraphError> {
         TemporalSnapshot::at_commit(&self.history, commit_id)

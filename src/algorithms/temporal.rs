@@ -6,9 +6,9 @@
 //! - Change tracking within time windows
 //! - Temporal metadata access during pipeline execution
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
-use crate::errors::GraphResult;
+use crate::errors::{GraphError, GraphResult};
 use crate::temporal::TemporalSnapshot;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId, StateId};
 
@@ -147,31 +147,109 @@ pub struct EdgeAttrChange {
 impl TemporalDelta {
     /// Compute the delta between two temporal snapshots.
     ///
-    /// This compares the existence sets and attributes of both snapshots
-    /// to identify all changes that occurred.
+    /// Compare retained states from the same in-process history instance.
+    /// Results are sorted net membership/property differences; property changes
+    /// cover entities surviving in both states. Branch siblings and reverse
+    /// comparisons are allowed. Intermediate events are not replayed, and
+    /// endpoint rewiring rejects until represented by this delta type.
     pub fn compute(prev: &TemporalSnapshot, cur: &TemporalSnapshot) -> GraphResult<Self> {
+        Self::compute_cancellable(prev, cur, || false)
+    }
+
+    pub(crate) fn compute_cancellable(
+        prev: &TemporalSnapshot,
+        cur: &TemporalSnapshot,
+        cancelled: impl Fn() -> bool,
+    ) -> GraphResult<Self> {
+        let check = || {
+            if cancelled() {
+                Err(GraphError::InvalidInput("temporal diff cancelled".into()))
+            } else {
+                Ok(())
+            }
+        };
+        check()?;
+        if !prev.same_history(cur) {
+            return Err(GraphError::InvalidInput(
+                "Temporal snapshots must belong to the same history instance".into(),
+            ));
+        }
+        let before = prev.read_state().snapshot();
+        let after = cur.read_state().snapshot();
         let from_commit = prev.lineage().commit_id;
         let to_commit = cur.lineage().commit_id;
-
-        // Compute node changes
-        let prev_nodes: HashSet<NodeId> = prev.existence().nodes().clone();
-        let cur_nodes: HashSet<NodeId> = cur.existence().nodes().clone();
-
-        let nodes_added: Vec<NodeId> = cur_nodes.difference(&prev_nodes).copied().collect();
-        let nodes_removed: Vec<NodeId> = prev_nodes.difference(&cur_nodes).copied().collect();
-
-        // Compute edge changes
-        let prev_edges: HashSet<EdgeId> = prev.existence().edges().clone();
-        let cur_edges: HashSet<EdgeId> = cur.existence().edges().clone();
-
-        let edges_added: Vec<EdgeId> = cur_edges.difference(&prev_edges).copied().collect();
-        let edges_removed: Vec<EdgeId> = prev_edges.difference(&cur_edges).copied().collect();
-
-        // Note: Attribute change detection would require iterating through all
-        // attributes on all nodes/edges that exist in both snapshots.
-        // For now, we'll leave these empty as a placeholder for future implementation.
-        let node_attr_changes = Vec::new();
-        let edge_attr_changes = Vec::new();
+        let prev_nodes = prev.existence().nodes();
+        let cur_nodes = cur.existence().nodes();
+        let prev_edges = prev.existence().edges();
+        let cur_edges = cur.existence().edges();
+        let mut nodes_added = Vec::new();
+        let mut nodes_removed = Vec::new();
+        let mut edges_added = Vec::new();
+        let mut edges_removed = Vec::new();
+        let mut node_attr_changes = Vec::new();
+        let mut edge_attr_changes = Vec::new();
+        for &id in cur_nodes {
+            check()?;
+            if !prev_nodes.contains(&id) {
+                nodes_added.push(id);
+            } else {
+                for (name, old_value, new_value) in property_changes(
+                    before.node_attributes.get(&id),
+                    after.node_attributes.get(&id),
+                    &check,
+                )? {
+                    node_attr_changes.push(NodeAttrChange {
+                        node_id: id,
+                        attr_name: name,
+                        old_value,
+                        new_value,
+                    });
+                }
+            }
+        }
+        for &id in prev_nodes {
+            check()?;
+            if !cur_nodes.contains(&id) {
+                nodes_removed.push(id);
+            }
+        }
+        for &id in cur_edges {
+            check()?;
+            if !prev_edges.contains(&id) {
+                edges_added.push(id);
+            } else {
+                if before.edges.get(&id) != after.edges.get(&id) {
+                    return Err(GraphError::InvalidInput(
+                        "Temporal edge endpoint-change deltas are not supported".into(),
+                    ));
+                }
+                for (name, old_value, new_value) in property_changes(
+                    before.edge_attributes.get(&id),
+                    after.edge_attributes.get(&id),
+                    &check,
+                )? {
+                    edge_attr_changes.push(EdgeAttrChange {
+                        edge_id: id,
+                        attr_name: name,
+                        old_value,
+                        new_value,
+                    });
+                }
+            }
+        }
+        for &id in prev_edges {
+            check()?;
+            if !cur_edges.contains(&id) {
+                edges_removed.push(id);
+            }
+        }
+        nodes_added.sort_unstable();
+        nodes_removed.sort_unstable();
+        edges_added.sort_unstable();
+        edges_removed.sort_unstable();
+        node_attr_changes.sort_by(|a, b| (a.node_id, &a.attr_name).cmp(&(b.node_id, &b.attr_name)));
+        edge_attr_changes.sort_by(|a, b| (a.edge_id, &a.attr_name).cmp(&(b.edge_id, &b.attr_name)));
+        check()?;
 
         Ok(Self {
             from_commit,
@@ -245,6 +323,32 @@ impl TemporalDelta {
         }
         affected
     }
+}
+
+type PropertyDifference = (AttrName, Option<AttrValue>, Option<AttrValue>);
+
+fn property_changes(
+    before: Option<&std::collections::HashMap<AttrName, AttrValue>>,
+    after: Option<&std::collections::HashMap<AttrName, AttrValue>>,
+    check: &impl Fn() -> GraphResult<()>,
+) -> GraphResult<Vec<PropertyDifference>> {
+    let mut names = BTreeSet::new();
+    for attrs in [before, after].into_iter().flatten() {
+        for name in attrs.keys() {
+            check()?;
+            names.insert(name);
+        }
+    }
+    let mut changes = Vec::new();
+    for name in names {
+        check()?;
+        let old = before.and_then(|attrs| attrs.get(name));
+        let new = after.and_then(|attrs| attrs.get(name));
+        if old != new {
+            changes.push((name.clone(), old.cloned(), new.cloned()));
+        }
+    }
+    Ok(changes)
 }
 
 /// Represents entities (nodes/edges) that changed within a time window.
@@ -335,6 +439,184 @@ impl ChangeType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::Graph;
+
+    #[test]
+    fn retained_delta_reports_sorted_logical_property_changes_and_membership() {
+        let mut graph = Graph::new();
+        graph.add_nodes(4);
+        let edge = graph.add_edge(0, 1).unwrap();
+        let removed_edge = graph.add_edge(2, 3).unwrap();
+        graph
+            .set_node_attr(0, "score".into(), AttrValue::Int(1))
+            .unwrap();
+        graph
+            .set_node_attr(0, "text".into(), AttrValue::Text("index_123".into()))
+            .unwrap();
+        graph
+            .set_edge_attr(edge, "weight".into(), AttrValue::Float64(1.0))
+            .unwrap();
+        let first = graph.commit("before".into(), "test".into()).unwrap();
+        let before = graph.snapshot_at_commit(first).unwrap();
+        graph
+            .set_node_attr(0, "score".into(), AttrValue::Int(2))
+            .unwrap();
+        graph
+            .set_node_attr(1, "nullable".into(), AttrValue::Null)
+            .unwrap();
+        graph
+            .set_edge_attr(edge, "weight".into(), AttrValue::Float64(2.0))
+            .unwrap();
+        graph.remove_node(3).unwrap();
+        let new = graph.add_node();
+        let added_edge = graph.add_edge(0, new).unwrap();
+        let second = graph.commit("after".into(), "test".into()).unwrap();
+        let after = graph.snapshot_at_commit(second).unwrap();
+        let delta = TemporalDelta::compute(&before, &after).unwrap();
+        assert_eq!(delta.nodes_added, vec![new]);
+        assert_eq!(delta.nodes_removed, vec![3]);
+        assert_eq!(delta.edges_added, vec![added_edge]);
+        assert_eq!(delta.edges_removed, vec![removed_edge]);
+        assert_eq!(delta.node_attr_changes.len(), 2);
+        assert_eq!(delta.node_attr_changes[0].node_id, 0);
+        assert_eq!(
+            delta.node_attr_changes[0].old_value,
+            Some(AttrValue::Int(1))
+        );
+        assert_eq!(
+            delta.node_attr_changes[0].new_value,
+            Some(AttrValue::Int(2))
+        );
+        assert_eq!(delta.node_attr_changes[1].node_id, 1);
+        assert_eq!(delta.node_attr_changes[1].old_value, None);
+        assert_eq!(delta.node_attr_changes[1].new_value, Some(AttrValue::Null));
+        assert_eq!(delta.edge_attr_changes.len(), 1);
+        assert_eq!(delta.edge_attr_changes[0].edge_id, edge);
+        assert!(delta.affected_nodes().contains(&0));
+        assert!(delta.summary().contains("3 attr changes"));
+        let reverse = TemporalDelta::compute(&after, &before).unwrap();
+        assert_eq!(reverse.nodes_added, vec![3]);
+        assert_eq!(
+            reverse.node_attr_changes[1].old_value,
+            Some(AttrValue::Null)
+        );
+        assert_eq!(reverse.node_attr_changes[1].new_value, None);
+        drop(graph);
+        assert!(TemporalDelta::compute(&before, &before.clone())
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn retained_delta_rejects_foreign_history_even_when_numeric_ids_match() {
+        let mut first = Graph::new();
+        let mut second = Graph::new();
+        first.add_node();
+        second.add_node();
+        let id = first.commit("same".into(), "test".into()).unwrap();
+        assert_eq!(second.commit("same".into(), "test".into()).unwrap(), id);
+        let before = first.snapshot_at_commit(id).unwrap();
+        let after = second.snapshot_at_commit(id).unwrap();
+        assert!(TemporalDelta::compute(&before, &after).is_err());
+    }
+
+    #[test]
+    fn property_delta_preserves_absence_null_types_and_stable_name_order() {
+        use std::collections::HashMap;
+        let before: HashMap<_, _> = [
+            ("removed".into(), AttrValue::Int(1)),
+            ("type".into(), AttrValue::Int(3)),
+            ("unchanged".into(), AttrValue::Float64(f64::NAN)),
+        ]
+        .into_iter()
+        .collect();
+        let after: HashMap<_, _> = [
+            ("null".into(), AttrValue::Null),
+            ("type".into(), AttrValue::Text("3".into())),
+            ("unchanged".into(), AttrValue::Float64(f64::NAN)),
+        ]
+        .into_iter()
+        .collect();
+        let changes = property_changes(Some(&before), Some(&after), &|| Ok(())).unwrap();
+        assert_eq!(
+            changes.iter().map(|row| row.0.as_str()).collect::<Vec<_>>(),
+            vec!["null", "removed", "type"]
+        );
+        assert_eq!(changes[0].1, None);
+        assert_eq!(changes[0].2, Some(AttrValue::Null));
+        assert_eq!(changes[1].2, None);
+        assert_eq!(changes[2].2, Some(AttrValue::Text("3".into())));
+    }
+
+    #[test]
+    fn retained_delta_rejects_unrepresented_endpoint_rewiring() {
+        use crate::state::{change_tracker::ChangeSet, history::HistoryForest};
+        let mut history = HistoryForest::new();
+        let mut first = ChangeSet::new();
+        first.nodes_added = vec![0, 1, 2];
+        first.edges_added = vec![(0, 0, 1)];
+        let before_id = history
+            .create_commit(first, "first".into(), "test".into(), None)
+            .unwrap();
+        let before = TemporalSnapshot::at_commit(&history, before_id).unwrap();
+        let mut next = ChangeSet::new();
+        next.edges_added = vec![(0, 0, 2)];
+        let after_id = history
+            .create_commit(next, "next".into(), "test".into(), Some(before_id))
+            .unwrap();
+        let after = TemporalSnapshot::at_commit(&history, after_id).unwrap();
+        assert!(TemporalDelta::compute(&before, &after).is_err());
+    }
+
+    #[test]
+    fn retained_delta_checks_cancellation_during_traversal() {
+        use std::cell::Cell;
+        let mut graph = Graph::new();
+        graph.add_nodes(20);
+        let id = graph.commit("fixture".into(), "test".into()).unwrap();
+        let snapshot = graph.snapshot_at_commit(id).unwrap();
+        let checks = Cell::new(0);
+        let result = TemporalDelta::compute_cancellable(&snapshot, &snapshot, || {
+            checks.set(checks.get() + 1);
+            checks.get() > 5
+        });
+        assert!(result.is_err());
+        assert_eq!(checks.get(), 6);
+    }
+
+    #[test]
+    fn retained_delta_compares_sibling_branches_without_numeric_time_assumptions() {
+        let mut graph = Graph::new();
+        graph.add_node();
+        graph
+            .set_node_attr(0, "x".into(), AttrValue::Int(0))
+            .unwrap();
+        graph.commit("root".into(), "test".into()).unwrap();
+        graph.create_branch("sibling".into()).unwrap();
+        graph
+            .set_node_attr(0, "x".into(), AttrValue::Int(1))
+            .unwrap();
+        let left = graph.commit("left".into(), "test".into()).unwrap();
+        let before = graph.snapshot_at_commit(left).unwrap();
+        graph.checkout_branch("sibling".into()).unwrap();
+        graph
+            .set_node_attr(0, "x".into(), AttrValue::Int(2))
+            .unwrap();
+        let right = graph.commit("right".into(), "test".into()).unwrap();
+        let after = graph.snapshot_at_commit(right).unwrap();
+        let delta = TemporalDelta::compute(&before, &after).unwrap();
+        assert!(delta.nodes_added.is_empty());
+        assert_eq!(delta.node_attr_changes.len(), 1);
+        assert_eq!(
+            delta.node_attr_changes[0].old_value,
+            Some(AttrValue::Int(1))
+        );
+        assert_eq!(
+            delta.node_attr_changes[0].new_value,
+            Some(AttrValue::Int(2))
+        );
+    }
 
     #[test]
     fn test_temporal_scope_creation() {

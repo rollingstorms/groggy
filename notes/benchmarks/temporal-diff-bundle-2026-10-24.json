@@ -1,0 +1,149 @@
+{
+  "cases": [
+    {
+      "edge_property_changes": 1000,
+      "edges": 1000,
+      "mode": "logical_delta",
+      "node_property_changes": 1000,
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000637875
+        },
+        {
+          "seconds": 0.000701125
+        },
+        {
+          "seconds": 0.000829042
+        },
+        {
+          "seconds": 0.000819333
+        },
+        {
+          "seconds": 0.000823167
+        }
+      ]
+    },
+    {
+      "edge_property_changes": 1000,
+      "edges": 1000,
+      "mode": "node_masks",
+      "node_property_changes": 1000,
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000936667
+        },
+        {
+          "seconds": 0.000914542
+        },
+        {
+          "seconds": 0.000904916
+        },
+        {
+          "seconds": 0.000903208
+        },
+        {
+          "seconds": 0.000902834
+        }
+      ]
+    },
+    {
+      "edge_property_changes": 1000,
+      "edges": 1000,
+      "mode": "edge_masks",
+      "node_property_changes": 1000,
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000908709
+        },
+        {
+          "seconds": 0.000838083
+        },
+        {
+          "seconds": 0.0008205
+        },
+        {
+          "seconds": 0.000828583
+        },
+        {
+          "seconds": 0.000811375
+        }
+      ]
+    },
+    {
+      "edge_property_changes": 10000,
+      "edges": 10000,
+      "mode": "logical_delta",
+      "node_property_changes": 10000,
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.010191834
+        },
+        {
+          "seconds": 0.008860375
+        },
+        {
+          "seconds": 0.008697666
+        },
+        {
+          "seconds": 0.008668
+        },
+        {
+          "seconds": 0.008654
+        }
+      ]
+    },
+    {
+      "edge_property_changes": 10000,
+      "edges": 10000,
+      "mode": "node_masks",
+      "node_property_changes": 10000,
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.009500416
+        },
+        {
+          "seconds": 0.009490292
+        },
+        {
+          "seconds": 0.009435834
+        },
+        {
+          "seconds": 0.009421333
+        },
+        {
+          "seconds": 0.0094155
+        }
+      ]
+    },
+    {
+      "edge_property_changes": 10000,
+      "edges": 10000,
+      "mode": "edge_masks",
+      "node_property_changes": 10000,
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.009443
+        },
+        {
+          "seconds": 0.009402791
+        },
+        {
+          "seconds": 0.009390333
+        },
+        {
+          "seconds": 0.009396209
+        },
+        {
+          "seconds": 0.009405042
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized retained logical diff and node/edge mask kernels; ring with all node and edge scalar properties changed, five observations. Excludes fixture/snapshot/variable preparation and validation; includes provenance checking, property comparison, stable sorting and result installation. Each mask helper currently computes the full logical diff. Validate every old/new value or mask plus unchanged owner. No property publication, FFI, memory, matched speedup or scale claim."
+}

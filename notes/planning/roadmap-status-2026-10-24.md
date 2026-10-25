@@ -11,6 +11,38 @@ because its heading parser treated the literal asterisk as formatting. The earli
 added two checked slices; three other entries were a counting correction. The
 recent loop/block, structural, filtering, aggregation, transformation, mask-sampling, community and bounded-selector continuation slices are counted individually alongside their open parents. Counts now use checkbox markers independently of headings.
 
+## Fixed remaining-work inventory
+
+The 79 unchecked entries are not 79 independent tasks: 14 are overlapping AR
+architecture entries, 65 are numbered entries (including nested publication
+parents), and nine of those numbered entries explicitly say Deferred. The old
+flat-checklist header also still said 158 checked; it is corrected to 189.
+Recent implementations were recorded as new checked slices while broad parents
+stayed open. That made the open total insensitive to substantial completed work.
+
+From this pass, audit repairs update existing requirements/evidence. New
+capabilities are identified as scope additions. Each current workstream uses a
+fixed implementation inventory with stated exits, so completing components reduces
+its remaining count without manufacturing broad parent completion.
+
+### Temporal builder family — existing eight primitives
+
+| Existing primitive | Current status | Remaining exit |
+| --- | --- | --- |
+| snapshot_at | Complete | Retained-state selector certified in 09.4b.2al; effective-time reconstruction remains a separate original requirement. |
+| decay | Complete | Checked maps/columns certified in 09.4b.2aj–2ak. |
+| diff_nodes | Complete this pass | Retained owner provenance, added/removed/modified maps, property comparison and atomic failure behavior verified. |
+| diff_edges | Complete this pass | Same; unrepresented endpoint rewiring rejects under existing 04.2/13.3. |
+| window_aggregate | Remaining | Correct change-value history, branch/index provenance, sparse state IDs, null/absence and checked reductions. |
+| filter | Remaining | Correct branch-scoped lifecycle/changes, retained-index provenance and failure/cancellation behavior. |
+| mark_changed_nodes | Remaining | Exact change-type membership, aggregation over windows and index provenance. |
+| window | Remaining | State-ID/time units, reactivation/deletion boundaries and branch-scoped existence. |
+
+**Remaining: six → four. No checklist rows added this pass.** These are the same
+primitive names present before the audit, not newly invented capabilities. Closing
+all eight will complete this family, not automatically all of 30.1 or arbitrary
+effective-time reconstruction (16.2).
+
 ## Recent completed slices
 
 | Slice | What is now supported |
@@ -36,7 +68,7 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 | 09.4b.2x–2z | Checked seeding, synchronous propagation and actual directed/undirected local modularity gains verified against independent full-objective moves. |
 | 09.4b.2aa–2ac | Ordered bounded selector iteration, selected neighborhood expansion and consistent induced emission; legacy owner connections remain explicit. |
 | 09.4b.2ad–2af | Recursive for-each property staging, complete child selector flattening and private merged/per-item owned output frames. |
-| 09.4b.2ag–2ai | Checked staged-weight distance maps, loopless Yen node paths and isolated seeded edge-incidence walks. Remaining temporal diff/index/window helpers stay open. |
+| 09.4b.2ag–2ai | Checked staged-weight distance maps, loopless Yen node paths and isolated seeded edge-incidence walks. Remaining temporal index/window helpers stay open. |
 | 09.4b.2aj–2al | Finite selected decay maps, ordered column parity and retained immutable snapshot builder selection with strict temporal controls. |
 
 
@@ -76,8 +108,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest temporal-builder change: **985 native tests passed, 52 ignored; 1,634 root
-Python API tests passed, 1 skipped; 75 executable documentation examples passed;
+Latest retained-diff change: **993 native tests passed, 52 ignored; 1,645 root
+Python API tests passed, 1 skipped; 78 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

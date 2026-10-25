@@ -1,6 +1,7 @@
 # Checked temporal builder primitives
 
-`temporal.decay` and `temporal.snapshot_at` support property-atomic algorithms,
+`temporal.decay`, `temporal.snapshot_at`, `temporal.diff_nodes` and
+`temporal.diff_edges` support property-atomic algorithms,
 loops and certified for-each bodies. They calculate private results and install
 the destination only after validation and a final cancellation check. Explicit
 attachments publish property changes through the enclosing algorithm's single
@@ -117,11 +118,12 @@ have their declared text type. Omitted optional values retain existing defaults.
 not exceed end. Mark-changed types are `created`, `deleted`, `modified`, or `any`.
 These checks run during preparation before any step can publish.
 
-Diff, index/window aggregation, lifecycle filtering/marking and temporal-window
-steps remain uncertified for atomic property runs. They need an audit of retained
-state identity, branch/ancestry semantics, index provenance, value histories and
-state-ID versus effective/acceptance-time coordinates. Strict factory validation
-alone does not close those concerns.
+Node/edge diff semantics are documented in [Retained snapshot diffs](builder-temporal-diffs.md).
+Window aggregation, lifecycle filtering/marking and temporal-window steps remain
+uncertified for atomic property runs. They need an audit of branch/ancestry
+semantics, index provenance, value histories and state-ID versus effective/
+acceptance-time coordinates. Strict factory validation alone does not close those
+concerns.
 
 Decay is O(source rows) time and output storage; ordered columns also use an
 O(rows) duplicate-ID set. It does not clone the owner/history or build indexes.

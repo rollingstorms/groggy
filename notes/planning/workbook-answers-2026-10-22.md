@@ -387,3 +387,22 @@ resolution need follow-up. Existing workbook decisions remain in force; no new
 owner choice or approval gate is introduced. See
 `checked-temporal-builder-bundle-2026-10-24.md` and
 `../../docs/api/builder-temporal.md` for contracts, costs and verification.
+
+
+## Retained diff completion and progress accounting — 2026-10-24
+
+Completed the existing node/edge temporal diff family under **30.1 / AR7.8**:
+real logical property records, stable added/removed/modified masks, immutable
+snapshot provenance and checked atomic output construction. Full-owner retained
+comparisons allow reverse/sibling states within one history; foreign history
+instances and unrepresented endpoint rewiring reject explicitly. No new policy
+question or checkbox row was added. The fixed eight-primitive temporal inventory
+now has four complete/four remaining, reduced from two complete/six remaining.
+
+The flat header's stale 158 count was corrected. The 189 checked/79 unchecked
+inventory overlaps broad parents, children, deferred scope and architecture work;
+it is not a burn-down count. Audit repairs now update existing requirements, with
+new capabilities explicitly identified as scope additions. Full parent exit
+criteria stay in force. See `roadmap-status-2026-10-24.md`,
+`retained-temporal-diffs-2026-10-24.md` and
+`../../docs/api/builder-temporal-diffs.md`.

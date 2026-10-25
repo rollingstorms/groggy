@@ -53,6 +53,8 @@ KEY INSIGHTS:
 /// - Change tracking (that's ChangeTracker's job)
 #[derive(Debug)]
 pub struct HistoryForest {
+    /// In-process provenance shared by snapshots, independent of numeric state IDs.
+    identity: Arc<()>,
     graph_type: GraphType,
     /*
     === COMMIT STORAGE ===
@@ -96,6 +98,10 @@ pub struct HistoryForest {
 }
 
 impl HistoryForest {
+    pub(crate) fn identity(&self) -> &Arc<()> {
+        &self.identity
+    }
+
     /// Explicit checkpoints in acceptance order, independent of version IDs.
     pub fn checkpoints(&self) -> &[crate::Checkpoint] {
         &self.checkpoints
@@ -121,6 +127,7 @@ impl HistoryForest {
         branches.insert("main".to_string(), 0); // main branch starts at state 0
 
         Self {
+            identity: Arc::new(()),
             graph_type,
             commits: HashMap::new(),
             deltas: HashMap::new(),

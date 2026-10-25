@@ -27,6 +27,7 @@ pub struct LineageMetadata {
 /// Immutable snapshot of graph state at a specific commit or timestamp.
 #[derive(Debug, Clone)]
 pub struct TemporalSnapshot {
+    history_identity: Arc<()>,
     lineage: LineageMetadata,
     state: PinnedReadState,
 }
@@ -36,7 +37,7 @@ impl TemporalSnapshot {
     pub fn at_commit(history: &HistoryForest, commit_id: StateId) -> Result<Self, GraphError> {
         let commit = history.get_commit(commit_id)?;
         let graph_snapshot = history.reconstruct_state_at(commit_id)?;
-        Self::from_components(commit, graph_snapshot)
+        Self::from_components(commit, graph_snapshot, Arc::clone(history.identity()))
     }
 
     /// Build a snapshot for the latest commit at or before the timestamp.
@@ -51,7 +52,11 @@ impl TemporalSnapshot {
         }
     }
 
-    fn from_components(commit: Arc<Commit>, snapshot: GraphSnapshot) -> Result<Self, GraphError> {
+    fn from_components(
+        commit: Arc<Commit>,
+        snapshot: GraphSnapshot,
+        history_identity: Arc<()>,
+    ) -> Result<Self, GraphError> {
         let lineage = LineageMetadata {
             commit_id: commit.id,
             parent_commits: commit.parents.clone(),
@@ -61,9 +66,18 @@ impl TemporalSnapshot {
         };
 
         Ok(Self {
+            history_identity,
             lineage,
             state: PinnedReadState::from_snapshot(snapshot)?,
         })
+    }
+
+    pub(crate) fn same_history(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.history_identity, &other.history_identity)
+    }
+
+    pub(crate) fn belongs_to_history(&self, history: &HistoryForest) -> bool {
+        Arc::ptr_eq(&self.history_identity, history.identity())
     }
 
     pub fn lineage(&self) -> &LineageMetadata {

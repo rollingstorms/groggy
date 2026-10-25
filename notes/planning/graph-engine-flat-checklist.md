@@ -21,8 +21,20 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has 158 checked / 79 unchecked entries, including overlapping
-parents and repair slices; this is not a completion percentage.
+The checklist has **189 checked / 79 unchecked entries**, including overlapping
+parents and repair slices; this is not a completion percentage. The old 158 count
+was stale. Recent repair work added checked evidence beneath still-open parents,
+so the unchanged open total did not measure remaining concrete work.
+
+**Progress accounting from this pass:** fixes to an existing requirement update
+that requirement and its evidence; they do not automatically create more checklist
+rows. A genuinely new capability is recorded as a scope addition. Report progress
+against a fixed component inventory and keep parent exit criteria explicit.
+For the current temporal builder family, the inventory is eight existing native
+primitives: **four complete, four remaining** (previously two complete/six remaining).
+See the status page for the names. This pass adds no checklist rows. The parent
+30.1 stays partial until the remaining execution and pinned-input requirements
+are complete; this does not imply that finished repairs are still unimplemented.
 
 ## Execution priority — remaining work
 
@@ -146,7 +158,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.4b.2ai — Isolated seeded selected random walks.** Certify stable start order, staged per-edge weights/multiplicity, overflow-safe transition normalization, explicit zero-row/restart/dead-end semantics, strict controls and failure-safe serialized results. Same bundle note.
 - [x] **09.4b.2aj — Checked finite selected decay maps.** Certify node/edge decay with finite positive half-life, finite nonnegative elapsed time, strict numeric values, selected active IDs/endpoint closure, subnormal-safe limits and private failure-safe results. Register the existing helper for atomic builders. See `checked-temporal-builder-bundle-2026-10-24.md`.
 - [x] **09.4b.2ak — Ordered decay column parity.** Preserve sparse node-column identity/order, reject duplicate IDs, support same-name outputs and staged-property loading without converting columns to maps. Re-export the existing native NodeColumn type. Same bundle note.
-- [x] **09.4b.2al — Retained snapshot builder and strict temporal controls.** Register/certify immutable full-owner retained snapshots by state ID or acceptance epoch-second selector, excluding in-flight writes. Reject truncated/wrapped coordinates and wrong-typed optional temporal selectors before execution. Effective-time reconstruction, diff/index/lifecycle semantics and other temporal certification remain open. Same bundle note.
+- [x] **09.4b.2al — Retained snapshot builder and strict temporal controls.** Register/certify immutable full-owner retained snapshots by state ID or acceptance epoch-second selector, excluding in-flight writes. Reject truncated/wrapped coordinates and wrong-typed optional temporal selectors before execution. Effective-time reconstruction and index/lifecycle certification remain open; node/edge diffs are completed under 30.1. Same bundle note.
 
 
 
@@ -268,7 +280,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **29.40 — Sparse-native canonical operations.** CSR pair arithmetic/products, mixed finite sparse/dense products, transpose/selection/logical reshape/scalar maps and explicit owned conversions retain appropriate sparse storage. Use checked/exact dots, remove canonical zeros, handle implicit-zero IEEE interactions and avoid dense copies for sum/extrema. Native 10,000-square diagonal storage/cancellation/domain/selection/shape tests and independent Python comparisons cover the slice. Sparse solves/factors, remaining statistics and release performance remain in the completion queue.
 - [x] **29.41 — Sparse LU/Cholesky/direct solve.** Sparse row maps/column adjacency retain fill-in without dense coefficients; return canonical sparse P/L/U/Cholesky, row-equilibrated multiple-RHS solves and sparse pivot-log determinant. Preserve finite square floating, singular-LU versus solve, symmetry/range and coordinate conventions; compare sparse saved input values without dense copies. Native 10,000-square diagonal/range/domain fixtures and independent seeded Python references pass. Dense-reference spectral/QR/refinement/gradient storage policies, remaining vector/matrix routines and release gates remain in the completion queue.
 - [x] **29.42 — Typed vector arithmetic/conversions/order and native matrix casts.** Shared native checked arithmetic/dots, floating true division, stable norms, exact mixed scalar comparisons, typed first-occurrence unique and conversion policies. Move Python constructor/to_type conversion rules into Rust, retain explicit rounding while rejecting wrap/saturation, expose exact casts and preserve matrix CSR/identity. Native generic statistics retain integer hints; scalar reads no longer copy whole vectors. Native limit/dtype/shape/precision/cast fixtures and Python scalar/array/reference checks pass. Remaining matrix helpers, automatic derivative routes, statistics/materialization and release/GIL gates continue in the completion pass.
-- [ ] **30.1 — Partial: pipeline builder.** Inventory existing builder/step capabilities and finish typed graph/table intermediates, naming/caching, repeatability, cancellation, and pinned historical inputs. Conditional and synchronous block semantics are repaired in 09.4b.2j–2k; streaming and other unsupported families remain open.
+- [ ] **30.1 — Partial: pipeline builder.** Inventory existing builder/step capabilities and finish typed graph/table intermediates, naming/caching, repeatability, cancellation, and pinned historical inputs. Conditional and synchronous block semantics are repaired in 09.4b.2j–2k; streaming and other unsupported families remain open. Temporal inventory: snapshot_at, decay, diff_nodes and diff_edges now support checked atomic property runs; window_aggregate, filter, mark_changed_nodes and window remain. See `retained-temporal-diffs-2026-10-24.md`.
 - [x] **30.1a — Typed transient attachment outputs.** Canonical native StepScope attachment paths and owned node/edge AlgorithmOutput columns make explicit persist=False meaningful across supported builder property-writing steps (09.4b.2f). Naming/default and whole-pipeline state/publication work remain in the parent.
 - [x] **30.1b — Staged property execution boundary.** Native Context/StepScope property overlays, step capability checks and one mixed acceptance support explicit atomic builders (09.4b.2g). No whole-graph clone is used. Other graph step migration, effect-aware optimization and default policy remain parent work.
 

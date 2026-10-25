@@ -107,7 +107,7 @@ def test_histogram_outputs_are_retained_for_every_item_with_stable_keys():
 def test_recursive_preflight_rejects_temporal_descendants_even_without_items(empty):
     graph = gr.Graph() if empty else fixture()
     before = graph.current_state_id
-    nested = each([{"id": "temporal.diff_nodes", "params": {}}], source="inner")
+    nested = each([{"id": "temporal.filter", "params": {"predicate": "created_after", "commit": 0, "output": "unsupported"}}], source="inner")
     body = [inputs("nodes"), nested]
     with pytest.raises(RuntimeError, match="does not yet support atomic"):
         graph.view().apply(Steps([inputs(), each(body)]), persist=True)

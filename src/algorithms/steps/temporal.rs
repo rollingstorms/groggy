@@ -21,17 +21,11 @@ use super::{core::NodeColumn, Step, StepMetadata, StepScope};
 
 const DEFAULT_TEMPORAL_INDEX_VAR: &str = "temporal_index";
 
-/// Compute differences between two temporal snapshots and store results.
+/// Compute full-owner node membership and property-change masks between retained states.
 ///
-/// This step takes two snapshots (from variables or context) and computes
-/// which nodes and edges were added, removed, or modified between them.
-///
-/// **Outputs:**
-/// - `<prefix>_nodes_added`: NodeMap marking added nodes (value=1)
-/// - `<prefix>_nodes_removed`: NodeMap marking removed nodes (value=1)
-/// - `<prefix>_edges_added`: EdgeMap marking added edges (value=1)
-/// - `<prefix>_edges_removed`: EdgeMap marking removed edges (value=1)
-#[allow(dead_code)] // Fields are placeholders for future full implementation
+/// Produces `<prefix>_nodes_added`, `_nodes_removed` and `_nodes_modified` node
+/// maps with value 1. Modified means a property differs on a surviving node;
+/// these are net snapshot differences, not all intervening historical events.
 pub struct DiffNodesStep {
     /// Variable name containing the "before" snapshot (or use context ref)
     before_var: Option<String>,
@@ -56,6 +50,10 @@ impl DiffNodesStep {
 }
 
 impl Step for DiffNodesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.diff_nodes"
     }
@@ -85,14 +83,22 @@ impl Step for DiffNodesStep {
 
         let mut nodes_added = HashMap::new();
         for node in delta.nodes_added {
+            check_cancelled(ctx)?;
             nodes_added.insert(node, AlgorithmParamValue::Int(1));
         }
 
         let mut nodes_removed = HashMap::new();
         for node in delta.nodes_removed {
+            check_cancelled(ctx)?;
             nodes_removed.insert(node, AlgorithmParamValue::Int(1));
         }
 
+        let mut nodes_modified = HashMap::new();
+        for change in delta.node_attr_changes {
+            check_cancelled(ctx)?;
+            nodes_modified.insert(change.node_id, AlgorithmParamValue::Int(1));
+        }
+        check_cancelled(ctx)?;
         let prefix = &self.output_prefix;
         scope
             .variables_mut()
@@ -100,13 +106,17 @@ impl Step for DiffNodesStep {
         scope
             .variables_mut()
             .set_node_map(format!("{}_nodes_removed", prefix), nodes_removed);
+        scope
+            .variables_mut()
+            .set_node_map(format!("{}_nodes_modified", prefix), nodes_modified);
 
         Ok(())
     }
 }
 
-/// Compute edge differences between temporal snapshots.
-#[allow(dead_code)] // Fields are placeholders for future full implementation
+/// Compute full-owner edge membership/property masks between retained states.
+/// Outputs `<prefix>_edges_added`, `_edges_removed` and `_edges_modified`.
+/// Common-edge endpoint changes reject until the delta format supports them.
 pub struct DiffEdgesStep {
     before_var: Option<String>,
     after_var: Option<String>,
@@ -128,6 +138,10 @@ impl DiffEdgesStep {
 }
 
 impl Step for DiffEdgesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.diff_edges"
     }
@@ -157,14 +171,22 @@ impl Step for DiffEdgesStep {
 
         let mut edges_added = HashMap::new();
         for edge in delta.edges_added {
+            check_cancelled(ctx)?;
             edges_added.insert(edge, AlgorithmParamValue::Int(1));
         }
 
         let mut edges_removed = HashMap::new();
         for edge in delta.edges_removed {
+            check_cancelled(ctx)?;
             edges_removed.insert(edge, AlgorithmParamValue::Int(1));
         }
 
+        let mut edges_modified = HashMap::new();
+        for change in delta.edge_attr_changes {
+            check_cancelled(ctx)?;
+            edges_modified.insert(change.edge_id, AlgorithmParamValue::Int(1));
+        }
+        check_cancelled(ctx)?;
         let prefix = &self.output_prefix;
         scope
             .variables_mut()
@@ -172,6 +194,9 @@ impl Step for DiffEdgesStep {
         scope
             .variables_mut()
             .set_edge_map(format!("{}_edges_removed", prefix), edges_removed);
+        scope
+            .variables_mut()
+            .set_edge_map(format!("{}_edges_modified", prefix), edges_modified);
 
         Ok(())
     }
@@ -1025,6 +1050,15 @@ fn resolve_snapshot_pair(
         snapshot_at_commit(scope, temporal_scope.current_commit)?
     };
 
+    let owner = scope.subgraph().graph();
+    let graph = owner.borrow();
+    if !graph.owns_temporal_snapshot(&before_snapshot)
+        || !graph.owns_temporal_snapshot(&after_snapshot)
+    {
+        return Err(anyhow!(
+            "{step_id} snapshots must belong to the invocation owner history"
+        ));
+    }
     Ok((before_snapshot, after_snapshot))
 }
 
@@ -1069,6 +1103,89 @@ mod tests {
             "decay".into(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn diff_step_rejects_foreign_owner_and_preserves_all_prior_outputs() {
+        let selected = fixture();
+        let foreign = fixture();
+        let foreign_state = foreign.graph().borrow().current_state_id();
+        let snapshot = foreign
+            .graph()
+            .borrow()
+            .snapshot_at_commit(foreign_state)
+            .unwrap();
+        let mut vars = StepVariables::default();
+        vars.set_snapshot("before", snapshot.clone());
+        vars.set_snapshot("after", snapshot);
+        for name in [
+            "diff_nodes_added",
+            "diff_nodes_removed",
+            "diff_nodes_modified",
+        ] {
+            vars.set_node_map(
+                name,
+                [(55, AlgorithmParamValue::Int(91))].into_iter().collect(),
+            );
+        }
+        let mut scope = StepScope::new(&selected, &mut vars);
+        assert!(
+            DiffNodesStep::new(Some("before".into()), Some("after".into()), "diff")
+                .apply(&mut Context::new(), &mut scope)
+                .is_err()
+        );
+        for name in [
+            "diff_nodes_added",
+            "diff_nodes_removed",
+            "diff_nodes_modified",
+        ] {
+            assert_eq!(
+                scope.variables().node_map(name).unwrap()[&55],
+                AlgorithmParamValue::Int(91)
+            );
+        }
+    }
+
+    #[test]
+    fn diff_steps_keep_historical_removed_ids_and_ignore_live_selection_clipping() {
+        let selected = fixture();
+        let state = selected.graph().borrow().current_state_id();
+        let before = selected.graph().borrow().snapshot_at_commit(state).unwrap();
+        selected.graph().borrow_mut().remove_node(2).unwrap();
+        let next = selected
+            .graph()
+            .borrow_mut()
+            .commit("removed".into(), "test".into())
+            .unwrap();
+        let after = selected.graph().borrow().snapshot_at_commit(next).unwrap();
+        let mut vars = StepVariables::default();
+        vars.set_snapshot("before", before);
+        vars.set_snapshot("after", after);
+        let mut scope = StepScope::new(&selected, &mut vars);
+        DiffNodesStep::new(Some("before".into()), Some("after".into()), "diff")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        DiffEdgesStep::new(Some("before".into()), Some("after".into()), "diff")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        assert_eq!(
+            scope.variables().node_map("diff_nodes_removed").unwrap()[&2],
+            AlgorithmParamValue::Int(1)
+        );
+        assert_eq!(
+            scope.variables().edge_map("diff_edges_removed").unwrap()[&1],
+            AlgorithmParamValue::Int(1)
+        );
+        assert!(scope
+            .variables()
+            .node_map("diff_nodes_modified")
+            .unwrap()
+            .is_empty());
+        assert!(scope
+            .variables()
+            .edge_map("diff_edges_modified")
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
