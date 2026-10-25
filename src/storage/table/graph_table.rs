@@ -4,6 +4,8 @@
 mod bundle;
 #[path = "domain_merge.rs"]
 mod domain_merge;
+#[path = "graph_streaming.rs"]
+mod streaming;
 
 use super::base::BaseTable;
 use super::base::InteractiveConfig;
@@ -13,11 +15,6 @@ use super::traits::Table;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::array::BaseArray;
 use crate::types::{AttrValue, EdgeId, NodeId};
-use crate::viz::display::{ColumnSchema, DataType};
-use crate::viz::streaming::data_source::{
-    DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm,
-};
-use crate::viz::streaming::NodePosition;
 use crate::viz::VizModule;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -193,6 +190,8 @@ pub struct ValidationReportJson {
 /// mutable component access detaches that component before returning a reference.
 #[derive(Clone, Debug)]
 pub struct GraphTable {
+    /// Process-local presentation identity; never an entity/history ID.
+    presentation_id: u64,
     /// Nodes component
     nodes: Arc<NodesTable>,
     /// Edges component
@@ -275,6 +274,7 @@ impl GraphTable {
                     )?)
                 };
                 Ok(Self {
+                    presentation_id: streaming::next_identity(),
                     nodes: nodes.into(),
                     edges,
                     policy: self.policy.clone(),
@@ -304,6 +304,7 @@ impl GraphTable {
     /// Create a new GraphTable from nodes and edges tables
     pub fn new(nodes: NodesTable, edges: EdgesTable) -> Self {
         Self {
+            presentation_id: streaming::next_identity(),
             nodes: nodes.into(),
             edges: edges.into(),
             policy: ValidationPolicy::default(),
@@ -313,6 +314,7 @@ impl GraphTable {
     /// Create GraphTable with custom validation policy
     pub fn with_policy(nodes: NodesTable, edges: EdgesTable, policy: ValidationPolicy) -> Self {
         Self {
+            presentation_id: streaming::next_identity(),
             nodes: nodes.into(),
             edges: edges.into(),
             policy,
@@ -348,11 +350,13 @@ impl GraphTable {
 
     /// Get mutable nodes, copying that component first if it is shared.
     pub fn nodes_mut(&mut self) -> &mut NodesTable {
+        self.presentation_id = streaming::next_identity();
         Arc::make_mut(&mut self.nodes)
     }
 
     /// Get mutable edges, copying that component first if it is shared.
     pub fn edges_mut(&mut self) -> &mut EdgesTable {
+        self.presentation_id = streaming::next_identity();
         Arc::make_mut(&mut self.edges)
     }
 
@@ -363,6 +367,7 @@ impl GraphTable {
 
     /// Update validation policy
     pub fn set_policy(&mut self, policy: ValidationPolicy) {
+        self.presentation_id = streaming::next_identity();
         self.policy = policy;
     }
 
@@ -567,6 +572,7 @@ impl GraphTable {
 
     /// Auto-assign edge IDs for null values (useful for meta nodes and imported data)
     pub fn auto_assign_edge_ids(mut self) -> GraphResult<Self> {
+        self.presentation_id = streaming::next_identity();
         // Delegate to the edges table's auto_assign_edge_ids method
         self.edges = Arc::unwrap_or_clone(self.edges)
             .auto_assign_edge_ids()?
@@ -657,11 +663,13 @@ impl GraphTable {
             true,
         )? {
             Component::Nodes => Ok(Self {
+                presentation_id: streaming::next_identity(),
                 nodes: self.nodes.sort_values(columns, ascending)?.into(),
                 edges: self.edges.clone(),
                 policy: self.policy.clone(),
             }),
             Component::Edges => Ok(Self {
+                presentation_id: streaming::next_identity(),
                 nodes: self.nodes.clone(),
                 edges: self.edges.sort_values(columns, ascending)?.into(),
                 policy: self.policy.clone(),
@@ -672,6 +680,7 @@ impl GraphTable {
     /// Apply the existing predicate to both components, then enforce node closure.
     pub fn filter(&self, predicate: &str) -> GraphResult<Self> {
         let filtered = Self {
+            presentation_id: streaming::next_identity(),
             nodes: self.nodes.clone(),
             edges: self.edges.filter(predicate)?.into(),
             policy: self.policy.clone(),
@@ -694,6 +703,7 @@ impl GraphTable {
                 .into_iter()
                 .map(|edges| {
                     Ok(Self {
+                        presentation_id: streaming::next_identity(),
                         nodes: self.nodes.clone(),
                         edges: edges.into(),
                         policy: self.policy.clone(),
@@ -748,6 +758,7 @@ impl GraphTable {
         let selected_edges = self.edges.select(&edge_columns)?;
 
         Ok(Self {
+            presentation_id: streaming::next_identity(),
             nodes: selected_nodes.into(),
             edges: selected_edges.into(),
             policy: self.policy.clone(),
@@ -757,6 +768,7 @@ impl GraphTable {
     pub fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
         // Compatibility default: with_column targets the node component.
         Ok(Self {
+            presentation_id: streaming::next_identity(),
             nodes: self.nodes.with_column(name, column)?.into(),
             edges: self.edges.clone(),
             policy: self.policy.clone(),
@@ -766,6 +778,7 @@ impl GraphTable {
     pub fn drop_columns(&self, column_names: &[String]) -> GraphResult<Self> {
         // Drop from both tables
         Ok(Self {
+            presentation_id: streaming::next_identity(),
             nodes: self.nodes.drop_columns(column_names)?.into(),
             edges: self.edges.drop_columns(column_names)?.into(),
             policy: self.policy.clone(),
@@ -783,6 +796,7 @@ impl GraphTable {
         required.extend([columns_col, values_col]);
         match self.component_for(&required, true)? {
             Component::Nodes => Ok(Self {
+                presentation_id: streaming::next_identity(),
                 nodes: self
                     .nodes
                     .pivot_table(index_cols, columns_col, values_col, agg_func)?
@@ -791,6 +805,7 @@ impl GraphTable {
                 policy: self.policy.clone(),
             }),
             Component::Edges => Ok(Self {
+                presentation_id: streaming::next_identity(),
                 nodes: self.nodes.clone(),
                 edges: self
                     .edges
@@ -816,6 +831,7 @@ impl GraphTable {
             .collect::<Vec<_>>();
         match self.component_for(&required, true)? {
             Component::Nodes => Ok(Self {
+                presentation_id: streaming::next_identity(),
                 nodes: self
                     .nodes
                     .melt(id_vars, value_vars, var_name, value_name)?
@@ -824,6 +840,7 @@ impl GraphTable {
                 policy: self.policy.clone(),
             }),
             Component::Edges => Ok(Self {
+                presentation_id: streaming::next_identity(),
                 nodes: self.nodes.clone(),
                 edges: self
                     .edges
@@ -1215,208 +1232,5 @@ impl GraphTable {
             return AttrValue::Float64(f);
         }
         AttrValue::Text(field.to_string())
-    }
-}
-
-// =============================================================================
-// DataSource Implementation for Graph Visualization
-// =============================================================================
-
-impl DataSource for GraphTable {
-    fn total_rows(&self) -> usize {
-        // For GraphTable, return total unique entities (nodes + edges)
-        self.nodes.nrows() + self.edges.nrows()
-    }
-
-    fn total_cols(&self) -> usize {
-        // Return unique column names across both tables
-        let mut columns = HashSet::new();
-        columns.extend(self.nodes.column_names().iter());
-        columns.extend(self.edges.column_names().iter());
-        columns.len()
-    }
-
-    fn get_window(&self, start: usize, count: usize) -> DataWindow {
-        // For GraphTable, we can window either nodes or edges
-        // For simplicity, window nodes first, then edges if needed
-        let node_count = self.nodes.nrows();
-
-        if start < node_count {
-            // Window is within nodes range
-            let node_end = (start + count).min(node_count);
-            self.nodes.get_window(start, node_end - start)
-        } else {
-            // Window is in edges range
-            let edge_start = start - node_count;
-            self.edges.get_window(edge_start, count)
-        }
-    }
-
-    fn get_schema(&self) -> DataSchema {
-        let mut columns = Vec::new();
-
-        // Add node columns
-        for col_name in self.nodes.column_names() {
-            columns.push(ColumnSchema {
-                name: format!("node_{}", col_name),
-                data_type: match col_name.as_str() {
-                    "node_id" => DataType::Integer,
-                    _ => DataType::String, // Simplified for now
-                },
-            });
-        }
-
-        // Add edge columns
-        for col_name in self.edges.column_names() {
-            columns.push(ColumnSchema {
-                name: format!("edge_{}", col_name),
-                data_type: match col_name.as_str() {
-                    "edge_id" | "source" | "target" => DataType::Integer,
-                    _ => DataType::String, // Simplified for now
-                },
-            });
-        }
-
-        DataSchema {
-            columns,
-            primary_key: None, // Composite table doesn't have single primary key
-            source_type: "graph_table".to_string(),
-        }
-    }
-
-    fn supports_streaming(&self) -> bool {
-        true
-    }
-
-    fn get_column_types(&self) -> Vec<DataType> {
-        self.get_schema()
-            .columns
-            .into_iter()
-            .map(|c| c.data_type)
-            .collect()
-    }
-
-    fn get_column_names(&self) -> Vec<String> {
-        self.get_schema()
-            .columns
-            .into_iter()
-            .map(|c| c.name)
-            .collect()
-    }
-
-    fn get_source_id(&self) -> String {
-        format!("graph_table_{}_{}", self.nodes.nrows(), self.edges.nrows())
-    }
-
-    fn get_version(&self) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        self.nodes.nrows().hash(&mut hasher);
-        self.nodes.ncols().hash(&mut hasher);
-        self.edges.nrows().hash(&mut hasher);
-        self.edges.ncols().hash(&mut hasher);
-        hasher.finish()
-    }
-
-    // Graph visualization support - this is where GraphTable really shines
-    fn supports_graph_view(&self) -> bool {
-        true
-    }
-
-    fn get_graph_nodes(&self) -> Vec<GraphNode> {
-        // Delegate to nodes table - it has the full implementation
-        self.nodes.get_graph_nodes()
-    }
-
-    fn get_graph_edges(&self) -> Vec<GraphEdge> {
-        // Delegate to edges table - it has the full implementation
-        self.edges.get_graph_edges()
-    }
-
-    fn get_graph_metadata(&self) -> GraphMetadata {
-        let nodes = self.get_graph_nodes();
-        let edges = self.get_graph_edges();
-        let mut attribute_types = HashMap::new();
-
-        // Collect attribute types from both tables
-        let nodes_schema = self.nodes.get_schema();
-        let edges_schema = self.edges.get_schema();
-
-        for col_schema in nodes_schema.columns {
-            if col_schema.name != "node_id" {
-                let type_name = match col_schema.data_type {
-                    DataType::Integer => "integer",
-                    DataType::Float => "float",
-                    DataType::String => "string",
-                    DataType::Boolean => "boolean",
-                    DataType::DateTime => "datetime",
-                    DataType::Json => "json",
-                    DataType::Unknown => "unknown",
-                };
-                attribute_types.insert(format!("node_{}", col_schema.name), type_name.to_string());
-            }
-        }
-
-        for col_schema in edges_schema.columns {
-            if !["edge_id", "source", "target"].contains(&col_schema.name.as_str()) {
-                let type_name = match col_schema.data_type {
-                    DataType::Integer => "integer",
-                    DataType::Float => "float",
-                    DataType::String => "string",
-                    DataType::Boolean => "boolean",
-                    DataType::DateTime => "datetime",
-                    DataType::Json => "json",
-                    DataType::Unknown => "unknown",
-                };
-                attribute_types.insert(format!("edge_{}", col_schema.name), type_name.to_string());
-            }
-        }
-
-        // Check if any edges have weights
-        let has_weights = edges.iter().any(|e| e.weight.is_some());
-
-        // Check if graph is directed (heuristic: if any edge has different source/target relationships)
-        let mut edge_pairs = HashSet::new();
-        let mut reverse_pairs = HashSet::new();
-        let mut is_directed = false;
-
-        for edge in &edges {
-            let pair = (&edge.source, &edge.target);
-            let reverse_pair = (&edge.target, &edge.source);
-
-            if edge_pairs.contains(&reverse_pair) {
-                // We found a bidirectional edge
-                continue;
-            } else if reverse_pairs.contains(&pair) {
-                // We found the reverse of an edge we've seen
-                continue;
-            } else {
-                edge_pairs.insert(pair);
-                reverse_pairs.insert(reverse_pair);
-
-                // Check if we have evidence this is directed
-                if !edges
-                    .iter()
-                    .any(|e| e.source == edge.target && e.target == edge.source)
-                {
-                    is_directed = true;
-                }
-            }
-        }
-
-        GraphMetadata {
-            node_count: nodes.len(),
-            edge_count: edges.len(),
-            is_directed,
-            has_weights,
-            attribute_types,
-        }
-    }
-
-    fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
-        // Use the edges table implementation which considers edge structure
-        self.edges.compute_layout(algorithm)
     }
 }

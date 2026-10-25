@@ -67,8 +67,8 @@ capture COW, Python/FFI or production-scale guarantee is claimed.
 
 ## Remaining existing scope
 
-The to_subgraphs contract remains open. Native legacy display/streaming adapters
-also need to honor distinct component schemas without pretending the graph
-bundle itself is a rectangle. Broader connected-view migration and portable
+The to_subgraphs contract remains open. Native display/streaming table schemas are now consistent through an explicit
+tagged projection; see `graph-table-streaming-2026-10-25.md`. Legacy native
+graph-data/layout compatibility methods remain separately scoped in AR7.6/28.15. Broader connected-view migration and portable
 pool/history storage remain 26.1 and 07.3/10.3/12.2. Effective-time reconstruction
 remains 16.2; no implementation claim is made for it by this table slice.

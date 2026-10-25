@@ -113,3 +113,21 @@ The earlier component-sharing receipt remains evidence for the earlier bundle
 policy. New induced-group costs are recorded separately; they must not be treated
 as an identical-workload speedup comparison. Fresh Graph.read_view capture costs
 and pooled/history portability remain separate workstreams.
+
+## Native streaming presentation
+
+The native DataSource adapter exposes an explicit tagged display projection:
+`entity_kind`, node-prefixed columns, then edge-prefixed columns. Node rows precede
+edge rows; cells for the other component are null padding. Windows can span both
+components, and their headers, schema and width agree. Types come from the
+component BaseTable schemas. Empty/out-of-range requests retain that schema.
+This is a display projection, not the shape/schema of the core graph bundle or
+an identity-preserving interchange format.
+
+Presentation cache identity is process-local. Clones share it until mutable
+component access; derived outputs and mutable access get a fresh identity, so
+same-size/same-version branches cannot reuse stale windows. Policy changes and
+explicit edge-ID assignment also invalidate it. This does not record a graph
+delta, publish history or make a live connection to the parent graph. Existing
+native graph-layout/graph-data compatibility adapters are separately scoped;
+use checked `.viz` for graph capture validation.

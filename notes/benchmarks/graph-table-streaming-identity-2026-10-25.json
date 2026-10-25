@@ -1,0 +1,122 @@
+{
+  "cases": [
+    {
+      "edges": 999,
+      "iterations_per_observation": 10000,
+      "nodes": 1000,
+      "operation": "clone_drop_shared_components",
+      "seconds": [
+        1.32791e-8,
+        1.27042e-8,
+        1.1975e-8,
+        1.2166599999999999e-8,
+        1.32917e-8
+      ]
+    },
+    {
+      "edges": 999,
+      "iterations_per_observation": 1,
+      "nodes": 1000,
+      "operation": "group_nodes_100",
+      "seconds": [
+        0.001373917,
+        0.000886334,
+        0.000838375,
+        0.000845125,
+        0.001236875
+      ]
+    },
+    {
+      "edges": 999,
+      "iterations_per_observation": 1,
+      "nodes": 1000,
+      "operation": "first_node_mutable_access",
+      "seconds": [
+        0.000011875,
+        5.958e-6,
+        5.666e-6,
+        5.541e-6,
+        8.084e-6
+      ]
+    },
+    {
+      "edges": 9999,
+      "iterations_per_observation": 10000,
+      "nodes": 10000,
+      "operation": "clone_drop_shared_components",
+      "seconds": [
+        2.46375e-8,
+        2.45875e-8,
+        2.45542e-8,
+        2.45958e-8,
+        2.4600000000000002e-8
+      ]
+    },
+    {
+      "edges": 9999,
+      "iterations_per_observation": 1,
+      "nodes": 10000,
+      "operation": "group_nodes_100",
+      "seconds": [
+        0.006228792,
+        0.004942583,
+        0.004114833,
+        0.004772208,
+        0.004717292
+      ]
+    },
+    {
+      "edges": 9999,
+      "iterations_per_observation": 1,
+      "nodes": 10000,
+      "operation": "first_node_mutable_access",
+      "seconds": [
+        0.00001525,
+        3.083e-6,
+        2.917e-6,
+        2.833e-6,
+        2.792e-6
+      ]
+    },
+    {
+      "edges": 99999,
+      "iterations_per_observation": 10000,
+      "nodes": 100000,
+      "operation": "clone_drop_shared_components",
+      "seconds": [
+        1.33125e-8,
+        1.4520900000000001e-8,
+        1.3241699999999999e-8,
+        1.28792e-8,
+        1.3962499999999998e-8
+      ]
+    },
+    {
+      "edges": 99999,
+      "iterations_per_observation": 1,
+      "nodes": 100000,
+      "operation": "group_nodes_100",
+      "seconds": [
+        0.030404875,
+        0.027749708,
+        0.028212958,
+        0.02906525,
+        0.026900209
+      ]
+    },
+    {
+      "edges": 99999,
+      "iterations_per_observation": 1,
+      "nodes": 100000,
+      "operation": "first_node_mutable_access",
+      "seconds": [
+        7.167e-6,
+        2.583e-6,
+        2.333e-6,
+        2.25e-6,
+        2.208e-6
+      ]
+    }
+  ],
+  "scope": "Native optimized current costs, five observations. Clone shares component table/schema objects above already-shared BaseArray value buffers; node grouping validates identity/topology and creates 100 induced groups by dispatching edges once; the chain fixture uses r modulo 100, so every edge crosses groups and all output edge tables are empty; first mutable access refreshes presentation identity and detaches node table/schema metadata while column buffers remain shared. Clone/drop is amortized over 10000 iterations per observation to exceed clock resolution; its destruction is included. Other operations time one output and exclude output destruction. Fixtures, prepared clone creation and assertions excluded; complete operation/allocation timed. Pointer checks prove shared untouched components, not an RSS estimate. The older bundle-retention receipt has different grouping semantics and is not a matched speedup comparison. No whole-graph capture COW, RSS, Python getter or FFI-budget claim."
+}

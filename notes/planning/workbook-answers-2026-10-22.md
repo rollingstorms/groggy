@@ -868,3 +868,25 @@ policy is a different workload; no matched speedup/RSS/FFI claim.
 legacy display/streaming schema integration. These are existing converter and
 metadata boundaries, not new requirements. Broader 26.1/portable history remain
 separate. Inventory **193 checked / 75 unchecked**, no new rows.
+
+### Native GraphTable streaming projection and cache identity — 2026-10-25
+
+Closed the remaining native table-schema integration boundary in 27.1/AR7.10.
+A private graph_streaming adapter produces one explicitly tagged display
+projection with component-prefixed columns, typed values and null padding;
+headers/schema/width agree and windows span both components. Core shapes remain
+separate. Clone-stable process-local presentation IDs refresh on derived outputs,
+mutable component access, policy edits and explicit ID assignment, preventing
+same-shaped branches from aliasing cached windows. No graph history is produced.
+
+Evidence: `graph-table-streaming-2026-10-25.md`; four native cases. Full gate:
+**1,161 native passed / 51 ignored; 1,890 root Python passed / 1 skipped;
+134 executable docs; strict all-target Clippy passed**. Current induced-group
+receipt: `notes/benchmarks/graph-table-streaming-identity-2026-10-25.json`;
+100k-node/100-group median about 28.2ms, not a speedup/RSS/FFI claim.
+
+The fixed 27.1 remainder is now **to_subgraphs grouping/ownership**, currently
+awaiting the owner choice (explicit column groups / connected components /
+deferral). Native legacy graph-data/layout adapters are unchanged and remain in
+existing AR7.6/28.15 scope. Broader 26.1 and portable-history work remain separate.
+Inventory **193 checked / 75 unchecked**, with no new rows.
