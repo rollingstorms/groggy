@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **177 checked and 79 unchecked entries**. Entries overlap:
+currently contains **180 checked and 80 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -9,7 +9,7 @@ not a completion percentage or an estimate of remaining implementation effort.
 Count correction: the earlier summary omitted three already checked A* entries
 because its heading parser treated the literal asterisk as formatting. The earlier atomic-builder pass
 added two checked slices; three other entries were a counting correction. The
-nested-loop, fused/block, conditional, synchronous, two structural, filtering and three aggregation, three transformation, three sampling and three community extensions add nineteen further checked slices. Counts now use checkbox markers independently of headings.
+recent loop/block, structural, filtering, aggregation, transformation, mask-sampling, community and bounded-selector continuation slices are counted individually alongside their open parents. Counts now use checkbox markers independently of headings.
 
 ## Recent completed slices
 
@@ -34,6 +34,7 @@ nested-loop, fused/block, conditional, synchronous, two structural, filtering an
 | 09.4b.2r–2t | Checked expression operators/literals, scoped synchronous/async maps and deterministic selected label/copy transformations; opaque callbacks remain uncertified. |
 | 09.4b.2u–2w | Stable isolated node/edge mask sampling and bounded map-key reservoirs with strict controls, selected identity validation and atomic publication. |
 | 09.4b.2x–2z | Checked seeding, synchronous propagation and actual directed/undirected local modularity gains verified against independent full-objective moves. |
+| 09.4b.2aa–2ac | Ordered bounded selector iteration, selected neighborhood expansion and consistent induced emission; legacy owner connections remain explicit. |
 
 
 
@@ -72,8 +73,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest community-bundle change: **964 native tests passed, 52 ignored; 1,489 root
-Python API tests passed, 1 skipped; 60 executable documentation examples passed;
+Latest bounded-selector change: **969 native tests passed, 52 ignored; 1,516 root
+Python API tests passed, 1 skipped; 64 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.
@@ -82,3 +83,7 @@ The matched before/after performance comparison remains follow-up under the
 existing performance gates. As requested, implementation priorities continue
 first; comparison must match workload, precision and history semantics and record
 time, allocations, peak memory and retained-history growth.
+
+Nested sampler execution now has explicit open child 09.4b.2ad under the existing
+09.4b.2 parent. This accounts for the additional unchecked entry and records the
+already remaining effect/output work; it does not expand the accepted scope.

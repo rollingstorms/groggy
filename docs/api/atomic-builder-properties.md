@@ -53,7 +53,7 @@ scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
 fused arithmetic/neighbor kernels, node degree and incident-weight sums,
 undirected triangle/k-core calculations, property filtering and ordering, checked
 statistical/category/neighbor aggregations, declarative expression maps and
-neighbor/in-place label transformations, node/edge/reservoir mask sampling, checked community helpers, and
+neighbor/in-place label transformations, node/edge/reservoir mask sampling, bounded sampler iteration/neighborhood/emission, checked community helpers, and
 ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
@@ -61,7 +61,7 @@ the native pipeline, before any step executes. Nested `iter.loop` bodies are als
 The complete body is checked even with zero iterations. Each iteration reads prior
 staged assignments; a later failure discards the entire outer run. Loops check
 cancellation between iterations and child steps. An alternate `batch_plan` rejects
-in atomic mode because its executor bypasses property staging. Subgraph-producing sampling, temporal and other graph-dependent families still require migration/certification.
+in atomic mode because its executor bypasses property staging. Nested sampler for-each execution, temporal and other graph-dependent families still require migration/certification.
 Sampler pipelines reject an atomic property request rather than ignoring it.
 
 Atomic mode uses the builder's original ordered steps. The current IR optimizer
@@ -399,3 +399,5 @@ Expression and transformation semantics, examples and costs: [checked builder tr
 Mask sampling controls and examples: [checked builder sampling](builder-sampling.md).
 
 Community seeding, propagation and local gain contracts: [checked community helpers](builder-community.md).
+
+Selector scope and ownership: [bounded subgraph samplers](builder-subgraph-sampling.md).

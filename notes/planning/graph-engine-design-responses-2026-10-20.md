@@ -1274,3 +1274,17 @@ compose through existing attachment/load paths. Broader execution, composer and
 remaining sampling/temporal/path audits stay open. See
 `atomic-community-builder-bundle-2026-10-24.md` and
 `../../docs/api/builder-community.md` for contracts, costs and verification.
+
+### Bounded subgraph sampler bundle — 2026-10-24
+
+Completed 09.4b.2aa–2ac: ordered selected node/edge iteration; invocation-bounded
+outgoing/undirected neighborhoods with direct map/array seed parity; consistent
+induced emission across source types/modes. Selected edge omissions, parallel
+edges and loops remain respected; foreign owners and malformed selectors reject.
+Results are legacy owner-connected selectors, not pinned value snapshots. Nested
+for-each stays uncertified; its already remaining child-effect/output audit is now
+explicit 09.4b.2ad, including first-result truncation and explicit-empty handling.
+This is an existing parent-work decomposition, not new scope. Verified with 969
+native tests, 1,516 Python tests, 64 doc examples, strict Clippy and 12 release
+workloads. See `bounded-subgraph-sampler-bundle-2026-10-24.md` and
+`../../docs/api/builder-subgraph-sampling.md`.

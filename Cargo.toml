@@ -119,3 +119,7 @@ harness = false
 [[bench]]
 name = "community_builder_steps"
 harness = false
+
+[[bench]]
+name = "subgraph_sampler_steps"
+harness = false

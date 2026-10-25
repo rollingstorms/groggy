@@ -104,8 +104,9 @@ Selected nodes must be active. Edge sampling additionally validates selected edg
 liveness and endpoint closure. Reservoir source IDs must belong to the active
 selection, even for k=0. Errors/cancellation leave the result variable unchanged;
 a failed atomic run discards prior staged attachments. Empty outputs alone create
-no graph version. Subgraph-producing iteration/expansion/emission/for-each steps
-and whole sampler-pipeline transactions remain outside atomic certification.
+no graph version. Nested for-each execution and whole sampler-pipeline transactions remain outside
+atomic certification. Iteration/expansion/emission contracts are now covered by
+[bounded subgraph samplers](builder-subgraph-sampling.md).
 
 All three steps share Algorithm R with O(min(k,N)) reservoir capacity and a sparse
 output map. Selected IDs are materialized in stable order; reservoir source keys

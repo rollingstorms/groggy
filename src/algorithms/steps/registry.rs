@@ -1442,7 +1442,12 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let hops = spec.params.get_int("hops").map(|v| v as usize).unwrap_or(1);
+            let hops = if spec.params.get("hops").is_some() {
+                usize::try_from(spec.params.expect_int("hops")?)
+                    .map_err(|_| anyhow!("hops must be non-negative and fit usize"))?
+            } else {
+                1
+            };
             Ok(Box::new(super::sampling::NeighborsStep::new(
                 source, hops, target,
             )))
@@ -1459,12 +1464,20 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let mode = match spec.params.get_text("mode") {
-                Some("unified") => super::sampling::EmitMode::Unified,
-                Some("per_item") | Some("per-item") | None => super::sampling::EmitMode::PerSeed,
-                Some(other) => return Err(anyhow!("unknown emit mode: {}", other)),
+            let mode = if spec.params.get("mode").is_some() {
+                match spec.params.expect_text("mode")? {
+                    "unified" => super::sampling::EmitMode::Unified,
+                    "per_item" | "per-item" => super::sampling::EmitMode::PerSeed,
+                    other => return Err(anyhow!("unknown emit mode: {}", other)),
+                }
+            } else {
+                super::sampling::EmitMode::PerSeed
             };
-            let induced = spec.params.get_bool("induced").unwrap_or(true);
+            let induced = if spec.params.get("induced").is_some() {
+                spec.params.expect_bool("induced")?
+            } else {
+                true
+            };
             Ok(Box::new(super::sampling::EmitSubgraphsStep::new(
                 source, target, mode, induced,
             )))

@@ -1,0 +1,329 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "mode": "iterate_nodes",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001030541,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000832792,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001487333,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001495958,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001304042,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "iterate_edges",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00105,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001048042,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001418083,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001438208,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00143925,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbors_zero",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001835,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00169,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001686667,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00161,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001525167,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "neighbors_one",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00192225,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001909875,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001748,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00175525,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001775708,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "mask_unified",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000248708,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000207,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000209792,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.000212125,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00021175,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "array_unified",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001098542,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001095583,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001060125,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001055292,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.001044208,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "iterate_nodes",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.009070041,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.008967667,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.008554833,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00841725,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.008410167,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "iterate_edges",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.010306625,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.010146542,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.010206,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.010158292,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.010133042,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbors_zero",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.013518583,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.013269958,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.013202458,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.01334125,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.013248541,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "neighbors_one",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.016549917,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.016319333,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.016466792,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.016831167,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.016650792,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "mask_unified",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.002125834,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002049083,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002123709,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002057625,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002033458,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "array_unified",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.010489167,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.010844084,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.010629375,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.011181084,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.010949125,
+          "state_id": 1
+        }
+      ]
+    }
+  ],
+  "scope": "Native release directed-ring selector construction, bounded expansion and emission. Fixture/spec construction excluded; five observations per workload. Validate all result memberships, induction, output order/cardinality and zero graph publications. Legacy connected selectors, not pinned snapshots. No matched speedup, FFI/RSS/allocation or production-scale claim."
+}

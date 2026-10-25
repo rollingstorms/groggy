@@ -135,6 +135,11 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.4b.2x — Checked deterministic community seeding.** Certify singleton/degree/random seeds with active selected identities, stable degree/hub ties, isolated RNG and strict k/seed controls. See `atomic-community-builder-bundle-2026-10-24.md`.
 - [x] **09.4b.2y — Checked synchronous community propagation.** Certify selected outgoing/bidirectional votes with explicit self/parallel/loop incidence, typed deterministic ties, map/column input parity and safe sparse/alias outputs. Same bundle note.
 - [x] **09.4b.2z — Actual local modularity move gains.** Replace the edge-fraction proxy with checked directed/undirected removal-plus-insertion deltas over neighboring communities; preserve integer/sparse partition contracts and verify against exhaustive independent full-objective recomputation. Same bundle note.
+- [x] **09.4b.2aa — Checked ordered selected iteration.** Certify node/edge selector iteration with stable identity order, active endpoint-closed scope, exact edge seeds and selected singleton loops. See `bounded-subgraph-sampler-bundle-2026-10-24.md`.
+- [x] **09.4b.2ab — Invocation-bounded neighborhood expansion.** Certify selected outgoing/undirected BFS, direct map/array seed parity, owner/identity/endpoint validation and strict hops; prevent global-owner expansion and induction. Same bundle note.
+- [x] **09.4b.2ac — Consistent bounded sampler emission.** Certify map/array emission with induced honored in every source/mode, stable order, explicit empty conventions, checked controls and failure-safe output installation. Recognize observable sampler outputs in Python validation. Same bundle note.
+- [ ] **09.4b.2ad — Open: nested sampler executor audit.** Finish recursive child-effect preflight, preserve all explicitly emitted child results and explicit empty results, define/retain transient outputs across items, and certify the outer property boundary. Current for-each remains unsupported in atomic mode; standalone sampler transaction and pinned-view migration remain parent work. Same bundle note.
+
 
 
 

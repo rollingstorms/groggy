@@ -984,6 +984,16 @@ class BuiltSampler(BuiltAlgorithm):
         super().__init__(name, steps)
         self._id = f"custom.sample.{name}"
 
+    def _validate(self) -> Tuple[List[str], List[str]]:
+        errors, warnings = super()._validate()
+        if any(
+            step.get("type") in {"sample.emit_subgraphs", "emit_subgraphs", "core.emit_subgraphs"}
+            and step.get("output", step.get("target")) == "__sample_output__"
+            for step in self._steps
+        ):
+            warnings = [warning for warning in warnings if warning != "Pipeline doesn't attach any output attributes"]
+        return errors, warnings
+
     def to_spec(self) -> Dict[str, Any]:
         alias_map: Dict[str, str] = {}
         encoded_steps: list[Dict[str, Any]] = []
