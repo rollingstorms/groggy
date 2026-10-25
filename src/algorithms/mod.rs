@@ -744,45 +744,34 @@ impl Context {
             .window
             .ok_or_else(|| anyhow!("temporal scope has no window defined"))?;
 
+        index.validate_captured_head(scope.current_commit)?;
+        index.validate_range(start, end)?;
         let mut entities = temporal::ChangedEntities::empty();
-
-        // Get all commits in the window
-        for commit_id in start..=end {
-            let changed_nodes = index.nodes_changed_in_commit(commit_id);
-            let changed_edges = index.edges_changed_in_commit(commit_id);
-
-            // For each changed node/edge, determine the change type
-            for node_id in changed_nodes {
-                // Check if created or deleted at this commit
-                if index.node_exists_at(node_id, commit_id)
-                    && !index.node_exists_at(node_id, commit_id.saturating_sub(1))
-                {
-                    entities.add_node(node_id, temporal::ChangeType::Created);
-                } else if !index.node_exists_at(node_id, commit_id)
-                    && (commit_id == 0
-                        || index.node_exists_at(node_id, commit_id.saturating_sub(1)))
-                {
-                    entities.add_node(node_id, temporal::ChangeType::Deleted);
-                } else {
-                    entities.add_node(node_id, temporal::ChangeType::AttributeModified);
-                }
+        for delta in index.changes_in_range(start, end) {
+            if self.is_cancelled() {
+                return Err(anyhow!("temporal changes cancelled"));
             }
-
-            for edge_id in changed_edges {
-                // Similar logic for edges
-                if index.edge_exists_at(edge_id, commit_id)
-                    && !index.edge_exists_at(edge_id, commit_id.saturating_sub(1))
-                {
-                    entities.add_edge(edge_id, temporal::ChangeType::Created);
-                } else if !index.edge_exists_at(edge_id, commit_id)
-                    && (commit_id == 0
-                        || index.edge_exists_at(edge_id, commit_id.saturating_sub(1)))
-                {
-                    entities.add_edge(edge_id, temporal::ChangeType::Deleted);
-                } else {
-                    entities.add_edge(edge_id, temporal::ChangeType::AttributeModified);
-                }
+            for &id in &delta.nodes_added {
+                entities.add_node(id, temporal::ChangeType::Created);
             }
+            for &id in &delta.nodes_removed {
+                entities.add_node(id, temporal::ChangeType::Deleted);
+            }
+            for (id, _, _, _) in &delta.node_attr_changes {
+                entities.add_node(*id, temporal::ChangeType::AttributeModified);
+            }
+            for &(id, _, _) in &delta.edges_added {
+                entities.add_edge(id, temporal::ChangeType::Created);
+            }
+            for &id in &delta.edges_removed {
+                entities.add_edge(id, temporal::ChangeType::Deleted);
+            }
+            for (id, _, _, _) in &delta.edge_attr_changes {
+                entities.add_edge(*id, temporal::ChangeType::AttributeModified);
+            }
+        }
+        if self.is_cancelled() {
+            return Err(anyhow!("temporal changes cancelled"));
         }
 
         Ok(entities)

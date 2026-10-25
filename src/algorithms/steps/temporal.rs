@@ -17,7 +17,11 @@ use crate::temporal::{TemporalIndex, TemporalSnapshot};
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId, StateId};
 
-use super::{core::NodeColumn, Step, StepMetadata, StepScope};
+use super::{
+    aggregations::{numeric_value, Reduction},
+    core::NodeColumn,
+    Step, StepMetadata, StepScope,
+};
 
 const DEFAULT_TEMPORAL_INDEX_VAR: &str = "temporal_index";
 
@@ -215,7 +219,6 @@ impl Step for DiffEdgesStep {
 /// - "avg": Average numeric values
 /// - "min": Minimum value
 /// - "max": Maximum value
-#[allow(dead_code)] // Fields used in placeholder implementation
 pub struct WindowAggregateStep {
     /// Name of the node attribute to aggregate
     attr_name: String,
@@ -225,6 +228,7 @@ pub struct WindowAggregateStep {
     output_var: String,
     /// Require temporal index in context (stored as scalar variable)
     index_var: String,
+    window: Option<(StateId, StateId)>,
 }
 
 #[derive(Clone, Debug)]
@@ -256,72 +260,62 @@ impl AggregateFunction {
         }
     }
 
-    #[allow(dead_code)] // Used in tests, will be used when steps are fully implemented
     fn apply(&self, values: &[(StateId, AlgorithmParamValue)]) -> Result<AlgorithmParamValue> {
-        if values.is_empty() {
-            return Ok(AlgorithmParamValue::None);
-        }
-
         match self {
-            Self::Count => Ok(AlgorithmParamValue::Int(values.len() as i64)),
-            Self::First => Ok(values.first().unwrap().1.clone()),
-            Self::Last => Ok(values.last().unwrap().1.clone()),
-            Self::Sum => {
-                let mut sum = 0.0;
-                for (_, val) in values {
-                    sum += to_float(val)?;
-                }
-                Ok(AlgorithmParamValue::Float(sum))
-            }
-            Self::Avg => {
-                let mut sum = 0.0;
-                for (_, val) in values {
-                    sum += to_float(val)?;
-                }
-                Ok(AlgorithmParamValue::Float(sum / values.len() as f64))
-            }
-            Self::Min => {
-                let mut min = f64::INFINITY;
-                for (_, val) in values {
-                    let v = to_float(val)?;
-                    if v < min {
-                        min = v;
-                    }
-                }
-                Ok(AlgorithmParamValue::Float(min))
-            }
-            Self::Max => {
-                let mut max = f64::NEG_INFINITY;
-                for (_, val) in values {
-                    let v = to_float(val)?;
-                    if v > max {
-                        max = v;
-                    }
-                }
-                Ok(AlgorithmParamValue::Float(max))
+            Self::Count => Ok(AlgorithmParamValue::Int(
+                i64::try_from(values.len()).map_err(|_| anyhow!("temporal count overflow"))?,
+            )),
+            Self::First => Ok(values
+                .first()
+                .map(|(_, value)| value.clone())
+                .unwrap_or(AlgorithmParamValue::None)),
+            Self::Last => Ok(values
+                .last()
+                .map(|(_, value)| value.clone())
+                .unwrap_or(AlgorithmParamValue::None)),
+            _ => {
+                let numeric = values
+                    .iter()
+                    .map(|(_, value)| numeric_value(value))
+                    .collect::<Result<Vec<_>>>()?;
+                let reduction = match self {
+                    Self::Sum => Reduction::Sum,
+                    Self::Avg => Reduction::Mean,
+                    Self::Min => Reduction::Min,
+                    Self::Max => Reduction::Max,
+                    _ => return Err(anyhow!("invalid temporal reduction")),
+                };
+                reduction.apply_values(&numeric)
             }
         }
     }
 
-    fn requires_numeric(&self) -> bool {
-        matches!(
-            self,
-            AggregateFunction::Sum
-                | AggregateFunction::Avg
-                | AggregateFunction::Min
-                | AggregateFunction::Max
-        )
-    }
-}
-
-/// Helper function to convert AlgorithmParamValue to f64
-#[allow(dead_code)] // Used by apply method which is tested
-fn to_float(val: &AlgorithmParamValue) -> Result<f64> {
-    match val {
-        AlgorithmParamValue::Int(i) => Ok(*i as f64),
-        AlgorithmParamValue::Float(f) => Ok(*f),
-        AlgorithmParamValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
-        _ => Err(anyhow!("Cannot convert {:?} to float", val)),
+    fn apply_history(
+        &self,
+        history: &[(StateId, AttrValue)],
+        ctx: &Context,
+    ) -> Result<AlgorithmParamValue> {
+        if matches!(self, Self::Count) {
+            return Ok(AlgorithmParamValue::Int(
+                i64::try_from(history.len()).map_err(|_| anyhow!("temporal count overflow"))?,
+            ));
+        }
+        let selected = match self {
+            Self::First => history.first().map(std::slice::from_ref).unwrap_or(&[]),
+            Self::Last => history.last().map(std::slice::from_ref).unwrap_or(&[]),
+            _ => history,
+        };
+        let mut values = Vec::with_capacity(selected.len());
+        for (state, value) in selected {
+            check_cancelled(ctx)?;
+            values.push((
+                *state,
+                AlgorithmParamValue::from_attr_value(value.clone()).ok_or_else(|| {
+                    anyhow!("temporal aggregate cannot represent this property value")
+                })?,
+            ));
+        }
+        self.apply(&values)
     }
 }
 
@@ -337,11 +331,22 @@ impl WindowAggregateStep {
             function,
             output_var: output_var.into(),
             index_var: index_var.into(),
+            window: None,
         }
+    }
+
+    /// Use explicit inclusive retained-state bounds instead of the Context window.
+    pub fn with_window(mut self, start: StateId, end: StateId) -> Self {
+        self.window = Some((start, end));
+        self
     }
 }
 
 impl Step for WindowAggregateStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.window_aggregate"
     }
@@ -355,62 +360,19 @@ impl Step for WindowAggregateStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("window_aggregate cancelled"));
-        }
-
-        let scope_info = ctx
-            .temporal_scope()
-            .ok_or_else(|| anyhow!("temporal.window_aggregate requires a temporal scope"))?;
-        let (start, end) = scope_info
-            .window
-            .ok_or_else(|| anyhow!("temporal.window_aggregate requires a scope window"))?;
-        if start > end {
-            return Err(anyhow!(
-                "temporal.window_aggregate received invalid window: start ({start}) > end ({end})"
-            ));
-        }
-
-        let index = ensure_temporal_index(scope, &self.index_var)?;
+        check_cancelled(ctx)?;
+        let (start, end) = temporal_window(ctx, self.window)?;
+        let index = ensure_temporal_index(ctx, scope, &self.index_var)?;
+        index.validate_range(start, end)?;
+        let nodes = temporal_nodes(ctx, scope, &index)?;
         let attr_name = AttrName::from(self.attr_name.clone());
-        let numeric_only = self.function.requires_numeric();
-        let mut result = HashMap::new();
-
-        for &node in scope.node_ids() {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("window_aggregate cancelled"));
-            }
-
-            let mut history = index.node_attr_history(node, &attr_name, start, end);
-            if history.is_empty() || history.iter().all(|(_, value)| is_placeholder_value(value)) {
-                history = snapshot_attr_history(scope, node, &attr_name, start, end)?;
-            }
-
-            let mut converted = Vec::with_capacity(history.len());
-            for (commit, value) in history {
-                let resolved = match resolve_history_value(scope, &attr_name, value)? {
-                    Some(val) => val,
-                    None => continue,
-                };
-                if let Some(param) = AlgorithmParamValue::from_attr_value(resolved) {
-                    if numeric_only
-                        && !matches!(
-                            param,
-                            AlgorithmParamValue::Int(_)
-                                | AlgorithmParamValue::Float(_)
-                                | AlgorithmParamValue::Bool(_)
-                        )
-                    {
-                        continue;
-                    }
-                    converted.push((commit, param));
-                }
-            }
-
-            let aggregated = self.function.apply(&converted)?;
-            result.insert(node, aggregated);
+        let mut result = HashMap::with_capacity(nodes.len());
+        for node in nodes {
+            check_cancelled(ctx)?;
+            let history = index.node_attr_history_slice(node, &attr_name, start, end);
+            result.insert(node, self.function.apply_history(history, ctx)?);
         }
-
+        check_cancelled(ctx)?;
         scope
             .variables_mut()
             .set_node_map(self.output_var.clone(), result);
@@ -426,7 +388,6 @@ impl Step for WindowAggregateStep {
 /// - Lifetime (creation to deletion span)
 /// - Change frequency (number of modifications)
 /// - Activity window (active during specific time range)
-#[allow(dead_code)] // Predicate used in future full implementation
 pub struct TemporalFilterStep {
     /// Predicate to apply
     predicate: TemporalPredicate,
@@ -472,6 +433,10 @@ impl TemporalFilterStep {
 }
 
 impl Step for TemporalFilterStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.filter"
     }
@@ -485,50 +450,39 @@ impl Step for TemporalFilterStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("temporal.filter cancelled"));
-        }
-
-        let index = ensure_temporal_index(scope, DEFAULT_TEMPORAL_INDEX_VAR)?;
-        let mut result = HashMap::new();
-
-        match self.predicate {
-            TemporalPredicate::CreatedAfter(commit) => {
-                for &node in scope.node_ids() {
-                    let created = index.node_creation_commit(node);
-                    let keep = created.map(|c| c > commit).unwrap_or(false);
-                    result.insert(node, bool_to_param(keep));
-                }
-            }
-            TemporalPredicate::CreatedBefore(commit) => {
-                for &node in scope.node_ids() {
-                    let created = index.node_creation_commit(node);
-                    let keep = created.map(|c| c < commit).unwrap_or(false);
-                    result.insert(node, bool_to_param(keep));
-                }
-            }
-            TemporalPredicate::ExistedAt(commit) => {
-                for &node in scope.node_ids() {
-                    let keep = index.node_exists_at(node, commit);
-                    result.insert(node, bool_to_param(keep));
-                }
-            }
+        check_cancelled(ctx)?;
+        let index = ensure_temporal_index(ctx, scope, DEFAULT_TEMPORAL_INDEX_VAR)?;
+        let changed = match self.predicate {
             TemporalPredicate::ModifiedInRange(start, end) => {
-                if start > end {
-                    return Err(anyhow!(
-                        "temporal.filter received invalid range: start ({start}) > end ({end})"
-                    ));
-                }
-                let changed: HashSet<NodeId> = index
-                    .nodes_changed_in_range(start, end)
-                    .into_iter()
-                    .collect();
-                for &node in scope.node_ids() {
-                    result.insert(node, bool_to_param(changed.contains(&node)));
-                }
+                index.validate_range(start, end)?;
+                Some(changed_nodes(ctx, &index, start, end, None)?)
             }
+            TemporalPredicate::CreatedAfter(state)
+            | TemporalPredicate::CreatedBefore(state)
+            | TemporalPredicate::ExistedAt(state) => {
+                index.validate_state(state)?;
+                None
+            }
+        };
+        let nodes = temporal_nodes(ctx, scope, &index)?;
+        let mut result = HashMap::with_capacity(nodes.len());
+        for node in nodes {
+            check_cancelled(ctx)?;
+            let keep = match self.predicate {
+                TemporalPredicate::CreatedAfter(state) => index
+                    .node_creation_commit(node)
+                    .is_some_and(|created| created > state),
+                TemporalPredicate::CreatedBefore(state) => index
+                    .node_creation_commit(node)
+                    .is_some_and(|created| created < state),
+                TemporalPredicate::ExistedAt(state) => index.node_exists_at(node, state),
+                TemporalPredicate::ModifiedInRange(_, _) => {
+                    changed.as_ref().is_some_and(|ids| ids.contains(&node))
+                }
+            };
+            result.insert(node, bool_to_param(keep));
         }
-
+        check_cancelled(ctx)?;
         scope
             .variables_mut()
             .set_node_map(self.output_var.clone(), result);
@@ -541,12 +495,12 @@ impl Step for TemporalFilterStep {
 ///
 /// This step uses the temporal index to identify nodes that were
 /// created, deleted, or had attributes modified within a specified window.
-#[allow(dead_code)] // change_type used in future full implementation
 pub struct MarkChangedNodesStep {
     /// Output variable name
     output_var: String,
     /// Optional: specific change type to filter for
     change_type: Option<String>,
+    window: Option<(StateId, StateId)>,
 }
 
 impl MarkChangedNodesStep {
@@ -554,7 +508,14 @@ impl MarkChangedNodesStep {
         Self {
             output_var: output_var.into(),
             change_type,
+            window: None,
         }
+    }
+
+    /// Use explicit inclusive retained-state bounds instead of the Context window.
+    pub fn with_window(mut self, start: StateId, end: StateId) -> Self {
+        self.window = Some((start, end));
+        self
     }
 
     pub fn all_changes(output_var: impl Into<String>) -> Self {
@@ -571,6 +532,10 @@ impl MarkChangedNodesStep {
 }
 
 impl Step for MarkChangedNodesStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.mark_changed_nodes"
     }
@@ -584,49 +549,24 @@ impl Step for MarkChangedNodesStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("temporal.mark_changed_nodes cancelled"));
-        }
-
-        let scope_info = ctx
-            .temporal_scope()
-            .ok_or_else(|| anyhow!("temporal.mark_changed_nodes requires a temporal scope"))?;
-        if scope_info.window.is_none() {
-            return Err(anyhow!(
-                "temporal.mark_changed_nodes requires the temporal scope to define a window"
-            ));
-        }
-
-        let index = ensure_temporal_index(scope, DEFAULT_TEMPORAL_INDEX_VAR)?;
-        let changed_entities = ctx.changed_entities(index.as_ref())?;
-
+        check_cancelled(ctx)?;
+        let (start, end) = temporal_window(ctx, self.window)?;
         let desired = match self.change_type.as_deref() {
-            None => None,
+            None | Some("any") => None,
             Some("created") => Some(ChangeType::Created),
             Some("deleted") => Some(ChangeType::Deleted),
             Some("modified") => Some(ChangeType::AttributeModified),
-            Some("any") => None,
-            Some(other) => {
-                return Err(anyhow!(
-                    "unknown change_type '{other}' supplied to temporal.mark_changed_nodes"
-                ))
-            }
+            Some(other) => return Err(anyhow!("unknown temporal change_type '{other}'")),
         };
-
+        let index = ensure_temporal_index(ctx, scope, DEFAULT_TEMPORAL_INDEX_VAR)?;
+        index.validate_range(start, end)?;
+        let changed = changed_nodes(ctx, &index, start, end, desired)?;
         let mut result = HashMap::new();
-        for &node in scope.node_ids() {
-            let matches = changed_entities
-                .node_change_types
-                .get(&node)
-                .map(|change| {
-                    desired.map_or(true, |desired_change| {
-                        change_matches(*change, desired_change)
-                    })
-                })
-                .unwrap_or(false);
-            result.insert(node, bool_to_param(matches));
+        for node in temporal_nodes(ctx, scope, &index)? {
+            check_cancelled(ctx)?;
+            result.insert(node, bool_to_param(changed.contains(&node)));
         }
-
+        check_cancelled(ctx)?;
         scope
             .variables_mut()
             .set_node_map(self.output_var.clone(), result);
@@ -703,7 +643,7 @@ impl Step for SnapshotAtStep {
     }
 }
 
-/// Filter to a temporal window between start and end timestamps.
+/// Mark selected nodes existing in any state of an inclusive retained-state window.
 pub struct TemporalWindowStep {
     start: u64,
     end: u64,
@@ -721,6 +661,10 @@ impl TemporalWindowStep {
 }
 
 impl Step for TemporalWindowStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.window"
     }
@@ -734,26 +678,18 @@ impl Step for TemporalWindowStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("temporal.window cancelled"));
-        }
-
-        if self.start > self.end {
-            return Err(anyhow!(
-                "invalid temporal window: start ({}) > end ({})",
-                self.start,
-                self.end
-            ));
-        }
-
-        let index = ensure_temporal_index(scope, DEFAULT_TEMPORAL_INDEX_VAR)?;
+        check_cancelled(ctx)?;
+        let index = ensure_temporal_index(ctx, scope, DEFAULT_TEMPORAL_INDEX_VAR)?;
+        index.validate_range(self.start, self.end)?;
         let mut result = HashMap::new();
-
-        for &node in scope.node_ids() {
-            let existed = node_existed_in_window(index.as_ref(), node, self.start, self.end);
-            result.insert(node, bool_to_param(existed));
+        for node in temporal_nodes(ctx, scope, &index)? {
+            check_cancelled(ctx)?;
+            result.insert(
+                node,
+                bool_to_param(index.node_existed_in_window(node, self.start, self.end)),
+            );
         }
-
+        check_cancelled(ctx)?;
         scope
             .variables_mut()
             .set_node_map(self.output.clone(), result);
@@ -921,82 +857,94 @@ fn validate_decay_entity(scope: &StepScope<'_>, entity: usize, edges: bool) -> R
     Ok(())
 }
 
-fn snapshot_attr_history(
+fn temporal_window(
+    ctx: &Context,
+    explicit: Option<(StateId, StateId)>,
+) -> Result<(StateId, StateId)> {
+    let (start, end) = explicit
+        .or_else(|| ctx.temporal_scope().and_then(|scope| scope.window))
+        .ok_or_else(|| {
+            anyhow!("temporal step requires an explicit window or Context scope window")
+        })?;
+    if start > end {
+        return Err(anyhow!("temporal range start exceeds end"));
+    }
+    Ok((start, end))
+}
+
+fn temporal_nodes(
+    ctx: &Context,
     scope: &StepScope<'_>,
-    node_id: NodeId,
-    attr: &AttrName,
+    index: &TemporalIndex,
+) -> Result<Vec<NodeId>> {
+    let nodes = scope.subgraph().ordered_nodes().to_vec();
+    let owner = scope.subgraph().graph();
+    let graph = owner.borrow();
+    for &node in &nodes {
+        check_cancelled(ctx)?;
+        if !graph.has_node(node) && index.node_creation_commit(node).is_none() {
+            return Err(anyhow!(
+                "temporal node {node} is unknown to the owner/retained lineage"
+            ));
+        }
+    }
+    Ok(nodes)
+}
+
+fn changed_nodes(
+    ctx: &Context,
+    index: &TemporalIndex,
     start: StateId,
     end: StateId,
-) -> Result<Vec<(StateId, AttrValue)>> {
-    if start > end {
-        return Ok(Vec::new());
-    }
-
-    let graph = scope.subgraph().graph();
-    let mut entries = Vec::new();
-    for commit in start..=end {
-        let snapshot = graph
-            .borrow()
-            .snapshot_at_commit(commit)
-            .map_err(|err| anyhow!("failed to build snapshot at commit {commit}: {err}"))?;
-        if let Some(value) = snapshot.node_attr(node_id, attr) {
-            entries.push((commit, value));
+    desired: Option<ChangeType>,
+) -> Result<HashSet<NodeId>> {
+    let mut nodes = HashSet::new();
+    for delta in index.changes_in_range(start, end) {
+        check_cancelled(ctx)?;
+        if desired.is_none() || desired == Some(ChangeType::Created) {
+            for &id in &delta.nodes_added {
+                check_cancelled(ctx)?;
+                nodes.insert(id);
+            }
+        }
+        if desired.is_none() || desired == Some(ChangeType::Deleted) {
+            for &id in &delta.nodes_removed {
+                check_cancelled(ctx)?;
+                nodes.insert(id);
+            }
+        }
+        if desired.is_none() || desired == Some(ChangeType::AttributeModified) {
+            for (id, _, _, _) in &delta.node_attr_changes {
+                check_cancelled(ctx)?;
+                nodes.insert(*id);
+            }
         }
     }
-    Ok(entries)
+    Ok(nodes)
 }
 
-fn is_placeholder_value(value: &AttrValue) -> bool {
-    matches!(value, AttrValue::Text(text) if text.starts_with("index_"))
-}
-
-fn resolve_history_value(
+fn ensure_temporal_index(
+    ctx: &Context,
     scope: &StepScope<'_>,
-    attr: &AttrName,
-    value: AttrValue,
-) -> Result<Option<AttrValue>> {
-    if let AttrValue::Text(text) = &value {
-        if let Some(resolved) = resolve_placeholder_from_pool(scope, attr, text, true)? {
-            return Ok(Some(resolved));
+    name: &str,
+) -> Result<Arc<TemporalIndex>> {
+    check_cancelled(ctx)?;
+    let owner = scope.subgraph().graph();
+    let graph = owner.borrow();
+    let head = ctx
+        .temporal_scope()
+        .map_or_else(|| graph.current_state_id(), |scope| scope.current_commit);
+    if scope.variables().contains(name) {
+        let index = scope.variables().temporal_index(name)?;
+        if !graph.owns_temporal_index(&index, head) {
+            return Err(anyhow!("temporal index has a foreign owner or different captured head; build an explicit matching index"));
         }
-    }
-    Ok(Some(value))
-}
-
-fn resolve_placeholder_from_pool(
-    scope: &StepScope<'_>,
-    attr: &AttrName,
-    placeholder: &str,
-    is_node: bool,
-) -> Result<Option<AttrValue>> {
-    let Some(index_str) = placeholder.strip_prefix("index_") else {
-        return Ok(None);
-    };
-    let Ok(index) = index_str.parse::<usize>() else {
-        return Ok(None);
-    };
-
-    let graph_rc = scope.subgraph().graph();
-    let graph_ref = graph_rc.borrow();
-    let pool = graph_ref.pool();
-    Ok(pool.get_attr_by_index(attr, index, is_node).cloned())
-}
-
-fn ensure_temporal_index(scope: &mut StepScope<'_>, name: &str) -> Result<Arc<TemporalIndex>> {
-    if let Ok(index) = scope.variables().temporal_index(name) {
         return Ok(index);
     }
-
-    let graph = scope.subgraph().graph();
-    let built = graph
-        .borrow()
-        .build_temporal_index()
-        .map_err(|err| anyhow!("failed to build temporal index: {err}"))?;
-    let index = Arc::new(built);
-    scope
-        .variables_mut()
-        .set_temporal_index(name.to_string(), Arc::clone(&index));
-    Ok(index)
+    // An ephemeral local read index is not installed into variables or a graph cache.
+    Ok(Arc::new(
+        graph.temporal_index_for_run(head, || ctx.is_cancelled())?,
+    ))
 }
 
 fn snapshot_at_commit(scope: &StepScope<'_>, commit_id: StateId) -> Result<TemporalSnapshot> {
@@ -1066,24 +1014,6 @@ fn bool_to_param(value: bool) -> AlgorithmParamValue {
     AlgorithmParamValue::Int(if value { 1 } else { 0 })
 }
 
-fn node_existed_in_window(
-    index: &TemporalIndex,
-    node_id: NodeId,
-    start: StateId,
-    end: StateId,
-) -> bool {
-    if let Some((created, deleted)) = index.node_lifetime_range(node_id) {
-        let deletion_commit = deleted.unwrap_or(StateId::MAX);
-        created <= end && start <= deletion_commit
-    } else {
-        false
-    }
-}
-
-fn change_matches(change: ChangeType, desired: ChangeType) -> bool {
-    change == desired || change == ChangeType::Multiple
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1103,6 +1033,178 @@ mod tests {
             "decay".into(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn window_reducers_preserve_literal_text_null_and_checked_numeric_semantics() {
+        let ctx = Context::new();
+        let text = vec![(1, AttrValue::Text("index_0".into())), (2, AttrValue::Null)];
+        assert_eq!(
+            AggregateFunction::First.apply_history(&text, &ctx).unwrap(),
+            AlgorithmParamValue::Text("index_0".into())
+        );
+        assert_eq!(
+            AggregateFunction::Last.apply_history(&text, &ctx).unwrap(),
+            AlgorithmParamValue::None
+        );
+        assert_eq!(
+            AggregateFunction::Count.apply_history(&text, &ctx).unwrap(),
+            AlgorithmParamValue::Int(2)
+        );
+        assert!(AggregateFunction::Sum.apply_history(&text, &ctx).is_err());
+        let wide = vec![
+            (1, AlgorithmParamValue::Int(9_007_199_254_740_993)),
+            (2, AlgorithmParamValue::Int(-9_007_199_254_740_992)),
+        ];
+        assert_eq!(
+            AggregateFunction::Sum.apply(&wide).unwrap(),
+            AlgorithmParamValue::Float(1.0)
+        );
+        let large = vec![
+            (1, AlgorithmParamValue::Float(1e308)),
+            (2, AlgorithmParamValue::Float(1e308)),
+        ];
+        assert!(AggregateFunction::Sum.apply(&large).is_err());
+        assert_eq!(
+            AggregateFunction::Avg.apply(&large).unwrap(),
+            AlgorithmParamValue::Float(1e308)
+        );
+        for value in [
+            AlgorithmParamValue::Bool(true),
+            AlgorithmParamValue::None,
+            AlgorithmParamValue::Float(f64::NAN),
+            AlgorithmParamValue::Float(f64::INFINITY),
+        ] {
+            assert!(AggregateFunction::Sum.apply(&[(1, value)]).is_err());
+        }
+    }
+
+    #[test]
+    fn temporal_steps_reject_foreign_stale_or_wrong_typed_indexes_without_replacing_outputs() {
+        let selected = fixture();
+        let foreign = fixture();
+        let head = selected.graph().borrow().current_state_id();
+        let stale = selected.graph().borrow().build_temporal_index().unwrap();
+        selected
+            .graph()
+            .borrow_mut()
+            .set_node_attr(0, "x".into(), AttrValue::Int(2))
+            .unwrap();
+        let next = selected
+            .graph()
+            .borrow_mut()
+            .commit("next".into(), "test".into())
+            .unwrap();
+        for index in [
+            stale,
+            foreign.graph().borrow().build_temporal_index().unwrap(),
+        ] {
+            let mut vars = StepVariables::default();
+            vars.set_temporal_index("temporal_index", Arc::new(index));
+            vars.set_scalar("old", AlgorithmParamValue::Int(77));
+            let mut scope = StepScope::new(&selected, &mut vars);
+            assert!(WindowAggregateStep::new(
+                "x",
+                AggregateFunction::Count,
+                "old",
+                "temporal_index"
+            )
+            .with_window(head, next)
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+            assert_eq!(
+                scope.variables().scalar("old").unwrap(),
+                &AlgorithmParamValue::Int(77)
+            );
+        }
+        let mut vars = StepVariables::default();
+        vars.set_scalar("temporal_index", AlgorithmParamValue::Int(5));
+        let mut scope = StepScope::new(&selected, &mut vars);
+        assert!(TemporalWindowStep::new(head, next, "result")
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+        assert_eq!(
+            scope.variables().scalar("temporal_index").unwrap(),
+            &AlgorithmParamValue::Int(5)
+        );
+    }
+
+    #[test]
+    fn exact_change_type_masks_do_not_treat_multiple_as_every_possible_type() {
+        let selected = fixture();
+        let start = selected.graph().borrow().current_state_id();
+        selected.graph().borrow_mut().remove_node(2).unwrap();
+        let end = selected
+            .graph()
+            .borrow_mut()
+            .commit("delete".into(), "test".into())
+            .unwrap();
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&selected, &mut vars);
+        let mut ctx = Context::with_temporal_scope(
+            crate::algorithms::temporal::TemporalScope::with_window(end, start, end),
+        );
+        for (kind, expected) in [("created", 1), ("deleted", 1), ("modified", 1)] {
+            MarkChangedNodesStep::new("result", Some(kind.into()))
+                .apply(&mut ctx, &mut scope)
+                .unwrap();
+            assert_eq!(
+                scope.variables().node_map("result").unwrap()[&2],
+                AlgorithmParamValue::Int(expected)
+            );
+        }
+        MarkChangedNodesStep::new("not_deleted", Some("deleted".into()))
+            .with_window(start, start)
+            .apply(&mut ctx, &mut scope)
+            .unwrap();
+        assert_eq!(
+            scope.variables().node_map("not_deleted").unwrap()[&2],
+            AlgorithmParamValue::Int(0)
+        );
+        let index = selected.graph().borrow().build_temporal_index().unwrap();
+        assert_eq!(
+            ctx.changed_entities(&index).unwrap().node_change_types[&2],
+            ChangeType::Multiple
+        );
+        TemporalWindowStep::new(end, end, "window")
+            .apply(&mut ctx, &mut scope)
+            .unwrap();
+        assert_eq!(
+            scope.variables().node_map("window").unwrap()[&2],
+            AlgorithmParamValue::Int(0)
+        );
+        assert!(!scope.variables().contains("temporal_index"));
+    }
+
+    #[test]
+    fn temporal_window_failure_and_cancellation_preserve_existing_outputs() {
+        let selected = fixture();
+        let head = selected.graph().borrow().current_state_id();
+        let steps: Vec<Box<dyn Step>> = vec![
+            Box::new(
+                WindowAggregateStep::new("x", AggregateFunction::Sum, "old", "temporal_index")
+                    .with_window(0, head),
+            ),
+            Box::new(TemporalFilterStep::existed_at(head, "old")),
+            Box::new(MarkChangedNodesStep::all_changes("old").with_window(0, head)),
+            Box::new(TemporalWindowStep::new(0, head, "old")),
+        ];
+        for step in steps {
+            let mut vars = StepVariables::default();
+            vars.set_scalar("old", AlgorithmParamValue::Int(19));
+            let mut scope = StepScope::new(&selected, &mut vars);
+            assert!(step
+                .apply(
+                    &mut Context::with_cancel_token(Arc::new(AtomicBool::new(true))),
+                    &mut scope
+                )
+                .is_err());
+            assert_eq!(
+                scope.variables().scalar("old").unwrap(),
+                &AlgorithmParamValue::Int(19)
+            );
+            assert!(!scope.variables().contains("temporal_index"));
+        }
     }
 
     #[test]
@@ -1465,6 +1567,6 @@ mod tests {
     fn test_aggregate_empty() {
         let values = vec![];
         let result = AggregateFunction::Count.apply(&values).unwrap();
-        assert_eq!(result, AlgorithmParamValue::None);
+        assert_eq!(result, AlgorithmParamValue::Int(0));
     }
 }

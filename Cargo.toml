@@ -139,3 +139,7 @@ harness = false
 [[bench]]
 name = "temporal_diff_steps"
 harness = false
+
+[[bench]]
+name = "temporal_window_steps"
+harness = false

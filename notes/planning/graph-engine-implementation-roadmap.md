@@ -562,3 +562,24 @@ new capabilities explicitly identified as scope additions. Full parent exit
 criteria stay in force. See `roadmap-status-2026-10-24.md`,
 `retained-temporal-diffs-2026-10-24.md` and
 `../../docs/api/builder-temporal-diffs.md`.
+
+
+## Temporal primitive family complete — 2026-10-24
+
+Finished the four remaining existing helpers under **30.1 / AR7.8**:
+window_aggregate, filter, mark_changed_nodes and window. They share owner/head-
+checked first-parent retained indexes, actual sparse state records and activation
+intervals. Aggregation counts property-change events, preserves literal text/null
+and uses shared checked numeric reductions; lifecycle windows exclude deletion
+and respect restoration gaps; change-type masks use exact delta membership.
+Supplied stale/foreign/unscoped indexes reject rather than silently refresh.
+Absent indexes remain ephemeral local read structures, with no cache/variable
+side effect. Existing native signatures remain and explicit window bounds expose
+these helpers through Python specs; no FFI business logic was added.
+
+The fixed temporal inventory is now **8 complete / 0 remaining**, with no new
+checklist rows. The broad pipeline, global index lifecycle and arbitrary effective-
+time reconstruction parents are not redefined or falsely closed. Verified with
+1,000 native tests, 1,695 Python tests, 81 documentation examples, strict Clippy
+and 12 release workloads. See `temporal-window-completion-2026-10-24.md` and
+`../../docs/api/builder-temporal-windows.md`.

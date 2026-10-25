@@ -1,0 +1,281 @@
+{
+  "cases": [
+    {
+      "attribute_events": 2000,
+      "mode": "index_build",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000578583
+        },
+        {
+          "seconds": 0.000523333
+        },
+        {
+          "seconds": 0.000501792
+        },
+        {
+          "seconds": 0.000524
+        },
+        {
+          "seconds": 0.000412875
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 2000,
+      "mode": "aggregate_reused",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000353208
+        },
+        {
+          "seconds": 0.000314417
+        },
+        {
+          "seconds": 0.000318041
+        },
+        {
+          "seconds": 0.000315667
+        },
+        {
+          "seconds": 0.000300167
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 2000,
+      "mode": "aggregate_ephemeral",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000781292
+        },
+        {
+          "seconds": 0.000783583
+        },
+        {
+          "seconds": 0.000785875
+        },
+        {
+          "seconds": 0.000924
+        },
+        {
+          "seconds": 0.000928041
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 2000,
+      "mode": "filter_reused",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000042417
+        },
+        {
+          "seconds": 0.000038958
+        },
+        {
+          "seconds": 0.000039083
+        },
+        {
+          "seconds": 0.000038709
+        },
+        {
+          "seconds": 0.000038625
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 2000,
+      "mode": "mark_reused",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00013125
+        },
+        {
+          "seconds": 0.000140208
+        },
+        {
+          "seconds": 0.000140917
+        },
+        {
+          "seconds": 0.000142416
+        },
+        {
+          "seconds": 0.000139
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 2000,
+      "mode": "window_reused",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000091083
+        },
+        {
+          "seconds": 0.000088125
+        },
+        {
+          "seconds": 0.0000865
+        },
+        {
+          "seconds": 0.000087666
+        },
+        {
+          "seconds": 0.000087708
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 20000,
+      "mode": "index_build",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.004555583
+        },
+        {
+          "seconds": 0.00392225
+        },
+        {
+          "seconds": 0.003947292
+        },
+        {
+          "seconds": 0.003922792
+        },
+        {
+          "seconds": 0.003928792
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 20000,
+      "mode": "aggregate_reused",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.003926875
+        },
+        {
+          "seconds": 0.003321791
+        },
+        {
+          "seconds": 0.003089667
+        },
+        {
+          "seconds": 0.003085042
+        },
+        {
+          "seconds": 0.00308175
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 20000,
+      "mode": "aggregate_ephemeral",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.008033042
+        },
+        {
+          "seconds": 0.007923167
+        },
+        {
+          "seconds": 0.007948959
+        },
+        {
+          "seconds": 0.007923208
+        },
+        {
+          "seconds": 0.007929958
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 20000,
+      "mode": "filter_reused",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.000622667
+        },
+        {
+          "seconds": 0.000536833
+        },
+        {
+          "seconds": 0.000535334
+        },
+        {
+          "seconds": 0.000534834
+        },
+        {
+          "seconds": 0.000536959
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 20000,
+      "mode": "mark_reused",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.001133
+        },
+        {
+          "seconds": 0.001086291
+        },
+        {
+          "seconds": 0.001090542
+        },
+        {
+          "seconds": 0.001090959
+        },
+        {
+          "seconds": 0.001086792
+        }
+      ],
+      "states": 2
+    },
+    {
+      "attribute_events": 20000,
+      "mode": "window_reused",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.000777084
+        },
+        {
+          "seconds": 0.000690084
+        },
+        {
+          "seconds": 0.00068525
+        },
+        {
+          "seconds": 0.000685542
+        },
+        {
+          "seconds": 0.000683167
+        }
+      ],
+      "states": 2
+    }
+  ],
+  "scope": "Native release retained branch index build and four temporal kernels; explicit reuse compared with local ephemeral aggregation index. Five observations; fixture/variable preparation and validation excluded. Every history/result and unchanged owner validated. Includes kernel validation, reductions, allocation/result installation and index build only where named. No publication, FFI, RSS/allocation, matched speedup or scale claim."
+}

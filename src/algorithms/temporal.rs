@@ -394,21 +394,31 @@ impl ChangedEntities {
     /// Add a node change.
     pub fn add_node(&mut self, node_id: NodeId, change_type: ChangeType) {
         self.modified_nodes.insert(node_id);
-        self.node_change_types.insert(node_id, change_type);
+        self.node_change_types
+            .entry(node_id)
+            .and_modify(|value| *value = value.combine(change_type))
+            .or_insert(change_type);
     }
 
     /// Add an edge change.
     pub fn add_edge(&mut self, edge_id: EdgeId, change_type: ChangeType) {
         self.modified_edges.insert(edge_id);
-        self.edge_change_types.insert(edge_id, change_type);
+        self.edge_change_types
+            .entry(edge_id)
+            .and_modify(|value| *value = value.combine(change_type))
+            .or_insert(change_type);
     }
 
     /// Merge another ChangedEntities into this one.
     pub fn merge(&mut self, other: ChangedEntities) {
         self.modified_nodes.extend(other.modified_nodes);
         self.modified_edges.extend(other.modified_edges);
-        self.node_change_types.extend(other.node_change_types);
-        self.edge_change_types.extend(other.edge_change_types);
+        for (id, change) in other.node_change_types {
+            self.add_node(id, change);
+        }
+        for (id, change) in other.edge_change_types {
+            self.add_edge(id, change);
+        }
     }
 }
 

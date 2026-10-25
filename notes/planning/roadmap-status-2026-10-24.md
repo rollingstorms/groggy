@@ -27,21 +27,22 @@ its remaining count without manufacturing broad parent completion.
 
 ### Temporal builder family — existing eight primitives
 
-| Existing primitive | Current status | Remaining exit |
+| Existing primitive | Current status | Verified boundary |
 | --- | --- | --- |
 | snapshot_at | Complete | Retained-state selector certified in 09.4b.2al; effective-time reconstruction remains a separate original requirement. |
 | decay | Complete | Checked maps/columns certified in 09.4b.2aj–2ak. |
-| diff_nodes | Complete this pass | Retained owner provenance, added/removed/modified maps, property comparison and atomic failure behavior verified. |
-| diff_edges | Complete this pass | Same; unrepresented endpoint rewiring rejects under existing 04.2/13.3. |
-| window_aggregate | Remaining | Correct change-value history, branch/index provenance, sparse state IDs, null/absence and checked reductions. |
-| filter | Remaining | Correct branch-scoped lifecycle/changes, retained-index provenance and failure/cancellation behavior. |
-| mark_changed_nodes | Remaining | Exact change-type membership, aggregation over windows and index provenance. |
-| window | Remaining | State-ID/time units, reactivation/deletion boundaries and branch-scoped existence. |
+| diff_nodes | Complete | Retained owner provenance, added/removed/modified maps, property comparison and atomic failure behavior verified. |
+| diff_edges | Complete | Same; unrepresented endpoint rewiring rejects under existing 04.2/13.3. |
+| window_aggregate | Complete | Correct change-value history, branch/index provenance, sparse state IDs, null/absence and checked reductions. |
+| filter | Complete | Correct branch-scoped lifecycle/changes, retained-index provenance and failure/cancellation behavior. |
+| mark_changed_nodes | Complete | Exact change-type membership, aggregation over windows and index provenance. |
+| window | Complete | State-ID/time units, reactivation/deletion boundaries and branch-scoped existence. |
 
-**Remaining: six → four. No checklist rows added this pass.** These are the same
-primitive names present before the audit, not newly invented capabilities. Closing
-all eight will complete this family, not automatically all of 30.1 or arbitrary
-effective-time reconstruction (16.2).
+**Remaining: six → four → zero. All eight primitives complete; no checklist rows
+added.** These are the same primitive names present before the audit. This closes
+the fixed temporal family under 30.1; other pipeline/intermediate/pin requirements
+and arbitrary effective-time reconstruction (16.2) retain their original scope.
+See `temporal-window-completion-2026-10-24.md` for implementation/gate evidence.
 
 ## Recent completed slices
 
@@ -68,8 +69,9 @@ effective-time reconstruction (16.2).
 | 09.4b.2x–2z | Checked seeding, synchronous propagation and actual directed/undirected local modularity gains verified against independent full-objective moves. |
 | 09.4b.2aa–2ac | Ordered bounded selector iteration, selected neighborhood expansion and consistent induced emission; legacy owner connections remain explicit. |
 | 09.4b.2ad–2af | Recursive for-each property staging, complete child selector flattening and private merged/per-item owned output frames. |
-| 09.4b.2ag–2ai | Checked staged-weight distance maps, loopless Yen node paths and isolated seeded edge-incidence walks. Remaining temporal index/window helpers stay open. |
+| 09.4b.2ag–2ai | Checked staged-weight distance maps, loopless Yen node paths and isolated seeded edge-incidence walks. All eight temporal primitives are now complete under 30.1; broader pipeline work remains. |
 | 09.4b.2aj–2al | Finite selected decay maps, ordered column parity and retained immutable snapshot builder selection with strict temporal controls. |
+| 30.1 temporal family | All eight primitives complete: retained branch indexes, exact lifecycle/change windows, checked aggregation and failure-safe outputs. |
 
 
 
@@ -108,8 +110,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest retained-diff change: **993 native tests passed, 52 ignored; 1,645 root
-Python API tests passed, 1 skipped; 78 executable documentation examples passed;
+Latest temporal-family completion: **1,000 native tests passed, 52 ignored; 1,695 root
+Python API tests passed, 1 skipped; 81 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

@@ -119,11 +119,10 @@ not exceed end. Mark-changed types are `created`, `deleted`, `modified`, or `any
 These checks run during preparation before any step can publish.
 
 Node/edge diff semantics are documented in [Retained snapshot diffs](builder-temporal-diffs.md).
-Window aggregation, lifecycle filtering/marking and temporal-window steps remain
-uncertified for atomic property runs. They need an audit of branch/ancestry
-semantics, index provenance, value histories and state-ID versus effective/
-acceptance-time coordinates. Strict factory validation alone does not close those
-concerns.
+The four remaining helpers are now completed as described in
+[Retained temporal windows](builder-temporal-windows.md). All eight native temporal
+primitives support atomic property execution. Broader effective-time reconstruction
+and pipeline/history/index lifecycle requirements retain their original scope.
 
 Decay is O(source rows) time and output storage; ordered columns also use an
 O(rows) duplicate-ID set. It does not clone the owner/history or build indexes.

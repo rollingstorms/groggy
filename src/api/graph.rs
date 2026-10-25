@@ -2476,7 +2476,31 @@ impl Graph {
     /// This is a one-time build operation that processes all commits.
     /// The resulting index can then be used for many temporal queries.
     pub fn build_temporal_index(&self) -> Result<crate::temporal::TemporalIndex, GraphError> {
-        crate::temporal::TemporalIndex::from_history(&self.history)
+        self.build_temporal_index_at(self.current_state_id())
+    }
+
+    /// Build a temporal index on the retained first-parent lineage of one state.
+    pub fn build_temporal_index_at(
+        &self,
+        state: StateId,
+    ) -> Result<crate::temporal::TemporalIndex, GraphError> {
+        crate::temporal::TemporalIndex::from_history_at(&self.history, state)
+    }
+
+    pub(crate) fn temporal_index_for_run(
+        &self,
+        state: StateId,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<crate::temporal::TemporalIndex, GraphError> {
+        crate::temporal::TemporalIndex::from_history_at_cancellable(&self.history, state, cancelled)
+    }
+
+    pub(crate) fn owns_temporal_index(
+        &self,
+        index: &crate::temporal::TemporalIndex,
+        state: StateId,
+    ) -> bool {
+        index.matches(&self.history, state)
     }
 
     /// Get neighbors of nodes as they existed at a specific commit.

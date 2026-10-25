@@ -37,7 +37,7 @@ use super::structural::{
 use super::temporal::{
     validate_decay_controls, AggregateFunction, DecayStep, DiffEdgesStep, DiffNodesStep,
     MarkChangedNodesStep, SnapshotAtStep, TemporalFilterStep, TemporalPredicate,
-    WindowAggregateStep,
+    TemporalWindowStep, WindowAggregateStep,
 };
 use super::transformations::MapNodesExprStep;
 
@@ -47,6 +47,21 @@ fn temporal_coordinate(params: &AlgorithmParams, name: &str) -> Result<u64> {
             u64::try_from(*value).map_err(|_| anyhow!("{name} must be non-negative"))
         }
         _ => Err(anyhow!("{name} must be a non-negative integer")),
+    }
+}
+
+fn optional_temporal_window(params: &AlgorithmParams) -> Result<Option<(u64, u64)>> {
+    match (params.get("start").is_some(), params.get("end").is_some()) {
+        (false, false) => Ok(None),
+        (true, true) => {
+            let start = temporal_coordinate(params, "start")?;
+            let end = temporal_coordinate(params, "end")?;
+            if start > end {
+                return Err(anyhow!("temporal range start exceeds end"));
+            }
+            Ok(Some((start, end)))
+        }
+        _ => Err(anyhow!("temporal window requires both start and end")),
     }
 }
 
@@ -1669,9 +1684,11 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let index_var =
                 optional_temporal_text(&spec.params, "index_var", Some("temporal_index"))?
                     .ok_or_else(|| anyhow!("missing index_var"))?;
-            Ok(Box::new(WindowAggregateStep::new(
-                attr_name, function, output_var, index_var,
-            )))
+            let mut step = WindowAggregateStep::new(attr_name, function, output_var, index_var);
+            if let Some((start, end)) = optional_temporal_window(&spec.params)? {
+                step = step.with_window(start, end);
+            }
+            Ok(Box::new(step))
         },
     )?;
 
@@ -1730,7 +1747,29 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             {
                 return Err(anyhow!("unknown temporal change_type"));
             }
-            Ok(Box::new(MarkChangedNodesStep::new(output_var, change_type)))
+            let mut step = MarkChangedNodesStep::new(output_var, change_type);
+            if let Some((start, end)) = optional_temporal_window(&spec.params)? {
+                step = step.with_window(start, end);
+            }
+            Ok(Box::new(step))
+        },
+    )?;
+
+    registry.register(
+        "temporal.window",
+        StepMetadata {
+            id: "temporal.window".into(),
+            description: "Mark selected existence within retained-state bounds".into(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let (start, end) = optional_temporal_window(&spec.params)?
+                .ok_or_else(|| anyhow!("temporal.window requires start and end"))?;
+            Ok(Box::new(TemporalWindowStep::new(
+                start,
+                end,
+                spec.params.expect_text("output")?,
+            )))
         },
     )?;
 
