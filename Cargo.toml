@@ -151,3 +151,7 @@ harness = false
 [[bench]]
 name = "graph_copy"
 harness = false
+
+[[bench]]
+name = "meta_creation"
+harness = false

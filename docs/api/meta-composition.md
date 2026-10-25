@@ -73,3 +73,10 @@ labels. Group storage here retains immutable membership only; portable pool
 persistence and full pinned source-state group revisions remain separate checklist
 work. This completes the three composer requirements in 09.4b.2b, not every native
 constructor, mutable storage accessor, algorithm or table writeback.
+
+Native `Graph::create_meta_node(reference)` also uses prepared execution in both
+publishing and manual modes. It validates retained-reference existence before
+allocating an ID; membership may include inactive entities. Reference validation
+checks storage membership without cloning the group's node/edge sets. This does
+not make global `get_meta_nodes()` selection constant time: that API still scans
+active nodes. See [creation evidence](../../notes/planning/prepared-meta-creation-2026-10-25.md).

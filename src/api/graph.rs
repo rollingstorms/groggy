@@ -1149,8 +1149,7 @@ impl Graph {
         // REQUIREMENT 2: Must have contains_subgraph reference
         match self.get_node_attr(node_id, &"contains_subgraph".into())? {
             Some(AttrValue::SubgraphRef(subgraph_id)) => {
-                self.pool.borrow().get_subgraph(subgraph_id)?;
-                Ok(())
+                self.pool.borrow().validate_stored_subgraph(subgraph_id)
             }
             _ => Err(GraphError::InvalidInput(format!(
                 "Meta-node {} missing required contains_subgraph attribute",
@@ -1173,70 +1172,11 @@ impl Graph {
         }
     }
 
-    /// SAFE: Create a meta-node atomically with required attributes
-    /// SAFETY: All-or-nothing creation with validation
+    /// Create a meta-node with its required system properties through prepared
+    /// execution. Publishing accepts one state; manual mode leaves pending changes.
+    /// Invalid retained references reject before allocating an ID.
     pub fn create_meta_node(&mut self, subgraph_id: SubgraphId) -> Result<NodeId, GraphError> {
-        if self.automatic_publication {
-            return self.publish_meta_node(subgraph_id);
-        }
-
-        // Reject a dangling reference before allocating or recording any change.
-        self.pool.borrow().get_subgraph(subgraph_id)?;
-        // Step 1: Create and activate the node ID
-        let node_id = self.pool.borrow_mut().add_node();
-        self.space.activate_node(node_id);
-        self.change_tracker.record_node_addition(node_id);
-
-        // Step 2: Set all required attributes atomically
-        match self.set_meta_node_attributes_atomic(node_id, subgraph_id) {
-            Ok(()) => {
-                // Success - node is fully created and validated
-                Ok(node_id)
-            }
-            Err(e) => {
-                // Step 3: On failure, deactivate and clean up
-                // The node ID in pool is already allocated, but we can deactivate it
-                self.space.deactivate_node(node_id);
-                Err(e)
-            }
-        }
-    }
-
-    /// Atomically set all required meta-node attributes
-    /// SAFETY: Either all succeed or all fail
-    fn set_meta_node_attributes_atomic(
-        &mut self,
-        node_id: NodeId,
-        subgraph_id: SubgraphId,
-    ) -> Result<(), GraphError> {
-        // Set entity_type = "meta"
-        self.set_node_attr_internal(
-            node_id,
-            "entity_type".into(),
-            AttrValue::Text("meta".to_string()),
-        )?;
-
-        // Set contains_subgraph reference
-        self.set_node_attr_internal(
-            node_id,
-            "contains_subgraph".into(),
-            AttrValue::SubgraphRef(subgraph_id),
-        )?;
-
-        // Validate the meta-node structure
-        self.validate_meta_node_structure_for_id(node_id)?;
-
-        Ok(())
-    }
-
-    /// Validate meta-node structure during creation (doesn't require active node)
-    fn validate_meta_node_structure_for_id(&self, _node_id: NodeId) -> Result<(), GraphError> {
-        // This is a simplified validation for creation time
-        // The full validation in validate_meta_node() requires active nodes
-
-        // For now, just ensure the basic structure is correct
-        // TODO: Add subgraph existence validation when pool supports it
-        Ok(())
+        self.create_meta_node_prepared(subgraph_id)
     }
 
     /*

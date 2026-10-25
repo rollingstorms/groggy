@@ -659,3 +659,16 @@ Five native and ten Python regressions plus all existing gates pass: 1,015 nativ
 copy workloads record current costs without a speedup claim. See
 `graph-copy-2026-10-25.md` and `../../docs/api/graph-copy.md`. Existing unchecked
 parents remain open; no checklist row was added (190 checked / 78 unchecked).
+
+
+## Prepared native meta-node creation — 2026-10-25
+
+Existing **09.4b.2 / 05.3**: removed the separate manual allocation/rollback path
+and no-op meta validator. Native create_meta_node prepares required properties
+before execution in both policies, retains inactive group membership, rejects
+invalid references without allocating IDs and preserves dirty-head boundaries.
+Reference validation no longer clones whole member sets. Global get_meta_nodes
+still scans active nodes. Six release cases cover groups up to 100k members;
+1,017 native tests, 1,730 Python tests, 87 documentation examples and strict
+Clippy pass. See `prepared-meta-creation-2026-10-25.md`. No checkbox row added;
+existing parent work remains open (190 checked / 78 unchecked).

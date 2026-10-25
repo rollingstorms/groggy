@@ -111,7 +111,7 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest graph-copy repair (2026-10-25): **1,015 native tests passed, 52 ignored; 1,730 root
+Latest prepared-meta repair (2026-10-25): **1,017 native tests passed, 52 ignored; 1,730 root
 Python API tests passed, 1 skipped; 87 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release

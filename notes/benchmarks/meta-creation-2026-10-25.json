@@ -1,0 +1,221 @@
+{
+  "cases": [
+    {
+      "members": 1000,
+      "publishing": false,
+      "samples": [
+        {
+          "node": 1000,
+          "seconds": 0.000030416,
+          "state_id": 1,
+          "validation_seconds": 0.000163917
+        },
+        {
+          "node": 1001,
+          "seconds": 6.208e-6,
+          "state_id": 1,
+          "validation_seconds": 0.000149167
+        },
+        {
+          "node": 1002,
+          "seconds": 3.834e-6,
+          "state_id": 1,
+          "validation_seconds": 0.000150958
+        },
+        {
+          "node": 1003,
+          "seconds": 3.667e-6,
+          "state_id": 1,
+          "validation_seconds": 0.000151584
+        },
+        {
+          "node": 1004,
+          "seconds": 4.917e-6,
+          "state_id": 1,
+          "validation_seconds": 0.000154917
+        }
+      ]
+    },
+    {
+      "members": 1000,
+      "publishing": true,
+      "samples": [
+        {
+          "node": 1000,
+          "seconds": 0.00001325,
+          "state_id": 2,
+          "validation_seconds": 0.000155459
+        },
+        {
+          "node": 1001,
+          "seconds": 6.375e-6,
+          "state_id": 3,
+          "validation_seconds": 0.000153208
+        },
+        {
+          "node": 1002,
+          "seconds": 7.125e-6,
+          "state_id": 4,
+          "validation_seconds": 0.0001555
+        },
+        {
+          "node": 1003,
+          "seconds": 9.208e-6,
+          "state_id": 5,
+          "validation_seconds": 0.000154708
+        },
+        {
+          "node": 1004,
+          "seconds": 6.333e-6,
+          "state_id": 6,
+          "validation_seconds": 0.000154416
+        }
+      ]
+    },
+    {
+      "members": 10000,
+      "publishing": false,
+      "samples": [
+        {
+          "node": 10000,
+          "seconds": 0.000022167,
+          "state_id": 1,
+          "validation_seconds": 0.001849916
+        },
+        {
+          "node": 10001,
+          "seconds": 7.458e-6,
+          "state_id": 1,
+          "validation_seconds": 0.00165675
+        },
+        {
+          "node": 10002,
+          "seconds": 6.792e-6,
+          "state_id": 1,
+          "validation_seconds": 0.001777542
+        },
+        {
+          "node": 10003,
+          "seconds": 6.917e-6,
+          "state_id": 1,
+          "validation_seconds": 0.001608459
+        },
+        {
+          "node": 10004,
+          "seconds": 3.583e-6,
+          "state_id": 1,
+          "validation_seconds": 0.001650583
+        }
+      ]
+    },
+    {
+      "members": 10000,
+      "publishing": true,
+      "samples": [
+        {
+          "node": 10000,
+          "seconds": 9e-6,
+          "state_id": 2,
+          "validation_seconds": 0.001640291
+        },
+        {
+          "node": 10001,
+          "seconds": 6.959e-6,
+          "state_id": 3,
+          "validation_seconds": 0.0015775
+        },
+        {
+          "node": 10002,
+          "seconds": 5.375e-6,
+          "state_id": 4,
+          "validation_seconds": 0.001769
+        },
+        {
+          "node": 10003,
+          "seconds": 0.000023625,
+          "state_id": 5,
+          "validation_seconds": 0.001669917
+        },
+        {
+          "node": 10004,
+          "seconds": 0.000011083,
+          "state_id": 6,
+          "validation_seconds": 0.001679
+        }
+      ]
+    },
+    {
+      "members": 100000,
+      "publishing": false,
+      "samples": [
+        {
+          "node": 100000,
+          "seconds": 0.000114125,
+          "state_id": 1,
+          "validation_seconds": 0.025242375
+        },
+        {
+          "node": 100001,
+          "seconds": 0.000012833,
+          "state_id": 1,
+          "validation_seconds": 0.021400042
+        },
+        {
+          "node": 100002,
+          "seconds": 5.958e-6,
+          "state_id": 1,
+          "validation_seconds": 0.020663542
+        },
+        {
+          "node": 100003,
+          "seconds": 0.000017958,
+          "state_id": 1,
+          "validation_seconds": 0.020473542
+        },
+        {
+          "node": 100004,
+          "seconds": 6.667e-6,
+          "state_id": 1,
+          "validation_seconds": 0.024036791
+        }
+      ]
+    },
+    {
+      "members": 100000,
+      "publishing": true,
+      "samples": [
+        {
+          "node": 100000,
+          "seconds": 0.000124959,
+          "state_id": 2,
+          "validation_seconds": 0.024219458
+        },
+        {
+          "node": 100001,
+          "seconds": 0.000027542,
+          "state_id": 3,
+          "validation_seconds": 0.026754458
+        },
+        {
+          "node": 100002,
+          "seconds": 0.000026875,
+          "state_id": 4,
+          "validation_seconds": 0.02433625
+        },
+        {
+          "node": 100003,
+          "seconds": 0.000021542,
+          "state_id": 5,
+          "validation_seconds": 0.021912375
+        },
+        {
+          "node": 100004,
+          "seconds": 0.000014625,
+          "state_id": 6,
+          "validation_seconds": 0.021083042
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized creation of five meta nodes referencing one retained immutable group. Setup and output checks excluded. Creation includes preparation, storage and optional publication. Separate get_meta_nodes timing scans all active nodes; it is not an O(1) global selection claim. No matched speedup, allocation/RSS, FFI or portable-pool guarantee."
+}

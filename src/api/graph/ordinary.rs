@@ -204,8 +204,11 @@ impl Graph {
         }
     }
 
-    pub(super) fn publish_meta_node(&mut self, subgraph_id: SubgraphId) -> GraphResult<NodeId> {
-        self.pool.borrow().get_subgraph(subgraph_id)?;
+    pub(super) fn create_meta_node_prepared(
+        &mut self,
+        subgraph_id: SubgraphId,
+    ) -> GraphResult<NodeId> {
+        self.pool.borrow().validate_stored_subgraph(subgraph_id)?;
         let mut batch = GraphBatch {
             add_nodes: 1,
             ..Default::default()
@@ -217,15 +220,26 @@ impl Graph {
                 AttrValue::SubgraphRef(subgraph_id),
             )],
         );
-        let mut prepared = self.prepare_publication(batch, self.current_state_id(), None)?;
-        let node = self.pool.borrow().statistics().node_count;
-        // Trusted system metadata, never accepted from user batch assignments.
-        prepared.batch.node_attrs.insert(
-            "entity_type".into(),
-            vec![(node, AttrValue::Text("meta".into()))],
-        );
-        Ok(self
-            .execute_publication(prepared, "create_meta_node".into(), "groggy".into())?
-            .added_nodes[0])
+        let counts = self.pool.borrow().statistics();
+        let node = counts.node_count;
+        let kind = vec![(node, AttrValue::Text("meta".into()))];
+        // Trusted system metadata is installed after user-input preparation;
+        // user GraphBatch assignments still cannot change entity_type.
+        if self.automatic_publication {
+            let mut prepared = self.prepare_publication(batch, self.current_state_id(), None)?;
+            prepared.batch.node_attrs.insert("entity_type".into(), kind);
+            self.execute_publication(prepared, "create_meta_node".into(), "groggy".into())?;
+        } else {
+            let mut prepared = batch.prepare(
+                |id| self.has_node(id),
+                |id| self.has_edge(id),
+                |id| self.pool.borrow().get_edge_endpoints(id),
+                counts.node_count,
+                counts.edge_count,
+            )?;
+            prepared.node_attrs.insert("entity_type".into(), kind);
+            self.execute_prepared_mutation(prepared)?;
+        }
+        Ok(node)
     }
 }

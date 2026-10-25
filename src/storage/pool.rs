@@ -36,7 +36,7 @@ This separation allows:
 */
 
 use crate::errors::{GraphError, GraphResult};
-use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId};
+use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId, SubgraphId};
 use std::collections::HashMap;
 
 /// Columnar storage for attribute values with memory pooling
@@ -958,6 +958,17 @@ impl GraphPool {
         self.stored_subgraphs
             .entry(prepared.id)
             .or_insert(prepared.content);
+    }
+
+    /// Check a retained reference without cloning its member sets.
+    pub(crate) fn validate_stored_subgraph(&self, id: SubgraphId) -> GraphResult<()> {
+        if self.stored_subgraphs.contains_key(&id) {
+            Ok(())
+        } else {
+            Err(crate::errors::GraphError::InvalidInput(format!(
+                "Subgraph with ID {id} not found in storage"
+            )))
+        }
     }
 
     /// Get stored subgraph data
