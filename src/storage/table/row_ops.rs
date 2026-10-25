@@ -59,7 +59,10 @@ impl BaseTable {
             .collect::<Vec<_>>();
         self.select_rows(&rows)
     }
-    pub(super) fn key_columns(&self, names: &[&str]) -> GraphResult<Vec<&BaseArray<AttrValue>>> {
+    pub(in crate::storage::table) fn key_columns(
+        &self,
+        names: &[&str],
+    ) -> GraphResult<Vec<&BaseArray<AttrValue>>> {
         let mut seen = HashSet::new();
         names
             .iter()

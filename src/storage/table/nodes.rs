@@ -315,6 +315,8 @@ impl Table for NodesTable {
     }
 
     fn select(&self, column_names: &[String]) -> GraphResult<Self> {
+        self.base
+            .key_columns(&column_names.iter().map(String::as_str).collect::<Vec<_>>())?;
         // Ensure node_id is always included
         let mut cols = vec!["node_id".to_string()];
         for col in column_names {

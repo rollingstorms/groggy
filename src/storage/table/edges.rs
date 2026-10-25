@@ -536,6 +536,8 @@ impl Table for EdgesTable {
     }
 
     fn select(&self, column_names: &[String]) -> GraphResult<Self> {
+        self.base
+            .key_columns(&column_names.iter().map(String::as_str).collect::<Vec<_>>())?;
         // Ensure required columns are always included
         let mut cols = vec![
             "edge_id".to_string(),

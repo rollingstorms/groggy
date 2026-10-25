@@ -940,3 +940,19 @@ are proportional to parent state; current capture/reuse measurements are in
 `notes/benchmarks/table-export-capture-2026-10-25.json`. No COW, O(1), RSS or fixed
 FFI budget claim. No new rows: **192 checked / 76 unchecked**. Broad legacy-view
 and composite adapter exits remain open.
+
+
+### Shared table schema validation — 2026-10-25
+
+Closed ordered constructor, projection and column-growth invariants under
+27.1/AR7.10. Every physical column must appear exactly once in an ordered schema;
+projections reject duplicate/unknown requests; declared zero-row schemas cannot
+be expanded by changing only one column. Truly empty initialization, sparse
+from_columns padding and N-row zero-column projections retain their contracts.
+Python node/edge projection delegates to native validation with GIL release.
+
+Evidence: `table-schema-invariants-2026-10-25.md`; 6 native / 6 Python cases.
+Gate: **1,120 native passed / 51 ignored; 1,861 root Python passed / 1 skipped;
+124 executable docs passed; strict all-target Clippy passed**. These are O(schema
+width) checks, without a new performance claim/kernel. No new rows: **192 checked /
+76 unchecked**. Composite routing/subsetting and broad legacy migration remain.

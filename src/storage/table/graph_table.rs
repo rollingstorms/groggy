@@ -661,6 +661,19 @@ impl Table for GraphTable {
     }
 
     fn select(&self, column_names: &[String]) -> GraphResult<Self> {
+        let mut seen = HashSet::new();
+        for name in column_names {
+            if !seen.insert(name) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Column '{name}' repeated"
+                )));
+            }
+            if !self.has_column(name) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Column '{name}' not found in GraphTable"
+                )));
+            }
+        }
         // For composite tables, select columns from appropriate components
         let mut node_columns = Vec::new();
         let mut edge_columns = Vec::new();

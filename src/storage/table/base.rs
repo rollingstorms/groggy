@@ -176,6 +176,18 @@ impl BaseTable {
             }
         }
 
+        let names: std::collections::HashSet<_> = column_order.iter().collect();
+        if names.len() != column_order.len() {
+            return Err(crate::GraphError::InvalidInput(
+                "Column order contains duplicate names".into(),
+            ));
+        }
+        if names.len() != columns.len() {
+            return Err(crate::GraphError::InvalidInput(
+                "Column order must name every column exactly once".into(),
+            ));
+        }
+
         if columns.is_empty() {
             return Ok(Self::new());
         }
@@ -1090,6 +1102,7 @@ impl Table for BaseTable {
     }
 
     fn select(&self, column_names: &[String]) -> GraphResult<Self> {
+        self.key_columns(&column_names.iter().map(String::as_str).collect::<Vec<_>>())?;
         let mut new_columns = HashMap::new();
 
         for name in column_names {
@@ -1114,7 +1127,7 @@ impl Table for BaseTable {
     }
 
     fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
-        if column.len() != self.nrows && self.nrows > 0 {
+        if column.len() != self.nrows && (self.nrows > 0 || !self.columns.is_empty()) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
                 "New column has {} rows but table has {} rows",
                 column.len(),

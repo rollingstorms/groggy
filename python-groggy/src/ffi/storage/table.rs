@@ -3610,26 +3610,12 @@ impl PyNodesTable {
     ///
     /// Returns:
     ///     PyNodesTable: A new table with only the selected columns
-    pub fn select(&self, columns: Vec<String>) -> PyResult<Self> {
-        // For NodesTable, ensure node_id column is always included
-        let mut all_columns = vec!["node_id".to_string()];
-        for col_name in columns {
-            if col_name != "node_id" {
-                all_columns.push(col_name);
-            }
-        }
-
-        let selected_base = self
-            .table
-            .base_table()
-            .select(&all_columns)
+    pub fn select(&self, py: Python<'_>, columns: Vec<String>) -> PyResult<Self> {
+        let table = &self.table;
+        let table = py
+            .allow_threads(|| table.select(&columns))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        let selected_nodes = groggy::storage::table::NodesTable::from_base_table(selected_base)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-
-        Ok(Self {
-            table: selected_nodes,
-        })
+        Ok(Self { table })
     }
 
     /// Drop columns from the table (cannot drop node_id)
@@ -4606,30 +4592,12 @@ impl PyEdgesTable {
     ///
     /// Returns:
     ///     PyEdgesTable: A new table with only the selected columns
-    pub fn select(&self, columns: Vec<String>) -> PyResult<Self> {
-        // For EdgesTable, ensure required columns are always included
-        let mut all_columns = vec![
-            "edge_id".to_string(),
-            "source".to_string(),
-            "target".to_string(),
-        ];
-        for col_name in columns {
-            if !all_columns.contains(&col_name) {
-                all_columns.push(col_name);
-            }
-        }
-
-        let selected_base = self
-            .table
-            .base_table()
-            .select(&all_columns)
+    pub fn select(&self, py: Python<'_>, columns: Vec<String>) -> PyResult<Self> {
+        let table = &self.table;
+        let table = py
+            .allow_threads(|| table.select(&columns))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        let selected_edges = groggy::storage::table::EdgesTable::from_base_table(selected_base)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-
-        Ok(Self {
-            table: selected_edges,
-        })
+        Ok(Self { table })
     }
 
     /// Drop columns from the table (cannot drop edge_id, source, or target)
