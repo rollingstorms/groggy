@@ -211,3 +211,7 @@ harness = false
 [[bench]]
 name = "table_export_capture"
 harness = false
+
+[[bench]]
+name = "graph_table_component_sharing"
+harness = false

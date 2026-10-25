@@ -739,3 +739,29 @@ Gate: **1,120 native passed / 51 ignored; 1,861 root Python passed / 1 skipped;
 124 executable docs passed; strict all-target Clippy passed**. These are O(schema
 width) checks, without a new performance claim/kernel. No new rows: **192 checked /
 76 unchecked**. Composite routing/subsetting and broad legacy migration remain.
+
+
+### Composite routing and shared component metadata — 2026-10-25
+
+Closed native sort/group/pivot/melt operand routing and GraphTable component
+metadata sharing under 27.1/AR7.10. Edge melt now respects its identifier component
+when values have shared names. Existing sort/reshape node preference and grouping
+ambiguity rejection remain. Clones/groups share table/schema objects above the
+already shared BaseArray value buffers; mutable access detaches metadata and
+retains the existing column COW/replacement rules. Initial progress commentary
+overstated prior value-copy costs; evidence/docs explicitly correct that claim.
+
+Evidence: `graph-table-component-conformance-2026-10-25.md`; 6 routing / 5 sharing
+native cases, including component and buffer pointer checks, independent edits
+and source publication. Gate: **1,131 native passed / 51 ignored; 1,861 root Python
+passed / 1 skipped; 127 executable docs passed; strict all-target Clippy passed**.
+Receipt: `notes/benchmarks/graph-table-component-sharing-2026-10-25.json`.
+Clone/drop timing is amortized over 10000 iterations to exceed clock resolution;
+no matched speedup, RSS, whole-graph COW or FFI latency guarantee.
+
+27.1 now has a fixed explicit remainder: node-subset edge policy; composite
+metadata/rectangular Table interpretation; existing unsupported to_nodes/to_edges/
+to_subgraphs converter contracts. These pre-existing facade contracts remain
+within the original parent, not new checklist rows. Legacy object migration stays
+in 26.1; full retained-pool/history portability remains separately tracked.
+Inventory: **192 checked / 76 unchecked**, unchanged by adding no rows.

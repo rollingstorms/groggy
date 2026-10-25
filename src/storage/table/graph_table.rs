@@ -21,6 +21,7 @@ use crate::viz::streaming::NodePosition;
 use crate::viz::VizModule;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::sync::Arc;
 
 /// Validation policy settings for GraphTable
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -188,23 +189,49 @@ pub struct ValidationReportJson {
     pub info: Vec<String>,
 }
 
-/// Composite table containing both nodes and edges with graph semantics
+/// Composite node/edge table bundle. Clones share immutable components;
+/// mutable component access detaches that component before returning a reference.
 #[derive(Clone, Debug)]
 pub struct GraphTable {
     /// Nodes component
-    nodes: NodesTable,
+    nodes: Arc<NodesTable>,
     /// Edges component
-    edges: EdgesTable,
+    edges: Arc<EdgesTable>,
     /// Validation policy
     policy: ValidationPolicy,
 }
 
+/// Internal component routing; GraphTable retains distinct node/edge ownership.
+#[derive(Clone, Copy)]
+enum Component {
+    Nodes,
+    Edges,
+}
+
 impl GraphTable {
+    // Resolve all operands together. Sort/reshape retain their historical node
+    // preference for shared columns; grouping requires an unambiguous component.
+    fn component_for(&self, names: &[&str], prefer_nodes: bool) -> GraphResult<Component> {
+        let nodes = names.iter().all(|name| self.nodes.has_column(name));
+        let edges = names.iter().all(|name| self.edges.has_column(name));
+        match (nodes, edges) {
+            (true, false) => Ok(Component::Nodes),
+            (false, true) => Ok(Component::Edges),
+            (true, true) if prefer_nodes => Ok(Component::Nodes),
+            (true, true) => Err(GraphError::InvalidInput(format!(
+                "Ambiguous GraphTable columns {names:?}; operate on nodes or edges explicitly"
+            ))),
+            (false, false) => Err(GraphError::InvalidInput(format!(
+                "Required columns {names:?} do not belong together to nodes or edges"
+            ))),
+        }
+    }
+
     /// Create a new GraphTable from nodes and edges tables
     pub fn new(nodes: NodesTable, edges: EdgesTable) -> Self {
         Self {
-            nodes,
-            edges,
+            nodes: nodes.into(),
+            edges: edges.into(),
             policy: ValidationPolicy::default(),
         }
     }
@@ -212,8 +239,8 @@ impl GraphTable {
     /// Create GraphTable with custom validation policy
     pub fn with_policy(nodes: NodesTable, edges: EdgesTable, policy: ValidationPolicy) -> Self {
         Self {
-            nodes,
-            edges,
+            nodes: nodes.into(),
+            edges: edges.into(),
             policy,
         }
     }
@@ -235,14 +262,14 @@ impl GraphTable {
         &self.edges
     }
 
-    /// Get mutable reference to nodes table
+    /// Get mutable nodes, copying that component first if it is shared.
     pub fn nodes_mut(&mut self) -> &mut NodesTable {
-        &mut self.nodes
+        Arc::make_mut(&mut self.nodes)
     }
 
-    /// Get mutable reference to edges table
+    /// Get mutable edges, copying that component first if it is shared.
     pub fn edges_mut(&mut self) -> &mut EdgesTable {
-        &mut self.edges
+        Arc::make_mut(&mut self.edges)
     }
 
     /// Get the validation policy
@@ -457,13 +484,18 @@ impl GraphTable {
     /// Auto-assign edge IDs for null values (useful for meta nodes and imported data)
     pub fn auto_assign_edge_ids(mut self) -> GraphResult<Self> {
         // Delegate to the edges table's auto_assign_edge_ids method
-        self.edges = self.edges.auto_assign_edge_ids()?;
+        self.edges = Arc::unwrap_or_clone(self.edges)
+            .auto_assign_edge_ids()?
+            .into();
         Ok(self)
     }
 
     /// Convert GraphTable into separate BaseTable components
     pub fn into_components(self) -> (BaseTable, BaseTable) {
-        (self.nodes.into_base(), self.edges.into_base())
+        (
+            Arc::unwrap_or_clone(self.nodes).into_base(),
+            Arc::unwrap_or_clone(self.edges).into_base(),
+        )
     }
 
     /// Get references to BaseTable components
@@ -476,8 +508,6 @@ impl GraphTable {
     /// Creates a VizModule that visualizes both nodes and edges as a complete graph.
     /// The visualization will show the graph structure with node-edge relationships.
     pub fn interactive(&self, _config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
-        use std::sync::Arc;
-
         // Create VizModule from this GraphTable which already implements DataSource
         // for unified graph visualization with both nodes and edges
         let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> =
@@ -531,11 +561,11 @@ impl Table for GraphTable {
     }
 
     fn head(&self, n: usize) -> Self {
-        // For composite table, take head from nodes primarily
-        // This is a simplified implementation
+        // Compatibility bundle selection retains the edge component. The graph
+        // induced-edge policy remains an explicit pending contract decision.
         Self {
-            nodes: self.nodes.head(n),
-            edges: self.edges.clone(), // Keep all edges for now
+            nodes: self.nodes.head(n).into(),
+            edges: self.edges.clone(),
             policy: self.policy.clone(),
         }
     }
@@ -543,8 +573,8 @@ impl Table for GraphTable {
     fn tail(&self, n: usize) -> Self {
         // For composite table, take tail from nodes primarily
         Self {
-            nodes: self.nodes.tail(n),
-            edges: self.edges.clone(), // Keep all edges for now
+            nodes: self.nodes.tail(n).into(),
+            edges: self.edges.clone(),
             policy: self.policy.clone(),
         }
     }
@@ -552,111 +582,72 @@ impl Table for GraphTable {
     fn slice(&self, start: usize, end: usize) -> Self {
         // For composite table, slice nodes primarily
         Self {
-            nodes: self.nodes.slice(start, end),
-            edges: self.edges.clone(), // Keep all edges for now
+            nodes: self.nodes.slice(start, end).into(),
+            edges: self.edges.clone(),
             policy: self.policy.clone(),
         }
     }
 
     fn sort_by(&self, column: &str, ascending: bool) -> GraphResult<Self> {
-        // Try sorting nodes first, then edges
-        if self.nodes.has_column(column) {
-            Ok(Self {
-                nodes: self.nodes.sort_by(column, ascending)?,
-                edges: self.edges.clone(),
-                policy: self.policy.clone(),
-            })
-        } else if self.edges.has_column(column) {
-            Ok(Self {
-                nodes: self.nodes.clone(),
-                edges: self.edges.sort_by(column, ascending)?,
-                policy: self.policy.clone(),
-            })
-        } else {
-            Err(GraphError::InvalidInput(format!(
-                "Column '{}' not found in GraphTable",
-                column
-            )))
-        }
+        self.sort_values(vec![column.to_string()], vec![ascending])
     }
 
     fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self> {
-        // Check which component has all the required columns
-        let nodes_has_all = columns.iter().all(|col| self.nodes.has_column(col));
-        let edges_has_all = columns.iter().all(|col| self.edges.has_column(col));
-
-        if nodes_has_all && !edges_has_all {
-            // Sort nodes only
-            Ok(Self {
-                nodes: self.nodes.sort_values(columns, ascending)?,
+        match self.component_for(
+            &columns.iter().map(String::as_str).collect::<Vec<_>>(),
+            true,
+        )? {
+            Component::Nodes => Ok(Self {
+                nodes: self.nodes.sort_values(columns, ascending)?.into(),
                 edges: self.edges.clone(),
                 policy: self.policy.clone(),
-            })
-        } else if edges_has_all && !nodes_has_all {
-            // Sort edges only
-            Ok(Self {
+            }),
+            Component::Edges => Ok(Self {
                 nodes: self.nodes.clone(),
-                edges: self.edges.sort_values(columns, ascending)?,
+                edges: self.edges.sort_values(columns, ascending)?.into(),
                 policy: self.policy.clone(),
-            })
-        } else if nodes_has_all && edges_has_all {
-            // Both have the columns - prefer nodes
-            Ok(Self {
-                nodes: self.nodes.sort_values(columns, ascending)?,
-                edges: self.edges.clone(),
-                policy: self.policy.clone(),
-            })
-        } else {
-            // Neither has all columns
-            Err(GraphError::InvalidInput(format!(
-                "Columns {:?} not found in GraphTable",
-                columns
-            )))
+            }),
         }
     }
 
     fn filter(&self, predicate: &str) -> GraphResult<Self> {
-        // Apply filter to both components
-        // This is a simplified approach - in practice, filtering might be more complex
+        // Compatibility contract: apply the same predicate to both components.
         Ok(Self {
-            nodes: self.nodes.filter(predicate)?,
-            edges: self.edges.filter(predicate)?,
+            nodes: self.nodes.filter(predicate)?.into(),
+            edges: self.edges.filter(predicate)?.into(),
             policy: self.policy.clone(),
         })
     }
 
     fn group_by(&self, columns: &[String]) -> GraphResult<Vec<Self>> {
-        // For composite tables, group by the component that has the columns
-        let nodes_has_cols = columns.iter().all(|col| self.nodes.has_column(col));
-        let edges_has_cols = columns.iter().all(|col| self.edges.has_column(col));
-
-        if nodes_has_cols && !edges_has_cols {
-            // Group nodes only, keep all edges
-            let node_groups = self.nodes.group_by(columns)?;
-            Ok(node_groups
+        match self.component_for(
+            &columns.iter().map(String::as_str).collect::<Vec<_>>(),
+            false,
+        )? {
+            Component::Nodes => self
+                .nodes
+                .group_by(columns)?
                 .into_iter()
-                .map(|nodes| Self {
-                    nodes,
-                    edges: self.edges.clone(),
-                    policy: self.policy.clone(),
+                .map(|nodes| {
+                    Ok(Self {
+                        nodes: nodes.into(),
+                        edges: self.edges.clone(),
+                        policy: self.policy.clone(),
+                    })
                 })
-                .collect())
-        } else if edges_has_cols && !nodes_has_cols {
-            // Group edges only, keep all nodes
-            let edge_groups = self.edges.group_by(columns)?;
-            Ok(edge_groups
+                .collect(),
+            Component::Edges => self
+                .edges
+                .group_by(columns)?
                 .into_iter()
-                .map(|edges| Self {
-                    nodes: self.nodes.clone(),
-                    edges,
-                    policy: self.policy.clone(),
+                .map(|edges| {
+                    Ok(Self {
+                        nodes: self.nodes.clone(),
+                        edges: edges.into(),
+                        policy: self.policy.clone(),
+                    })
                 })
-                .collect())
-        } else {
-            // Complex case - columns span both tables or neither
-            Err(GraphError::InvalidInput(
-                "Group by columns must belong to either nodes or edges table, not both".to_string(),
-            ))
+                .collect(),
         }
     }
 
@@ -705,17 +696,16 @@ impl Table for GraphTable {
         let selected_edges = self.edges.select(&edge_columns)?;
 
         Ok(Self {
-            nodes: selected_nodes,
-            edges: selected_edges,
+            nodes: selected_nodes.into(),
+            edges: selected_edges.into(),
             policy: self.policy.clone(),
         })
     }
 
     fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
-        // Adding columns to composite table is ambiguous
-        // For now, add to nodes table by default
+        // Compatibility default: with_column targets the node component.
         Ok(Self {
-            nodes: self.nodes.with_column(name, column)?,
+            nodes: self.nodes.with_column(name, column)?.into(),
             edges: self.edges.clone(),
             policy: self.policy.clone(),
         })
@@ -724,8 +714,8 @@ impl Table for GraphTable {
     fn drop_columns(&self, column_names: &[String]) -> GraphResult<Self> {
         // Drop from both tables
         Ok(Self {
-            nodes: self.nodes.drop_columns(column_names)?,
-            edges: self.edges.drop_columns(column_names)?,
+            nodes: self.nodes.drop_columns(column_names)?.into(),
+            edges: self.edges.drop_columns(column_names)?.into(),
             policy: self.policy.clone(),
         })
     }
@@ -737,47 +727,25 @@ impl Table for GraphTable {
         values_col: &str,
         agg_func: &str,
     ) -> GraphResult<Self> {
-        // Check which component has all the required columns
-        let nodes_has_all = index_cols.iter().all(|col| self.nodes.has_column(col))
-            && self.nodes.has_column(columns_col)
-            && self.nodes.has_column(values_col);
-        let edges_has_all = index_cols.iter().all(|col| self.edges.has_column(col))
-            && self.edges.has_column(columns_col)
-            && self.edges.has_column(values_col);
-
-        if nodes_has_all && !edges_has_all {
-            // Pivot nodes only
-            Ok(Self {
+        let mut required = index_cols.iter().map(String::as_str).collect::<Vec<_>>();
+        required.extend([columns_col, values_col]);
+        match self.component_for(&required, true)? {
+            Component::Nodes => Ok(Self {
                 nodes: self
                     .nodes
-                    .pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                    .pivot_table(index_cols, columns_col, values_col, agg_func)?
+                    .into(),
                 edges: self.edges.clone(),
                 policy: self.policy.clone(),
-            })
-        } else if edges_has_all && !nodes_has_all {
-            // Pivot edges only
-            Ok(Self {
+            }),
+            Component::Edges => Ok(Self {
                 nodes: self.nodes.clone(),
                 edges: self
                     .edges
-                    .pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                    .pivot_table(index_cols, columns_col, values_col, agg_func)?
+                    .into(),
                 policy: self.policy.clone(),
-            })
-        } else if nodes_has_all && edges_has_all {
-            // Both have the columns - prefer nodes (consistent with other operations)
-            Ok(Self {
-                nodes: self
-                    .nodes
-                    .pivot_table(index_cols, columns_col, values_col, agg_func)?,
-                edges: self.edges.clone(),
-                policy: self.policy.clone(),
-            })
-        } else {
-            // Neither has all columns
-            Err(crate::errors::GraphError::InvalidInput(format!(
-                "Required columns for pivot not found in GraphTable. Index cols: {:?}, Columns col: {}, Values col: {}",
-                index_cols, columns_col, values_col
-            )))
+            }),
         }
     }
 
@@ -788,58 +756,29 @@ impl Table for GraphTable {
         var_name: Option<String>,
         value_name: Option<String>,
     ) -> GraphResult<Self> {
-        // For melt, we need to determine which component to melt
-        // Check if specified columns exist in nodes or edges
-        let mut melt_nodes = false;
-        let mut melt_edges = false;
-
-        // Check id_vars
-        if let Some(id_vars) = id_vars {
-            let nodes_has_id_vars = id_vars.iter().all(|col| self.nodes.has_column(col));
-            let edges_has_id_vars = id_vars.iter().all(|col| self.edges.has_column(col));
-
-            if nodes_has_id_vars && !edges_has_id_vars {
-                melt_nodes = true;
-            } else if edges_has_id_vars && !nodes_has_id_vars {
-                melt_edges = true;
-            } else if nodes_has_id_vars && edges_has_id_vars {
-                // Both have id_vars - prefer nodes
-                melt_nodes = true;
-            }
-        }
-
-        // Check value_vars if specified
-        if let Some(value_vars) = value_vars {
-            let nodes_has_value_vars = value_vars.iter().all(|col| self.nodes.has_column(col));
-            let edges_has_value_vars = value_vars.iter().all(|col| self.edges.has_column(col));
-
-            if nodes_has_value_vars && !edges_has_value_vars {
-                melt_nodes = true;
-            } else if edges_has_value_vars && !nodes_has_value_vars {
-                melt_edges = true;
-            } else if nodes_has_value_vars && edges_has_value_vars {
-                // Both have value_vars - prefer nodes
-                melt_nodes = true;
-            }
-        }
-
-        // If neither id_vars nor value_vars specified, prefer nodes
-        if !melt_nodes && !melt_edges {
-            melt_nodes = true;
-        }
-
-        if melt_nodes {
-            Ok(Self {
-                nodes: self.nodes.melt(id_vars, value_vars, var_name, value_name)?,
+        let required = id_vars
+            .into_iter()
+            .flatten()
+            .chain(value_vars.into_iter().flatten())
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        match self.component_for(&required, true)? {
+            Component::Nodes => Ok(Self {
+                nodes: self
+                    .nodes
+                    .melt(id_vars, value_vars, var_name, value_name)?
+                    .into(),
                 edges: self.edges.clone(),
                 policy: self.policy.clone(),
-            })
-        } else {
-            Ok(Self {
+            }),
+            Component::Edges => Ok(Self {
                 nodes: self.nodes.clone(),
-                edges: self.edges.melt(id_vars, value_vars, var_name, value_name)?,
+                edges: self
+                    .edges
+                    .melt(id_vars, value_vars, var_name, value_name)?
+                    .into(),
                 policy: self.policy.clone(),
-            })
+            }),
         }
     }
 }
