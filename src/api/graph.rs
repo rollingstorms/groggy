@@ -682,17 +682,7 @@ impl Graph {
             });
         }
 
-        // First remove all incident edges
-        let incident_edges = self.incident_edges(node)?;
-        for edge_id in incident_edges {
-            // Use try_remove_edge to handle edges that may have been removed during meta-node operations
-            self.try_remove_edge(edge_id)?;
-        }
-
-        self.change_tracker.record_node_removal(node);
-        self.space.deactivate_node(node);
-
-        Ok(())
+        self.remove_nodes(&[node])
     }
 
     /// Remove an edge
@@ -746,8 +736,11 @@ impl Graph {
         }
 
         self.validate_removal_targets(edges, false)?;
-        for &edge_id in edges {
-            self.remove_edge(edge_id)?;
+        if !edges.is_empty() {
+            for &edge_id in edges {
+                self.change_tracker.record_edge_removal(edge_id);
+            }
+            self.space.deactivate_edges(edges);
         }
         Ok(())
     }
@@ -766,10 +759,42 @@ impl Graph {
         }
 
         self.validate_removal_targets(nodes, true)?;
-        for &node_id in nodes {
-            self.remove_node(node_id)?;
+        if nodes.is_empty() {
+            return Ok(());
         }
+        // Prepare the complete cascade before writing. Scan active edges once,
+        // independent of the number of selected nodes or retained tombstones.
+        let selected = nodes.iter().copied().collect();
+        let incident = self.incident_edges_for_nodes(&selected)?;
+        let edges: Vec<_> = incident.into_iter().map(|(edge, _, _)| edge).collect();
+        self.remove_edges(&edges)?;
+        for &node in nodes {
+            self.change_tracker.record_node_removal(node);
+        }
+        self.space.deactivate_nodes(nodes);
         Ok(())
+    }
+
+    // Shared by mutation execution and publication-clock preparation. Only active
+    // edges matter; each loop, parallel instance and shared edge is returned once.
+    fn incident_edges_for_nodes(
+        &self,
+        nodes: &HashSet<NodeId>,
+    ) -> GraphResult<Vec<(EdgeId, NodeId, NodeId)>> {
+        if nodes.is_empty() {
+            return Ok(Vec::new());
+        }
+        let pool = self.pool.borrow();
+        let mut incident = Vec::new();
+        for edge in self.space.edge_ids() {
+            let (source, target) = pool
+                .get_edge_endpoints(edge)
+                .ok_or_else(|| GraphError::edge_not_found(edge, "prepare node removal cascade"))?;
+            if nodes.contains(&source) || nodes.contains(&target) {
+                incident.push((edge, source, target));
+            }
+        }
+        Ok(incident)
     }
 
     fn validate_removal_targets(&self, ids: &[usize], is_nodes: bool) -> GraphResult<()> {

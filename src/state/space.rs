@@ -172,21 +172,32 @@ impl GraphSpace {
 
     /// Add a node to the active set (&mut self)
     pub fn activate_node(&mut self, node_id: NodeId) {
-        self.active_nodes.insert(node_id);
+        if self.active_nodes.insert(node_id) {
+            self.version += 1;
+        }
     }
 
     /// Bulk activate nodes (&mut self - PERFORMANCE: single extend call)
     pub fn activate_nodes<I: IntoIterator<Item = NodeId>>(&mut self, nodes: I) {
+        let before = self.active_nodes.len();
         self.active_nodes.extend(nodes);
+        if self.active_nodes.len() != before {
+            self.version += 1;
+        }
     }
 
     /// Remove multiple nodes from the active set (&mut self)
     pub fn deactivate_nodes(&mut self, nodes: &[NodeId]) {
-        let to_remove: HashSet<NodeId> = nodes.iter().copied().collect();
-        self.active_nodes.retain(|n| !to_remove.contains(n));
+        let before = self.active_nodes.len();
+        for node in nodes {
+            self.active_nodes.remove(node);
+        }
+        if self.active_nodes.len() != before {
+            self.version += 1;
+        }
         // Remove nodes from all attribute indices
         for (_, nodes_map) in self.node_attribute_indices.iter_mut() {
-            for node_id in &to_remove {
+            for node_id in nodes {
                 nodes_map.remove(node_id);
             }
         }
@@ -194,7 +205,9 @@ impl GraphSpace {
 
     /// Remove a node from the active set (&mut self)
     pub fn deactivate_node(&mut self, node_id: NodeId) {
-        self.active_nodes.remove(&node_id);
+        if self.active_nodes.remove(&node_id) {
+            self.version += 1;
+        }
         // Remove node from all attribute indices
         for (_, nodes) in self.node_attribute_indices.iter_mut() {
             nodes.remove(&node_id);
@@ -225,11 +238,15 @@ impl GraphSpace {
 
     /// Remove multiple edges from the active set (&mut self)
     pub fn deactivate_edges(&mut self, edges: &[EdgeId]) {
-        let to_remove: HashSet<EdgeId> = edges.iter().copied().collect();
-        self.active_edges.retain(|e| !to_remove.contains(e));
+        if edges.is_empty() {
+            return;
+        }
+        for edge in edges {
+            self.active_edges.remove(edge);
+        }
         // Remove edges from all attribute indices
         for (_, edges_map) in self.edge_attribute_indices.iter_mut() {
-            for edge_id in &to_remove {
+            for edge_id in edges {
                 edges_map.remove(edge_id);
             }
         }

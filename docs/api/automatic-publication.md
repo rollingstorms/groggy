@@ -99,3 +99,11 @@ Prefer bulk operations for bulk workloads. The native receipt in
 `benches/automatic_publication_2026-10-23.json` records workload time and version
 counts; bulk and scalar workloads deliberately retain different histories. It
 provides neither an FFI latency guarantee nor a memory/throughput SLA.
+
+Bulk node removal prepares incident edges in one active-edge scan per phase
+(publication clocks and storage execution), rather than rescanning retained
+edges for each selected node. Loops/shared/parallel edge instances are removed
+once. Implicit edge-removal time is the earliest removed endpoint time; an
+explicit edge-removal override wins. Empty removals leave history and caches
+unchanged. Isolated-node changes also invalidate the internal CSR cache. See
+[the matched release comparison](../../notes/planning/bulk-removal-2026-10-25.md).

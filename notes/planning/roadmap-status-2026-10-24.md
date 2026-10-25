@@ -111,14 +111,15 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest composer completion: **1,006 native tests passed, 52 ignored; 1,716 root
+Latest bulk-removal repair (2026-10-25): **1,010 native tests passed, 52 ignored; 1,720 root
 Python API tests passed, 1 skipped; 84 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.
 
-The matched before/after performance comparison remains follow-up under the
-existing performance gates. As requested, implementation priorities continue
+A matched composer before/after comparison now measures the bulk-removal repair
+(`bulk-removal-2026-10-25.md`); broader performance comparison remains follow-up
+under the existing performance gates. As requested, implementation priorities continue
 first; comparison must match workload, precision and history semantics and record
 time, allocations, peak memory and retained-history growth.
 

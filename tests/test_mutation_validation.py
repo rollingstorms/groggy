@@ -172,3 +172,33 @@ def test_malformed_ids_do_not_shift_later_error_positions(entity):
     assert f"score[2]: {entity} 99" in message
     assert f"score[3]: duplicate {entity}" in message
     assert "first at score[1]" in message
+
+
+@pytest.mark.parametrize("directed", [False, True])
+@pytest.mark.parametrize("manual", [False, True])
+def test_bulk_node_removal_preserves_parallel_loop_history(directed, manual):
+    graph = Graph(directed=directed, manual=manual)
+    graph.add_nodes(4)
+    edges = graph.add_edges([
+        (0, 1, {"weight": 1}),
+        (0, 1, {"weight": 2}),
+        (1, 1, {"weight": 3}),
+        (1, 2, {"weight": 4}),
+        (2, 3, {"weight": 5}),
+    ])
+    before = graph.commit("before", "test")
+    frozen = graph.read_view()
+    graph.remove_nodes([0, 1])
+    if not manual:
+        assert graph.current_state_id == before + 1
+        assert len(graph.publication_metadata(before + 1)["change_times"]) == 6
+    after = graph.commit("after", "test")
+    assert set(graph.node_ids) == {2, 3}
+    assert list(graph.edge_ids) == [edges[4]]
+    assert frozen.edge_attr(edges[1], "weight") == 2
+    assert graph.snapshot_at_commit(before).edge_attr(edges[2], "weight").value == 3
+    assert graph.snapshot_at_commit(after).edge_attr(edges[2], "weight") is None
+    graph.remove_nodes([])
+    graph.remove_edges([])
+    assert graph.current_state_id == after
+    assert not graph.has_uncommitted_changes()

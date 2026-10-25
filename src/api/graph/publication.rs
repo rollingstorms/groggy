@@ -29,19 +29,24 @@ impl Graph {
             change_times.insert(key, at);
             change_times.insert(ChangeKey::NodeAttribute(id, "entity_type".into()), at);
         }
+        let mut removal_times = HashMap::new();
         for &id in &batch.remove_nodes {
             let key = ChangeKey::NodeRemoved(id);
             let at = time(&key);
             change_times.insert(key, at);
-            if self.has_node(id) {
-                for edge in self.incident_edges(id)? {
-                    // An implicit edge removal takes the earliest removed endpoint time.
-                    change_times
-                        .entry(ChangeKey::EdgeRemoved(edge))
-                        .and_modify(|old| *old = (*old).min(at))
-                        .or_insert(at);
-                }
-            }
+            removal_times.insert(id, at);
+        }
+        let removed_nodes = removal_times.keys().copied().collect();
+        for (edge, source, target) in self.incident_edges_for_nodes(&removed_nodes)? {
+            // A shared implicit cascade takes the earliest removed endpoint time.
+            // Explicit edge removals below retain their own override precedence.
+            let at = [source, target]
+                .iter()
+                .filter_map(|node| removal_times.get(node))
+                .min()
+                .copied()
+                .ok_or_else(|| GraphError::InvalidInput("Missing cascade removal time".into()))?;
+            change_times.insert(ChangeKey::EdgeRemoved(edge), at);
         }
         for id in first_edge..first_edge + batch.add_edges.len() {
             let key = ChangeKey::EdgeAdded(id);

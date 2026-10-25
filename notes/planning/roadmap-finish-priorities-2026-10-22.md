@@ -628,3 +628,16 @@ and strict Clippy. Ten bounded release workloads expose repeated edge scanning
 during bulk source removal; that measured performance repair follows under
 existing bulk/performance requirements. See `composer-completion-2026-10-24.md`
 and `../../docs/api/composer-options.md`.
+
+
+## Bulk cascade performance and cache correctness — 2026-10-25
+
+Repaired existing **05.3 / 09.4b.2 / 32** requirements without a new checkbox row.
+Cascade execution and effective-time preparation each scan active edges once per
+batch, preserving distinct edges, retained history and explicit clock overrides.
+Bulk space removal touches selected IDs directly; isolated-node membership changes
+invalidate cached CSR. At 10k nodes, matched release medians improve about 15x for
+preset/selector collapse and 10–11x for contraction, on the bounded chain fixture.
+No general memory/scale guarantee is inferred. Full gates: 1,010 native, 1,720
+Python, 84 documentation examples, strict Clippy. See `bulk-removal-2026-10-25.md`.
+The fixed inventory remains **190 checked / 78 unchecked**; broad parents stay open.
