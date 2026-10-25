@@ -47,32 +47,30 @@ fn clones_share_immutable_components_and_detach_only_the_mutably_accessed_compon
     );
 }
 #[test]
-fn grouped_and_selected_results_share_untouched_components_without_cross_mutation() {
+fn grouped_and_selected_results_induce_edges_and_share_untouched_whole_components() {
     let original = fixture();
     let mut groups = original.group_by(&["g".into()]).unwrap();
-    assert!(groups
-        .iter()
-        .all(|group| std::ptr::eq(group.edges(), original.edges())));
+    assert!(groups.iter().all(|group| group.edges().nrows() == 0));
     groups[0]
         .edges_mut()
         .base_table_mut()
-        .set_column("w", vec![V::Int(99)])
+        .set_column("extra", vec![])
         .unwrap();
-    assert_eq!(
-        groups[1].edges().get_column("w").unwrap().get(0),
-        Some(&V::Int(3))
-    );
+    assert!(!groups[1].edges().has_column("extra"));
+    assert!(!original.edges().has_column("extra"));
     assert_eq!(
         original.edges().get_column("w").unwrap().get(0),
         Some(&V::Int(3))
     );
-    let head = original.head(1);
-    assert!(std::ptr::eq(head.edges(), original.edges()));
-    assert_eq!(head.edges().nrows(), 1);
+    let head = original.head(1).unwrap();
+    assert_eq!(head.edges().nrows(), 0);
+    let whole = original.head(2).unwrap();
+    assert!(std::ptr::eq(whole.edges(), original.edges()));
     let sorted = original.sort_by("g", false).unwrap();
     assert!(std::ptr::eq(sorted.edges(), original.edges()));
     assert_eq!(sorted.nodes().node_ids().unwrap(), vec![1, 0]);
 }
+
 #[test]
 fn consuming_shared_components_returns_independent_owned_tables() {
     let original = fixture();

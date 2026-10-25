@@ -201,6 +201,15 @@ pub struct GraphTable {
     policy: ValidationPolicy,
 }
 
+/// Independent component dimensions; GraphTable is not one rectangular table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GraphTableShape {
+    /// Node rows and columns.
+    pub nodes: (usize, usize),
+    /// Edge rows and columns.
+    pub edges: (usize, usize),
+}
+
 /// Internal component routing; GraphTable retains distinct node/edge ownership.
 #[derive(Clone, Copy)]
 enum Component {
@@ -209,6 +218,71 @@ enum Component {
 }
 
 impl GraphTable {
+    // Build a node-to-group map, then dispatch every edge once. Node grouping
+    // partitions rows; crossing edges belong to no group. Row projection retains
+    // captured edge identity and typed columns through the shared BaseTable path.
+    fn induced_groups(&self, groups: Vec<NodesTable>) -> GraphResult<Vec<Self>> {
+        let original = self.nodes.node_ids()?;
+        let original: HashSet<_> = original.iter().copied().collect::<HashSet<_>>();
+        if original.len() != self.nodes.nrows() {
+            return Err(GraphError::InvalidInput(
+                "Duplicate node_id in graph table".into(),
+            ));
+        }
+        let mut membership = HashMap::new();
+        for (group, nodes) in groups.iter().enumerate() {
+            for id in nodes.node_ids()? {
+                if !original.contains(&id) || membership.insert(id, group).is_some() {
+                    return Err(GraphError::InvalidInput(
+                        "Invalid or repeated node group identity".into(),
+                    ));
+                }
+            }
+        }
+        let ids = self.edges.edge_ids()?;
+        let sources = super::structural::column(self.edges.base(), "source")?;
+        let targets = super::structural::column(self.edges.base(), "target")?;
+        let mut seen = HashSet::new();
+        let mut rows = vec![Vec::new(); groups.len()];
+        for (row, id) in ids.into_iter().enumerate() {
+            if !seen.insert(id) {
+                return Err(GraphError::InvalidInput(
+                    "Duplicate edge_id in graph table".into(),
+                ));
+            }
+            let from = super::structural::id(&sources.data()[row], "source", row)?;
+            let to = super::structural::id(&targets.data()[row], "target", row)?;
+            if !original.contains(&from) || !original.contains(&to) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Edge {id} has an endpoint outside the node table"
+                )));
+            }
+            if let Some(&group) = membership.get(&from) {
+                if membership.get(&to) == Some(&group) {
+                    rows[group].push(row);
+                }
+            }
+        }
+        groups
+            .into_iter()
+            .zip(rows)
+            .map(|(nodes, rows)| {
+                let edges = if rows.len() == self.edges.nrows() {
+                    self.edges.clone()
+                } else {
+                    Arc::new(EdgesTable::from_base_table(
+                        self.edges.base().select_rows(&rows)?,
+                    )?)
+                };
+                Ok(Self {
+                    nodes: nodes.into(),
+                    edges,
+                    policy: self.policy.clone(),
+                })
+            })
+            .collect()
+    }
+
     // Resolve all operands together. Sort/reshape retain their historical node
     // preference for shared columns; grouping requires an unambiguous component.
     fn component_for(&self, names: &[&str], prefer_nodes: bool) -> GraphResult<Component> {
@@ -260,6 +334,16 @@ impl GraphTable {
     /// Get reference to edges table
     pub fn edges(&self) -> &EdgesTable {
         &self.edges
+    }
+
+    /// Return an independent node-table wrapper over the existing snapshot columns.
+    pub fn to_nodes(&self) -> NodesTable {
+        self.nodes.as_ref().clone()
+    }
+
+    /// Return an independent edge-table wrapper over the existing snapshot columns.
+    pub fn to_edges(&self) -> EdgesTable {
+        self.edges.as_ref().clone()
     }
 
     /// Get mutable nodes, copying that component first if it is shared.
@@ -518,14 +602,14 @@ impl GraphTable {
     }
 }
 
-// Implement Table trait for GraphTable with composite semantics
-impl Table for GraphTable {
-    fn nrows(&self) -> usize {
+// Graph bundles own two rectangles; graph operations are not a rectangular Table.
+impl GraphTable {
+    pub fn nrows(&self) -> usize {
         // For composite table, return total rows across both tables
         self.nodes.nrows() + self.edges.nrows()
     }
 
-    fn ncols(&self) -> usize {
+    pub fn ncols(&self) -> usize {
         // Return unique column names across both tables
         let mut columns = HashSet::new();
         columns.extend(self.nodes.column_names().iter());
@@ -533,66 +617,41 @@ impl Table for GraphTable {
         columns.len()
     }
 
-    fn column_names(&self) -> &[String] {
-        // For composite table, we need to return all unique column names
-        // Since we can't return a computed Vec from a &[String] method,
-        // we'll return nodes column names as the primary ones
-        // NOTE: This is a limitation of the Table trait - ideally we'd return Vec<String>
-        self.nodes.column_names()
+    /// Separate node/edge column names, without a synthetic shared rectangle.
+    pub fn column_names(&self) -> (&[String], &[String]) {
+        (self.nodes.column_names(), self.edges.column_names())
     }
 
-    fn column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
-        // Try nodes first, then edges
-        self.nodes.column(name).or_else(|| self.edges.column(name))
-    }
-
-    fn column_by_index(&self, index: usize) -> Option<&BaseArray<AttrValue>> {
-        // Try nodes first, then edges with adjusted index
-        let nodes_cols = self.nodes.ncols();
-        if index < nodes_cols {
-            self.nodes.column_by_index(index)
-        } else {
-            self.edges.column_by_index(index - nodes_cols)
-        }
-    }
-
-    fn has_column(&self, name: &str) -> bool {
+    pub fn has_column(&self, name: &str) -> bool {
         self.nodes.has_column(name) || self.edges.has_column(name)
     }
 
-    fn head(&self, n: usize) -> Self {
-        // Compatibility bundle selection retains the edge component. The graph
-        // induced-edge policy remains an explicit pending contract decision.
-        Self {
-            nodes: self.nodes.head(n).into(),
-            edges: self.edges.clone(),
-            policy: self.policy.clone(),
-        }
+    /// Select the first node rows and only their internal edges.
+    pub fn head(&self, n: usize) -> GraphResult<Self> {
+        self.induced_groups(vec![self.nodes.head(n)])?
+            .pop()
+            .ok_or_else(|| GraphError::InvalidInput("Missing node selection".into()))
     }
 
-    fn tail(&self, n: usize) -> Self {
-        // For composite table, take tail from nodes primarily
-        Self {
-            nodes: self.nodes.tail(n).into(),
-            edges: self.edges.clone(),
-            policy: self.policy.clone(),
-        }
+    /// Select the last node rows and only their internal edges.
+    pub fn tail(&self, n: usize) -> GraphResult<Self> {
+        self.induced_groups(vec![self.nodes.tail(n)])?
+            .pop()
+            .ok_or_else(|| GraphError::InvalidInput("Missing node selection".into()))
     }
 
-    fn slice(&self, start: usize, end: usize) -> Self {
-        // For composite table, slice nodes primarily
-        Self {
-            nodes: self.nodes.slice(start, end).into(),
-            edges: self.edges.clone(),
-            policy: self.policy.clone(),
-        }
+    /// Select node rows in the clamped half-open range and their internal edges.
+    pub fn slice(&self, start: usize, end: usize) -> GraphResult<Self> {
+        self.induced_groups(vec![self.nodes.slice(start, end)])?
+            .pop()
+            .ok_or_else(|| GraphError::InvalidInput("Missing node selection".into()))
     }
 
-    fn sort_by(&self, column: &str, ascending: bool) -> GraphResult<Self> {
+    pub fn sort_by(&self, column: &str, ascending: bool) -> GraphResult<Self> {
         self.sort_values(vec![column.to_string()], vec![ascending])
     }
 
-    fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self> {
+    pub fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self> {
         match self.component_for(
             &columns.iter().map(String::as_str).collect::<Vec<_>>(),
             true,
@@ -610,32 +669,25 @@ impl Table for GraphTable {
         }
     }
 
-    fn filter(&self, predicate: &str) -> GraphResult<Self> {
-        // Compatibility contract: apply the same predicate to both components.
-        Ok(Self {
-            nodes: self.nodes.filter(predicate)?.into(),
+    /// Apply the existing predicate to both components, then enforce node closure.
+    pub fn filter(&self, predicate: &str) -> GraphResult<Self> {
+        let filtered = Self {
+            nodes: self.nodes.clone(),
             edges: self.edges.filter(predicate)?.into(),
             policy: self.policy.clone(),
-        })
+        };
+        filtered
+            .induced_groups(vec![self.nodes.filter(predicate)?])?
+            .pop()
+            .ok_or_else(|| GraphError::InvalidInput("Missing filtered selection".into()))
     }
 
-    fn group_by(&self, columns: &[String]) -> GraphResult<Vec<Self>> {
+    pub fn group_by(&self, columns: &[String]) -> GraphResult<Vec<Self>> {
         match self.component_for(
             &columns.iter().map(String::as_str).collect::<Vec<_>>(),
             false,
         )? {
-            Component::Nodes => self
-                .nodes
-                .group_by(columns)?
-                .into_iter()
-                .map(|nodes| {
-                    Ok(Self {
-                        nodes: nodes.into(),
-                        edges: self.edges.clone(),
-                        policy: self.policy.clone(),
-                    })
-                })
-                .collect(),
+            Component::Nodes => self.induced_groups(self.nodes.group_by(columns)?),
             Component::Edges => self
                 .edges
                 .group_by(columns)?
@@ -651,7 +703,7 @@ impl Table for GraphTable {
         }
     }
 
-    fn select(&self, column_names: &[String]) -> GraphResult<Self> {
+    pub fn select(&self, column_names: &[String]) -> GraphResult<Self> {
         let mut seen = HashSet::new();
         for name in column_names {
             if !seen.insert(name) {
@@ -702,7 +754,7 @@ impl Table for GraphTable {
         })
     }
 
-    fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
+    pub fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
         // Compatibility default: with_column targets the node component.
         Ok(Self {
             nodes: self.nodes.with_column(name, column)?.into(),
@@ -711,7 +763,7 @@ impl Table for GraphTable {
         })
     }
 
-    fn drop_columns(&self, column_names: &[String]) -> GraphResult<Self> {
+    pub fn drop_columns(&self, column_names: &[String]) -> GraphResult<Self> {
         // Drop from both tables
         Ok(Self {
             nodes: self.nodes.drop_columns(column_names)?.into(),
@@ -720,7 +772,7 @@ impl Table for GraphTable {
         })
     }
 
-    fn pivot_table(
+    pub fn pivot_table(
         &self,
         index_cols: &[String],
         columns_col: &str,
@@ -749,7 +801,7 @@ impl Table for GraphTable {
         }
     }
 
-    fn melt(
+    pub fn melt(
         &self,
         id_vars: Option<&[String]>,
         value_vars: Option<&[String]>,
@@ -899,9 +951,12 @@ impl GraphTable {
         Ok(matrix)
     }
 
-    /// Get table shape (rows, columns) for nodes table
-    pub fn shape(&self) -> (usize, usize) {
-        (self.nodes.nrows(), self.nodes.column_names().len())
+    /// Independent node and edge rectangle shapes.
+    pub fn shape(&self) -> GraphTableShape {
+        GraphTableShape {
+            nodes: self.nodes.shape(),
+            edges: self.edges.shape(),
+        }
     }
 
     /// Check if table is empty

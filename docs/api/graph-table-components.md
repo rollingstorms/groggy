@@ -7,7 +7,7 @@ table's implementation:
 | Operation | Shared-column rule | Other component |
 | --- | --- | --- |
 | sort_by / sort_values | Prefer nodes when both contain all keys | Retained |
-| group_by | Ambiguous shared keys reject; choose nodes/edges explicitly | Retained in every group |
+| group_by | Ambiguous shared keys reject; choose nodes/edges explicitly | Node groups induce internal edges; edge groups retain nodes |
 | pivot_table | Prefer nodes when both contain all operands | Retained |
 | melt | Resolve ID and value columns together; shared-only operands prefer nodes | Retained |
 
@@ -27,7 +27,7 @@ identity; direct sorts/groups retain their existing source-row binding.
 BaseArray value buffers were already shared. Native GraphTable clones now also
 share the node and edge table objects, including schema and column handles.
 Operations that change one component retain the other shared table object.
-Node grouping avoids cloning the edge table/schema metadata for every group.
+Node grouping dispatches edges once to the group containing both endpoints. Crossing edges are excluded. A result retaining every edge shares the original edge component; projected edge rows use the shared source-aware row kernel.
 `nodes_mut()` or `edges_mut()` detaches that table's metadata on its first mutable
 access when shared; existing column buffers stay shared until replaced or edited
 through their existing copy-on-write path. Independent edits and original source
@@ -50,7 +50,7 @@ original = GraphTable(
 head = original.head(1)
 assert head.nodes.base_table()["x"] == 1
 assert original.nodes.base_table()["x"].to_list() == [1, 2]
-assert head.edges.nrows() == 1
+assert head.edges.nrows() == 0
 ```
 
 ```python
@@ -72,19 +72,44 @@ assert original.nodes.base_table()["x"].to_list() == [1, 2]
 assert merged.edges.as_tuples() == [(0, 0, 1)]
 ```
 
-## Existing selection boundary
+## Node subsets and component shapes
 
-Head/tail/slice and node groups retain the existing edge component; this is
-currently a table bundle operation and can yield edges outside the selected
-node rows. The outstanding induced-edge versus independent-bundle choice has
-not been silently changed. Full graph materialization continues to validate
-endpoint membership. Filter still applies its predicate to both components;
-with_column defaults to nodes. Select includes named columns from each component
-and retains structural fields; drop preserves required structural columns.
-Use the node or edge component for rectangular table operations. The legacy
-composite metadata/rectangular-trait interpretation remains open under 27.1.
+The owner confirmed induced node subsets on 2026-10-25. Head/tail/slice and node
+groups retain only edges whose endpoints are both selected. Loops and parallel
+edge instances keep their IDs and physical order; crossing edges are excluded.
+Empty selections keep both schemas. Malformed/duplicate IDs and dangling input
+endpoints reject rather than silently disappear. Native head/tail/slice now
+return GraphResult; the Python facade raises standard errors and releases the GIL.
 
-Current native metadata-sharing/grouping/mutable-access measurements are in
-`notes/benchmarks/graph-table-component-sharing-2026-10-25.json`. Pointer-identity
-tests certify untouched component sharing and copy isolation; they are not RSS
-measurements, a matched speedup or a fixed FFI latency guarantee.
+GraphTable is no longer a native rectangular Table implementation. Its graph
+operations remain inherent methods. Native shape() returns GraphTableShape with
+node/edge dimensions; column_names() returns the two component schemas. Python
+shape() returns a dictionary and columns exposes both name lists. Use nodes/edges
+for rectangular row iteration and indexed/named column operations. Legacy nrows
+and len count entities across both components; ncols counts distinct names across
+them. Those aggregate counts do not define a rectangle.
+
+```python
+assert original.shape() == {"nodes": (2, 2), "edges": (1, 3)}
+assert set(original.columns) == {"nodes", "edges"}
+assert isinstance(original.to_nodes(), NodesTable)
+assert isinstance(original.to_edges(), EdgesTable)
+assert original.slice(0, 1).edges.nrows() == 0
+```
+
+The owner confirmed to_nodes()/to_edges() return independent component wrappers,
+matching the properties. Their columns/source captures remain frozen relative to
+later graph changes; editing an owned wrapper does not edit the graph. Explicit
+source publication remains available through the checked update APIs. No new
+graph, graph IDs, history or source ownership is created by these aliases.
+
+Filter retains its existing both-component predicate rule and then enforces
+internal-edge closure. Sort/reshape retain their earlier component routing.
+Node grouping validates and builds one node-to-group map, then dispatches each
+edge once. Group output row projection preserves exact source identity and policy.
+The to_subgraphs grouping/ownership choice is being clarified separately.
+
+The earlier component-sharing receipt remains evidence for the earlier bundle
+policy. New induced-group costs are recorded separately; they must not be treated
+as an identical-workload speedup comparison. Fresh Graph.read_view capture costs
+and pooled/history portability remain separate workstreams.

@@ -5245,14 +5245,22 @@ impl PyGraphTable {
         self.table.nrows()
     }
 
-    /// Get number of columns (max of nodes and edges)
+    /// Count distinct column names across both components; not a rectangle width.
     pub fn ncols(&self) -> usize {
         self.table.ncols()
     }
 
-    /// Get shape as (rows, cols)
-    pub fn shape(&self) -> (usize, usize) {
-        self.table.shape()
+    /// Independent component shapes; the bundle is not one rectangle.
+    pub fn shape(&self) -> HashMap<&'static str, (usize, usize)> {
+        let shape = self.table.shape();
+        HashMap::from([("nodes", shape.nodes), ("edges", shape.edges)])
+    }
+
+    /// Independent node/edge column names.
+    #[getter]
+    pub fn columns(&self) -> HashMap<&'static str, Vec<String>> {
+        let (nodes, edges) = self.table.column_names();
+        HashMap::from([("nodes", nodes.to_vec()), ("edges", edges.to_vec())])
     }
 
     /// Check whether both node and edge tables are empty
@@ -5403,18 +5411,32 @@ impl PyGraphTable {
 
     /// Get first n rows (primarily from nodes table, default 5)
     #[pyo3(signature = (n = 5))]
-    pub fn head(&self, n: usize) -> PyGraphTable {
-        PyGraphTable {
-            table: self.table.head(n),
-        }
+    pub fn head(&self, py: Python<'_>, n: usize) -> PyResult<PyGraphTable> {
+        py.allow_threads(|| self.table.head(n))
+            .map(|table| Self { table })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
     /// Get last n rows (primarily from nodes table, default 5)
     #[pyo3(signature = (n = 5))]
-    pub fn tail(&self, n: usize) -> PyGraphTable {
-        PyGraphTable {
-            table: self.table.tail(n),
-        }
+    pub fn tail(&self, py: Python<'_>, n: usize) -> PyResult<PyGraphTable> {
+        py.allow_threads(|| self.table.tail(n))
+            .map(|table| Self { table })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
+    /// Select a clamped node row range and its internal edges.
+    pub fn slice(&self, py: Python<'_>, start: usize, end: usize) -> PyResult<Self> {
+        py.allow_threads(|| self.table.slice(start, end))
+            .map(|table| Self { table })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
+    /// Partition nodes by explicit columns and retain internal edges per group.
+    pub fn group_by(&self, py: Python<'_>, columns: Vec<String>) -> PyResult<Vec<Self>> {
+        py.allow_threads(|| self.table.group_by(&columns))
+            .map(|groups| groups.into_iter().map(|table| Self { table }).collect())
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
     /// Merge multiple GraphTables into one using the specified strategy
@@ -5665,22 +5687,18 @@ impl PyGraphTable {
     // Cross-Type Conversions for Phase 3 Delegation Architecture
     // =============================================================================
 
-    /// Convert table to NodesAccessor by extracting node IDs from the table
-    pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
-        // TODO: Implement proper conversion from GraphTable to NodesAccessor
-        // This requires understanding the graph context and creating appropriate accessors
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "GraphTable to NodesAccessor conversion not yet implemented. Use .nodes() property instead."
-        ))
+    /// Return the immutable node-table snapshot as an independent wrapper.
+    pub fn to_nodes(&self) -> PyNodesTable {
+        PyNodesTable {
+            table: self.table.to_nodes(),
+        }
     }
 
-    /// Convert table to EdgesAccessor by extracting edge IDs from the table
-    pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
-        // TODO: Implement proper conversion from GraphTable to EdgesAccessor
-        // This requires understanding the graph context and creating appropriate accessors
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "GraphTable to EdgesAccessor conversion not yet implemented. Use .edges() property instead."
-        ))
+    /// Return the immutable edge-table snapshot as an independent wrapper.
+    pub fn to_edges(&self) -> PyEdgesTable {
+        PyEdgesTable {
+            table: self.table.to_edges(),
+        }
     }
 
     /// Convert table to SubgraphArray by creating subgraphs from table rows

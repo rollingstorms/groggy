@@ -565,3 +565,11 @@ Code / record context:
 - [Durable-storage guarantees and limits](../../docs/api/durable-storage.md)
 
 The earlier decision record is chronological. Later implementation entries supersede earlier statements about what is still missing. The old focused-follow-up questions are not all still open. This appendix does not reopen the already accepted versioning, immutable-view or recorded-time model.
+
+## GraphTable decisions confirmed — 2026-10-25
+
+The owner confirmed internal-edge node subsets, separate node/edge shapes with
+rectangular work through components, and to_nodes/to_edges returning table
+components. These are implemented; see `graph-table-decisions-2026-10-25.md`.
+The separate to_subgraphs grouping/ownership question remains pending. Earlier
+workbook answers and unanswered schema/merge/index/service choices stay as recorded.

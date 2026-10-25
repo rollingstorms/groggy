@@ -106,7 +106,7 @@ fn grouping_retains_domain_specific_groups_and_rejects_ambiguous_or_cross_domain
     let groups = t.group_by(&names(&["node_group"])).unwrap();
     assert_eq!(groups.len(), 2);
     assert_eq!(groups[0].nodes().node_ids().unwrap(), vec![7]);
-    assert_eq!(groups[0].edges().edge_ids().unwrap(), vec![9, 5]);
+    assert!(groups[0].edges().edge_ids().unwrap().is_empty());
     let groups = t.group_by(&names(&["edge_group"])).unwrap();
     assert_eq!(groups[0].edges().edge_ids().unwrap(), vec![9]);
     assert_eq!(groups[0].nodes().node_ids().unwrap(), vec![7, 3]);

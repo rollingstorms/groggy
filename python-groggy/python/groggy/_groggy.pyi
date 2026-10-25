@@ -6024,6 +6024,19 @@ class GraphTable:
     Python wrapper for GraphTable
     """
     @property
+    def columns(self) -> Dict[str, List[str]]:
+        """Independent node and edge column names."""
+        ...
+
+    def slice(self, start: int, end: int) -> GraphTable:
+        """Select a clamped node range and internal edges."""
+        ...
+
+    def group_by(self, columns: List[str]) -> List[GraphTable]:
+        """Group nodes with internal edges, or group edge rows explicitly."""
+        ...
+
+    @property
     def edges(self) -> Any:
         """
         Get EdgesTable component
@@ -6105,10 +6118,8 @@ class GraphTable:
         """Read verified bundle metadata and native counts/policy/schema."""
         ...
 
-    def head(self, *args, **kwargs) -> Any:
-        """
-        Get first n rows (primarily from nodes table, default 5)
-        """
+    def head(self, n: int = 5) -> GraphTable:
+        """Select the first node rows and only their internal edges."""
         ...
 
     def is_empty(self, *args, **kwargs) -> Any:
@@ -6146,10 +6157,8 @@ class GraphTable:
         """Atomically replace the typed v3 bundle.cbor file."""
         ...
 
-    def shape(self, *args, **kwargs) -> Any:
-        """
-        Get shape as (rows, cols)
-        """
+    def shape(self) -> Dict[str, Tuple[int, int]]:
+        """Independent node and edge rectangle shapes."""
         ...
 
     def stats(self, *args, **kwargs) -> Any:
@@ -6158,16 +6167,12 @@ class GraphTable:
         """
         ...
 
-    def tail(self, *args, **kwargs) -> Any:
-        """
-        Get last n rows (primarily from nodes table, default 5)
-        """
+    def tail(self, n: int = 5) -> GraphTable:
+        """Select the last node rows and only their internal edges."""
         ...
 
-    def to_edges(self, *args, **kwargs) -> Any:
-        """
-        Convert table to EdgesAccessor by extracting edge IDs from the table
-        """
+    def to_edges(self) -> EdgesTable:
+        """Return an independent edge-table snapshot wrapper."""
         ...
 
     def to_graph(self, *args, **kwargs) -> Any:
@@ -6176,10 +6181,8 @@ class GraphTable:
         """
         ...
 
-    def to_nodes(self, *args, **kwargs) -> Any:
-        """
-        Convert table to NodesAccessor by extracting node IDs from the table
-        """
+    def to_nodes(self) -> NodesTable:
+        """Return an independent node-table snapshot wrapper."""
         ...
 
     def to_subgraphs(self, *args, **kwargs) -> Any:

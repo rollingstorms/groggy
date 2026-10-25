@@ -60,9 +60,8 @@ accessor starts no server; `.show()`/`.server()` launch the existing viewer.
 
 The legacy native table `DataSource` compatibility implementations and
 `interactive_viz` option/fallback paths are separate surfaces; this repair does
-not certify them. It also leaves the unresolved GraphTable node-subset policy
-unchanged. A subset retaining external edges therefore rejects on combined
-visualization until the caller supplies a complete node/edge bundle.
+not certify them. GraphTable node subsets now induce their internal edges under the owner’s
+2026-10-25 decision. Malformed standalone bundles still reject before visualization.
 
 ## Capture sharing and server identity
 

@@ -903,7 +903,7 @@ impl Table for BaseTable {
         let mut new_columns = HashMap::new();
 
         for (name, column) in &self.columns {
-            new_columns.insert(name.clone(), column.slice(start, actual_end));
+            new_columns.insert(name.clone(), column.slice(start, actual_end - start));
         }
 
         Self {

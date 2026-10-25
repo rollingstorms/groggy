@@ -365,3 +365,26 @@ pooled snapshots (12.2) or effective-time reconstruction (16.2) are complete.
 Current gate remains 1,150 native / 1,881 root Python / 133 executable docs,
 with 51 native ignored and one Python skip; strict all-target Clippy passed.
 Inventory now **193 checked / 75 unchecked**, with no rows added or removed.
+
+### GraphTable owner decisions implemented — 2026-10-25
+
+Owner confirmed induced node subsets, separate component shapes/rectangular
+operations through .nodes/.edges, and table-component to_nodes/to_edges aliases.
+Implemented checked head/tail/slice and one-pass induced node grouping, exact row
+provenance, separate native/Python shapes/schemas and independent component
+wrappers. GraphTable no longer implements rectangular Table; native subsets are
+fallible and Python raises standard errors. Existing aggregate counts remain
+explicitly separate from shape. Also fixed BaseTable's end-versus-length slice
+bug found by the new middle/reversed range cases.
+
+Evidence/API: `graph-table-decisions-2026-10-25.md` and
+`docs/api/graph-table-components.md`. Gate: **1,157 native passed / 51 ignored;
+1,890 root Python passed / 1 skipped; 134 executable docs; strict all-target
+Clippy passed**. Current 100k-node/100-group native cost about 31ms; receipt
+`notes/benchmarks/graph-table-induced-groups-2026-10-25.json`. The earlier bundle
+policy is a different workload; no matched speedup/RSS/FFI claim.
+
+27.1 remaining inventory is now its unresolved to_subgraphs contract and native
+legacy display/streaming schema integration. These are existing converter and
+metadata boundaries, not new requirements. Broader 26.1/portable history remain
+separate. Inventory **193 checked / 75 unchecked**, no new rows.

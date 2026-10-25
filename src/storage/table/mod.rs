@@ -21,8 +21,8 @@ pub use writeback::TableWriteback;
 pub use base::BaseTable;
 pub use edges::{EdgeConfig, EdgesTable};
 pub use graph_table::{
-    BundleMetadata, ConflictResolution, GraphTable, ValidationPolicy, ValidationReport,
-    ValidationStrictness,
+    BundleMetadata, ConflictResolution, GraphTable, GraphTableShape, ValidationPolicy,
+    ValidationReport, ValidationStrictness,
 };
 pub use nodes::NodesTable;
 pub use table_array::TableArray;

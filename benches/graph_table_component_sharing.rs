@@ -1,4 +1,5 @@
-//! Current costs for shared composite components, grouping and first mutable access.
+//! Current costs for shared composite components, induced grouping and first mutable access.
+use groggy::storage::table::Table;
 use groggy::{
     storage::table::{EdgesTable, GraphTable, NodesTable},
     AttrValue as V, GraphError,
@@ -35,17 +36,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         assert!(std::ptr::eq(prepared.edges(), table.edges()));
                     }
                     "group_nodes_100" => {
-                        use groggy::storage::table::Table;
                         let groups = table.group_by(&["g".into()])?;
                         seconds.push(start.elapsed().as_secs_f64());
-                        if groups.len() != 100
-                            || groups
-                                .iter()
-                                .any(|g| !std::ptr::eq(g.edges(), table.edges()))
-                        {
-                            return Err(
-                                GraphError::InvalidInput("group sharing mismatch".into()).into()
-                            );
+                        if groups.len() != 100 || groups.iter().any(|g| g.edges().nrows() != 0) {
+                            return Err(GraphError::InvalidInput(
+                                "induced grouping mismatch".into(),
+                            )
+                            .into());
                         }
                         std::hint::black_box(groups);
                     }
@@ -66,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(
         path,
         serde_json::to_vec_pretty(
-            &json!({"scope":"Native optimized current costs, five observations. Clone shares component table/schema objects above already-shared BaseArray value buffers; node grouping creates 100 groups sharing untouched edge metadata; first mutable access detaches node table/schema metadata while column buffers remain shared. Clone/drop is amortized over 10000 iterations per observation to exceed clock resolution; its destruction is included. Other operations time one output and exclude output destruction. Fixtures, prepared clone creation and assertions excluded; complete operation/allocation timed. Pointer checks prove shared untouched components, not an RSS estimate. No matched speedup, whole-graph capture COW, Python getter or FFI-budget claim.","cases":cases}),
+            &json!({"scope":"Native optimized current costs, five observations. Clone shares component table/schema objects above already-shared BaseArray value buffers; node grouping validates identity/topology and creates 100 induced groups by dispatching edges once; the chain fixture uses r modulo 100, so every edge crosses groups and all output edge tables are empty; first mutable access detaches node table/schema metadata while column buffers remain shared. Clone/drop is amortized over 10000 iterations per observation to exceed clock resolution; its destruction is included. Other operations time one output and exclude output destruction. Fixtures, prepared clone creation and assertions excluded; complete operation/allocation timed. Pointer checks prove shared untouched components, not an RSS estimate. The older bundle-retention receipt has different grouping semantics and is not a matched speedup comparison. No whole-graph capture COW, RSS, Python getter or FFI-budget claim.","cases":cases}),
         )?,
     )?;
     Ok(())
