@@ -7,13 +7,27 @@ use crate::viz::streaming::data_source::{
     HierarchicalDirection, LayoutAlgorithm, NodePosition, Position,
 };
 use crate::{GraphError, GraphResult};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
+
+static NEXT_SNAPSHOT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// DataSource adapter that exposes a `Graph` through the realtime/streaming pipeline.
+/// Clones share one immutable snapshot and stable process-local source identity.
 #[derive(Debug, Clone)]
 pub struct GraphDataSource {
-    node_count: usize,
-    edge_count: usize,
+    snapshot: Arc<GraphSnapshot>,
+}
+
+/// Immutable payload and process-local identity shared by every clone.
+#[derive(Debug)]
+struct GraphSnapshot {
+    id: u64,
     is_directed: bool,
     nodes: Vec<GraphNode>,
     edges: Vec<GraphEdge>,
@@ -79,14 +93,7 @@ impl GraphDataSource {
                 edge.weight = extract_weight(&edge.attributes);
             }
         }
-        Ok(Self {
-            node_count: nodes.len(),
-            edge_count: edges.len(),
-            is_directed,
-            nodes,
-            edges,
-            attribute_types,
-        })
+        Ok(Self::capture(nodes, edges, is_directed, attribute_types))
     }
 
     /// Create a new adapter using the "name" attribute as the preferred label.
@@ -158,40 +165,38 @@ impl GraphDataSource {
             })
             .collect::<Vec<_>>();
 
-        let node_count = nodes.len();
-        let edge_count = edges.len();
-        let is_directed = graph.is_directed();
+        Self::capture(nodes, edges, graph.is_directed(), attribute_types)
+    }
 
+    fn capture(
+        nodes: Vec<GraphNode>,
+        edges: Vec<GraphEdge>,
+        is_directed: bool,
+        attribute_types: HashMap<String, String>,
+    ) -> Self {
         Self {
-            node_count,
-            edge_count,
-            is_directed,
-            nodes,
-            edges,
-            attribute_types,
+            snapshot: Arc::new(GraphSnapshot {
+                id: NEXT_SNAPSHOT_ID.fetch_add(1, Ordering::Relaxed),
+                nodes,
+                edges,
+                is_directed,
+                attribute_types,
+            }),
         }
     }
 
     fn graph_nodes(&self) -> Vec<crate::viz::streaming::data_source::GraphNode> {
-        self.nodes.clone()
+        self.snapshot.nodes.clone()
     }
 
     fn graph_edges(&self) -> Vec<crate::viz::streaming::data_source::GraphEdge> {
-        self.edges.clone()
-    }
-
-    fn viz_nodes(&self) -> Vec<crate::viz::streaming::data_source::GraphNode> {
-        self.nodes.clone()
-    }
-
-    fn viz_edges(&self) -> Vec<crate::viz::streaming::data_source::GraphEdge> {
-        self.edges.clone()
+        self.snapshot.edges.clone()
     }
 }
 
 impl DataSource for GraphDataSource {
     fn total_rows(&self) -> usize {
-        self.node_count
+        self.snapshot.nodes.len()
     }
 
     fn total_cols(&self) -> usize {
@@ -199,8 +204,8 @@ impl DataSource for GraphDataSource {
     }
 
     fn get_window(&self, start: usize, count: usize) -> DataWindow {
-        let begin = start.min(self.nodes.len());
-        let end = start.saturating_add(count).min(self.nodes.len());
+        let begin = start.min(self.snapshot.nodes.len());
+        let end = start.saturating_add(count).min(self.snapshot.nodes.len());
         let headers = vec![
             "id".to_string(),
             "label".to_string(),
@@ -208,7 +213,7 @@ impl DataSource for GraphDataSource {
             "y".to_string(),
         ];
 
-        let rows = self.nodes[begin..end]
+        let rows = self.snapshot.nodes[begin..end]
             .iter()
             .map(|node| {
                 let (x, y) = node
@@ -230,7 +235,7 @@ impl DataSource for GraphDataSource {
             headers,
             rows,
             schema: self.get_schema(),
-            total_rows: self.nodes.len(),
+            total_rows: self.snapshot.nodes.len(),
             start_offset: start,
             metadata: DataWindowMetadata {
                 created_at: std::time::SystemTime::now(),
@@ -289,7 +294,7 @@ impl DataSource for GraphDataSource {
     }
 
     fn get_source_id(&self) -> String {
-        format!("graph-{}", std::ptr::addr_of!(*self) as usize)
+        format!("graph-snapshot-{}", self.snapshot.id)
     }
 
     fn get_version(&self) -> u64 {
@@ -310,17 +315,17 @@ impl DataSource for GraphDataSource {
 
     fn get_graph_metadata(&self) -> GraphMetadata {
         GraphMetadata {
-            node_count: self.node_count,
-            edge_count: self.edge_count,
-            is_directed: self.is_directed,
-            has_weights: self.edges.iter().any(|edge| edge.weight.is_some()),
-            attribute_types: self.attribute_types.clone(),
+            node_count: self.snapshot.nodes.len(),
+            edge_count: self.snapshot.edges.len(),
+            is_directed: self.snapshot.is_directed,
+            has_weights: self.snapshot.edges.iter().any(|edge| edge.weight.is_some()),
+            attribute_types: self.snapshot.attribute_types.clone(),
         }
     }
 
     fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
-        let nodes = self.viz_nodes();
-        let edges = self.viz_edges();
+        let nodes = self.graph_nodes();
+        let edges = self.graph_edges();
 
         match algorithm {
             LayoutAlgorithm::ForceDirected {
@@ -533,12 +538,12 @@ fn hierarchical_layout(
 impl GraphDataSource {
     /// Convenience method for tests and tooling to access node data by ID.
     pub fn node(&self, id: &str) -> Option<&GraphNode> {
-        self.nodes.iter().find(|node| node.id == id)
+        self.snapshot.nodes.iter().find(|node| node.id == id)
     }
 
     /// Convenience method to access edge data by ID.
     pub fn edge(&self, id: &str) -> Option<&GraphEdge> {
-        self.edges.iter().find(|edge| edge.id == id)
+        self.snapshot.edges.iter().find(|edge| edge.id == id)
     }
 }
 
@@ -555,5 +560,23 @@ mod float_width_tests {
         assert_eq!(position.y, 1e300);
         attributes.insert("weight".into(), AttrValue::Float64(x));
         assert_eq!(extract_weight(&attributes), Some(x));
+    }
+}
+
+#[cfg(test)]
+mod snapshot_sharing_tests {
+    use super::*;
+
+    #[test]
+    fn clones_share_the_entire_immutable_payload_and_final_clone_owns_it() {
+        let source = GraphDataSource::from_entities(vec![], vec![], false).unwrap();
+        let clone = source.clone();
+        assert!(Arc::ptr_eq(&source.snapshot, &clone.snapshot));
+        assert_eq!(Arc::strong_count(&source.snapshot), 2);
+        let key = source.get_source_id();
+        drop(source);
+        assert_eq!(Arc::strong_count(&clone.snapshot), 1);
+        assert_eq!(clone.get_source_id(), key);
+        assert_eq!(clone.total_rows(), 0);
     }
 }

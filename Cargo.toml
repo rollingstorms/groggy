@@ -218,3 +218,7 @@ harness = false
 [[bench]]
 name = "table_visualization"
 harness = false
+
+[[bench]]
+name = "viz_snapshot_sharing"
+harness = false

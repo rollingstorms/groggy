@@ -63,3 +63,18 @@ The legacy native table `DataSource` compatibility implementations and
 not certify them. It also leaves the unresolved GraphTable node-subset policy
 unchanged. A subset retaining external edges therefore rejects on combined
 visualization until the caller supplies a complete node/edge bundle.
+
+## Capture sharing and server identity
+
+Cloning a native GraphDataSource shares its entire immutable capture, including
+entities and schema metadata. A process-local identity stays stable through
+clones, moves and thread transfers. Independent captures have distinct IDs,
+even when their rows and values match. This identity scopes viewer server reuse;
+it is not a graph entity ID, durable history ID or content hash.
+
+Keep the accessor returned by `.viz` when calling `.show()` or `.update()` again.
+The same accessor reuses its server. Reading `.viz` again creates a new capture
+and a separate server identity; it cannot update a different capture's server.
+Native `get_graph_nodes()`/`get_graph_edges()` still return owned payload copies,
+and creating the initial capture still copies its rows. Sharing a capture does
+not make graph reads, layout, websocket serialization or Python calls O(1).

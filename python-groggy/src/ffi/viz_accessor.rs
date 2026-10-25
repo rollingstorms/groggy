@@ -4,7 +4,7 @@
 //! arrays, and tables with support for different backends (jupyter, server).
 
 use futures_util::SinkExt;
-use groggy::viz::streaming::GraphDataSource;
+use groggy::viz::streaming::{DataSource, GraphDataSource};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
@@ -152,7 +152,7 @@ impl VizAccessor {
 impl VizAccessor {
     /// Create a new VizAccessor with a data source (for graph-based objects)
     pub fn with_data_source(data_source: GraphDataSource, object_type: String) -> Self {
-        let data_source_id = format!("{:p}", &data_source as *const _);
+        let data_source_id = data_source.get_source_id();
         Self {
             data_source: Some(data_source),
             object_type,

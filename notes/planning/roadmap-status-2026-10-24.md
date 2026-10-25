@@ -307,3 +307,22 @@ loop or an RSS/FFI/server guarantee. Receipt:
 Existing table DataSource compatibility readers and interactive_viz options,
 converter ownership, node-subset and rectangular metadata contracts remain open.
 Inventory remains **192 checked / 76 unchecked**; no new rows added.
+
+### Shared immutable visualization captures — 2026-10-25
+
+GraphDataSource clones now share their entire immutable payload and stable
+process-local identity; counts derive from stored vectors and duplicate payload
+helpers are consolidated. Python viewer server reuse now uses that identity,
+replacing a temporary stack-address key that could alias separate captures.
+Same accessor reuses its server; a fresh `.viz` accessor is a separate capture.
+
+Evidence: `viz-snapshot-sharing-2026-10-25.md`; one pointer/last-owner test, four
+native public-contract cases and one process-isolated Python real HTTP/websocket
+server test (including sparse IDs in actual server snapshots). Gate: **1,143
+native passed / 51 ignored; 1,870 root Python passed / 1 skipped; 130 executable
+docs passed; strict all-target Clippy passed**. Matched native clone/drop at 100k
+nodes: median 26.06ms before / 10ns after, amortized over 100 iterations with the
+same benchmark source. Initial capture and owned payload exports still copy;
+this is not a graph-capture/RSS/FFI/server latency claim. Receipts:
+`notes/benchmarks/viz-snapshot-clone-{before,after}-2026-10-25.json`.
+Existing 27.1/AR7.10/28.15 scope; **192 checked / 76 unchecked**, no new rows.

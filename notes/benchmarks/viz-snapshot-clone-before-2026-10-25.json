@@ -1,0 +1,43 @@
+{
+  "cases": [
+    {
+      "clone_drop_seconds_amortized": [
+        0.00027203041,
+        0.00024723167,
+        0.00024636791,
+        0.00024667583,
+        0.00024639375
+      ],
+      "edges": 999,
+      "iterations_per_observation": 100,
+      "nodes": 1000
+    },
+    {
+      "clone_drop_seconds_amortized": [
+        0.00252706542,
+        0.0025298625,
+        0.00251899292,
+        0.0025974020799999996,
+        0.00259182709
+      ],
+      "edges": 9999,
+      "iterations_per_observation": 100,
+      "nodes": 10000
+    },
+    {
+      "clone_drop_seconds_amortized": [
+        0.02637474,
+        0.0259167375,
+        0.0260556775,
+        0.02609321917,
+        0.02595587583
+      ],
+      "edges": 99999,
+      "iterations_per_observation": 100,
+      "nodes": 100000
+    }
+  ],
+  "scope": "Optimized native snapshot clone/drop, same benchmark source and 100 iterations per observation, five observations. Dense chain with two node properties. Fixture and original capture construction excluded; clone, black_box, O(1) row-count assertion and clone destruction included. No DataSource get_graph_nodes/get_graph_edges payload export, server, FFI, Python, RSS or whole-graph capture measurement. Each clone is dropped before the next. Amortized timing exceeds clock resolution.",
+  "benchmark_source_sha256": "7766e3050629f6ade36507f06d55df5883e22065bbedb7358c691b8aa7e6717a",
+  "variant": "deep owned snapshot clone at b00e0ba5"
+}

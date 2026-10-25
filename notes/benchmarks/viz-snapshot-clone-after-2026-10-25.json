@@ -1,0 +1,43 @@
+{
+  "cases": [
+    {
+      "clone_drop_seconds_amortized": [
+        1e-08,
+        1e-08,
+        1e-08,
+        1e-08,
+        1e-08
+      ],
+      "edges": 999,
+      "iterations_per_observation": 100,
+      "nodes": 1000
+    },
+    {
+      "clone_drop_seconds_amortized": [
+        1.083e-08,
+        1.042e-08,
+        1.042e-08,
+        1.042e-08,
+        1.041e-08
+      ],
+      "edges": 9999,
+      "iterations_per_observation": 100,
+      "nodes": 10000
+    },
+    {
+      "clone_drop_seconds_amortized": [
+        1.125e-08,
+        9.58e-09,
+        1e-08,
+        1e-08,
+        1e-08
+      ],
+      "edges": 99999,
+      "iterations_per_observation": 100,
+      "nodes": 100000
+    }
+  ],
+  "scope": "Optimized native snapshot clone/drop, same benchmark source and 100 iterations per observation, five observations. Dense chain with two node properties. Fixture and original capture construction excluded; clone, black_box, O(1) row-count assertion and clone destruction included. No DataSource get_graph_nodes/get_graph_edges payload export, server, FFI, Python, RSS or whole-graph capture measurement. Each clone is dropped before the next. Amortized timing exceeds clock resolution.",
+  "benchmark_source_sha256": "7766e3050629f6ade36507f06d55df5883e22065bbedb7358c691b8aa7e6717a",
+  "variant": "shared immutable Arc snapshot"
+}
