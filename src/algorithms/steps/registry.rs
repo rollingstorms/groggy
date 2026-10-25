@@ -1673,10 +1673,11 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let output = spec.params.expect_text("output")?.to_string();
-            let weight_attr = spec
-                .params
-                .get_text("weight_attr")
-                .map(|s| AttrName::from(s.to_string()));
+            let weight_attr = if spec.params.get("weight_attr").is_some() {
+                Some(AttrName::from(spec.params.expect_text("weight_attr")?))
+            } else {
+                None
+            };
             Ok(Box::new(ShortestPathMapStep::new(
                 source,
                 weight_attr,
@@ -1695,12 +1696,14 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let k = spec.params.expect_int("k")? as usize;
+            let k = usize::try_from(spec.params.expect_int("k")?)
+                .map_err(|_| anyhow!("k must be non-negative and fit usize"))?;
             let output = spec.params.expect_text("output")?.to_string();
-            let weight_attr = spec
-                .params
-                .get_text("weight_attr")
-                .map(|s| AttrName::from(s.to_string()));
+            let weight_attr = if spec.params.get("weight_attr").is_some() {
+                Some(AttrName::from(spec.params.expect_text("weight_attr")?))
+            } else {
+                None
+            };
             Ok(Box::new(KShortestPathsStep::new(
                 source,
                 target,
@@ -1721,14 +1724,23 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
         |spec| {
             let start_nodes = spec.params.expect_text("start_nodes")?.to_string();
-            let length = spec.params.expect_int("length")? as usize;
+            let length = usize::try_from(spec.params.expect_int("length")?)
+                .map_err(|_| anyhow!("length must be non-negative and fit usize"))?;
             let output = spec.params.expect_text("output")?.to_string();
-            let restart_prob = spec.params.get_float("restart_prob").unwrap_or(0.0);
-            let weight_attr = spec
-                .params
-                .get_text("weight_attr")
-                .map(|s| AttrName::from(s.to_string()));
-            let seed = spec.params.get_int("seed").map(|i| i as u64);
+            let restart_prob = if spec.params.get("restart_prob").is_some() {
+                spec.params.expect_float("restart_prob")?
+            } else {
+                0.0
+            };
+            if !restart_prob.is_finite() || !(0.0..=1.0).contains(&restart_prob) {
+                return Err(anyhow!("restart_prob must be finite and in [0,1]"));
+            }
+            let weight_attr = if spec.params.get("weight_attr").is_some() {
+                Some(AttrName::from(spec.params.expect_text("weight_attr")?))
+            } else {
+                None
+            };
+            let seed = sampling_seed(&spec.params)?;
             Ok(Box::new(RandomWalkStep::new(
                 start_nodes,
                 length,

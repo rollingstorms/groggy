@@ -108,7 +108,7 @@ the enclosing atomic algorithm owns discarding its property batch.
 
 Recursive child-effect checks include nested loops/for-each and run before atomic
 execution even on empty inputs. Unknown/malformed bodies reject during native
-construction; unsupported temporal/path descendants remain explicit errors.
+construction; unsupported temporal descendants remain explicit errors.
 Cancellation checks cover inputs, items, child boundaries and final preparation;
 individual sorts/merges/large kernels do not promise bounded interruption latency.
 Python validation recognizes attachments nested in bodies, avoiding a false

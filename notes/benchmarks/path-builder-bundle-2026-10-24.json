@@ -1,0 +1,329 @@
+{
+  "cases": [
+    {
+      "edges": 1001,
+      "mode": "shortest_unweighted",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.003449708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002580583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001503666,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002072833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0019845,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1001,
+      "mode": "shortest_weighted",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.003811584,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003550625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003105584,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003095125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002892958,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1001,
+      "mode": "k_shortest",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000332042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000305584,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000294625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000287875,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000263792,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1001,
+      "mode": "walk_uniform",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000303917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0002795,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000261917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000283084,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000255375,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1001,
+      "mode": "walk_weighted",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.001526792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001498083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001512583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001449334,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.001500959,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1001,
+      "mode": "walk_many_starts",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000756416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000734083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000714167,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000731542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.000730209,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10001,
+      "mode": "shortest_unweighted",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.012744833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012541458,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012262416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012204625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.012306375,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10001,
+      "mode": "shortest_weighted",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.024840541,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.024266083,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.024306542,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.0243185,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.024418792,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10001,
+      "mode": "k_shortest",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.002737042,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002720041,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002699583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002698916,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002696959,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10001,
+      "mode": "walk_uniform",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.002702625,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002702167,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002692583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002677958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.002685291,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10001,
+      "mode": "walk_weighted",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.014901208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014789416,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014772292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014641958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.014711917,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10001,
+      "mode": "walk_many_starts",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.008161834,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.008223791,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.007842833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.008088833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.008380292,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release directed ring+shortcut: selected BFS/Dijkstra, staged weights, Yen node paths and seeded single/multiple walks. Fixture/spec preparation and validation excluded; five observations per workload. Includes calculation, scalar result serialization where applicable, bounded result attachment and one checked publication. Validate every distance/path/walk/publication. No matched speedup, FFI/RSS/allocation or production-scale claim."
+}

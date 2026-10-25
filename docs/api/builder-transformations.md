@@ -125,6 +125,6 @@ copy. Neighbor expressions build sorted selected adjacency once per map pass;
 scalar-only maps avoid the edge scan. Individual expression kernels/neighbor rows
 are not a bounded-latency cancellation guarantee. Owner graphs/history are not
 cloned. These correctness costs have a bounded native release receipt, without a
-matched before/after speedup, RSS/FFI or production-scale claim. Temporal/path steps and whole outer-pipeline transactions remain under separate
+matched before/after speedup, RSS/FFI or production-scale claim. Temporal steps and whole outer-pipeline transactions remain under separate
 audits. Checked community and bounded sampler
 contracts are documented in their corresponding API pages.

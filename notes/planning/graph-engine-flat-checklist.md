@@ -141,6 +141,10 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **09.4b.2ad — Recursive nested sampler property boundary.** Certify for-each only when every descendant supports atomic property execution, prevalidate all item owners/scopes, share the outer staged buffer and abort it on failure. Standalone sampler transactions remain separate. See `atomic-foreach-sampler-bundle-2026-10-24.md`.
 - [x] **09.4b.2ae — Complete ordered child selector outputs.** Preserve every emitted child selector and duplicates, distinguish explicit empty from absent output, reject wrong-typed/escaping outputs, and revalidate item liveness before installation. Same bundle note.
 - [x] **09.4b.2af — Owned per-item output frames.** Merge node/edge columns once by ID with later values winning and prior rows retained; preserve non-column outputs under per-item keys and restore prior outputs/target arrays on failure. Recognize nested property attachments in Python validation. Same bundle note.
+- [x] **09.4b.2ag — Checked selected shortest-distance maps.** Certify shared staged-weight adjacency, active endpoint-closed scope, BFS integer distances and nonnegative finite Dijkstra with parallel minima, reverse traversal and checked IDs/costs. See `atomic-path-builder-bundle-2026-10-24.md`.
+- [x] **09.4b.2ah — Checked loopless k-shortest node paths.** Repair Yen root exclusions, full-cost heap ordering, candidate deduplication and zero/trivial/unreachable requests; retain serialized node-path output and minimum parallel-arc semantics. Verify against exhaustive independent simple-path enumeration. Same bundle note.
+- [x] **09.4b.2ai — Isolated seeded selected random walks.** Certify stable start order, staged per-edge weights/multiplicity, overflow-safe transition normalization, explicit zero-row/restart/dead-end semantics, strict controls and failure-safe serialized results. Same bundle note.
+
 
 
 

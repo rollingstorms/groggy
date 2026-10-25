@@ -53,7 +53,7 @@ scalar/vector arithmetic, normalization, variable flow/alias, stroke smoothing,
 fused arithmetic/neighbor kernels, node degree and incident-weight sums,
 undirected triangle/k-core calculations, property filtering and ordering, checked
 statistical/category/neighbor aggregations, declarative expression maps and
-neighbor/in-place label transformations, node/edge/reservoir mask sampling, bounded sampler iteration/neighborhood/emission and recursively checked for-each, checked community helpers, and
+neighbor/in-place label transformations, node/edge/reservoir mask sampling, bounded sampler iteration/neighborhood/emission and recursively checked for-each, checked community/path helpers, and
 ordered or synchronous message-pass blocks.
 The declaration means writes use StepScope attachments and property reads honor
 its overlay; topology remains unchanged. Unsupported steps reject while building
@@ -61,7 +61,7 @@ the native pipeline, before any step executes. Nested `iter.loop` bodies are als
 The complete body is checked even with zero iterations. Each iteration reads prior
 staged assignments; a later failure discards the entire outer run. Loops check
 cancellation between iterations and child steps. An alternate `batch_plan` rejects
-in atomic mode because its executor bypasses property staging. Temporal/path and other remaining graph-dependent families still require migration/certification.
+in atomic mode because its executor bypasses property staging. Temporal and other remaining graph-dependent families still require migration/certification.
 Sampler pipelines reject an atomic property request rather than ignoring it.
 
 Atomic mode uses the builder's original ordered steps. The current IR optimizer
@@ -403,3 +403,5 @@ Community seeding, propagation and local gain contracts: [checked community help
 Selector scope and ownership: [bounded subgraph samplers](builder-subgraph-sampling.md).
 
 Nested child effects and owned outputs: [for-each execution](builder-foreach.md).
+
+Selected weighted paths and walks: [checked path helpers](builder-paths.md).

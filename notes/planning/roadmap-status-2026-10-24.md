@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **183 checked and 79 unchecked entries**. Entries overlap:
+currently contains **186 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -36,6 +36,7 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 | 09.4b.2x–2z | Checked seeding, synchronous propagation and actual directed/undirected local modularity gains verified against independent full-objective moves. |
 | 09.4b.2aa–2ac | Ordered bounded selector iteration, selected neighborhood expansion and consistent induced emission; legacy owner connections remain explicit. |
 | 09.4b.2ad–2af | Recursive for-each property staging, complete child selector flattening and private merged/per-item owned output frames. |
+| 09.4b.2ag–2ai | Checked staged-weight distance maps, loopless Yen node paths and isolated seeded edge-incidence walks. Temporal helpers remain next. |
 
 
 
@@ -74,8 +75,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest nested-sampler change: **975 native tests passed, 52 ignored; 1,532 root
-Python API tests passed, 1 skipped; 68 executable documentation examples passed;
+Latest path-helper change: **979 native tests passed, 52 ignored; 1,595 root
+Python API tests passed, 1 skipped; 72 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

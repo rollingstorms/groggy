@@ -356,3 +356,15 @@ Verified with 975 native tests, 1,532 Python tests, 68 doc examples and strict
 Clippy; release receipt covers 12 workloads. See
 `atomic-foreach-sampler-bundle-2026-10-24.md` and
 `../../docs/api/builder-foreach.md`.
+
+### Checked path builder bundle — 2026-10-24
+
+Completed 09.4b.2ag–2ai: shared checked selected/staged-weight topology for BFS/
+Dijkstra maps, repaired loopless Yen node paths and isolated seeded per-edge walks.
+Root exclusions, full f64 candidate ordering/deduplication, parallel minima versus
+walk multiplicity, reverse traversal, missing/null distinctions and strict input/
+overflow/cancellation handling are explicit. Native DFS references enumerate small
+graph paths independently. Temporal steps remain next; broader execution/native
+compatibility/source-pin and standalone sampler parents stay open. See
+`atomic-path-builder-bundle-2026-10-24.md` and
+`../../docs/api/builder-paths.md` for contracts, costs and gate/receipt evidence.

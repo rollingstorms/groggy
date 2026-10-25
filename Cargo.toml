@@ -127,3 +127,7 @@ harness = false
 [[bench]]
 name = "foreach_sampler_steps"
 harness = false
+
+[[bench]]
+name = "path_builder_steps"
+harness = false

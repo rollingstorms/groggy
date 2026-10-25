@@ -1,74 +1,213 @@
-//! Path utility steps for pathfinding operations.
-//!
-//! This module provides step primitives for common pathfinding operations:
-//! - Single-source shortest paths (Dijkstra/BFS)
-//! - K-shortest paths (Yen's algorithm)
-//! - Random walks with optional restart
+//! Checked selected path primitives sharing one staged-weight topology/kernel.
+use super::{
+    core::{Step, StepMetadata, StepScope},
+    transformations::selected_nodes,
+};
+use crate::{
+    algorithms::{AlgorithmParamValue, Context, CostHint},
+    storage::numeric::scalar::attribute_number,
+    types::{AttrName, NodeId},
+};
+use anyhow::{anyhow, bail, Result};
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
-use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::sync::Arc;
-
-use anyhow::{anyhow, Result};
-use rustc_hash::FxHashMap;
-
-use crate::algorithms::pathfinding::utils::{bfs_layers, checked_dijkstra_weights, dijkstra};
-use crate::algorithms::{AlgorithmParamValue, Context};
-use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
-use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
-use crate::types::{AttrName, AttrValue, NodeId};
-
-use super::core::{Step, StepMetadata, StepScope};
-
-/// Ensures CSR cache is warmed for optimal pathfinding performance.
-/// This enables the pathfinding utilities to use their fast CSR code paths.
-fn ensure_csr_cache(subgraph: &Subgraph, add_reverse: bool) {
-    // Check if cache already exists
-    if subgraph.csr_cache_get(add_reverse).is_some() {
-        return;
+fn check(ctx: &Context) -> Result<()> {
+    if ctx.is_cancelled() {
+        bail!("path step cancelled");
     }
-
-    // Build and cache CSR
-    let nodes = subgraph.ordered_nodes();
-    let edges = subgraph.ordered_edges();
-
-    // Build node indexer
-    let mut node_to_index = FxHashMap::default();
-    node_to_index.reserve(nodes.len());
-    for (i, &node) in nodes.iter().enumerate() {
-        node_to_index.insert(node, i);
+    Ok(())
+}
+fn resolve(scope: &StepScope<'_>, name: &str) -> Result<NodeId> {
+    match scope.variables().scalar(name)? {
+        AlgorithmParamValue::Int(value) => usize::try_from(*value)
+            .map_err(|_| anyhow!("node ID must be non-negative and fit usize")),
+        AlgorithmParamValue::Text(value) => value
+            .parse::<usize>()
+            .map_err(|_| anyhow!("invalid node ID text: {value}")),
+        _ => bail!("node ID variable '{name}' must be integer or text"),
     }
-
-    let graph_ref = subgraph.graph();
-    let graph = graph_ref.borrow();
-
-    let mut csr = Csr::default();
-    build_csr_from_edges_with_scratch(
-        &mut csr,
-        nodes.len(),
-        edges.iter().copied(),
-        |nid| node_to_index.get(&nid).copied(),
-        |eid| graph.edge_endpoints(eid).ok(),
-        CsrOptions {
-            add_reverse_edges: add_reverse,
-            sort_neighbors: false,
-        },
-    );
-
-    drop(graph);
-    subgraph.csr_cache_store(add_reverse, Arc::new(csr));
+}
+#[derive(Clone, Copy)]
+struct ArcStep {
+    target: NodeId,
+    edge: usize,
+    weight: f64,
+}
+struct PathTopology {
+    rows: HashMap<NodeId, Vec<ArcStep>>,
+}
+impl PathTopology {
+    fn prepare(ctx: &Context, scope: &StepScope<'_>, attr: Option<&AttrName>) -> Result<Self> {
+        let nodes = selected_nodes(scope.subgraph(), ctx)?;
+        let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
+        let owner = scope.subgraph().graph();
+        let graph = owner.borrow();
+        for &edge in scope.subgraph().ordered_edges().iter() {
+            check(ctx)?;
+            if !graph.has_edge(edge) {
+                bail!("Path edge {edge} is inactive");
+            }
+            let (source, target) = graph.edge_endpoints(edge)?;
+            if !rows.contains_key(&source) || !rows.contains_key(&target) {
+                bail!("Path edge {edge} endpoint is outside selection");
+            }
+            let weight = if let Some(attr) = attr {
+                match scope.edge_attribute(ctx, edge, attr)? {
+                    None => 1.0,
+                    Some(value) => attribute_number(&value)
+                        .ok_or_else(|| anyhow!("Path weights require finite non-negative numbers"))?
+                        .as_f64(),
+                }
+            } else {
+                1.0
+            };
+            if !weight.is_finite() || weight < 0.0 {
+                bail!("Path weights require finite non-negative numbers");
+            }
+            rows.get_mut(&source)
+                .ok_or_else(|| anyhow!("Missing source"))?
+                .push(ArcStep {
+                    target,
+                    edge,
+                    weight,
+                });
+            if graph.is_undirected() && source != target {
+                rows.get_mut(&target)
+                    .ok_or_else(|| anyhow!("Missing target"))?
+                    .push(ArcStep {
+                        target: source,
+                        edge,
+                        weight,
+                    });
+            }
+        }
+        for row in rows.values_mut() {
+            row.sort_by_key(|arc| (arc.target, arc.edge));
+        }
+        Ok(Self { rows })
+    }
+    fn require(&self, node: NodeId) -> Result<()> {
+        if !self.rows.contains_key(&node) {
+            bail!("Path node {node} is outside active selection");
+        }
+        Ok(())
+    }
+    fn arc_cost(&self, source: NodeId, target: NodeId) -> Result<f64> {
+        self.rows[&source]
+            .iter()
+            .filter(|arc| arc.target == target)
+            .map(|arc| arc.weight)
+            .min_by(f64::total_cmp)
+            .ok_or_else(|| anyhow!("Missing path arc"))
+    }
+    fn search(
+        &self,
+        ctx: &Context,
+        source: NodeId,
+        target: Option<NodeId>,
+        excluded_nodes: &HashSet<NodeId>,
+        excluded_edges: &HashSet<(NodeId, NodeId)>,
+    ) -> Result<(HashMap<NodeId, f64>, HashMap<NodeId, NodeId>)> {
+        check(ctx)?;
+        let mut distances = HashMap::from([(source, 0.0)]);
+        let mut previous = HashMap::new();
+        let mut heap = BinaryHeap::from([SearchState {
+            cost: 0.0,
+            node: source,
+        }]);
+        while let Some(SearchState { cost, node }) = heap.pop() {
+            check(ctx)?;
+            if cost > distances[&node] {
+                continue;
+            }
+            if Some(node) == target {
+                break;
+            }
+            for arc in &self.rows[&node] {
+                check(ctx)?;
+                if excluded_nodes.contains(&arc.target)
+                    || excluded_edges.contains(&(node, arc.target))
+                {
+                    continue;
+                }
+                let next = add_cost(cost, arc.weight)?;
+                if next < distances.get(&arc.target).copied().unwrap_or(f64::INFINITY) {
+                    distances.insert(arc.target, next);
+                    previous.insert(arc.target, node);
+                    heap.push(SearchState {
+                        cost: next,
+                        node: arc.target,
+                    });
+                }
+            }
+        }
+        Ok((distances, previous))
+    }
+    fn path(
+        &self,
+        ctx: &Context,
+        source: NodeId,
+        target: NodeId,
+        excluded_nodes: &HashSet<NodeId>,
+        excluded_edges: &HashSet<(NodeId, NodeId)>,
+    ) -> Result<Option<(Vec<NodeId>, f64)>> {
+        let (distances, previous) =
+            self.search(ctx, source, Some(target), excluded_nodes, excluded_edges)?;
+        let Some(&cost) = distances.get(&target) else {
+            return Ok(None);
+        };
+        let mut path = vec![target];
+        let mut node = target;
+        while node != source {
+            check(ctx)?;
+            node = *previous
+                .get(&node)
+                .ok_or_else(|| anyhow!("Missing path predecessor"))?;
+            path.push(node);
+        }
+        path.reverse();
+        Ok(Some((path, cost)))
+    }
+}
+fn add_cost(left: f64, right: f64) -> Result<f64> {
+    let value = left + right;
+    if !value.is_finite() {
+        bail!("Path cost overflow");
+    }
+    Ok(value)
+}
+#[derive(Clone, Copy, Debug)]
+struct SearchState {
+    cost: f64,
+    node: NodeId,
+}
+impl PartialEq for SearchState {
+    fn eq(&self, other: &Self) -> bool {
+        self.cost.total_cmp(&other.cost).is_eq() && self.node == other.node
+    }
+}
+impl Eq for SearchState {}
+impl Ord for SearchState {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .cost
+            .total_cmp(&self.cost)
+            .then_with(|| other.node.cmp(&self.node))
+    }
+}
+impl PartialOrd for SearchState {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
-/// Computes single-source shortest paths from a source node to all reachable nodes.
-///
-/// Uses BFS for unweighted graphs or Dijkstra for weighted graphs.
-/// Stores distances as a node map variable.
+/// Reachable distances: checked integer BFS or non-negative weighted Dijkstra.
 pub struct ShortestPathMapStep {
-    source: String,                // Variable name containing source node ID (scalar)
-    weight_attr: Option<AttrName>, // Optional edge weight attribute
-    output: String,                // Variable name for output distances (node map)
+    source: String,
+    weight_attr: Option<AttrName>,
+    output: String,
 }
-
 impl ShortestPathMapStep {
     pub fn new(source: String, weight_attr: Option<AttrName>, output: String) -> Self {
         Self {
@@ -77,103 +216,73 @@ impl ShortestPathMapStep {
             output,
         }
     }
-
-    fn resolve_source(&self, scope: &StepScope<'_>) -> Result<NodeId> {
-        let value = scope.variables().scalar(&self.source)?;
-        match value {
-            AlgorithmParamValue::Int(id) => Ok(*id as usize),
-            AlgorithmParamValue::Text(s) => s
-                .parse::<usize>()
-                .map_err(|_| anyhow!("cannot parse node id from text '{}'", s)),
-            _ => Err(anyhow!(
-                "source variable '{}' must be int or text, got {:?}",
-                self.source,
-                value
-            )),
-        }
-    }
 }
-
 impl Step for ShortestPathMapStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.shortest_path_map"
     }
-
     fn metadata(&self) -> StepMetadata {
         StepMetadata {
-            id: self.id().to_string(),
-            description: "Single-source shortest paths using BFS or Dijkstra".to_string(),
-            cost_hint: crate::algorithms::CostHint::Linearithmic,
+            id: self.id().into(),
+            description: "Checked selected BFS/Dijkstra distances".into(),
+            cost_hint: CostHint::Linearithmic,
         }
     }
-
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let source = self.resolve_source(scope)?;
-        let subgraph = scope.subgraph();
-
-        // Validate source exists in subgraph
-        if !subgraph.nodes().contains(&source) || !subgraph.graph().borrow().has_node(source) {
-            return Err(anyhow!("source node {} not in subgraph", source));
-        }
-
-        // Warm CSR cache for optimal performance
-        let is_directed = subgraph.graph().borrow().is_directed();
-        ctx.with_scoped_timer("step.shortest_path_map.warm_csr", || -> Result<()> {
-            ensure_csr_cache(subgraph, !is_directed);
-            Ok(())
-        })?;
-
-        let distances: HashMap<NodeId, AlgorithmParamValue> =
-            if let Some(weight_attr) = &self.weight_attr {
-                // Weighted: use Dijkstra
-                let weight_map = ctx.with_scoped_timer(
-                    "step.shortest_path_map.collect_weights",
-                    || -> Result<HashMap<(NodeId, NodeId), f64>> {
-                        Ok(checked_dijkstra_weights(subgraph, Some(weight_attr))?)
-                    },
-                )?;
-
-                ctx.with_scoped_timer(
-                    "step.shortest_path_map.dijkstra",
-                    || -> Result<HashMap<NodeId, f64>> {
-                        Ok(dijkstra(subgraph, source, |u, v| {
-                            weight_map.get(&(u, v)).copied().unwrap_or(1.0)
-                        }))
-                    },
-                )?
+        check(ctx)?;
+        let source = resolve(scope, &self.source)?;
+        let topology = PathTopology::prepare(ctx, scope, self.weight_attr.as_ref())?;
+        topology.require(source)?;
+        let result: HashMap<NodeId, AlgorithmParamValue> = if self.weight_attr.is_some() {
+            topology
+                .search(ctx, source, None, &HashSet::new(), &HashSet::new())?
+                .0
                 .into_iter()
-                .map(|(node, dist)| (node, AlgorithmParamValue::Float(dist)))
+                .map(|(node, distance)| (node, AlgorithmParamValue::Float(distance)))
                 .collect()
-            } else {
-                // Unweighted: use BFS
-                ctx.with_scoped_timer(
-                    "step.shortest_path_map.bfs",
-                    || -> Result<HashMap<NodeId, usize>> { Ok(bfs_layers(subgraph, source)) },
-                )?
+        } else {
+            let mut distances = HashMap::from([(source, 0i64)]);
+            let mut queue = VecDeque::from([source]);
+            while let Some(node) = queue.pop_front() {
+                check(ctx)?;
+                let distance = distances[&node]
+                    .checked_add(1)
+                    .ok_or_else(|| anyhow!("BFS distance overflow"))?;
+                for arc in &topology.rows[&node] {
+                    check(ctx)?;
+                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                        distances.entry(arc.target)
+                    {
+                        entry.insert(distance);
+                        queue.push_back(arc.target);
+                    }
+                }
+            }
+            distances
                 .into_iter()
-                .map(|(node, dist)| (node, AlgorithmParamValue::Int(dist as i64)))
+                .map(|(node, value)| (node, AlgorithmParamValue::Int(value)))
                 .collect()
-            };
-
-        ctx.emit_iteration(0, distances.len());
+        };
+        check(ctx)?;
+        ctx.emit_iteration(0, result.len());
         scope
             .variables_mut()
-            .set_node_map(self.output.clone(), distances);
+            .set_node_map(self.output.clone(), result);
         Ok(())
     }
 }
 
-/// Computes k shortest paths between source and target nodes using Yen's algorithm.
-///
-/// Returns a list of paths, each represented as a sequence of node IDs.
+/// K distinct loopless node sequences, with minimum parallel-arc costs.
 pub struct KShortestPathsStep {
-    source: String,                // Variable name for source node ID (scalar)
-    target: String,                // Variable name for target node ID (scalar)
-    k: usize,                      // Number of paths to find
-    weight_attr: Option<AttrName>, // Optional edge weight attribute
-    output: String,                // Variable name for output paths
+    source: String,
+    target: String,
+    k: usize,
+    weight_attr: Option<AttrName>,
+    output: String,
 }
-
 impl KShortestPathsStep {
     pub fn new(
         source: String,
@@ -190,397 +299,134 @@ impl KShortestPathsStep {
             output,
         }
     }
-
-    fn resolve_node_id(&self, scope: &StepScope<'_>, var_name: &str) -> Result<NodeId> {
-        let value = scope.variables().scalar(var_name)?;
-        match value {
-            AlgorithmParamValue::Int(id) => Ok(*id as usize),
-            AlgorithmParamValue::Text(s) => s
-                .parse::<usize>()
-                .map_err(|_| anyhow!("cannot parse node id from text '{}'", s)),
-            _ => Err(anyhow!(
-                "variable '{}' must be int or text, got {:?}",
-                var_name,
-                value
-            )),
-        }
-    }
-
-    /// Dijkstra that also tracks predecessors for path reconstruction
-    /// Uses CSR for optimal performance
-    fn dijkstra_with_path(
-        &self,
-        subgraph: &Subgraph,
-        source: NodeId,
-        target: NodeId,
-        weight_map: &HashMap<(NodeId, NodeId), f64>,
-        excluded_edges: &HashSet<(NodeId, NodeId)>,
-    ) -> Option<(Vec<NodeId>, f64)> {
-        #[derive(Copy, Clone, Debug)]
-        struct State {
-            cost: f64,
-            node: NodeId,
-        }
-
-        impl Eq for State {}
-        impl PartialEq for State {
-            fn eq(&self, other: &Self) -> bool {
-                self.node == other.node && (self.cost - other.cost).abs() <= f64::EPSILON
-            }
-        }
-        impl Ord for State {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                other
-                    .cost
-                    .partial_cmp(&self.cost)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| self.node.cmp(&other.node))
-            }
-        }
-        impl PartialOrd for State {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        // Try CSR path first (will be available due to ensure_csr_cache call)
-        if let Some(csr) = subgraph.csr_cache_get(false) {
-            let nodes = subgraph.ordered_nodes();
-            let mut node_to_idx = FxHashMap::default();
-            for (i, &nid) in nodes.iter().enumerate() {
-                node_to_idx.insert(nid, i);
-            }
-
-            let source_idx = *node_to_idx.get(&source)?;
-            let target_idx = *node_to_idx.get(&target)?;
-
-            let mut dist = vec![f64::INFINITY; nodes.len()];
-            let mut prev = vec![None; nodes.len()];
-            let mut heap: BinaryHeap<State> = BinaryHeap::new();
-
-            dist[source_idx] = 0.0;
-            heap.push(State {
-                cost: 0.0,
-                node: source,
-            });
-
-            while let Some(State { cost, node }) = heap.pop() {
-                let node_idx = node_to_idx[&node];
-
-                if node == target {
-                    // Reconstruct path
-                    let mut path = vec![target];
-                    let mut current_idx = target_idx;
-                    while let Some(pred_idx) = prev[current_idx] {
-                        path.push(nodes[pred_idx]);
-                        current_idx = pred_idx;
-                    }
-                    path.reverse();
-                    return Some((path, cost));
-                }
-
-                if cost > dist[node_idx] + f64::EPSILON {
-                    continue;
-                }
-
-                // Use CSR for neighbor iteration
-                let start = csr.offsets[node_idx];
-                let end = csr.offsets[node_idx + 1];
-
-                for i in start..end {
-                    let neighbor_idx = csr.neighbors[i];
-                    let neighbor = nodes[neighbor_idx];
-
-                    // Skip excluded edges
-                    if excluded_edges.contains(&(node, neighbor)) {
-                        continue;
-                    }
-
-                    let weight = weight_map.get(&(node, neighbor)).copied().unwrap_or(1.0);
-                    let next_cost = cost + weight;
-                    let best = dist[neighbor_idx];
-
-                    if next_cost + f64::EPSILON < best {
-                        dist[neighbor_idx] = next_cost;
-                        prev[neighbor_idx] = Some(node_idx);
-                        heap.push(State {
-                            cost: next_cost,
-                            node: neighbor,
-                        });
-                    }
-                }
-            }
-
-            return None;
-        }
-
-        // Fallback to trait-based (should not happen after ensure_csr_cache)
-        let mut dist: HashMap<NodeId, f64> = HashMap::new();
-        let mut prev: HashMap<NodeId, NodeId> = HashMap::new();
-        let mut heap: BinaryHeap<State> = BinaryHeap::new();
-
-        dist.insert(source, 0.0);
-        heap.push(State {
-            cost: 0.0,
-            node: source,
-        });
-
-        while let Some(State { cost, node }) = heap.pop() {
-            if node == target {
-                // Reconstruct path
-                let mut path = vec![target];
-                let mut current = target;
-                while let Some(&pred) = prev.get(&current) {
-                    path.push(pred);
-                    current = pred;
-                }
-                path.reverse();
-                return Some((path, cost));
-            }
-
-            if cost > dist[&node] + f64::EPSILON {
-                continue;
-            }
-
-            if let Ok(neighbors) = subgraph.neighbors(node) {
-                for neighbor in neighbors {
-                    // Skip excluded edges
-                    if excluded_edges.contains(&(node, neighbor)) {
-                        continue;
-                    }
-
-                    let weight = weight_map.get(&(node, neighbor)).copied().unwrap_or(1.0);
-                    let next_cost = cost + weight;
-                    let best = dist.get(&neighbor).copied().unwrap_or(f64::INFINITY);
-
-                    if next_cost + f64::EPSILON < best {
-                        dist.insert(neighbor, next_cost);
-                        prev.insert(neighbor, node);
-                        heap.push(State {
-                            cost: next_cost,
-                            node: neighbor,
-                        });
-                    }
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Yen's algorithm for k-shortest paths
-    fn yens_algorithm(
-        &self,
-        subgraph: &Subgraph,
-        source: NodeId,
-        target: NodeId,
-        weight_map: &HashMap<(NodeId, NodeId), f64>,
-    ) -> Vec<(Vec<NodeId>, f64)> {
-        let mut result_paths: Vec<(Vec<NodeId>, f64)> = Vec::new();
-
-        // We'll use a custom struct for the heap that wraps the path and cost
-        #[derive(Debug, Clone)]
-        struct PathCandidate {
-            cost_millis: i64, // Cost in millis for ordering
-            path: Vec<NodeId>,
-            cost: f64,
-        }
-
-        impl Eq for PathCandidate {}
-        impl PartialEq for PathCandidate {
-            fn eq(&self, other: &Self) -> bool {
-                self.cost_millis == other.cost_millis
-            }
-        }
-        impl Ord for PathCandidate {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                // Min-heap: reverse comparison
-                other.cost_millis.cmp(&self.cost_millis)
-            }
-        }
-        impl PartialOrd for PathCandidate {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        let mut candidate_paths: BinaryHeap<PathCandidate> = BinaryHeap::new();
-
-        // Find the first shortest path
-        if let Some((path, cost)) =
-            self.dijkstra_with_path(subgraph, source, target, weight_map, &HashSet::new())
-        {
-            result_paths.push((path, cost));
-        } else {
-            return result_paths; // No path exists
-        }
-
-        // Find k-1 more paths
-        for k_iter in 1..self.k {
-            let prev_path = &result_paths[k_iter - 1].0;
-
-            // Iterate over spur nodes (all but last node in previous path)
-            for i in 0..prev_path.len().saturating_sub(1) {
-                let spur_node = prev_path[i];
-                let root_path = &prev_path[0..=i];
-
-                let mut excluded_edges = HashSet::new();
-
-                // Exclude edges that are part of previous paths sharing the same root
-                for (existing_path, _) in &result_paths {
-                    if existing_path.len() > i
-                        && existing_path[0..=i] == root_path[..]
-                        && i + 1 < existing_path.len()
-                    {
-                        excluded_edges.insert((existing_path[i], existing_path[i + 1]));
-                    }
-                }
-
-                // Find shortest path from spur node to target with excluded edges
-                if let Some((spur_path, spur_cost)) = self.dijkstra_with_path(
-                    subgraph,
-                    spur_node,
-                    target,
-                    weight_map,
-                    &excluded_edges,
-                ) {
-                    // Combine root path and spur path
-                    let mut total_path = root_path[0..root_path.len() - 1].to_vec();
-                    total_path.extend(spur_path);
-
-                    // Calculate total cost
-                    let root_cost: f64 = (0..root_path.len() - 1)
-                        .map(|j| {
-                            weight_map
-                                .get(&(root_path[j], root_path[j + 1]))
-                                .copied()
-                                .unwrap_or(1.0)
-                        })
-                        .sum();
-                    let total_cost = root_cost + spur_cost;
-
-                    // Add to candidates
-                    candidate_paths.push(PathCandidate {
-                        cost_millis: (total_cost * 1000000.0) as i64,
-                        path: total_path,
-                        cost: total_cost,
-                    });
-                }
-            }
-
-            // Select the best candidate
-            if let Some(candidate) = candidate_paths.pop() {
-                // Avoid duplicates
-                if !result_paths.iter().any(|(p, _)| p == &candidate.path) {
-                    result_paths.push((candidate.path, candidate.cost));
-                }
-            } else {
-                break; // No more paths found
-            }
-        }
-
-        result_paths
+}
+#[derive(Clone)]
+struct Candidate {
+    path: Vec<NodeId>,
+    cost: f64,
+}
+impl PartialEq for Candidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.cost.total_cmp(&other.cost).is_eq() && self.path == other.path
     }
 }
-
+impl Eq for Candidate {}
+impl Ord for Candidate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .cost
+            .total_cmp(&self.cost)
+            .then_with(|| other.path.cmp(&self.path))
+    }
+}
+impl PartialOrd for Candidate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl KShortestPathsStep {
+    fn paths(
+        &self,
+        ctx: &Context,
+        topology: &PathTopology,
+        source: NodeId,
+        target: NodeId,
+    ) -> Result<Vec<(Vec<NodeId>, f64)>> {
+        if self.k == 0 {
+            return Ok(vec![]);
+        }
+        let Some(first) = topology.path(ctx, source, target, &HashSet::new(), &HashSet::new())?
+        else {
+            return Ok(vec![]);
+        };
+        let mut seen = HashSet::from([first.0.clone()]);
+        let mut accepted = vec![first];
+        let mut candidates = BinaryHeap::new();
+        while accepted.len() < self.k {
+            check(ctx)?;
+            let previous = &accepted[accepted.len() - 1].0;
+            let mut prefix_cost = 0.0;
+            for index in 0..previous.len().saturating_sub(1) {
+                check(ctx)?;
+                let root = &previous[..=index];
+                let excluded_nodes: HashSet<_> = root[..index].iter().copied().collect();
+                let excluded_edges: HashSet<_> = accepted
+                    .iter()
+                    .filter_map(|(path, _)| {
+                        if path.len() > index + 1 && path[..=index] == *root {
+                            Some((path[index], path[index + 1]))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if let Some((spur, cost)) = topology.path(
+                    ctx,
+                    previous[index],
+                    target,
+                    &excluded_nodes,
+                    &excluded_edges,
+                )? {
+                    let mut path = root[..index].to_vec();
+                    path.extend(spur);
+                    let cost = add_cost(prefix_cost, cost)?;
+                    if seen.insert(path.clone()) {
+                        candidates.push(Candidate { path, cost });
+                    }
+                }
+                prefix_cost = add_cost(
+                    prefix_cost,
+                    topology.arc_cost(previous[index], previous[index + 1])?,
+                )?;
+            }
+            let Some(next) = candidates.pop() else { break };
+            accepted.push((next.path, next.cost));
+        }
+        accepted.sort_by(|(a, ac), (b, bc)| ac.total_cmp(bc).then_with(|| a.cmp(b)));
+        Ok(accepted)
+    }
+}
 impl Step for KShortestPathsStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.k_shortest_paths"
     }
-
     fn metadata(&self) -> StepMetadata {
         StepMetadata {
-            id: self.id().to_string(),
-            description: "K-shortest paths using Yen's algorithm".to_string(),
-            cost_hint: crate::algorithms::CostHint::Quadratic,
+            id: self.id().into(),
+            description: "Checked loopless node paths using Yen".into(),
+            cost_hint: CostHint::Quadratic,
         }
     }
-
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let source = self.resolve_node_id(scope, &self.source)?;
-        let target = self.resolve_node_id(scope, &self.target)?;
-        let subgraph = scope.subgraph();
-
-        // Validate nodes exist
-        if !subgraph.nodes().contains(&source) {
-            return Err(anyhow!("source node {} not in subgraph", source));
-        }
-        if !subgraph.nodes().contains(&target) {
-            return Err(anyhow!("target node {} not in subgraph", target));
-        }
-
-        // Warm CSR cache - although Yen's uses trait-based neighbors,
-        // warming the cache may help future algorithm steps
-        let is_directed = subgraph.graph().borrow().is_directed();
-        ctx.with_scoped_timer("step.k_shortest_paths.warm_csr", || -> Result<()> {
-            ensure_csr_cache(subgraph, !is_directed);
-            Ok(())
-        })?;
-
-        // Build weight map
-        let weight_map = ctx.with_scoped_timer(
-            "step.k_shortest_paths.collect_weights",
-            || -> Result<HashMap<(NodeId, NodeId), f64>> {
-                if let Some(weight_attr) = &self.weight_attr {
-                    let graph_ref = subgraph.graph();
-                    let graph = graph_ref.borrow();
-                    let mut wm = HashMap::new();
-                    for &edge_id in subgraph.edge_set() {
-                        if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                            if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
-                                if let Some(weight) = match value {
-                                    AttrValue::Float(f) => Some(f as f64),
-                                    AttrValue::Float64(f) => Some(f),
-                                    AttrValue::Int(i) => Some(i as f64),
-                                    _ => None,
-                                } {
-                                    wm.insert((u, v), weight);
-                                }
-                            }
-                        }
-                    }
-                    Ok(wm)
-                } else {
-                    Ok(HashMap::new()) // Will default to 1.0
-                }
-            },
-        )?;
-
-        let paths = ctx.with_scoped_timer(
-            "step.k_shortest_paths.yens_algorithm",
-            || -> Result<Vec<(Vec<NodeId>, f64)>> {
-                Ok(self.yens_algorithm(subgraph, source, target, &weight_map))
-            },
-        )?;
-
+        check(ctx)?;
+        let source = resolve(scope, &self.source)?;
+        let target = resolve(scope, &self.target)?;
+        let topology = PathTopology::prepare(ctx, scope, self.weight_attr.as_ref())?;
+        topology.require(source)?;
+        topology.require(target)?;
+        let paths = self.paths(ctx, &topology, source, target)?;
+        let output = serde_json::to_string(&paths)?;
+        check(ctx)?;
         ctx.emit_iteration(0, paths.len());
-
-        // Convert paths to a scalar containing serialized list
-        // Format: list of (path, cost) tuples
-        let paths_json = serde_json::to_string(&paths).map_err(|e| anyhow!("JSON error: {}", e))?;
-
         scope
             .variables_mut()
-            .set_scalar(self.output.clone(), AlgorithmParamValue::Text(paths_json));
+            .set_scalar(self.output.clone(), AlgorithmParamValue::Text(output));
         Ok(())
     }
 }
 
-/// Performs random walks starting from specified nodes.
-///
-/// Supports:
-/// - Fixed walk length
-/// - Restart probability (teleport back to start)
-/// - Weighted edge transitions
+/// Ordered seeded walks with per-edge transition multiplicity and optional restart.
 pub struct RandomWalkStep {
-    start_nodes: String, // Variable name for starting nodes (node map or scalar)
-    length: usize,       // Walk length
-    restart_prob: f64,   // Probability of restarting from source (0.0-1.0)
-    weight_attr: Option<AttrName>, // Optional edge weight for biased walks
-    seed: Option<u64>,   // Random seed for reproducibility
-    output: String,      // Variable name for output walks
+    start_nodes: String,
+    length: usize,
+    restart_prob: f64,
+    weight_attr: Option<AttrName>,
+    seed: Option<u64>,
+    output: String,
 }
-
 impl RandomWalkStep {
     pub fn new(
         start_nodes: String,
@@ -599,176 +445,99 @@ impl RandomWalkStep {
             output,
         }
     }
-
-    fn resolve_start_nodes(&self, scope: &StepScope<'_>) -> Result<Vec<NodeId>> {
-        let vars = scope.variables();
-
-        // Try to get as node map first
-        if let Ok(map) = vars.node_map(&self.start_nodes) {
-            return Ok(map.keys().copied().collect());
-        }
-
-        // Otherwise try as scalar
-        if let Ok(value) = vars.scalar(&self.start_nodes) {
-            match value {
-                AlgorithmParamValue::Int(id) => Ok(vec![*id as usize]),
-                AlgorithmParamValue::Text(s) => {
-                    let id: usize = s
-                        .parse()
-                        .map_err(|_| anyhow!("cannot parse node id from text '{}'", s))?;
-                    Ok(vec![id])
-                }
-                _ => Err(anyhow!(
-                    "start_nodes scalar variable '{}' must be int or text",
-                    self.start_nodes
-                )),
-            }
-        } else {
-            Err(anyhow!(
-                "start_nodes variable '{}' must be node map or scalar node ID",
-                self.start_nodes
-            ))
-        }
-    }
-
-    fn perform_walk(
-        &self,
-        subgraph: &Subgraph,
-        start: NodeId,
-        weight_map: &HashMap<(NodeId, NodeId), f64>,
-    ) -> Vec<NodeId> {
-        let mut walk = vec![start];
-        let mut current = start;
-
-        for _ in 0..self.length {
-            // Check restart probability
-            if fastrand::f64() < self.restart_prob {
-                current = start;
-                walk.push(current);
-                continue;
-            }
-
-            // Get neighbors
-            if let Ok(neighbors) = subgraph.neighbors(current) {
-                if neighbors.is_empty() {
-                    break; // Dead end
-                }
-
-                // Choose next node (weighted or uniform)
-                let next = if weight_map.is_empty() {
-                    // Uniform random selection
-                    let idx = fastrand::usize(0..neighbors.len());
-                    neighbors[idx]
-                } else {
-                    // Weighted selection
-                    let weights: Vec<f64> = neighbors
-                        .iter()
-                        .map(|&n| weight_map.get(&(current, n)).copied().unwrap_or(1.0))
-                        .collect();
-                    let total: f64 = weights.iter().sum();
-
-                    if total <= 0.0 {
-                        // Fall back to uniform
-                        let idx = fastrand::usize(0..neighbors.len());
-                        neighbors[idx]
-                    } else {
-                        let mut pick = fastrand::f64() * total;
-                        let mut selected = neighbors[0];
-                        for (i, &w) in weights.iter().enumerate() {
-                            if pick < w {
-                                selected = neighbors[i];
-                                break;
-                            }
-                            pick -= w;
-                        }
-                        selected
-                    }
-                };
-
-                walk.push(next);
-                current = next;
-            } else {
-                break; // No neighbors
-            }
-        }
-
-        walk
-    }
 }
-
 impl Step for RandomWalkStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
     fn id(&self) -> &'static str {
         "core.random_walk"
     }
-
     fn metadata(&self) -> StepMetadata {
         StepMetadata {
-            id: self.id().to_string(),
-            description: "Random walk sequences with optional restart and weighted transitions"
-                .to_string(),
-            cost_hint: crate::algorithms::CostHint::Linear,
+            id: self.id().into(),
+            description: "Checked selected seeded random walks".into(),
+            cost_hint: CostHint::Linear,
         }
     }
-
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let start_nodes = self.resolve_start_nodes(scope)?;
-        let subgraph = scope.subgraph();
-
-        // Validate restart probability
-        if !(0.0..=1.0).contains(&self.restart_prob) {
-            return Err(anyhow!(
-                "restart_prob must be in [0.0, 1.0], got {}",
-                self.restart_prob
-            ));
+        check(ctx)?;
+        if !self.restart_prob.is_finite() || !(0.0..=1.0).contains(&self.restart_prob) {
+            bail!("restart_prob must be finite and in [0,1]");
         }
-
-        // Build weight map if needed
-        let weight_map = if let Some(weight_attr) = &self.weight_attr {
-            let graph_ref = subgraph.graph();
-            let graph = graph_ref.borrow();
-            let mut wm = HashMap::new();
-            for &edge_id in subgraph.edge_set() {
-                if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                    if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
-                        if let Some(weight) = match value {
-                            AttrValue::Float(f) => Some(f as f64),
-                            AttrValue::Float64(f) => Some(f),
-                            AttrValue::Int(i) => Some(i as f64),
-                            _ => None,
-                        } {
-                            wm.insert((u, v), weight);
+        let mut starts = if let Ok(map) = scope.variables().node_map(&self.start_nodes) {
+            map.keys().copied().collect::<Vec<_>>()
+        } else {
+            vec![resolve(scope, &self.start_nodes)?]
+        };
+        starts.sort_unstable();
+        let topology = PathTopology::prepare(ctx, scope, self.weight_attr.as_ref())?;
+        for &node in &starts {
+            topology.require(node)?;
+        }
+        let mut transitions = HashMap::new();
+        if self.weight_attr.is_some() {
+            for (&node, row) in &topology.rows {
+                check(ctx)?;
+                let maximum = row.iter().map(|arc| arc.weight).fold(0.0_f64, f64::max);
+                let mut cumulative = 0.0;
+                let mut choices = Vec::new();
+                if maximum > 0.0 {
+                    for arc in row {
+                        let next = cumulative + arc.weight / maximum;
+                        if next > cumulative {
+                            choices.push((arc.target, next));
                         }
+                        cumulative = next;
                     }
                 }
+                transitions.insert(node, (cumulative, choices));
             }
-            wm
-        } else {
-            HashMap::new()
-        };
-
-        // Seed the RNG if specified
-        if let Some(seed) = self.seed {
-            fastrand::seed(seed);
         }
-
-        // Perform walks
-        let walks: Vec<Vec<NodeId>> = start_nodes
-            .iter()
-            .map(|&start| self.perform_walk(subgraph, start, &weight_map))
-            .collect();
-
+        let mut rng = self.seed.map(fastrand::Rng::with_seed).unwrap_or_default();
+        let mut walks = Vec::with_capacity(starts.len());
+        for start in starts {
+            check(ctx)?;
+            let mut current = start;
+            let mut walk = vec![start];
+            for _ in 0..self.length {
+                check(ctx)?;
+                let next = if rng.f64() < self.restart_prob {
+                    start
+                } else {
+                    let row = &topology.rows[&current];
+                    if row.is_empty() {
+                        break;
+                    }
+                    if let Some((total, choices)) =
+                        transitions.get(&current).filter(|(total, _)| *total > 0.0)
+                    {
+                        let pick = rng.f64() * total;
+                        choices
+                            .iter()
+                            .find(|(_, limit)| pick < *limit)
+                            .or_else(|| choices.last())
+                            .ok_or_else(|| anyhow!("Missing weighted transition"))?
+                            .0
+                    } else {
+                        row[rng.usize(0..row.len())].target
+                    }
+                };
+                walk.try_reserve(1)?;
+                walk.push(next);
+                current = next;
+            }
+            walks.push(walk);
+        }
+        let output = serde_json::to_string(&walks)?;
+        check(ctx)?;
         ctx.emit_iteration(0, walks.len());
-
-        // Serialize walks as JSON
-        let walks_json = serde_json::to_string(&walks).map_err(|e| anyhow!("JSON error: {}", e))?;
-
         scope
             .variables_mut()
-            .set_scalar(self.output.clone(), AlgorithmParamValue::Text(walks_json));
+            .set_scalar(self.output.clone(), AlgorithmParamValue::Text(output));
         Ok(())
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -844,5 +613,237 @@ mod tests {
         } else {
             panic!("Expected text output");
         }
+    }
+}
+
+#[cfg(test)]
+mod checked_tests {
+    use super::*;
+    use crate::{algorithms::steps::StepVariables, subgraphs::Subgraph, AttrValue, Graph};
+    use std::{
+        cell::RefCell,
+        rc::Rc,
+        sync::{atomic::AtomicBool, Arc},
+    };
+
+    fn enumerate(
+        topology: &PathTopology,
+        node: NodeId,
+        target: NodeId,
+        path: &mut Vec<NodeId>,
+        cost: f64,
+        result: &mut HashMap<Vec<NodeId>, f64>,
+    ) {
+        if node == target {
+            result
+                .entry(path.clone())
+                .and_modify(|old| *old = old.min(cost))
+                .or_insert(cost);
+            return;
+        }
+        for arc in &topology.rows[&node] {
+            if !path.contains(&arc.target) {
+                path.push(arc.target);
+                enumerate(
+                    topology,
+                    arc.target,
+                    target,
+                    path,
+                    cost + arc.weight,
+                    result,
+                );
+                path.pop();
+            }
+        }
+    }
+    #[test]
+    fn yen_matches_exhaustive_simple_path_enumeration_on_all_four_node_graphs() {
+        for directed in [false, true] {
+            let pairs: Vec<_> = (0..4)
+                .flat_map(|u| {
+                    (0..4)
+                        .filter(move |&v| if directed { u != v } else { u < v })
+                        .map(move |v| (u, v))
+                })
+                .collect();
+            for mask in 0..1usize << pairs.len() {
+                let mut rows: HashMap<_, Vec<_>> = (0..4).map(|node| (node, vec![])).collect();
+                for (edge, &(u, v)) in pairs.iter().enumerate() {
+                    if mask & (1 << edge) != 0 {
+                        let weight = (edge % 3) as f64;
+                        rows.get_mut(&u).expect("row").push(ArcStep {
+                            target: v,
+                            edge,
+                            weight,
+                        });
+                        if !directed {
+                            rows.get_mut(&v).expect("row").push(ArcStep {
+                                target: u,
+                                edge,
+                                weight,
+                            });
+                        }
+                    }
+                }
+                for row in rows.values_mut() {
+                    row.sort_by_key(|arc| (arc.target, arc.edge));
+                }
+                let topology = PathTopology { rows };
+                let mut expected = HashMap::new();
+                enumerate(&topology, 0, 3, &mut vec![0], 0.0, &mut expected);
+                let step = KShortestPathsStep::new(
+                    "source".into(),
+                    "target".into(),
+                    usize::MAX,
+                    None,
+                    "paths".into(),
+                );
+                let actual = step.paths(&Context::new(), &topology, 0, 3).expect("paths");
+                assert_eq!(
+                    actual.len(),
+                    expected.len(),
+                    "directed={directed}, mask={mask}"
+                );
+                for (path, cost) in &actual {
+                    assert_eq!(expected.get(path), Some(cost));
+                    assert_eq!(path.iter().collect::<HashSet<_>>().len(), path.len());
+                }
+                assert!(actual.windows(2).all(|pair| pair[0].1 <= pair[1].1));
+                if !actual.is_empty() {
+                    let first = KShortestPathsStep::new(
+                        "source".into(),
+                        "target".into(),
+                        1,
+                        None,
+                        "paths".into(),
+                    )
+                    .paths(&Context::new(), &topology, 0, 3)
+                    .expect("first");
+                    assert_eq!(first[0].1, actual[0].1);
+                }
+            }
+        }
+    }
+    fn selection() -> Subgraph {
+        let mut graph = Graph::new_undirected();
+        graph.add_nodes(4);
+        for (u, v, w) in [
+            (0, 1, 10.0),
+            (0, 1, 2.0),
+            (1, 2, 1.0),
+            (0, 2, 8.0),
+            (2, 3, 1.0),
+        ] {
+            let edge = graph.add_edge(u, v).expect("edge");
+            graph
+                .set_edge_attr(edge, "weight".into(), AttrValue::Float64(w))
+                .expect("weight");
+        }
+        Subgraph::new(
+            Rc::new(RefCell::new(graph)),
+            HashSet::from([0, 1, 2]),
+            HashSet::from([0, 1, 2, 3]),
+            "selected".into(),
+        )
+    }
+    #[test]
+    fn weighted_distances_and_paths_keep_parallel_minima_undirected_reverse_and_selection() {
+        let selected = selection();
+        let mut vars = StepVariables::default();
+        vars.set_scalar("source", AlgorithmParamValue::Int(2));
+        vars.set_scalar("target", AlgorithmParamValue::Int(0));
+        let mut scope = StepScope::new(&selected, &mut vars);
+        ShortestPathMapStep::new("source".into(), Some("weight".into()), "distance".into())
+            .apply(&mut Context::new(), &mut scope)
+            .expect("distances");
+        assert_eq!(
+            scope.variables().node_map("distance").expect("map")[&0],
+            AlgorithmParamValue::Float(3.0)
+        );
+        assert!(!scope
+            .variables()
+            .node_map("distance")
+            .expect("map")
+            .contains_key(&3));
+        KShortestPathsStep::new(
+            "source".into(),
+            "target".into(),
+            10,
+            Some("weight".into()),
+            "paths".into(),
+        )
+        .apply(&mut Context::new(), &mut scope)
+        .expect("paths");
+        let AlgorithmParamValue::Text(value) = scope.variables().scalar("paths").expect("paths")
+        else {
+            panic!("text")
+        };
+        let paths: Vec<(Vec<usize>, f64)> = serde_json::from_str(value).expect("json");
+        assert_eq!(paths, [(vec![2, 1, 0], 3.0), (vec![2, 0], 8.0)]);
+    }
+    #[test]
+    fn negative_ids_bad_weights_and_cancellation_preserve_previous_results() {
+        let selected = selection();
+        let mut vars = StepVariables::default();
+        vars.set_scalar("source", AlgorithmParamValue::Int(-1));
+        vars.set_node_map("result", HashMap::from([(0, AlgorithmParamValue::Int(99))]));
+        let mut scope = StepScope::new(&selected, &mut vars);
+        let step =
+            ShortestPathMapStep::new("source".into(), Some("weight".into()), "result".into());
+        assert!(step.apply(&mut Context::new(), &mut scope).is_err());
+        scope
+            .variables_mut()
+            .set_scalar("source", AlgorithmParamValue::Int(0));
+        let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+        assert!(step.apply(&mut ctx, &mut scope).is_err());
+        selected
+            .graph()
+            .borrow_mut()
+            .set_edge_attr(0, "weight".into(), AttrValue::Float64(-1.0))
+            .expect("bad weight");
+        assert!(step.apply(&mut Context::new(), &mut scope).is_err());
+        assert_eq!(
+            scope.variables().node_map("result").expect("unchanged")[&0],
+            AlgorithmParamValue::Int(99)
+        );
+    }
+    #[test]
+    fn seeded_walks_are_isolated_and_huge_finite_weights_normalize_without_overflow() {
+        let mut graph = Graph::new_directed();
+        graph.add_nodes(3);
+        for (u, v, w) in [(0, 1, 0.0), (0, 2, 1e308), (0, 2, 1e308), (2, 2, 1.0)] {
+            let edge = graph.add_edge(u, v).expect("edge");
+            graph
+                .set_edge_attr(edge, "weight".into(), AttrValue::Float64(w))
+                .expect("weight");
+        }
+        let selected = Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            (0..3).collect(),
+            "walk".into(),
+        )
+        .expect("selection");
+        let mut vars = StepVariables::default();
+        vars.set_scalar("start", AlgorithmParamValue::Int(0));
+        let mut scope = StepScope::new(&selected, &mut vars);
+        let step = RandomWalkStep::new(
+            "start".into(),
+            5,
+            0.0,
+            Some("weight".into()),
+            Some(19),
+            "walk".into(),
+        );
+        fastrand::seed(71);
+        let expected = fastrand::u64(..);
+        fastrand::seed(71);
+        step.apply(&mut Context::new(), &mut scope).expect("walk");
+        assert_eq!(fastrand::u64(..), expected);
+        let AlgorithmParamValue::Text(value) = scope.variables().scalar("walk").expect("walk")
+        else {
+            panic!("text")
+        };
+        let walks: Vec<Vec<usize>> = serde_json::from_str(value).expect("json");
+        assert_eq!(walks, vec![vec![0, 2, 2, 2, 2, 2]]);
     }
 }
