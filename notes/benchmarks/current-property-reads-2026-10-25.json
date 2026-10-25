@@ -1,0 +1,281 @@
+{
+  "cases": [
+    {
+      "columns": 32,
+      "entities": 1000,
+      "entity_kind": "edge",
+      "mode": "scalar",
+      "samples": [
+        {
+          "seconds": 0.000117875
+        },
+        {
+          "seconds": 0.000110625
+        },
+        {
+          "seconds": 0.000111584
+        },
+        {
+          "seconds": 0.000109166
+        },
+        {
+          "seconds": 0.00011125
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 1000,
+      "entity_kind": "edge",
+      "mode": "projection",
+      "samples": [
+        {
+          "seconds": 0.000338583
+        },
+        {
+          "seconds": 0.000316458
+        },
+        {
+          "seconds": 0.000308416
+        },
+        {
+          "seconds": 0.000306792
+        },
+        {
+          "seconds": 0.000305208
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 1000,
+      "entity_kind": "edge",
+      "mode": "column",
+      "samples": [
+        {
+          "seconds": 0.000096375
+        },
+        {
+          "seconds": 0.000093958
+        },
+        {
+          "seconds": 0.000094583
+        },
+        {
+          "seconds": 0.000092875
+        },
+        {
+          "seconds": 0.0000965
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 1000,
+      "entity_kind": "node",
+      "mode": "scalar",
+      "samples": [
+        {
+          "seconds": 0.000107708
+        },
+        {
+          "seconds": 0.000109834
+        },
+        {
+          "seconds": 0.000109666
+        },
+        {
+          "seconds": 0.000109334
+        },
+        {
+          "seconds": 0.000109291
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 1000,
+      "entity_kind": "node",
+      "mode": "projection",
+      "samples": [
+        {
+          "seconds": 0.000300583
+        },
+        {
+          "seconds": 0.000310125
+        },
+        {
+          "seconds": 0.000305
+        },
+        {
+          "seconds": 0.00030725
+        },
+        {
+          "seconds": 0.000311
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 1000,
+      "entity_kind": "node",
+      "mode": "column",
+      "samples": [
+        {
+          "seconds": 0.000095792
+        },
+        {
+          "seconds": 0.000094333
+        },
+        {
+          "seconds": 0.000092625
+        },
+        {
+          "seconds": 0.000092917
+        },
+        {
+          "seconds": 0.000093709
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 10000,
+      "entity_kind": "edge",
+      "mode": "scalar",
+      "samples": [
+        {
+          "seconds": 0.001010291
+        },
+        {
+          "seconds": 0.000919125
+        },
+        {
+          "seconds": 0.000899417
+        },
+        {
+          "seconds": 0.000921542
+        },
+        {
+          "seconds": 0.000898792
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 10000,
+      "entity_kind": "edge",
+      "mode": "projection",
+      "samples": [
+        {
+          "seconds": 0.0027855
+        },
+        {
+          "seconds": 0.0025545
+        },
+        {
+          "seconds": 0.002633125
+        },
+        {
+          "seconds": 0.002588417
+        },
+        {
+          "seconds": 0.002609459
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 10000,
+      "entity_kind": "edge",
+      "mode": "column",
+      "samples": [
+        {
+          "seconds": 0.000813583
+        },
+        {
+          "seconds": 0.000827917
+        },
+        {
+          "seconds": 0.000805292
+        },
+        {
+          "seconds": 0.000811541
+        },
+        {
+          "seconds": 0.000804792
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 10000,
+      "entity_kind": "node",
+      "mode": "scalar",
+      "samples": [
+        {
+          "seconds": 0.000973166
+        },
+        {
+          "seconds": 0.000918083
+        },
+        {
+          "seconds": 0.000912792
+        },
+        {
+          "seconds": 0.000883834
+        },
+        {
+          "seconds": 0.000916542
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 10000,
+      "entity_kind": "node",
+      "mode": "projection",
+      "samples": [
+        {
+          "seconds": 0.002587208
+        },
+        {
+          "seconds": 0.002608625
+        },
+        {
+          "seconds": 0.002565167
+        },
+        {
+          "seconds": 0.0024985
+        },
+        {
+          "seconds": 0.0025215
+        }
+      ]
+    },
+    {
+      "columns": 32,
+      "entities": 10000,
+      "entity_kind": "node",
+      "mode": "column",
+      "samples": [
+        {
+          "seconds": 0.000813583
+        },
+        {
+          "seconds": 0.000803416
+        },
+        {
+          "seconds": 0.00080075
+        },
+        {
+          "seconds": 0.000803334
+        },
+        {
+          "seconds": 0.000801125
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized valid f64 scalar, requested two-key row projection and aligned one-column reads, 32 stored properties per kind. Five observations; fixture setup and final value checks excluded. Projection includes map-shape checks and extraction into ordered values, so modes are distinct workloads. No matched speedup, allocation/RSS or FFI guarantee."
+}

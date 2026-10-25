@@ -646,3 +646,20 @@ still scans active nodes. Six release cases cover groups up to 100k members;
 1,017 native tests, 1,730 Python tests, 87 documentation examples and strict
 Clippy pass. See `prepared-meta-creation-2026-10-25.md`. No checkbox row added;
 existing parent work remains open (190 checked / 78 unchecked).
+
+
+## Current property reader family complete — 2026-10-25
+
+Existing **07.4 / 33.2 / AR5**: all twelve scalar, row, requested-row and aligned
+column entry points (including compatibility aliases) share a focused native
+reader module. Missing retained columns/indices now error rather than silently
+become absent values. Existing active-ID versus aligned-column None policies,
+request order/repeats and native null/absence remain unchanged. Bulk columns
+resolve storage once; requested row projections avoid scanning unrelated columns.
+The Graph coordinator loses 384 lines; no FFI business logic or API removal.
+
+Three native corruption/scope/liveness tests, 1,020 total native tests, 1,730 Python
+tests, 88 documentation examples and strict Clippy pass. Twelve optimized release
+workloads record valid read costs without a speedup/FFI claim. See
+`current-property-reads-2026-10-25.md`. This closes the fixed reader family, not
+the broader integrity/consumer audit; inventory stays 190 checked / 78 unchecked.

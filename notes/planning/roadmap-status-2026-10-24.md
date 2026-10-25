@@ -111,8 +111,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest prepared-meta repair (2026-10-25): **1,017 native tests passed, 52 ignored; 1,730 root
-Python API tests passed, 1 skipped; 87 executable documentation examples passed;
+Latest current-reader repair (2026-10-25): **1,020 native tests passed, 52 ignored; 1,730 root
+Python API tests passed, 1 skipped; 88 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

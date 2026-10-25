@@ -81,3 +81,38 @@ Meta-nodes and `SubgraphRef` properties currently reject export because this for
 This format contains active topology, typed properties, active external identities and graph direction. It does **not** back up branches, history, inactive entities, old external-ID reservations, discarded allocation counters, subgraph pool contents, indexes or other graph configuration. Entity-ID arrays retain numeric values, not inactive referents. Default Python loading accepts an independent graph as one newly published import. `manual=True` retains deferred import compatibility. Checked journals retain their supported history; full pooled/meta recovery and bounded storage lifecycle remain item 10. JSON here is active interchange, not a full engine backup.
 
 Native temporal types are implemented; see [temporal properties](temporal-properties.md) for exact domains, timezone normalization and versioned payloads.
+
+## Current read integrity
+
+The native Graph scalar, row, requested-row and aligned-column readers share one
+implementation in `api::graph::read_attributes`. A current index pointing at a
+missing storage column or an out-of-range retained value returns `InvalidInput`,
+including entity kind/ID, attribute and index. It cannot silently become absence.
+Requested projections validate only their requested rows/keys. All-property row
+reads validate every current binding in that row.
+
+Scalar/row readers require active IDs. The existing aligned-column methods
+`get_nodes_attrs`/`get_edges_attrs` retain None for inactive/unknown IDs, request
+order and repeated IDs. Bulk row maps retain their existing ID/key map semantics.
+An absent key stays omitted; a present native Null stays a property. No read
+creates a state or changes history. Thin Python adapters keep their existing
+projection/exception behavior; raw native storage escape hatches remain outside
+the checked mutation API.
+
+```python
+from groggy import Graph
+checked = Graph()
+id = checked.add_node(present=None)
+state = checked.current_state_id
+frozen = checked.read_view()
+assert checked.get_node_attr(id, "present") is None
+assert checked.get_node_attr(id, "absent") is None
+assert checked.snapshot_at_commit(state).node_attr(id, "present").type_name == "null"
+assert checked.snapshot_at_commit(state).node_attr(id, "absent") is None
+checked.set_node_attr(id, "present", 7)
+assert frozen.node_attr(id, "present") is None
+assert checked.current_state_id == state + 1
+```
+
+The twelve native entry points and their corruption/liveness/null/absence tests
+are recorded in [the reader consolidation note](../../notes/planning/current-property-reads-2026-10-25.md).

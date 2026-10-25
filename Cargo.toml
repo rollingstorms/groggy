@@ -155,3 +155,7 @@ harness = false
 [[bench]]
 name = "meta_creation"
 harness = false
+
+[[bench]]
+name = "current_property_reads"
+harness = false
