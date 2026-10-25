@@ -191,3 +191,7 @@ harness = false
 [[bench]]
 name = "graph_table_features"
 harness = false
+
+[[bench]]
+name = "table_reshaping"
+harness = false

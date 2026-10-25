@@ -2104,28 +2104,8 @@ class BaseTable:
         """
         ...
 
-    def melt(self, *args, **kwargs) -> Any:
-        """
-        Melt operation for data unpivoting (pandas-style melt)
-
-        # Arguments
-        * `id_vars` - Column(s) to use as identifier variables
-        * `value_vars` - Column(s) to unpivot (if None, uses all columns except id_vars)
-        * `var_name` - Name for the variable column (default: "variable")
-        * `value_name` - Name for the value column (default: "value")
-
-        # Returns
-        Unpivoted table in long format
-
-        # Examples
-        ```python
-        # Basic melt
-        melted = table.melt(["id"], ["col1", "col2"])
-
-        # Custom column names
-        melted = table.melt(["id"], ["col1", "col2"], "metric", "score")
-        ```
-        """
+    def melt(self, value_vars: Union[str, List[str]], var_name: Optional[str] = None, value_name: Optional[str] = None, *, id_vars: Optional[List[str]] = None) -> "BaseTable":
+        """Unpivot selected columns, retaining explicitly selected identifier columns."""
         ...
 
     def nlargest(self, *args, **kwargs) -> Any:

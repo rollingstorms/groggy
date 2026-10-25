@@ -626,3 +626,18 @@ Evidence: `graph-table-feature-conformance-2026-10-25.md`, five native regressio
 and native 1k/10k/100k-row benchmark receipt. This completes the feature conversion
 family; broader reshaping/bundle boundaries remain in the same parent. No new
 checklist rows: 191 checked / 77 unchecked.
+
+
+### Typed filters and checked reshapes — 2026-10-25
+
+Closed node/edge typed equality filtering, stable generic pivot grouping,
+checked melt schema/row counts, specialized pivot/melt identity validation and
+the Python melt identifier adapter under 27.1/AR7.10. Existing positional Python
+melt calls remain valid; `id_vars` is an optional keyword. General long layouts
+use BaseTable; specialized outputs cannot discard or duplicate graph identity.
+
+Evidence: `table-reshape-conformance-2026-10-25.md`. Gates: **1,090 native passed /
+51 ignored; 1,819 root Python passed / 1 skipped; 112 executable docs passed;
+strict all-target Clippy passed**. Current-cost receipt:
+`notes/benchmarks/table-reshaping-2026-10-25.json`. No new checklist rows;
+191 checked / 77 unchecked. Composite/bundle adapter scope remains open.

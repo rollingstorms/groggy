@@ -481,17 +481,7 @@ impl EdgesTable {
 
     /// Filter edges by attribute value
     pub fn filter_by_attr(&self, attr_name: &str, value: &AttrValue) -> GraphResult<Self> {
-        let predicate = match value {
-            AttrValue::Text(s) => format!("{} == \"{}\"", attr_name, s),
-            AttrValue::Int(i) => format!("{} == {}", attr_name, i),
-            AttrValue::Float(f) => format!("{} == {}", attr_name, f64::from(*f)),
-            AttrValue::Float64(f) => format!("{} == {}", attr_name, f),
-            AttrValue::Bool(b) => format!("{} == {}", attr_name, b),
-            _ => format!("{} == null", attr_name),
-        };
-
-        let filtered_base = self.base.filter(&predicate)?;
-        Self::from_base_table(filtered_base)
+        Self::from_base_table(self.base.filter_by_value(attr_name, value)?)
     }
 
     /// Get unique values for an attribute
@@ -637,11 +627,11 @@ impl Table for EdgesTable {
         values_col: &str,
         agg_func: &str,
     ) -> GraphResult<Self> {
-        Ok(Self {
-            base: self
-                .base
-                .pivot_table(index_cols, columns_col, values_col, agg_func)?,
-        })
+        let base = self
+            .base
+            .pivot_table(index_cols, columns_col, values_col, agg_func)?;
+        super::structural::validate_reshape(&base, &["edge_id", "source", "target"])?;
+        Self::from_base_table(base)
     }
 
     fn melt(
@@ -651,9 +641,9 @@ impl Table for EdgesTable {
         var_name: Option<String>,
         value_name: Option<String>,
     ) -> GraphResult<Self> {
-        Ok(Self {
-            base: self.base.melt(id_vars, value_vars, var_name, value_name)?,
-        })
+        let base = self.base.melt(id_vars, value_vars, var_name, value_name)?;
+        super::structural::validate_reshape(&base, &["edge_id", "source", "target"])?;
+        Self::from_base_table(base)
     }
 }
 

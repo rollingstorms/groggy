@@ -18,6 +18,19 @@ pub(super) fn row_key(columns: &[&BaseArray<AttrValue>], row: usize) -> Vec<Attr
         .collect()
 }
 impl BaseTable {
+    /// Select rows by logical property equality without constructing a query string.
+    pub fn filter_by_value(&self, name: &str, value: &AttrValue) -> GraphResult<Self> {
+        let column = self
+            .columns
+            .get(name)
+            .ok_or_else(|| invalid(format!("Column '{name}' not found")))?;
+        let rows = column
+            .iter()
+            .enumerate()
+            .filter_map(|(row, candidate)| (candidate == value).then_some(row))
+            .collect::<Vec<_>>();
+        self.select_rows(&rows)
+    }
     pub(super) fn key_columns(&self, names: &[&str]) -> GraphResult<Vec<&BaseArray<AttrValue>>> {
         let mut seen = HashSet::new();
         names

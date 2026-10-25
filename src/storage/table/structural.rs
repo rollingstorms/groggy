@@ -75,3 +75,22 @@ pub(super) fn materialized_edge_ids(table: &BaseTable) -> GraphResult<Vec<usize>
         })
         .collect()
 }
+
+/// A specialized reshape may not discard structural columns or duplicate IDs.
+/// General long/aggregated tables are available through the underlying BaseTable.
+pub(super) fn validate_reshape(table: &BaseTable, required: &[&str]) -> GraphResult<()> {
+    let mut seen = std::collections::HashSet::new();
+    for (column_index, name) in required.iter().enumerate() {
+        let values = ids(table, name).map_err(|error| {
+            GraphError::InvalidInput(format!(
+            "Reshape must retain entity identity; use base_table() for a general table: {error}"
+        ))
+        })?;
+        if column_index == 0 && values.iter().any(|id| !seen.insert(*id)) {
+            return Err(GraphError::InvalidInput(
+                "Reshape duplicates entity IDs; use base_table() for a general table".into(),
+            ));
+        }
+    }
+    Ok(())
+}

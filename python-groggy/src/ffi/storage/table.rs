@@ -2045,6 +2045,7 @@ impl PyBaseTable {
     /// ```
     pub fn pivot_table(
         &self,
+        py: Python<'_>,
         index: PyObject,
         columns: &str,
         values: &str,
@@ -2065,9 +2066,9 @@ impl PyBaseTable {
             }
         })?;
 
-        let result = self
-            .table
-            .pivot_table(&index_cols, columns, values, aggfunc)
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.pivot_table(&index_cols, columns, values, aggfunc))
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(Self::from_table(result))
@@ -2087,16 +2088,19 @@ impl PyBaseTable {
     /// # Examples
     /// ```python
     /// # Basic melt
-    /// melted = table.melt(["id"], ["col1", "col2"])
+    /// melted = table.melt(["col1", "col2"], id_vars=["id"])
     ///
     /// # Custom column names
-    /// melted = table.melt(["id"], ["col1", "col2"], "metric", "score")
+    /// melted = table.melt(["col1", "col2"], "metric", "score", id_vars=["id"])
     /// ```
+    #[pyo3(signature=(value_vars,var_name=None,value_name=None,*,id_vars=None))]
     pub fn melt(
         &self,
+        py: Python<'_>,
         value_vars: PyObject,
         var_name: Option<&str>,
         value_name: Option<&str>,
+        id_vars: Option<Vec<String>>,
     ) -> PyResult<Self> {
         // Convert value_vars - handle both single string and list of strings
         let value_vars: Vec<String> = Python::with_gil(|py| {
@@ -2116,14 +2120,16 @@ impl PyBaseTable {
         let var_name = var_name.unwrap_or("variable");
         let value_name = value_name.unwrap_or("value");
 
-        let result = self
-            .table
-            .melt(
-                None, // id_vars - let all other columns be identifiers
-                Some(&value_vars),
-                Some(var_name.to_string()),
-                Some(value_name.to_string()),
-            )
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| {
+                table.melt(
+                    id_vars.as_deref(),
+                    Some(&value_vars),
+                    Some(var_name.to_string()),
+                    Some(value_name.to_string()),
+                )
+            })
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(Self::from_table(result))
@@ -3413,12 +3419,10 @@ impl PyNodesTable {
     }
 
     /// Filter nodes by attribute value
-    pub fn filter_by_attr(&self, attr_name: &str, value: &PyAny) -> PyResult<Self> {
-        // Convert PyAny to PyAttrValue for compatibility
-        let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
-        let result = self
-            .table
-            .filter_by_attr(attr_name, &py_attr_value.inner)
+    pub fn filter_by_attr(&self, py: Python<'_>, attr_name: &str, value: &PyAny) -> PyResult<Self> {
+        let value = crate::ffi::types::PyAttrValue::from_py_value(value)?.inner;
+        let result = py
+            .allow_threads(|| self.table.filter_by_attr(attr_name, &value))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(Self { table: result })
@@ -4400,12 +4404,10 @@ impl PyEdgesTable {
     }
 
     /// Filter edges by attribute value
-    pub fn filter_by_attr(&self, attr_name: &str, value: &PyAny) -> PyResult<Self> {
-        // Convert PyAny to PyAttrValue for compatibility
-        let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
-        let result = self
-            .table
-            .filter_by_attr(attr_name, &py_attr_value.inner)
+    pub fn filter_by_attr(&self, py: Python<'_>, attr_name: &str, value: &PyAny) -> PyResult<Self> {
+        let value = crate::ffi::types::PyAttrValue::from_py_value(value)?.inner;
+        let result = py
+            .allow_threads(|| self.table.filter_by_attr(attr_name, &value))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(Self { table: result })

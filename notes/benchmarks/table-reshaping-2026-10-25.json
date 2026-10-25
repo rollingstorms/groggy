@@ -1,0 +1,104 @@
+{
+  "cases": [
+    {
+      "operation": "typed_filter",
+      "rows": 1000,
+      "seconds": [
+        0.000060083,
+        0.000025,
+        0.00002,
+        0.00001925,
+        0.000021625
+      ]
+    },
+    {
+      "operation": "pivot",
+      "rows": 1000,
+      "seconds": [
+        0.000989167,
+        0.000752291,
+        0.000716666,
+        0.000715625,
+        0.000708583
+      ]
+    },
+    {
+      "operation": "melt",
+      "rows": 1000,
+      "seconds": [
+        0.000502917,
+        0.000531292,
+        0.000459542,
+        0.000462875,
+        0.000451542
+      ]
+    },
+    {
+      "operation": "typed_filter",
+      "rows": 10000,
+      "seconds": [
+        0.000097958,
+        0.000091333,
+        0.000082375,
+        0.000075417,
+        0.000075416
+      ]
+    },
+    {
+      "operation": "pivot",
+      "rows": 10000,
+      "seconds": [
+        0.003121959,
+        0.003131125,
+        0.00272025,
+        0.002739542,
+        0.002692792
+      ]
+    },
+    {
+      "operation": "melt",
+      "rows": 10000,
+      "seconds": [
+        0.003210041,
+        0.002963166,
+        0.002629208,
+        0.002665125,
+        0.002643375
+      ]
+    },
+    {
+      "operation": "typed_filter",
+      "rows": 100000,
+      "seconds": [
+        0.000460583,
+        0.000430083,
+        0.00041725,
+        0.000416917,
+        0.00041675
+      ]
+    },
+    {
+      "operation": "pivot",
+      "rows": 100000,
+      "seconds": [
+        0.016771042,
+        0.014761625,
+        0.013721417,
+        0.01384,
+        0.013567541
+      ]
+    },
+    {
+      "operation": "melt",
+      "rows": 100000,
+      "seconds": [
+        0.020674875,
+        0.018475625,
+        0.018868084,
+        0.018990917,
+        0.018248375
+      ]
+    }
+  ],
+  "scope": "Native optimized current cost: typed equality filter, stable pivot (100 groups, 4 keys), two-column melt. Five observations; complete operations including output allocation and validation timed. Fixture construction and checks excluded. No speedup, RSS or FFI latency claim."
+}

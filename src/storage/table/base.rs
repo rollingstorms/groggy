@@ -2128,6 +2128,8 @@ impl BaseTable {
             )));
         }
 
+        self.key_columns(&index_cols.iter().map(String::as_str).collect::<Vec<_>>())?;
+
         // Get unique values from columns_col to determine new column names
         let columns_array = self.column(columns_col).unwrap();
         let mut unique_values = std::collections::HashSet::new();
@@ -2140,24 +2142,9 @@ impl BaseTable {
         let mut unique_sorted: Vec<AttrValue> = unique_values.into_iter().collect();
         unique_sorted.sort_by(|a, b| self.compare_attr_values_for_sort(a, b));
 
-        // Create groups based on index columns
-        let mut groups: HashMap<Vec<AttrValue>, Vec<usize>> = HashMap::new();
-
-        for row_idx in 0..self.nrows {
-            let mut group_key = Vec::new();
-            for col_name in index_cols {
-                let col = self.column(col_name).unwrap();
-                if let Some(value) = col.get(row_idx) {
-                    group_key.push(value.clone());
-                } else {
-                    group_key.push(AttrValue::Null);
-                }
-            }
-            groups
-                .entry(group_key)
-                .or_insert_with(Vec::new)
-                .push(row_idx);
-        }
+        // Reuse typed, stable grouping rather than random HashMap iteration.
+        let groups =
+            self.stable_groups(&index_cols.iter().map(String::as_str).collect::<Vec<_>>())?;
 
         // Build the pivot table
         let mut new_columns = HashMap::new();
@@ -2302,6 +2289,19 @@ impl BaseTable {
                 .collect()
         };
 
+        self.key_columns(&id_vars.iter().map(String::as_str).collect::<Vec<_>>())?;
+        self.key_columns(&value_vars.iter().map(String::as_str).collect::<Vec<_>>())?;
+        if value_vars.iter().any(|name| id_vars.contains(name)) {
+            return Err(crate::GraphError::InvalidInput(
+                "Melt ID and value columns overlap".into(),
+            ));
+        }
+        if var_name == value_name || id_vars.contains(&var_name) || id_vars.contains(&value_name) {
+            return Err(crate::GraphError::InvalidInput(
+                "Melt output column names collide".into(),
+            ));
+        }
+
         if value_vars.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
                 "No columns to melt".to_string(),
@@ -2309,7 +2309,10 @@ impl BaseTable {
         }
 
         // Calculate the number of rows in the melted table
-        let melted_rows = self.nrows * value_vars.len();
+        let melted_rows = self
+            .nrows
+            .checked_mul(value_vars.len())
+            .ok_or_else(|| crate::GraphError::InvalidInput("Melt row count overflow".into()))?;
 
         // Create new column order: id_vars + var_name + value_name
         let mut new_column_order = id_vars.to_vec();
