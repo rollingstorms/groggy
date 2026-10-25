@@ -827,3 +827,19 @@ context preparation may scan cells, with no O(1), memory or FFI latency promise.
 No new rows: 191 checked / 77 unchecked, including nine explicitly deferred and
 14 overlapping architecture entries. Broader graph/table conversions and existing
 legacy-view/portable-storage parents remain open; this ownership family is done.
+
+
+### Native graph-table feature conversions — 2026-10-25
+
+Closed both existing domain conversions and their three node dtype conveniences
+under 27.1/AR7.10. One GraphTable-owned implementation fixes column-major data
+being interpreted as row-major, preserves empty shapes and feature names, and
+validates unique nonnegative integer row IDs. Physical row/feature order and
+existing scalar conversion policies remain; errors identify the feature and row.
+Outputs are independent numerical copies. No Python method or new module added.
+
+Evidence: `graph-table-feature-conformance-2026-10-25.md`, five native regressions
+(including 32 shapes in both domains), API contract `docs/api/graph-table-features.md`
+and native 1k/10k/100k-row benchmark receipt. This completes the feature conversion
+family; broader reshaping/bundle boundaries remain in the same parent. No new
+checklist rows: 191 checked / 77 unchecked.

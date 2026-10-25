@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "domain": "nodes",
+      "features": 8,
+      "rows": 1000,
+      "seconds": [
+        0.000095458,
+        0.000066417,
+        0.000065375,
+        0.000065792,
+        0.000065083
+      ]
+    },
+    {
+      "domain": "edges",
+      "features": 8,
+      "rows": 1000,
+      "seconds": [
+        0.0000385,
+        0.000035125,
+        0.00003475,
+        0.0000345,
+        0.000034458
+      ]
+    },
+    {
+      "domain": "nodes",
+      "features": 8,
+      "rows": 10000,
+      "seconds": [
+        0.000676541,
+        0.00065525,
+        0.000651708,
+        0.000653375,
+        0.000653417
+      ]
+    },
+    {
+      "domain": "edges",
+      "features": 8,
+      "rows": 10000,
+      "seconds": [
+        0.000335,
+        0.000330708,
+        0.000328542,
+        0.000329042,
+        0.000330333
+      ]
+    },
+    {
+      "domain": "nodes",
+      "features": 8,
+      "rows": 100000,
+      "seconds": [
+        0.008859375,
+        0.00852825,
+        0.00808275,
+        0.008010041,
+        0.008163166
+      ]
+    },
+    {
+      "domain": "edges",
+      "features": 8,
+      "rows": 100000,
+      "seconds": [
+        0.004521458,
+        0.003866959,
+        0.003844291,
+        0.003903041,
+        0.003882417
+      ]
+    }
+  ],
+  "scope": "Native optimized owned f64 feature conversion. Five observations, eight columns; ID validation, column resolution, conversion, allocation and matrix construction timed. Fixtures and output checks excluded. No matched baseline, RSS or FFI claims."
+}

@@ -867,67 +867,18 @@ impl std::fmt::Display for GraphTable {
 
 /// GraphMatrix conversion methods for GraphTable
 impl GraphTable {
-    /// Convert table data to GraphMatrix with generic numeric type support
+    /// Copy node properties to a row-major feature matrix in table column order.
+    ///
+    /// Structural IDs are excluded from features and must be unique nonnegative
+    /// integers. Node IDs label the rows. Empty dimensions and feature names are
+    /// preserved. Every remaining column uses `FromAttrValue` conversion (null
+    /// becomes zero); unsupported values return a column/row error. This owned
+    /// numerical copy has no connected writeback identity.
     pub fn to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
     where
         T: crate::storage::matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::GraphMatrix;
-
-        // For now, convert nodes table to matrix (most common use case)
-        // TODO: Add option to convert edges table or combined table
-
-        if self.nodes.is_empty() {
-            return Ok(GraphMatrix::zeros(0, 0));
-        }
-
-        // Get node data as columns
-        let node_ids = self.nodes.node_ids()?;
-        let attribute_names = self.nodes.column_names();
-
-        // Filter out the ID column if it exists
-        let data_columns: Vec<_> = attribute_names
-            .iter()
-            .filter(|&name| name != "id" && name != "node_id")
-            .collect();
-
-        if data_columns.is_empty() {
-            return Ok(GraphMatrix::zeros(node_ids.len(), 0));
-        }
-
-        // Build matrix data column by column
-        let mut matrix_data = Vec::with_capacity(node_ids.len() * data_columns.len());
-
-        for &col_name in &data_columns {
-            if let Ok(column) = self.nodes.get_column(col_name) {
-                for row_idx in 0..node_ids.len() {
-                    let value = column.get(row_idx).unwrap_or(&AttrValue::Null);
-                    let numeric_value = T::from_attr_value(value)?;
-                    matrix_data.push(numeric_value);
-                }
-            } else {
-                // Fill missing columns with zeros
-                for _ in 0..node_ids.len() {
-                    matrix_data.push(T::zero());
-                }
-            }
-        }
-
-        // Create column names vector
-        let column_names: Vec<String> = data_columns.iter().map(|s| s.to_string()).collect();
-
-        // Create GraphMatrix with proper column names
-        let mut matrix = GraphMatrix::from_row_major_data(
-            matrix_data,
-            node_ids.len(),
-            data_columns.len(),
-            Some(&node_ids),
-        )?;
-
-        // Set custom column names
-        matrix.set_column_names(column_names);
-
-        Ok(matrix)
+        Self::feature_matrix(self.nodes.base_table(), "node_id", &["id", "node_id"], true)
     }
 
     /// Convert to f64 matrix (most common use case)
@@ -945,49 +896,72 @@ impl GraphTable {
         self.to_matrix::<i64>()
     }
 
-    /// Convert edges table to GraphMatrix
+    /// Copy edge properties to a row-major feature matrix in table column order.
+    ///
+    /// Excludes IDs/endpoints and preserves feature names and empty dimensions.
+    /// Edge IDs are validated but are not presented as node row labels. Property
+    /// conversion and owned-copy semantics match [`Self::to_matrix`].
     pub fn edges_to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
     where
         T: crate::storage::matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
+        Self::feature_matrix(
+            self.edges.base_table(),
+            "edge_id",
+            &["id", "edge_id", "source", "target"],
+            false,
+        )
+    }
+
+    // A feature matrix is an owned numerical copy, not a graph adjacency or a
+    // connected table. Resolve columns once, then fill the row-major buffer.
+    fn feature_matrix<T>(
+        table: &BaseTable,
+        id_column: &str,
+        structural: &[&str],
+        node_labels: bool,
+    ) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
+    where
+        T: crate::storage::matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
+    {
         use crate::storage::matrix::GraphMatrix;
-
-        if self.edges.is_empty() {
-            return Ok(GraphMatrix::zeros(0, 0));
+        let ids = super::structural::ids(table, id_column)?;
+        let mut seen = HashSet::with_capacity(ids.len());
+        if ids.iter().any(|id| !seen.insert(*id)) {
+            return Err(GraphError::InvalidInput(format!("Duplicate {id_column}")));
         }
-
-        let edge_ids = self.edges.edge_ids()?;
-        let attribute_names = self.edges.column_names();
-
-        // Filter out structural columns (id, source, target)
-        let data_columns: Vec<_> = attribute_names
+        let names: Vec<_> = table
+            .column_names()
             .iter()
-            .filter(|&name| !["id", "edge_id", "source", "target"].contains(&name.as_str()))
+            .filter(|name| !structural.contains(&name.as_str()))
+            .cloned()
             .collect();
-
-        if data_columns.is_empty() {
-            return Ok(GraphMatrix::zeros(edge_ids.len(), 0));
-        }
-
-        // Build matrix data
-        let mut matrix_data = Vec::with_capacity(edge_ids.len() * data_columns.len());
-
-        for &col_name in &data_columns {
-            if let Ok(column) = self.edges.get_column(col_name) {
-                for row_idx in 0..edge_ids.len() {
-                    let value = column.get(row_idx).unwrap_or(&AttrValue::Null);
-                    let numeric_value = T::from_attr_value(value)?;
-                    matrix_data.push(numeric_value);
-                }
+        let columns = names
+            .iter()
+            .map(|name| super::structural::column(table, name))
+            .collect::<GraphResult<Vec<_>>>()?;
+        let count = table
+            .nrows()
+            .checked_mul(columns.len())
+            .ok_or_else(|| GraphError::InvalidInput("Feature matrix shape overflow".into()))?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(count)
+            .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+        for row in 0..table.nrows() {
+            for (name, column) in names.iter().zip(&columns) {
+                data.push(T::from_attr_value(&column.data()[row]).map_err(|error| {
+                    GraphError::InvalidInput(format!("Feature {name} row {row}: {error}"))
+                })?);
             }
         }
-
-        GraphMatrix::from_row_major_data(
-            matrix_data,
-            edge_ids.len(),
-            data_columns.len(),
-            None, // Edge IDs as NodeIds not supported yet
-        )
+        let mut matrix = GraphMatrix::from_row_major_data(
+            data,
+            table.nrows(),
+            columns.len(),
+            node_labels.then_some(ids.as_slice()),
+        )?;
+        matrix.set_column_names(names);
+        Ok(matrix)
     }
 
     /// Get table shape (rows, columns) for nodes table

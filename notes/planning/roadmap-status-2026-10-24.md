@@ -128,3 +128,21 @@ The explicit nested-sampler child 09.4b.2ad is now complete alongside related
 selector-output and owned-frame slices 09.4b.2ae/2af. This closes one unchecked
 entry while adding two checked implementation slices. Standalone sampler
 transactions and pinned view/source provenance remain open parent work.
+
+
+### Native graph-table feature conversions — 2026-10-25
+
+Completed native node/edge feature conversion and the existing f64/f32/i64 node
+conveniences under 27.1/AR7.10. Fixed row-major layout, empty shape/name retention,
+and strict ID validation through one GraphTable-owned implementation. Five new
+native tests cover both domains, 32 shapes and conversion/ownership errors.
+
+Latest gate: **1,084 native passed / 51 ignored; 1,812 root Python passed /
+1 skipped; 109 executable docs passed; strict all-target Clippy passed**.
+Evidence: `graph-table-feature-conformance-2026-10-25.md`; benchmark receipt:
+`notes/benchmarks/graph-table-features-2026-10-25.json`.
+
+No new checkbox rows: **191 checked / 77 unchecked**, including overlapping
+parents and nine explicitly deferred entries. The feature-matrix conversion
+family is closed; the broader graph/table reshaping and bundle adapter boundaries
+remain under the existing parent.
