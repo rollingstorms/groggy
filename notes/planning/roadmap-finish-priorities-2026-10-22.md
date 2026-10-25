@@ -689,3 +689,33 @@ tests, 88 documentation examples and strict Clippy pass. Twelve optimized releas
 workloads record valid read costs without a speedup/FFI claim. See
 `current-property-reads-2026-10-25.md`. This closes the fixed reader family, not
 the broader integrity/consumer audit; inventory stays 190 checked / 78 unchecked.
+
+
+## Checked pinned-view write slice — 2026-10-25
+
+Closed original **26.2**, reducing the inventory to **191 checked / 77 unchecked**
+without adding a checklist row. Current GraphView captures carry source history,
+branch and accepted-head provenance through clones/selections/filters. Graph and
+DurableGraph apply_view_batch prepare mixed writes against that pin, require every
+existing mutation target/endpoint and deletion cascade to stay selected, then
+publish one state and return a new immutable view. Returned data is constructed
+and validated before publication. Earlier views keep their original values and
+edge scope; no excluded parallel edges are induced into the result.
+
+Schemas, managed identities and explicit/default change times use the existing
+coordinator. Durable writes enforce installed plus per-call schemas and use the
+existing append/sync/publication boundary. Recovery replays ordinary batch records;
+old process pins cannot write to a reopened store. Dirty/standalone/unrecorded
+snapshot captures are read-only; foreign, different-branch, stale and out-of-scope
+requests reject before mutation/append. Raw untracked changes after capture reject;
+native escapes made before capture remain outside the supported contract and
+09.4b.2 remains open.
+
+Ten native regressions (including 80 chained overlay/oracle comparisons), sixteen
+Python cases, updated generated stubs, three executable examples and six release
+workloads pass. Full gates: 1,030 native, 1,746 Python, 91 documentation examples,
+strict Clippy and in-tree FFI build. The explicit refreshed-snapshot path owns full
+current values/topology and is not an O(1) scalar writer. See
+`pinned-view-writes-2026-10-25.md` and `../../docs/api/pinned-view-writes.md`.
+Legacy connected Subgraph/table reads, table source provenance, portable group
+contents and arbitrary effective-time reconstruction keep their original scope.

@@ -9,6 +9,11 @@ pub struct PyGraphView {
 }
 #[pymethods]
 impl PyGraphView {
+    /// Accepted source state for checked writeback; None for dirty/standalone captures.
+    #[getter]
+    fn write_state_id(&self) -> Option<groggy::StateId> {
+        self.inner.write_state_id()
+    }
     #[getter]
     fn node_ids(&self, py: Python) -> Vec<NodeId> {
         py.allow_threads(|| self.inner.node_ids())
@@ -161,7 +166,8 @@ impl PyGraphView {
         let direction = groggy::algorithms::centrality::ClosenessDirection::parse(direction)
             .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
         py.allow_threads(|| {
-            self.inner.closeness(harmonic, weight_attr, direction, normalized)
+            self.inner
+                .closeness(harmonic, weight_attr, direction, normalized)
         })
         .map_err(graph_error_to_py_err)
     }
@@ -176,7 +182,8 @@ impl PyGraphView {
         personalization_attr: Option<String>,
     ) -> PyResult<PyPageRankResult> {
         py.allow_threads(|| {
-            self.inner.pagerank(damping, max_iter, tolerance, personalization_attr)
+            self.inner
+                .pagerank(damping, max_iter, tolerance, personalization_attr)
         })
         .map(|inner| PyPageRankResult { inner })
         .map_err(graph_error_to_py_err)

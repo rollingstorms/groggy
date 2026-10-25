@@ -221,3 +221,22 @@ pub(crate) fn publication_to_python(
     output.set_item("change_times", changes)?;
     Ok(output.to_object(py))
 }
+
+/// Marshal an accepted view mutation; all source/scope policies live in the core.
+pub(crate) fn view_result_to_python(
+    py: Python,
+    result: groggy::ViewBatchResult,
+) -> PyResult<PyObject> {
+    let output = PyDict::new(py);
+    output.set_item("state_id", result.batch.state_id)?;
+    output.set_item("added_nodes", result.batch.added_nodes)?;
+    output.set_item("added_edges", result.batch.added_edges)?;
+    output.set_item(
+        "view",
+        Py::new(
+            py,
+            crate::ffi::subgraphs::view::PyGraphView { inner: result.view },
+        )?,
+    )?;
+    Ok(output.to_object(py))
+}

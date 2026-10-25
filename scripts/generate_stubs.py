@@ -90,6 +90,7 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'edges_with_relationship_type': 'List[int]',
             'validate_schema': 'List[Dict[str, Any]]',
             'apply_batch': 'Dict[str, Any]',
+            'apply_view_batch': 'Dict[str, Any]', 'read_view': 'GraphView',
             'writer': 'GraphWriter',
             'publication_metadata': 'Optional[Dict[str, Any]]',
             'publish_upsert_nodes': 'Dict[str, Any]',
@@ -109,12 +110,30 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'node_by_external_id': 'Optional[int]', 'edge_by_external_id': 'Optional[int]',
             'allocated_entity_for_external_id': 'Optional[Tuple[str, int]]',
             'writer': 'GraphWriter', 'apply_batch': 'Dict[str, Any]',
+            'apply_view_batch': 'Dict[str, Any]', 'read_view': 'GraphView',
             'publish_upsert_nodes': 'Dict[str, Any]', 'publish_upsert_edges': 'Dict[str, Any]',
             'publication_metadata': 'Optional[Dict[str, Any]]',
             'snapshot_at_commit': 'TemporalSnapshot', 'commit_history': 'List[Commit]',
             'configuration': 'Dict[str, Any]', 'schema': 'Optional[Dict[str, Any]]',
             'set_schema': 'int', 'create_branch': 'None', 'checkout_branch': 'None',
             'list_branches': 'List[Dict[str, Any]]',
+        },
+        'GraphView': {
+            'write_state_id': 'Optional[int]', 'node_ids': 'List[int]', 'edge_ids': 'List[int]',
+            'node_count': 'int', 'edge_count': 'int', 'is_directed': 'bool',
+            'contains_node': 'bool', 'contains_edge': 'bool',
+            'has_node_attribute': 'bool', 'has_edge_attribute': 'bool',
+            'node_attribute_keys': 'List[str]', 'edge_attribute_keys': 'List[str]',
+            'node_attr': 'Any', 'edge_attr': 'Any', 'edge_endpoints': 'Tuple[int, int]',
+            'neighbors': 'List[int]', 'incident_edges': 'List[int]',
+            'degree': 'int', 'out_degree': 'int', 'in_degree': 'int',
+            'select_nodes': 'GraphView', 'select_edges': 'GraphView',
+            'filter_nodes': 'GraphView', 'filter_edges': 'GraphView', 'copy': 'GraphView',
+            'connected_components': 'List[GraphView]',
+            'adjacency_matrix': 'GraphMatrix', 'to_matrix': 'GraphMatrix',
+            'nodes_table': 'NodesTable', 'edges_table': 'EdgesTable', 'table': 'GraphTable',
+            'bfs_distances': 'List[Tuple[int, int]]', 'dfs_order': 'List[Tuple[int, int]]',
+            'dijkstra_distances': 'List[Tuple[int, float]]',
         },
         'AttrValue': {
             'float_vec': 'AttrValue',
@@ -441,6 +460,10 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
             lines.append(f"    def __getattr__(self, name: str) -> Any:")
             if not method_doc:
                 method_doc = "Dynamic attribute access for runtime attribute dictionaries"
+        elif class_name in ('Graph', 'DurableGraph') and method_name == 'apply_view_batch':
+            lines.append("    def apply_view_batch(self, view: GraphView, batch: Any, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
+        elif class_name in ('Graph', 'DurableGraph') and method_name == 'read_view':
+            lines.append("    def read_view(self) -> GraphView:")
         elif class_name == 'Graph' and method_name == 'apply_batch':
             lines.append("    def apply_batch(self, batch: Any, expected_state: int, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
         elif method_name == 'experimental':

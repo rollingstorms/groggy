@@ -1,6 +1,8 @@
 //! Shared immutable read-state ownership for current captures and historical snapshots.
 use super::state::GraphSnapshot;
-use crate::{types::GraphType, AttrName, AttrValue, EdgeId, GraphError, GraphResult, NodeId};
+use crate::{
+    types::GraphType, AttrName, AttrValue, EdgeId, GraphError, GraphResult, NodeId, StateId,
+};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -46,11 +48,20 @@ struct ReadData {
     adjacency: HashMap<NodeId, Adjacency>,
     incident: HashMap<NodeId, Vec<EdgeId>>,
 }
+/// In-process checked-write provenance, shared by derived immutable selections.
+#[derive(Debug)]
+pub(crate) struct ReadOrigin {
+    pub history: Arc<()>,
+    pub branch: String,
+    pub state: StateId,
+    pub clean: bool,
+}
 /// Cheap clones share frozen topology and values; no writable graph owner is exposed.
 /// Capturing current state does not create a checkpoint or record a mutation.
 #[derive(Debug, Clone)]
 pub struct PinnedReadState {
     data: Arc<ReadData>,
+    origin: Option<Arc<ReadOrigin>>,
 }
 impl PinnedReadState {
     pub(crate) fn from_snapshot(snapshot: GraphSnapshot) -> GraphResult<Self> {
@@ -94,6 +105,7 @@ impl PinnedReadState {
             })
             .collect();
         Ok(Self {
+            origin: None,
             data: Arc::new(ReadData {
                 snapshot,
                 existence: ExistenceIndex::new(nodes, edges),
@@ -101,6 +113,30 @@ impl PinnedReadState {
                 incident,
             }),
         })
+    }
+    pub(crate) fn with_origin(
+        mut self,
+        history: Arc<()>,
+        branch: String,
+        state: StateId,
+        clean: bool,
+    ) -> Self {
+        self.origin = Some(Arc::new(ReadOrigin {
+            history,
+            branch,
+            state,
+            clean,
+        }));
+        self
+    }
+    pub(crate) fn origin(&self) -> Option<&ReadOrigin> {
+        self.origin.as_deref()
+    }
+    /// Accepted source state for checked writeback; dirty and standalone captures are read-only.
+    pub fn write_state_id(&self) -> Option<StateId> {
+        self.origin()
+            .filter(|origin| origin.clean)
+            .map(|origin| origin.state)
     }
     /// Borrow frozen values/topology. state_id is checkpoint ancestry for a working capture,
     /// not an assertion that uncheckpointed edits have been recorded in history.

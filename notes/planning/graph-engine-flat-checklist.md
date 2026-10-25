@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has **190 checked / 78 unchecked entries**, including overlapping
+The checklist has **191 checked / 77 unchecked entries**, including overlapping
 parents and repair slices; this is not a completion percentage. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
@@ -204,7 +204,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **25.1 — Deferred: Graphiti operation driver.** Implement required native operation/session/transaction/index/search interfaces, explicitly reject unsupported behavior, and maintain a documented upstream compatibility target.
 - [ ] **25.2 — Deferred: end-to-end Graphiti proof.** Run ingest/correction/retrieval flows against Groggy after the adapter and core are ready; do not infer driver compatibility from storing embeddings alone.
 - [ ] **26.1 — Partial: immutable connected graph views.** Audit existing Subgraph live-parent reads and migrate to state-pinned properties/topology. An older view must remain unchanged after a parent write.
-- [ ] **26.2 — Open: mutation through pinned views.** Check the expected state and return a new view or conflict; define explicit live retrieval, materialized copies, and cache invalidation without ambiguous mutability.
+- [x] **26.2 — Checked mutation through pinned views.** Graph/DurableGraph apply_view_batch validates captured source history, branch, clean accepted head and exact selected mutation scope; mixed GraphBatch writes publish once and return a prevalidated new immutable view. Cascades outside selection reject; existing views stay readable. Schema, identity and effective-time policies use the normal coordinator; durable writes sync/recover through ordinary journal records. Explicit fresh retrieval and materialization remain distinct; frozen caches never invalidate. Legacy connected Subgraph/table migration stays open under 26.1/27. See `pinned-view-writes-2026-10-25.md` for costs and raw-storage escape limits.
 - [ ] **27.1 — Review: graph/table identity.** Audit current graph tables, projections, joins, and copies; preserve source identity and pins through selections and joins unless the caller explicitly materializes a new graph.
 - [ ] **27.2 — Open: connected table updates.** Complete columnar filters/aggregations/conversions and checked bulk edits that generate typed deltas. Table joins remain views unless explicitly persisted; coordinate this with item 26.
 - [x] **27.2a — Explicit mapped mixed property updates.** Native/Python graph tables can update selected node and edge columns atomically through 09.4b.2c. Explicit mapping is the target-identity assertion; automatic source lineage, connected views and graph materialization remain outside this slice.

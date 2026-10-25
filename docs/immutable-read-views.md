@@ -21,8 +21,10 @@ assert frozen.edge_count() == 0
 ```
 
 The frozen values remain readable after the working graph removes an entity or
-is destroyed. Mutations continue through the working graph. To observe later
-changes, obtain a new view.
+is destroyed. Mutations continue through the working graph. A checked
+[`apply_view_batch`](api/pinned-view-writes.md) can publish a scoped batch against
+a current pin and return a new frozen selection. To observe later changes without
+writing, obtain a new view.
 
 ## Select within a view
 

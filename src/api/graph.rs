@@ -22,10 +22,12 @@ mod publication;
 mod read_attributes;
 mod schema;
 mod tables;
+mod view_updates;
 use identity::ExternalIdentityIndex;
 pub use identity::{EdgeUpsert, ExternalEntityRef, NodeUpsert, EXTERNAL_ID};
 pub use kinds::{LABELS, RELATIONSHIP_TYPE};
 pub use schema::{GraphSchema, PropertyConstraint, PropertyKind, SchemaViolation};
+pub use view_updates::ViewBatchResult;
 
 use crate::api::batch::{BatchResult, GraphBatch};
 use crate::errors::{GraphError, GraphResult};
@@ -2132,7 +2134,14 @@ impl Graph {
         let snapshot = self
             .space
             .capture_read_snapshot(&self.pool.borrow(), self.current_commit)?;
-        crate::state::PinnedReadState::from_snapshot(snapshot)
+        Ok(
+            crate::state::PinnedReadState::from_snapshot(snapshot)?.with_origin(
+                Arc::clone(self.history.identity()),
+                self.current_branch.clone(),
+                self.current_commit,
+                !self.has_uncommitted_changes() && (self.current_commit != 0 || self.is_empty()),
+            ),
+        )
     }
 
     /// Construct a fresh graph from a historical snapshot.

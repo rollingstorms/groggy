@@ -2,7 +2,7 @@
 use crate::{
     state::{state::GraphSnapshot, PinnedReadState},
     types::GraphType,
-    AttrName, AttrValue, EdgeId, GraphError, GraphResult, NodeId,
+    AttrName, AttrValue, EdgeId, GraphError, GraphResult, NodeId, StateId,
 };
 use std::{collections::HashSet, sync::Arc};
 #[derive(Debug, Clone)]
@@ -61,6 +61,10 @@ impl GraphView {
     /// Shared immutable state underlying this selection.
     pub fn read_state(&self) -> &PinnedReadState {
         &self.state
+    }
+    /// Accepted source state for checked writeback. None means a read-only capture.
+    pub fn write_state_id(&self) -> Option<StateId> {
+        self.state.write_state_id()
     }
     /// Selected node membership, including isolated nodes.
     pub fn nodes(&self) -> &HashSet<NodeId> {

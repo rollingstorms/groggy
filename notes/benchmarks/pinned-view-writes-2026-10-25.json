@@ -1,0 +1,221 @@
+{
+  "cases": [
+    {
+      "mode": "properties",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00219925,
+          "selected_edges": 499,
+          "selected_nodes": 500,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.002046125,
+          "selected_edges": 499,
+          "selected_nodes": 500,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.001843958,
+          "selected_edges": 499,
+          "selected_nodes": 500,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.0016935,
+          "selected_edges": 499,
+          "selected_nodes": 500,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.001667875,
+          "selected_edges": 499,
+          "selected_nodes": 500,
+          "state_id": 4
+        }
+      ]
+    },
+    {
+      "mode": "mixed",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000980334,
+          "selected_edges": 499,
+          "selected_nodes": 501,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.000968959,
+          "selected_edges": 499,
+          "selected_nodes": 501,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.000915584,
+          "selected_edges": 499,
+          "selected_nodes": 501,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.000911125,
+          "selected_edges": 499,
+          "selected_nodes": 501,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.0009435,
+          "selected_edges": 499,
+          "selected_nodes": 501,
+          "state_id": 4
+        }
+      ]
+    },
+    {
+      "mode": "cascade",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00132925,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.001348541,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.001339958,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.001352208,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.001340083,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        }
+      ]
+    },
+    {
+      "mode": "properties",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.017144791,
+          "selected_edges": 4999,
+          "selected_nodes": 5000,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.016946084,
+          "selected_edges": 4999,
+          "selected_nodes": 5000,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.017514667,
+          "selected_edges": 4999,
+          "selected_nodes": 5000,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.019246,
+          "selected_edges": 4999,
+          "selected_nodes": 5000,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.019031666,
+          "selected_edges": 4999,
+          "selected_nodes": 5000,
+          "state_id": 4
+        }
+      ]
+    },
+    {
+      "mode": "mixed",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.012836375,
+          "selected_edges": 4999,
+          "selected_nodes": 5001,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.010932208,
+          "selected_edges": 4999,
+          "selected_nodes": 5001,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.010954625,
+          "selected_edges": 4999,
+          "selected_nodes": 5001,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.011057375,
+          "selected_edges": 4999,
+          "selected_nodes": 5001,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.010804875,
+          "selected_edges": 4999,
+          "selected_nodes": 5001,
+          "state_id": 4
+        }
+      ]
+    },
+    {
+      "mode": "cascade",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.01672275,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.017351208,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.016004167,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.01603325,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        },
+        {
+          "seconds": 0.016107333,
+          "selected_edges": 0,
+          "selected_nodes": 2,
+          "state_id": 4
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized chain, half-graph immutable selection, f64 scalar and eight-element vectors. Five observations per case. Includes current-state validation/capture, complete scope/publication preparation, output snapshot/selection construction, mutation and publication. Fixture, initial view and exhaustive validation excluded. No matched speedup, allocation/RSS, FFI, durable-fsync or general scale guarantee."
+}

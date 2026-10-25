@@ -170,7 +170,7 @@ pub mod api {
 pub use api::batch::{BatchChangeRef, BatchEdgeRef, BatchNodeRef, BatchResult, GraphBatch};
 pub use api::graph::{
     EdgeUpsert, ExternalEntityRef, Graph, GraphSchema, NodeUpsert, PropertyConstraint,
-    PropertyKind, SchemaViolation, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
+    PropertyKind, SchemaViolation, ViewBatchResult, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
 };
 pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};

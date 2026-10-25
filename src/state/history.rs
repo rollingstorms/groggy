@@ -102,6 +102,11 @@ impl HistoryForest {
         &self.identity
     }
 
+    /// Reserved next acceptance ID while the caller holds exclusive graph ownership.
+    pub(crate) fn next_state_id(&self) -> StateId {
+        self.next_state_id
+    }
+
     /// Explicit checkpoints in acceptance order, independent of version IDs.
     pub fn checkpoints(&self) -> &[crate::Checkpoint] {
         &self.checkpoints

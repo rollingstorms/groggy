@@ -159,3 +159,7 @@ harness = false
 [[bench]]
 name = "current_property_reads"
 harness = false
+
+[[bench]]
+name = "pinned_view_writes"
+harness = false

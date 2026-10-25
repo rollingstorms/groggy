@@ -1671,6 +1671,36 @@ impl PyGraph {
         Ok(output.to_object(py))
     }
 
+    /// Apply a checked batch within an immutable view and return its refreshed selection.
+    #[pyo3(signature = (view, batch, message, author, *, schema=None))]
+    fn apply_view_batch(
+        &mut self,
+        py: Python,
+        view: &crate::ffi::subgraphs::view::PyGraphView,
+        batch: &PyAny,
+        message: String,
+        author: String,
+        schema: Option<&PyDict>,
+    ) -> PyResult<PyObject> {
+        let batch = parse_batch(batch)?;
+        let schema = schema.map(parse_schema).transpose()?;
+        let result = if let Some(schema) = schema.as_ref() {
+            self.inner.borrow_mut().apply_view_batch_with_schema(
+                &view.inner,
+                batch,
+                message,
+                author,
+                schema,
+            )
+        } else {
+            self.inner
+                .borrow_mut()
+                .apply_view_batch(&view.inner, batch, message, author)
+        }
+        .map_err(graph_error_to_py_err)?;
+        crate::ffi::api::graph_batch::view_result_to_python(py, result)
+    }
+
     /// Get immutable effective/recorded times for an automatic publication.
     fn publication_metadata(&self, py: Python, state_id: StateId) -> PyResult<PyObject> {
         match self

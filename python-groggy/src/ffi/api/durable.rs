@@ -247,6 +247,33 @@ impl PyDurableGraph {
         output.set_item("added_edges", result.added_edges)?;
         Ok(output.to_object(py))
     }
+    /// Capture the current accepted durable head.
+    fn read_view(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        self.core()?
+            .read_view()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(graph_error_to_py_err)
+    }
+
+    #[pyo3(signature=(view,batch,message,author,*,schema=None))]
+    fn apply_view_batch(
+        &mut self,
+        py: Python,
+        view: &crate::ffi::subgraphs::view::PyGraphView,
+        batch: &PyAny,
+        message: String,
+        author: String,
+        schema: Option<&PyDict>,
+    ) -> PyResult<PyObject> {
+        let batch = parse_batch(batch)?;
+        let schema = schema.map(parse_schema).transpose()?;
+        let result = self
+            .core_mut()?
+            .apply_view_batch_with_schema(&view.inner, batch, message, author, schema.as_ref())
+            .map_err(graph_error_to_py_err)?;
+        crate::ffi::api::graph_batch::view_result_to_python(py, result)
+    }
+
     #[pyo3(signature=(rows,expected_state,*,author="upsert",uid_key="external_id",schema=None,effective_at=None))]
     fn publish_upsert_nodes(
         &mut self,

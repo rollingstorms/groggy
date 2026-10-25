@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **190 checked and 78 unchecked entries**. Entries overlap:
+currently contains **191 checked and 77 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 78 unchecked entries are not 78 independent tasks: 14 are overlapping AR
-architecture entries, 64 are numbered entries (including nested publication
+The 77 unchecked entries are not 77 independent tasks: 14 are overlapping AR
+architecture entries, 63 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header also still said 158 checked; it is corrected to 189.
 Recent implementations were recorded as new checked slices while broad parents
@@ -48,6 +48,7 @@ See `temporal-window-completion-2026-10-24.md` for implementation/gate evidence.
 
 | Slice | What is now supported |
 | --- | --- |
+| 26.2 | Checked current-view batch writes, exact source/scope validation, prevalidated refreshed pins and durable journal publication/recovery. |
 | 12.3a | Explicit checkpoints label accepted states without creating duplicate mutation deltas. |
 | 09.4b.1 | Ordinary Python mutations default to checked publication, including initial properties and bulk operations. Explicit manual compatibility remains. |
 | 09.4b.2a | Compound collapse prepares aggregations, retained membership, boundary edges and removals before accepting one version. |
@@ -86,7 +87,7 @@ not represent building its basic engine contract from scratch.
 | Numerical core and architecture | Canonical matrix/array foundations, entity handles, many arithmetic/statistical/solver/factorization/sparse/operator and algorithm repairs, bounded release receipts. | Remaining promised derivative/composition domains, uncovered consumers and representative performance/memory/scale gates; broad numerical parents remain partial. |
 | Mutation/publication | Checked mixed batches, ordinary Python defaults, property clocks, checkpoints, compound collapse and recent table/subgraph boundaries. | Remaining native default/infallible compatibility, mutable pool/space escapes, whole-pipeline boundaries and broader pipeline semantics. |
 | Properties, state and history | f64 defaults, typed temporal properties, shared logical change records, retained snapshots and immutable read APIs. | Complete value lifecycle, effective-time reconstruction/validation, rewiring/revert, exact portable snapshots and portable pooled/meta contents. |
-| Views and tables | Explicit pinned read views, frozen matrix/table exports, mapped writeback and checked independent materialization. | Migrate legacy connected reads, preserve source identity/pins through selections/joins, checked writes through pinned views. |
+| Views and tables | Explicit pinned read views, frozen matrix/table exports, mapped writeback and checked independent materialization. | Migrate legacy connected reads and preserve source identity/pins through table selections/joins; checked writes through explicit GraphView pins are complete in 26.2. |
 | Storage, branches and schema | Checked journal/recovery foundations, checkpoint annotations, existing branch/identity behavior and explicit schema checks. | Full pooled retention, lifecycle/compaction/format migration, complete branch lifecycle, three-way merge, purge and schema evolution. |
 | Queries, indexes and pipelines | Existing native filter/query/index/builder machinery and many repaired algorithm paths. | Consistent index lifecycle, pinned temporal query results, shared expression/execution boundaries, pipeline intermediates/history and complete algorithm certification. |
 | Integration and service | Existing embedded engine and test/benchmark infrastructure. | Graphiti ingest/driver/provenance/retrieval remain deferred behind core; service concurrency, multi-user deployment and broad comparison/scale gates remain open. |
@@ -111,8 +112,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest current-reader repair (2026-10-25): **1,020 native tests passed, 52 ignored; 1,730 root
-Python API tests passed, 1 skipped; 88 executable documentation examples passed;
+Latest pinned-view write slice (2026-10-25): **1,030 native tests passed, 52 ignored; 1,746 root
+Python API tests passed, 1 skipped; 91 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

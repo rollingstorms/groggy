@@ -564,6 +564,72 @@ impl DurableGraph {
             self.schema.as_ref(),
             additional_schema,
         )?;
+        self.execute_prepared_batch(
+            prepared,
+            stored,
+            expected_state,
+            message,
+            author,
+            additional_schema,
+        )
+    }
+
+    /// Capture the current durable head as an immutable selection with write provenance.
+    pub fn read_view(&self) -> GraphResult<crate::GraphView> {
+        self.graph()?.read_view()
+    }
+
+    /// Sync and publish one batch scoped to a current immutable view, returning a new view.
+    pub fn apply_view_batch(
+        &mut self,
+        view: &crate::GraphView,
+        batch: GraphBatch,
+        message: String,
+        author: String,
+    ) -> GraphResult<crate::ViewBatchResult> {
+        self.apply_view_batch_with_schema(view, batch, message, author, None)
+    }
+
+    /// Check both installed durable schema and optional stricter per-call policy.
+    pub fn apply_view_batch_with_schema(
+        &mut self,
+        view: &crate::GraphView,
+        batch: GraphBatch,
+        message: String,
+        author: String,
+        additional_schema: Option<&GraphSchema>,
+    ) -> GraphResult<crate::ViewBatchResult> {
+        self.ready()?;
+        let stored = StoredBatch::encode(&batch)?;
+        let prepared = self.graph.prepare_view_publication(
+            view,
+            batch,
+            self.schema.as_ref(),
+            additional_schema,
+        )?;
+        let batch = self.execute_prepared_batch(
+            prepared.publication,
+            stored,
+            prepared.expected_state,
+            message,
+            author,
+            additional_schema,
+        )?;
+        Ok(crate::ViewBatchResult {
+            batch,
+            view: prepared.view,
+        })
+    }
+
+    fn execute_prepared_batch(
+        &mut self,
+        prepared: crate::api::batch::PreparedPublication,
+        stored: StoredBatch,
+        expected_state: StateId,
+        message: String,
+        author: String,
+        additional_schema: Option<&GraphSchema>,
+    ) -> GraphResult<BatchResult> {
         self.append(Record::Batch {
             expected_state,
             batch: Box::new(stored),

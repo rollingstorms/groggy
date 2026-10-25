@@ -3329,6 +3329,17 @@ class DurableGraph:
         ...
 
 
+
+    def read_view(self) -> GraphView:
+        """
+        Capture the current accepted durable head.
+        """
+        ...
+
+    def apply_view_batch(self, view: GraphView, batch: Any, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        ...
+
+
 class Edge:
     """
     Python wrapper for a regular graph edge
@@ -5302,6 +5313,20 @@ class Graph:
 
 
 
+
+
+
+    def read_view(self) -> GraphView:
+        """
+        Capture immutable current state; later working-graph writes do not alter this view.
+        """
+        ...
+
+    def apply_view_batch(self, view: GraphView, batch: Any, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Apply a checked batch within an immutable view and return its refreshed selection.
+        """
+        ...
 
 
 class GraphMatrix:
@@ -10543,5 +10568,206 @@ class VizAccessor:
     def update(self, *args, **kwargs) -> Any:
         """
         Update visualization parameters - sends control message to existing server
+        """
+        ...
+
+
+class GraphView:
+    @property
+    def edge_ids(self) -> List[int]:
+        ...
+
+    @property
+    def is_directed(self) -> bool:
+        ...
+
+    @property
+    def node_ids(self) -> List[int]:
+        ...
+
+    @property
+    def write_state_id(self) -> Optional[int]:
+        """
+        Accepted source state for checked writeback; None for dirty/standalone captures.
+        """
+        ...
+
+    def __eq__(self, other: Any) -> bool:
+        """
+        Return self==value.
+        """
+        ...
+
+    def __hash__(self) -> int:
+        """
+        Return hash(self).
+        """
+        ...
+
+    def __init__(self, *args, **kwargs) -> None:
+        """
+        Initialize self.  See help(type(self)) for accurate signature.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return repr(self).
+        """
+        ...
+
+    def __str__(self) -> str:
+        """
+        Return str(self).
+        """
+        ...
+
+    def adjacency_matrix(self, *args, **kwargs) -> GraphMatrix:
+        """
+        Owned adjacency operator from this selection's captured weights/topology.
+        """
+        ...
+
+    def astar_path(self, *args, **kwargs) -> Any:
+        """
+        Owned captured A* path, including selected parallel-edge identity and cost.
+        """
+        ...
+
+    def betweenness(self, *args, **kwargs) -> Any:
+        """
+        Captured Brandes node betweenness as owned f64 rows.
+        """
+        ...
+
+    def bfs_distances(self, *args, **kwargs) -> List[Tuple[int, int]]:
+        """
+        Frozen hop distances as (node ID, distance) rows; writes no properties.
+        """
+        ...
+
+    def closeness(self, *args, **kwargs) -> Any:
+        """
+        Captured classic or harmonic closeness, returned as owned f64 rows.
+        """
+        ...
+
+    def connected_components(self, *args, **kwargs) -> List[GraphView]:
+        """
+        Immutable components sharing captured state; ignores orientation by default.
+        """
+        ...
+
+    def contains_edge(self, *args, **kwargs) -> bool:
+        ...
+
+    def contains_node(self, *args, **kwargs) -> bool:
+        ...
+
+    def copy(self, *args, **kwargs) -> GraphView:
+        """
+        Cheap ownership copy; the frozen state and selected membership remain shared.
+        """
+        ...
+
+    def degree(self, *args, **kwargs) -> int:
+        ...
+
+    def dfs_order(self, *args, **kwargs) -> List[Tuple[int, int]]:
+        """
+        Frozen ascending-neighbor DFS preorder as (node ID, order) rows.
+        """
+        ...
+
+    def dijkstra_distances(self, *args, **kwargs) -> List[Tuple[int, float]]:
+        """
+        Nonnegative weighted distances from captured values, with no property writes.
+        """
+        ...
+
+    def edge_attr(self, *args, **kwargs) -> Any:
+        ...
+
+    def edge_attribute_keys(self, *args, **kwargs) -> List[str]:
+        ...
+
+    def edge_count(self, *args, **kwargs) -> int:
+        ...
+
+    def edge_endpoints(self, *args, **kwargs) -> Tuple[int, int]:
+        ...
+
+    def edges_table(self, *args, **kwargs) -> EdgesTable:
+        """
+        Owned edge table from captured values and endpoints.
+        """
+        ...
+
+    def filter_edges(self, *args, **kwargs) -> GraphView:
+        """
+        Filter captured selected edge instances using the shared native executor.
+        """
+        ...
+
+    def filter_nodes(self, *args, **kwargs) -> GraphView:
+        """
+        Filter captured selected nodes using a native filter or the existing query syntax.
+        """
+        ...
+
+    def has_edge_attribute(self, *args, **kwargs) -> bool:
+        ...
+
+    def has_node_attribute(self, *args, **kwargs) -> bool:
+        ...
+
+    def in_degree(self, *args, **kwargs) -> int:
+        ...
+
+    def incident_edges(self, *args, **kwargs) -> List[int]:
+        ...
+
+    def neighbors(self, *args, **kwargs) -> List[int]:
+        ...
+
+    def node_attr(self, *args, **kwargs) -> Any:
+        ...
+
+    def node_attribute_keys(self, *args, **kwargs) -> List[str]:
+        ...
+
+    def node_count(self, *args, **kwargs) -> int:
+        ...
+
+    def nodes_table(self, *args, **kwargs) -> NodesTable:
+        """
+        Owned node table from captured values; no working-graph writeback.
+        """
+        ...
+
+    def out_degree(self, *args, **kwargs) -> int:
+        ...
+
+    def pagerank(self, *args, **kwargs) -> Any:
+        """
+        Captured unweighted PageRank, including explicit convergence status.
+        """
+        ...
+
+    def select_edges(self, *args, **kwargs) -> GraphView:
+        ...
+
+    def select_nodes(self, *args, **kwargs) -> GraphView:
+        ...
+
+    def table(self, *args, **kwargs) -> GraphTable:
+        """
+        Owned graph table; both components use this immutable state.
+        """
+        ...
+
+    def to_matrix(self, *args, **kwargs) -> GraphMatrix:
+        """
+        Owned scalar feature matrix using the graph API's shared conversion policy.
         """
         ...
