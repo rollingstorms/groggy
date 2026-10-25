@@ -85,83 +85,123 @@ impl Graph {
         Ok(self)
     }
 
-    pub(super) fn publish_graph_copy(&mut self, other: &Graph) -> GraphResult<()> {
-        let mut nodes = other.node_ids();
+    pub(super) fn copy_graph_active(&mut self, other: &Graph) -> GraphResult<()> {
+        // Validate every active index and endpoint before allocating destination
+        // IDs. Unlike permissive legacy row readers, this cannot drop corruption.
+        let snapshot = other
+            .space
+            .capture_read_snapshot(&other.pool.borrow(), other.current_state_id())?;
+        let mut nodes = snapshot.active_nodes;
         nodes.sort_unstable();
         if nodes.is_empty() {
             return Ok(());
         }
-        let positions: HashMap<_, _> = nodes.iter().enumerate().map(|(i, &id)| (id, i)).collect();
+        let mut edges: Vec<_> = snapshot.edges.into_iter().collect();
+        edges.sort_unstable_by_key(|&(id, _)| id);
+        let counts = self.pool.borrow().statistics();
+        if counts.node_count.checked_add(nodes.len()).is_none()
+            || counts.edge_count.checked_add(edges.len()).is_none()
+        {
+            return Err(GraphError::InvalidInput(
+                "Graph copy ID allocation would overflow".into(),
+            ));
+        }
+        let node_ids: HashMap<_, _> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &id)| (id, counts.node_count + i))
+            .collect();
+        let edge_ids: HashMap<_, _> = edges
+            .iter()
+            .enumerate()
+            .map(|(i, &(id, _))| (id, counts.edge_count + i))
+            .collect();
+        let mapped = |ids: &HashMap<usize, usize>, id: usize| {
+            ids.get(&id).copied().ok_or_else(|| {
+                GraphError::InvalidInput(format!("Graph copy lost active entity {id}"))
+            })
+        };
         let mut batch = GraphBatch {
             add_nodes: nodes.len(),
             ..Default::default()
         };
-        for (position, &node) in nodes.iter().enumerate() {
-            for (name, value) in other.get_node_attrs(node)? {
-                if name == EXTERNAL_ID {
-                    return Err(GraphError::InvalidInput(
-                        "add_graph cannot copy managed external IDs; use explicit upserts".into(),
-                    ));
-                }
-                if name == "entity_type" {
-                    if value.get_text().as_deref() != Some("base") {
+        for &(_, (source, target)) in &edges {
+            // capture_read_snapshot already verified both active endpoints.
+            batch.add_edges.push((
+                crate::BatchNodeRef::Added(mapped(&node_ids, source)? - counts.node_count),
+                crate::BatchNodeRef::Added(mapped(&node_ids, target)? - counts.node_count),
+            ));
+        }
+        for (is_node, attributes) in [
+            (true, snapshot.node_attributes),
+            (false, snapshot.edge_attributes),
+        ] {
+            for (id, attrs) in attributes {
+                for (name, value) in attrs {
+                    if name == EXTERNAL_ID {
+                        return Err(GraphError::InvalidInput(
+                            "add_graph cannot copy managed external IDs; use explicit upserts"
+                                .into(),
+                        ));
+                    }
+                    if is_node && name == "entity_type" {
+                        if value.get_text().as_deref() != Some("base") {
+                            return Err(GraphError::InvalidInput(
+                                "add_graph requires explicit copying of pooled/meta references"
+                                    .into(),
+                            ));
+                        }
+                        continue;
+                    }
+                    if name == "contains_subgraph" && !matches!(value, AttrValue::Null) {
                         return Err(GraphError::InvalidInput(
                             "add_graph requires explicit copying of pooled/meta references".into(),
                         ));
                     }
-                    continue;
+                    let value = crate::storage::value_references::remap(
+                        value,
+                        &node_ids,
+                        &edge_ids,
+                        "copied active graph",
+                    )
+                    .map_err(|error| {
+                        GraphError::InvalidInput(format!(
+                            "add_graph {} {id}.{name}: {error}",
+                            if is_node { "node" } else { "edge" },
+                        ))
+                    })?;
+                    if is_node {
+                        batch.node_attrs.entry(name).or_default().push((
+                            crate::BatchNodeRef::Added(mapped(&node_ids, id)? - counts.node_count),
+                            value,
+                        ));
+                    } else {
+                        batch.edge_attrs.entry(name).or_default().push((
+                            crate::BatchEdgeRef::Added(mapped(&edge_ids, id)? - counts.edge_count),
+                            value,
+                        ));
+                    }
                 }
-                if matches!(value, AttrValue::SubgraphRef(_)) {
-                    return Err(GraphError::InvalidInput(
-                        "add_graph requires explicit copying of pooled/meta references".into(),
-                    ));
-                }
-                batch
-                    .node_attrs
-                    .entry(name)
-                    .or_default()
-                    .push((crate::BatchNodeRef::Added(position), value));
             }
         }
-        let mut edges = other.edge_ids();
-        edges.sort_unstable();
-        for (position, edge) in edges.into_iter().enumerate() {
-            let (source, target) = other.edge_endpoints(edge)?;
-            let source = *positions.get(&source).ok_or_else(|| {
-                GraphError::InvalidInput("Copied edge has an inactive source".into())
-            })?;
-            let target = *positions.get(&target).ok_or_else(|| {
-                GraphError::InvalidInput("Copied edge has an inactive target".into())
-            })?;
-            batch.add_edges.push((
-                crate::BatchNodeRef::Added(source),
-                crate::BatchNodeRef::Added(target),
-            ));
-            for (name, value) in other.get_edge_attrs(edge)? {
-                if name == EXTERNAL_ID {
-                    return Err(GraphError::InvalidInput(
-                        "add_graph cannot copy managed external IDs; use explicit upserts".into(),
-                    ));
-                }
-                if matches!(value, AttrValue::SubgraphRef(_)) {
-                    return Err(GraphError::InvalidInput(
-                        "add_graph requires explicit copying of pooled/meta references".into(),
-                    ));
-                }
-                batch
-                    .edge_attrs
-                    .entry(name)
-                    .or_default()
-                    .push((crate::BatchEdgeRef::Added(position), value));
-            }
+        if self.automatic_publication {
+            self.apply_batch(
+                batch,
+                self.current_state_id(),
+                "add_graph".into(),
+                "groggy".into(),
+            )
+            .map(|_| ())
+        } else {
+            let prepared = batch.prepare(
+                |id| self.has_node(id),
+                |id| self.has_edge(id),
+                |id| self.pool.borrow().get_edge_endpoints(id),
+                counts.node_count,
+                counts.edge_count,
+            )?;
+            self.execute_prepared_mutation(prepared).map(|_| ())
         }
-        self.apply_batch(
-            batch,
-            self.current_state_id(),
-            "add_graph".into(),
-            "groggy".into(),
-        )
-        .map(|_| ())
     }
 
     pub(super) fn publish_meta_node(&mut self, subgraph_id: SubgraphId) -> GraphResult<NodeId> {

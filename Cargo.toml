@@ -147,3 +147,7 @@ harness = false
 [[bench]]
 name = "composer_completion"
 harness = false
+
+[[bench]]
+name = "graph_copy"
+harness = false

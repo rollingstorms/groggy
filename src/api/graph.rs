@@ -572,97 +572,11 @@ impl Graph {
         Ok(edge_ids)
     }
 
-    /// Add all nodes and edges from another graph to this graph
+    /// Copy another graph's active base entities through one prepared operation.
+    /// Typed entity references are remapped; unsupported pooled contents and
+    /// managed identities reject before allocating destination IDs.
     pub fn add_graph(&mut self, other: &Graph) -> Result<(), GraphError> {
-        if self.automatic_publication {
-            return self.publish_graph_copy(other);
-        }
-        if other.node_ids().iter().any(|&id| {
-            other
-                .get_node_attr(id, &EXTERNAL_ID.into())
-                .ok()
-                .flatten()
-                .is_some()
-        }) || other.edge_ids().iter().any(|&id| {
-            other
-                .get_edge_attr(id, &EXTERNAL_ID.into())
-                .ok()
-                .flatten()
-                .is_some()
-        }) {
-            return Err(GraphError::InvalidInput(
-                "add_graph cannot copy managed external IDs; use explicit upserts".into(),
-            ));
-        }
-        // Step 1: Create ID mapping by adding nodes
-        let other_nodes = other.node_ids();
-        let node_count = other_nodes.len();
-
-        if node_count == 0 {
-            return Ok(()); // Nothing to add
-        }
-
-        // Create new nodes and build ID mapping
-        let new_nodes = self.add_nodes(node_count);
-        let mut id_map: HashMap<NodeId, NodeId> = HashMap::new();
-
-        for (old_id, new_id) in other_nodes.iter().zip(new_nodes.iter()) {
-            id_map.insert(*old_id, *new_id);
-        }
-
-        // Step 2: Copy node attributes using the new IDs
-        for (&old_id, &new_id) in &id_map {
-            if let Ok(attrs) = other.get_node_attrs(old_id) {
-                for (attr_name, attr_value) in attrs {
-                    // Skip entity_type as it's already set by add_nodes
-                    if attr_name == "entity_type" {
-                        continue;
-                    }
-                    // Use the new ID, not the old one
-                    let _ = self.set_node_attr(new_id, attr_name, attr_value);
-                }
-            }
-        }
-
-        // Step 3: Add edges using remapped node IDs
-        let other_edges = other.edge_ids();
-        let mut edges_to_add = Vec::new();
-        let mut edge_id_pairs = Vec::new(); // Track (old_edge_id, position_in_edges_to_add)
-
-        for (idx, edge_id) in other_edges.iter().enumerate() {
-            if let Ok((old_source, old_target)) = other.edge_endpoints(*edge_id) {
-                // Map old node IDs to new node IDs
-                if let (Some(&new_source), Some(&new_target)) =
-                    (id_map.get(&old_source), id_map.get(&old_target))
-                {
-                    edges_to_add.push((new_source, new_target));
-                    edge_id_pairs.push((*edge_id, idx));
-                } else {
-                    // Skip edges with unmapped nodes (shouldn't happen but be safe)
-                    eprintln!("Warning: Skipping edge with unmapped nodes");
-                    continue;
-                }
-            }
-        }
-
-        // Add all edges and build edge ID mapping
-        let new_edge_ids = if !edges_to_add.is_empty() {
-            self.add_edges(&edges_to_add)?
-        } else {
-            Vec::new()
-        };
-
-        // Step 4: Copy edge attributes using the new edge IDs
-        for ((old_edge_id, _), &new_edge_id) in edge_id_pairs.iter().zip(new_edge_ids.iter()) {
-            if let Ok(attrs) = other.get_edge_attrs(*old_edge_id) {
-                for (attr_name, attr_value) in attrs {
-                    // Use the new edge ID, not the old one
-                    let _ = self.set_edge_attr(new_edge_id, attr_name, attr_value);
-                }
-            }
-        }
-
-        Ok(())
+        self.copy_graph_active(other)
     }
 
     /// Remove a node and all its incident edges

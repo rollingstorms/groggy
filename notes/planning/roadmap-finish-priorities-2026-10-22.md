@@ -641,3 +641,21 @@ preset/selector collapse and 10–11x for contraction, on the bounded chain fixt
 No general memory/scale guarantee is inferred. Full gates: 1,010 native, 1,720
 Python, 84 documentation examples, strict Clippy. See `bulk-removal-2026-10-25.md`.
 The fixed inventory remains **190 checked / 78 unchecked**; broad parents stay open.
+
+
+## Prepared active graph copying — 2026-10-25
+
+Continued existing **09.4b.2 / 05.3 / 07.4 / AR7.10**: manual and publishing
+`add_graph` now share complete source validation and prepared bulk execution.
+Removed the legacy per-row path that discarded errors. Typed NodeArray/EdgeArray
+values remap to fresh destination IDs using one storage helper also used by table
+materialization. Missing/inactive reference targets, pooled/meta data, managed
+identities and corrupt source indices reject before writes or allocation. Empty
+sources remain no-ops, manual targets retain pending changes, publishing targets
+accept once, and destination direction remains unchanged.
+
+Five native and ten Python regressions plus all existing gates pass: 1,015 native,
+1,730 Python, 87 documentation examples and strict Clippy. Four bounded release
+copy workloads record current costs without a speedup claim. See
+`graph-copy-2026-10-25.md` and `../../docs/api/graph-copy.md`. Existing unchecked
+parents remain open; no checklist row was added (190 checked / 78 unchecked).

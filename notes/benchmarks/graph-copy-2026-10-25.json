@@ -1,0 +1,149 @@
+{
+  "cases": [
+    {
+      "nodes_copied": 1000,
+      "publishing": false,
+      "samples": [
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.003372625,
+          "state_id": 1
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.003291417,
+          "state_id": 1
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.003283042,
+          "state_id": 1
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.003742625,
+          "state_id": 1
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.003410084,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "nodes_copied": 1000,
+      "publishing": true,
+      "samples": [
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.007769625,
+          "state_id": 4
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.00736675,
+          "state_id": 4
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.00796575,
+          "state_id": 4
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.007600542,
+          "state_id": 4
+        },
+        {
+          "edges": 1000,
+          "nodes": 1002,
+          "seconds": 0.00744725,
+          "state_id": 4
+        }
+      ]
+    },
+    {
+      "nodes_copied": 10000,
+      "publishing": false,
+      "samples": [
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.039063,
+          "state_id": 1
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.03709775,
+          "state_id": 1
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.039592375,
+          "state_id": 1
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.037756458,
+          "state_id": 1
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.038833042,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "nodes_copied": 10000,
+      "publishing": true,
+      "samples": [
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.08985625,
+          "state_id": 4
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.086694,
+          "state_id": 4
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.088858292,
+          "state_id": 4
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.086656625,
+          "state_id": 4
+        },
+        {
+          "edges": 10000,
+          "nodes": 10002,
+          "seconds": 0.090912291,
+          "state_id": 4
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized active graph copying; source has sparse IDs, f64 scalar/vector and typed references. Five observations per case; complete validation, capture, remapping, bulk installation and publication (when enabled) measured. Setup and exhaustive verification excluded. No historical/pool copy, matched speedup, RSS/allocation or FFI claim."
+}

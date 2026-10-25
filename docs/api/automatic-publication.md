@@ -74,7 +74,8 @@ subgraph-array factories also return publishing graphs after accepting their
 privately assembled contents. Existing checked journals retain their recovery
 semantics and original clocks.
 
-Ordinary `add_graph` stages base topology and properties as one batch. Managed
+Ordinary [`add_graph`](graph-copy.md) stages base topology and properties as one batch
+in both publishing and explicit manual modes, remapping typed entity references. Managed
 external identities require explicit upserts. Cross-pool/meta references require
 explicit portable copying and reject before allocation; copying pool-local IDs
 as though they were portable could otherwise produce dangling references.

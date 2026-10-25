@@ -19,6 +19,7 @@ pub mod numeric;
 pub mod pool;
 pub mod table; // BaseTable system
 pub(crate) mod value_codec;
+pub(crate) mod value_references;
 
 // Re-export components
 pub use adjacency::*;

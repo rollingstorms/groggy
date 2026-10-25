@@ -156,34 +156,8 @@ fn remap(
     nodes: &HashMap<usize, usize>,
     edges: &HashMap<usize, usize>,
 ) -> GraphResult<AttrValue> {
-    match value {
-        AttrValue::SubgraphRef(_) => Err(invalid(format!(
-            "{name} row {row}: SubgraphRef requires portable source pool contents"
-        ))),
-        AttrValue::NodeArray(ids) => ids
-            .iter()
-            .map(|id| {
-                nodes.get(id).copied().ok_or_else(|| {
-                    invalid(format!(
-                        "{name} row {row}: referenced node {id} is absent from table"
-                    ))
-                })
-            })
-            .collect::<GraphResult<_>>()
-            .map(AttrValue::NodeArray),
-        AttrValue::EdgeArray(ids) => ids
-            .iter()
-            .map(|id| {
-                edges.get(id).copied().ok_or_else(|| {
-                    invalid(format!(
-                        "{name} row {row}: referenced edge {id} is absent from table"
-                    ))
-                })
-            })
-            .collect::<GraphResult<_>>()
-            .map(AttrValue::EdgeArray),
-        _ => Ok(value.clone()),
-    }
+    crate::storage::value_references::remap(value.clone(), nodes, edges, "table")
+        .map_err(|error| invalid(format!("{name} row {row}: {error}")))
 }
 
 #[cfg(test)]
