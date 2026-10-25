@@ -125,7 +125,7 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'stack': 'BaseTable', 'concat': 'BaseTable',
             'union': 'BaseTable', 'intersect': 'BaseTable',
         },
-        'GraphTable': {'update_source_graph': 'Dict[str, Any]'},
+        'GraphTable': {'update_source_graph': 'Dict[str, Any]', 'merge': 'GraphTable', 'from_federated_bundles': 'GraphTable'},
         'TableArray': {name: 'BaseTable' for name in ('sum', 'mean', 'min', 'max', 'all', 'count', 'agg', 'concat')},
         'GraphView': {
             'write_state_id': 'Optional[int]', 'node_ids': 'List[int]', 'edge_ids': 'List[int]',
@@ -479,6 +479,12 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
             lines.append("    def join(self, other: BaseTable, on: Any, how: Optional[str] = None) -> BaseTable:")
         elif class_name == 'BaseTable' and method_name == 'update_source_graph':
             lines.append("    def update_source_graph(self, graph: Any, columns: List[str], *, effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
+        elif class_name == 'GraphTable' and method_name == 'merge':
+            lines.append("    @staticmethod")
+            lines.append("    def merge(tables: List[GraphTable], strategy: str = 'domain_prefix') -> GraphTable:")
+        elif class_name == 'GraphTable' and method_name == 'from_federated_bundles':
+            lines.append("    @staticmethod")
+            lines.append("    def from_federated_bundles(bundle_paths: List[str], domain_names: Optional[List[str]] = None) -> GraphTable:")
         elif class_name == 'GraphTable' and method_name == 'update_source_graph':
             lines.append("    def update_source_graph(self, graph: Any, *, node_columns: List[str], edge_columns: List[str], effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
         elif class_name in ('NodesTable', 'EdgesTable') and method_name == 'from_base_table':

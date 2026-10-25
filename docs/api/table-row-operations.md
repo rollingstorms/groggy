@@ -98,9 +98,10 @@ adapters with the same semantics.
 All outputs are eager owned columns; retained sources keep their frozen payloads
 alive. Key hashing includes cell content. Group selection, set indexes and row
 plans allocate memory proportional to their inputs/results; no memory budget,
-streaming or billion-row guarantee is established. Specialized graph-domain
-merges and broader collection ownership/conversion adapters remain separate open
-work under 27/AR7.10.
+streaming or billion-row guarantee is established. Broader collection ownership/conversion adapters remain open under 27/AR7.10.
 
 [Collection reductions](table-collection-reductions.md) now share native numeric
 kernels, checked group metadata and lossless supplied-table flattening.
+
+[Specialized graph-table merge](graph-table-merge.md) now defines the six existing
+identity/conflict policies, checked reference maps and retained source provenance.

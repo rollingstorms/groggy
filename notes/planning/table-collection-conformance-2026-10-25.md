@@ -72,3 +72,7 @@ A zero-table collection has no input capture/schema to recover; this slice retai
 captures belonging to supplied tables, including supplied empty tables. It does
 not certify every legacy collection transform or merge merely because reductions
 now share a coordinator. Checklist stays 191 checked / 77 unchecked.
+
+Follow-up: [specialized merge conformance](graph-table-merge-conformance-2026-10-25.md)
+closes all six graph-table merge strategies and federated naming. Broader collection
+ownership/conversion and existing pooled portability work remain open.

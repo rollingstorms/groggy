@@ -109,6 +109,9 @@ clones input BaseTables while preparing a native collection, so it has a copy
 cost beyond native kernel measurements. No streaming-output, memory-budget,
 100ns whole-reduction or large-scale latency guarantee is established.
 
-Specialized graph-domain merges, collection ownership across zero-table
-transformations and broader conversion adapters remain open under 27/AR7.10.
+Collection ownership across zero-table transformations and broader conversion
+adapters remain open under 27/AR7.10.
 This slice certifies reduction/flatten outputs for their supplied input tables.
+
+[Specialized graph-table merge](graph-table-merge.md) now defines the six existing
+identity/conflict policies, checked reference maps and retained source provenance.

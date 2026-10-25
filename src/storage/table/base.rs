@@ -76,11 +76,11 @@ impl Clone for BaseTable {
 }
 
 impl BaseTable {
-    pub(super) fn collection_result(
+    pub(super) fn collection_result<'a>(
         columns: HashMap<String, BaseArray<AttrValue>>,
         order: Vec<String>,
         rows: usize,
-        sources: &[BaseTable],
+        sources: impl IntoIterator<Item = &'a BaseTable>,
     ) -> GraphResult<Self> {
         let mut result = Self::with_column_order(columns, order)?;
         result.nrows = rows;

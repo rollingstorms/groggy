@@ -6106,11 +6106,13 @@ class GraphTable:
         """
         ...
 
-    def from_federated_bundles(self, *args, **kwargs) -> Any:
+    @staticmethod
+    def from_federated_bundles(bundle_paths: List[str], domain_names: Optional[List[str]] = None) -> GraphTable:
         """
         Create federated GraphTable from multiple bundle paths
         """
         ...
+
 
     def get_bundle_info(self, *args, **kwargs) -> Any:
         """
@@ -6166,11 +6168,13 @@ class GraphTable:
         """
         ...
 
-    def merge(self, *args, **kwargs) -> Any:
+    @staticmethod
+    def merge(tables: List[GraphTable], strategy: str = 'domain_prefix') -> GraphTable:
         """
         Merge multiple GraphTables into one using the specified strategy
         """
         ...
+
 
     def ncols(self, *args, **kwargs) -> Any:
         """

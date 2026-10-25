@@ -5507,7 +5507,11 @@ impl PyGraphTable {
     /// Merge multiple GraphTables into one using the specified strategy
     #[staticmethod]
     #[pyo3(signature = (tables, strategy = "domain_prefix"))]
-    pub fn merge(tables: Vec<PyGraphTable>, strategy: &str) -> PyResult<PyGraphTable> {
+    pub fn merge(
+        tables: Vec<PyGraphTable>,
+        strategy: &str,
+        py: Python<'_>,
+    ) -> PyResult<PyGraphTable> {
         use groggy::storage::graph_table::MergeOptions;
         use groggy::storage::table::ConflictResolution;
 
@@ -5529,11 +5533,14 @@ impl PyGraphTable {
         let rust_tables: Vec<groggy::storage::table::GraphTable> =
             tables.into_iter().map(|t| t.table).collect();
 
-        let merged = groggy::storage::table::GraphTable::merge(
-            rust_tables,
-            MergeOptions::new(conflict_strategy),
-        )
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let merged = py
+            .allow_threads(|| {
+                groggy::storage::table::GraphTable::merge(
+                    rust_tables,
+                    MergeOptions::new(conflict_strategy),
+                )
+            })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(PyGraphTable { table: merged })
     }
@@ -5543,12 +5550,16 @@ impl PyGraphTable {
     pub fn from_federated_bundles(
         bundle_paths: Vec<&str>,
         domain_names: Option<Vec<String>>,
+        py: Python<'_>,
     ) -> PyResult<PyGraphTable> {
         use std::path::Path;
 
         let paths: Vec<&Path> = bundle_paths.iter().map(Path::new).collect();
 
-        let table = groggy::storage::table::GraphTable::from_federated_bundles(paths, domain_names)
+        let table = py
+            .allow_threads(|| {
+                groggy::storage::table::GraphTable::from_federated_bundles(paths, domain_names)
+            })
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(PyGraphTable { table })

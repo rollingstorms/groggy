@@ -569,3 +569,22 @@ Native kernel timings exclude the legacy bridge's BaseTable cloning cost; no
 matched speedup, memory or FFI latency guarantee is claimed. Checklist stays
 191 checked / 77 unchecked, with no new rows. Specialized merges and broader
 collection ownership/conversion adapters remain open; this family is complete.
+
+
+## 2026-10-25 — specialized graph-table merges (27 / AR7.10)
+
+Closed all six existing GraphTable merge strategies and federated-domain naming.
+One checked Rust plan replaces attribute-dropping, empty-output and cross-domain
+fallback paths. Sparse IDs/endpoints and typed reference arrays use complete local
+maps. Fail/keep/attribute/dense/auto-remap policies now have explicit stable row,
+property and conflict behavior. Output retains source captures read-only, preserves
+validation policies conservatively and checks surviving external identity.
+Federated names are validated and emitted. Python merge/loading release the GIL.
+
+Evidence: `graph-table-merge-conformance-2026-10-25.md`, ten native tests including
+256 independent topology-oracle combinations, thirteen Python cases, 1,071 native /
+1,802 root Python tests, 106 executable docs and strict all-target Clippy. Receipt:
+`notes/benchmarks/graph-table-merge-2026-10-25.json`; no matched speedup or memory/
+FFI latency claim. Checklist remains 191 checked / 77 unchecked, no new rows.
+Specialized merges are complete; broader collection ownership/conversions stay
+under existing 27/AR7.10, while pooled portability stays in 07.3/10.3/12.2.

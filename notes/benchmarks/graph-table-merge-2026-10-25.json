@@ -1,0 +1,137 @@
+{
+  "cases": [
+    {
+      "nodes_per_input": 1000,
+      "seconds": [
+        0.00233575,
+        0.00200025,
+        0.003596834,
+        0.004673208,
+        0.004141125
+      ],
+      "strategy": "fail"
+    },
+    {
+      "nodes_per_input": 1000,
+      "seconds": [
+        0.0018925,
+        0.002866,
+        0.002608208,
+        0.002552459,
+        0.002636125
+      ],
+      "strategy": "keep_first"
+    },
+    {
+      "nodes_per_input": 1000,
+      "seconds": [
+        0.002482333,
+        0.002521084,
+        0.002516625,
+        0.002300791,
+        0.002203125
+      ],
+      "strategy": "keep_second"
+    },
+    {
+      "nodes_per_input": 1000,
+      "seconds": [
+        0.002432541,
+        0.002414416,
+        0.002161208,
+        0.002148667,
+        0.002204042
+      ],
+      "strategy": "merge_attributes"
+    },
+    {
+      "nodes_per_input": 1000,
+      "seconds": [
+        0.003152959,
+        0.00282325,
+        0.002874292,
+        0.002862291,
+        0.002716375
+      ],
+      "strategy": "domain_prefix"
+    },
+    {
+      "nodes_per_input": 1000,
+      "seconds": [
+        0.002864083,
+        0.002699,
+        0.002790459,
+        0.002795334,
+        0.002647916
+      ],
+      "strategy": "auto_remap"
+    },
+    {
+      "nodes_per_input": 10000,
+      "seconds": [
+        0.022692167,
+        0.022187209,
+        0.022462375,
+        0.022377,
+        0.021789666
+      ],
+      "strategy": "fail"
+    },
+    {
+      "nodes_per_input": 10000,
+      "seconds": [
+        0.016178417,
+        0.016371583,
+        0.015657708,
+        0.015856583,
+        0.015325291
+      ],
+      "strategy": "keep_first"
+    },
+    {
+      "nodes_per_input": 10000,
+      "seconds": [
+        0.018776458,
+        0.018313792,
+        0.017576917,
+        0.016977667,
+        0.017497584
+      ],
+      "strategy": "keep_second"
+    },
+    {
+      "nodes_per_input": 10000,
+      "seconds": [
+        0.017843417,
+        0.017924583,
+        0.018048416,
+        0.018477083,
+        0.018865208
+      ],
+      "strategy": "merge_attributes"
+    },
+    {
+      "nodes_per_input": 10000,
+      "seconds": [
+        0.024698792,
+        0.024376542,
+        0.0237555,
+        0.024672042,
+        0.025802875
+      ],
+      "strategy": "domain_prefix"
+    },
+    {
+      "nodes_per_input": 10000,
+      "seconds": [
+        0.027765167,
+        0.0257245,
+        0.025587708,
+        0.025625125,
+        0.026568833
+      ],
+      "strategy": "auto_remap"
+    }
+  ],
+  "scope": "Native optimized six-policy merge of two graph tables; five observations. Chain topology, node integer and edge precise-f64 properties. Fail uses disjoint IDs; other policies collide. Input preparation/cloning and final checks excluded. Complete merge validation, identity planning, property transfer and output construction timed. No matched speedup, RSS/allocation or FFI latency claim."
+}

@@ -86,11 +86,13 @@ multiplication and row-plan reservations are checked, but this is not a memory
 budget or streaming join. Source captures remain alive with the result. There is
 no row-identity guarantee for joined output and no inferred graph mutation.
 
-Specialized graph-domain merges and broader collection ownership/conversion
-adapters remain separate open work under 27/AR7.10.
+Broader collection ownership/conversion adapters remain open under 27/AR7.10.
 
 [Grouping and row operations](table-row-operations.md) now share these typed keys
 and define stable group/set ordering and explicit combination contracts.
 
 [Collection reductions](table-collection-reductions.md) now share native numeric
 kernels, checked group metadata and lossless supplied-table flattening.
+
+[Specialized graph-table merge](graph-table-merge.md) now defines the six existing
+identity/conflict policies, checked reference maps and retained source provenance.
