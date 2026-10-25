@@ -86,6 +86,8 @@ multiplication and row-plan reservations are checked, but this is not a memory
 budget or streaming join. Source captures remain alive with the result. There is
 no row-identity guarantee for joined output and no inferred graph mutation.
 
-Specialized graph-domain merges, TableArray aggregation/group-key policies,
-set-operation/grouping key migration and other table conversions remain separate
-open work under 27/AR7.10.
+Specialized graph-domain merges, TableArray aggregation/group-key policies
+and broader table conversions remain separate open work under 27/AR7.10.
+
+[Grouping and row operations](table-row-operations.md) now share these typed keys
+and define stable group/set ordering and explicit combination contracts.

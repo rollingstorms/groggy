@@ -50,18 +50,10 @@ impl BaseTable {
             if left_on.is_empty() || left_on.len() != right_on.len() {
                 return Err(invalid("Join keys must be nonempty lists of equal length"));
             }
-            for (table, names, side) in [(self, left_on, "Left"), (other, right_on, "Right")] {
-                let mut seen = HashSet::new();
-                for &name in names {
-                    if !seen.insert(name) {
-                        return Err(invalid(format!("{side} join column '{name}' repeated")));
-                    }
-                    if !table.columns.contains_key(name) {
-                        return Err(invalid(format!("{side} join column '{name}' not found")));
-                    }
-                }
-            }
+            self.key_columns(left_on)?;
+            other.key_columns(right_on)?;
         }
+
         if how == "right" {
             return other.join_on(self, right_on, left_on, "left");
         }
@@ -125,27 +117,9 @@ impl BaseTable {
             }
             rows
         } else {
-            fn columns<'a>(
-                table: &'a BaseTable,
-                keys: &[&str],
-            ) -> GraphResult<Vec<&'a BaseArray<AttrValue>>> {
-                keys.iter()
-                    .map(|key| {
-                        table
-                            .columns
-                            .get(*key)
-                            .ok_or_else(|| invalid("Missing join key"))
-                    })
-                    .collect()
-            }
-            let left = columns(self, left_on)?;
-            let right = columns(other, right_on)?;
-            let key = |columns: &[&BaseArray<AttrValue>], row| -> Vec<AttrValue> {
-                columns
-                    .iter()
-                    .map(|col| col.get(row).cloned().unwrap_or(AttrValue::Null))
-                    .collect()
-            };
+            let left = self.key_columns(left_on)?;
+            let right = other.key_columns(right_on)?;
+            let key = super::row_ops::row_key;
             let mut index: HashMap<Vec<AttrValue>, Vec<usize>> = HashMap::new();
             for row in 0..other.nrows {
                 index.entry(key(&right, row)).or_default().push(row);

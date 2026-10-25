@@ -1,0 +1,95 @@
+{
+  "cases": [
+    {
+      "input_rows": 1000,
+      "samples": [
+        {
+          "concat_seconds": 0.000076833,
+          "dedup_seconds": 0.000214792,
+          "group_seconds": 0.001619166,
+          "intersection_seconds": 0.000490292,
+          "stack_seconds": 0.000104584,
+          "union_seconds": 0.000427334
+        },
+        {
+          "concat_seconds": 0.000022,
+          "dedup_seconds": 0.000083667,
+          "group_seconds": 0.000547791,
+          "intersection_seconds": 0.0001985,
+          "stack_seconds": 0.000030667,
+          "union_seconds": 0.00017375
+        },
+        {
+          "concat_seconds": 0.000017584,
+          "dedup_seconds": 0.000085792,
+          "group_seconds": 0.000421541,
+          "intersection_seconds": 0.000194333,
+          "stack_seconds": 0.000030375,
+          "union_seconds": 0.000162458
+        },
+        {
+          "concat_seconds": 0.000017333,
+          "dedup_seconds": 0.000086791,
+          "group_seconds": 0.000421292,
+          "intersection_seconds": 0.000189667,
+          "stack_seconds": 0.000031416,
+          "union_seconds": 0.000160709
+        },
+        {
+          "concat_seconds": 0.000017167,
+          "dedup_seconds": 0.00008375,
+          "group_seconds": 0.000417,
+          "intersection_seconds": 0.000189542,
+          "stack_seconds": 0.000030083,
+          "union_seconds": 0.000161
+        }
+      ]
+    },
+    {
+      "input_rows": 10000,
+      "samples": [
+        {
+          "concat_seconds": 0.000412667,
+          "dedup_seconds": 0.001518042,
+          "group_seconds": 0.002696833,
+          "intersection_seconds": 0.003164542,
+          "stack_seconds": 0.000631541,
+          "union_seconds": 0.002672584
+        },
+        {
+          "concat_seconds": 0.000160416,
+          "dedup_seconds": 0.001141375,
+          "group_seconds": 0.002117375,
+          "intersection_seconds": 0.002675167,
+          "stack_seconds": 0.000353042,
+          "union_seconds": 0.002343041
+        },
+        {
+          "concat_seconds": 0.000143417,
+          "dedup_seconds": 0.001039083,
+          "group_seconds": 0.001783458,
+          "intersection_seconds": 0.002462125,
+          "stack_seconds": 0.000319,
+          "union_seconds": 0.002060958
+        },
+        {
+          "concat_seconds": 0.000143417,
+          "dedup_seconds": 0.000930875,
+          "group_seconds": 0.001566333,
+          "intersection_seconds": 0.002243125,
+          "stack_seconds": 0.000317333,
+          "union_seconds": 0.001904709
+        },
+        {
+          "concat_seconds": 0.00013575,
+          "dedup_seconds": 0.000901416,
+          "group_seconds": 0.0015735,
+          "intersection_seconds": 0.002020959,
+          "stack_seconds": 0.000296042,
+          "union_seconds": 0.001712084
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized grouping, dedup, self-union/intersection, vertical stack and horizontal concat. Two columns, 100 repeated keys, five observations. Full result construction included; fixture construction and correctness checks excluded. No matched baseline, RSS/allocation, FFI or speedup claim."
+}

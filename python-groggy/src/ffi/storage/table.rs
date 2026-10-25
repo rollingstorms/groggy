@@ -621,7 +621,7 @@ impl PyBaseTable {
     ///
     /// Returns:
     ///     PyTableArray: Array-like container holding the grouped tables
-    pub fn group_by(&self, columns: PyObject) -> PyResult<PyTableArray> {
+    pub fn group_by(&self, columns: PyObject, py: Python<'_>) -> PyResult<PyTableArray> {
         // Convert PyObject to Vec<String> - handle both single string and list of strings
         let column_vec: Vec<String> = Python::with_gil(|py| {
             if let Ok(single_str) = columns.extract::<String>(py) {
@@ -637,9 +637,9 @@ impl PyBaseTable {
             }
         })?;
 
-        let grouped_tables = self
-            .table
-            .group_by(&column_vec)
+        let table = &self.table;
+        let grouped_tables = py
+            .allow_threads(|| table.group_by(&column_vec))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         // Convert to PyBaseTable objects
@@ -1204,9 +1204,12 @@ impl PyBaseTable {
         let column_refs: Vec<&str> = column_names.iter().map(|s| s.as_str()).collect();
 
         // Call core groupby method
-        let result = self.table.groupby(&column_refs).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Groupby failed: {}", e))
-        })?;
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.groupby(&column_refs))
+            .map_err(|e| {
+                pyo3::exceptions::PyValueError::new_err(format!("Groupby failed: {}", e))
+            })?;
 
         Ok(crate::ffi::storage::table_array_core::PyTableArrayCore { inner: result })
     }
@@ -1215,10 +1218,14 @@ impl PyBaseTable {
     pub fn groupby_single(
         &self,
         column: String,
+        py: Python<'_>,
     ) -> PyResult<crate::ffi::storage::table_array_core::PyTableArrayCore> {
-        let result = self.table.groupby_single(&column).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Groupby failed: {}", e))
-        })?;
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.groupby_single(&column))
+            .map_err(|e| {
+                pyo3::exceptions::PyValueError::new_err(format!("Groupby failed: {}", e))
+            })?;
 
         Ok(crate::ffi::storage::table_array_core::PyTableArrayCore { inner: result })
     }
@@ -1336,8 +1343,10 @@ impl PyBaseTable {
     /// # Combine two tables with same schema
     /// combined = table1.union(table2)
     /// ```
-    pub fn union(&self, other: &Self) -> PyResult<Self> {
-        let result = self.table.union(&other.table).map_err(|e| {
+    pub fn union(&self, other: &Self, py: Python<'_>) -> PyResult<Self> {
+        let table = &self.table;
+        let other = &other.table;
+        let result = py.allow_threads(|| table.union(other)).map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Union failed: {}", e))
         })?;
 
@@ -1354,12 +1363,32 @@ impl PyBaseTable {
     /// # Find common rows between tables
     /// common = table1.intersect(table2)
     /// ```
-    pub fn intersect(&self, other: &Self) -> PyResult<Self> {
-        let result = self.table.intersect(&other.table).map_err(|e| {
+    pub fn intersect(&self, other: &Self, py: Python<'_>) -> PyResult<Self> {
+        let table = &self.table;
+        let other = &other.table;
+        let result = py.allow_threads(|| table.intersect(other)).map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Intersect failed: {}", e))
         })?;
 
         Ok(Self::from_table(result))
+    }
+
+    /// Append rows with identical ordered columns, retaining read-only sources.
+    pub fn stack(&self, other: &Self, py: Python<'_>) -> PyResult<Self> {
+        let table = &self.table;
+        let other = &other.table;
+        py.allow_threads(|| table.stack(other))
+            .map(Self::from_table)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Stack failed: {e}")))
+    }
+
+    /// Combine columns by row position, padding with nulls and rejecting name collisions.
+    pub fn concat(&self, other: &Self, py: Python<'_>) -> PyResult<Self> {
+        let table = &self.table;
+        let other = &other.table;
+        py.allow_threads(|| table.concat(other))
+            .map(Self::from_table)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Concat failed: {e}")))
     }
 
     // === SMART ACCESS METHODS (Week 3-4: Smart Table Access) ===
@@ -1833,11 +1862,14 @@ impl PyBaseTable {
     /// # Drop duplicates based only on 'name' and 'age' columns
     /// new_table = table.drop_duplicates(["name", "age"])
     /// ```
-    pub fn drop_duplicates(&self, subset: Option<Vec<String>>) -> PyResult<Self> {
+    pub fn drop_duplicates(&self, subset: Option<Vec<String>>, py: Python<'_>) -> PyResult<Self> {
         let subset_slice = subset.as_deref();
-        let result = self.table.drop_duplicates(subset_slice).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Drop duplicates failed: {}", e))
-        })?;
+        let table = &self.table;
+        let result = py
+            .allow_threads(|| table.drop_duplicates(subset_slice))
+            .map_err(|e| {
+                pyo3::exceptions::PyValueError::new_err(format!("Drop duplicates failed: {}", e))
+            })?;
 
         Ok(Self::from_table(result))
     }

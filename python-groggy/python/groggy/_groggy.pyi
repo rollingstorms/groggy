@@ -1293,6 +1293,12 @@ class BaseTable:
         ...
 
     @property
+    def concat(self, other: BaseTable) -> BaseTable:
+        """
+        Combine columns by row position, padding with nulls and rejecting name collisions.
+        """
+        ...
+
     def ncols(self) -> Any:
         """
         Get number of columns
@@ -1999,7 +2005,7 @@ class BaseTable:
         """
         ...
 
-    def intersect(self, *args, **kwargs) -> Any:
+    def intersect(self, other: BaseTable) -> BaseTable:
         """
         Intersect with another table (returns common rows)
 
@@ -2546,6 +2552,12 @@ class BaseTable:
         """
         ...
 
+    def stack(self, other: BaseTable) -> BaseTable:
+        """
+        Append rows with identical ordered columns, retaining read-only sources.
+        """
+        ...
+
     def std(self, *args, **kwargs) -> Any:
         """
         Calculate standard deviation for a specific column
@@ -2647,7 +2659,7 @@ class BaseTable:
         """
         ...
 
-    def union(self, *args, **kwargs) -> Any:
+    def union(self, other: BaseTable) -> BaseTable:
         """
         Union with another table (removes duplicates)
 

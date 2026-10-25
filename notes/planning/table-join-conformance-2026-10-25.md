@@ -65,3 +65,7 @@ GraphTable domain merges/remapping, grouping and set-operation key semantics,
 TableArray aggregation/group-key policies and other conversion adapters remain
 under existing 27/AR7.10; legacy connected reads remain under 26.1. This pass
 neither expands those requirements nor claims broader table completion.
+
+Follow-up: [row conformance](table-row-conformance-2026-10-25.md) closes shared
+grouping/dedup/set/stack/concat semantics. Specialized domain merges, TableArray
+aggregation/group-key policy and broader conversions remain open.

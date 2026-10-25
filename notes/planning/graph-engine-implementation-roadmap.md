@@ -742,3 +742,25 @@ native receipt: `notes/benchmarks/table-joins-2026-10-25.json`; no matched speed
 or memory guarantee. Checklist remains 191 checked / 77 unchecked: no new rows.
 The generic join family is complete; broad 27/AR7.10 remain partial for specialized
 merges, grouping/set/conversion semantics and TableArray aggregation adapters.
+
+
+## 2026-10-25 — stable typed table row operations (27 / AR7.10)
+
+Closed the generic grouping/dedup/set/stack/concat inventory. One private Rust
+row-key mechanism now serves joins, both group APIs, grouped aggregates and set
+operations. Groups and distinct rows keep first-occurrence order. Canonical
+property identity replaces debug/delimited strings. Group/dedup selections retain
+exact source IDs; combinations/aggregates keep read-only source contexts.
+Concat now preserves column order, pads shorter inputs, and rejects colliding
+names. Stack preserves all rows with identical ordered schemas. Both native
+combination methods now have thin Python adapters; affected BaseTable row/group
+calls release the GIL. Grouped aggregation rejects output collisions and invalid
+empty-input specs, and aggregation columns have deterministic order.
+
+Evidence: `table-row-conformance-2026-10-25.md`, seven native regressions including
+432 independent set/stack oracle comparisons, ten Python cases, 1,054 native /
+1,777 root Python tests, 100 executable docs and strict all-target Clippy. Receipt:
+`notes/benchmarks/table-rows-2026-10-25.json`; no matched speedup or memory guarantee.
+Checklist remains 191 checked / 77 unchecked with no added rows. Specialized
+GraphTable domain merges, TableArray aggregate/group-key policies and broader
+conversion adapters remain open; generic joins and this row family are complete.

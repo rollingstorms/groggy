@@ -171,3 +171,7 @@ harness = false
 [[bench]]
 name = "table_joins"
 harness = false
+
+[[bench]]
+name = "table_rows"
+harness = false

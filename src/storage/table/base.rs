@@ -2,6 +2,8 @@
 
 #[path = "joins.rs"]
 mod joins;
+#[path = "row_ops.rs"]
+mod row_ops;
 
 use super::traits::Table;
 use crate::core::{DisplayDataSchema, DisplayDataWindow};
@@ -1064,45 +1066,10 @@ impl Table for BaseTable {
             return Ok(vec![self.clone()]);
         }
 
-        // Validate that all group columns exist
-        for col_name in columns {
-            if !self.columns.contains_key(col_name) {
-                return Err(crate::errors::GraphError::InvalidInput(format!(
-                    "Column '{}' not found in table",
-                    col_name
-                )));
-            }
-        }
-
-        // Create groups by building composite keys
-        let mut groups: HashMap<Vec<String>, Vec<usize>> = HashMap::new();
-
-        for row_idx in 0..self.nrows {
-            // Build composite key for this row
-            let mut key = Vec::new();
-            for col_name in columns {
-                if let Some(column) = self.columns.get(col_name) {
-                    if let Some(value) = column.get(row_idx) {
-                        key.push(format!("{:?}", value));
-                    } else {
-                        key.push("NULL".to_string());
-                    }
-                } else {
-                    key.push("NULL".to_string());
-                }
-            }
-
-            groups.entry(key).or_insert_with(Vec::new).push(row_idx);
-        }
-
-        // Create a table for each group
-        let mut result = Vec::new();
-        for (_, row_indices) in groups {
-            let group_table = self.select_rows(&row_indices)?;
-            result.push(group_table);
-        }
-
-        Ok(result)
+        self.stable_groups(&columns.iter().map(String::as_str).collect::<Vec<_>>())?
+            .into_iter()
+            .map(|(_, rows)| self.select_rows(&rows))
+            .collect()
     }
 
     fn select(&self, column_names: &[String]) -> GraphResult<Self> {
@@ -3974,33 +3941,17 @@ impl BaseTable {
             return self.aggregate(agg_specs);
         }
 
-        // Validate group columns exist
-        for col_name in group_cols {
-            if !self.columns.contains_key(col_name) {
-                return Err(crate::errors::GraphError::InvalidInput(format!(
-                    "Group column '{}' not found in table",
-                    col_name
+        let groups =
+            self.stable_groups(&group_cols.iter().map(String::as_str).collect::<Vec<_>>())?;
+        let mut specs: Vec<_> = agg_specs.iter().collect();
+        specs.sort_by_key(|(name, _)| *name);
+        for (name, operation) in &specs {
+            if group_cols.contains(name) {
+                return Err(crate::GraphError::InvalidInput(format!(
+                    "Aggregation column '{name}' collides with group key"
                 )));
             }
-        }
-
-        // Create groups
-        let mut groups: HashMap<Vec<&AttrValue>, Vec<usize>> = HashMap::new();
-
-        for row_idx in 0..self.nrows {
-            let mut key = Vec::new();
-            for col_name in group_cols {
-                if let Some(column) = self.columns.get(col_name) {
-                    if let Some(value) = column.get(row_idx) {
-                        key.push(value);
-                    } else {
-                        key.push(&AttrValue::Null);
-                    }
-                } else {
-                    key.push(&AttrValue::Null);
-                }
-            }
-            groups.entry(key).or_insert_with(Vec::new).push(row_idx);
+            self.apply_aggregation(&[], name, operation)?;
         }
 
         // Build result table
@@ -4013,7 +3964,7 @@ impl BaseTable {
         }
 
         // Initialize aggregation columns
-        for (col_name, _agg_func) in &agg_specs {
+        for &(col_name, _agg_func) in &specs {
             column_order.push(col_name.clone());
             result_columns.insert(col_name.clone(), Vec::new());
         }
@@ -4028,7 +3979,7 @@ impl BaseTable {
             }
 
             // Apply aggregations
-            for (agg_col, agg_func) in &agg_specs {
+            for &(agg_col, agg_func) in &specs {
                 let agg_result = self.apply_aggregation(&row_indices, agg_col, agg_func)?;
                 if let Some(column) = result_columns.get_mut(agg_col) {
                     column.push(agg_result);
@@ -4085,7 +4036,9 @@ impl BaseTable {
         let mut result_columns = HashMap::new();
         let mut column_order = Vec::new();
 
-        for (col_name, agg_func) in &agg_specs {
+        let mut specs: Vec<_> = agg_specs.iter().collect();
+        specs.sort_by_key(|(name, _)| *name);
+        for (col_name, agg_func) in specs {
             column_order.push(col_name.clone());
             let row_indices: Vec<usize> = (0..self.nrows).collect();
             let agg_result = self.apply_aggregation(&row_indices, col_name, agg_func)?;
@@ -4131,298 +4084,6 @@ impl BaseTable {
                 .map(|source| source.take(row_indices)),
             version: self.version + 1,
         })
-    }
-
-    /// Union with another table (combines all rows, removes duplicates)
-    pub fn union(&self, other: &Self) -> GraphResult<Self> {
-        // Tables must have the same schema
-        if self.column_order != other.column_order {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Union requires tables with identical column schemas".to_string(),
-            ));
-        }
-
-        let mut result_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-        for col_name in &self.column_order {
-            result_columns.insert(col_name.clone(), Vec::new());
-        }
-
-        // Track unique rows
-        let mut unique_rows = std::collections::HashSet::new();
-
-        // Add rows from first table
-        for row_idx in 0..self.nrows {
-            let mut row_key = Vec::new();
-            for col_name in &self.column_order {
-                if let Some(column) = self.columns.get(col_name) {
-                    if let Some(value) = column.get(row_idx) {
-                        row_key.push(format!("{:?}", value));
-                    } else {
-                        row_key.push("NULL".to_string());
-                    }
-                }
-            }
-
-            let row_hash = row_key.join("|");
-            if unique_rows.insert(row_hash) {
-                // Add this unique row
-                for col_name in &self.column_order {
-                    if let Some(column) = self.columns.get(col_name) {
-                        if let Some(values) = result_columns.get_mut(col_name) {
-                            if let Some(value) = column.get(row_idx) {
-                                values.push(value.clone());
-                            } else {
-                                values.push(crate::types::AttrValue::Null);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Add rows from second table
-        for row_idx in 0..other.nrows {
-            let mut row_key = Vec::new();
-            for col_name in &other.column_order {
-                if let Some(column) = other.columns.get(col_name) {
-                    if let Some(value) = column.get(row_idx) {
-                        row_key.push(format!("{:?}", value));
-                    } else {
-                        row_key.push("NULL".to_string());
-                    }
-                }
-            }
-
-            let row_hash = row_key.join("|");
-            if unique_rows.insert(row_hash) {
-                // Add this unique row
-                for col_name in &other.column_order {
-                    if let Some(column) = other.columns.get(col_name) {
-                        if let Some(values) = result_columns.get_mut(col_name) {
-                            if let Some(value) = column.get(row_idx) {
-                                values.push(value.clone());
-                            } else {
-                                values.push(crate::types::AttrValue::Null);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Convert to BaseArray columns
-        let mut base_columns = HashMap::new();
-        for (name, values) in result_columns {
-            base_columns.insert(name, BaseArray::from_attr_values(values));
-        }
-
-        let mut result = BaseTable::from_columns(base_columns)?;
-        result.provenance = super::provenance::TableProvenance::joined(
-            self.provenance.as_ref(),
-            other.provenance.as_ref(),
-        );
-        result.column_order = self.column_order.clone();
-        Ok(result)
-    }
-
-    /// Stack tables vertically (concatenate rows) - similar to pandas.concat(axis=0)
-    /// TODO: Implement vertical stacking/concatenation for tables
-    /// This should append rows from other table to this table, handling schema differences
-    pub fn stack(&self, other: &Self) -> GraphResult<Self> {
-        // TODO: Allow stacking tables with different schemas by:
-        // 1. Create union of all column names from both tables
-        // 2. Fill missing columns with AttrValue::Null
-        // 3. Concatenate all rows maintaining original order
-        // 4. Return new table with combined schema and all rows
-
-        // For now, require same schema like union but without deduplication
-        if self.column_order != other.column_order {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Stack requires tables with identical column schemas (TODO: support different schemas)".to_string()
-            ));
-        }
-
-        let mut result_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-        for col_name in &self.column_order {
-            result_columns.insert(col_name.clone(), Vec::new());
-        }
-
-        // Add all rows from first table (no deduplication)
-        for row_idx in 0..self.nrows {
-            for col_name in &self.column_order {
-                if let Some(column) = self.columns.get(col_name) {
-                    if let Some(values) = result_columns.get_mut(col_name) {
-                        if let Some(value) = column.get(row_idx) {
-                            values.push(value.clone());
-                        } else {
-                            values.push(crate::types::AttrValue::Null);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Add all rows from second table (no deduplication)
-        for row_idx in 0..other.nrows {
-            for col_name in &other.column_order {
-                if let Some(column) = other.columns.get(col_name) {
-                    if let Some(values) = result_columns.get_mut(col_name) {
-                        if let Some(value) = column.get(row_idx) {
-                            values.push(value.clone());
-                        } else {
-                            values.push(crate::types::AttrValue::Null);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Convert to BaseArray columns
-        let mut base_columns = HashMap::new();
-        for (name, values) in result_columns {
-            base_columns.insert(name, BaseArray::from_attr_values(values));
-        }
-
-        let mut result = BaseTable::from_columns(base_columns)?;
-        result.provenance = super::provenance::TableProvenance::joined(
-            self.provenance.as_ref(),
-            other.provenance.as_ref(),
-        );
-        result.column_order = self.column_order.clone();
-        Ok(result)
-    }
-
-    /// Concatenate tables horizontally (add columns) - similar to pandas.concat(axis=1)
-    /// TODO: Implement horizontal concatenation for tables
-    pub fn concat(&self, other: &Self) -> GraphResult<Self> {
-        // TODO: Implement horizontal concatenation by:
-        // 1. Combine column sets from both tables
-        // 2. Handle column name conflicts (add suffix like _x, _y)
-        // 3. Align rows by index (pad shorter table with nulls)
-        // 4. Return new table with combined columns
-
-        // Basic implementation for now
-        let mut result_columns = self.columns.clone();
-        let target_rows = std::cmp::max(self.nrows, other.nrows);
-
-        // Add columns from other table, handling conflicts
-        for (col_name, column) in &other.columns {
-            let final_col_name = if result_columns.contains_key(col_name) {
-                format!("{}_y", col_name) // TODO: Better conflict resolution
-            } else {
-                col_name.clone()
-            };
-
-            // Pad column to match target row count
-            let mut values = column.data().clone();
-            while values.len() < target_rows {
-                values.push(crate::types::AttrValue::Null);
-            }
-
-            result_columns.insert(final_col_name.clone(), BaseArray::from_attr_values(values));
-        }
-
-        // Pad existing columns to match target row count
-        for column in result_columns.values_mut() {
-            let mut values = column.data().clone();
-            while values.len() < target_rows {
-                values.push(crate::types::AttrValue::Null);
-            }
-            *column = BaseArray::from_attr_values(values);
-        }
-
-        let mut result = BaseTable::from_columns(result_columns)?;
-        result.provenance = super::provenance::TableProvenance::joined(
-            self.provenance.as_ref(),
-            other.provenance.as_ref(),
-        );
-        // TODO: Proper column order management for concatenated tables
-        result
-            .column_order
-            .extend(other.column_order.iter().map(|name| {
-                if self.column_order.contains(name) {
-                    format!("{}_y", name)
-                } else {
-                    name.clone()
-                }
-            }));
-        Ok(result)
-    }
-
-    /// Intersect with another table (returns only common rows)
-    pub fn intersect(&self, other: &Self) -> GraphResult<Self> {
-        // Tables must have the same schema
-        if self.column_order != other.column_order {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "Intersect requires tables with identical column schemas".to_string(),
-            ));
-        }
-
-        // Build set of rows from the other table
-        let mut other_rows = std::collections::HashSet::new();
-        for row_idx in 0..other.nrows {
-            let mut row_key = Vec::new();
-            for col_name in &other.column_order {
-                if let Some(column) = other.columns.get(col_name) {
-                    if let Some(value) = column.get(row_idx) {
-                        row_key.push(format!("{:?}", value));
-                    } else {
-                        row_key.push("NULL".to_string());
-                    }
-                }
-            }
-            other_rows.insert(row_key.join("|"));
-        }
-
-        let mut result_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-        for col_name in &self.column_order {
-            result_columns.insert(col_name.clone(), Vec::new());
-        }
-
-        // Find intersecting rows from first table
-        let mut seen_rows = std::collections::HashSet::new();
-        for row_idx in 0..self.nrows {
-            let mut row_key = Vec::new();
-            for col_name in &self.column_order {
-                if let Some(column) = self.columns.get(col_name) {
-                    if let Some(value) = column.get(row_idx) {
-                        row_key.push(format!("{:?}", value));
-                    } else {
-                        row_key.push("NULL".to_string());
-                    }
-                }
-            }
-
-            let row_hash = row_key.join("|");
-            if other_rows.contains(&row_hash) && seen_rows.insert(row_hash) {
-                // Add this intersecting row
-                for col_name in &self.column_order {
-                    if let Some(column) = self.columns.get(col_name) {
-                        if let Some(values) = result_columns.get_mut(col_name) {
-                            if let Some(value) = column.get(row_idx) {
-                                values.push(value.clone());
-                            } else {
-                                values.push(crate::types::AttrValue::Null);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Convert to BaseArray columns
-        let mut base_columns = HashMap::new();
-        for (name, values) in result_columns {
-            base_columns.insert(name, BaseArray::from_attr_values(values));
-        }
-
-        let mut result = BaseTable::from_columns(base_columns)?;
-        result.provenance = super::provenance::TableProvenance::joined(
-            self.provenance.as_ref(),
-            other.provenance.as_ref(),
-        );
-        result.column_order = self.column_order.clone();
-        Ok(result)
     }
 
     /// Generate descriptive statistics for all numeric columns
@@ -4741,82 +4402,6 @@ impl BaseTable {
     // GROUPBY OPERATIONS
     // ==================================================================================
 
-    /// Group table by one or more columns, returning a TableArray
-    /// This enables powerful fluent operations like groupby().sum(), groupby().agg()
-    ///
-    /// # Arguments
-    /// * `by` - Column names to group by
-    ///
-    /// # Returns
-    /// A TableArray where each table represents one group, with group keys attached
-    ///
-    /// # Examples
-    /// ```ignore
-    /// // Group by single column
-    /// let grouped = table.groupby(&["category"])?;
-    /// let sums = grouped.sum()?;  // Sum each group
-    ///
-    /// // Group by multiple columns
-    /// let grouped = table.groupby(&["category", "region"])?;
-    /// let aggregated = grouped.agg(hashmap!{
-    ///     "sales" => "sum",
-    ///     "price" => "mean"
-    /// })?;
-    /// ```ignore
-    pub fn groupby(&self, by: &[&str]) -> GraphResult<super::TableArray> {
-        use super::TableArray;
-
-        // Validate that all groupby columns exist
-        for col_name in by {
-            if !self.columns.contains_key(*col_name) {
-                return Err(crate::errors::GraphError::InvalidInput(format!(
-                    "Column '{}' not found in table",
-                    col_name
-                )));
-            }
-        }
-
-        // Create group keys by iterating through rows
-        let mut groups: HashMap<Vec<AttrValue>, Vec<usize>> = HashMap::new();
-
-        for row_idx in 0..self.nrows {
-            let mut key = Vec::new();
-
-            // Build group key from specified columns
-            for col_name in by {
-                if let Some(column) = self.columns.get(*col_name) {
-                    if let Some(value) = column.get(row_idx) {
-                        key.push(value.clone());
-                    } else {
-                        key.push(AttrValue::Null);
-                    }
-                }
-            }
-
-            groups.entry(key).or_insert_with(Vec::new).push(row_idx);
-        }
-
-        // Create tables for each group
-        let mut group_tables = Vec::new();
-        let mut group_keys = Vec::new();
-
-        for (group_key, row_indices) in groups {
-            // Create a table for this group by selecting the relevant rows
-            let group_table = self.select_rows(&row_indices)?;
-
-            // Create group key mapping
-            let mut key_map = HashMap::new();
-            for (i, col_name) in by.iter().enumerate() {
-                key_map.insert(col_name.to_string(), group_key[i].clone());
-            }
-
-            group_tables.push(group_table);
-            group_keys.push(key_map);
-        }
-
-        Ok(TableArray::from_tables_with_keys(group_tables, group_keys))
-    }
-
     /// Group by single column (convenience method)
     pub fn groupby_single(&self, column: &str) -> GraphResult<super::TableArray> {
         self.groupby(&[column])
@@ -5053,67 +4638,6 @@ impl BaseTable {
                 .filter(|row| !dropped.contains(row))
                 .collect::<Vec<_>>(),
         )
-    }
-
-    /// Drop duplicate rows based on specified columns (or all columns if none specified)
-    pub fn drop_duplicates(&self, subset: Option<&[String]>) -> GraphResult<Self> {
-        let columns_to_check = match subset {
-            Some(cols) => {
-                // Validate that all specified columns exist
-                for col in cols {
-                    if !self.columns.contains_key(col) {
-                        return Err(crate::errors::GraphError::InvalidInput(format!(
-                            "Column '{}' does not exist",
-                            col
-                        )));
-                    }
-                }
-                cols.to_vec()
-            }
-            None => self.column_order.clone(),
-        };
-
-        let mut seen_rows = std::collections::HashSet::new();
-        let mut keep_indices = Vec::new();
-
-        for i in 0..self.nrows {
-            // Create a tuple of values for the columns we're checking
-            let mut row_key = Vec::new();
-            for col_name in &columns_to_check {
-                if let Some(val) = self.columns[col_name].get(i) {
-                    // Convert AttrValue to a hashable representation
-                    let key_part = match val {
-                        AttrValue::Int(x) => format!("i:{}", x),
-                        AttrValue::SmallInt(x) => format!("si:{}", x),
-                        AttrValue::Float(x) => format!("f:{}", x),
-                        AttrValue::Text(x) => format!("t:{}", x),
-                        AttrValue::CompactText(x) => format!("ct:{:?}", x),
-                        AttrValue::Bool(x) => format!("b:{}", x),
-                        AttrValue::Null => "null".to_string(),
-                        AttrValue::FloatVec(v) => format!("fv:{:?}", v),
-                        AttrValue::Bytes(b) => format!("by:{:?}", b),
-                        _ => format!("other:{:?}", val),
-                    };
-                    row_key.push(key_part);
-                }
-            }
-
-            let row_signature = row_key.join("|");
-            if seen_rows.insert(row_signature) {
-                keep_indices.push(i);
-            }
-        }
-
-        // If all rows are unique, return clone
-        if keep_indices.len() == self.nrows {
-            return Ok(self.clone());
-        }
-
-        // Delegate to select_rows which uses BaseArray take_indices
-        let mut result = self.select_rows(&keep_indices)?;
-        result.version += 1;
-
-        Ok(result)
     }
 
     // ==================================================================================
