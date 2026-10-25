@@ -424,15 +424,7 @@ impl GraphTable {
         &self,
         node_ids: &[NodeId],
     ) -> GraphResult<HashMap<NodeId, HashMap<String, AttrValue>>> {
-        let mut result = HashMap::new();
-
-        for &node_id in node_ids {
-            if let Some(node_data) = self.nodes.get_by_uid(node_id) {
-                result.insert(node_id, node_data);
-            }
-        }
-
-        Ok(result)
+        self.nodes.base_table().identity_rows("node_id", node_ids)
     }
 
     /// Get edges by their IDs
@@ -440,36 +432,25 @@ impl GraphTable {
         &self,
         edge_ids: &[EdgeId],
     ) -> GraphResult<HashMap<EdgeId, HashMap<String, AttrValue>>> {
-        let mut result = HashMap::new();
-
-        for &edge_id in edge_ids {
-            if let Some(edge_data) = self.edges.get_by_edge_id(edge_id) {
-                result.insert(edge_id, edge_data);
-            }
-        }
-
-        Ok(result)
+        self.edges.base_table().identity_rows("edge_id", edge_ids)
     }
 
     /// Get all neighbors of a set of nodes
     pub fn neighbors(&self, node_ids: &[NodeId]) -> GraphResult<HashSet<NodeId>> {
+        let selected: HashSet<_> = node_ids.iter().copied().collect();
+        let sources = super::structural::column(self.edges.base_table(), "source")?;
+        let targets = super::structural::column(self.edges.base_table(), "target")?;
         let mut neighbors = HashSet::new();
-
-        // Get outgoing edges
-        let outgoing = self.edges.outgoing_edges(node_ids)?;
-        let out_targets = outgoing.targets()?;
-        neighbors.extend(out_targets);
-
-        // Get incoming edges
-        let incoming = self.edges.incoming_edges(node_ids)?;
-        let in_sources = incoming.sources()?;
-        neighbors.extend(in_sources);
-
-        // Remove the original nodes from neighbors
-        for &node_id in node_ids {
-            neighbors.remove(&node_id);
+        for (row, (source, target)) in sources.iter().zip(targets.iter()).enumerate() {
+            let source = super::structural::id(source, "source", row)?;
+            let target = super::structural::id(target, "target", row)?;
+            if selected.contains(&source) && !selected.contains(&target) {
+                neighbors.insert(target);
+            }
+            if selected.contains(&target) && !selected.contains(&source) {
+                neighbors.insert(source);
+            }
         }
-
         Ok(neighbors)
     }
 

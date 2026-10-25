@@ -1,0 +1,122 @@
+{
+  "cases": [
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "node_lookup_100",
+      "seconds": [
+        0.00004,
+        0.000036542,
+        0.000038917,
+        0.000039,
+        0.000038959
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "edge_lookup_100",
+      "seconds": [
+        0.000039917,
+        0.000049375,
+        0.000046208,
+        0.000042375,
+        0.000043792
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "external_neighbors_100",
+      "seconds": [
+        0.000046083,
+        0.000041375,
+        0.000048,
+        0.000052125,
+        0.000045834
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "node_lookup_100",
+      "seconds": [
+        0.000240333,
+        0.000226041,
+        0.000194042,
+        0.000201625,
+        0.000257834
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "edge_lookup_100",
+      "seconds": [
+        0.000250541,
+        0.000235875,
+        0.0002415,
+        0.000182292,
+        0.00027025
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "external_neighbors_100",
+      "seconds": [
+        0.000306833,
+        0.000351958,
+        0.000365875,
+        0.000361792,
+        0.000402875
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "node_lookup_100",
+      "seconds": [
+        0.002312708,
+        0.001902917,
+        0.002838083,
+        0.002222334,
+        0.002138167
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "edge_lookup_100",
+      "seconds": [
+        0.002286916,
+        0.001989292,
+        0.003039667,
+        0.002432459,
+        0.002344625
+      ],
+      "selected": 100
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "external_neighbors_100",
+      "seconds": [
+        0.003455166,
+        0.003183208,
+        0.003816,
+        0.00363,
+        0.003486292
+      ],
+      "selected": 100
+    }
+  ],
+  "scope": "Native optimized checked reads on chain tables, 100 requested IDs, five observations. Complete operation validation and output allocation timed; fixtures, input selection, assertions and output destruction excluded. Current costs only; no matched speedup, RSS or FFI claim."
+}

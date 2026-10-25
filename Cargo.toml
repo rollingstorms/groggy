@@ -203,3 +203,7 @@ harness = false
 [[bench]]
 name = "entity_table_adapters"
 harness = false
+
+[[bench]]
+name = "graph_table_bulk_reads"
+harness = false

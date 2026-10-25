@@ -18,6 +18,34 @@ pub(super) fn row_key(columns: &[&BaseArray<AttrValue>], row: usize) -> Vec<Attr
         .collect()
 }
 impl BaseTable {
+    /// Checked bulk identity lookup; scan IDs once and copy only selected first rows.
+    pub(in crate::storage::table) fn identity_rows(
+        &self,
+        id_column: &str,
+        requested: &[usize],
+    ) -> GraphResult<HashMap<usize, HashMap<String, AttrValue>>> {
+        let ids = crate::storage::table::structural::column(self, id_column)?;
+        let columns = self
+            .column_order
+            .iter()
+            .map(|name| Ok((name, crate::storage::table::structural::column(self, name)?)))
+            .collect::<GraphResult<Vec<_>>>()?;
+        let requested: HashSet<_> = requested.iter().copied().collect();
+        let mut result = HashMap::new();
+        for (row, value) in ids.iter().enumerate() {
+            let id = crate::storage::table::structural::id(value, id_column, row)?;
+            if requested.contains(&id) {
+                result.entry(id).or_insert_with(|| {
+                    columns
+                        .iter()
+                        .map(|(name, column)| ((*name).clone(), column.data()[row].clone()))
+                        .collect()
+                });
+            }
+        }
+        Ok(result)
+    }
+
     /// Select rows by logical property equality without constructing a query string.
     pub fn filter_by_value(&self, name: &str, value: &AttrValue) -> GraphResult<Self> {
         let column = self

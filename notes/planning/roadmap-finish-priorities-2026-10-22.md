@@ -927,3 +927,24 @@ regressions. Gate: **1,104 native passed / 51 ignored; 1,843 root Python passed 
 1 skipped; 118 executable docs passed; strict all-target Clippy passed**.
 Receipt: `notes/benchmarks/entity-table-adapters-2026-10-25.json`.
 No new checklist rows: **192 checked / 76 unchecked** after closing 27.2.
+
+
+### Checked bulk table lookups and neighbor reads — 2026-10-25
+
+Closed the existing native get_nodes/get_edges/neighbors adapter family under
+27.1/AR7.10. Bulk identity lookup scans IDs once and copies selected first whole
+rows; duplicate requests collapse and unknown IDs remain omitted. Structural
+errors reject consistently. Neighbors scan borrowed endpoints once, preserving
+the existing external-neighbor set semantics without copied edge tables/arrays.
+No public API or graph direction/subsetting policy was added.
+
+Evidence: `graph-table-bulk-reads-2026-10-25.md`; four native regressions, including
+all 32 subsets of an independent looped/multiedge oracle. Gate: **1,108 native
+passed / 51 ignored; 1,843 root Python passed / 1 skipped; 118 executable docs
+passed; strict all-target Clippy passed**. Receipt:
+`notes/benchmarks/graph-table-bulk-reads-2026-10-25.json`.
+At 100k input rows with 100 requested IDs, current medians are 2.222 ms node
+lookup, 2.345 ms edge lookup and 3.486 ms external neighbors; no matched speedup,
+RSS or FFI claim. No new rows: **192 checked / 76 unchecked** after 27.2 closure.
+Composite subsetting/routing and legacy view migration remain open. The induced
+node-subset edge policy question remains unanswered; it was not silently applied.

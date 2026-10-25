@@ -69,3 +69,24 @@ Native ID-mapped columns validate and construct in O(rows + input entries).
 Tuple extraction uses O(rows) work. This does not make owned column replacement
 an O(1) mutation or certify the per-call FFI budget. Current measurements are in
 `notes/benchmarks/entity-table-adapters-2026-10-25.json`.
+
+## Native graph-table bulk reads
+
+`GraphTable::get_nodes(ids)` and `get_edges(ids)` validate structural IDs and scan
+the table once. Requested duplicates collapse to one result; unknown IDs are
+omitted. If a raw input table repeats an entity ID, lookup retains the first
+whole row, matching the existing single-row lookup convention. Only selected
+row values are copied. Malformed structural IDs/column lengths reject even for
+an empty request; the Option-returning single-row methods retain their separate
+skip-invalid contract.
+
+`GraphTable::neighbors(ids)` retains its existing external-neighbor set semantics:
+either endpoint can match; loops and neighbors within the selected set are
+excluded; parallel edges do not duplicate neighbors. It validates and scans
+borrowed endpoint columns directly, without copying edge tables or full endpoint
+arrays. It does not add a directed-graph policy to the table bundle.
+
+Regression coverage includes every selected subset of a small looped/multiedge
+fixture, exact wide IDs, duplicate/unknown requests and owned-result isolation.
+Current native lookup/neighbor costs are recorded in
+`notes/benchmarks/graph-table-bulk-reads-2026-10-25.json`.
