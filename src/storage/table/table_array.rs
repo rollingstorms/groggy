@@ -8,15 +8,22 @@ use crate::errors::GraphResult;
 use crate::types::AttrValue;
 use std::collections::HashMap;
 
+#[path = "collection_context.rs"]
+mod collection_context;
 #[path = "collection_reductions.rs"]
 mod collection_reductions;
+use collection_context::CollectionContext;
+use std::sync::Arc;
 
 /// Core TableArray - an array of BaseTable instances
 ///
 /// This is the foundation for advanced table operations like groupby().sum()
 /// where operations are applied across multiple tables and aggregated.
+/// Construct with new/from_tables/from_tables_with_keys; private context retains
+/// empty-result schema and immutable source ownership across supported transforms.
 #[derive(Debug, Clone)]
 pub struct TableArray {
+    context: Option<Arc<CollectionContext>>,
     /// The tables in this array
     pub tables: Vec<BaseTable>,
     /// Optional group keys for each table (used by groupby)
@@ -29,6 +36,7 @@ impl TableArray {
         Self {
             tables: Vec::new(),
             group_keys: None,
+            context: None,
         }
     }
 
@@ -37,6 +45,7 @@ impl TableArray {
         Self {
             tables,
             group_keys: None,
+            context: None,
         }
     }
 
@@ -48,6 +57,7 @@ impl TableArray {
         Self {
             tables,
             group_keys: Some(group_keys),
+            context: None,
         }
     }
 
@@ -102,31 +112,19 @@ impl TableArray {
     where
         F: Fn(&BaseTable) -> bool,
     {
-        let filtered_tables: Vec<BaseTable> = self
-            .tables
-            .iter()
-            .filter(|table| predicate(table))
-            .cloned()
-            .collect();
-
-        let filtered_keys = if let Some(ref keys) = self.group_keys {
-            let filtered_keys: Vec<HashMap<String, AttrValue>> = self
-                .tables
-                .iter()
-                .zip(keys.iter())
-                .filter(|(table, _)| predicate(table))
-                .map(|(_, key)| key.clone())
-                .collect();
-            Some(filtered_keys)
-        } else {
-            None
-        };
-
-        if let Some(keys) = filtered_keys {
-            TableArray::from_tables_with_keys(filtered_tables, keys)
-        } else {
-            TableArray::from_tables(filtered_tables)
+        let mut tables = Vec::new();
+        let mut selected_keys = self.group_keys.as_ref().map(|_| Vec::new());
+        for (i, table) in self.tables.iter().enumerate() {
+            if predicate(table) {
+                tables.push(table.clone());
+                if let (Some(keys), Some(selected)) = (&self.group_keys, &mut selected_keys) {
+                    if let Some(key) = keys.get(i) {
+                        selected.push(key.clone());
+                    }
+                }
+            }
         }
+        self.inherit(tables, selected_keys)
     }
 
     /// Take the first n tables from the array
@@ -138,11 +136,7 @@ impl TableArray {
             .as_ref()
             .map(|keys| keys.iter().take(n).cloned().collect());
 
-        if let Some(keys) = taken_keys {
-            TableArray::from_tables_with_keys(taken_tables, keys)
-        } else {
-            TableArray::from_tables(taken_tables)
-        }
+        self.inherit(taken_tables, taken_keys)
     }
 
     /// Skip the first n tables in the array
@@ -154,11 +148,7 @@ impl TableArray {
             .as_ref()
             .map(|keys| keys.iter().skip(n).cloned().collect());
 
-        if let Some(keys) = skipped_keys {
-            TableArray::from_tables_with_keys(skipped_tables, keys)
-        } else {
-            TableArray::from_tables(skipped_tables)
-        }
+        self.inherit(skipped_tables, skipped_keys)
     }
 
     /// Join this TableArray with another TableArray
@@ -175,51 +165,15 @@ impl TableArray {
             ));
         }
 
-        let mut joined_tables = Vec::new();
-        let mut joined_keys = Vec::new();
-
-        for (i, (left_table, right_table)) in
-            self.tables.iter().zip(other.tables.iter()).enumerate()
-        {
-            // Perform join between corresponding tables
-            let joined_table = match join_type {
-                "inner" => left_table.inner_join(right_table, on, on)?,
-                "left" => left_table.left_join(right_table, on, on)?,
-                "right" => left_table.right_join(right_table, on, on)?,
-                "outer" => left_table.outer_join(right_table, on, on)?,
-                "cross" => left_table.cross_join(right_table)?,
-                _ => {
-                    return Err(crate::errors::GraphError::InvalidInput(format!(
-                        "Unsupported join type: {}",
-                        join_type
-                    )))
-                }
-            };
-
-            joined_tables.push(joined_table);
-
-            // Combine group keys if they exist
-            if let (Some(ref left_keys), Some(ref right_keys)) =
-                (&self.group_keys, &other.group_keys)
-            {
-                if let (Some(left_key), Some(right_key)) = (left_keys.get(i), right_keys.get(i)) {
-                    let mut combined_key = left_key.clone();
-                    for (key, value) in right_key {
-                        combined_key.insert(format!("right_{}", key), value.clone());
-                    }
-                    joined_keys.push(combined_key);
-                }
-            }
-        }
-
-        if !joined_keys.is_empty() {
-            Ok(TableArray::from_tables_with_keys(
-                joined_tables,
-                joined_keys,
-            ))
-        } else {
-            Ok(TableArray::from_tables(joined_tables))
-        }
+        self.key_names()?;
+        other.key_names()?;
+        let joined_tables = self
+            .tables
+            .iter()
+            .zip(&other.tables)
+            .map(|(left, right)| left.join_on(right, &[on], &[on], join_type))
+            .collect::<GraphResult<Vec<_>>>()?;
+        self.joined_collection(other, on, join_type, joined_tables)
     }
 
     /// Apply a custom function to each table in the array
@@ -234,14 +188,7 @@ impl TableArray {
             mapped_tables.push(mapped_table);
         }
 
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                mapped_tables,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(mapped_tables))
-        }
+        Ok(self.inherit(mapped_tables, self.group_keys.clone()))
     }
 
     /// Reduce all tables in the array to a single value using a binary operation
@@ -274,11 +221,7 @@ impl TableArray {
     pub fn head(&self, n: usize) -> TableArray {
         let head_tables: Vec<BaseTable> = self.tables.iter().map(|table| table.head(n)).collect();
 
-        if let Some(ref keys) = self.group_keys {
-            TableArray::from_tables_with_keys(head_tables, keys.clone())
-        } else {
-            TableArray::from_tables(head_tables)
-        }
+        self.inherit(head_tables, self.group_keys.clone())
     }
 
     /// Get last n rows from each table in the array
@@ -286,11 +229,7 @@ impl TableArray {
     pub fn tail(&self, n: usize) -> TableArray {
         let tail_tables: Vec<BaseTable> = self.tables.iter().map(|table| table.tail(n)).collect();
 
-        if let Some(ref keys) = self.group_keys {
-            TableArray::from_tables_with_keys(tail_tables, keys.clone())
-        } else {
-            TableArray::from_tables(tail_tables)
-        }
+        self.inherit(tail_tables, self.group_keys.clone())
     }
 
     /// Sample n rows from each table in the array
@@ -304,94 +243,32 @@ impl TableArray {
             sampled_tables.push(sampled_table);
         }
 
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                sampled_tables,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(sampled_tables))
-        }
+        Ok(self.inherit(sampled_tables, self.group_keys.clone()))
     }
 
     /// Select specific columns from each table in the array
     /// Returns a new TableArray with select(columns) applied to each table
     pub fn select(&self, columns: &[String]) -> GraphResult<TableArray> {
-        let mut selected_tables = Vec::new();
-
-        for table in &self.tables {
-            let selected_table = table.select(columns)?;
-            selected_tables.push(selected_table);
-        }
-
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                selected_tables,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(selected_tables))
-        }
+        self.select_schema(columns)
     }
 
     /// Sort each table in the array by a column
     /// Returns a new TableArray with sort_by applied to each table
     pub fn sort_by(&self, column: &str, ascending: bool) -> GraphResult<TableArray> {
-        let mut sorted_tables = Vec::new();
-
-        for table in &self.tables {
-            let sorted_table = table.sort_by(column, ascending)?;
-            sorted_tables.push(sorted_table);
-        }
-
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                sorted_tables,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(sorted_tables))
-        }
+        self.empty_schema().sort_by(column, ascending)?;
+        self.map(|table| table.sort_by(column, ascending))
     }
 
     /// Drop columns from each table in the array
     /// Returns a new TableArray with drop_columns applied to each table
     pub fn drop_columns(&self, columns: &[String]) -> GraphResult<TableArray> {
-        let mut tables_with_dropped_columns = Vec::new();
-
-        for table in &self.tables {
-            let table_with_dropped_columns = table.drop_columns(columns)?;
-            tables_with_dropped_columns.push(table_with_dropped_columns);
-        }
-
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                tables_with_dropped_columns,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(tables_with_dropped_columns))
-        }
+        self.drop_schema(columns)
     }
 
     /// Rename columns in each table in the array
     /// Returns a new TableArray with rename applied to each table
     pub fn rename(&self, mapping: &HashMap<String, String>) -> GraphResult<TableArray> {
-        let mut renamed_tables = Vec::new();
-
-        for table in &self.tables {
-            let renamed_table = table.rename(mapping.clone())?;
-            renamed_tables.push(renamed_table);
-        }
-
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                renamed_tables,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(renamed_tables))
-        }
+        self.rename_schema(mapping)
     }
 
     /// Apply a function to each table in the array
@@ -407,14 +284,7 @@ impl TableArray {
             applied_tables.push(applied_table);
         }
 
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                applied_tables,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(applied_tables))
-        }
+        Ok(self.inherit(applied_tables, self.group_keys.clone()))
     }
 
     /// Apply a function to each table and return a vector of results
@@ -510,14 +380,7 @@ impl TableArray {
             described_tables.push(described_table);
         }
 
-        if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(
-                described_tables,
-                keys.clone(),
-            ))
-        } else {
-            Ok(TableArray::from_tables(described_tables))
-        }
+        Ok(self.inherit(described_tables, self.group_keys.clone()))
     }
 
     /// Sum values in a column across all tables

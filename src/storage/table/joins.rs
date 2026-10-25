@@ -57,51 +57,7 @@ impl BaseTable {
         if how == "right" {
             return other.join_on(self, right_on, left_on, "left");
         }
-        // Plan names before expanding rows. Preserve existing public naming policies.
-        let mut names = HashSet::new();
-        let mut plan = Vec::new();
-        for (right, table) in [(false, self), (true, other)] {
-            for name in &table.column_order {
-                let shared_key = left_on
-                    .iter()
-                    .zip(right_on)
-                    .any(|(a, b)| a == b && *a == name);
-                if right
-                    && how != "cross"
-                    && right_on.contains(&name.as_str())
-                    && (how != "outer" || shared_key)
-                {
-                    continue;
-                }
-                let output = if matches!(how.as_str(), "inner" | "left") {
-                    if right && self.columns.contains_key(name) {
-                        format!("right_{name}")
-                    } else if !right
-                        && other.columns.contains_key(name)
-                        && !left_on.contains(&name.as_str())
-                    {
-                        format!("left_{name}")
-                    } else {
-                        name.clone()
-                    }
-                } else if right && self.columns.contains_key(name) {
-                    format!("{name}_right")
-                } else {
-                    name.clone()
-                };
-                if !names.insert(output.clone()) {
-                    return Err(invalid(format!(
-                        "Join output column '{output}' collides; rename input columns explicitly"
-                    )));
-                }
-                plan.push((
-                    right,
-                    name.as_str(),
-                    output,
-                    how == "outer" && !right && shared_key,
-                ));
-            }
-        }
+        let plan = self.join_plan(other, left_on, right_on, &how)?;
         let rows = if how == "cross" {
             let count = self
                 .nrows
@@ -179,5 +135,59 @@ impl BaseTable {
         result.provenance =
             TableProvenance::joined(self.provenance.as_ref(), other.provenance.as_ref());
         Ok(result)
+    }
+    pub(in crate::storage::table) fn join_plan<'a>(
+        &'a self,
+        other: &'a Self,
+        left_on: &[&str],
+        right_on: &[&str],
+        how: &str,
+    ) -> GraphResult<Vec<(bool, &'a str, String, bool)>> {
+        // Plan names before expanding rows. Preserve existing public naming policies.
+        let mut names = HashSet::new();
+        let mut plan = Vec::new();
+        for (right, table) in [(false, self), (true, other)] {
+            for name in &table.column_order {
+                let shared_key = left_on
+                    .iter()
+                    .zip(right_on)
+                    .any(|(a, b)| a == b && *a == name);
+                if right
+                    && how != "cross"
+                    && right_on.contains(&name.as_str())
+                    && (how != "outer" || shared_key)
+                {
+                    continue;
+                }
+                let output = if matches!(how, "inner" | "left") {
+                    if right && self.columns.contains_key(name) {
+                        format!("right_{name}")
+                    } else if !right
+                        && other.columns.contains_key(name)
+                        && !left_on.contains(&name.as_str())
+                    {
+                        format!("left_{name}")
+                    } else {
+                        name.clone()
+                    }
+                } else if right && self.columns.contains_key(name) {
+                    format!("{name}_right")
+                } else {
+                    name.clone()
+                };
+                if !names.insert(output.clone()) {
+                    return Err(invalid(format!(
+                        "Join output column '{output}' collides; rename input columns explicitly"
+                    )));
+                }
+                plan.push((
+                    right,
+                    name.as_str(),
+                    output,
+                    how == "outer" && !right && shared_key,
+                ));
+            }
+        }
+        Ok(plan)
     }
 }

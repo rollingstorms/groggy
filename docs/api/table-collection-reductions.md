@@ -63,7 +63,7 @@ reject. Logical unique counts can count nonfinite properties by property identit
 
 All-null or empty numeric/boolean groups return Null; counts and unique counts
 return zero. An empty collection has zero result rows, and explicit specs retain
-empty output columns. It has no retained source tables or inferred group schema.
+empty output columns. A newly constructed empty collection has no inferred data schema; explicitly declared or captured keys/schema remain available.
 A zero-column nonempty collection still retains the correct result row count.
 
 ## Group metadata and missing columns
@@ -109,8 +109,9 @@ clones input BaseTables while preparing a native collection, so it has a copy
 cost beyond native kernel measurements. No streaming-output, memory-budget,
 100ns whole-reduction or large-scale latency guarantee is established.
 
-Collection ownership across zero-table transformations and broader conversion
-adapters remain open under 27/AR7.10.
+Supported zero-table ownership transformations are now defined in
+[collection ownership](table-collection-ownership.md). Broader conversion adapters
+remain open under 27/AR7.10.
 This slice certifies reduction/flatten outputs for their supplied input tables.
 
 [Specialized graph-table merge](graph-table-merge.md) now defines the six existing

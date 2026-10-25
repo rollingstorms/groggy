@@ -156,17 +156,17 @@ impl PyTableArrayCore {
 
     /// Filter tables with a Python predicate function
     fn filter(&self, predicate: PyObject, py: Python) -> PyResult<Self> {
-        let filtered = self.inner.filter(|table| {
-            // Convert table to PyBaseTable and call predicate
-            let py_table = crate::ffi::storage::table::PyBaseTable::from_table(table.clone());
-
-            match predicate.call1(py, (py_table,)) {
-                Ok(result) => result.is_true(py).unwrap_or(false),
-                Err(_) => false,
+        let mut indices = Vec::new();
+        for (i, table) in self.inner.tables.iter().enumerate() {
+            let table = crate::ffi::storage::table::PyBaseTable::from_table(table.clone());
+            if predicate.call1(py, (table,))?.is_true(py)? {
+                indices.push(i);
             }
-        });
-
-        Ok(Self { inner: filtered })
+        }
+        self.inner
+            .select_tables(&indices)
+            .map(|inner| Self { inner })
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     /// Convert to list of tables

@@ -91,11 +91,14 @@ impl TableArray {
                     .collect::<GraphResult<HashMap<_, _>>>()
             })
             .collect::<GraphResult<Vec<_>>>()?;
-        let result = Self::from_tables_with_keys(tables, keys);
+        let result = Self::from_tables_with_keys(tables, keys).declare_keys(columns);
         result.key_names()?;
         Ok(result)
     }
-    fn key_names(&self) -> GraphResult<Vec<String>> {
+    pub(super) fn key_names(&self) -> GraphResult<Vec<String>> {
+        if let Some(error) = self.context.as_ref().and_then(|c| c.error.as_ref()) {
+            return Err(invalid(error.clone()));
+        }
         let Some(keys) = &self.group_keys else {
             return Ok(Vec::new());
         };
@@ -105,7 +108,12 @@ impl TableArray {
         let mut names = keys
             .first()
             .map(|k| k.keys().cloned().collect::<Vec<_>>())
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                self.context
+                    .as_ref()
+                    .map(|c| c.group_names.clone())
+                    .unwrap_or_default()
+            });
         names.sort();
         for (table, key) in self.tables.iter().zip(keys) {
             if key.len() != names.len() || names.iter().any(|n| !key.contains_key(n)) {
@@ -124,7 +132,7 @@ impl TableArray {
         }
         Ok(names)
     }
-    fn column_names_checked(&self) -> GraphResult<Vec<String>> {
+    pub(super) fn column_names_checked(&self) -> GraphResult<Vec<String>> {
         let mut names = Vec::new();
         let mut seen = HashSet::new();
         for table in &self.tables {
@@ -138,6 +146,11 @@ impl TableArray {
                 }
             }
         }
+        if self.tables.is_empty() {
+            if let Some(context) = &self.context {
+                names = context.prototype.column_names().to_vec();
+            }
+        }
         Ok(names)
     }
     fn validate_specs(&self, specs: &[(String, Reduction)], keys: &[String]) -> GraphResult<()> {
@@ -148,7 +161,7 @@ impl TableArray {
                     "Aggregation column '{name}' collides with group key"
                 )));
             }
-            if !self.tables.is_empty() && !names.contains(name) {
+            if (!self.tables.is_empty() || self.context.is_some()) && !names.contains(name) {
                 return Err(invalid(format!("Aggregation column '{name}' missing")));
             }
         }
@@ -204,7 +217,7 @@ impl TableArray {
             };
             columns.insert(name, BaseArray::from_attr_values(values));
         }
-        BaseTable::collection_result(columns, order, rows, &self.tables)
+        self.output(columns, order, rows)
     }
     fn default_reduction(&self, operation: Reduction) -> GraphResult<BaseTable> {
         let keys = self.key_names()?;
@@ -219,14 +232,34 @@ impl TableArray {
                 .iter()
                 .flat_map(|t| t.column(&name).into_iter().flat_map(|c| c.data().iter()))
                 .filter(|v| !matches!(v, V::Null));
-            let eligible = match operation {
-                Reduction::Count | Reduction::Nunique => true,
-                Reduction::All => cells.clone().any(|v| matches!(v, V::Bool(_))),
-                _ => {
-                    cells.clone().next().is_none()
-                        || cells
-                            .clone()
-                            .any(|v| crate::storage::numeric::scalar::attribute_number(v).is_some())
+            let eligible = if self.tables.is_empty() {
+                match operation {
+                    Reduction::Count | Reduction::Nunique => true,
+                    Reduction::All => self
+                        .context
+                        .as_ref()
+                        .is_some_and(|c| c.boolean.contains(&name)),
+                    _ => self
+                        .context
+                        .as_ref()
+                        .is_some_and(|c| c.numeric.contains(&name)),
+                }
+            } else {
+                match operation {
+                    Reduction::Count | Reduction::Nunique => true,
+                    Reduction::All => cells.clone().any(|v| matches!(v, V::Bool(_))),
+                    _ => {
+                        (cells.clone().next().is_none()
+                            && self
+                                .context
+                                .as_ref()
+                                .filter(|c| c.prototype.has_column(&name))
+                                .map(|c| c.numeric.contains(&name))
+                                .unwrap_or(true))
+                            || cells.clone().any(|v| {
+                                crate::storage::numeric::scalar::attribute_number(v).is_some()
+                            })
+                    }
                 }
             };
             if eligible {
@@ -293,6 +326,6 @@ impl TableArray {
             }
             columns.insert(name.clone(), BaseArray::from_attr_values(values));
         }
-        BaseTable::collection_result(columns, names, rows, &self.tables)
+        self.output(columns, names, rows)
     }
 }

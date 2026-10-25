@@ -1,0 +1,67 @@
+{
+  "cases": [
+    {
+      "groups": 100,
+      "input_rows": 1000,
+      "samples": [
+        {
+          "filter_empty_seconds": 0.000089209,
+          "projection_seconds": 0.000051667,
+          "take_empty_seconds": 0.000101875
+        },
+        {
+          "filter_empty_seconds": 0.000086958,
+          "projection_seconds": 0.000035583,
+          "take_empty_seconds": 0.000086042
+        },
+        {
+          "filter_empty_seconds": 0.000089125,
+          "projection_seconds": 0.000038541,
+          "take_empty_seconds": 0.000084042
+        },
+        {
+          "filter_empty_seconds": 0.000085792,
+          "projection_seconds": 0.000032125,
+          "take_empty_seconds": 0.000083208
+        },
+        {
+          "filter_empty_seconds": 0.000087583,
+          "projection_seconds": 0.000029708,
+          "take_empty_seconds": 0.000083917
+        }
+      ]
+    },
+    {
+      "groups": 100,
+      "input_rows": 10000,
+      "samples": [
+        {
+          "filter_empty_seconds": 0.000189708,
+          "projection_seconds": 0.000034958,
+          "take_empty_seconds": 0.00019175
+        },
+        {
+          "filter_empty_seconds": 0.000190875,
+          "projection_seconds": 0.000028166,
+          "take_empty_seconds": 0.000187
+        },
+        {
+          "filter_empty_seconds": 0.00021225,
+          "projection_seconds": 0.000028292,
+          "take_empty_seconds": 0.000191
+        },
+        {
+          "filter_empty_seconds": 0.000218625,
+          "projection_seconds": 0.000027916,
+          "take_empty_seconds": 0.000190625
+        },
+        {
+          "filter_empty_seconds": 0.000189708,
+          "projection_seconds": 0.000027125,
+          "take_empty_seconds": 0.000189667
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized take(0)+flatten, empty projection/rename+sum, and filter-all+sum; three columns, 100 existing groups, five observations per size. Schema/role/source-context preparation and result construction included; source/group fixtures and checks excluded. No matched baseline, RSS/allocation or Python callback/FFI latency claim."
+}

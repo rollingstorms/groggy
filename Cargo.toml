@@ -183,3 +183,7 @@ harness = false
 [[bench]]
 name = "graph_table_merge"
 harness = false
+
+[[bench]]
+name = "table_collection_context"
+harness = false

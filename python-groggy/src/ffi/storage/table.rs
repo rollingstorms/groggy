@@ -650,6 +650,7 @@ impl PyBaseTable {
 
         Ok(PyTableArray {
             tables: py_tables,
+            origin: Some(self.table.head(0)),
             group_columns: column_vec,
         })
     }
@@ -3716,6 +3717,7 @@ impl PyNodesTable {
 
         Ok(PyNodesTableArray {
             tables: py_tables,
+            origin: Some(self.table.base_table().head(0)),
             group_columns: column_vec,
         })
     }
@@ -4715,6 +4717,7 @@ impl PyEdgesTable {
 
         Ok(PyEdgesTableArray {
             tables: py_tables,
+            origin: Some(self.table.base_table().head(0)),
             group_columns: column_vec,
         })
     }
@@ -6092,6 +6095,7 @@ impl PyGraphTable {
 #[derive(Clone)]
 pub struct PyTableArray {
     tables: Vec<PyBaseTable>,
+    origin: Option<BaseTable>,
     /// Column names that were used for grouping (used for aggregation column selection)
     group_columns: Vec<String>,
 }
@@ -6135,6 +6139,7 @@ impl PyTableArray {
 
         Ok(Self {
             tables: processed_tables,
+            origin: None,
             group_columns: Vec::new(),
         })
     }
@@ -6228,8 +6233,14 @@ impl PyTableArray {
     ) -> PyResult<PyBaseTable> {
         let tables = self.tables.iter().map(|t| t.table.clone()).collect();
         let keys = self.group_columns.clone();
+        let origin = self.origin.clone();
         py.allow_threads(move || {
             let collection = groggy::storage::table::TableArray::from_group_columns(tables, &keys)?;
+            let collection = if let Some(origin) = origin {
+                collection.with_empty_source(&origin)?
+            } else {
+                collection
+            };
             match operation {
                 "sum" => collection.sum(),
                 "mean" => collection.mean(),
@@ -6278,6 +6289,7 @@ impl PyTableArrayIterator {
 #[derive(Clone)]
 pub struct PyNodesTableArray {
     tables: Vec<PyNodesTable>,
+    origin: Option<BaseTable>,
     group_columns: Vec<String>,
 }
 
@@ -6425,6 +6437,7 @@ impl PyNodesTableArray {
 
         let table_array = PyTableArray {
             tables: base_tables,
+            origin: self.origin.clone(),
             group_columns: self.group_columns.clone(), // Pass group columns through delegation
         };
         let array_obj = table_array.into_py(py);
@@ -6465,6 +6478,7 @@ impl PyNodesTableArrayIterator {
 #[derive(Clone)]
 pub struct PyEdgesTableArray {
     tables: Vec<PyEdgesTable>,
+    origin: Option<BaseTable>,
     group_columns: Vec<String>,
 }
 
@@ -6524,6 +6538,7 @@ impl PyEdgesTableArray {
 
         let table_array = PyTableArray {
             tables: base_tables,
+            origin: self.origin.clone(),
             group_columns: self.group_columns.clone(),
         };
         let array_obj = table_array.into_py(py);

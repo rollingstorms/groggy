@@ -75,3 +75,7 @@ Collection ownership when transformations remove all tables and broader graph/
 table conversion adapters remain under 27/AR7.10. Complete pooled contents remain
 under 07.3 / 10.3 / 12.2. Broad parent checkboxes remain partial until their full
 exits are satisfied; the checklist still has 191 checked / 77 unchecked rows.
+
+Follow-up: [collection ownership](table-collection-ownership-2026-10-25.md) closes
+the supported empty selection/schema/callback/join ownership family. Broader
+conversion adapters remain open under the existing table parents.

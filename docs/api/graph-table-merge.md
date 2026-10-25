@@ -118,4 +118,7 @@ streaming, matched speedup or FFI latency guarantee is established.
 
 This closes the six-policy specialized merge and federated-name delegation
 family under 27/AR7.10. Portable pooled contents remain in their existing checklist
-items; broader collection ownership/conversion adapters remain under 27.
+items; broader graph/table conversion adapters remain under 27.
+
+[Collection ownership](table-collection-ownership.md) retains source captures and
+known schema across supported empty collection transformations.

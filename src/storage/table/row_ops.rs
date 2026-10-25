@@ -55,7 +55,7 @@ impl BaseTable {
             tables.push(self.select_rows(&rows)?);
             keys.push(by.iter().map(|s| s.to_string()).zip(key).collect());
         }
-        Ok(TableArray::from_tables_with_keys(tables, keys))
+        Ok(TableArray::from_tables_with_keys(tables, keys).remember_origin(self, by))
     }
     /// Keep the first row for each logical key, retaining its exact source identity.
     /// An empty subset considers all rows equal, including zero-column rows.

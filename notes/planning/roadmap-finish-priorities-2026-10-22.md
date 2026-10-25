@@ -831,3 +831,25 @@ Evidence: `graph-table-merge-conformance-2026-10-25.md`, ten native tests includ
 FFI latency claim. Checklist remains 191 checked / 77 unchecked, no new rows.
 Specialized merges are complete; broader collection ownership/conversions stay
 under existing 27/AR7.10, while pooled portability stays in 07.3/10.3/12.2.
+
+
+## 2026-10-25 — collection ownership through empty results (27 / AR7.10)
+
+Closed the supported empty grouping/selection/schema/callback/join ownership
+inventory. A shared native context retains schema, observed roles, declared keys
+and frozen source captures even when no tables remain. Projection/rename and
+actual join column plans keep metadata coherent; invalid metadata cannot be
+laundered by selecting nothing. Predicates execute once and Python callback
+errors propagate. Native/core and legacy node/edge group adapters retain captures.
+
+Rust compatibility: TableArray now has private context; direct struct literals
+must use existing constructors. Public table/key fields and Python call shapes
+remain. Native with_empty_source validates schema-only adapter metadata.
+
+Evidence: `table-collection-ownership-2026-10-25.md`, eight native regressions,
+ten Python cases, 1,079 native / 1,812 root Python tests, 109 executable docs and
+strict all-target Clippy. Receipt: `notes/benchmarks/table-collection-context-2026-10-25.json`;
+context preparation may scan cells, with no O(1), memory or FFI latency promise.
+No new rows: 191 checked / 77 unchecked, including nine explicitly deferred and
+14 overlapping architecture entries. Broader graph/table conversions and existing
+legacy-view/portable-storage parents remain open; this ownership family is done.
