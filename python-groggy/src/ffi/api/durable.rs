@@ -22,7 +22,7 @@ impl PyDurableGraph {
             .as_ref()
             .ok_or_else(|| PyValueError::new_err("DurableGraph is closed"))
     }
-    fn core_mut(&mut self) -> PyResult<&mut DurableGraph> {
+    pub(crate) fn core_mut(&mut self) -> PyResult<&mut DurableGraph> {
         self.store
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("DurableGraph is closed"))

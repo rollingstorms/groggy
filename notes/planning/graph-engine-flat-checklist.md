@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-10-24 on `groggy-roadmap-2026-10-20`.
+Updated 2026-10-25 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -205,8 +205,8 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **25.2 — Deferred: end-to-end Graphiti proof.** Run ingest/correction/retrieval flows against Groggy after the adapter and core are ready; do not infer driver compatibility from storing embeddings alone.
 - [ ] **26.1 — Partial: immutable connected graph views.** Audit existing Subgraph live-parent reads and migrate to state-pinned properties/topology. An older view must remain unchanged after a parent write.
 - [x] **26.2 — Checked mutation through pinned views.** Graph/DurableGraph apply_view_batch validates captured source history, branch, clean accepted head and exact selected mutation scope; mixed GraphBatch writes publish once and return a prevalidated new immutable view. Cascades outside selection reject; existing views stay readable. Schema, identity and effective-time policies use the normal coordinator; durable writes sync/recover through ordinary journal records. Explicit fresh retrieval and materialization remain distinct; frozen caches never invalidate. Legacy connected Subgraph/table migration stays open under 26.1/27. See `pinned-view-writes-2026-10-25.md` for costs and raw-storage escape limits.
-- [ ] **27.1 — Review: graph/table identity.** Audit current graph tables, projections, joins, and copies; preserve source identity and pins through selections and joins unless the caller explicitly materializes a new graph.
-- [ ] **27.2 — Open: connected table updates.** Complete columnar filters/aggregations/conversions and checked bulk edits that generate typed deltas. Table joins remain views unless explicitly persisted; coordinate this with item 26.
+- [ ] **27.1 — Partial: graph/table identity.** Frozen GraphView exports now retain source captures and immutable row identity through BaseTable projections/selections/copies. Five generic join families retain deduplicated read-only source contexts without guessing row ownership. Standalone materialization stays explicit. Wider specialized GraphTable domain-merge/TableArray adapter migration and join-key conformance remain open. See `table-source-pins-2026-10-25.md`.
+- [ ] **27.2 — Partial: connected table updates.** Source-bound BaseTable and mixed GraphTable property columns now publish through checked Graph/DurableGraph view batches with one delta, immutable row identity and stale/foreign/schema rejection. Broader columnar aggregation/conversion adapters remain open. Joins retain source context and require explicit identity resolution before writeback; no implicit persistence. Existing mapped updates remain supported. See `table-source-pins-2026-10-25.md`.
 - [x] **27.2a — Explicit mapped mixed property updates.** Native/Python graph tables can update selected node and edge columns atomically through 09.4b.2c. Explicit mapping is the target-identity assertion; automatic source lineage, connected views and graph materialization remain outside this slice.
 - [x] **27.2b — Checked materialization into an independent graph.** Complete columnar preparation, typed inline/reference remapping, identity registration and one accepted state replace the lossy legacy row loop (09.4b.2e). Source direction is explicit; portable pooled/history copying and connected source pins remain open.
 

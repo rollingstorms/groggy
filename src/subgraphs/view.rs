@@ -465,7 +465,8 @@ impl GraphView {
             &nodes,
             names.into_iter().cloned().collect(),
             |id, name| Ok(attrs.get(&id).and_then(|attrs| attrs.get(name))),
-        )
+        )?
+        .with_graph_source(self.clone(), true, nodes)
     }
     /// Owned edge columns from captured endpoints and selected edge instances.
     pub fn edge_table_data(
@@ -483,13 +484,14 @@ impl GraphView {
             names.into_iter().cloned().collect(),
             |id| self.edge_endpoints(id),
             |id, name| Ok(attrs.get(&id).and_then(|attrs| attrs.get(name))),
-        )
+        )?
+        .with_graph_source(self.clone(), false, edges)
     }
     /// Independent node table; missing properties occupy aligned null cells.
     pub fn nodes_table(&self) -> GraphResult<crate::storage::table::NodesTable> {
         self.node_table_data()?.into_nodes_table()
     }
-    /// Independent edge table retaining captured endpoint identity.
+    /// Owned edge table retaining captured endpoint identity and explicit source provenance.
     pub fn edges_table(&self) -> GraphResult<crate::storage::table::EdgesTable> {
         self.edge_table_data()?.into_edges_table()
     }

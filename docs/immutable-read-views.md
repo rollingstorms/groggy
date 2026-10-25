@@ -130,8 +130,10 @@ assert view.nodes_table()["score"].to_list() == [7, None]
 These exports share the native projection code used by `Graph` and `Subgraph`.
 A fresh legacy export reads the current working state. Stale selected IDs,
 unreadable value references and properties colliding with structural column names
-raise errors. Exports preserve IDs; a table does not carry a writeback owner or an
-implicit graph join policy. Editing an exported table cannot change its source.
+raise errors. Exports preserve IDs and now carry an immutable source pin and row identity for
+[explicit checked source writeback](api/table-source-pins.md). They hold no mutable
+writeback owner and infer no identity for joined rows. Editing an exported table
+cannot change its source until an explicit update is accepted.
 Python releases the GIL while projecting captured column data.
 
 

@@ -9,19 +9,42 @@ use std::collections::HashMap;
 /// Missing properties are null cells; this is a materialized copy, not writeback.
 #[derive(Debug)]
 pub struct OwnedTableData {
+    source: Option<super::provenance::TableProvenance>,
     columns: HashMap<String, Vec<AttrValue>>,
     order: Vec<String>,
 }
 impl OwnedTableData {
     /// Construct an independent table with stable column order.
     pub fn into_base_table(self) -> GraphResult<BaseTable> {
-        BaseTable::with_column_order(
+        let mut table = BaseTable::with_column_order(
             self.columns
                 .into_iter()
                 .map(|(name, values)| (name, BaseArray::from_attr_values(values)))
                 .collect(),
             self.order,
-        )
+        )?;
+        table.provenance = self.source;
+        Ok(table)
+    }
+    pub(crate) fn with_graph_source(
+        mut self,
+        pin: crate::GraphView,
+        nodes: bool,
+        ids: Vec<usize>,
+    ) -> GraphResult<Self> {
+        if self
+            .columns
+            .values()
+            .any(|column| column.len() != ids.len())
+        {
+            return Err(GraphError::InvalidInput(
+                "Source projection length mismatch".into(),
+            ));
+        }
+        self.source = Some(super::provenance::TableProvenance::for_graph(
+            pin, nodes, ids,
+        )?);
+        Ok(self)
     }
     /// Construct a node table, validating its structural column.
     pub fn into_nodes_table(self) -> GraphResult<NodesTable> {
@@ -80,6 +103,7 @@ pub(crate) fn nodes<'a>(
         ids,
         names,
         OwnedTableData {
+            source: None,
             columns,
             order: vec!["node_id".into()],
         },
@@ -113,6 +137,7 @@ pub(crate) fn edges<'a>(
         ids,
         names,
         OwnedTableData {
+            source: None,
             columns,
             order: vec!["edge_id".into(), "source".into(), "target".into()],
         },

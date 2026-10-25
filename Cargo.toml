@@ -163,3 +163,7 @@ harness = false
 [[bench]]
 name = "pinned_view_writes"
 harness = false
+
+[[bench]]
+name = "table_source_pins"
+harness = false

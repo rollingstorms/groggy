@@ -31,6 +31,7 @@ struct ColumnStatistics {
 /// This provides the foundation for all table types in the system
 #[derive(Debug)]
 pub struct BaseTable {
+    pub(super) provenance: Option<super::provenance::TableProvenance>,
     /// Columns stored as BaseArrays with AttrValue type
     columns: HashMap<String, BaseArray<AttrValue>>,
     /// Column order for consistent iteration
@@ -63,6 +64,7 @@ impl Clone for BaseTable {
             active_server_handles: Vec::new(), // Don't clone server handles
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.clone(),
             version: self.version,
         }
     }
@@ -86,6 +88,7 @@ impl BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: StreamingConfig::default(),
             source_id: format!("basetable_{}", timestamp),
+            provenance: None,
             version: 1,
         }
     }
@@ -131,6 +134,7 @@ impl BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: StreamingConfig::default(),
             source_id: format!("basetable_{}", timestamp),
+            provenance: None,
             version: 1,
         })
     }
@@ -182,6 +186,7 @@ impl BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: StreamingConfig::default(),
             source_id: format!("basetable_{}", timestamp),
+            provenance: None,
             version: 1,
         })
     }
@@ -611,7 +616,9 @@ impl BaseTable {
         };
 
         if sample_size == 0 {
-            return Ok(BaseTable::new());
+            let mut empty = BaseTable::new();
+            empty.provenance = self.provenance.as_ref().map(|source| source.derived());
+            return Ok(empty);
         }
 
         // Prepare row weights
@@ -863,11 +870,8 @@ impl Table for BaseTable {
     }
 
     fn slice(&self, start: usize, end: usize) -> Self {
-        if start >= self.nrows || end <= start {
-            return Self::new();
-        }
-
-        let actual_end = std::cmp::min(end, self.nrows);
+        let start = start.min(self.nrows);
+        let actual_end = end.min(self.nrows).max(start);
         let mut new_columns = HashMap::new();
 
         for (name, column) in &self.columns {
@@ -883,6 +887,10 @@ impl Table for BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self
+                .provenance
+                .as_ref()
+                .map(|source| source.slice(start, actual_end)),
             version: self.version + 1, // Increment version for new slice
         }
     }
@@ -896,7 +904,11 @@ impl Table for BaseTable {
         let mut indices: Vec<_> = (0..self.nrows).collect();
         indices.sort_by(|&a, &b| {
             let order = super::numeric::compare(&sort_column.data()[a], &sort_column.data()[b]);
-            if ascending { order } else { order.reverse() }
+            if ascending {
+                order
+            } else {
+                order.reverse()
+            }
         });
 
         // Apply indices to all columns
@@ -914,6 +926,7 @@ impl Table for BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.as_ref().map(|source| source.take(&indices)),
             version: self.version + 1,
         })
     }
@@ -1012,6 +1025,7 @@ impl Table for BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.as_ref().map(|source| source.take(&indices)),
             version: self.version + 1,
         })
     }
@@ -1037,6 +1051,7 @@ impl Table for BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.as_ref().map(|source| source.filter(&mask)),
             version: self.version + 1,
         })
     }
@@ -1106,6 +1121,7 @@ impl Table for BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.clone(),
             version: self.version + 1,
         })
     }
@@ -1141,6 +1157,13 @@ impl Table for BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.as_ref().map(|source| {
+                source.for_rows(if self.nrows == 0 {
+                    column.len()
+                } else {
+                    self.nrows
+                })
+            }),
             version: self.version + 1,
         })
     }
@@ -1163,6 +1186,7 @@ impl Table for BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.clone(),
             version: self.version + 1,
         })
     }
@@ -1216,6 +1240,7 @@ impl BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self.provenance.as_ref().map(|source| source.filter(mask)),
             version: self.version + 1,
         })
     }
@@ -2233,6 +2258,7 @@ impl BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: format!("{}_pivot", self.source_id),
+            provenance: self.provenance.as_ref().map(|source| source.derived()),
             version: self.version + 1,
         })
     }
@@ -2356,6 +2382,7 @@ impl BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: format!("{}_melt", self.source_id),
+            provenance: self.provenance.as_ref().map(|source| source.derived()),
             version: self.version + 1,
         })
     }
@@ -2862,7 +2889,10 @@ impl BaseTable {
             result_columns.insert(col_name, BaseArray::from_attr_values(values));
         }
 
-        Self::from_columns(result_columns)
+        Self::from_columns(result_columns).map(|mut result| {
+            result.provenance = self.provenance.as_ref().map(|source| source.derived());
+            result
+        })
     }
 
     /// Apply a function to each row in the table (pandas-style apply with axis=1)
@@ -2922,7 +2952,10 @@ impl BaseTable {
             BaseArray::from_attr_values(result_values),
         );
 
-        Self::from_columns(result_columns)
+        Self::from_columns(result_columns).map(|mut result| {
+            result.provenance = self.provenance.as_ref().map(|source| source.derived());
+            result
+        })
     }
 
     /// Append a new row to the table (pandas-style append)
@@ -3223,7 +3256,13 @@ impl BaseTable {
             }
         }
 
-        Self::from_columns(result_columns)
+        Self::from_columns(result_columns).map(|mut result| {
+            result.provenance = self
+                .provenance
+                .as_ref()
+                .map(|source| source.for_rows(self.nrows));
+            result
+        })
     }
 
     /// Apply expanding window operations to all numeric columns
@@ -3257,7 +3296,13 @@ impl BaseTable {
             }
         }
 
-        Self::from_columns(result_columns)
+        Self::from_columns(result_columns).map(|mut result| {
+            result.provenance = self
+                .provenance
+                .as_ref()
+                .map(|source| source.for_rows(self.nrows));
+            result
+        })
     }
 
     /// Comprehensive data profiling and quality assessment
@@ -3406,7 +3451,10 @@ impl BaseTable {
         profile_data.insert("q75".to_string(), BaseArray::from_attr_values(q75s));
         profile_data.insert("max".to_string(), BaseArray::from_attr_values(maxs));
 
-        Self::from_columns(profile_data)
+        Self::from_columns(profile_data).map(|mut result| {
+            result.provenance = self.provenance.as_ref().map(|source| source.derived());
+            result
+        })
     }
 
     /// Detect outliers in numeric columns using IQR method
@@ -3562,7 +3610,10 @@ impl BaseTable {
         );
         validation_data.insert("issues".to_string(), BaseArray::from_attr_values(issues));
 
-        Self::from_columns(validation_data)
+        Self::from_columns(validation_data).map(|mut result| {
+            result.provenance = self.provenance.as_ref().map(|source| source.derived());
+            result
+        })
     }
 }
 
@@ -3990,6 +4041,7 @@ impl BaseTable {
 
         // Create result table
         let mut result = BaseTable::from_columns(base_columns)?;
+        result.provenance = self.provenance.as_ref().map(|source| source.derived());
         result.column_order = column_order;
         Ok(result)
     }
@@ -4022,7 +4074,9 @@ impl BaseTable {
     /// Aggregate entire table (no grouping)
     pub fn aggregate(&self, agg_specs: HashMap<String, String>) -> GraphResult<Self> {
         if agg_specs.is_empty() {
-            return Ok(BaseTable::new());
+            let mut empty = BaseTable::new();
+            empty.provenance = self.provenance.as_ref().map(|source| source.derived());
+            return Ok(empty);
         }
 
         let mut result_columns = HashMap::new();
@@ -4039,12 +4093,18 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(result_columns)?;
+        result.provenance = self.provenance.as_ref().map(|source| source.derived());
         result.column_order = column_order;
         Ok(result)
     }
 
     /// Select specific rows by indices
     pub fn select_rows(&self, row_indices: &[usize]) -> GraphResult<Self> {
+        if row_indices.iter().any(|&row| row >= self.nrows) {
+            return Err(crate::GraphError::InvalidInput(
+                "Table row index out of bounds".into(),
+            ));
+        }
         let mut new_columns = HashMap::new();
 
         // Delegate to BaseArray take_indices operation for each column
@@ -4062,6 +4122,10 @@ impl BaseTable {
             active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
+            provenance: self
+                .provenance
+                .as_ref()
+                .map(|source| source.take(row_indices)),
             version: self.version + 1,
         })
     }
@@ -4160,6 +4224,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(result_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         result.column_order = column_order;
         Ok(result)
     }
@@ -4266,6 +4334,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(result_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         result.column_order = column_order;
         Ok(result)
     }
@@ -4414,6 +4486,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(result_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         result.column_order = column_order;
         Ok(result)
     }
@@ -4478,6 +4554,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(result_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         result.column_order = column_order;
         Ok(result)
     }
@@ -4566,6 +4646,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(base_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -4629,6 +4713,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(base_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -4673,6 +4761,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(result_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         // TODO: Proper column order management for concatenated tables
         result
             .column_order
@@ -4754,6 +4846,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(base_columns)?;
+        result.provenance = super::provenance::TableProvenance::joined(
+            self.provenance.as_ref(),
+            other.provenance.as_ref(),
+        );
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -4793,7 +4889,9 @@ impl BaseTable {
 
         // If no numeric columns, return empty table
         if numeric_columns.is_empty() {
-            return Ok(BaseTable::new());
+            let mut empty = BaseTable::new();
+            empty.provenance = self.provenance.as_ref().map(|source| source.derived());
+            return Ok(empty);
         }
 
         // Initialize result columns - one column per original numeric column
@@ -4830,6 +4928,7 @@ impl BaseTable {
 
         // Create result table
         let mut result = BaseTable::from_columns(base_columns)?;
+        result.provenance = self.provenance.as_ref().map(|source| source.derived());
         result.column_order = numeric_columns;
 
         Ok(result)
@@ -4905,6 +5004,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(filtered_columns)?;
+        result.provenance = self
+            .provenance
+            .as_ref()
+            .map(|source| source.filter(&row_mask));
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -4940,6 +5043,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(filtered_columns)?;
+        result.provenance = self
+            .provenance
+            .as_ref()
+            .map(|source| source.filter(&row_mask));
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -4961,6 +5068,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(null_mask_columns)?;
+        result.provenance = self
+            .provenance
+            .as_ref()
+            .map(|source| source.for_rows(self.nrows));
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -4983,6 +5094,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(not_null_mask_columns)?;
+        result.provenance = self
+            .provenance
+            .as_ref()
+            .map(|source| source.for_rows(self.nrows));
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -5026,6 +5141,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(filled_columns)?;
+        result.provenance = self
+            .provenance
+            .as_ref()
+            .map(|source| source.for_rows(self.nrows));
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -5039,6 +5158,10 @@ impl BaseTable {
         }
 
         let mut result = BaseTable::from_columns(filled_columns)?;
+        result.provenance = self
+            .provenance
+            .as_ref()
+            .map(|source| source.for_rows(self.nrows));
         result.column_order = self.column_order.clone();
         Ok(result)
     }
@@ -5284,6 +5407,7 @@ impl BaseTable {
 
         let mut result = self.clone();
         result.columns = new_columns;
+        result.provenance = self.provenance.as_ref().map(|source| source.derived());
         result.nrows += 1;
         result.version += 1;
 
@@ -5329,6 +5453,7 @@ impl BaseTable {
 
         let mut result = self.clone();
         result.columns = new_columns;
+        result.provenance = self.provenance.as_ref().map(|source| source.derived());
         result.nrows += rows.len();
         result.version += 1;
 
@@ -5351,20 +5476,12 @@ impl BaseTable {
             }
         }
 
-        let mut new_columns = HashMap::new();
-        for col_name in &self.column_order {
-            // Delegate to BaseArray drop_elements operation
-            let new_array = self.columns[col_name].drop_elements(indices)?;
-            new_columns.insert(col_name.clone(), new_array);
-        }
-
-        let new_nrows = self.nrows - indices.len();
-        let mut result = self.clone();
-        result.columns = new_columns;
-        result.nrows = new_nrows;
-        result.version += 1;
-
-        Ok(result)
+        let dropped: std::collections::HashSet<_> = indices.iter().copied().collect();
+        self.select_rows(
+            &(0..self.nrows)
+                .filter(|row| !dropped.contains(row))
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// Drop duplicate rows based on specified columns (or all columns if none specified)

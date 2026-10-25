@@ -2720,6 +2720,29 @@ class BaseTable:
         ...
 
 
+
+    @property
+    def source_state_id(self) -> Optional[int]:
+        ...
+
+    @property
+    def source_entity_ids(self) -> Optional[List[int]]:
+        ...
+
+    @property
+    def source_entity_kind(self) -> Optional[str]:
+        ...
+
+    def source_views(self, *args, **kwargs) -> List[GraphView]:
+        ...
+
+    def update_source_graph(self, graph: Any, columns: List[str], *, effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Publish selected columns through the retained source pin; graph may be Graph or DurableGraph.
+        """
+        ...
+
+
 class BranchInfo:
     """
     Python wrapper for branch information
@@ -4385,6 +4408,15 @@ class EdgesTable:
     def unique_attr_values(self, *args, **kwargs) -> Any:
         """
         Get unique values for an attribute
+        """
+        ...
+
+
+
+    @staticmethod
+    def from_base_table(table: BaseTable) -> EdgesTable:
+        """
+        Convert an existing BaseTable, preserving retained source identity and pins.
         """
         ...
 
@@ -6229,6 +6261,14 @@ class GraphTable:
         else:
             print(f"Issues found: {verification['errors']}")
         ```
+        """
+        ...
+
+
+
+    def update_source_graph(self, graph: Any, *, node_columns: List[str], edge_columns: List[str], effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Publish node/edge columns from one shared source capture in one checked batch.
         """
         ...
 
@@ -8408,6 +8448,15 @@ class NodesTable:
 
         Returns:
             PyNodesTable: A new table with the attributes added
+        """
+        ...
+
+
+
+    @staticmethod
+    def from_base_table(table: BaseTable) -> NodesTable:
+        """
+        Convert an existing BaseTable, preserving retained source identity and pins.
         """
         ...
 

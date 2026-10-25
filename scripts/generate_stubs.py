@@ -118,6 +118,12 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
             'set_schema': 'int', 'create_branch': 'None', 'checkout_branch': 'None',
             'list_branches': 'List[Dict[str, Any]]',
         },
+        'BaseTable': {
+            'source_state_id': 'Optional[int]', 'source_entity_ids': 'Optional[List[int]]',
+            'source_entity_kind': 'Optional[str]', 'source_views': 'List[GraphView]',
+            'update_source_graph': 'Dict[str, Any]',
+        },
+        'GraphTable': {'update_source_graph': 'Dict[str, Any]'},
         'GraphView': {
             'write_state_id': 'Optional[int]', 'node_ids': 'List[int]', 'edge_ids': 'List[int]',
             'node_count': 'int', 'edge_count': 'int', 'is_directed': 'bool',
@@ -460,6 +466,13 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
             lines.append(f"    def __getattr__(self, name: str) -> Any:")
             if not method_doc:
                 method_doc = "Dynamic attribute access for runtime attribute dictionaries"
+        elif class_name == 'BaseTable' and method_name == 'update_source_graph':
+            lines.append("    def update_source_graph(self, graph: Any, columns: List[str], *, effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
+        elif class_name == 'GraphTable' and method_name == 'update_source_graph':
+            lines.append("    def update_source_graph(self, graph: Any, *, node_columns: List[str], edge_columns: List[str], effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
+        elif class_name in ('NodesTable', 'EdgesTable') and method_name == 'from_base_table':
+            lines.append("    @staticmethod")
+            lines.append(f"    def from_base_table(table: BaseTable) -> {class_name}:")
         elif class_name in ('Graph', 'DurableGraph') and method_name == 'apply_view_batch':
             lines.append("    def apply_view_batch(self, view: GraphView, batch: Any, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
         elif class_name in ('Graph', 'DurableGraph') and method_name == 'read_view':

@@ -138,6 +138,9 @@ impl PinnedReadState {
             .filter(|origin| origin.clean)
             .map(|origin| origin.state)
     }
+    pub(crate) fn shares_capture(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data)
+    }
     /// Borrow frozen values/topology. state_id is checkpoint ancestry for a working capture,
     /// not an assertion that uncheckpointed edits have been recorded in history.
     pub fn snapshot(&self) -> &GraphSnapshot {

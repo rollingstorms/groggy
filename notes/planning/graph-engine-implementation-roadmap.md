@@ -693,3 +693,31 @@ current values/topology and is not an O(1) scalar writer. See
 `pinned-view-writes-2026-10-25.md` and `../../docs/api/pinned-view-writes.md`.
 Legacy connected Subgraph/table reads, table source provenance, portable group
 contents and arbitrary effective-time reconstruction keep their original scope.
+
+
+## Frozen graph-table source slice — 2026-10-25
+
+Advanced existing **27.1 / 27.2 / AR7.10**. GraphView owned exports now carry shared
+frozen source pins and immutable row-to-entity IDs through the native table
+foundation, including the thread-transferable projection path used by Python.
+Selections, filters, sorting and column projections preserve exact row identity
+even after visible ID columns are dropped. Five generic joins keep source pins
+but require explicit identity resolution before automatic source writeback.
+
+BaseTable chosen-column and GraphTable mixed-column updates use the existing
+checked view coordinator for Graph/DurableGraph, retain schema/time behavior, and
+publish one delta. Forged structural IDs/endpoints, duplicate rows, wrong kinds,
+independently captured bundles and stale/foreign/read-only sources reject. New
+from_base_table adapters preserve provenance. Imports remain unbound; explicit
+mapped writeback and independent materialization remain available. Empty slices
+keep columns; repeated drop indices remove rows once.
+
+Ten native regressions, thirteen Python cases, three executable examples and
+release observations at 1k/10k nodes pass. Full baseline: 1,040 native, 1,759 Python,
+94 documentation examples and strict Clippy. Source pins retain the full frozen
+payload; selections share that allocation and own row-ID maps. See
+`table-source-pins-2026-10-25.md` and `../../docs/api/table-source-pins.md`.
+This finishes the explicit frozen export/base-row/generic-join/source-write family.
+Specialized domain merges, TableArray adapters, broad join-key conformance and
+legacy connected reads keep the existing parents partial; no new checkbox rows
+were added and the inventory remains **191 checked / 77 unchecked**.

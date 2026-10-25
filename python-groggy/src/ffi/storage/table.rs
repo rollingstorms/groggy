@@ -54,6 +54,62 @@ impl Default for PyBaseTable {
 
 #[pymethods]
 impl PyBaseTable {
+    #[getter]
+    fn source_state_id(&self) -> Option<groggy::StateId> {
+        self.table.source_state_id()
+    }
+    #[getter]
+    fn source_entity_ids(&self) -> Option<Vec<usize>> {
+        self.table.source_entity_ids().map(|ids| ids.to_vec())
+    }
+    #[getter]
+    fn source_entity_kind(&self) -> Option<&'static str> {
+        self.table.source_entity_kind()
+    }
+    fn source_views(&self) -> Vec<crate::ffi::subgraphs::view::PyGraphView> {
+        self.table
+            .source_views()
+            .into_iter()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .collect()
+    }
+    /// Publish selected columns through the retained source pin; graph may be Graph or DurableGraph.
+    #[pyo3(signature=(graph,columns,*,effective_at=None,schema=None))]
+    fn update_source_graph(
+        &self,
+        py: Python,
+        graph: &PyAny,
+        columns: Vec<String>,
+        effective_at: Option<groggy::TimestampMicros>,
+        schema: Option<&PyDict>,
+    ) -> PyResult<PyObject> {
+        let schema = schema
+            .map(crate::ffi::api::graph::parse_schema)
+            .transpose()?;
+        let result = if let Ok(graph) = graph.extract::<PyRef<crate::ffi::api::graph::PyGraph>>() {
+            self.table.update_source_graph(
+                &mut graph.inner.borrow_mut(),
+                &columns,
+                effective_at,
+                schema.as_ref(),
+            )
+        } else if let Ok(mut graph) =
+            graph.extract::<PyRefMut<crate::ffi::api::durable::PyDurableGraph>>()
+        {
+            self.table.update_source_durable(
+                graph.core_mut()?,
+                &columns,
+                effective_at,
+                schema.as_ref(),
+            )
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Expected Graph or DurableGraph",
+            ));
+        }
+        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        crate::ffi::api::graph_batch::view_result_to_python(py, result)
+    }
     /// Create a new empty BaseTable
     #[new]
     pub fn new() -> Self {
@@ -3291,6 +3347,13 @@ pub struct PyNodesTable {
 
 #[pymethods]
 impl PyNodesTable {
+    /// Convert an existing BaseTable, preserving retained source identity and pins.
+    #[staticmethod]
+    fn from_base_table(table: &PyBaseTable) -> PyResult<Self> {
+        NodesTable::from_base_table(table.table.clone())
+            .map(|table| Self { table })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
     /// Create new NodesTable from node IDs
     #[new]
     pub fn new(node_ids: Vec<NodeId>) -> Self {
@@ -4244,6 +4307,13 @@ pub struct PyEdgesTable {
 
 #[pymethods]
 impl PyEdgesTable {
+    /// Convert an existing BaseTable, preserving retained source identity and pins.
+    #[staticmethod]
+    fn from_base_table(table: &PyBaseTable) -> PyResult<Self> {
+        EdgesTable::from_base_table(table.table.clone())
+            .map(|table| Self { table })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
     /// Create new EdgesTable from edge tuples
     #[new]
     pub fn new(edges: Vec<(EdgeId, NodeId, NodeId)>) -> Self {
@@ -5311,6 +5381,47 @@ impl PyGraphTable {
             .auto_assign_edge_ids()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(Self { table: fixed_table })
+    }
+
+    /// Publish node/edge columns from one shared source capture in one checked batch.
+    #[pyo3(signature=(graph,*,node_columns,edge_columns,effective_at=None,schema=None))]
+    fn update_source_graph(
+        &self,
+        py: Python,
+        graph: &PyAny,
+        node_columns: Vec<String>,
+        edge_columns: Vec<String>,
+        effective_at: Option<groggy::TimestampMicros>,
+        schema: Option<&PyDict>,
+    ) -> PyResult<PyObject> {
+        let schema = schema
+            .map(crate::ffi::api::graph::parse_schema)
+            .transpose()?;
+        let result = if let Ok(graph) = graph.extract::<PyRef<crate::ffi::api::graph::PyGraph>>() {
+            self.table.update_source_graph(
+                &mut graph.inner.borrow_mut(),
+                &node_columns,
+                &edge_columns,
+                effective_at,
+                schema.as_ref(),
+            )
+        } else if let Ok(mut graph) =
+            graph.extract::<PyRefMut<crate::ffi::api::durable::PyDurableGraph>>()
+        {
+            self.table.update_source_durable(
+                graph.core_mut()?,
+                &node_columns,
+                &edge_columns,
+                effective_at,
+                schema.as_ref(),
+            )
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "Expected Graph or DurableGraph",
+            ));
+        }
+        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        crate::ffi::api::graph_batch::view_result_to_python(py, result)
     }
 
     /// Write explicitly mapped property columns to existing graph entities in one batch.

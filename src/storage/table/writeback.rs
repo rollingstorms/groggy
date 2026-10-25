@@ -155,7 +155,7 @@ fn validate_mapping(
     Ok(())
 }
 
-fn columns(
+pub(super) fn columns(
     table: &BaseTable,
     names: &[AttrName],
     reserved: &[&str],

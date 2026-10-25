@@ -1,0 +1,75 @@
+{
+  "cases": [
+    {
+      "nodes": 1000,
+      "samples": [
+        {
+          "export_seconds": 0.000305958,
+          "join_seconds": 0.000299875,
+          "selection_seconds": 0.000077541,
+          "write_seconds": 0.00158275
+        },
+        {
+          "export_seconds": 0.000407625,
+          "join_seconds": 0.000476875,
+          "selection_seconds": 0.000081875,
+          "write_seconds": 0.002587542
+        },
+        {
+          "export_seconds": 0.0003175,
+          "join_seconds": 0.000417875,
+          "selection_seconds": 0.000069291,
+          "write_seconds": 0.002257042
+        },
+        {
+          "export_seconds": 0.000318542,
+          "join_seconds": 0.000303708,
+          "selection_seconds": 0.000062084,
+          "write_seconds": 0.001713042
+        },
+        {
+          "export_seconds": 0.000254916,
+          "join_seconds": 0.000327083,
+          "selection_seconds": 0.000051125,
+          "write_seconds": 0.001691417
+        }
+      ]
+    },
+    {
+      "nodes": 10000,
+      "samples": [
+        {
+          "export_seconds": 0.002301833,
+          "join_seconds": 0.003058666,
+          "selection_seconds": 0.000428041,
+          "write_seconds": 0.015899792
+        },
+        {
+          "export_seconds": 0.002194625,
+          "join_seconds": 0.002843708,
+          "selection_seconds": 0.000312958,
+          "write_seconds": 0.015296125
+        },
+        {
+          "export_seconds": 0.002120042,
+          "join_seconds": 0.002898125,
+          "selection_seconds": 0.00030225,
+          "write_seconds": 0.015346791
+        },
+        {
+          "export_seconds": 0.002239625,
+          "join_seconds": 0.002794125,
+          "selection_seconds": 0.000298916,
+          "write_seconds": 0.015411708
+        },
+        {
+          "export_seconds": 0.002166416,
+          "join_seconds": 0.003039833,
+          "selection_seconds": 0.000308541,
+          "write_seconds": 0.017000916
+        }
+      ]
+    }
+  ],
+  "scope": "Native optimized frozen node-table export, descending sort/head/projection, half-row source writeback and read-only self join. Five observations. Fixture/initial pin/edit preparation/final verification excluded; write includes complete view-source validation, output capture and publication. No matched speedup, RSS/allocation, FFI or durable-fsync guarantee."
+}

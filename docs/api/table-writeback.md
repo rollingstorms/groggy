@@ -85,3 +85,8 @@ mutation currently retains the GIL, like the existing borrowed graph setters.
 The separate [checked `to_graph()` conversion](table-materialization.md)
 materializes an independent graph. It does not update the source graph or restore
 its retained pool/history. Full pipeline publication remains separate work.
+
+Frozen GraphView exports also support [source-pinned writeback](table-source-pins.md)
+without manually supplying ID maps. Row identity is retained independently of
+editable cells; joins require explicit resolution. The mapping API on this page
+remains available for unbound/imported data and deliberate cross-graph writes.

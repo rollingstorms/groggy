@@ -8,6 +8,7 @@ mod materialize;
 pub mod nodes;
 mod numeric;
 pub mod projection;
+mod provenance;
 mod structural;
 pub mod table_array;
 mod text;
