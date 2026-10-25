@@ -215,3 +215,6 @@ harness = false
 [[bench]]
 name = "graph_table_component_sharing"
 harness = false
+[[bench]]
+name = "table_visualization"
+harness = false

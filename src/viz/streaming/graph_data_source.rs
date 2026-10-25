@@ -6,7 +6,8 @@ use crate::viz::streaming::data_source::{
     DataSchema, DataSource, DataWindow, DataWindowMetadata, GraphEdge, GraphMetadata, GraphNode,
     HierarchicalDirection, LayoutAlgorithm, NodePosition, Position,
 };
-use std::collections::HashMap;
+use crate::{GraphError, GraphResult};
+use std::collections::{HashMap, HashSet};
 
 /// DataSource adapter that exposes a `Graph` through the realtime/streaming pipeline.
 #[derive(Debug, Clone)]
@@ -20,6 +21,74 @@ pub struct GraphDataSource {
 }
 
 impl GraphDataSource {
+    /// Capture checked visualization entities without allocating graph IDs or history.
+    /// IDs and typed attributes retain their original identity; all edge endpoints
+    /// must belong to the supplied node set. Direction is supplied explicitly.
+    pub fn from_entities(
+        mut nodes: Vec<GraphNode>,
+        mut edges: Vec<GraphEdge>,
+        is_directed: bool,
+    ) -> GraphResult<Self> {
+        let mut node_ids = HashSet::with_capacity(nodes.len());
+        for node in &nodes {
+            if !node_ids.insert(node.id.as_str()) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Duplicate visualization node ID {}",
+                    node.id
+                )));
+            }
+        }
+        let mut edge_ids = HashSet::with_capacity(edges.len());
+        for edge in &edges {
+            if !edge_ids.insert(edge.id.as_str()) {
+                return Err(GraphError::InvalidInput(format!(
+                    "Duplicate visualization edge ID {}",
+                    edge.id
+                )));
+            }
+            if !node_ids.contains(edge.source.as_str()) || !node_ids.contains(edge.target.as_str())
+            {
+                return Err(GraphError::InvalidInput(format!(
+                    "Visualization edge {} has an endpoint outside the node table",
+                    edge.id
+                )));
+            }
+        }
+        let mut attribute_types = HashMap::new();
+        for node in &mut nodes {
+            for (key, value) in &node.attributes {
+                record_attribute_type(&mut attribute_types, "node", key, value);
+            }
+            if node.label.is_none() {
+                node.label = Some(
+                    node.attributes
+                        .get("name")
+                        .and_then(attr_to_string)
+                        .unwrap_or_else(|| format!("Node {}", node.id)),
+                );
+            }
+            if node.position.is_none() {
+                node.position = extract_position(&node.attributes);
+            }
+        }
+        for edge in &mut edges {
+            for (key, value) in &edge.attributes {
+                record_attribute_type(&mut attribute_types, "edge", key, value);
+            }
+            if edge.weight.is_none() {
+                edge.weight = extract_weight(&edge.attributes);
+            }
+        }
+        Ok(Self {
+            node_count: nodes.len(),
+            edge_count: edges.len(),
+            is_directed,
+            nodes,
+            edges,
+            attribute_types,
+        })
+    }
+
     /// Create a new adapter using the "name" attribute as the preferred label.
     pub fn new(graph: &Graph) -> Self {
         Self::new_with_label(graph, "name")
@@ -130,7 +199,8 @@ impl DataSource for GraphDataSource {
     }
 
     fn get_window(&self, start: usize, count: usize) -> DataWindow {
-        let end = (start + count).min(self.nodes.len());
+        let begin = start.min(self.nodes.len());
+        let end = start.saturating_add(count).min(self.nodes.len());
         let headers = vec![
             "id".to_string(),
             "label".to_string(),
@@ -138,7 +208,7 @@ impl DataSource for GraphDataSource {
             "y".to_string(),
         ];
 
-        let rows = self.nodes[start..end]
+        let rows = self.nodes[begin..end]
             .iter()
             .map(|node| {
                 let (x, y) = node

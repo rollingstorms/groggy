@@ -1,0 +1,65 @@
+{
+  "cases": [
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "direct_checked_capture",
+      "seconds": [
+        0.000791125,
+        0.000689333,
+        0.000682708
+      ]
+    },
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "checked_graph_materialization_then_capture",
+      "seconds": [
+        0.00628225,
+        0.006088959,
+        0.006206041
+      ]
+    },
+    {
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "direct_checked_capture",
+      "seconds": [
+        0.007648292,
+        0.006704958,
+        0.006966834
+      ]
+    },
+    {
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "checked_graph_materialization_then_capture",
+      "seconds": [
+        0.064333917,
+        0.066102833,
+        0.061710834
+      ]
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "direct_checked_capture",
+      "seconds": [
+        0.080039625,
+        0.076969625,
+        0.081816042
+      ]
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "checked_graph_materialization_then_capture",
+      "seconds": [
+        0.805452083,
+        0.797546375,
+        0.786441708
+      ]
+    }
+  ],
+  "scope": "Native optimized current alternatives, three observations. Dense chain with two node properties and one edge property. Direct checked table-to-viz capture versus checked table-to-Graph materialization plus GraphDataSource capture. Both produce the same IDs/topology on this dense fixture. Fixture construction, assertions, metadata reads and all output destruction excluded. Graph materialization includes checked publication/history allocation; direct capture creates no Graph or history. Neither benchmark is the old incorrect FFI row loop. No historical speedup, RSS, Python/GIL/FFI budget or server/layout claim."
+}

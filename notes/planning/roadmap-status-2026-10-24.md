@@ -285,3 +285,25 @@ to_subgraphs converter contracts. These pre-existing facade contracts remain
 within the original parent, not new checklist rows. Legacy object migration stays
 in 26.1; full retained-pool/history portability remains separately tracked.
 Inventory: **192 checked / 76 unchecked**, unchanged by adding no rows.
+
+### Checked table visualization captures — 2026-10-25
+
+Replaced all three Python table `.viz` graph-rebuilding loops with native checked
+entity adaptation (27.1/AR7.10 and 28.15). Sparse/optimized IDs, parallel edges,
+loops and typed properties retain their original identity; malformed/duplicate
+IDs and dangling endpoints reject before server creation. No temporary graph,
+new IDs or history are allocated. Direction is explicit natively; the existing
+Python undirected default remains. Empty/oversized GraphDataSource windows are
+safe. Evidence/API: `table-visualization-2026-10-25.md` and
+`docs/api/table-visualization.md`; 7 native / 8 Python cases and 3 API examples.
+Full gate: **1,138 native passed / 51 ignored; 1,869 root Python passed / 1 skipped;
+130 executable docs passed; strict all-target Clippy passed**.
+
+At 100k nodes, the current native direct capture median is about 80ms versus
+798ms for checked graph materialization plus capture on the same dense fixture.
+These are current alternatives, not a speedup against the old incorrect FFI
+loop or an RSS/FFI/server guarantee. Receipt:
+`notes/benchmarks/table-visualization-2026-10-25.json`.
+Existing table DataSource compatibility readers and interactive_viz options,
+converter ownership, node-subset and rectangular metadata contracts remain open.
+Inventory remains **192 checked / 76 unchecked**; no new rows added.

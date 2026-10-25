@@ -13,6 +13,7 @@ mod structural;
 pub mod table_array;
 mod text;
 pub mod traits;
+mod visualization;
 mod writeback;
 pub use writeback::TableWriteback;
 
