@@ -93,12 +93,12 @@ impl PyEdgesArray {
     // Domain-specific operations (apply-on-each pattern)
 
     /// Apply table() to each EdgesAccessor in the array
-    fn table(&self) -> PyResult<PyTableArray> {
+    fn table(&self, py: Python<'_>) -> PyResult<PyTableArray> {
         let mut tables = Vec::new();
 
         // Iterate through EdgesAccessor objects and apply table()
         for accessor in self.base.iter() {
-            let edge_table = accessor.table()?;
+            let edge_table = accessor.table(py)?;
             Python::with_gil(|py| {
                 tables.push(edge_table.into_py(py));
             });
@@ -287,13 +287,13 @@ impl PyEdgesArrayIterator {
 #[pymethods]
 impl PyEdgesArrayIterator {
     /// Apply table() to each EdgesAccessor in the iterator
-    fn table(&mut self) -> PyResult<PyTableArray> {
+    fn table(&mut self, py: Python<'_>) -> PyResult<PyTableArray> {
         let mut tables = Vec::new();
 
         // Convert iterator to vector and iterate through EdgesAccessor objects
         let accessors = self.inner.clone().into_vec();
         for accessor in accessors {
-            let edge_table = accessor.table()?;
+            let edge_table = accessor.table(py)?;
             Python::with_gil(|py| {
                 tables.push(edge_table.into_py(py));
             });

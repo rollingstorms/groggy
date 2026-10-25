@@ -112,7 +112,7 @@ assert graph.get_edge_attr(0, "weight") == 2.5
 - The same Python method accepts `DurableGraph`; installed and stricter optional
   schemas apply, rejected updates append nothing, and accepted values recover
   through the existing journal. Reopening requires a new source capture.
-- Plain imported tables and current legacy Graph/Subgraph exports remain unbound.
+- Plain imported tables remain unbound. Graph/Subgraph/accessor table exports now use the same pinned source path; see [legacy table exports](legacy-table-exports.md).
   They use explicit mapping with `update_graph` or explicit independent
   materialization with `to_graph`; visible integer IDs alone grant no source pin.
 - Pins are in-process metadata and are not persisted in CSV/JSON as capabilities.

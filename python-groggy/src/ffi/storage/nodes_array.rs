@@ -92,12 +92,12 @@ impl PyNodesArray {
     // Domain-specific operations (apply-on-each pattern)
 
     /// Apply table() to each NodesAccessor and return TableArray
-    fn table(&self) -> PyResult<PyTableArray> {
+    fn table(&self, py: Python<'_>) -> PyResult<PyTableArray> {
         let mut tables = Vec::new();
 
         // Apply table() to each NodesAccessor in the array
         for accessor in self.base.iter() {
-            let node_table = accessor.table()?;
+            let node_table = accessor.table(py)?;
             Python::with_gil(|py| {
                 tables.push(node_table.into_py(py));
             });
@@ -259,13 +259,13 @@ impl PyNodesArrayIterator {
 #[pymethods]
 impl PyNodesArrayIterator {
     /// Apply table() to each NodesAccessor in the iterator
-    fn table(&mut self) -> PyResult<PyTableArray> {
+    fn table(&mut self, py: Python<'_>) -> PyResult<PyTableArray> {
         let mut tables = Vec::new();
 
         // Convert iterator to vector and iterate through NodesAccessor objects
         let accessors = self.inner.clone().into_vec();
         for accessor in accessors {
-            let node_table = accessor.table()?;
+            let node_table = accessor.table(py)?;
             Python::with_gil(|py| {
                 tables.push(node_table.into_py(py));
             });

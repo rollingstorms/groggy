@@ -705,3 +705,21 @@ lookup, 2.345 ms edge lookup and 3.486 ms external neighbors; no matched speedup
 RSS or FFI claim. No new rows: **192 checked / 76 unchecked** after 27.2 closure.
 Composite subsetting/routing and legacy view migration remain open. The induced
 node-subset edge policy question remains unanswered; it was not silently applied.
+
+
+### Legacy table output pin migration — 2026-10-25
+
+Closed existing native/Python Graph, connected Subgraph and full/constrained
+accessor table export paths under 26.1/27.1/AR7.10. All share pinned projection,
+source row identity, stable selected IDs and explicit-null preservation. Mixed
+exports share one capture; stale selections reject; dirty working captures stay
+read-only. Removed separate FFI row-building logic. Legacy source objects remain
+connected; GraphTable edge-retention policy is unchanged.
+
+Evidence: `legacy-table-export-migration-2026-10-25.md`; 6 native / 12 Python cases.
+Gate: **1,114 native passed / 51 ignored; 1,855 root Python passed / 1 skipped;
+121 executable docs passed; strict all-target Clippy passed**. Fresh capture costs
+are proportional to parent state; current capture/reuse measurements are in
+`notes/benchmarks/table-export-capture-2026-10-25.json`. No COW, O(1), RSS or fixed
+FFI budget claim. No new rows: **192 checked / 76 unchecked**. Broad legacy-view
+and composite adapter exits remain open.

@@ -2817,15 +2817,16 @@ impl PyGraph {
 
     /// Get a GraphTable representation of this graph
     /// Implements: g.table()
-    pub fn table(&self) -> PyResult<crate::ffi::storage::table::PyGraphTable> {
-        let graph_table = {
-            let graph = self.inner.borrow();
-            graph.table().map_err(|e| {
-                PyRuntimeError::new_err(format!("Failed to create graph table: {}", e))
-            })?
-        };
-
-        Ok(crate::ffi::storage::table::PyGraphTable { table: graph_table })
+    pub fn table(&self, py: Python<'_>) -> PyResult<crate::ffi::storage::table::PyGraphTable> {
+        let view = self
+            .inner
+            .borrow()
+            .read_view()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let table = py
+            .allow_threads(|| view.table())
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(crate::ffi::storage::table::PyGraphTable { table })
     }
 
     /// Create a full-graph subgraph view efficiently (for apply method)

@@ -1,0 +1,155 @@
+{
+  "cases": [
+    {
+      "operation": "fresh_nodes",
+      "parent_edges": 999,
+      "parent_nodes": 1000,
+      "seconds": [
+        0.000901416,
+        0.000748333,
+        0.00084725
+      ]
+    },
+    {
+      "operation": "fresh_bundle",
+      "parent_edges": 999,
+      "parent_nodes": 1000,
+      "seconds": [
+        0.000917166,
+        0.000865083,
+        0.000885083
+      ]
+    },
+    {
+      "operation": "reused_nodes",
+      "parent_edges": 999,
+      "parent_nodes": 1000,
+      "seconds": [
+        0.00023175,
+        0.000197375,
+        0.00019375
+      ]
+    },
+    {
+      "operation": "reused_bundle",
+      "parent_edges": 999,
+      "parent_nodes": 1000,
+      "seconds": [
+        0.00025825,
+        0.000276666,
+        0.000275
+      ]
+    },
+    {
+      "operation": "selected_bundle_fresh_capture",
+      "parent_edges": 999,
+      "parent_nodes": 1000,
+      "seconds": [
+        0.000650875,
+        0.000634958,
+        0.000563209
+      ]
+    },
+    {
+      "operation": "fresh_nodes",
+      "parent_edges": 9999,
+      "parent_nodes": 10000,
+      "seconds": [
+        0.009897292,
+        0.00910125,
+        0.008603459
+      ]
+    },
+    {
+      "operation": "fresh_bundle",
+      "parent_edges": 9999,
+      "parent_nodes": 10000,
+      "seconds": [
+        0.009418084,
+        0.009459666,
+        0.009388375
+      ]
+    },
+    {
+      "operation": "reused_nodes",
+      "parent_edges": 9999,
+      "parent_nodes": 10000,
+      "seconds": [
+        0.002500583,
+        0.001973917,
+        0.001957958
+      ]
+    },
+    {
+      "operation": "reused_bundle",
+      "parent_edges": 9999,
+      "parent_nodes": 10000,
+      "seconds": [
+        0.002624208,
+        0.002804959,
+        0.002848083
+      ]
+    },
+    {
+      "operation": "selected_bundle_fresh_capture",
+      "parent_edges": 9999,
+      "parent_nodes": 10000,
+      "seconds": [
+        0.006551417,
+        0.006432833,
+        0.006458
+      ]
+    },
+    {
+      "operation": "fresh_nodes",
+      "parent_edges": 99999,
+      "parent_nodes": 100000,
+      "seconds": [
+        0.172443125,
+        0.194794958,
+        0.190416542
+      ]
+    },
+    {
+      "operation": "fresh_bundle",
+      "parent_edges": 99999,
+      "parent_nodes": 100000,
+      "seconds": [
+        0.198564708,
+        0.205721292,
+        0.199576042
+      ]
+    },
+    {
+      "operation": "reused_nodes",
+      "parent_edges": 99999,
+      "parent_nodes": 100000,
+      "seconds": [
+        0.086477291,
+        0.088683167,
+        0.094485625
+      ]
+    },
+    {
+      "operation": "reused_bundle",
+      "parent_edges": 99999,
+      "parent_nodes": 100000,
+      "seconds": [
+        0.100277875,
+        0.103060458,
+        0.091627833
+      ]
+    },
+    {
+      "operation": "selected_bundle_fresh_capture",
+      "parent_edges": 99999,
+      "parent_nodes": 100000,
+      "seconds": [
+        0.109116,
+        0.108249,
+        0.106289208
+      ]
+    }
+  ],
+  "scope": "Native optimized current-cost comparison of fresh immutable graph captures and reuse of a pre-captured GraphView, three observations. Selected bundle uses 1% of parent nodes. Complete capture/selection/projection/source binding timed as applicable; fixtures, shared view creation for reused cases, assertions and output destruction excluded. Fresh capture copies parent read state, not just selected columns. No matched old-version speedup, RSS, COW or FFI-budget claim."
+}

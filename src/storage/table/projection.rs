@@ -6,7 +6,8 @@ use crate::{
 use std::collections::HashMap;
 
 /// Owned, thread-transferable graph table columns, without display/server state.
-/// Missing properties are null cells; this is a materialized copy, not writeback.
+/// Missing properties are null cells. Optional immutable source provenance permits
+/// explicit checked publication; cell buffers remain materialized copies.
 #[derive(Debug)]
 pub struct OwnedTableData {
     source: Option<super::provenance::TableProvenance>,

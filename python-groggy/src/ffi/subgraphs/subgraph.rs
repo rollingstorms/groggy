@@ -395,26 +395,26 @@ impl PySubgraph {
     /// Convert subgraph to a GraphTable containing both nodes and edges
     /// Pure delegation to core GraphTable
     pub fn table(&self, py: Python) -> PyResult<PyObject> {
-        let core_table = self
+        let view = self
             .inner
-            .table()
-            .map_err(|e| PyRuntimeError::new_err(format!("Table creation error: {}", e)))?;
-
-        // Return as PyGraphTable
-        let py_table = crate::ffi::storage::table::PyGraphTable::from_table(core_table);
-        Ok(py_table.into_py(py))
+            .pin_view()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let table = py
+            .allow_threads(|| view.table())
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(crate::ffi::storage::table::PyGraphTable::from_table(table).into_py(py))
     }
 
-    /// Convert subgraph edges to a table - pure delegation to core GraphTable
+    /// Export edge columns from one pinned current selection.
     fn edges_table(&self, py: Python) -> PyResult<PyObject> {
-        let core_table = self
+        let view = self
             .inner
-            .edges_table()
-            .map_err(|e| PyRuntimeError::new_err(format!("Edges table creation error: {}", e)))?;
-
-        // Return as PyEdgesTable
-        let py_table = crate::ffi::storage::table::PyEdgesTable { table: core_table };
-        Ok(Py::new(py, py_table)?.into_py(py))
+            .pin_view()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let table = py
+            .allow_threads(|| view.edges_table())
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(Py::new(py, crate::ffi::storage::table::PyEdgesTable { table })?.into_py(py))
     }
 
     // === Filtering Methods - delegate to SubgraphOperations ===

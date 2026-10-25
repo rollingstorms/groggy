@@ -406,10 +406,24 @@ impl Subgraph {
 
     /// Compute an owned numerical snapshot of this view's selected active edges.
     /// The view itself continues to read its live parent graph.
-    pub fn adjacency_matrix(&self, sparse: bool, weight_attr: Option<&str>) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
+    pub fn adjacency_matrix(
+        &self,
+        sparse: bool,
+        weight_attr: Option<&str>,
+    ) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
         let graph = self.graph.borrow();
-        let nodes: Vec<_> = self.ordered_nodes().iter().copied().filter(|&id| graph.space().contains_node(id)).collect();
-        let edges: Vec<_> = self.ordered_edges().iter().copied().filter(|&id| graph.space().contains_edge(id)).collect();
+        let nodes: Vec<_> = self
+            .ordered_nodes()
+            .iter()
+            .copied()
+            .filter(|&id| graph.space().contains_node(id))
+            .collect();
+        let edges: Vec<_> = self
+            .ordered_edges()
+            .iter()
+            .copied()
+            .filter(|&id| graph.space().contains_edge(id))
+            .collect();
         graph.adjacency_from_entities(&nodes, &edges, sparse, weight_attr)
     }
 
@@ -496,28 +510,20 @@ impl Subgraph {
         Ok(csr_arc)
     }
 
-    /// Materialize selected current nodes with aligned properties in stable ID order.
+    /// Capture the current selection and export source-bound node columns.
     pub fn nodes_table(&self) -> GraphResult<crate::storage::table::NodesTable> {
-        self.graph
-            .borrow()
-            .node_table_data_for_entities(&self.ordered_nodes())?
-            .into_nodes_table()
+        self.pin_view()?.nodes_table()
     }
 
-    /// Materialize selected current edge instances with aligned properties/endpoints.
+    /// Capture the current selection and export source-bound edge columns.
     pub fn edges_table(&self) -> GraphResult<crate::storage::table::EdgesTable> {
-        self.graph
-            .borrow()
-            .edge_table_data_for_entities(&self.ordered_edges())?
-            .into_edges_table()
+        self.pin_view()?.edges_table()
     }
 
-    /// Owned tables from the current working selection. This does not freeze Subgraph.
+    /// Export both components from one immutable capture of the current selection.
+    /// The returned table is pinned; this legacy Subgraph itself remains connected.
     pub fn table(&self) -> GraphResult<crate::storage::table::GraphTable> {
-        Ok(crate::storage::table::GraphTable::new(
-            self.nodes_table()?,
-            self.edges_table()?,
-        ))
+        self.pin_view()?.table()
     }
 }
 

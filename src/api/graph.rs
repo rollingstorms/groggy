@@ -2780,36 +2780,6 @@ impl Graph {
     // PHASE 5: Graph Integration & Equivalence - Table Access Methods
     // =============================================================================
 
-    /// Get a GraphTable representation of this graph
-    /// Implements: g.table()
-    pub fn table(&self) -> crate::errors::GraphResult<crate::storage::table::GraphTable> {
-        // Convert current graph state to GraphTable
-        let nodes_table = self.nodes_table()?;
-        let edges_table = self.edges_table()?;
-
-        // Create GraphTable with nodes and edges
-        Ok(crate::storage::table::GraphTable::new(
-            nodes_table,
-            edges_table,
-        ))
-    }
-
-    /// Owned node table in stable ID order, with row-aligned current properties.
-    pub fn nodes_table(&self) -> GraphResult<crate::storage::table::NodesTable> {
-        let mut nodes = self.node_ids();
-        nodes.sort_unstable();
-        self.node_table_data_for_entities(&nodes)?
-            .into_nodes_table()
-    }
-
-    /// Owned edge table in stable ID order, with current endpoints/properties.
-    pub fn edges_table(&self) -> GraphResult<crate::storage::table::EdgesTable> {
-        let mut edges = self.edge_ids();
-        edges.sort_unstable();
-        self.edge_table_data_for_entities(&edges)?
-            .into_edges_table()
-    }
-
     /// 🎨 Get visualization module for unified rendering
     ///
     /// This provides a single entry point for all visualization backends:
