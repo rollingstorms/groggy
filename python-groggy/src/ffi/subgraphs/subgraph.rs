@@ -4,8 +4,8 @@
 //! This replaces the 800+ line complex version with pure delegation to existing trait methods.
 
 use crate::ffi::api::pipeline::{
-    py_build_pipeline, py_drop_pipeline, py_run_pipeline, py_build_sample_pipeline,
-    py_drop_sample_pipeline, py_run_sample_pipeline, PyPipelineHandle, PySamplePipelineHandle,
+    py_build_pipeline, py_build_sample_pipeline, py_drop_pipeline, py_drop_sample_pipeline,
+    py_run_pipeline, py_run_sample_pipeline, PyPipelineHandle, PySamplePipelineHandle,
 };
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
@@ -244,7 +244,7 @@ impl PySubgraph {
         return_profile: bool,
     ) -> PyResult<PyObject> {
         let apply_total_start = Instant::now();
-        
+
         if let Some((result, profile)) =
             self.try_apply_pipeline_object(py, algorithm_or_pipeline, persist)?
         {
@@ -276,7 +276,7 @@ impl PySubgraph {
         py_drop_pipeline(&handle);
         let drop_elapsed = drop_start.elapsed();
         let (result, profile) = run_result?;
-        
+
         let create_subgraph_obj_start = Instant::now();
         let subgraph_obj = Py::new(py, result)?.into_py(py);
         let create_subgraph_obj_elapsed = create_subgraph_obj_start.elapsed();
@@ -287,7 +287,10 @@ impl PySubgraph {
             python_apply.set_item("build_pipeline_py", build_elapsed.as_secs_f64())?;
             python_apply.set_item("run_pipeline_py", run_call_elapsed.as_secs_f64())?;
             python_apply.set_item("drop_pipeline_py", drop_elapsed.as_secs_f64())?;
-            python_apply.set_item("create_subgraph_obj_py", create_subgraph_obj_elapsed.as_secs_f64())?;
+            python_apply.set_item(
+                "create_subgraph_obj_py",
+                create_subgraph_obj_elapsed.as_secs_f64(),
+            )?;
 
             if let Ok(Some(run_time_obj)) = profile_dict.get_item("run_time") {
                 if let Ok(run_time) = run_time_obj.extract::<f64>() {
@@ -301,7 +304,11 @@ impl PySubgraph {
                 + run_call_elapsed
                 + drop_elapsed
                 + create_subgraph_obj_elapsed;
-            let remaining = apply_total_start.elapsed().checked_sub(accounted).map(|d| d.as_secs_f64()).unwrap_or(0.0);
+            let remaining = apply_total_start
+                .elapsed()
+                .checked_sub(accounted)
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0);
             python_apply.set_item("apply_remaining_py", remaining)?;
 
             profile_dict.set_item("python_apply", python_apply)?;
@@ -1008,7 +1015,7 @@ impl PySubgraph {
         // Create PyGraphAnalysis and delegate to it
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, py_graph)?)?;
         let result = analysis_handler.neighborhood(py, central_nodes_vec, Some(hops), None)?;
-        
+
         // Convert the NeighborhoodArray into a SubgraphArray for Python consumption
         Ok(result.inner().clone())
     }
@@ -1443,13 +1450,14 @@ impl PySubgraph {
     #[pyo3(signature = (
         node_aggs = None,
         edge_aggs = None,
-        edge_strategy = "aggregate",
+        edge_strategy = None,
         node_strategy = "extract",
         preset = None,
-        include_edge_count = true,
-        mark_entity_type = true,
-        entity_type = "meta",
-        allow_missing_attributes = true
+        include_edge_count = None,
+        mark_entity_type = None,
+        entity_type = None,
+        allow_missing_attributes = true,
+        meta_targets = None
     ))]
     // TODO: Refactor to use config/builder pattern
     #[allow(clippy::too_many_arguments)]
@@ -1458,13 +1466,14 @@ impl PySubgraph {
         py: Python,
         node_aggs: Option<&PyAny>,
         edge_aggs: Option<&PyAny>,
-        edge_strategy: &str,
+        edge_strategy: Option<&str>,
         node_strategy: &str,
         preset: Option<String>,
-        include_edge_count: bool,
-        mark_entity_type: bool,
-        entity_type: &str,
+        include_edge_count: Option<bool>,
+        mark_entity_type: Option<bool>,
+        entity_type: Option<&str>,
         allow_missing_attributes: bool,
+        meta_targets: Option<Vec<usize>>,
     ) -> PyResult<PyObject> {
         use crate::ffi::subgraphs::composer::{
             parse_edge_aggs_from_python, parse_node_aggs_from_python,
@@ -1485,9 +1494,12 @@ impl PySubgraph {
             Vec::new()
         };
 
-        let strategy = EdgeStrategy::from_str(edge_strategy).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Invalid edge strategy: {}", e))
-        })?;
+        let strategy = edge_strategy
+            .map(EdgeStrategy::from_str)
+            .transpose()
+            .map_err(|e| {
+                pyo3::exceptions::PyValueError::new_err(format!("Invalid edge strategy: {e}"))
+            })?;
 
         let node_strategy = match node_strategy {
             "extract" => NodeStrategy::Extract,
@@ -1500,39 +1512,32 @@ impl PySubgraph {
             }
         };
 
-        // Call the trait method
         let plan = self
             .inner
-            .collapse(
-                parsed_node_aggs,
-                parsed_edge_aggs,
-                strategy,
-                node_strategy,
+            .collapse_with_options(groggy::subgraphs::composer::ComposerOptions {
                 preset,
+                node_aggs: parsed_node_aggs,
+                edge_aggs: parsed_edge_aggs,
+                edge_strategy: strategy,
+                node_strategy: Some(node_strategy),
                 include_edge_count,
                 mark_entity_type,
-                entity_type.to_string(),
+                entity_type: entity_type.map(str::to_string),
+            })
+            .map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {e}"))
+            })?;
+        let meta_node = plan
+            .execute_configured(
+                &self.inner,
+                allow_missing_attributes,
+                meta_targets.as_deref(),
             )
             .map_err(|e| {
-                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {}", e))
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to create meta-node: {e}"
+                ))
             })?;
-
-        // Execute using appropriate method based on allow_missing_attributes
-        let meta_node = if allow_missing_attributes {
-            plan.add_to_graph_with_defaults(&self.inner).map_err(|e| {
-                pyo3::exceptions::PyRuntimeError::new_err(format!(
-                    "Failed to create meta-node: {}",
-                    e
-                ))
-            })?
-        } else {
-            plan.add_to_graph(&self.inner).map_err(|e| {
-                pyo3::exceptions::PyRuntimeError::new_err(format!(
-                    "Failed to create meta-node: {}",
-                    e
-                ))
-            })?
-        };
 
         // Return the MetaNode directly using the new trait-based entity
         use crate::ffi::entities::PyMetaNode;
@@ -1607,15 +1612,25 @@ impl PySubgraph {
     /// Convert this subgraph to its adjacency matrix representation
     /// Returns a GraphMatrix with rows/columns scoped to this subgraph
     #[pyo3(signature = (*, sparse=false, weight_attr=None))]
-    fn adjacency_matrix(&self, sparse: bool, weight_attr: Option<&str>) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
-        let matrix = self.inner.adjacency_matrix(sparse, weight_attr)
+    fn adjacency_matrix(
+        &self,
+        sparse: bool,
+        weight_attr: Option<&str>,
+    ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        let matrix = self
+            .inner
+            .adjacency_matrix(sparse, weight_attr)
             .map_err(crate::ffi::utils::graph_error_to_py_err)?;
         Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(matrix))
     }
 
     /// Get adjacency matrix (alias for adjacency_matrix).
     #[pyo3(signature = (*, sparse=false, weight_attr=None))]
-    fn adj(&self, sparse: bool, weight_attr: Option<&str>) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+    fn adj(
+        &self,
+        sparse: bool,
+        weight_attr: Option<&str>,
+    ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
         self.adjacency_matrix(sparse, weight_attr)
     }
 

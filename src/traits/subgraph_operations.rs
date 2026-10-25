@@ -32,6 +32,8 @@ pub enum ExternalEdgeStrategy {
     Aggregate,
     /// Create single meta-edge with only count information
     Count,
+    /// Connect distinct reachable external endpoint pairs through selected internal edges.
+    Contract,
     /// No meta-edges to external nodes created
     None,
 }
@@ -49,8 +51,25 @@ pub enum MetaEdgeStrategy {
     Auto,
     /// Only create meta-to-meta edges when explicitly requested
     Explicit,
+    /// Only connect to these active external meta-node IDs.
+    Selected(HashSet<NodeId>),
     /// No meta-to-meta edges created automatically
     None,
+}
+
+impl MetaEdgeStrategy {
+    /// Validate a caller's target sequence before constructing a selector.
+    pub fn selected(targets: impl IntoIterator<Item = NodeId>) -> GraphResult<Self> {
+        let mut selected = HashSet::new();
+        for id in targets {
+            if !selected.insert(id) {
+                return Err(GraphError::InvalidInput(
+                    "Duplicate explicit meta target".into(),
+                ));
+            }
+        }
+        Ok(Self::Selected(selected))
+    }
 }
 
 impl Default for MetaEdgeStrategy {
@@ -184,6 +203,14 @@ pub struct EdgeAggregationConfig {
     pub mark_entity_type: bool,
     /// Strategy for handling original nodes during collapse
     pub node_strategy: NodeStrategy,
+}
+
+impl EdgeAggregationConfig {
+    /// Select external meta-node targets explicitly; ordinary external nodes remain eligible.
+    pub fn with_meta_targets(mut self, targets: HashSet<NodeId>) -> Self {
+        self.edge_to_meta = MetaEdgeStrategy::Selected(targets);
+        self
+    }
 }
 
 impl Default for EdgeAggregationConfig {
@@ -638,12 +665,21 @@ pub trait SubgraphOperations: GraphEntity {
         if !graph.contains_node(meta_node_id) {
             return Err(GraphError::InvalidInput("Meta-node is inactive".into()));
         }
-        let staged = crate::subgraphs::composition::boundary_edges(
-            &graph,
-            self.node_set(),
-            meta_node_id,
-            config,
-        )?;
+        let staged = if config.edge_to_external == ExternalEdgeStrategy::Contract {
+            crate::subgraphs::composition::contraction_edges(
+                &graph,
+                self.node_set(),
+                self.edge_set(),
+                config,
+            )?
+        } else {
+            crate::subgraphs::composition::boundary_edges(
+                &graph,
+                self.node_set(),
+                meta_node_id,
+                config,
+            )?
+        };
         graph.add_edges_with_attrs(staged)?;
         Ok(())
     }
@@ -855,6 +891,14 @@ pub trait SubgraphOperations: GraphEntity {
         plan.entity_type = entity_type;
 
         Ok(plan)
+    }
+
+    /// Build a composition using preset defaults followed by explicit overrides.
+    fn collapse_with_options(
+        &self,
+        options: crate::subgraphs::composer::ComposerOptions,
+    ) -> GraphResult<MetaNodePlan> {
+        MetaNodePlan::from_options(self.node_set().clone(), self.edge_set().clone(), options)
     }
 
     /// Create a VizModule for this subgraph to enable visualization

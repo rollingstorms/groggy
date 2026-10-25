@@ -201,6 +201,14 @@ impl PyMetaEdgeStrategy {
         }
     }
 
+    /// Select active external meta-node IDs explicitly.
+    #[classmethod]
+    fn selected(_cls: &PyType, targets: Vec<usize>) -> PyResult<Self> {
+        MetaEdgeStrategy::selected(targets)
+            .map(|inner| Self { inner })
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
     /// No meta-to-meta edges created automatically
     #[classmethod]
     fn none(_cls: &PyType) -> Self {

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **189 checked and 79 unchecked entries**. Entries overlap:
+currently contains **190 checked and 78 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 79 unchecked entries are not 79 independent tasks: 14 are overlapping AR
-architecture entries, 65 are numbered entries (including nested publication
+The 78 unchecked entries are not 78 independent tasks: 14 are overlapping AR
+architecture entries, 64 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header also still said 158 checked; it is corrected to 189.
 Recent implementations were recorded as new checked slices while broad parents
@@ -71,6 +71,7 @@ See `temporal-window-completion-2026-10-24.md` for implementation/gate evidence.
 | 09.4b.2ad–2af | Recursive for-each property staging, complete child selector flattening and private merged/per-item owned output frames. |
 | 09.4b.2ag–2ai | Checked staged-weight distance maps, loopless Yen node paths and isolated seeded edge-incidence walks. All eight temporal primitives are now complete under 30.1; broader pipeline work remains. |
 | 09.4b.2aj–2al | Finite selected decay maps, ordered column parity and retained immutable snapshot builder selection with strict temporal controls. |
+| 09.4b.2b | Preset/override precedence, canonical meta identity with semantic labels, explicit meta selectors and real external endpoint contraction. |
 | 30.1 temporal family | All eight primitives complete: retained branch indexes, exact lifecycle/change windows, checked aggregation and failure-safe outputs. |
 
 
@@ -83,7 +84,7 @@ not represent building its basic engine contract from scratch.
 | Area | Completed foundation | Still open |
 | --- | --- | --- |
 | Numerical core and architecture | Canonical matrix/array foundations, entity handles, many arithmetic/statistical/solver/factorization/sparse/operator and algorithm repairs, bounded release receipts. | Remaining promised derivative/composition domains, uncovered consumers and representative performance/memory/scale gates; broad numerical parents remain partial. |
-| Mutation/publication | Checked mixed batches, ordinary Python defaults, property clocks, checkpoints, compound collapse and recent table/subgraph boundaries. | Remaining native default/infallible compatibility, mutable pool/space escapes, whole-pipeline boundaries and unfinished composer semantics. |
+| Mutation/publication | Checked mixed batches, ordinary Python defaults, property clocks, checkpoints, compound collapse and recent table/subgraph boundaries. | Remaining native default/infallible compatibility, mutable pool/space escapes, whole-pipeline boundaries and broader pipeline semantics. |
 | Properties, state and history | f64 defaults, typed temporal properties, shared logical change records, retained snapshots and immutable read APIs. | Complete value lifecycle, effective-time reconstruction/validation, rewiring/revert, exact portable snapshots and portable pooled/meta contents. |
 | Views and tables | Explicit pinned read views, frozen matrix/table exports, mapped writeback and checked independent materialization. | Migrate legacy connected reads, preserve source identity/pins through selections/joins, checked writes through pinned views. |
 | Storage, branches and schema | Checked journal/recovery foundations, checkpoint annotations, existing branch/identity behavior and explicit schema checks. | Full pooled retention, lifecycle/compaction/format migration, complete branch lifecycle, three-way merge, purge and schema evolution. |
@@ -93,7 +94,7 @@ not represent building its basic engine contract from scratch.
 ## Continue in this order
 
 1. Finish the remaining native mutation/publication and compound pipeline audits
-   under 09.4b.2, including the explicitly recorded composer gaps.
+   under 09.4b.2; composer leaf 09.4b.2b is now complete.
 2. Complete legacy view/source-pin migration and retained pool/meta recovery;
    these underpin dependable history and connected table behavior.
 3. Finish timestamp reconstruction and timeline validation, then complete
@@ -110,8 +111,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest temporal-family completion: **1,000 native tests passed, 52 ignored; 1,695 root
-Python API tests passed, 1 skipped; 81 executable documentation examples passed;
+Latest composer completion: **1,006 native tests passed, 52 ignored; 1,716 root
+Python API tests passed, 1 skipped; 84 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

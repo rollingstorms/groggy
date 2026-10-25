@@ -127,13 +127,14 @@ impl PyComponentsArray {
     #[pyo3(signature = (
         node_aggs = None,
         edge_aggs = None,
-        edge_strategy = "aggregate",
+        edge_strategy = None,
         node_strategy = "extract",
         preset = None,
-        include_edge_count = true,
-        mark_entity_type = true,
-        entity_type = "meta",
-        allow_missing_attributes = true
+        include_edge_count = None,
+        mark_entity_type = None,
+        entity_type = None,
+        allow_missing_attributes = true,
+        meta_targets = None
     ))]
     // TODO: Refactor to use config/builder pattern
     #[allow(clippy::too_many_arguments)]
@@ -142,13 +143,14 @@ impl PyComponentsArray {
         py: Python,
         node_aggs: Option<&PyAny>,
         edge_aggs: Option<&PyAny>,
-        edge_strategy: &str,
+        edge_strategy: Option<&str>,
         node_strategy: &str,
         preset: Option<String>,
-        include_edge_count: bool,
-        mark_entity_type: bool,
-        entity_type: &str,
+        include_edge_count: Option<bool>,
+        mark_entity_type: Option<bool>,
+        entity_type: Option<&str>,
         allow_missing_attributes: bool,
+        meta_targets: Option<Vec<usize>>,
     ) -> PyResult<Vec<Py<PyMetaNode>>> {
         let mut meta_nodes = Vec::with_capacity(self.components_data.len());
 
@@ -165,6 +167,7 @@ impl PyComponentsArray {
                 mark_entity_type,
                 entity_type,
                 allow_missing_attributes,
+                meta_targets.clone(),
             )?;
 
             meta_nodes.push(meta_node.extract::<Py<PyMetaNode>>(py)?);

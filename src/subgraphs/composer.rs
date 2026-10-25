@@ -177,6 +177,19 @@ pub fn get_preset(name: &str) -> GraphResult<ComposerPreset> {
     }
 }
 
+/// Optional caller overrides, applied after a preset without guessing which values were supplied.
+#[derive(Debug, Clone, Default)]
+pub struct ComposerOptions {
+    pub preset: Option<String>,
+    pub node_aggs: Vec<(String, String, Option<String>)>,
+    pub edge_aggs: Vec<(String, String)>,
+    pub edge_strategy: Option<EdgeStrategy>,
+    pub node_strategy: Option<NodeStrategy>,
+    pub include_edge_count: Option<bool>,
+    pub mark_entity_type: Option<bool>,
+    pub entity_type: Option<String>,
+}
+
 /// A plan for creating a meta-node (not yet executed)
 ///
 /// This provides a clean separation between configuration and execution,
@@ -228,6 +241,40 @@ impl MetaNodePlan {
             source_nodes,
             source_edges,
         }
+    }
+
+    /// Resolve preset defaults in Rust, then apply caller-supplied overrides.
+    pub fn from_options(
+        source_nodes: std::collections::HashSet<NodeId>,
+        source_edges: std::collections::HashSet<crate::EdgeId>,
+        options: ComposerOptions,
+    ) -> GraphResult<Self> {
+        let mut plan = Self::new(source_nodes, source_edges);
+        if let Some(preset) = options.preset {
+            plan = plan.with_preset(&preset)?;
+        }
+        for (target, function, source) in options.node_aggs {
+            plan = plan.with_node_agg(target, function, source);
+        }
+        for (attr, function) in options.edge_aggs {
+            plan = plan.with_edge_agg(attr, function);
+        }
+        if let Some(value) = options.edge_strategy {
+            plan.edge_strategy = value;
+        }
+        if let Some(value) = options.node_strategy {
+            plan.node_strategy = value;
+        }
+        if let Some(value) = options.include_edge_count {
+            plan.include_edge_count = value;
+        }
+        if let Some(value) = options.mark_entity_type {
+            plan.mark_entity_type = value;
+        }
+        if let Some(value) = options.entity_type {
+            plan.entity_type = value;
+        }
+        Ok(plan)
     }
 
     /// Apply a preset configuration
@@ -339,7 +386,7 @@ impl MetaNodePlan {
     /// # Returns
     /// A `MetaNode` representing the newly created meta-node
     pub fn add_to_graph<T: SubgraphOperations>(&self, subgraph: &T) -> GraphResult<MetaNode> {
-        self.execute(subgraph, false)
+        self.execute_configured(subgraph, false, None)
     }
 
     /// Execute the plan, substituting defaults when no source observations exist.
@@ -347,10 +394,16 @@ impl MetaNodePlan {
         &self,
         subgraph: &T,
     ) -> GraphResult<MetaNode> {
-        self.execute(subgraph, true)
+        self.execute_configured(subgraph, true, None)
     }
 
-    fn execute<T: SubgraphOperations>(&self, subgraph: &T, lenient: bool) -> GraphResult<MetaNode> {
+    /// Execute with optional explicit external meta targets and missing-value policy.
+    pub fn execute_configured<T: SubgraphOperations + ?Sized>(
+        &self,
+        subgraph: &T,
+        lenient: bool,
+        meta_targets: Option<&[NodeId]>,
+    ) -> GraphResult<MetaNode> {
         if &self.source_nodes != subgraph.node_set() || &self.source_edges != subgraph.edge_set() {
             return Err(GraphError::InvalidInput(
                 "Composition plan selection has changed".into(),
@@ -366,8 +419,19 @@ impl MetaNodePlan {
                 default_value: None,
             })
             .collect();
-        let config = self.convert_to_edge_config()?;
-        let node = crate::subgraphs::composition::compose(subgraph, &specs, &config, lenient)?;
+        let mut config = self.convert_to_edge_config()?;
+        if let Some(targets) = meta_targets {
+            config.edge_to_meta = crate::traits::subgraph_operations::MetaEdgeStrategy::selected(
+                targets.iter().copied(),
+            )?;
+        }
+        let node = crate::subgraphs::composition::compose_with_label(
+            subgraph,
+            &specs,
+            &config,
+            lenient,
+            Some(&self.entity_type),
+        )?;
         MetaNode::new(node, subgraph.graph_ref())
     }
 
@@ -398,7 +462,7 @@ impl MetaNodePlan {
             EdgeStrategy::Aggregate => ExternalEdgeStrategy::Aggregate,
             EdgeStrategy::KeepExternal => ExternalEdgeStrategy::Copy,
             EdgeStrategy::DropAll => ExternalEdgeStrategy::None,
-            EdgeStrategy::ContractAll => ExternalEdgeStrategy::Aggregate, // TODO: Implement contract properly
+            EdgeStrategy::ContractAll => ExternalEdgeStrategy::Contract,
         };
 
         // Convert edge aggregations

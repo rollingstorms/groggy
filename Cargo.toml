@@ -143,3 +143,7 @@ harness = false
 [[bench]]
 name = "temporal_window_steps"
 harness = false
+
+[[bench]]
+name = "composer_completion"
+harness = false

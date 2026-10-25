@@ -609,3 +609,22 @@ time reconstruction parents are not redefined or falsely closed. Verified with
 1,000 native tests, 1,695 Python tests, 81 documentation examples, strict Clippy
 and 12 release workloads. See `temporal-window-completion-2026-10-24.md` and
 `../../docs/api/builder-temporal-windows.md`.
+
+
+## Composer semantics complete — 2026-10-24
+
+Closed existing **09.4b.2b**, without adding checklist rows: preset defaults now
+precede explicit overrides, domain kinds are labels on canonical meta nodes, and
+explicit existing-meta selectors are available in Rust/Python. `contract_all`
+implements actual external connectivity through the selected interior. The owner
+chose **one edge per reachable external endpoint pair**. Attribute reduction uses
+each distinct original corridor edge once, in edge-ID order; this is a documented
+implementation contract, not a promise of flow-equivalent capacity. The summary
+meta-node is isolated in contraction mode.
+
+The checklist is **190 checked / 78 unchecked**, with overlapping parents still
+open. Full gates: 1,006 native tests, 1,716 Python tests, 84 documentation examples
+and strict Clippy. Ten bounded release workloads expose repeated edge scanning
+during bulk source removal; that measured performance repair follows under
+existing bulk/performance requirements. See `composer-completion-2026-10-24.md`
+and `../../docs/api/composer-options.md`.

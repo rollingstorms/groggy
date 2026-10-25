@@ -62,17 +62,14 @@ requested generated metadata (`edge_count=1`, entity marker, source/target).
 external IDs must be assigned through explicit upserts.
 
 The native configuration also supports count-only edges, per-group minimum edge
-counts and suppressing automatic edges to existing meta-nodes. Its `Explicit`
-meta-edge policy has no selector API yet and rejects rather than silently acting
-like `Auto`. Standalone native meta-edge helpers stage attributes before accepting
-an edge batch as well.
+counts and suppressing automatic edges to existing meta-nodes. Explicit selectors,
+preset resolution and real external-pair contraction are described in
+[Composer options and contraction](composer-options.md).
 
-## Remaining scope
+## Retained scope
 
-`contract_all` still uses its existing aggregate compatibility behavior; it does
-not implement paths between external endpoints. Preset/custom `entity_type`
-strings do not replace the canonical node identity `meta`. Both are tracked as
-remaining composer work. Group storage here retains immutable membership only;
-portable pool persistence and full pinned source-state group revisions remain
-separate checklist work. This step does not finish the migration of every native
+Canonical node identity remains meta; preset/custom domain kinds become semantic
+labels. Group storage here retains immutable membership only; portable pool
+persistence and full pinned source-state group revisions remain separate checklist
+work. This completes the three composer requirements in 09.4b.2b, not every native
 constructor, mutable storage accessor, algorithm or table writeback.
