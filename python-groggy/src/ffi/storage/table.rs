@@ -5700,192 +5700,53 @@ impl PyGraphTable {
     // Phase 2 Features: Enhanced Bundle System
     // =============================================================================
 
-    /// Save GraphTable as a v2.0 bundle with comprehensive metadata and checksums
-    ///
-    /// # Arguments
-    /// * `bundle_path` - Directory path to save the bundle
-    ///
-    /// # Examples
-    /// ```python
-    /// # Save with comprehensive metadata and validation
-    /// graph_table.save_bundle("./graph_data_bundle")
-    ///
-    /// # Bundle will contain:
-    /// # - metadata.json: Comprehensive metadata with checksums
-    /// # - MANIFEST.json: File integrity manifest
-    /// # - validation_report.json: Structured validation results
-    /// # - nodes.csv: Node data
-    /// # - edges.csv: Edge data
-    /// ```
-    pub fn save_bundle(&self, bundle_path: &str) -> PyResult<()> {
-        self.table.save_bundle(bundle_path).map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to save bundle: {}", e))
-        })
+    /// Save a typed v3 bundle with atomic file replacement and checksum validation.
+    /// The authoritative bundle.cbor file contains metadata and both tables.
+    pub fn save_bundle(&self, py: Python<'_>, bundle_path: &str) -> PyResult<()> {
+        let table = &self.table;
+        py.allow_threads(|| table.save_bundle(bundle_path))
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
     }
 
-    /// Load GraphTable from a bundle directory (supports both v1.0 and v2.0 formats)
-    ///
-    /// # Arguments
-    /// * `bundle_path` - Directory path containing the bundle
-    ///
-    /// # Returns
-    /// * `PyGraphTable` - Loaded graph table with validation policy restored
-    ///
-    /// # Examples
-    /// ```python
-    /// # Load from v2.0 bundle (with integrity verification)
-    /// graph_table = GraphTable.load_bundle("./graph_data_bundle")
-    ///
-    /// # Also supports legacy v1.0 bundles
-    /// graph_table = GraphTable.load_bundle("./old_bundle")
-    /// ```
+    /// Load a checksum-verified v3 binary or legacy v2 CSV bundle.
     #[staticmethod]
-    pub fn load_bundle(bundle_path: &str) -> PyResult<Self> {
-        let table = groggy::storage::table::GraphTable::load_bundle(bundle_path).map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to load bundle: {}", e))
-        })?;
-
+    pub fn load_bundle(py: Python<'_>, bundle_path: &str) -> PyResult<Self> {
+        let table = py
+            .allow_threads(|| groggy::storage::table::GraphTable::load_bundle(bundle_path))
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
         Ok(Self { table })
     }
 
-    /// Get bundle metadata information without loading the full bundle
-    ///
-    /// # Arguments
-    /// * `bundle_path` - Directory path containing the bundle
-    ///
-    /// # Returns
-    /// * `dict` - Bundle metadata information
-    ///
-    /// # Examples
-    /// ```python
-    /// # Inspect bundle metadata
-    /// metadata = GraphTable.get_bundle_info("./graph_data_bundle")
-    /// print(f"Bundle version: {metadata['version']}")
-    /// print(f"Nodes: {metadata['node_count']}, Edges: {metadata['edge_count']}")
-    /// print(f"Created: {metadata['created_at']}")
-    /// ```
+    /// Return verified metadata, preserving integer counts and nested policy/schema.
     #[staticmethod]
-    pub fn get_bundle_info(py: Python, bundle_path: &str) -> PyResult<PyObject> {
-        use std::path::Path;
-
-        let bundle_path = Path::new(bundle_path);
-
-        // Try v2.0 format first (JSON metadata)
-        let metadata_json_path = bundle_path.join("metadata.json");
-        if metadata_json_path.exists() {
-            let metadata_json = std::fs::read_to_string(&metadata_json_path).map_err(|e| {
-                pyo3::exceptions::PyIOError::new_err(format!("Failed to read metadata: {}", e))
-            })?;
-
-            // Parse JSON to Python dict
-            let metadata: serde_json::Value =
-                serde_json::from_str(&metadata_json).map_err(|e| {
-                    pyo3::exceptions::PyValueError::new_err(format!(
-                        "Failed to parse metadata JSON: {}",
-                        e
-                    ))
-                })?;
-
-            // Convert to Python object
-            let py_dict = pyo3::types::PyDict::new(py);
-            json_value_to_py_dict(py, &metadata, py_dict)?;
-            return Ok(py_dict.to_object(py));
-        }
-
-        // Fall back to v1.0 format (text metadata)
-        let metadata_txt_path = bundle_path.join("metadata.txt");
-        if metadata_txt_path.exists() {
-            let metadata_text = std::fs::read_to_string(&metadata_txt_path).map_err(|e| {
-                pyo3::exceptions::PyIOError::new_err(format!("Failed to read metadata: {}", e))
-            })?;
-
-            // Parse simple key-value format
-            let py_dict = pyo3::types::PyDict::new(py);
-            py_dict.set_item("format_version", "1.0")?;
-
-            for line in metadata_text.lines() {
-                if let Some((key, value)) = line.split_once(": ") {
-                    py_dict.set_item(key.trim(), value.trim())?;
-                }
-            }
-
-            return Ok(py_dict.to_object(py));
-        }
-
-        Err(pyo3::exceptions::PyFileNotFoundError::new_err(format!(
-            "Bundle metadata not found at: {}",
-            bundle_path.display()
-        )))
+    pub fn get_bundle_info(py: Python<'_>, bundle_path: &str) -> PyResult<PyObject> {
+        let value = py
+            .allow_threads(|| {
+                groggy::storage::table::GraphTable::bundle_metadata_value(bundle_path)
+            })
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+        let result = PyDict::new(py);
+        json_value_to_py_dict(py, &value, result)?;
+        Ok(result.to_object(py))
     }
 
-    /// Verify bundle integrity without loading the full data
-    ///
-    /// # Arguments
-    /// * `bundle_path` - Directory path containing the bundle
-    ///
-    /// # Returns
-    /// * `dict` - Verification results with checksums and validation status
-    ///
-    /// # Examples
-    /// ```python
-    /// # Verify bundle integrity
-    /// verification = GraphTable.verify_bundle("./graph_data_bundle")
-    /// if verification['is_valid']:
-    ///     print("Bundle integrity verified!")
-    /// else:
-    ///     print(f"Issues found: {verification['errors']}")
-    /// ```
+    /// Verify encoded integrity/schema; is_valid here describes the bundle, not topology.
     #[staticmethod]
-    pub fn verify_bundle(py: Python, bundle_path: &str) -> PyResult<PyObject> {
-        use std::path::Path;
-
-        let bundle_path = Path::new(bundle_path);
-        let py_dict = pyo3::types::PyDict::new(py);
-
-        // Check if bundle directory exists
-        if !bundle_path.exists() {
-            py_dict.set_item("is_valid", false)?;
-            py_dict.set_item("errors", vec!["Bundle directory does not exist"])?;
-            return Ok(py_dict.to_object(py));
-        }
-
-        // For v2.0 bundles, verify checksums
-        let metadata_json_path = bundle_path.join("metadata.json");
-        let manifest_path = bundle_path.join("MANIFEST.json");
-
-        if metadata_json_path.exists() && manifest_path.exists() {
-            // This would implement full checksum verification
-            // For now, just check file existence
-            let required_files = vec!["metadata.json", "MANIFEST.json", "nodes.csv", "edges.csv"];
-            let mut missing_files = Vec::new();
-
-            for file_name in &required_files {
-                if !bundle_path.join(file_name).exists() {
-                    missing_files.push(file_name.to_string());
-                }
+    pub fn verify_bundle(py: Python<'_>, bundle_path: &str) -> PyResult<PyObject> {
+        let verified =
+            py.allow_threads(|| groggy::storage::table::GraphTable::validate_bundle(bundle_path));
+        let result = PyDict::new(py);
+        result.set_item("is_valid", verified.is_ok())?;
+        result.set_item("checksum_verified", verified.is_ok())?;
+        result.set_item("missing_files", Vec::<String>::new())?;
+        match verified {
+            Ok(metadata) => {
+                result.set_item("format_version", metadata.version)?;
+                result.set_item("errors", Vec::<String>::new())?;
             }
-
-            py_dict.set_item("format_version", "2.0")?;
-            py_dict.set_item("is_valid", missing_files.is_empty())?;
-            py_dict.set_item("missing_files", missing_files)?;
-            py_dict.set_item("checksum_verified", false)?; // TODO: Implement full verification
-        } else {
-            // v1.0 bundle format
-            let required_files = vec!["metadata.txt", "nodes.csv", "edges.csv"];
-            let mut missing_files = Vec::new();
-
-            for file_name in &required_files {
-                if !bundle_path.join(file_name).exists() {
-                    missing_files.push(file_name.to_string());
-                }
-            }
-
-            py_dict.set_item("format_version", "1.0")?;
-            py_dict.set_item("is_valid", missing_files.is_empty())?;
-            py_dict.set_item("missing_files", missing_files)?;
+            Err(error) => result.set_item("errors", vec![error.to_string()])?,
         }
-
-        Ok(py_dict.to_object(py))
+        Ok(result.to_object(py))
     }
 
     // =============================================================================

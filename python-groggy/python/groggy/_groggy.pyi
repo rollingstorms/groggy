@@ -6094,25 +6094,9 @@ class GraphTable:
         ...
 
 
-    def get_bundle_info(self, *args, **kwargs) -> Any:
-        """
-        Get bundle metadata information without loading the full bundle
-
-        # Arguments
-        * `bundle_path` - Directory path containing the bundle
-
-        # Returns
-        * `dict` - Bundle metadata information
-
-        # Examples
-        ```python
-        # Inspect bundle metadata
-        metadata = GraphTable.get_bundle_info("./graph_data_bundle")
-        print(f"Bundle version: {metadata['version']}")
-        print(f"Nodes: {metadata['node_count']}, Edges: {metadata['edge_count']}")
-        print(f"Created: {metadata['created_at']}")
-        ```
-        """
+    @staticmethod
+    def get_bundle_info(bundle_path: str) -> Dict[str, Any]:
+        """Read verified bundle metadata and native counts/policy/schema."""
         ...
 
     def head(self, *args, **kwargs) -> Any:
@@ -6127,25 +6111,9 @@ class GraphTable:
         """
         ...
 
-    def load_bundle(self, *args, **kwargs) -> Any:
-        """
-        Load GraphTable from a bundle directory (supports both v1.0 and v2.0 formats)
-
-        # Arguments
-        * `bundle_path` - Directory path containing the bundle
-
-        # Returns
-        * `PyGraphTable` - Loaded graph table with validation policy restored
-
-        # Examples
-        ```python
-        # Load from v2.0 bundle (with integrity verification)
-        graph_table = GraphTable.load_bundle("./graph_data_bundle")
-
-        # Also supports legacy v1.0 bundles
-        graph_table = GraphTable.load_bundle("./old_bundle")
-        ```
-        """
+    @staticmethod
+    def load_bundle(bundle_path: str) -> "GraphTable":
+        """Load a checksum-verified typed v3 or legacy v2 CSV bundle."""
         ...
 
     @staticmethod
@@ -6168,26 +6136,8 @@ class GraphTable:
         """
         ...
 
-    def save_bundle(self, *args, **kwargs) -> Any:
-        """
-        Save GraphTable as a v2.0 bundle with comprehensive metadata and checksums
-
-        # Arguments
-        * `bundle_path` - Directory path to save the bundle
-
-        # Examples
-        ```python
-        # Save with comprehensive metadata and validation
-        graph_table.save_bundle("./graph_data_bundle")
-
-        # Bundle will contain:
-        # - metadata.json: Comprehensive metadata with checksums
-        # - MANIFEST.json: File integrity manifest
-        # - validation_report.json: Structured validation results
-        # - nodes.csv: Node data
-        # - edges.csv: Edge data
-        ```
-        """
+    def save_bundle(self, bundle_path: str) -> None:
+        """Atomically replace the typed v3 bundle.cbor file."""
         ...
 
     def shape(self, *args, **kwargs) -> Any:
@@ -6238,29 +6188,10 @@ class GraphTable:
         """
         ...
 
-    def verify_bundle(self, *args, **kwargs) -> Any:
-        """
-        Verify bundle integrity without loading the full data
-
-        # Arguments
-        * `bundle_path` - Directory path containing the bundle
-
-        # Returns
-        * `dict` - Verification results with checksums and validation status
-
-        # Examples
-        ```python
-        # Verify bundle integrity
-        verification = GraphTable.verify_bundle("./graph_data_bundle")
-        if verification['is_valid']:
-            print("Bundle integrity verified!")
-        else:
-            print(f"Issues found: {verification['errors']}")
-        ```
-        """
+    @staticmethod
+    def verify_bundle(bundle_path: str) -> Dict[str, Any]:
+        """Verify encoded integrity/schema; return is_valid, errors and checksum_verified."""
         ...
-
-
 
     def update_source_graph(self, graph: Any, *, node_columns: List[str], edge_columns: List[str], effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """

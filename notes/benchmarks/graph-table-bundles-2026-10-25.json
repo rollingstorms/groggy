@@ -1,0 +1,104 @@
+{
+  "cases": [
+    {
+      "bytes": 194261,
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "save_replace_sync",
+      "seconds": [
+        0.053020666,
+        0.011986542,
+        0.01421325
+      ]
+    },
+    {
+      "bytes": 194261,
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "load_verify_decode",
+      "seconds": [
+        0.006368667,
+        0.005462333,
+        0.00507525
+      ]
+    },
+    {
+      "bytes": 194261,
+      "edges": 999,
+      "nodes": 1000,
+      "operation": "verify_decode_metadata",
+      "seconds": [
+        0.004145917,
+        0.004101875,
+        0.003841
+      ]
+    },
+    {
+      "bytes": 1949261,
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "save_replace_sync",
+      "seconds": [
+        0.034299417,
+        0.03310225,
+        0.032434625
+      ]
+    },
+    {
+      "bytes": 1949261,
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "load_verify_decode",
+      "seconds": [
+        0.02927525,
+        0.028909708,
+        0.028804625
+      ]
+    },
+    {
+      "bytes": 1949261,
+      "edges": 9999,
+      "nodes": 10000,
+      "operation": "verify_decode_metadata",
+      "seconds": [
+        0.028934166,
+        0.029906125,
+        0.028938792
+      ]
+    },
+    {
+      "bytes": 19774987,
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "save_replace_sync",
+      "seconds": [
+        0.264778833,
+        0.253885542,
+        0.256209458
+      ]
+    },
+    {
+      "bytes": 19774987,
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "load_verify_decode",
+      "seconds": [
+        0.325068667,
+        0.295400166,
+        0.295405833
+      ]
+    },
+    {
+      "bytes": 19774987,
+      "edges": 99999,
+      "nodes": 100000,
+      "operation": "verify_decode_metadata",
+      "seconds": [
+        0.295796292,
+        0.298398583,
+        0.296692084
+      ]
+    }
+  ],
+  "scope": "Native optimized complete v3 bundle costs. Three observations; node scalar/four-f64 vector plus chain edge weight. Fixtures excluded. Save includes encode, checksum, temp write, file sync, replacement and directory sync. Load/verify include bytes, checksum, schema/value decoding and metadata construction; output destruction is inside these timers. Warm OS caches; no cold-open, speedup, RSS, streaming or FFI claim."
+}

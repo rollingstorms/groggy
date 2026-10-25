@@ -161,3 +161,26 @@ Evidence: `table-reshape-conformance-2026-10-25.md`. Gates: **1,090 native passe
 strict all-target Clippy passed**. Current-cost receipt:
 `notes/benchmarks/table-reshaping-2026-10-25.json`. No new checklist rows;
 191 checked / 77 unchecked. Composite/bundle adapter scope remains open.
+
+
+### Typed and verified standalone table bundles — 2026-10-25
+
+Closed the existing save/load/validate/info/verify bundle family under
+27.1/AR7.10. New v3 CBOR stores ordered logical inline values and policy using
+the shared property codec, exact float bits, checked framing/checksum and atomic
+synced replacement of one authoritative file. V2 CSV reads now verify historical
+checksums, metadata, manifest and schema/counts; resave migrates to v3. FFI
+persistence logic was replaced with native delegation and GIL release.
+
+Pooled refs reject rather than becoming strings; source pins/history are detached,
+not represented as portable. Legacy CSV cannot recover lost type information.
+Topology validation and encoded integrity remain separate. Whole-table memory
+cost and post-publication directory-sync reconciliation are documented.
+
+Evidence: `graph-table-bundle-conformance-2026-10-25.md`; frozen v2 fixture;
+8 native / 11 Python regression cases. Gate: **1,098 native passed / 51 ignored;
+1,830 root Python passed / 1 skipped; 115 executable docs passed; strict
+all-target Clippy passed**. Benchmark receipt:
+`notes/benchmarks/graph-table-bundles-2026-10-25.json`. No new checklist rows;
+191 checked / 77 unchecked. Composite adapters and separate full retained-pool,
+history and storage lifecycle requirements remain open.

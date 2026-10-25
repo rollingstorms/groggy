@@ -1,5 +1,7 @@
 //! GraphTable - composite table containing both nodes and edges with graph-specific operations
 
+#[path = "bundle.rs"]
+mod bundle;
 #[path = "domain_merge.rs"]
 mod domain_merge;
 
@@ -1017,267 +1019,36 @@ impl BundleMetadata {
             .as_secs();
 
         Self {
-            version: "1.0.0".to_string(),
+            version: "3.0".to_string(),
             created_at: format!("timestamp_{}", timestamp),
             node_count: graph_table.nodes.nrows(),
             edge_count: graph_table.edges.nrows(),
             validation_policy: graph_table.policy.clone(),
-            checksums: HashMap::new(), // TODO: Implement checksums
+            checksums: HashMap::new(), // Populated only for an encoded bundle.
         }
     }
 }
 
 impl GraphTable {
-    /// Save GraphTable as a bundle to the specified path
-    ///
-    /// A bundle consists of:
-    /// - metadata.json: Bundle metadata and validation policy
-    /// - nodes.parquet: Nodes table data (future: use parquet format)  
-    /// - edges.parquet: Edges table data (future: use parquet format)
-    /// - For now, we'll use JSON format as a placeholder
+    /// Save an owned, typed v3 table bundle using atomic file replacement.
+    /// Source view pins/history and pooled SubgraphRef values are not serialized.
     pub fn save_bundle<P: AsRef<Path>>(&self, bundle_path: P) -> GraphResult<()> {
-        let bundle_path = bundle_path.as_ref();
-
-        // Create bundle directory
-        std::fs::create_dir_all(bundle_path).map_err(|e| {
-            GraphError::InvalidInput(format!("Failed to create bundle directory: {}", e))
-        })?;
-
-        // Save tables first to calculate checksums
-        let nodes_path = bundle_path.join("nodes.csv");
-        let nodes_csv = self.serialize_nodes_to_csv()?;
-        std::fs::write(&nodes_path, &nodes_csv)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to write nodes data: {}", e)))?;
-
-        let edges_path = bundle_path.join("edges.csv");
-        let edges_csv = self.serialize_edges_to_csv()?;
-        std::fs::write(&edges_path, &edges_csv)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to write edges data: {}", e)))?;
-
-        // Calculate checksums
-        let nodes_checksum = self.calculate_checksum(&nodes_csv);
-        let edges_checksum = self.calculate_checksum(&edges_csv);
-
-        // Run validation
-        let validation_report = self.validate();
-
-        // Generate comprehensive metadata with checksums and validation
-        let metadata = EnhancedBundleMetadata {
-            version: "2.0".to_string(),
-            created_at: chrono::Utc::now().to_rfc3339(),
-            groggy_version: env!("CARGO_PKG_VERSION").to_string(),
-            node_count: self.nodes.nrows(),
-            edge_count: self.edges.nrows(),
-            validation_policy: self.policy.clone(),
-            checksums: BundleChecksums {
-                nodes_sha256: nodes_checksum.clone(),
-                edges_sha256: edges_checksum.clone(),
-                metadata_sha256: String::new(), // Will be filled after metadata generation
-            },
-            schema_info: BundleSchemaInfo {
-                node_columns: self.nodes.column_names().to_vec(),
-                edge_columns: self.edges.column_names().to_vec(),
-                has_node_attributes: self.nodes.ncols() > 1, // More than just node_id
-                has_edge_attributes: self.edges.ncols() > 3, // More than edge_id, source, target
-            },
-            validation_summary: BundleValidationSummary {
-                is_valid: validation_report.is_valid(),
-                error_count: validation_report.errors.len(),
-                warning_count: validation_report.warnings.len(),
-                info_count: validation_report.info.len(),
-            },
-        };
-
-        // Save metadata as JSON for better structure
-        let metadata_json = serde_json::to_string_pretty(&metadata).map_err(|e| {
-            GraphError::InvalidInput(format!("Failed to serialize metadata: {}", e))
-        })?;
-
-        // Calculate metadata checksum
-        let metadata_checksum = self.calculate_checksum(&metadata_json);
-        let mut final_metadata = metadata;
-        final_metadata.checksums.metadata_sha256 = metadata_checksum;
-
-        // Save final metadata with checksum
-        let final_metadata_json = serde_json::to_string_pretty(&final_metadata).map_err(|e| {
-            GraphError::InvalidInput(format!("Failed to serialize final metadata: {}", e))
-        })?;
-
-        let metadata_path = bundle_path.join("metadata.json");
-        std::fs::write(&metadata_path, final_metadata_json)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to write metadata: {}", e)))?;
-
-        // Save detailed validation report
-        let report_path = bundle_path.join("validation_report.json");
-        let validation_json = serde_json::to_string_pretty(&ValidationReportJson {
-            summary: final_metadata.validation_summary.clone(),
-            errors: validation_report.errors,
-            warnings: validation_report.warnings,
-            info: validation_report.info,
-        })
-        .map_err(|e| {
-            GraphError::InvalidInput(format!("Failed to serialize validation report: {}", e))
-        })?;
-        std::fs::write(&report_path, validation_json).map_err(|e| {
-            GraphError::InvalidInput(format!("Failed to write validation report: {}", e))
-        })?;
-
-        // Save bundle manifest for integrity verification
-        let manifest = BundleManifest {
-            format_version: "2.0".to_string(),
-            files: vec![
-                FileEntry {
-                    name: "metadata.json".to_string(),
-                    checksum: final_metadata.checksums.metadata_sha256.clone(),
-                },
-                FileEntry {
-                    name: "nodes.csv".to_string(),
-                    checksum: nodes_checksum,
-                },
-                FileEntry {
-                    name: "edges.csv".to_string(),
-                    checksum: edges_checksum,
-                },
-            ],
-            created_at: final_metadata.created_at.clone(),
-        };
-
-        let manifest_path = bundle_path.join("MANIFEST.json");
-        let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|e| {
-            GraphError::InvalidInput(format!("Failed to serialize manifest: {}", e))
-        })?;
-        std::fs::write(&manifest_path, manifest_json)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to write manifest: {}", e)))?;
-
-        Ok(())
+        bundle::save(self, bundle_path.as_ref())
     }
 
-    /// Calculate SHA-256 checksum for data integrity
-    fn calculate_checksum(&self, data: &str) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        data.hash(&mut hasher);
-        format!("{:x}", hasher.finish())
-    }
-
-    /// Load GraphTable from a bundle directory
-    ///
-    /// This is a placeholder implementation - in a real system this would:
-    /// - Parse metadata.json
-    /// - Load nodes.parquet and edges.parquet  
-    /// - Reconstruct GraphTable with validation policy
-    /// - Verify checksums
+    /// Load a checksum-verified v3 binary or legacy v2 CSV table bundle.
     pub fn load_bundle<P: AsRef<Path>>(bundle_path: P) -> GraphResult<Self> {
-        let bundle_path = bundle_path.as_ref();
-
-        // Check that bundle directory exists
-        if !bundle_path.exists() {
-            return Err(GraphError::InvalidInput(format!(
-                "Bundle path does not exist: {}. Make sure to:\n\
-                    1. Create a bundle first using save_bundle()\n\
-                    2. Provide the correct path to an existing bundle directory\n\
-                    3. Ensure the path points to a directory (not a file)",
-                bundle_path.display()
-            )));
-        }
-
-        // Check if it's a directory
-        if !bundle_path.is_dir() {
-            return Err(GraphError::InvalidInput(format!(
-                "Bundle path must be a directory, not a file: {}",
-                bundle_path.display()
-            )));
-        }
-
-        // Check for required files
-        let metadata_path = bundle_path.join("metadata.json");
-        let nodes_path = bundle_path.join("nodes.csv");
-        let edges_path = bundle_path.join("edges.csv");
-
-        // Provide detailed error messages for missing files
-        let missing_files: Vec<String> = [
-            ("metadata.json", &metadata_path),
-            ("nodes.csv", &nodes_path),
-            ("edges.csv", &edges_path),
-        ]
-        .iter()
-        .filter(|(_, path)| !path.exists())
-        .map(|(name, _)| name.to_string())
-        .collect();
-
-        if !missing_files.is_empty() {
-            return Err(GraphError::InvalidInput(format!(
-                "Bundle is missing required files: {}. \
-                    Bundle directory should contain: metadata.json, nodes.csv, edges.csv",
-                missing_files.join(", ")
-            )));
-        }
-
-        // Load metadata
-        let metadata = Self::validate_bundle(bundle_path)?;
-
-        // Load nodes and edges from CSV
-        let nodes_csv = std::fs::read_to_string(&nodes_path)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to read nodes.csv: {}", e)))?;
-        let edges_csv = std::fs::read_to_string(&edges_path)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to read edges.csv: {}", e)))?;
-
-        // Parse CSV data (simplified parsing - not production grade)
-        let nodes_table = Self::parse_nodes_from_csv(&nodes_csv)?;
-        let edges_table = Self::parse_edges_from_csv(&edges_csv)?;
-
-        // Create GraphTable with loaded policy
-        Ok(Self::with_policy(
-            nodes_table,
-            edges_table,
-            metadata.validation_policy,
-        ))
+        bundle::load(bundle_path.as_ref()).map(|(table, _)| table)
     }
 
-    /// Validate bundle integrity without loading
+    /// Validate checksum, format, schema and row counts before exposing metadata.
     pub fn validate_bundle<P: AsRef<Path>>(bundle_path: P) -> GraphResult<BundleMetadata> {
-        let bundle_path = bundle_path.as_ref();
+        bundle::load(bundle_path.as_ref()).map(|(_, metadata)| metadata)
+    }
 
-        // Load and parse metadata (simplified parsing)
-        let metadata_path = bundle_path.join("metadata.json");
-        let metadata_content = std::fs::read_to_string(&metadata_path)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to read metadata: {}", e)))?;
-
-        // Parse JSON metadata (v2.0 format)
-        let enhanced_metadata: EnhancedBundleMetadata = serde_json::from_str(&metadata_content)
-            .map_err(|e| {
-                GraphError::InvalidInput(format!("Failed to parse metadata JSON: {}", e))
-            })?;
-
-        // Convert enhanced metadata to legacy BundleMetadata format
-        let mut checksums = HashMap::new();
-        checksums.insert(
-            "nodes_sha256".to_string(),
-            enhanced_metadata.checksums.nodes_sha256.clone(),
-        );
-        checksums.insert(
-            "edges_sha256".to_string(),
-            enhanced_metadata.checksums.edges_sha256.clone(),
-        );
-        checksums.insert(
-            "metadata_sha256".to_string(),
-            enhanced_metadata.checksums.metadata_sha256.clone(),
-        );
-
-        let metadata = BundleMetadata {
-            version: enhanced_metadata.version,
-            created_at: enhanced_metadata.created_at,
-            node_count: enhanced_metadata.node_count,
-            edge_count: enhanced_metadata.edge_count,
-            validation_policy: enhanced_metadata.validation_policy,
-            checksums,
-        };
-
-        // TODO: Verify checksums, file integrity, etc.
-
-        Ok(metadata)
+    /// Read verified metadata with its native value types for language adapters.
+    pub fn bundle_metadata_value<P: AsRef<Path>>(bundle_path: P) -> GraphResult<serde_json::Value> {
+        bundle::metadata_value(bundle_path.as_ref())
     }
 
     /// Get bundle information without loading the full GraphTable
@@ -1295,88 +1066,6 @@ impl GraphTable {
         );
 
         Ok(info)
-    }
-
-    // Helper methods for CSV serialization
-    fn serialize_nodes_to_csv(&self) -> GraphResult<String> {
-        let mut csv_lines = Vec::new();
-
-        // Header
-        let column_names = self.nodes.column_names();
-        csv_lines.push(column_names.join(","));
-
-        // Data rows
-        let nrows = self.nodes.nrows();
-        for i in 0..nrows {
-            let mut row = Vec::new();
-            for col_name in column_names {
-                if let Some(column) = self.nodes.column(col_name) {
-                    if let Some(value) = column.get(i) {
-                        row.push(self.attr_value_to_csv_string(value));
-                    } else {
-                        row.push("".to_string());
-                    }
-                } else {
-                    row.push("".to_string());
-                }
-            }
-            csv_lines.push(row.join(","));
-        }
-
-        Ok(csv_lines.join("\n"))
-    }
-
-    fn serialize_edges_to_csv(&self) -> GraphResult<String> {
-        let mut csv_lines = Vec::new();
-
-        // Header
-        let column_names = self.edges.column_names();
-        csv_lines.push(column_names.join(","));
-
-        // Data rows
-        let nrows = self.edges.nrows();
-        for i in 0..nrows {
-            let mut row = Vec::new();
-            for col_name in column_names {
-                if let Some(column) = self.edges.column(col_name) {
-                    if let Some(value) = column.get(i) {
-                        row.push(self.attr_value_to_csv_string(value));
-                    } else {
-                        row.push("".to_string());
-                    }
-                } else {
-                    row.push("".to_string());
-                }
-            }
-            csv_lines.push(row.join(","));
-        }
-
-        Ok(csv_lines.join("\n"))
-    }
-
-    fn attr_value_to_csv_string(&self, value: &AttrValue) -> String {
-        match value {
-            AttrValue::Int(i) => i.to_string(),
-            AttrValue::Float(f) => f.to_string(),
-            AttrValue::Float64(f) => f.to_string(),
-            AttrValue::Text(s) => format!("\"{}\"", s.replace("\"", "\"\"")), // Escape quotes
-            AttrValue::Bool(b) => b.to_string(),
-            AttrValue::Null => "".to_string(),
-            AttrValue::Float64Vec(v) => format!("{v:?}"),
-            AttrValue::FloatVec(v) => format!(
-                "[{}]",
-                v.iter()
-                    .map(|f| f.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            ),
-            AttrValue::CompactText(s) => format!("\"{}\"", s.as_str().replace("\"", "\"\"")),
-            AttrValue::SmallInt(i) => i.to_string(),
-            AttrValue::Bytes(b) => format!("bytes:{}", b.len()), // Just show byte length
-            AttrValue::CompressedText(_) => "compressed_text".to_string(), // Placeholder
-            // Add any other missing variants with reasonable string representations
-            _ => "unsupported".to_string(),
-        }
     }
 
     // Helper methods for CSV parsing (simplified - not production grade)
