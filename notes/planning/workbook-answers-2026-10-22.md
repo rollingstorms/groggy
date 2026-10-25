@@ -806,3 +806,26 @@ same benchmark source. Initial capture and owned payload exports still copy;
 this is not a graph-capture/RSS/FFI/server latency claim. Receipts:
 `notes/benchmarks/viz-snapshot-clone-{before,after}-2026-10-25.json`.
 Existing 27.1/AR7.10/28.15 scope; **192 checked / 76 unchecked**, no new rows.
+
+### Checked BaseTable entity conversions — 2026-10-25
+
+Closed the existing native BaseTable converter family and exposed thin Python
+`to_nodes(uid_key="node_id")` / `to_edges()` adapters (27.1/AR7.10). Custom node
+keys now rename correctly; edge aliases use existing native normalization.
+Complete identity/endpoint validation rejects malformed or duplicate IDs, while
+parallel edges/self loops remain valid. Conversions create table components,
+share column payloads, and allocate no graph entities or history.
+
+Writable source binding survives only for the same captured kind/IDs/endpoints;
+changed identity/kind/topology retains read-only source captures. Compatible
+renames can publish one explicit source update. Import-oriented from_base_table
+wrappers remain permissive. Evidence/API: `checked-table-conversions-2026-10-25.md`
+and `docs/api/checked-table-conversions.md`; 7 native / 11 Python cases, 3 examples.
+Gate: **1,150 native passed / 51 ignored; 1,881 root Python passed / 1 skipped;
+133 executable docs passed; strict all-target Clippy passed**. Validation scans
+identity columns; no speedup, RSS or FFI latency claim.
+
+The fixed 27.1 remainder still names GraphTable node-subset policy, rectangular
+metadata, and its unsupported graph-accessor/subgraph converter contracts.
+Those are distinct from the now-complete BaseTable data-only adapters. No new
+checklist rows; inventory remains **192 checked / 76 unchecked**.

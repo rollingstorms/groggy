@@ -1278,6 +1278,14 @@ class BaseTable:
     """
     Python wrapper for BaseTable
     """
+    def to_nodes(self, uid_key: str = "node_id") -> NodesTable:
+        """Checked data-only conversion; rename the explicit integer ID column."""
+        ...
+
+    def to_edges(self) -> EdgesTable:
+        """Checked data-only edge conversion using existing structural aliases."""
+        ...
+
     @property
     def column_names(self) -> Any:
         """

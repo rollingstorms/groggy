@@ -103,6 +103,37 @@ fn invalid(message: impl Into<String>) -> GraphError {
 }
 
 impl BaseTable {
+    /// A structural conversion keeps writable row identity only if it still
+    /// describes the exact captured entity kind, IDs and edge endpoints.
+    pub(super) fn retain_entity_conversion_binding(&mut self, nodes: bool) -> GraphResult<()> {
+        let Some(provenance) = &self.provenance else {
+            return Ok(());
+        };
+        let Some(rows) = &provenance.rows else {
+            return Ok(());
+        };
+        let ids = structural::ids(self, if nodes { "node_id" } else { "edge_id" })?;
+        let mut compatible = rows.nodes == nodes && rows.ids == ids;
+        if compatible && !nodes {
+            let sources = structural::ids(self, "source")?;
+            let targets = structural::ids(self, "target")?;
+            compatible = provenance.sources.first().is_some_and(|source| {
+                ids.iter()
+                    .zip(sources)
+                    .zip(targets)
+                    .all(|((&id, from), to)| {
+                        source
+                            .edge_endpoints(id)
+                            .is_ok_and(|actual| actual == (from, to))
+                    })
+            });
+        }
+        if !compatible {
+            self.provenance = Some(provenance.derived());
+        }
+        Ok(())
+    }
+
     /// Immutable sources retained by this table, including read-only join/aggregate provenance.
     pub fn source_views(&self) -> Vec<GraphView> {
         self.provenance

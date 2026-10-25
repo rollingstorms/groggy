@@ -110,6 +110,23 @@ impl PyBaseTable {
         .map_err(crate::ffi::utils::graph_error_to_py_err)?;
         crate::ffi::api::graph_batch::view_result_to_python(py, result)
     }
+    /// Convert owned table columns to a checked node table; creates no graph.
+    #[pyo3(signature = (uid_key = "node_id"))]
+    pub fn to_nodes(&self, py: Python<'_>, uid_key: &str) -> PyResult<PyNodesTable> {
+        let table = &self.table;
+        py.allow_threads(|| table.clone().to_nodes(uid_key))
+            .map(|table| PyNodesTable { table })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
+    /// Convert owned table columns to a checked edge table; creates no graph.
+    pub fn to_edges(&self, py: Python<'_>) -> PyResult<PyEdgesTable> {
+        let table = &self.table;
+        py.allow_threads(|| table.clone().to_edges())
+            .map(|table| PyEdgesTable { table })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     /// Create a new empty BaseTable
     #[new]
     pub fn new() -> Self {

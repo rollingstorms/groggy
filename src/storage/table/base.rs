@@ -244,29 +244,27 @@ impl BaseTable {
         }
     }
 
-    /// Convert to NodesTable with UID key validation (Phase 2 plan method)
+    /// Convert to a checked NodesTable, renaming the explicitly chosen integer
+    /// identity column to node_id. Duplicate/malformed IDs and name collisions
+    /// reject. Graph ownership is never inferred from an arbitrary ID column.
     pub fn to_nodes(self, uid_key: &str) -> GraphResult<super::nodes::NodesTable> {
-        // Validate that the UID key column exists
         if !self.has_column(uid_key) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
                 "UID column '{}' not found",
                 uid_key
             )));
         }
-
-        // If uid_key is not "node_id", we need to rename it
-        let table_with_node_id = if uid_key == "node_id" {
+        let base = if uid_key == "node_id" {
             self
         } else {
-            // For now, require that the UID column is already named "node_id"
-            // Future enhancement could rename the column
-            return Err(crate::errors::GraphError::InvalidInput(format!(
-                "UID column must be named 'node_id', found '{}'",
-                uid_key
-            )));
+            self.rename(HashMap::from([(uid_key.to_string(), "node_id".into())]))?
         };
-
-        super::nodes::NodesTable::from_base_table(table_with_node_id)
+        let mut table = super::nodes::NodesTable::from_base_table(base)?;
+        table.validate_uids()?;
+        table
+            .base_table_mut()
+            .retain_entity_conversion_binding(true)?;
+        Ok(table)
     }
 
     /// Convert to EdgesTable if appropriate (contains edge_id column)  
@@ -278,20 +276,16 @@ impl BaseTable {
         }
     }
 
-    /// Convert to EdgesTable with validation (Phase 3 plan method)
+    /// Convert to a checked EdgesTable using the existing structural aliases.
+    /// IDs/endpoints must be nonnegative integers and edge IDs unique. Parallel
+    /// edges and self loops are allowed; no outside node graph is inferred.
     pub fn to_edges(self) -> GraphResult<super::edges::EdgesTable> {
-        // Validate that required edge columns exist
-        let required_cols = ["edge_id", "source", "target"];
-        for col in &required_cols {
-            if !self.has_column(col) {
-                return Err(crate::errors::GraphError::InvalidInput(format!(
-                    "EdgesTable requires '{}' column",
-                    col
-                )));
-            }
-        }
-
-        super::edges::EdgesTable::from_base_table(self)
+        let mut table = super::edges::EdgesTable::from_base_table(self)?;
+        table.validate_edges(&super::edges::EdgeConfig::default())?;
+        table
+            .base_table_mut()
+            .retain_entity_conversion_binding(false)?;
+        Ok(table)
     }
 
     // =============================================================================
