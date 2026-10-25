@@ -123,3 +123,7 @@ harness = false
 [[bench]]
 name = "subgraph_sampler_steps"
 harness = false
+
+[[bench]]
+name = "foreach_sampler_steps"
+harness = false

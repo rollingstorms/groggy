@@ -402,7 +402,7 @@ mod tests {
         ]);
         assert!(LoopStep::new(2, supported, registry).supports_atomic_properties());
         for body in [
-            serde_json::json!([{"id": "sample.for_each", "params": {"source": "unneeded", "target": "sample", "body": []}}]),
+            serde_json::json!([{"id": "temporal.diff_nodes", "params": {}}]),
             serde_json::json!([{"params": {}}]),
             serde_json::json!({"value": [], "batch_plan": {}}),
         ] {

@@ -1,0 +1,329 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "mode": "flat_selectors",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.007892875,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.007167417,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.006073667,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.005152208,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00554675,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "empty_selectors",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002734125,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002679042,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002564291,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002445375,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002415791,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "persistent_overlap",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.003929,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003754833,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003678292,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003607583,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.003619583,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "transient_overlap",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002888333,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002884625,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002931917,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002870084,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002875166,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "item_histograms",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.002352292,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002352041,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002333208,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.00231775,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.002326208,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "nested_properties",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00675725,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.006730917,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.006758792,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.006738708,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.00672825,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "flat_selectors",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.044110333,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.046412791,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.043024166,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.042883459,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.043045875,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "empty_selectors",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.022889916,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.022821459,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.022831875,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.022776333,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.022851167,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "persistent_overlap",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.037753125,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.037377667,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.039041958,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.037901666,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.037401916,
+          "state_id": 2
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "transient_overlap",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.030681666,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.031963917,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.029802459,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.029594291,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.029553833,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "item_histograms",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.023781625,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.023693334,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.02368325,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.023742167,
+          "state_id": 1
+        },
+        {
+          "seconds": 0.02691775,
+          "state_id": 1
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "nested_properties",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.069763208,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.070911459,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.07204475,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.070049291,
+          "state_id": 2
+        },
+        {
+          "seconds": 0.072864834,
+          "state_id": 2
+        }
+      ]
+    }
+  ],
+  "scope": "Native release directed rings; six nested selector/property/output frame modes. Fixture/spec construction and validation excluded; five observations per workload. Validate full output cardinality/order, merged columns, per-item histograms and zero/one publication. Legacy connected selectors. No matched speedup, FFI/RSS/allocation or production-scale claim."
+}

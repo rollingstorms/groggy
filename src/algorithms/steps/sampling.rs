@@ -7,7 +7,7 @@
 //!
 //! All sampling operations support seeded RNG for reproducibility.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use anyhow::{bail, Result};
@@ -17,7 +17,7 @@ use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{EdgeId, NodeId};
 
-use super::super::{AlgorithmParamValue, Context, CostHint};
+use super::super::{AlgorithmOutput, AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope, StepVariables};
 
 /// Specification for sampling: either a fraction or absolute count.
@@ -645,6 +645,93 @@ impl Step for EmitSubgraphsStep {
     }
 }
 
+/// Frame-local owned results. Aggregate entity columns once, avoiding repeated
+/// concatenation/sorting as each item completes; other payloads retain item scope.
+enum OwnedColumn {
+    Nodes(BTreeMap<NodeId, crate::AttrValue>),
+    Edges(BTreeMap<EdgeId, crate::AttrValue>),
+}
+#[derive(Default)]
+struct ForEachOutputs {
+    columns: HashMap<String, OwnedColumn>,
+    other: HashMap<String, AlgorithmOutput>,
+}
+impl ForEachOutputs {
+    fn absorb(
+        &mut self,
+        target: &str,
+        index: usize,
+        outputs: HashMap<String, AlgorithmOutput>,
+    ) -> Result<()> {
+        for (key, output) in outputs {
+            match output {
+                AlgorithmOutput::NodeAttributes(rows) => {
+                    let entry = self
+                        .columns
+                        .entry(key)
+                        .or_insert_with(|| OwnedColumn::Nodes(BTreeMap::new()));
+                    let OwnedColumn::Nodes(values) = entry else {
+                        bail!("for_each output column type mismatch");
+                    };
+                    values.extend(rows);
+                }
+                AlgorithmOutput::EdgeAttributes(rows) => {
+                    let entry = self
+                        .columns
+                        .entry(key)
+                        .or_insert_with(|| OwnedColumn::Edges(BTreeMap::new()));
+                    let OwnedColumn::Edges(values) = entry else {
+                        bail!("for_each output column type mismatch");
+                    };
+                    values.extend(rows);
+                }
+                output => {
+                    self.other
+                        .insert(format!("for_each.{target}.{index}.{key}"), output);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn finish(
+        self,
+        mut prior: HashMap<String, AlgorithmOutput>,
+    ) -> Result<HashMap<String, AlgorithmOutput>> {
+        for (key, column) in self.columns {
+            let old = prior.remove(&key);
+            let output = match (column, old) {
+                (OwnedColumn::Nodes(rows), None) => {
+                    AlgorithmOutput::NodeAttributes(rows.into_iter().collect())
+                }
+                (OwnedColumn::Edges(rows), None) => {
+                    AlgorithmOutput::EdgeAttributes(rows.into_iter().collect())
+                }
+                (OwnedColumn::Nodes(rows), Some(AlgorithmOutput::NodeAttributes(previous))) => {
+                    let mut values: BTreeMap<_, _> = previous.into_iter().collect();
+                    values.extend(rows);
+                    AlgorithmOutput::NodeAttributes(values.into_iter().collect())
+                }
+                (OwnedColumn::Edges(rows), Some(AlgorithmOutput::EdgeAttributes(previous))) => {
+                    let mut values: BTreeMap<_, _> = previous.into_iter().collect();
+                    values.extend(rows);
+                    AlgorithmOutput::EdgeAttributes(values.into_iter().collect())
+                }
+                _ => bail!("for_each output column type mismatch with prior result"),
+            };
+            prior.insert(key, output);
+        }
+        prior.extend(self.other);
+        Ok(prior)
+    }
+}
+
+fn restore_outputs(ctx: &mut Context, outputs: HashMap<String, AlgorithmOutput>) {
+    for (key, output) in outputs {
+        ctx.add_output(key, output);
+    }
+}
+
 /// Map a sub-pipeline over each subgraph in a subgraph array.
 pub struct ForEachSubgraphStep {
     source: String,
@@ -667,6 +754,12 @@ impl ForEachSubgraphStep {
 }
 
 impl Step for ForEachSubgraphStep {
+    fn supports_atomic_properties(&self) -> bool {
+        self.body_steps
+            .iter()
+            .all(|step| step.supports_atomic_properties())
+    }
+
     fn id(&self) -> &'static str {
         "sample.for_each"
     }
@@ -680,29 +773,81 @@ impl Step for ForEachSubgraphStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        check_cancelled(ctx)?;
+        if ctx.property_batch.is_some() && !self.supports_atomic_properties() {
+            bail!("for_each body does not support atomic property execution");
+        }
+        let topology = SelectionTopology::prepare(ctx, scope)?;
         let inputs = scope.variables().subgraph_array(&self.source)?;
-        let mut outputs = Vec::with_capacity(inputs.len());
-
-        for sg in inputs {
-            let mut vars = StepVariables::default();
-            for step in &self.body_steps {
-                let mut inner_scope = StepScope::new(sg, &mut vars);
-                step.apply(ctx, &mut inner_scope)?;
-            }
-
-            if let Ok(out_array) = vars.subgraph_array("__sample_output__") {
-                if let Some(first) = out_array.first() {
-                    outputs.push(first.clone());
-                    continue;
+        // Validate every item before any child can stage a property assignment.
+        for selector in inputs {
+            topology.validate(ctx, scope, selector)?;
+        }
+        let prior = ctx.take_outputs();
+        let mut collected = ForEachOutputs::default();
+        let result: Result<Vec<Subgraph>> = (|| {
+            let mut outputs = Vec::new();
+            for (index, selector) in inputs.iter().enumerate() {
+                check_cancelled(ctx)?;
+                let mut vars = StepVariables::default();
+                for step in &self.body_steps {
+                    check_cancelled(ctx)?;
+                    let mut inner_scope = StepScope::new(selector, &mut vars);
+                    step.apply(ctx, &mut inner_scope)?;
+                    collected.absorb(&self.target, index, ctx.take_outputs())?;
+                }
+                check_cancelled(ctx)?;
+                let has_output = vars.contains("__sample_output__");
+                let inner_scope = StepScope::new(selector, &mut vars);
+                let inner_topology = SelectionTopology::prepare(ctx, &inner_scope)?;
+                if has_output {
+                    // An explicit empty array emits zero, while an absent output
+                    // preserves the input. Wrong-typed output is an error.
+                    let array = inner_scope
+                        .variables()
+                        .subgraph_array("__sample_output__")?;
+                    for output in array {
+                        inner_topology.validate(ctx, &inner_scope, output)?;
+                        outputs.push(output.clone());
+                    }
+                } else {
+                    outputs.push(selector.clone());
                 }
             }
-
-            outputs.push(sg.clone());
+            check_cancelled(ctx)?;
+            Ok(outputs)
+        })();
+        let outputs = match result {
+            Ok(outputs) => outputs,
+            Err(error) => {
+                ctx.take_outputs();
+                restore_outputs(ctx, prior);
+                return Err(error);
+            }
+        };
+        // Validate result kinds before consuming prior payloads, preserving those
+        // payloads if a custom non-atomic body used conflicting output keys.
+        for (key, column) in &collected.columns {
+            if let Some(old) = prior.get(key) {
+                if !matches!(
+                    (column, old),
+                    (OwnedColumn::Nodes(_), AlgorithmOutput::NodeAttributes(_))
+                        | (OwnedColumn::Edges(_), AlgorithmOutput::EdgeAttributes(_))
+                ) {
+                    restore_outputs(ctx, prior);
+                    bail!("for_each output column type mismatch with prior result");
+                }
+            }
         }
-
+        if let Err(error) = check_cancelled(ctx) {
+            restore_outputs(ctx, prior);
+            return Err(error);
+        }
+        let merged = collected.finish(prior)?;
+        restore_outputs(ctx, merged);
         scope
             .variables_mut()
-            .set_subgraph_array(self.target.clone(), outputs);
+            .set_subgraph_array(&self.target, outputs);
         Ok(())
     }
 }
@@ -1217,5 +1362,309 @@ mod subgraph_sampling_tests {
                 usize::from(source == "map")
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod foreach_tests {
+    use super::*;
+    use crate::{
+        algorithms::{
+            steps::core::{global_step_registry, StepSpec},
+            AlgorithmParams,
+        },
+        AttrValue, Graph,
+    };
+    use std::{
+        cell::RefCell,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    };
+
+    fn fixture() -> Subgraph {
+        let mut graph = Graph::new_directed();
+        graph.add_nodes(3);
+        graph.add_edge(0, 1).expect("edge");
+        graph.add_edge(1, 2).expect("edge");
+        Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            (0..3).collect(),
+            "root".into(),
+        )
+        .expect("root")
+    }
+    fn body(definitions: serde_json::Value) -> Vec<Box<dyn Step>> {
+        crate::algorithms::steps::ensure_core_steps_registered();
+        definitions
+            .as_array()
+            .expect("array")
+            .iter()
+            .map(|value| {
+                global_step_registry()
+                    .instantiate(&StepSpec {
+                        id: value["id"].as_str().expect("id").into(),
+                        params: AlgorithmParams::from_json_map(
+                            value["params"].as_object().expect("params"),
+                        )
+                        .expect("params"),
+                        inputs: vec![],
+                        outputs: vec![],
+                    })
+                    .expect("step")
+            })
+            .collect()
+    }
+
+    #[test]
+    fn foreach_flattens_all_ordered_results_and_distinguishes_empty_from_missing() {
+        let root = fixture();
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&root, &mut vars);
+        IterateEdgesStep::new("inputs")
+            .apply(&mut Context::new(), &mut scope)
+            .expect("seeds");
+        let step = ForEachSubgraphStep::new(
+            "inputs",
+            "result",
+            body(serde_json::json!([
+                {"id":"sample.iterate_nodes","params":{"target":"nodes"}},
+                {"id":"sample.emit_subgraphs","params":{"source":"nodes","target":"__sample_output__","induced":false}}
+            ])),
+        );
+        assert!(step.supports_atomic_properties());
+        step.apply(&mut Context::new(), &mut scope).expect("flat");
+        let nodes: Vec<_> = scope
+            .variables()
+            .subgraph_array("result")
+            .expect("result")
+            .iter()
+            .map(|sg| sg.ordered_nodes().to_vec())
+            .collect();
+        assert_eq!(nodes, [vec![0], vec![1], vec![1], vec![2]]);
+        let empty = ForEachSubgraphStep::new(
+            "inputs",
+            "result",
+            body(serde_json::json!([
+                {"id":"core.sample_nodes","params":{"target":"mask","count":0}},
+                {"id":"sample.emit_subgraphs","params":{"source":"mask","target":"__sample_output__","induced":false}}
+            ])),
+        );
+        empty.apply(&mut Context::new(), &mut scope).expect("empty");
+        assert!(scope
+            .variables()
+            .subgraph_array("result")
+            .expect("result")
+            .is_empty());
+        ForEachSubgraphStep::new("inputs", "result", vec![])
+            .apply(&mut Context::new(), &mut scope)
+            .expect("fallback");
+        assert_eq!(
+            scope
+                .variables()
+                .subgraph_array("result")
+                .expect("fallback")
+                .len(),
+            2
+        );
+    }
+
+    struct Unsupported;
+    impl Step for Unsupported {
+        fn id(&self) -> &'static str {
+            "test.unsupported"
+        }
+        fn apply(&self, _: &mut Context, _: &mut StepScope<'_>) -> Result<()> {
+            bail!("must not run")
+        }
+    }
+    #[test]
+    fn recursive_preflight_rejects_unsupported_children_even_with_zero_inputs() {
+        let inner = ForEachSubgraphStep::new("inner", "out", vec![Box::new(Unsupported)]);
+        let outer = ForEachSubgraphStep::new("inputs", "out", vec![Box::new(inner)]);
+        assert!(!outer.supports_atomic_properties());
+        assert!(ForEachSubgraphStep::new("inputs", "out", vec![]).supports_atomic_properties());
+    }
+
+    struct Cancel {
+        token: Arc<AtomicBool>,
+    }
+    impl Step for Cancel {
+        fn id(&self) -> &'static str {
+            "test.cancel"
+        }
+        fn apply(&self, ctx: &mut Context, _: &mut StepScope<'_>) -> Result<()> {
+            ctx.add_output("discard", AlgorithmOutput::Histogram(vec![1]));
+            self.token.store(true, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+    #[test]
+    fn cancellation_restores_prior_owned_outputs_and_target_array() {
+        let root = fixture();
+        let mut vars = StepVariables::default();
+        vars.set_subgraph_array("inputs", vec![root.clone()]);
+        vars.set_subgraph_array("result", vec![root.clone()]);
+        let token = Arc::new(AtomicBool::new(false));
+        let mut ctx = Context::with_cancel_token(token.clone());
+        ctx.add_output("prior", AlgorithmOutput::Histogram(vec![9]));
+        let mut scope = StepScope::new(&root, &mut vars);
+        assert!(
+            ForEachSubgraphStep::new("inputs", "result", vec![Box::new(Cancel { token })])
+                .apply(&mut ctx, &mut scope)
+                .is_err()
+        );
+        let outputs = ctx.take_outputs();
+        assert_eq!(outputs.len(), 1);
+        assert!(matches!(&outputs["prior"],AlgorithmOutput::Histogram(values) if values==&vec![9]));
+        assert_eq!(
+            scope
+                .variables()
+                .subgraph_array("result")
+                .expect("unchanged")[0]
+                .ordered_nodes()
+                .as_ref(),
+            &[0, 1, 2]
+        );
+    }
+
+    struct Escape;
+    impl Step for Escape {
+        fn id(&self) -> &'static str {
+            "test.escape"
+        }
+        fn apply(&self, _: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+            let graph = scope.subgraph().graph();
+            scope.variables_mut().set_subgraph_array(
+                "__sample_output__",
+                vec![Subgraph::new(
+                    graph,
+                    HashSet::from([2]),
+                    HashSet::new(),
+                    "escaped".into(),
+                )],
+            );
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn wrong_typed_or_escaping_child_output_preserves_prior_result() {
+        let root = fixture();
+        let mut vars = StepVariables::default();
+        vars.set_subgraph_array("inputs", vec![root.clone()]);
+        vars.set_subgraph_array("result", vec![root.clone()]);
+        let mut scope = StepScope::new(&root, &mut vars);
+        let step = ForEachSubgraphStep::new(
+            "inputs",
+            "result",
+            body(serde_json::json!([
+                {"id":"core.init_nodes","params":{"target":"__sample_output__","value":1}}
+            ])),
+        );
+        assert!(step.apply(&mut Context::new(), &mut scope).is_err());
+        assert_eq!(
+            scope
+                .variables()
+                .subgraph_array("result")
+                .expect("unchanged")
+                .len(),
+            1
+        );
+        let seed = Subgraph::new(
+            root.graph(),
+            HashSet::from([0]),
+            HashSet::new(),
+            "small".into(),
+        );
+        scope
+            .variables_mut()
+            .set_subgraph_array("inputs", vec![seed]);
+        assert!(
+            ForEachSubgraphStep::new("inputs", "result", vec![Box::new(Escape)])
+                .apply(&mut Context::new(), &mut scope)
+                .is_err()
+        );
+        assert_eq!(
+            scope
+                .variables()
+                .subgraph_array("result")
+                .expect("unchanged")
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn all_input_owners_validate_before_any_child_runs() {
+        struct Count(Arc<std::sync::atomic::AtomicUsize>);
+        impl Step for Count {
+            fn id(&self) -> &'static str {
+                "test.count"
+            }
+            fn apply(&self, _: &mut Context, _: &mut StepScope<'_>) -> Result<()> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        let root = fixture();
+        let foreign = fixture();
+        let mut vars = StepVariables::default();
+        vars.set_subgraph_array("inputs", vec![root.clone(), foreign]);
+        let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut scope = StepScope::new(&root, &mut vars);
+        assert!(
+            ForEachSubgraphStep::new("inputs", "result", vec![Box::new(Count(count.clone()))])
+                .apply(&mut Context::new(), &mut scope)
+                .is_err()
+        );
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn owned_frames_merge_columns_once_with_last_values_and_keep_item_payloads() {
+        let mut frame = ForEachOutputs::default();
+        let mut prior = HashMap::from([(
+            "node_attributes.x".into(),
+            AlgorithmOutput::NodeAttributes(vec![(9, AttrValue::Int(9))]),
+        )]);
+        prior.insert("untouched".into(), AlgorithmOutput::Histogram(vec![8]));
+        frame
+            .absorb(
+                "out",
+                0,
+                HashMap::from([
+                    (
+                        "node_attributes.x".into(),
+                        AlgorithmOutput::NodeAttributes(vec![
+                            (0, AttrValue::Int(1)),
+                            (1, AttrValue::Int(1)),
+                        ]),
+                    ),
+                    ("histograms.h".into(), AlgorithmOutput::Histogram(vec![2])),
+                ]),
+            )
+            .expect("first");
+        frame
+            .absorb(
+                "out",
+                1,
+                HashMap::from([
+                    (
+                        "node_attributes.x".into(),
+                        AlgorithmOutput::NodeAttributes(vec![(1, AttrValue::Int(2))]),
+                    ),
+                    ("histograms.h".into(), AlgorithmOutput::Histogram(vec![3])),
+                ]),
+            )
+            .expect("second");
+        let output = frame.finish(prior).expect("finish");
+        assert!(
+            matches!(&output["node_attributes.x"],AlgorithmOutput::NodeAttributes(rows) if rows==&vec![(0,AttrValue::Int(1)),(1,AttrValue::Int(2)),(9,AttrValue::Int(9))])
+        );
+        assert!(output.contains_key("for_each.out.0.histograms.h"));
+        assert!(output.contains_key("for_each.out.1.histograms.h"));
+        assert!(output.contains_key("untouched"));
     }
 }

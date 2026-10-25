@@ -23,6 +23,15 @@ def _has_histogram_output(rows: List[Dict[str, Any]]) -> bool:
     )
 
 
+def _has_property_attachment(rows: List[Dict[str, Any]]) -> bool:
+    """Recognize property outputs nested in loops and per-selector bodies."""
+    return any(
+        row.get("type") in {"attach_attr", "core.attach_attr", "attr.save", "attr.attach", "core.attach_node_attr", "core.attach_edge_attr"}
+        or (isinstance(row.get("body"), list) and _has_property_attachment(row["body"]))
+        for row in rows
+    )
+
+
 class LoopContext:
     """Context manager for loop body."""
 
@@ -964,7 +973,7 @@ class BuiltAlgorithm(AlgorithmHandle):
             warnings.append("Pipeline has no steps")
 
         # Check if anything is attached
-        has_attach = any(s.get("type") == "attach_attr" for s in self._steps)
+        has_attach = _has_property_attachment(self._steps)
         if not has_attach and not _has_histogram_output(self._steps):
             warnings.append("Pipeline doesn't attach any output attributes")
 

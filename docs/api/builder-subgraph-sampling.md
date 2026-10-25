@@ -131,8 +131,7 @@ installation; allocation/sorting do not promise bounded interruption latency.
 No owner/history clone or mutation is introduced. Bounded native release receipts
 are not matched speedups, RSS/FFI or production-scale guarantees.
 
-Nested sample.for_each remains uncertified. Its legacy executor truncates an
-explicit child array to its first result and treats an explicit empty array as
-fallback input. Child-effect preflight, output flattening, transient output
-ownership and its transactional boundary are the next audit. This delivery does
-not certify that path or close the view/pipeline parent workstreams.
+Nested sample.for_each now has a separate checked contract for recursive child
+effects, complete child-array flattening and owned per-item outputs: see
+[for-each execution](builder-foreach.md). Standalone sampler transactions and
+pinned-view migration remain open parent work.

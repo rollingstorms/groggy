@@ -342,3 +342,17 @@ This is an existing parent-work decomposition, not new scope. Verified with 969
 native tests, 1,516 Python tests, 64 doc examples, strict Clippy and 12 release
 workloads. See `bounded-subgraph-sampler-bundle-2026-10-24.md` and
 `../../docs/api/builder-subgraph-sampling.md`.
+
+### Checked nested sampler execution bundle — 2026-10-24
+
+Completed the explicit open 09.4b.2ad and related 09.4b.2ae–2af: recursive child
+capability checks, shared outer property staging, complete ordered child-array
+flattening with explicit-empty semantics, validated item outputs and private owned
+frames. Transient entity columns merge by ID across items/steps and prior rows;
+non-column payloads retain per-item keys. Failure restores prior owned outputs
+and target arrays while the outer atomic algorithm discards pending properties.
+Standalone sampler transactions and pinned views remain separate open parents.
+Verified with 975 native tests, 1,532 Python tests, 68 doc examples and strict
+Clippy; release receipt covers 12 workloads. See
+`atomic-foreach-sampler-bundle-2026-10-24.md` and
+`../../docs/api/builder-foreach.md`.

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **180 checked and 80 unchecked entries**. Entries overlap:
+currently contains **183 checked and 79 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -35,6 +35,7 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 | 09.4b.2u–2w | Stable isolated node/edge mask sampling and bounded map-key reservoirs with strict controls, selected identity validation and atomic publication. |
 | 09.4b.2x–2z | Checked seeding, synchronous propagation and actual directed/undirected local modularity gains verified against independent full-objective moves. |
 | 09.4b.2aa–2ac | Ordered bounded selector iteration, selected neighborhood expansion and consistent induced emission; legacy owner connections remain explicit. |
+| 09.4b.2ad–2af | Recursive for-each property staging, complete child selector flattening and private merged/per-item owned output frames. |
 
 
 
@@ -73,8 +74,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest bounded-selector change: **969 native tests passed, 52 ignored; 1,516 root
-Python API tests passed, 1 skipped; 64 executable documentation examples passed;
+Latest nested-sampler change: **975 native tests passed, 52 ignored; 1,532 root
+Python API tests passed, 1 skipped; 68 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.
@@ -84,6 +85,7 @@ existing performance gates. As requested, implementation priorities continue
 first; comparison must match workload, precision and history semantics and record
 time, allocations, peak memory and retained-history growth.
 
-Nested sampler execution now has explicit open child 09.4b.2ad under the existing
-09.4b.2 parent. This accounts for the additional unchecked entry and records the
-already remaining effect/output work; it does not expand the accepted scope.
+The explicit nested-sampler child 09.4b.2ad is now complete alongside related
+selector-output and owned-frame slices 09.4b.2ae/2af. This closes one unchecked
+entry while adding two checked implementation slices. Standalone sampler
+transactions and pinned view/source provenance remain open parent work.
