@@ -35,10 +35,32 @@ use super::structural::{
     EdgeWeightSumStep, KCoreMarkStep, NodeDegreeStep, TriangleCountStep, WeightedDegreeStep,
 };
 use super::temporal::{
-    AggregateFunction, DiffEdgesStep, DiffNodesStep, MarkChangedNodesStep, TemporalFilterStep,
-    TemporalPredicate, WindowAggregateStep,
+    validate_decay_controls, AggregateFunction, DecayStep, DiffEdgesStep, DiffNodesStep,
+    MarkChangedNodesStep, SnapshotAtStep, TemporalFilterStep, TemporalPredicate,
+    WindowAggregateStep,
 };
 use super::transformations::MapNodesExprStep;
+
+fn temporal_coordinate(params: &AlgorithmParams, name: &str) -> Result<u64> {
+    match params.get(name) {
+        Some(AlgorithmParamValue::Int(value)) => {
+            u64::try_from(*value).map_err(|_| anyhow!("{name} must be non-negative"))
+        }
+        _ => Err(anyhow!("{name} must be a non-negative integer")),
+    }
+}
+
+fn optional_temporal_text(
+    params: &AlgorithmParams,
+    name: &str,
+    default: Option<&str>,
+) -> Result<Option<String>> {
+    if params.get(name).is_some() {
+        Ok(Some(params.expect_text(name)?.to_string()))
+    } else {
+        Ok(default.map(str::to_string))
+    }
+}
 
 fn json_to_param(value: serde_json::Value) -> Result<AlgorithmParamValue> {
     Ok(match value {
@@ -1550,6 +1572,55 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
     )?;
 
     // === Temporal Steps ===
+    registry.register(
+        "temporal.decay",
+        StepMetadata {
+            id: "temporal.decay".into(),
+            description: "Checked exponential decay of selected values".into(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let attr = spec.params.expect_text("attr")?.to_string();
+            let output = spec.params.expect_text("output")?.to_string();
+            let half_life = spec.params.expect_float("half_life")?;
+            let time_delta = if spec.params.get("time_delta").is_some() {
+                spec.params.expect_float("time_delta")?
+            } else {
+                0.0
+            };
+            validate_decay_controls(half_life, time_delta)?;
+            Ok(Box::new(
+                DecayStep::new(attr, half_life, output).with_time_delta(time_delta),
+            ))
+        },
+    )?;
+    registry.register(
+        "temporal.snapshot_at",
+        StepMetadata {
+            id: "temporal.snapshot_at".into(),
+            description: "Capture an immutable retained owner state".into(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let output = spec.params.expect_text("output")?.to_string();
+            match (
+                spec.params.get("state_id").is_some(),
+                spec.params.get("timestamp").is_some(),
+            ) {
+                (true, false) => Ok(Box::new(SnapshotAtStep::new_at_commit(
+                    temporal_coordinate(&spec.params, "state_id")?,
+                    output,
+                ))),
+                (false, true) => Ok(Box::new(SnapshotAtStep::new_at_timestamp(
+                    temporal_coordinate(&spec.params, "timestamp")?,
+                    output,
+                ))),
+                _ => Err(anyhow!(
+                    "temporal.snapshot_at requires exactly one of state_id or timestamp"
+                )),
+            }
+        },
+    )?;
 
     registry.register(
         "temporal.diff_nodes",
@@ -1559,13 +1630,10 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Linear,
         },
         |spec| {
-            let before_var = spec.params.get_text("before").map(|s| s.to_string());
-            let after_var = spec.params.get_text("after").map(|s| s.to_string());
-            let prefix = spec
-                .params
-                .get_text("output_prefix")
-                .unwrap_or("diff")
-                .to_string();
+            let before_var = optional_temporal_text(&spec.params, "before", None)?;
+            let after_var = optional_temporal_text(&spec.params, "after", None)?;
+            let prefix = optional_temporal_text(&spec.params, "output_prefix", Some("diff"))?
+                .ok_or_else(|| anyhow!("missing output_prefix"))?;
             Ok(Box::new(DiffNodesStep::new(before_var, after_var, prefix)))
         },
     )?;
@@ -1578,13 +1646,10 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             cost_hint: CostHint::Linear,
         },
         |spec| {
-            let before_var = spec.params.get_text("before").map(|s| s.to_string());
-            let after_var = spec.params.get_text("after").map(|s| s.to_string());
-            let prefix = spec
-                .params
-                .get_text("output_prefix")
-                .unwrap_or("diff")
-                .to_string();
+            let before_var = optional_temporal_text(&spec.params, "before", None)?;
+            let after_var = optional_temporal_text(&spec.params, "after", None)?;
+            let prefix = optional_temporal_text(&spec.params, "output_prefix", Some("diff"))?
+                .ok_or_else(|| anyhow!("missing output_prefix"))?;
             Ok(Box::new(DiffEdgesStep::new(before_var, after_var, prefix)))
         },
     )?;
@@ -1601,11 +1666,9 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let function_str = spec.params.expect_text("function")?;
             let function = AggregateFunction::from_str(function_str)?;
             let output_var = spec.params.expect_text("output")?.to_string();
-            let index_var = spec
-                .params
-                .get_text("index_var")
-                .unwrap_or("temporal_index")
-                .to_string();
+            let index_var =
+                optional_temporal_text(&spec.params, "index_var", Some("temporal_index"))?
+                    .ok_or_else(|| anyhow!("missing index_var"))?;
             Ok(Box::new(WindowAggregateStep::new(
                 attr_name, function, output_var, index_var,
             )))
@@ -1625,20 +1688,23 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
 
             let predicate = match predicate_type {
                 "created_after" => {
-                    let commit = spec.params.expect_int("commit")? as u64;
+                    let commit = temporal_coordinate(&spec.params, "commit")?;
                     TemporalPredicate::CreatedAfter(commit)
                 }
                 "created_before" => {
-                    let commit = spec.params.expect_int("commit")? as u64;
+                    let commit = temporal_coordinate(&spec.params, "commit")?;
                     TemporalPredicate::CreatedBefore(commit)
                 }
                 "existed_at" => {
-                    let commit = spec.params.expect_int("commit")? as u64;
+                    let commit = temporal_coordinate(&spec.params, "commit")?;
                     TemporalPredicate::ExistedAt(commit)
                 }
                 "modified_in_range" => {
-                    let start = spec.params.expect_int("start")? as u64;
-                    let end = spec.params.expect_int("end")? as u64;
+                    let start = temporal_coordinate(&spec.params, "start")?;
+                    let end = temporal_coordinate(&spec.params, "end")?;
+                    if start > end {
+                        return Err(anyhow!("temporal range start must not exceed end"));
+                    }
                     TemporalPredicate::ModifiedInRange(start, end)
                 }
                 other => return Err(anyhow!("Unknown temporal predicate: {}", other)),
@@ -1657,7 +1723,13 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
         |spec| {
             let output_var = spec.params.expect_text("output")?.to_string();
-            let change_type = spec.params.get_text("change_type").map(|s| s.to_string());
+            let change_type = optional_temporal_text(&spec.params, "change_type", None)?;
+            if change_type
+                .as_deref()
+                .is_some_and(|value| !matches!(value, "created" | "deleted" | "modified" | "any"))
+            {
+                return Err(anyhow!("unknown temporal change_type"));
+            }
             Ok(Box::new(MarkChangedNodesStep::new(output_var, change_type)))
         },
     )?;

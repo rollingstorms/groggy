@@ -550,3 +550,22 @@ graph paths independently. Temporal steps remain next; broader execution/native
 compatibility/source-pin and standalone sampler parents stay open. See
 `atomic-path-builder-bundle-2026-10-24.md` and
 `../../docs/api/builder-paths.md` for contracts, costs and gate/receipt evidence.
+
+
+## Checked temporal builder continuation — 2026-10-24
+
+Completed **09.4b.2aj–2al**: checked finite node/edge decay, ordered node-column
+parity, and retained immutable snapshot selection with strict temporal factory
+parameters. Existing helper implementations now have builder registry entries.
+Decay uses explicit elapsed time and creates deltas only through attachments;
+loading earlier staged properties follows the existing overlay. Retained snapshots
+exclude those pending writes and do not create checkpoints or change the working
+graph. Snapshot timestamps keep the existing whole-history acceptance epoch-second
+selector (state-ID tie-break), not arbitrary effective-time reconstruction.
+
+Other temporal steps remain uncertified: diff snapshot/source identity and
+branch semantics, index provenance/lifecycle intervals, and window-value history
+resolution need follow-up. Existing workbook decisions remain in force; no new
+owner choice or approval gate is introduced. See
+`checked-temporal-builder-bundle-2026-10-24.md` and
+`../../docs/api/builder-temporal.md` for contracts, costs and verification.

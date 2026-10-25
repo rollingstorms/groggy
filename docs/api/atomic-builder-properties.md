@@ -405,3 +405,5 @@ Selector scope and ownership: [bounded subgraph samplers](builder-subgraph-sampl
 Nested child effects and owned outputs: [for-each execution](builder-foreach.md).
 
 Selected weighted paths and walks: [checked path helpers](builder-paths.md).
+
+Checked decay and retained snapshot selection: [temporal builder primitives](builder-temporal.md).

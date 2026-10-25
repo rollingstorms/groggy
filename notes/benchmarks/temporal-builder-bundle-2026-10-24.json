@@ -1,0 +1,181 @@
+{
+  "cases": [
+    {
+      "edges": 1000,
+      "mode": "node_map",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.00006675
+        },
+        {
+          "seconds": 0.000036416
+        },
+        {
+          "seconds": 0.00003675
+        },
+        {
+          "seconds": 0.000036709
+        },
+        {
+          "seconds": 0.000037625
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "edge_map",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000089875
+        },
+        {
+          "seconds": 0.000089084
+        },
+        {
+          "seconds": 0.000088792
+        },
+        {
+          "seconds": 0.0000885
+        },
+        {
+          "seconds": 0.000085875
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "node_column",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000092375
+        },
+        {
+          "seconds": 0.000088958
+        },
+        {
+          "seconds": 0.000085666
+        },
+        {
+          "seconds": 0.000085708
+        },
+        {
+          "seconds": 0.0001065
+        }
+      ]
+    },
+    {
+      "edges": 1000,
+      "mode": "retained_snapshot",
+      "nodes": 1000,
+      "samples": [
+        {
+          "seconds": 0.000845
+        },
+        {
+          "seconds": 0.000807
+        },
+        {
+          "seconds": 0.000707083
+        },
+        {
+          "seconds": 0.0007185
+        },
+        {
+          "seconds": 0.000733458
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "node_map",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.000488792
+        },
+        {
+          "seconds": 0.000460125
+        },
+        {
+          "seconds": 0.000460958
+        },
+        {
+          "seconds": 0.000460208
+        },
+        {
+          "seconds": 0.000468291
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "edge_map",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.001155708
+        },
+        {
+          "seconds": 0.001155292
+        },
+        {
+          "seconds": 0.001145833
+        },
+        {
+          "seconds": 0.00105575
+        },
+        {
+          "seconds": 0.001053875
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "node_column",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.000926542
+        },
+        {
+          "seconds": 0.000917833
+        },
+        {
+          "seconds": 0.000924375
+        },
+        {
+          "seconds": 0.000927375
+        },
+        {
+          "seconds": 0.000894667
+        }
+      ]
+    },
+    {
+      "edges": 10000,
+      "mode": "retained_snapshot",
+      "nodes": 10000,
+      "samples": [
+        {
+          "seconds": 0.01006475
+        },
+        {
+          "seconds": 0.00943875
+        },
+        {
+          "seconds": 0.00951025
+        },
+        {
+          "seconds": 0.009697625
+        },
+        {
+          "seconds": 0.009443916
+        }
+      ]
+    }
+  ],
+  "scope": "Native release kernel-only decay maps/ordered columns and retained full-owner snapshots on a ring, five observations per workload. Fixture/variable setup and validation excluded; includes validation, calculation/reconstruction and private result installation. No property publication, FFI, RSS, allocation, speedup or production-scale claim. Every value, column order, snapshot identity/existence and unchanged owner state validated."
+}

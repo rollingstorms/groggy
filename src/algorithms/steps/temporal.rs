@@ -14,9 +14,10 @@ use anyhow::{anyhow, Result};
 use crate::algorithms::temporal::ChangeType;
 use crate::algorithms::{AlgorithmParamValue, Context, CostHint};
 use crate::temporal::{TemporalIndex, TemporalSnapshot};
+use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId, StateId};
 
-use super::{Step, StepMetadata, StepScope};
+use super::{core::NodeColumn, Step, StepMetadata, StepScope};
 
 const DEFAULT_TEMPORAL_INDEX_VAR: &str = "temporal_index";
 
@@ -609,10 +610,9 @@ impl Step for MarkChangedNodesStep {
     }
 }
 
-/// Create a temporal snapshot at a specific commit or timestamp.
-///
-/// This is a placeholder that stores metadata about the snapshot request.
-/// Full implementation requires integration with TemporalSnapshot infrastructure.
+/// Capture an owned immutable retained state, excluding in-flight property writes.
+/// Timestamp references select retained acceptance time in epoch seconds, not
+/// per-property effective time. The snapshot covers the owner graph.
 pub struct SnapshotAtStep {
     /// Commit ID or timestamp to snapshot at
     reference: SnapshotReference,
@@ -643,6 +643,10 @@ impl SnapshotAtStep {
 }
 
 impl Step for SnapshotAtStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.snapshot_at"
     }
@@ -665,6 +669,7 @@ impl Step for SnapshotAtStep {
             SnapshotReference::Timestamp(ts) => snapshot_at_timestamp(scope, *ts)?,
         };
 
+        check_cancelled(ctx)?;
         scope
             .variables_mut()
             .set_snapshot(self.output.clone(), snapshot);
@@ -760,6 +765,10 @@ impl DecayStep {
 }
 
 impl Step for DecayStep {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "temporal.decay"
     }
@@ -773,59 +782,118 @@ impl Step for DecayStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("decay cancelled"));
-        }
-
-        if self.half_life <= 0.0 {
-            return Err(anyhow!(
-                "half_life must be positive, got {}",
-                self.half_life
-            ));
-        }
-
-        // Compute decay factor: exp(-λ * t) where λ = ln(2) / half_life
-        let lambda = std::f64::consts::LN_2 / self.half_life;
-        let decay_factor = (-lambda * self.time_delta).exp();
-
-        // Try node map first, then edge map
-        if let Ok(map) = scope.variables().node_map(&self.attr) {
-            let decayed = apply_decay(map, decay_factor)?;
+        check_cancelled(ctx)?;
+        validate_decay_controls(self.half_life, self.time_delta)?;
+        // Divide before multiplying: LN_2 / a subnormal half-life can overflow,
+        // producing NaN for zero elapsed time. A nonnegative ratio may overflow
+        // to infinity legitimately, in which case exp(-infinity) is zero.
+        let factor = (-std::f64::consts::LN_2 * (self.time_delta / self.half_life)).exp();
+        let variables = scope.variables();
+        if let Ok(column) = variables.node_column(&self.attr) {
+            let mut ids = Vec::new();
+            let mut values = Vec::new();
+            let mut seen = HashSet::new();
+            for (node, value) in column.iter() {
+                check_cancelled(ctx)?;
+                validate_decay_entity(scope, node, false)?;
+                if !seen.insert(node) {
+                    return Err(anyhow!("temporal.decay duplicate node ID {node}"));
+                }
+                ids.push(node);
+                values.push(decay_value(value, factor)?);
+            }
+            check_cancelled(ctx)?;
             scope
                 .variables_mut()
-                .set_node_map(self.output.clone(), decayed);
-            Ok(())
-        } else if let Ok(map) = scope.variables().edge_map(&self.attr) {
-            let decayed = apply_decay(map, decay_factor)?;
-            scope
-                .variables_mut()
-                .set_edge_map(self.output.clone(), decayed);
-            Ok(())
+                .set_node_column(self.output.clone(), NodeColumn::new(ids, values));
         } else {
-            Err(anyhow!("variable '{}' not found or not a map", self.attr))
+            let (source, edges) = if let Ok(map) = variables.node_map(&self.attr) {
+                (map, false)
+            } else if let Ok(map) = variables.edge_map(&self.attr) {
+                (map, true)
+            } else {
+                return Err(anyhow!(
+                    "variable '{}' must be a node map, node column, or edge map",
+                    self.attr
+                ));
+            };
+            let mut result = HashMap::with_capacity(source.len());
+            for (&entity, value) in source {
+                check_cancelled(ctx)?;
+                validate_decay_entity(scope, entity, edges)?;
+                result.insert(entity, decay_value(value, factor)?);
+            }
+            check_cancelled(ctx)?;
+            if edges {
+                scope
+                    .variables_mut()
+                    .set_edge_map(self.output.clone(), result);
+            } else {
+                scope
+                    .variables_mut()
+                    .set_node_map(self.output.clone(), result);
+            }
         }
+        Ok(())
     }
 }
 
-fn apply_decay<K>(
-    map: &HashMap<K, AlgorithmParamValue>,
-    factor: f64,
-) -> Result<HashMap<K, AlgorithmParamValue>>
-where
-    K: Copy + std::cmp::Eq + std::hash::Hash,
-{
-    let mut result = HashMap::with_capacity(map.len());
-
-    for (&key, value) in map.iter() {
-        let decayed_value = match value {
-            AlgorithmParamValue::Float(v) => AlgorithmParamValue::Float(v * factor),
-            AlgorithmParamValue::Int(v) => AlgorithmParamValue::Float(*v as f64 * factor),
-            other => other.clone(), // Non-numeric values pass through unchanged
-        };
-        result.insert(key, decayed_value);
+pub(super) fn validate_decay_controls(half_life: f64, time_delta: f64) -> Result<()> {
+    if !half_life.is_finite() || half_life <= 0.0 {
+        return Err(anyhow!("half_life must be finite and positive"));
     }
+    if !time_delta.is_finite() || time_delta < 0.0 {
+        return Err(anyhow!("time_delta must be finite and non-negative"));
+    }
+    Ok(())
+}
 
-    Ok(result)
+fn check_cancelled(ctx: &Context) -> Result<()> {
+    if ctx.is_cancelled() {
+        return Err(anyhow!("temporal step cancelled"));
+    }
+    Ok(())
+}
+
+fn decay_value(value: &AlgorithmParamValue, factor: f64) -> Result<AlgorithmParamValue> {
+    let number = match value {
+        AlgorithmParamValue::Int(value) => *value as f64,
+        AlgorithmParamValue::Float(value) if value.is_finite() => *value,
+        _ => return Err(anyhow!("temporal.decay requires finite numeric values")),
+    };
+    let result = number * factor;
+    if !result.is_finite() {
+        return Err(anyhow!("temporal.decay produced a non-finite value"));
+    }
+    Ok(AlgorithmParamValue::Float(result))
+}
+
+fn validate_decay_entity(scope: &StepScope<'_>, entity: usize, edges: bool) -> Result<()> {
+    let selected = scope.subgraph();
+    let owner = selected.graph();
+    let graph = owner.borrow();
+    if edges {
+        if !selected.edge_set().contains(&entity) || !graph.has_edge(entity) {
+            return Err(anyhow!(
+                "temporal.decay edge {entity} is outside the active selection"
+            ));
+        }
+        let (source, target) = graph.edge_endpoints(entity)?;
+        if !selected.node_set().contains(&source)
+            || !selected.node_set().contains(&target)
+            || !graph.has_node(source)
+            || !graph.has_node(target)
+        {
+            return Err(anyhow!(
+                "temporal.decay edge {entity} endpoints are outside the active selection"
+            ));
+        }
+    } else if !selected.node_set().contains(&entity) || !graph.has_node(entity) {
+        return Err(anyhow!(
+            "temporal.decay node {entity} is outside the active selection"
+        ));
+    }
+    Ok(())
 }
 
 fn snapshot_attr_history(
@@ -985,6 +1053,236 @@ fn change_matches(change: ChangeType, desired: ChangeType) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::{algorithms::steps::core::StepVariables, api::graph::Graph, subgraphs::Subgraph};
+    use std::{cell::RefCell, rc::Rc, sync::atomic::AtomicBool};
+
+    fn fixture() -> Subgraph {
+        let mut graph = Graph::new();
+        graph.add_nodes(3);
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(1, 2).unwrap();
+        graph.commit("fixture".into(), "test".into()).unwrap();
+        Subgraph::from_nodes(
+            Rc::new(RefCell::new(graph)),
+            [0, 1, 2].into_iter().collect(),
+            "decay".into(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn decay_preserves_column_order_and_supports_in_place_output() {
+        let selected = fixture();
+        let mut vars = StepVariables::default();
+        vars.set_node_column(
+            "values",
+            NodeColumn::new(
+                vec![2, 0],
+                vec![
+                    AlgorithmParamValue::Int(-8),
+                    AlgorithmParamValue::Float(4.0),
+                ],
+            ),
+        );
+        let mut scope = StepScope::new(&selected, &mut vars);
+        DecayStep::new("values", 2.0, "values")
+            .with_time_delta(4.0)
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        let actual: Vec<_> = scope
+            .variables()
+            .node_column("values")
+            .unwrap()
+            .iter()
+            .map(|(id, value)| (id, value.clone()))
+            .collect();
+        assert_eq!(
+            actual,
+            vec![
+                (2, AlgorithmParamValue::Float(-2.0)),
+                (0, AlgorithmParamValue::Float(1.0))
+            ]
+        );
+    }
+
+    #[test]
+    fn decay_validates_controls_and_values_before_installing_output() {
+        let selected = fixture();
+        let mut vars = StepVariables::default();
+        vars.set_node_map(
+            "old",
+            [(0, AlgorithmParamValue::Int(91))].into_iter().collect(),
+        );
+        for (half, elapsed) in [
+            (0.0, 0.0),
+            (-1.0, 0.0),
+            (f64::INFINITY, 0.0),
+            (f64::NAN, 0.0),
+            (1.0, -1.0),
+            (1.0, f64::INFINITY),
+            (1.0, f64::NAN),
+        ] {
+            vars.set_node_map("values", HashMap::new());
+            let mut scope = StepScope::new(&selected, &mut vars);
+            assert!(DecayStep::new("values", half, "old")
+                .with_time_delta(elapsed)
+                .apply(&mut Context::new(), &mut scope)
+                .is_err());
+            assert_eq!(
+                scope.variables().node_map("old").unwrap()[&0],
+                AlgorithmParamValue::Int(91)
+            );
+        }
+        for value in [
+            AlgorithmParamValue::Bool(true),
+            AlgorithmParamValue::None,
+            AlgorithmParamValue::Text("x".into()),
+            AlgorithmParamValue::Float(f64::NAN),
+            AlgorithmParamValue::Float(f64::INFINITY),
+        ] {
+            vars.set_edge_map("values", [(0, value)].into_iter().collect());
+            let mut scope = StepScope::new(&selected, &mut vars);
+            assert!(DecayStep::new("values", 1.0, "old")
+                .apply(&mut Context::new(), &mut scope)
+                .is_err());
+            assert_eq!(
+                scope.variables().node_map("old").unwrap()[&0],
+                AlgorithmParamValue::Int(91)
+            );
+        }
+    }
+
+    #[test]
+    fn decay_extreme_finite_controls_have_finite_limits() {
+        let selected = fixture();
+        let mut vars = StepVariables::default();
+        vars.set_node_map(
+            "values",
+            [(0, AlgorithmParamValue::Float(f64::MAX))]
+                .into_iter()
+                .collect(),
+        );
+        let mut scope = StepScope::new(&selected, &mut vars);
+        for (elapsed, expected) in [(0.0, f64::MAX), (f64::MAX, 0.0)] {
+            DecayStep::new("values", f64::from_bits(1), "result")
+                .with_time_delta(elapsed)
+                .apply(&mut Context::new(), &mut scope)
+                .unwrap();
+            assert_eq!(
+                scope.variables().node_map("result").unwrap()[&0],
+                AlgorithmParamValue::Float(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn decay_rejects_foreign_inactive_and_duplicate_ids() {
+        let selected = fixture();
+        let mut vars = StepVariables::default();
+        for edges in [false, true] {
+            let map = [(999, AlgorithmParamValue::Int(2))].into_iter().collect();
+            if edges {
+                vars.set_edge_map("values", map);
+            } else {
+                vars.set_node_map("values", map);
+            }
+            let mut scope = StepScope::new(&selected, &mut vars);
+            assert!(DecayStep::new("values", 1.0, "result")
+                .apply(&mut Context::new(), &mut scope)
+                .is_err());
+            assert!(!scope.variables().contains("result"));
+        }
+        vars.set_node_column(
+            "values",
+            NodeColumn::new(vec![0, 0], vec![AlgorithmParamValue::Int(1); 2]),
+        );
+        let mut scope = StepScope::new(&selected, &mut vars);
+        assert!(DecayStep::new("values", 1.0, "result")
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+        selected.graph().borrow_mut().remove_node(2).unwrap();
+        scope.variables_mut().set_node_map(
+            "values",
+            [(2, AlgorithmParamValue::Int(2))].into_iter().collect(),
+        );
+        assert!(DecayStep::new("values", 1.0, "result")
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+    }
+
+    #[test]
+    fn snapshot_step_retains_owner_state_without_working_changes() {
+        let selected = fixture();
+        let state = selected.graph().borrow().current_state_id();
+        selected
+            .graph()
+            .borrow_mut()
+            .set_node_attr(0, "score".into(), AttrValue::Int(3))
+            .unwrap();
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&selected, &mut vars);
+        SnapshotAtStep::new_at_commit(state, "saved")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        let saved = scope.variables().snapshot("saved").unwrap().clone();
+        assert!(saved.node_exists(2));
+        assert_eq!(saved.node_attr(0, &"score".into()), None);
+        let seconds = saved.lineage().timestamp;
+        SnapshotAtStep::new_at_timestamp(seconds, "by_time")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        assert_eq!(
+            scope
+                .variables()
+                .snapshot("by_time")
+                .unwrap()
+                .lineage()
+                .commit_id,
+            state
+        );
+        selected
+            .graph()
+            .borrow_mut()
+            .commit("next".into(), "test".into())
+            .unwrap();
+        assert_eq!(saved.node_attr(0, &"score".into()), None);
+        assert!(SnapshotAtStep::new_at_commit(u64::MAX, "saved")
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+        assert_eq!(
+            scope
+                .variables()
+                .snapshot("saved")
+                .unwrap()
+                .lineage()
+                .commit_id,
+            state
+        );
+    }
+
+    #[test]
+    fn snapshot_and_decay_cancellation_preserve_existing_variables() {
+        let selected = fixture();
+        let mut vars = StepVariables::default();
+        vars.set_scalar("result", AlgorithmParamValue::Int(71));
+        vars.set_node_map(
+            "values",
+            [(0, AlgorithmParamValue::Int(2))].into_iter().collect(),
+        );
+        let mut scope = StepScope::new(&selected, &mut vars);
+        let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+        assert!(SnapshotAtStep::new_at_commit(1, "result")
+            .apply(&mut ctx, &mut scope)
+            .is_err());
+        assert!(DecayStep::new("values", 1.0, "result")
+            .apply(&mut ctx, &mut scope)
+            .is_err());
+        assert_eq!(
+            scope.variables().scalar("result").unwrap(),
+            &AlgorithmParamValue::Int(71)
+        );
+    }
 
     #[test]
     fn test_aggregate_function_from_str() {

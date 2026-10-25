@@ -33,8 +33,8 @@ pub mod validation;
 
 // Re-export core types
 pub use core::{
-    global_step_registry, Step, StepEdgeInput, StepInput, StepMetadata, StepRegistry, StepScope,
-    StepSpec, StepValue, StepVariables,
+    global_step_registry, NodeColumn, Step, StepEdgeInput, StepInput, StepMetadata, StepRegistry,
+    StepScope, StepSpec, StepValue, StepVariables,
 };
 
 // Re-export expression types

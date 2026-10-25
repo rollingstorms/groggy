@@ -131,3 +131,7 @@ harness = false
 [[bench]]
 name = "path_builder_steps"
 harness = false
+
+[[bench]]
+name = "temporal_builder_steps"
+harness = false
