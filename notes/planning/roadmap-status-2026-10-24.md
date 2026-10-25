@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **192 checked and 76 unchecked entries**. Entries overlap:
+currently contains **193 checked and 75 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 76 unchecked entries are not 76 independent tasks: 14 are overlapping AR
-architecture entries, 62 are numbered entries (including nested publication
+The 75 unchecked entries are not 75 independent tasks: 14 are overlapping AR
+architecture entries, 61 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -349,3 +349,19 @@ The fixed 27.1 remainder still names GraphTable node-subset policy, rectangular
 metadata, and its unsupported graph-accessor/subgraph converter contracts.
 Those are distinct from the now-complete BaseTable data-only adapters. No new
 checklist rows; inventory remains **192 checked / 76 unchecked**.
+
+### 12.3 exit review — explicit checkpoint requirement complete
+
+Closed the original 12.3 parent after tracing native commit/checkpoint, writer,
+Python default publication and durable annotation/replay through the existing
+passing conformance suites. The former Partial status predated ordinary Python
+default migration. Clean labels add no delta or state ID; dirty/manual commit
+publishes once for compatibility; stale/dirty/schema failures and durable
+rollback/recovery are covered. Evidence: `checkpoint-exit-review-2026-10-25.md`.
+
+This is a status correction, not a new capability or a claim that native default
+migration (09.4b.2), materialized recovery checkpoints/compaction (10.4), portable
+pooled snapshots (12.2) or effective-time reconstruction (16.2) are complete.
+Current gate remains 1,150 native / 1,881 root Python / 133 executable docs,
+with 51 native ignored and one Python skip; strict all-target Clippy passed.
+Inventory now **193 checked / 75 unchecked**, with no rows added or removed.

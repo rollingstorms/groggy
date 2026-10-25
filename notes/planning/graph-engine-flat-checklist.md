@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has **192 checked / 76 unchecked entries**, including overlapping
+The checklist has **193 checked / 75 unchecked entries**, including overlapping
 parents and repair slices; this is not a completion percentage. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
@@ -174,7 +174,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **11.2 — Partial: complete property history.** Finish coalescing, deletion/unset/null distinctions, effective versus recorded ordering, all value types, and retained value references. Do not confuse property changes with deltas of the encoded value itself.
 - [x] **12.1 — Recorded state switching foundations.** Preserve direction, ID allocation, retained membership/endpoints, and backing column references through branch switches/reset; reject missing referents.
 - [ ] **12.2 — Partial: exact portable snapshots.** Restore all configuration and pinned referents; bound repeated-switch column allocation and verify reads independently of the working head.
-- [ ] **12.3 — Partial: explicit checkpoint semantics.** Make an explicit commit/snapshot checkpoint the current published state through a compatible migration. Automatic deltas remain available between checkpoints.
+- [x] **12.3 — Explicit checkpoint semantics.** Clean commit/checkpoint labels the current published state without an extra mutation delta or changed publication clocks. Ordinary Python defaults publish mutations between checkpoints; explicit manual compatibility publishes pending changes once before labeling. Native/writer/Python/durable, stale/dirty/schema failures, empty/repeated labels, branch/reopen/backup and journal-fault behavior are verified. Exit: `checkpoint-exit-review-2026-10-25.md`. Native default/escape-path migration remains 09.4b.2; materialized storage checkpoints stay in 10.4 and effective-time reconstruction in 16.2.
 - [x] **12.3a — Checkpoint published states without duplicate deltas.** `checkpoint`, writer checkpoint and clean `commit()` label the current version, preserving state IDs and publication clocks. Durable records sync/replay/backup labels with original timestamps; stale/dirty/schema failures reject, empty/repeated labels work and checkpoints are not permanent retention pins. Legacy dirty `commit()` publishes once for compatibility. See `explicit-checkpoints-2026-10-23.md`; ordinary defaults remain 09.4b.
 - [x] **13.1 — Hard reset foundations.** Restore the recorded state while preserving allocated-ID reservations and retained pool references.
 - [x] **13.2 — State-based diffs.** Compare reconstructed states in either direction with deterministic typed property and topology changes in Rust/Python.
