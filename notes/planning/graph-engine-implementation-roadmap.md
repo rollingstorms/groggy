@@ -721,3 +721,24 @@ This finishes the explicit frozen export/base-row/generic-join/source-write fami
 Specialized domain merges, TableArray adapters, broad join-key conformance and
 legacy connected reads keep the existing parents partial; no new checkbox rows
 were added and the inventory remains **191 checked / 77 unchecked**.
+
+
+## 2026-10-25 — generic table join conformance (27 / AR7.10)
+
+Closed the five-family generic join engine inventory using one Rust typed hash
+planner and columnar materializer. Single/composite keys follow property identity;
+null matches null, storage variants match and f32/f64 remain distinct. Stable
+outer ordering and coalesced right-only shared keys replace arbitrary hash order
+and lost keys. Generated-name collisions now reject rather than overwrite data.
+Existing family naming and right-join swapped-left behavior remain explicit.
+Python's existing multi-key syntax now executes and releases the GIL over native
+work. Native TableArray positional joins delegate all five families. Frozen
+source contexts remain immutable and joined rows require explicit write identity.
+
+Evidence: `table-join-conformance-2026-10-25.md`, seven native regressions including
+300 independent nested-loop comparisons, eight Python cases, 1,047 native /
+1,767 root Python tests, 97 executable docs and strict all-target Clippy. Release
+native receipt: `notes/benchmarks/table-joins-2026-10-25.json`; no matched speedup
+or memory guarantee. Checklist remains 191 checked / 77 unchecked: no new rows.
+The generic join family is complete; broad 27/AR7.10 remain partial for specialized
+merges, grouping/set/conversion semantics and TableArray aggregation adapters.

@@ -167,3 +167,7 @@ harness = false
 [[bench]]
 name = "table_source_pins"
 harness = false
+
+[[bench]]
+name = "table_joins"
+harness = false

@@ -1301,67 +1301,28 @@ impl PyBaseTable {
     /// # Multi-column join
     /// result = table1.join(table2, on=["key1", "key2"], how="outer")
     /// ```
-    pub fn join(&self, other: &Self, on: &PyAny, how: Option<&str>) -> PyResult<Self> {
-        // Parse the 'on' parameter
-        let (left_cols, right_cols) = self.parse_join_on(on)?;
-
-        // Use default join type if not specified
-        let how = how.unwrap_or("inner");
-
-        // Validate join type
-        let join_result = match how.to_lowercase().as_str() {
-            "inner" => {
-                if left_cols.len() == 1 {
-                    self.table
-                        .inner_join(&other.table, &left_cols[0], &right_cols[0])
-                } else {
-                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                        "Multi-column joins not yet implemented",
-                    ));
-                }
-            }
-            "left" => {
-                if left_cols.len() == 1 {
-                    self.table
-                        .left_join(&other.table, &left_cols[0], &right_cols[0])
-                } else {
-                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                        "Multi-column joins not yet implemented",
-                    ));
-                }
-            }
-            "right" => {
-                if left_cols.len() == 1 {
-                    self.table
-                        .right_join(&other.table, &left_cols[0], &right_cols[0])
-                } else {
-                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                        "Multi-column joins not yet implemented",
-                    ));
-                }
-            }
-            "outer" => {
-                if left_cols.len() == 1 {
-                    self.table
-                        .outer_join(&other.table, &left_cols[0], &right_cols[0])
-                } else {
-                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                        "Multi-column joins not yet implemented",
-                    ));
-                }
-            }
-            "cross" => self.table.cross_join(&other.table),
-            _ => {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    format!("Invalid join type '{}'. Must be one of: 'inner', 'left', 'right', 'outer', 'cross'", how)
-                ));
-            }
-        };
-
-        let result = join_result.map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("Join failed: {}", e))
-        })?;
-
+    pub fn join(
+        &self,
+        py: Python<'_>,
+        other: &Self,
+        on: &PyAny,
+        how: Option<&str>,
+    ) -> PyResult<Self> {
+        let (left, right) = self.parse_join_on(on)?;
+        let left: Vec<&str> = left.iter().map(String::as_str).collect();
+        let right: Vec<&str> = right.iter().map(String::as_str).collect();
+        // Parse the public family argument, preserving its ValueError contract.
+        let how = how.unwrap_or("inner").to_ascii_lowercase();
+        if !matches!(how.as_str(), "inner" | "left" | "right" | "outer" | "cross") {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Invalid join type '{how}'. Must be one of: 'inner', 'left', 'right', 'outer', 'cross'"
+            )));
+        }
+        let table = &self.table;
+        let other = &other.table;
+        let result = py
+            .allow_threads(|| table.join_on(other, &left, &right, &how))
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Join failed: {e}")))?;
         Ok(Self::from_table(result))
     }
 

@@ -1,0 +1,65 @@
+{
+  "cases": [
+    {
+      "rows_per_input": 1000,
+      "samples": [
+        {
+          "composite_outer_seconds": 0.000448375,
+          "inner_seconds": 0.000200666,
+          "outer_seconds": 0.000279375
+        },
+        {
+          "composite_outer_seconds": 0.000421125,
+          "inner_seconds": 0.000172667,
+          "outer_seconds": 0.000252041
+        },
+        {
+          "composite_outer_seconds": 0.000408542,
+          "inner_seconds": 0.00021525,
+          "outer_seconds": 0.000260458
+        },
+        {
+          "composite_outer_seconds": 0.0004255,
+          "inner_seconds": 0.000150959,
+          "outer_seconds": 0.000229625
+        },
+        {
+          "composite_outer_seconds": 0.00042225,
+          "inner_seconds": 0.000165791,
+          "outer_seconds": 0.000245708
+        }
+      ]
+    },
+    {
+      "rows_per_input": 10000,
+      "samples": [
+        {
+          "composite_outer_seconds": 0.004115334,
+          "inner_seconds": 0.001779208,
+          "outer_seconds": 0.002650625
+        },
+        {
+          "composite_outer_seconds": 0.004337791,
+          "inner_seconds": 0.001494542,
+          "outer_seconds": 0.002621291
+        },
+        {
+          "composite_outer_seconds": 0.004127583,
+          "inner_seconds": 0.001507083,
+          "outer_seconds": 0.002434875
+        },
+        {
+          "composite_outer_seconds": 0.004111583,
+          "inner_seconds": 0.001540958,
+          "outer_seconds": 0.002326375
+        },
+        {
+          "composite_outer_seconds": 0.003911083,
+          "inner_seconds": 0.001469666,
+          "outer_seconds": 0.002291375
+        }
+      ]
+    }
+  ],
+  "scope": "Five observations of native optimized disjoint-key inner, outer, and composite outer joins. Duplicate keys within each input; fixture construction and output correctness checks excluded. Full result construction included. No matched baseline, FFI, memory/RSS or speedup claim."
+}

@@ -87,7 +87,7 @@ not represent building its basic engine contract from scratch.
 | Numerical core and architecture | Canonical matrix/array foundations, entity handles, many arithmetic/statistical/solver/factorization/sparse/operator and algorithm repairs, bounded release receipts. | Remaining promised derivative/composition domains, uncovered consumers and representative performance/memory/scale gates; broad numerical parents remain partial. |
 | Mutation/publication | Checked mixed batches, ordinary Python defaults, property clocks, checkpoints, compound collapse and recent table/subgraph boundaries. | Remaining native default/infallible compatibility, mutable pool/space escapes, whole-pipeline boundaries and broader pipeline semantics. |
 | Properties, state and history | f64 defaults, typed temporal properties, shared logical change records, retained snapshots and immutable read APIs. | Complete value lifecycle, effective-time reconstruction/validation, rewiring/revert, exact portable snapshots and portable pooled/meta contents. |
-| Views and tables | Explicit pinned read views, frozen matrix/table exports, mapped writeback and checked independent materialization. | Migrate legacy connected reads, specialized GraphTable domain merges and TableArray adapters. Frozen BaseTable selections/projections and generic joins now retain source pins; direct/mixed source property writeback is checked. Broader table parents remain partial. |
+| Views and tables | Explicit pinned read views, frozen matrix/table exports, mapped writeback and checked independent materialization. | Migrate legacy connected reads, specialized GraphTable domain merges and TableArray adapters. Frozen BaseTable selections/projections and generic joins now retain source pins; direct/mixed source property writeback is checked. Generic joins now share typed/composite key semantics, stable ordering and checked output names; broader table parents remain partial. |
 | Storage, branches and schema | Checked journal/recovery foundations, checkpoint annotations, existing branch/identity behavior and explicit schema checks. | Full pooled retention, lifecycle/compaction/format migration, complete branch lifecycle, three-way merge, purge and schema evolution. |
 | Queries, indexes and pipelines | Existing native filter/query/index/builder machinery and many repaired algorithm paths. | Consistent index lifecycle, pinned temporal query results, shared expression/execution boundaries, pipeline intermediates/history and complete algorithm certification. |
 | Integration and service | Existing embedded engine and test/benchmark infrastructure. | Graphiti ingest/driver/provenance/retrieval remain deferred behind core; service concurrency, multi-user deployment and broad comparison/scale gates remain open. |
@@ -112,8 +112,8 @@ appendix and their corresponding checklist entries.
 
 ## Current verification baseline
 
-Latest table-source slice (2026-10-25): **1,040 native tests passed, 52 ignored; 1,759 root
-Python API tests passed, 1 skipped; 94 executable documentation examples passed;
+Latest table-join slice (2026-10-25): **1,047 native tests passed, 52 ignored; 1,767 root
+Python API tests passed, 1 skipped; 97 executable documentation examples passed;
 strict all-target core Clippy passed.** The root Python gate excludes the unrelated
 owner benchmark test and the separate legacy modules survey. Local release
 receipts are bounded observations, not production throughput/memory guarantees.

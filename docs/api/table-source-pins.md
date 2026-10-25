@@ -124,3 +124,6 @@ assert graph.get_edge_attr(0, "weight") == 2.5
   The original `update_graph` mapping API and its behavior remain available.
 
 See [implementation inventory, verification and bounded costs](../../notes/planning/table-source-pins-2026-10-25.md).
+
+See [table joins](table-joins.md) for typed/composite keys, stable output ordering,
+column naming and unmatched-row behavior.

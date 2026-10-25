@@ -121,7 +121,7 @@ def get_known_return_types() -> Dict[str, Dict[str, str]]:
         'BaseTable': {
             'source_state_id': 'Optional[int]', 'source_entity_ids': 'Optional[List[int]]',
             'source_entity_kind': 'Optional[str]', 'source_views': 'List[GraphView]',
-            'update_source_graph': 'Dict[str, Any]',
+            'update_source_graph': 'Dict[str, Any]', 'join': 'BaseTable',
         },
         'GraphTable': {'update_source_graph': 'Dict[str, Any]'},
         'GraphView': {
@@ -466,6 +466,8 @@ def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = Non
             lines.append(f"    def __getattr__(self, name: str) -> Any:")
             if not method_doc:
                 method_doc = "Dynamic attribute access for runtime attribute dictionaries"
+        elif class_name == 'BaseTable' and method_name == 'join':
+            lines.append("    def join(self, other: BaseTable, on: Any, how: Optional[str] = None) -> BaseTable:")
         elif class_name == 'BaseTable' and method_name == 'update_source_graph':
             lines.append("    def update_source_graph(self, graph: Any, columns: List[str], *, effective_at: Optional[int] = None, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:")
         elif class_name == 'GraphTable' and method_name == 'update_source_graph':

@@ -2053,7 +2053,7 @@ class BaseTable:
         """
         ...
 
-    def join(self, *args, **kwargs) -> Any:
+    def join(self, other: BaseTable, on: Any, how: Optional[str] = None) -> BaseTable:
         """
         Unified join method with pandas-style interface
 

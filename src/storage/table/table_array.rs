@@ -445,6 +445,11 @@ impl TableArray {
     /// Join this TableArray with another TableArray
     /// Performs element-wise joins between corresponding tables
     pub fn join(&self, other: &TableArray, on: &str, join_type: &str) -> GraphResult<TableArray> {
+        if !matches!(join_type, "inner" | "left" | "right" | "outer" | "cross") {
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Unsupported join type: {join_type}"
+            )));
+        }
         if self.tables.len() != other.tables.len() {
             return Err(crate::errors::GraphError::InvalidInput(
                 "TableArrays must have same length for join".to_string(),
@@ -461,6 +466,9 @@ impl TableArray {
             let joined_table = match join_type {
                 "inner" => left_table.inner_join(right_table, on, on)?,
                 "left" => left_table.left_join(right_table, on, on)?,
+                "right" => left_table.right_join(right_table, on, on)?,
+                "outer" => left_table.outer_join(right_table, on, on)?,
+                "cross" => left_table.cross_join(right_table)?,
                 _ => {
                     return Err(crate::errors::GraphError::InvalidInput(format!(
                         "Unsupported join type: {}",

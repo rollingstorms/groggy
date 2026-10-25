@@ -82,3 +82,7 @@ Legacy connected reads (26.1), specialized GraphTable domain merges/remapping an
 TableArray aggregation adapters, broad join-key conformance and remaining table
 conversion/aggregation contracts remain open in 27/AR7.10. This slice does not
 certify every old operation merely because source metadata now exists.
+
+Follow-up: [table join conformance](table-join-conformance-2026-10-25.md) closes
+the generic join-key family above. Specialized merges, aggregation adapters and
+other grouping/set/conversion work remain open.
