@@ -571,5 +571,10 @@ The earlier decision record is chronological. Later implementation entries super
 The owner confirmed internal-edge node subsets, separate node/edge shapes with
 rectangular work through components, and to_nodes/to_edges returning table
 components. These are implemented; see `graph-table-decisions-2026-10-25.md`.
-The separate to_subgraphs grouping/ownership question remains pending. Earlier
-workbook answers and unanswered schema/merge/index/service choices stay as recorded.
+The separate to_subgraphs grouping/ownership question was confirmed again on
+2026-10-26: views grouped by a caller-supplied column. This is implemented by
+`GraphTable.to_subgraphs(by=..., directed=...)`; see
+`graph-table-grouped-views-2026-10-25.md`. It returns immutable views with internal
+edges, preserving IDs and one frozen source capture. The field is required; missing
+columns reject. Earlier workbook answers and unanswered schema/merge/index/service
+choices stay as recorded.

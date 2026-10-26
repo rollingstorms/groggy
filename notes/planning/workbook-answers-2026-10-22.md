@@ -1070,3 +1070,10 @@ remains material work. Evidence: `chunked-storage-baselines-2026-10-26.md`.
 Gates: 1,259 native / 51 ignored; 2,000 root Python / 1 skipped; 158 docs; strict
 Clippy. No new checklist rows: **201 checked / 67 open**. 10.4 remains partial
 for decoded-memory/migration/platform/process-failure scope; A02 schedule deferred.
+
+### 2026-10-26 — GraphTable converter confirmation
+
+Owner reconfirmed: `to_subgraphs` means immutable views grouped by an explicit
+caller-supplied column. Existing native/FFI/Python implementation and tests already
+match this answer; see `graph-table-grouped-views-2026-10-25.md`. Updated the
+appendix's stale pending marker. No new feature or checklist row is introduced.
