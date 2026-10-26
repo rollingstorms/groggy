@@ -3226,6 +3226,10 @@ class DurableGraph:
         """Start a journal with complete retained graph storage/history."""
         ...
 
+    def compact_storage(self, *, expected_state: Optional[int] = None) -> Dict[str, Any]:
+        """Deduplicate exact pool values and replace the retained baseline (Unix)."""
+        ...
+
     def checkpoint_storage(self, *, expected_state: Optional[int] = None) -> Dict[str, int]:
         """Replace the operation log with a complete retained baseline (Unix)."""
         ...

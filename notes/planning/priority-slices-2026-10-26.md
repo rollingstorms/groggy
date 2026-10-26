@@ -353,3 +353,18 @@ and immutable pins are preserved. See `pool-compaction-2026-10-26.md` for native
 Python, archive and local release evidence. No new rows; **201 checked / 67 open**.
 Destructive distinct-value/entity/group collection and identity release still need
 complete reference closure. Durable physical installation is the next component.
+
+### Durable exact-column compaction completed
+
+15.2/10.4 now includes explicit `compact_storage`, preserving all distinct raw
+values and retained history while physically replacing the baseline and installing
+the same remapped columns in memory. Five injected failures plus twelve actual
+SIGKILL/reopen cases preserve old/new layout, clocks/schema/history and locks.
+Warm-cache release fixture: **8.58 → 5.80 MB**, reopen **34.37 → 22.31 ms** with
+all eleven versions retained. Details/limits: `pool-compaction-2026-10-26.md`.
+Gates: **1,279 native / 52 ignored**, serial matrix **1 passed / twelve cases**,
+**2,009 root Python / 1 skipped**, **162 docs**, strict Clippy, rebuilt extension.
+No new rows; **201 checked / 67 open**. Raw duplicate reclamation and verified
+physical compaction are done; deleting unreachable distinct values/entities/groups
+and releasing external identities remain separate destructive reference-closure
+work. Ordinary checkpoints continue to preserve raw column positions.

@@ -1,0 +1,42 @@
+{
+  "benchmark": "storage_compaction",
+  "samples": [
+    {
+      "capture_seconds": 0.007735042,
+      "execute_and_file_verification_seconds": 0.068326041,
+      "file_bytes_after": 5800477,
+      "file_bytes_before": 8583523,
+      "install_seconds": 0.000451333,
+      "node_slots_after": 11,
+      "node_slots_before": 11000,
+      "reopen_after_seconds": 0.022710542,
+      "reopen_before_seconds": 0.043694083,
+      "retained_versions": 11
+    },
+    {
+      "capture_seconds": 0.007819875,
+      "execute_and_file_verification_seconds": 0.070724708,
+      "file_bytes_after": 5800469,
+      "file_bytes_before": 8583515,
+      "install_seconds": 0.000460417,
+      "node_slots_after": 11,
+      "node_slots_before": 11000,
+      "reopen_after_seconds": 0.022305208,
+      "reopen_before_seconds": 0.03436525,
+      "retained_versions": 11
+    },
+    {
+      "capture_seconds": 0.007428666,
+      "execute_and_file_verification_seconds": 0.069171958,
+      "file_bytes_after": 5800469,
+      "file_bytes_before": 8583515,
+      "install_seconds": 0.000461208,
+      "node_slots_after": 11,
+      "node_slots_before": 11000,
+      "reopen_after_seconds": 0.022236916,
+      "reopen_before_seconds": 0.032519084,
+      "retained_versions": 11
+    }
+  ],
+  "scope": "local release; 1000 nodes, ten bulk text revisions, ten distinct 256-byte strings; full history retained; warm-cache reopen; not isolated RSS/power-loss evidence"
+}

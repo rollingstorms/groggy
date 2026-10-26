@@ -58,3 +58,38 @@ rebuilt in-tree extension and scoped formatting/diff checks. Default ignores inc
 the separately required process-death matrix, which is rerun for the following
 durable slice. Owner benchmark and nested legacy surveys remain excluded. Three
 pre-existing FFI warnings remain; no packages installed.
+
+## Durable physical installation
+
+`DurableGraph.compact_storage` uses the existing checkpoint plan/outcome protocol:
+prepare a raw-column capture plus full portable baseline, deduplicate off-owner,
+remap the baseline, write/sync/verify a sibling file, replace it under continuous
+inode locks, sync the directory, then install the same column result in memory.
+An ordinary `checkpoint_storage` still preserves raw offsets. Its Python result
+shape is unchanged; the explicit compactor adds nested `pool_compaction` counts.
+
+Pre-replacement failure leaves original memory and named bytes untouched.
+Post-replacement failure preserves original inaccessible memory, poisons the owner
+and requires reopening the complete replacement. No partial in-memory remapping
+occurs. Detached maintenance blocks owner reads/writes until completion.
+
+Five injected failure phases and twelve actual SIGKILL/reopen cases (six ordinary
+checkpoint plus six compacting checkpoint phases) verify old/new raw layouts,
+complete clocks/history/schema/checkpoints and locks. Large interrupted-fragment
+cases remain included. This verifies process death, not sudden power loss.
+Native/Python tests also cover physical shrinkage in a repetitive fixture,
+idempotence, branches, group pins, external reservations, stale rejection,
+append/reopen and backup. No storage format change or package install.
+
+Durable local release medians (three warm-cache fixtures, 1k nodes / ten bulk
+text revisions): file **8,583,515 → 5,800,469 bytes**, reopen **34.37 → 22.31 ms**;
+capture **7.74 ms**, detached deduplication/write/sync/verification **69.17 ms**,
+installation **0.46 ms**. All eleven versions remain. Receipt:
+`../benchmarks/storage-compaction-2026-10-26.json`. Not isolated RSS, unique-value
+performance, physical power loss or a production latency guarantee.
+
+Durable-slice gates: **1,279 native passed / 52 ignored**, dedicated serial
+process-death matrix **1 passed / twelve cases**, **2,009 root Python passed / 1
+skipped**, **162 executable docs examples**, strict all-target Clippy and rebuilt
+in-tree extension. Owner benchmark/nested legacy survey exclusions and the three
+pre-existing FFI warnings remain unchanged. No packages installed or push.

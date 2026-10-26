@@ -14,6 +14,9 @@ pub struct StorageCheckpointReport {
     pub retained_versions: usize,
     /// Selected version; storage maintenance does not publish a graph change.
     pub selected_state: StateId,
+    /// Exact slot deduplication counts for explicit compact_storage; None for an
+    /// ordinary checkpoint_storage, which preserves raw positions.
+    pub pool_compaction: Option<crate::PoolCompactionReport>,
 }
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +37,7 @@ pub struct StorageCheckpointPlan {
     record: Record,
     report: StorageCheckpointReport,
     schema_revision: u64,
+    compaction: Option<crate::PoolCompactionPlan>,
     #[cfg(test)]
     failure: Option<CheckpointFailure>,
 }
@@ -46,6 +50,7 @@ pub struct StorageCheckpointOutcome {
     source_path: PathBuf,
     source_identity: File,
     expected_state: StateId,
+    compaction: Option<crate::PoolCompactionOutcome>,
 }
 // Test-only process handshake: no environment-controlled behavior exists in
 // production builds. A parent test kills this process after observing the phase.
@@ -79,6 +84,32 @@ impl DurableGraph {
         let plan = self.prepare_storage_checkpoint(expected_state)?;
         self.finish_storage_checkpoint(plan.execute())
     }
+    /// Deduplicate exact raw property values and publish one verified retained
+    /// baseline with locked atomic replacement. History/distinct values/IDs remain.
+    /// Pre-replacement errors leave memory and disk unchanged; post-replacement
+    /// errors require reopen. Requires Unix like checkpoint_storage.
+    pub fn compact_storage(
+        &mut self,
+        expected_state: StateId,
+    ) -> GraphResult<StorageCheckpointReport> {
+        let plan = self.prepare_storage_compaction(expected_state)?;
+        self.finish_storage_checkpoint(plan.execute())
+    }
+    /// Capture raw columns and a full baseline for detached compaction and I/O.
+    /// This explicit maintenance can temporarily duplicate retained payloads.
+    #[doc(hidden)]
+    pub fn prepare_storage_compaction(
+        &mut self,
+        expected_state: StateId,
+    ) -> GraphResult<StorageCheckpointPlan> {
+        self.ready()?;
+        self.graph.validate_write_head(expected_state)?;
+        let compaction = self.graph.prepare_pool_compaction()?;
+        let mut plan = self.prepare_storage_checkpoint(expected_state)?;
+        plan.compaction = Some(compaction);
+        Ok(plan)
+    }
+
     /// Prepare detached storage work for runtime integrations. The owner must not
     /// accept any mutations until finish_storage_checkpoint consumes the outcome.
     #[doc(hidden)]
@@ -103,6 +134,7 @@ impl DurableGraph {
             previous_records: self.next_sequence,
             retained_versions: self.graph.history_records().len(),
             selected_state: self.graph.current_state_id(),
+            pool_compaction: None,
         };
         let record = Record::InitArchive {
             archive: Box::new(self.graph.archive_document()?),
@@ -122,6 +154,7 @@ impl DurableGraph {
             record,
             report,
             schema_revision: self.schema_revision,
+            compaction: None,
             #[cfg(test)]
             failure: self.checkpoint_failure,
         })
@@ -151,6 +184,7 @@ impl DurableGraph {
             source_path,
             source_identity,
             expected_state,
+            compaction,
         } = outcome;
         if source_path != self.path
             || expected_state != self.graph.current_state_id()
@@ -167,6 +201,14 @@ impl DurableGraph {
             self.recovered_tail_bytes = 0;
         }
         self.poisoned = invalidate_owner;
+        if result.is_ok() {
+            if let Some(compaction) = compaction {
+                if let Err(error) = self.graph.finish_pool_compaction(compaction) {
+                    self.poisoned = true;
+                    return Err(error);
+                }
+            }
+        }
         result
     }
 }
@@ -197,15 +239,32 @@ fn check_path(source: &File, path: &Path) -> GraphResult<()> {
 impl StorageCheckpointPlan {
     /// Perform detached file I/O and candidate verification. Always finish the outcome
     /// on its original owner, including errors, to preserve lock/publication ownership.
-    pub fn execute(self) -> StorageCheckpointOutcome {
+    pub fn execute(mut self) -> StorageCheckpointOutcome {
         let mut replacement = None;
         let mut invalidate_owner = false;
+        let mut compaction = None;
+        let prepared = (|| -> GraphResult<()> {
+            if let Some(plan) = self.compaction.take() {
+                let outcome = plan.execute()?;
+                let Record::InitArchive { archive, .. } = &mut self.record else {
+                    return Err(invalid("compaction requires a full retained baseline"));
+                };
+                outcome.rewrite_archive(archive)?;
+                self.report.pool_compaction = Some(outcome.report());
+                compaction = Some(outcome);
+            }
+            Ok(())
+        })();
         #[cfg(unix)]
-        let result = self.execute_unix(&mut replacement, &mut invalidate_owner);
+        let result =
+            prepared.and_then(|()| self.execute_unix(&mut replacement, &mut invalidate_owner));
         #[cfg(not(unix))]
-        let result = Err(invalid(
-            "atomic storage checkpoint replacement currently requires Unix",
-        ));
+        let result = prepared.and_then(|()| {
+            Err(invalid(
+                "atomic storage checkpoint replacement currently requires Unix",
+            ))
+        });
+        let compaction = if result.is_ok() { compaction } else { None };
         StorageCheckpointOutcome {
             replacement,
             invalidate_owner,
@@ -213,6 +272,7 @@ impl StorageCheckpointPlan {
             source_path: self.path,
             source_identity: self.source,
             expected_state: self.report.selected_state,
+            compaction,
         }
     }
     #[cfg(unix)]
@@ -340,9 +400,16 @@ mod tests {
             return;
         };
         let mut store = DurableGraph::open(Path::new(&path)).expect("open child journal");
-        store
-            .checkpoint_storage(store.graph.current_state_id())
-            .expect("checkpoint must reach requested phase");
+        let state = store.graph.current_state_id();
+        if std::env::var("GROGGY_TEST_CHECKPOINT_COMPACT").as_deref() == Ok("true") {
+            store
+                .compact_storage(state)
+                .expect("compaction must reach requested phase");
+        } else {
+            store
+                .checkpoint_storage(state)
+                .expect("checkpoint must reach requested phase");
+        }
         panic!("checkpoint did not pause at requested boundary");
     }
 
@@ -359,124 +426,231 @@ mod tests {
                 let _ = self.0.wait();
             }
         }
-        for phase in [
-            "BeforeWrite",
-            "AfterFirstFragment",
-            "AfterSync",
-            "BeforeReplace",
-            "AfterReplace",
-            "AfterDirectorySync",
-        ] {
-            let dir = tempfile::tempdir().unwrap();
-            let path = dir.path().join("journal");
-            let ready = dir.path().join("ready");
-            let mut store = populated(&path);
-            if phase == "AfterFirstFragment" {
+        for compact in [false, true] {
+            for phase in [
+                "BeforeWrite",
+                "AfterFirstFragment",
+                "AfterSync",
+                "BeforeReplace",
+                "AfterReplace",
+                "AfterDirectorySync",
+            ] {
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("journal");
+                let ready = dir.path().join("ready");
+                let mut store = populated(&path);
+                if compact {
+                    let state = store.graph.current_state_id();
+                    store
+                        .apply_batch(
+                            GraphBatch {
+                                node_attrs: HashMap::from([(
+                                    "v".into(),
+                                    vec![(N::Existing(0), V::Int(10))],
+                                )]),
+                                ..Default::default()
+                            },
+                            state,
+                            "duplicate".into(),
+                            "test".into(),
+                        )
+                        .unwrap();
+                }
+                if phase == "AfterFirstFragment" {
+                    let state = store.graph.current_state_id();
+                    store
+                        .apply_batch(
+                            GraphBatch {
+                                node_attrs: HashMap::from([(
+                                    "large".into(),
+                                    vec![(N::Existing(0), V::Text("x".repeat(9 * 1024 * 1024)))],
+                                )]),
+                                ..Default::default()
+                            },
+                            state,
+                            "large".into(),
+                            "test".into(),
+                        )
+                        .unwrap();
+                }
                 let state = store.graph.current_state_id();
+                store.set_schema(None, state, 0).unwrap();
                 store
-                    .apply_batch(
-                        GraphBatch {
-                            node_attrs: HashMap::from([(
-                                "large".into(),
-                                vec![(N::Existing(0), V::Text("x".repeat(9 * 1024 * 1024)))],
-                            )]),
-                            ..Default::default()
-                        },
-                        state,
-                        "large".into(),
-                        "test".into(),
-                    )
+                    .checkpoint(state, "label".into(), "test".into())
                     .unwrap();
-            }
-            let state = store.graph.current_state_id();
-            store.set_schema(None, state, 0).unwrap();
-            store
-                .checkpoint(state, "label".into(), "test".into())
-                .unwrap();
-            let clocks = store.graph.publication_metadata(state).unwrap();
-            let history: Vec<_> = store
-                .graph
-                .history_records()
-                .iter()
-                .map(|v| (v.id, v.content_hash))
-                .collect();
-            let before = std::fs::read(&path).unwrap();
-            drop(store);
-            let mut child = KillOnDrop(
-                Command::new(std::env::current_exe().unwrap())
-                    .args([
-                        "--exact",
-                        "storage::journal::checkpoint::tests::checkpoint_process_child",
-                        "--nocapture",
-                    ])
-                    .env("GROGGY_TEST_CHECKPOINT_PATH", &path)
-                    .env("GROGGY_TEST_CHECKPOINT_PHASE", phase)
-                    .env("GROGGY_TEST_CHECKPOINT_READY", &ready)
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn()
-                    .unwrap(),
-            );
-            let deadline = Instant::now() + Duration::from_secs(20);
-            while !ready.exists() {
-                assert!(
-                    child.0.try_wait().unwrap().is_none(),
-                    "helper exited before {phase}"
-                );
-                assert!(Instant::now() < deadline, "helper timed out at {phase}");
-                std::thread::sleep(Duration::from_millis(5));
-            }
-            child.0.kill().unwrap();
-            assert_eq!(child.0.wait().unwrap().signal(), Some(9));
-            if !matches!(phase, "AfterReplace" | "AfterDirectorySync") {
-                assert_eq!(std::fs::read(&path).unwrap(), before, "{phase}");
-            }
-            let mut recovered = DurableGraph::open(&path).unwrap();
-            assert_eq!(recovered.graph.current_state_id(), state, "{phase}");
-            assert_eq!(recovered.schema_revision, 1, "{phase}");
-            assert_eq!(
-                recovered.graph.publication_metadata(state).unwrap(),
-                clocks,
-                "{phase}"
-            );
-            assert_eq!(
-                recovered
+                let clocks = store.graph.publication_metadata(state).unwrap();
+                let history: Vec<_> = store
                     .graph
                     .history_records()
                     .iter()
                     .map(|v| (v.id, v.content_hash))
-                    .collect::<Vec<_>>(),
-                history,
-                "{phase}"
+                    .collect();
+                let before = std::fs::read(&path).unwrap();
+                drop(store);
+                let mut child = KillOnDrop(
+                    Command::new(std::env::current_exe().unwrap())
+                        .args([
+                            "--exact",
+                            "storage::journal::checkpoint::tests::checkpoint_process_child",
+                            "--nocapture",
+                        ])
+                        .env("GROGGY_TEST_CHECKPOINT_PATH", &path)
+                        .env("GROGGY_TEST_CHECKPOINT_COMPACT", compact.to_string())
+                        .env("GROGGY_TEST_CHECKPOINT_PHASE", phase)
+                        .env("GROGGY_TEST_CHECKPOINT_READY", &ready)
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn()
+                        .unwrap(),
+                );
+                let deadline = Instant::now() + Duration::from_secs(20);
+                while !ready.exists() {
+                    assert!(
+                        child.0.try_wait().unwrap().is_none(),
+                        "helper exited before {phase}"
+                    );
+                    assert!(Instant::now() < deadline, "helper timed out at {phase}");
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                child.0.kill().unwrap();
+                assert_eq!(child.0.wait().unwrap().signal(), Some(9));
+                if !matches!(phase, "AfterReplace" | "AfterDirectorySync") {
+                    assert_eq!(std::fs::read(&path).unwrap(), before, "{phase}");
+                }
+                let mut recovered = DurableGraph::open(&path).unwrap();
+                assert_eq!(recovered.graph.current_state_id(), state, "{phase}");
+                assert_eq!(recovered.schema_revision, 1, "{phase}");
+                assert_eq!(
+                    recovered.graph.publication_metadata(state).unwrap(),
+                    clocks,
+                    "{phase}"
+                );
+                assert_eq!(
+                    recovered
+                        .graph
+                        .history_records()
+                        .iter()
+                        .map(|v| (v.id, v.content_hash))
+                        .collect::<Vec<_>>(),
+                    history,
+                    "{phase}"
+                );
+                assert_eq!(
+                    recovered.graph.get_node_attr(0, &"v".into()).unwrap(),
+                    Some(V::Int(10)),
+                    "{phase}"
+                );
+                assert_eq!(recovered.graph.checkpoints().len(), 1, "{phase}");
+                if compact {
+                    let expected = if matches!(phase, "AfterReplace" | "AfterDirectorySync") {
+                        11
+                    } else {
+                        12
+                    };
+                    assert_eq!(
+                        recovered
+                            .graph
+                            .pool()
+                            .get_node_attribute_column(&"v".into())
+                            .unwrap()
+                            .len(),
+                        expected,
+                        "{phase}"
+                    );
+                }
+                assert!(
+                    DurableGraph::open(&path).is_err(),
+                    "reopened writer lock missing at {phase}"
+                );
+                let appended = recovered
+                    .apply_batch(
+                        GraphBatch {
+                            add_nodes: 1,
+                            ..Default::default()
+                        },
+                        state,
+                        "after kill".into(),
+                        "test".into(),
+                    )
+                    .unwrap();
+                assert_eq!(appended.added_nodes, vec![1], "{phase}");
+                drop(recovered);
+                assert_eq!(
+                    DurableGraph::open(&path).unwrap().graph.node_count(),
+                    2,
+                    "{phase}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn compaction_failures_keep_original_memory_and_recover_matching_old_or_new_storage() {
+        for phase in [
+            CheckpointFailure::BeforeWrite,
+            CheckpointFailure::AfterSync,
+            CheckpointFailure::BeforeReplace,
+            CheckpointFailure::AfterReplace,
+            CheckpointFailure::AfterDirectorySync,
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("journal");
+            let mut store = populated(&path);
+            let state = store.graph.current_state_id();
+            store
+                .apply_batch(
+                    GraphBatch {
+                        node_attrs: HashMap::from([(
+                            "v".into(),
+                            vec![(N::Existing(0), V::Int(10))],
+                        )]),
+                        ..Default::default()
+                    },
+                    state,
+                    "duplicate".into(),
+                    "test".into(),
+                )
+                .unwrap();
+            let state = store.graph.current_state_id();
+            let before = store.graph.check_integrity().unwrap();
+            let original = std::fs::read(&path).unwrap();
+            store.checkpoint_failure = Some(phase);
+            assert!(store.compact_storage(state).is_err(), "{phase:?}");
+            let replaced = matches!(
+                phase,
+                CheckpointFailure::AfterReplace | CheckpointFailure::AfterDirectorySync
             );
+            assert_eq!(store.poisoned, replaced);
+            // Even a post-rename error never partially installs raw memory.
+            assert_eq!(store.graph.check_integrity().unwrap(), before);
+            if !replaced {
+                assert_eq!(std::fs::read(&path).unwrap(), original);
+            }
+            assert!(DurableGraph::open(&path).is_err());
+            drop(store);
+            let mut recovered = DurableGraph::open(&path).unwrap();
+            assert_eq!(recovered.graph.current_state_id(), state);
             assert_eq!(
-                recovered.graph.get_node_attr(0, &"v".into()).unwrap(),
-                Some(V::Int(10)),
-                "{phase}"
+                recovered
+                    .graph
+                    .pool()
+                    .get_node_attribute_column(&"v".into())
+                    .unwrap()
+                    .len(),
+                if replaced { 11 } else { 12 }
             );
-            assert_eq!(recovered.graph.checkpoints().len(), 1, "{phase}");
-            assert!(
-                DurableGraph::open(&path).is_err(),
-                "reopened writer lock missing at {phase}"
-            );
-            let appended = recovered
+            recovered.graph.check_integrity().unwrap();
+            recovered
                 .apply_batch(
                     GraphBatch {
                         add_nodes: 1,
                         ..Default::default()
                     },
                     state,
-                    "after kill".into(),
+                    "after".into(),
                     "test".into(),
                 )
                 .unwrap();
-            assert_eq!(appended.added_nodes, vec![1], "{phase}");
-            drop(recovered);
-            assert_eq!(
-                DurableGraph::open(&path).unwrap().graph.node_count(),
-                2,
-                "{phase}"
-            );
         }
     }
 

@@ -262,3 +262,7 @@ harness = false
 [[bench]]
 name = "pool_compaction"
 harness = false
+
+[[bench]]
+name = "storage_compaction"
+harness = false

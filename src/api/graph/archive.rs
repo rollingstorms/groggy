@@ -297,6 +297,35 @@ fn read_header(header: &[u8; HEADER]) -> GraphResult<u64> {
     Ok(length)
 }
 impl GraphArchive {
+    pub(crate) fn replace_compacted_columns(
+        &mut self,
+        nodes: &crate::storage::pool::compaction::CompactedColumns,
+        edges: &crate::storage::pool::compaction::CompactedColumns,
+    ) -> GraphResult<()> {
+        let remap = |indices: &[(usize, AttrName, usize)],
+                     columns: &crate::storage::pool::compaction::CompactedColumns|
+         -> GraphResult<Vec<(usize, AttrName, usize)>> {
+            indices
+                .iter()
+                .map(|(id, name, index)| {
+                    let offset = columns
+                        .offsets
+                        .get(name)
+                        .and_then(|offsets| offsets.get(*index))
+                        .ok_or_else(|| invalid("invalid source compaction offset"))?;
+                    Ok((*id, name.clone(), *offset))
+                })
+                .collect()
+        };
+        let node_indices = remap(&self.node_indices, nodes)?;
+        let edge_indices = remap(&self.edge_indices, edges)?;
+        self.pool
+            .replace_compacted_columns(&nodes.columns, &edges.columns)?;
+        self.node_indices = node_indices;
+        self.edge_indices = edge_indices;
+        Ok(())
+    }
+
     pub(crate) fn restore(self) -> GraphResult<Graph> {
         if self.version != VERSION {
             return Err(invalid("unsupported document version"));

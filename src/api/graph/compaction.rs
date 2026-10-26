@@ -50,6 +50,24 @@ impl PoolCompactionPlan {
         })
     }
 }
+impl PoolCompactionOutcome {
+    /// Slot counts for this detached result. Installation still requires source validation.
+    pub fn report(&self) -> PoolCompactionReport {
+        PoolCompactionReport {
+            selected_state: self.guard.state,
+            previous_node_values: self.nodes.previous,
+            current_node_values: self.nodes.current,
+            previous_edge_values: self.edges.previous,
+            current_edge_values: self.edges.current,
+        }
+    }
+    pub(crate) fn rewrite_archive(
+        &self,
+        archive: &mut super::archive::GraphArchive,
+    ) -> GraphResult<()> {
+        archive.replace_compacted_columns(&self.nodes, &self.edges)
+    }
+}
 impl Graph {
     /// Remove duplicate raw property slots while preserving all distinct values,
     /// states, branches, inactive IDs, groups and identity reservations. Requires
@@ -119,15 +137,9 @@ impl Graph {
                 })
                 .collect()
         };
+        let report = outcome.report();
         let nodes = remap(outcome.guard.nodes, &outcome.nodes)?;
         let edges = remap(outcome.guard.edges, &outcome.edges)?;
-        let report = PoolCompactionReport {
-            selected_state: outcome.guard.state,
-            previous_node_values: outcome.nodes.previous,
-            current_node_values: outcome.nodes.current,
-            previous_edge_values: outcome.edges.previous,
-            current_edge_values: outcome.edges.current,
-        };
         let mut pool = self.pool.borrow_mut();
         pool.install_compacted_columns(true, outcome.nodes.columns);
         pool.install_compacted_columns(false, outcome.edges.columns);

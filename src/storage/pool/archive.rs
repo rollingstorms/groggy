@@ -82,6 +82,33 @@ impl GraphPool {
     }
 }
 impl PoolDocument {
+    pub(crate) fn replace_compacted_columns(
+        &mut self,
+        nodes: &super::compaction::Columns,
+        edges: &super::compaction::Columns,
+    ) -> GraphResult<()> {
+        let encode =
+            |columns: &super::compaction::Columns| -> GraphResult<BTreeMap<String, Vec<Value>>> {
+                columns
+                    .iter()
+                    .map(|(name, values)| {
+                        Ok((
+                            name.clone(),
+                            values
+                                .iter()
+                                .map(retained_group::encode)
+                                .collect::<GraphResult<_>>()?,
+                        ))
+                    })
+                    .collect()
+            };
+        let nodes = encode(nodes)?;
+        let edges = encode(edges)?;
+        self.node_attributes = nodes;
+        self.edge_attributes = edges;
+        Ok(())
+    }
+
     pub(crate) fn restore(self, graph_type: GraphType) -> GraphResult<GraphPool> {
         if self.graph_type != graph_type
             || self.edge_sources.len() != self.edge_targets.len()
