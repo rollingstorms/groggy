@@ -684,3 +684,16 @@ append are verified. See `checkpoint-process-recovery-2026-10-26.md`. This does
 not certify sudden power loss/non-Unix replacement or add orphan maintenance.
 Gates: **1,263 native / 51 ignored**, strict all-target Clippy; production API
 unchanged. No new rows; **201 checked / 67 open**.
+
+### Recorded-state reconstruction completed without per-version whole-state copies
+
+HistoryForest borrows retained deltas; GraphSnapshot uses one owning replay buffer
+and a generation/order membership index. Existing immutable APIs, selected lineage,
+IDs/types/clocks and write semantics remain. Native prefix parity and 10k-version
+scalar-add regressions pass. Three-pair release fixture (10k nodes / 1k property
+versions): **1.025 s → 1.722 ms**, requested allocations **4.18 GB → 4.62 MB**;
+ordinary mutation/FFI latency is not measured. Scalar-add scratch peak grows by
+~40 KiB in its small fixture. Evidence: `recorded-reconstruction-2026-10-26.md`.
+Gates: **1,265 native / 51 ignored**, **2,000 root Python / 1 skipped**, **158
+documentation examples**, strict Clippy and rebuilt extension. No new rows;
+**201 checked / 67 open**. Full retained integrity scanning is the next 33.2 slice.

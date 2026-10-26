@@ -118,3 +118,9 @@ history. Neither full captures nor full restores are O(1): explicit owned captur
 copies all retained pool contents, and restoring creates an independently writable
 pool. Owner-thread Graph/FFI assembly still runs with the GIL; this API does not
 promise concurrent mutation during capture.
+
+Recorded-state reconstruction now borrows retained deltas and uses one owning
+working state. It avoids cloning the complete snapshot at every version; immutable
+`apply_delta` and returned snapshot ownership remain unchanged. Node insertion
+order and remove/re-add behavior are preserved. This does not make reconstruction
+constant-time or remove retained-state memory costs.

@@ -285,41 +285,47 @@ impl GraphSnapshot {
     /// PERFORMANCE: O(changes in delta + size of current snapshot for cloning)
     pub fn apply_delta(&self, delta: &Delta, target_state: StateId) -> Self {
         let mut new_snapshot = self.clone();
-        new_snapshot.state_id = target_state;
+        new_snapshot.apply_delta_in_place(delta, target_state);
+        new_snapshot
+    }
 
-        // Hash membership once; scanning the growing vector for every added
-        // node made initial recorded-state reconstruction quadratic in V.
+    /// Advance an already owned snapshot. Public immutable application clones once;
+    /// retained-history verification can reuse its owned working buffer.
+    pub(crate) fn apply_delta_in_place(&mut self, delta: &Delta, target_state: StateId) {
         if !delta.nodes_added.is_empty() {
-            let mut active: HashSet<_> = new_snapshot.active_nodes.iter().copied().collect();
-            for &node_id in &delta.nodes_added {
-                if active.insert(node_id) {
-                    new_snapshot.active_nodes.push(node_id);
+            let mut active: HashSet<_> = self.active_nodes.iter().copied().collect();
+            for &id in &delta.nodes_added {
+                if active.insert(id) {
+                    self.active_nodes.push(id);
                 }
             }
         }
-        // Likewise filter removals once rather than scanning V per removed node.
         if !delta.nodes_removed.is_empty() {
             let removed: HashSet<_> = delta.nodes_removed.iter().copied().collect();
-            new_snapshot.active_nodes.retain(|id| !removed.contains(id));
-            for node_id in removed {
-                new_snapshot.node_attributes.remove(&node_id);
+            self.active_nodes.retain(|id| !removed.contains(id));
+            for id in removed {
+                self.node_attributes.remove(&id);
             }
         }
+        self.apply_delta_payload(delta, target_state);
+    }
 
+    fn apply_delta_payload(&mut self, delta: &Delta, target_state: StateId) {
+        self.state_id = target_state;
         // Apply edge additions
         for &(edge_id, source, target) in &delta.edges_added {
-            new_snapshot.edges.insert(edge_id, (source, target));
+            self.edges.insert(edge_id, (source, target));
         }
 
         // Apply edge removals
         for &edge_id in &delta.edges_removed {
-            new_snapshot.edges.remove(&edge_id);
-            new_snapshot.edge_attributes.remove(&edge_id);
+            self.edges.remove(&edge_id);
+            self.edge_attributes.remove(&edge_id);
         }
 
         // Apply node attribute changes
         for (node_id, attr_name, _old_value, new_value) in &delta.node_attr_changes {
-            let attrs = new_snapshot
+            let attrs = self
                 .node_attributes
                 .entry(*node_id)
                 .or_insert_with(HashMap::new);
@@ -332,7 +338,7 @@ impl GraphSnapshot {
 
         // Apply edge attribute changes
         for (edge_id, attr_name, _old_value, new_value) in &delta.edge_attr_changes {
-            let attrs = new_snapshot
+            let attrs = self
                 .edge_attributes
                 .entry(*edge_id)
                 .or_insert_with(HashMap::new);
@@ -342,8 +348,6 @@ impl GraphSnapshot {
                 attrs.remove(attr_name);
             }
         }
-
-        new_snapshot
     }
 
     /// Create a snapshot by applying a sequence of deltas
@@ -358,12 +362,48 @@ impl GraphSnapshot {
         base: Option<&GraphSnapshot>,
         deltas: &[(Delta, StateId)],
     ) -> GraphResult<Self> {
+        Self::reconstruct_from_delta_refs(base, deltas.iter().map(|(delta, id)| (delta, *id)))
+    }
+
+    /// Borrow retained deltas and clone only values that reach the working state.
+    /// Node generations defer vector compaction until the end, preserving insertion
+    /// order (including remove/re-add) without rebuilding membership at each version.
+    pub(crate) fn reconstruct_from_delta_refs<'a>(
+        base: Option<&GraphSnapshot>,
+        deltas: impl IntoIterator<Item = (&'a Delta, StateId)>,
+    ) -> GraphResult<Self> {
         let mut current = base.cloned().unwrap_or_else(|| GraphSnapshot::empty(0));
-
-        for (delta, target_state) in deltas {
-            current = current.apply_delta(delta, *target_state);
+        let mut order: Vec<_> = std::mem::take(&mut current.active_nodes)
+            .into_iter()
+            .map(|id| (id, 0usize))
+            .collect();
+        let mut active: HashMap<_, _> = order
+            .iter()
+            .map(|&(id, generation)| (id, generation))
+            .collect();
+        for (delta, id) in deltas {
+            for &node in &delta.nodes_added {
+                if let std::collections::hash_map::Entry::Vacant(entry) = active.entry(node) {
+                    let generation = order.len().checked_add(1).ok_or_else(|| {
+                        crate::GraphError::InvalidInput(
+                            "Reconstruction node order exhausted".into(),
+                        )
+                    })?;
+                    entry.insert(generation);
+                    order.push((node, generation));
+                }
+            }
+            for node in &delta.nodes_removed {
+                active.remove(node);
+                current.node_attributes.remove(node);
+            }
+            current.apply_delta_payload(delta, id);
         }
-
+        current.active_nodes = order
+            .into_iter()
+            .filter(|(node, generation)| active.get(node) == Some(generation))
+            .map(|(node, _)| node)
+            .collect();
         Ok(current)
     }
 

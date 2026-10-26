@@ -657,7 +657,6 @@ impl HistoryForest {
             )));
         }
         // Collect all deltas from root to this commit
-        let mut deltas_to_apply = Vec::new();
         let mut current_id = commit_id;
 
         // Trace back to root, collecting commits
@@ -673,24 +672,14 @@ impl HistoryForest {
         // Reverse to get chronological order (root -> target)
         commit_chain.reverse();
 
-        // Convert commits to deltas with state IDs
-        for (state_id, commit) in &commit_chain {
-            // Convert our Delta to the format expected by GraphSnapshot
-            let history_delta = Delta {
-                content_hash: commit.delta.content_hash,
-                nodes_added: commit.delta.nodes_added.clone(),
-                nodes_removed: commit.delta.nodes_removed.clone(),
-                edges_added: commit.delta.edges_added.clone(),
-                edges_removed: commit.delta.edges_removed.clone(),
-                node_attr_changes: commit.delta.node_attr_changes.clone(),
-                edge_attr_changes: commit.delta.edge_attr_changes.clone(),
-            };
-            deltas_to_apply.push((history_delta, *state_id));
-        }
-
-        // Start with empty state and apply all deltas
+        // Borrow shared immutable deltas rather than cloning every historical value.
         let base = GraphSnapshot::empty_with_type(0, self.graph_type);
-        GraphSnapshot::reconstruct_from_deltas(Some(&base), &deltas_to_apply)
+        GraphSnapshot::reconstruct_from_delta_refs(
+            Some(&base),
+            commit_chain
+                .iter()
+                .map(|(state, commit)| (commit.delta.as_ref(), *state)),
+        )
     }
 
     /// First-parent event index cache. A merge's delta is its accepted resolution

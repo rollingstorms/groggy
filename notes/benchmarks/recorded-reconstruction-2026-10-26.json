@@ -1,0 +1,171 @@
+{
+  "benchmark": "recorded_reconstruction",
+  "cases": [
+    {
+      "initial_nodes": 1000,
+      "samples": [
+        {
+          "allocation_calls": 2506502,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 883489,
+          "requested_bytes": 434194744,
+          "seconds": 0.109651084,
+          "trial": 1
+        },
+        {
+          "allocation_calls": 4004,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 484569,
+          "requested_bytes": 493568,
+          "seconds": 0.000223625,
+          "trial": 1
+        },
+        {
+          "allocation_calls": 4004,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 484569,
+          "requested_bytes": 493568,
+          "seconds": 0.000164958,
+          "trial": 2
+        },
+        {
+          "allocation_calls": 2506502,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 883489,
+          "requested_bytes": 434194744,
+          "seconds": 0.090981875,
+          "trial": 2
+        },
+        {
+          "allocation_calls": 2506502,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 883489,
+          "requested_bytes": 434194744,
+          "seconds": 0.090885916,
+          "trial": 3
+        },
+        {
+          "allocation_calls": 4004,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 484569,
+          "requested_bytes": 493568,
+          "seconds": 0.00018325,
+          "trial": 3
+        }
+      ],
+      "scalar_adds": false,
+      "versions": 1000
+    },
+    {
+      "initial_nodes": 10000,
+      "samples": [
+        {
+          "allocation_calls": 29533502,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 8367793,
+          "requested_bytes": 4180088896,
+          "seconds": 1.015334292,
+          "trial": 1
+        },
+        {
+          "allocation_calls": 31004,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 4542433,
+          "requested_bytes": 4623432,
+          "seconds": 0.002015875,
+          "trial": 1
+        },
+        {
+          "allocation_calls": 31004,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 4542433,
+          "requested_bytes": 4623432,
+          "seconds": 0.001126542,
+          "trial": 2
+        },
+        {
+          "allocation_calls": 29533502,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 8367793,
+          "requested_bytes": 4180088896,
+          "seconds": 1.0253775,
+          "trial": 2
+        },
+        {
+          "allocation_calls": 29533502,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 8367793,
+          "requested_bytes": 4180088896,
+          "seconds": 1.031725333,
+          "trial": 3
+        },
+        {
+          "allocation_calls": 31004,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 4542433,
+          "requested_bytes": 4623432,
+          "seconds": 0.001721709,
+          "trial": 3
+        }
+      ],
+      "scalar_adds": false,
+      "versions": 1000
+    },
+    {
+      "initial_nodes": 0,
+      "samples": [
+        {
+          "allocation_calls": 15010,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 233688,
+          "requested_bytes": 492533120,
+          "seconds": 0.239557166,
+          "trial": 1
+        },
+        {
+          "allocation_calls": 24,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 274448,
+          "requested_bytes": 540636,
+          "seconds": 0.000320917,
+          "trial": 1
+        },
+        {
+          "allocation_calls": 24,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 274448,
+          "requested_bytes": 540636,
+          "seconds": 0.000276542,
+          "trial": 2
+        },
+        {
+          "allocation_calls": 15010,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 233688,
+          "requested_bytes": 492533120,
+          "seconds": 0.223084958,
+          "trial": 2
+        },
+        {
+          "allocation_calls": 15010,
+          "mode": "sequential",
+          "peak_additional_requested_live_bytes": 233688,
+          "requested_bytes": 492533120,
+          "seconds": 0.232983333,
+          "trial": 3
+        },
+        {
+          "allocation_calls": 24,
+          "mode": "borrowed",
+          "peak_additional_requested_live_bytes": 274448,
+          "requested_bytes": 540636,
+          "seconds": 0.000307708,
+          "trial": 3
+        }
+      ],
+      "scalar_adds": true,
+      "versions": 5000
+    }
+  ],
+  "scope": "same inputs, alternating modes, release, process-wide Rust requested allocations; not allocator/RSS or FFI metrics; public immutable sequential replay is reference"
+}

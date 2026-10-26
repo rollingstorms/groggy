@@ -246,3 +246,7 @@ harness = false
 [[bench]]
 name = "large_storage_baseline"
 harness = false
+
+[[bench]]
+name = "recorded_reconstruction"
+harness = false
