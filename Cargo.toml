@@ -231,3 +231,6 @@ harness = false
 [[bench]]
 name = "owned_snapshot_restoration"
 harness = false
+[[bench]]
+name = "history_collection"
+harness = false

@@ -410,6 +410,31 @@ impl PyDurableGraph {
         Ok(PyTemporalSnapshot { inner })
     }
 
+    #[pyo3(signature=(name,*,expected_state=None))]
+    fn prune_branch(&mut self, name: String, expected_state: Option<StateId>) -> PyResult<usize> {
+        let expected = expected_state.unwrap_or(
+            self.core()?
+                .graph()
+                .map_err(graph_error_to_py_err)?
+                .current_state_id(),
+        );
+        self.core_mut()?
+            .prune_branch(name, expected)
+            .map_err(graph_error_to_py_err)
+    }
+    #[pyo3(signature=(*,expected_state=None))]
+    fn gc_history(&mut self, expected_state: Option<StateId>) -> PyResult<usize> {
+        let expected = expected_state.unwrap_or(
+            self.core()?
+                .graph()
+                .map_err(graph_error_to_py_err)?
+                .current_state_id(),
+        );
+        self.core_mut()?
+            .gc_history(expected)
+            .map_err(graph_error_to_py_err)
+    }
+
     #[pyo3(signature=(message,author,*,expected_state=None,schema=None))]
     fn checkpoint(
         &mut self,

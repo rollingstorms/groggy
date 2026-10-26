@@ -2028,6 +2028,20 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    /// Explicit history-only pruning; backing values and identity reservations remain.
+    fn prune_branch(&self, name: &str) -> PyResult<usize> {
+        self.inner
+            .borrow_mut()
+            .prune_branch(name)
+            .map_err(graph_error_to_py_err)
+    }
+    fn gc_history(&self) -> PyResult<usize> {
+        self.inner
+            .borrow_mut()
+            .gc_history()
+            .map_err(graph_error_to_py_err)
+    }
+
     /// Build a temporal index from the graph history for efficient temporal queries.
     ///
     /// The temporal index provides O(log n) or better lookups for:

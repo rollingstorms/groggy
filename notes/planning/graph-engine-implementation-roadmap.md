@@ -1197,3 +1197,12 @@ unselected retained states cannot leak into it. Frozen groups, dirty manual
 workflows, empty branches and durable schema/failure boundaries are verified.
 **200 checked / 68 open**, no new rows. See `branch-lifecycle-exit-review-2026-10-26.md`.
 Explicit destructive pruning/history and pool reclamation remain 15/10.4.
+
+## 2026-10-26 — explicit history retention component (15.1 / 15.2)
+
+Replaced no-op gc_history and added explicit branch pruning with shared branch/tag/
+merge ancestry, open immutable payloads, lifetime reservations and A09 checkpoint
+policy preserved. Durable removal receipts, rollback/replay/reopen/backup and a
+50k-version benchmark are recorded in `history-retention-slice-2026-10-26.md`.
+Raw pool/identity reclamation, complete referent closure and physical compaction/
+replacement remain open under 15/10.4. **200 checked / 68 open**, no new rows.

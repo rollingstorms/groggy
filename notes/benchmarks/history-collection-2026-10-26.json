@@ -1,0 +1,32 @@
+{
+  "benchmark": "history_collection",
+  "cases": [
+    {
+      "column_values_after": 1001,
+      "column_values_before": 1001,
+      "open_cold_plan_still_readable": true,
+      "property_versions": 1000,
+      "prune_seconds": 0.000267583,
+      "removed_versions": 500,
+      "retained_versions_before_followup": 501
+    },
+    {
+      "column_values_after": 10001,
+      "column_values_before": 10001,
+      "open_cold_plan_still_readable": true,
+      "property_versions": 10000,
+      "prune_seconds": 0.002602041,
+      "removed_versions": 5000,
+      "retained_versions_before_followup": 5001
+    },
+    {
+      "column_values_after": 50001,
+      "column_values_before": 50001,
+      "open_cold_plan_still_readable": true,
+      "property_versions": 50000,
+      "prune_seconds": 0.014997667,
+      "removed_versions": 25000,
+      "retained_versions_before_followup": 25001
+    }
+  ]
+}

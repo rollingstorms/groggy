@@ -14,8 +14,9 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Next: native compatibility/compound boundaries (09.4b.2), starting with explicit
-whole-pipeline property publication. Exact owned snapshots (12.2), property history
+Next: remaining native default/infallible constructors, raw pool/space escapes
+and uncertified/topology acceptance (09.4b.2), then persistent raw-pool import and
+storage lifecycle (10.3/10.4). Explicit outer property pipelines are complete. Exact owned snapshots (12.2), property history
 (11.2) and 16.2 are
 complete: effective reconstruction, atomic endpoint validation, frozen nested group
 sources/durable transfer, explicit legacy inputs, resolved first-parent merge reads
@@ -1199,3 +1200,12 @@ unselected retained states cannot leak into it. Frozen groups, dirty manual
 workflows, empty branches and durable schema/failure boundaries are verified.
 **200 checked / 68 open**, no new rows. See `branch-lifecycle-exit-review-2026-10-26.md`.
 Explicit destructive pruning/history and pool reclamation remain 15/10.4.
+
+## 2026-10-26 — explicit history retention component (15.1 / 15.2)
+
+Replaced no-op gc_history and added explicit branch pruning with shared branch/tag/
+merge ancestry, open immutable payloads, lifetime reservations and A09 checkpoint
+policy preserved. Durable removal receipts, rollback/replay/reopen/backup and a
+50k-version benchmark are recorded in `history-retention-slice-2026-10-26.md`.
+Raw pool/identity reclamation, complete referent closure and physical compaction/
+replacement remain open under 15/10.4. **200 checked / 68 open**, no new rows.

@@ -22,6 +22,7 @@ mod persistence;
 mod property_unset;
 mod publication;
 mod read_attributes;
+pub(crate) mod retention;
 mod schema;
 pub(crate) mod snapshot;
 mod tables;
@@ -2258,9 +2259,8 @@ impl Graph {
 
     /// Garbage collect unreferenced historical states
     pub fn gc_history(&mut self) -> Result<usize, GraphError> {
-        // Basic implementation performs no garbage collection
-        // Full implementation would garbage collect unreachable commits
-        Ok(0)
+        let prepared = self.prepare_history_collection(None)?;
+        self.execute_history_collection(prepared)
     }
 
     /// Export the active graph with typed property values (not a history backup).

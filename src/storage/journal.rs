@@ -200,6 +200,11 @@ enum Record {
     CheckoutBranch {
         name: String,
     },
+    CollectHistory {
+        expected_state: StateId,
+        branch: Option<String>,
+        removed: Vec<StateId>,
+    },
     Schema {
         schema: Option<GraphSchema>,
         revision: u64,
@@ -548,6 +553,20 @@ impl DurableGraph {
                 if let Some(schema) = schema {
                     graph.check_schema_policy(schema)?;
                 }
+            }
+            Record::CollectHistory {
+                expected_state,
+                branch,
+                removed,
+            } => {
+                graph.validate_write_head(expected_state)?;
+                let prepared = graph.prepare_history_collection(branch)?;
+                if prepared.removed != removed {
+                    return Err(invalid(
+                        "history collection does not match retained references",
+                    ));
+                }
+                graph.execute_history_collection(prepared)?;
             }
             Record::Schema {
                 schema: policy,
@@ -991,6 +1010,39 @@ impl DurableGraph {
     }
 
     /// Create a durable branch from the selected clean head.
+    /// Explicitly prune one non-current, non-main branch and unreachable history.
+    pub fn prune_branch(&mut self, name: String, expected_state: StateId) -> GraphResult<usize> {
+        self.collect_history(Some(name), expected_state)
+    }
+    /// Explicitly collect unreachable history without deleting any branch reference.
+    pub fn gc_history(&mut self, expected_state: StateId) -> GraphResult<usize> {
+        self.collect_history(None, expected_state)
+    }
+    fn collect_history(
+        &mut self,
+        branch: Option<String>,
+        expected_state: StateId,
+    ) -> GraphResult<usize> {
+        self.ready()?;
+        self.graph.validate_write_head(expected_state)?;
+        let prepared = self.graph.prepare_history_collection(branch)?;
+        if prepared.branch.is_none() && prepared.removed.is_empty() {
+            return Ok(0);
+        }
+        self.append(Record::CollectHistory {
+            expected_state,
+            branch: prepared.branch.clone(),
+            removed: prepared.removed.clone(),
+        })?;
+        match self.graph.execute_history_collection(prepared) {
+            Ok(removed) => Ok(removed),
+            Err(error) => {
+                self.poisoned = true;
+                Err(error)
+            }
+        }
+    }
+
     pub fn create_branch(&mut self, name: String, expected_state: StateId) -> GraphResult<()> {
         self.ready()?;
         self.graph.validate_write_head(expected_state)?;
@@ -1374,6 +1426,65 @@ mod branch_failure_tests {
                 );
                 assert_eq!(recovered.graph().unwrap().pool().statistics().node_count, 1);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod history_collection_failure_tests {
+    use super::*;
+    #[test]
+    fn prune_failures_preserve_references_and_history_until_record_acceptance() {
+        for failure in [
+            Failure::BeforeHeader,
+            Failure::AfterHeader,
+            Failure::AfterPayload,
+            Failure::AfterSync,
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("prune.ggj");
+            let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+            let root = store
+                .apply_batch(
+                    GraphBatch {
+                        add_nodes: 1,
+                        ..Default::default()
+                    },
+                    0,
+                    "root".into(),
+                    "test".into(),
+                )
+                .unwrap()
+                .state_id;
+            store.create_branch("discard".into(), root).unwrap();
+            store.checkout_branch("discard".into(), root).unwrap();
+            let gone = store
+                .apply_batch(
+                    GraphBatch {
+                        add_nodes: 1,
+                        ..Default::default()
+                    },
+                    root,
+                    "side".into(),
+                    "test".into(),
+                )
+                .unwrap()
+                .state_id;
+            store.checkout_branch("main".into(), gone).unwrap();
+            let baseline = std::fs::read(&path).unwrap();
+            store.failure = Some(failure);
+            assert!(store.prune_branch("discard".into(), root).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), baseline);
+            assert!(store.graph().unwrap().snapshot_at_commit(gone).is_ok());
+            assert_eq!(store.graph().unwrap().list_branches().len(), 2);
+            store.failure = None;
+            assert_eq!(store.prune_branch("discard".into(), root).unwrap(), 1);
+            assert!(store.graph().unwrap().snapshot_at_commit(gone).is_err());
+            drop(store);
+            let recovered = DurableGraph::open(&path).unwrap();
+            assert_eq!(recovered.graph().unwrap().current_state_id(), root);
+            assert_eq!(recovered.graph().unwrap().list_branches().len(), 1);
+            assert!(recovered.graph().unwrap().snapshot_at_commit(gone).is_err());
         }
     }
 }

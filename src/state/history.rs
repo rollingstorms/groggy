@@ -767,84 +767,84 @@ impl HistoryForest {
     Cleaning up unreachable history
     */
 
-    /// Find all commits reachable from branches and tags
+    /// Find all commits reachable from branch/tag references, including merge parents.
     pub fn find_reachable_commits(&self) -> HashSet<StateId> {
-        let mut reachable = HashSet::new();
-        let mut to_visit = Vec::new();
+        self.reachable_commits(None, &HashSet::new())
+    }
 
-        // 1. Start from all branch heads and tags
-        for &head_id in self.branches.values() {
-            to_visit.push(head_id);
-        }
-        for &tag_id in self.tags.values() {
-            to_visit.push(tag_id);
-        }
-
-        // 2. DFS to find all reachable commits
-        while let Some(commit_id) = to_visit.pop() {
-            if reachable.contains(&commit_id) {
-                continue;
-            }
-            reachable.insert(commit_id);
-
-            if let Some(commit) = self.commits.get(&commit_id) {
-                for &parent_id in &commit.parents {
-                    if !reachable.contains(&parent_id) {
-                        to_visit.push(parent_id);
-                    }
+    fn reachable_commits(
+        &self,
+        excluded_branch: Option<&str>,
+        extra: &HashSet<StateId>,
+    ) -> HashSet<StateId> {
+        let mut keep = HashSet::new();
+        let mut pending: Vec<_> = self
+            .branches
+            .iter()
+            .filter(|(name, _)| Some(name.as_str()) != excluded_branch)
+            .map(|(_, &head)| head)
+            .chain(self.tags.values().copied())
+            .chain(extra.iter().copied())
+            .collect();
+        while let Some(state) = pending.pop() {
+            if let Some(commit) = self.commits.get(&state) {
+                if keep.insert(state) {
+                    pending.extend(commit.parents.iter().copied());
                 }
             }
         }
-
-        reachable
+        keep
     }
 
-    /// Remove unreachable commits and their deltas
+    pub(crate) fn collection_plan(
+        &self,
+        excluded_branch: Option<&str>,
+        extra: &HashSet<StateId>,
+    ) -> (HashSet<StateId>, Vec<StateId>) {
+        let keep = self.reachable_commits(excluded_branch, extra);
+        let mut removed: Vec<_> = self
+            .commits
+            .keys()
+            .filter(|state| !keep.contains(state))
+            .copied()
+            .collect();
+        removed.sort_unstable();
+        (keep, removed)
+    }
+
+    /// Explicit history collection. Branches/tags and ancestry of additional
+    /// requested states are retained. Open immutable payloads keep their own Arcs.
     pub fn garbage_collect(&mut self, keep_commits: &HashSet<StateId>) -> usize {
-        let mut removed_count = 0;
+        let keep = self.reachable_commits(None, keep_commits);
+        self.retain_commits(&keep)
+    }
 
-        // 1. Find commits not in keep_commits and collect their deltas
-        let mut removed_commits = Vec::new();
-        let mut delta_hashes_to_check = Vec::new();
-
-        for (&commit_id, commit) in &self.commits {
-            if !keep_commits.contains(&commit_id) {
-                removed_commits.push(commit_id);
-                delta_hashes_to_check.push(commit.delta.content_hash);
-            }
+    pub(crate) fn retain_commits(&mut self, keep: &HashSet<StateId>) -> usize {
+        let before = self.commits.len();
+        self.commits.retain(|state, _| keep.contains(state));
+        let removed = before - self.commits.len();
+        if removed == 0 {
+            return 0;
         }
-
-        // 2. Remove commits from self.commits
-        for commit_id in &removed_commits {
-            self.commits.remove(commit_id);
-            *self.effective_topology.get_mut() = Default::default();
-            *self.effective_reads.get_mut() = None;
-            removed_count += 1;
-        }
-
-        // 3. Check if deltas are still referenced by remaining commits
-        let mut still_referenced_deltas = HashSet::new();
-        for commit in self.commits.values() {
-            still_referenced_deltas.insert(commit.delta.content_hash);
-        }
-
-        // 4. Remove unreferenced deltas from self.deltas
-        for delta_hash in delta_hashes_to_check {
-            if !still_referenced_deltas.contains(&delta_hash) {
-                self.deltas.remove(&delta_hash);
-            }
-        }
-
-        // 5. Update children index
-        for commit_id in &removed_commits {
-            self.children.remove(commit_id);
-            // Remove this commit from all parent's children lists
-            for children_list in self.children.values_mut() {
-                children_list.retain(|&child_id| child_id != *commit_id);
-            }
-        }
-
-        removed_count
+        let retained = &self.commits;
+        let hashes: HashSet<_> = retained
+            .values()
+            .map(|commit| commit.delta.content_hash)
+            .collect();
+        self.deltas.retain(|hash, _| hashes.contains(hash));
+        self.children.retain(|parent, children| {
+            children.retain(|child| retained.contains_key(child));
+            retained.contains_key(parent)
+        });
+        self.roots.retain(|state| retained.contains_key(state));
+        // Checkpoint labels are metadata, not permanent retention pins (A09).
+        self.checkpoints.retain(|checkpoint| {
+            checkpoint.state_id == 0 || retained.contains_key(&checkpoint.state_id)
+        });
+        *self.effective_topology.get_mut() = Default::default();
+        *self.effective_reads.get_mut() = None;
+        // Acceptance IDs are lifetime reservations and never rewind after collection.
+        removed
     }
 
     /*
