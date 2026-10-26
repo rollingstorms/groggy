@@ -55,6 +55,13 @@ impl GraphView {
             membership: Membership::Selected(Arc::new(Selection { nodes, edges })),
         })
     }
+    /// Read a meta-node's immutable source group, independent of current liveness.
+    pub fn meta_subgraph(&self, node: NodeId) -> GraphResult<Self> {
+        match self.node_attr(node, &"contains_subgraph".into())? {
+            Some(AttrValue::SubgraphRef(id)) => self.state.retained_group(id),
+            _ => Err(Self::invalid("Node has no retained group reference")),
+        }
+    }
     fn invalid(message: &str) -> GraphError {
         GraphError::InvalidInput(message.into())
     }

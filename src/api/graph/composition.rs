@@ -26,11 +26,15 @@ impl Graph {
                 "contains_subgraph is managed by meta composition".into(),
             ));
         }
-        let stored = self.pool.borrow_mut().prepare_stored_subgraph(
+        let source = crate::GraphView::from_membership(
+            self.pin_current_state()?,
             composition.nodes.clone(),
-            composition.edges,
-            composition.kind,
+            composition.edges.clone(),
         )?;
+        let stored = self
+            .pool
+            .borrow_mut()
+            .prepare_frozen_group(source, composition.kind)?;
         let mut batch = GraphBatch {
             add_nodes: 1,
             ..Default::default()
@@ -62,7 +66,12 @@ impl Graph {
         let counts = self.pool.borrow().statistics();
         let node = counts.node_count;
         if self.automatic_publication {
+            batch.node_attrs.remove("contains_subgraph");
             let mut prepared = self.prepare_publication(batch, self.current_state_id(), None)?;
+            prepared.batch.node_attrs.insert(
+                "contains_subgraph".into(),
+                vec![(node, AttrValue::SubgraphRef(stored.id))],
+            );
             prepared.batch.node_attrs.insert(
                 "entity_type".into(),
                 vec![(node, AttrValue::Text("meta".into()))],
@@ -85,5 +94,43 @@ impl Graph {
             self.execute_prepared_mutation(prepared)?;
         }
         Ok(node)
+    }
+}
+
+impl Graph {
+    /// Retain an explicit frozen source selection. Changed source state or values
+    /// produce a new group reference; no graph delta is published by retaining it.
+    pub fn retain_group(
+        &mut self,
+        source: &crate::GraphView,
+        kind: String,
+    ) -> GraphResult<SubgraphId> {
+        let prepared = self
+            .pool
+            .borrow_mut()
+            .prepare_frozen_group(source.clone(), kind)?;
+        let id = prepared.id;
+        self.pool.borrow_mut().install_stored_subgraph(prepared);
+        Ok(id)
+    }
+    /// Install a revision prepared independently of the mutable graph owner.
+    pub fn retain_group_revision(
+        &mut self,
+        group: crate::storage::retained_group::RetainedGroup,
+    ) -> GraphResult<SubgraphId> {
+        let prepared = self.pool.borrow_mut().prepare_group_revision(group)?;
+        let id = prepared.id;
+        self.pool.borrow_mut().install_stored_subgraph(prepared);
+        Ok(id)
+    }
+    /// Upgrade a membership-only group using a caller-chosen source state.
+    pub fn pin_legacy_group(
+        &mut self,
+        id: SubgraphId,
+        source: &crate::GraphView,
+    ) -> GraphResult<SubgraphId> {
+        let (nodes, edges, kind) = self.pool.borrow().get_subgraph(id)?;
+        let view = crate::GraphView::from_membership(source.read_state().clone(), nodes, edges)?;
+        self.retain_group(&view, kind)
     }
 }

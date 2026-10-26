@@ -63,6 +63,7 @@ pub struct PinnedReadState {
     data: Arc<ReadData>,
     origin: Option<Arc<ReadOrigin>>,
     read_time: Option<Arc<super::effective_read::ReadTime>>,
+    groups: Arc<HashMap<crate::types::SubgraphId, crate::storage::retained_group::RetainedGroup>>,
 }
 impl PinnedReadState {
     pub(crate) fn from_snapshot(snapshot: GraphSnapshot) -> GraphResult<Self> {
@@ -108,6 +109,7 @@ impl PinnedReadState {
         Ok(Self {
             origin: None,
             read_time: None,
+            groups: Default::default(),
             data: Arc::new(ReadData {
                 snapshot,
                 existence: ExistenceIndex::new(nodes, edges),
@@ -115,6 +117,33 @@ impl PinnedReadState {
                 incident,
             }),
         })
+    }
+    pub(crate) fn with_groups(
+        mut self,
+        groups: Arc<
+            HashMap<crate::types::SubgraphId, crate::storage::retained_group::RetainedGroup>,
+        >,
+    ) -> Self {
+        self.groups = groups;
+        self
+    }
+    pub(crate) fn groups(
+        &self,
+    ) -> &Arc<HashMap<crate::types::SubgraphId, crate::storage::retained_group::RetainedGroup>>
+    {
+        &self.groups
+    }
+    /// Retrieve an immutable retained source revision. Legacy membership-only IDs
+    /// need an explicit source pin; current working values are never substituted.
+    pub fn retained_group(&self, id: crate::types::SubgraphId) -> GraphResult<crate::GraphView> {
+        self.groups
+            .get(&id)
+            .map(|group| group.view.clone())
+            .ok_or_else(|| {
+                GraphError::InvalidInput(format!(
+                    "Group {id} has no frozen source revision; pin an explicit source view"
+                ))
+            })
     }
     pub(crate) fn with_read_time(mut self, time: super::effective_read::ReadTime) -> Self {
         self.read_time = Some(Arc::new(time));

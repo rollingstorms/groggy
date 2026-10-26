@@ -208,9 +208,20 @@ impl Graph {
         &mut self,
         subgraph_id: SubgraphId,
     ) -> GraphResult<NodeId> {
+        self.create_meta_node_at(subgraph_id, None)
+    }
+
+    /// Create a meta-node with an explicit effective time, publishing it even
+    /// when ordinary mutations use manual compatibility mode.
+    pub fn create_meta_node_at(
+        &mut self,
+        subgraph_id: SubgraphId,
+        effective_at: Option<i64>,
+    ) -> GraphResult<NodeId> {
         self.pool.borrow().validate_stored_subgraph(subgraph_id)?;
         let mut batch = GraphBatch {
             add_nodes: 1,
+            effective_at,
             ..Default::default()
         };
         batch.node_attrs.insert(
@@ -225,7 +236,7 @@ impl Graph {
         let kind = vec![(node, AttrValue::Text("meta".into()))];
         // Trusted system metadata is installed after user-input preparation;
         // user GraphBatch assignments still cannot change entity_type.
-        if self.automatic_publication {
+        if self.automatic_publication || effective_at.is_some() {
             let mut prepared = self.prepare_publication(batch, self.current_state_id(), None)?;
             prepared.batch.node_attrs.insert("entity_type".into(), kind);
             self.execute_publication(prepared, "create_meta_node".into(), "groggy".into())?;

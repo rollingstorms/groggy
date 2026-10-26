@@ -98,7 +98,7 @@ fn segments<T: Copy + PartialEq>(
 }
 impl EffectiveTopology {
     pub(crate) fn append_if_current(&mut self, commit: &Commit) {
-        if commit.parents.len() > 1 || commit.parents.first().copied().unwrap_or(0) != self.head {
+        if commit.parents.first().copied().unwrap_or(0) != self.head {
             return;
         }
         self.head = commit.id;
@@ -187,11 +187,6 @@ impl HistoryForest {
                     ));
                 }
                 let commit = self.get_commit(current)?;
-                if commit.parents.len() > 1 {
-                    return Err(GraphError::InvalidInput(
-                        "Effective topology validation requires single-parent ancestry".into(),
-                    ));
-                }
                 current = commit.parents.first().copied().unwrap_or(0);
                 lineage.push(commit);
             }

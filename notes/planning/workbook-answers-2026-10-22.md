@@ -934,3 +934,15 @@ history participates, including edges already removed from current state. Journa
 recovery uses the original acceptance clock. Explicit timed topology with unknown
 legacy lifetimes rejects; untimed legacy compatibility is retained without a
 historical temporal guarantee. Evidence: effective-topology-publication-2026-10-25.md.
+
+## 2026-10-26 — Effective-time contract complete (16.2)
+
+Frozen source revisions now implement the accepted A01 separation: subnode changes
+and meta property changes remain distinct; changed source pins produce new group
+references, with old sources retained. Missing legacy clocks/member-source pins
+require explicit caller inputs for that read, never guesses or immutable-history
+rewrites. Known precise clocks/frozen refs cannot be overridden. Resolved merge
+reads follow existing first-parent resolution semantics; planning stays 14.2.
+See effective-time-exit-review-2026-10-26.md. Property unset remains the next 11.2
+priority. The owner authorized up to 90 minutes of priority slices after 16.2,
+aiming at task completion, separate coherent commits and explicit open-work notes.

@@ -72,6 +72,18 @@ impl TemporalSnapshot {
         })
     }
 
+    pub(crate) fn with_groups(
+        mut self,
+        groups: Arc<
+            std::collections::HashMap<
+                crate::types::SubgraphId,
+                crate::storage::retained_group::RetainedGroup,
+            >,
+        >,
+    ) -> Self {
+        self.state = self.state.with_groups(groups);
+        self
+    }
     pub(crate) fn same_history(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.history_identity, &other.history_identity)
     }

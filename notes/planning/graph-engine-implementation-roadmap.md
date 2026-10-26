@@ -1149,3 +1149,13 @@ Durable replay validates original clocks. Pooled/group history, property unset,
 merge/legacy migration and effective read indexing remain in their existing scopes.
 See effective-topology-publication-2026-10-25.md. Next core priority is retained
 property/group history rather than adjacent facade audit expansion.
+
+## 2026-10-26 — Complete 16.2
+
+Effective-time reads now include frozen nested source revisions and durable source
+transfer, explicit read-local legacy clocks/source bindings, resolved first-parent
+merge replay and selected-head event indexes. Atomic endpoint validation remains
+in checked publication. See effective-time-exit-review-2026-10-26.md. This closes
+16.2; property unset (11.2), owned/configuration-complete snapshots (12.2), merge
+planning (14.2), storage lifecycle (10.3/10.4) and broad adapter migration (26.1)
+retain their original requirements. No new checklist rows were introduced.

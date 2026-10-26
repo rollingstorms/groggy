@@ -46,6 +46,13 @@ impl PyAttrValue {
         Self::from_py_value(value)
     }
 
+    /// A typed reference to an explicitly retained group revision.
+    #[staticmethod]
+    fn subgraph_ref(id: usize) -> Self {
+        Self {
+            inner: RustAttrValue::SubgraphRef(id),
+        }
+    }
     /// Explicit utc_instant property from the corresponding Python datetime type.
     #[staticmethod]
     fn utc_instant(value: &PyAny) -> PyResult<Self> {

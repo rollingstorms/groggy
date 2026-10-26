@@ -1030,22 +1030,74 @@ impl PyGraph {
         Ok(edge_ids)
     }
 
+    /// Retain a frozen source revision; preparation runs without the GIL.
+    #[pyo3(signature=(source, kind="group"))]
+    fn retain_group(
+        &self,
+        py: Python<'_>,
+        source: &crate::ffi::subgraphs::view::PyGraphView,
+        kind: &str,
+    ) -> PyResult<usize> {
+        let revision = py
+            .allow_threads(|| {
+                groggy::storage::retained_group::RetainedGroup::new(
+                    source.inner.clone(),
+                    kind.to_owned(),
+                )
+            })
+            .map_err(graph_error_to_py_err)?;
+        self.inner
+            .borrow_mut()
+            .retain_group_revision(revision)
+            .map_err(graph_error_to_py_err)
+    }
+    /// Create a meta-node referencing an explicitly retained source revision.
+    #[pyo3(signature=(group, *, effective_at=None))]
+    fn create_meta_node(&self, group: usize, effective_at: Option<&PyAny>) -> PyResult<usize> {
+        let at = effective_at
+            .map(crate::ffi::api::graph_batch::timestamp)
+            .transpose()?;
+        self.inner
+            .borrow_mut()
+            .create_meta_node_at(group, at)
+            .map_err(graph_error_to_py_err)
+    }
+    /// Pin legacy membership using an explicitly chosen retained source state.
+    fn pin_legacy_group(
+        &self,
+        group: usize,
+        source: &crate::ffi::subgraphs::view::PyGraphView,
+    ) -> PyResult<usize> {
+        self.inner
+            .borrow_mut()
+            .pin_legacy_group(group, &source.inner)
+            .map_err(graph_error_to_py_err)
+    }
     /// Reconstruct immutable effective-time state from a pinned published head.
-    #[pyo3(signature=(effective_at, *, recorded_by=None))]
+    #[pyo3(signature=(effective_at, *, recorded_by=None, legacy_times=None, group_sources=None))]
     fn read_view_at(
         &self,
         py: Python<'_>,
         effective_at: &PyAny,
         recorded_by: Option<&PyAny>,
+        legacy_times: Option<&PyDict>,
+        group_sources: Option<&PyDict>,
     ) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
         let effective_at = crate::ffi::api::graph_batch::timestamp(effective_at)?;
         let recorded_by = recorded_by
             .map(crate::ffi::api::graph_batch::timestamp)
             .transpose()?;
+        let legacy = crate::ffi::api::graph_batch::parse_legacy_times(legacy_times)?;
+        let sources = crate::ffi::api::graph_batch::parse_group_sources(group_sources)?;
+        let options = groggy::state::effective_read::EffectiveReadOptions {
+            recorded_by,
+            legacy_publications: legacy,
+            group_sources: sources,
+        };
         let plan = self
             .inner
             .borrow()
-            .prepare_read_at(effective_at, recorded_by)
+            .prepare_effective_read(effective_at, options)
             .map_err(graph_error_to_py_err)?;
         py.allow_threads(move || plan.read_view())
             .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })

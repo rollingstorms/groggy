@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **196 checked and 72 unchecked entries**. Entries overlap:
+currently contains **197 checked and 71 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 72 unchecked entries are not 72 independent tasks: 14 are overlapping AR
-architecture entries, 61 are numbered entries (including nested publication
+The 71 unchecked entries are not 71 independent tasks: 13 are overlapping AR
+architecture entries, 58 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -501,3 +501,29 @@ The count remains **196 checked / 72 open**: this removes a concrete 16.2 blocke
 without adding rows or falsely closing the parent. Next core scope is property
 unset/retained property history (11.2), followed by retained pooled/group reads
 (12.2/16.2) and measured read indexing. Legacy/merge migration remains explicit.
+
+## 2026-10-26 — Complete 16.2 effective-time contract
+
+Closed 16.2 after implementing frozen source revisions/nested referents, typed
+durable transfer/reopen/backup, explicit read-local legacy clocks and source
+bindings, resolved first-parent merge replay, checked pooled-reference admission,
+and cached selected-head event prefixes. Existing atomic endpoint checks remain.
+No working values or second-resolution clocks are guessed for missing legacy data.
+Known precise clocks/frozen sources reject overrides. See the full criteria and
+scope boundaries in `effective-time-exit-review-2026-10-26.md`.
+
+**197 checked / 71 open**, no new rows. Recounting the open categories gives 13 AR
+entries and 58 numbered entries, including nine explicitly deferred entries;
+the earlier category subtotal was stale even though the headline total was correct.
+Property unset/coalescing is next under 11.2; owned/configuration-complete snapshots,
+merge planning and storage checkpoints retain their existing parent requirements.
+
+Release receipt distinguishes cold/warm reads: at 100k nodes/101 versions, about
+155 ms cold index+reconstruction, 105 ms warm reconstruction and 0.4 µs warm empty
+prefix. This is not O(1) full graph materialization or a production/RSS guarantee.
+
+Gate: **1,184 native passed / 51 ignored; 1,913 root Python passed / 1 skipped;
+139 executable documentation examples; strict all-target Clippy passed**. Scoped
+rustfmt, stub AST parsing and git diff --check passed. In-tree FFI rebuild retains
+three unrelated pre-existing warnings. Owner benchmark edits/test/receipt remain
+untouched, unstaged and excluded from execution. Logs use /tmp/groggy-162-*-exit.

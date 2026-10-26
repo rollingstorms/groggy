@@ -80,3 +80,13 @@ allocating an ID; membership may include inactive entities. Reference validation
 checks storage membership without cloning the group's node/edge sets. This does
 not make global `get_meta_nodes()` selection constant time: that API still scans
 active nodes. See [creation evidence](../../notes/planning/prepared-meta-creation-2026-10-25.md).
+
+## Frozen temporal source reads
+
+New composition also pins the selected source properties/topology as an immutable
+group revision. `graph.read_view_at(T).meta_subgraph(meta_id)` reads that explicit
+source, including after original members are deactivated. Subnode updates do not
+change older group revisions. To choose another source state, retain a new group
+and explicitly publish its reference; see [effective-time reads](effective-time-reads.md).
+Connected legacy `expand()` adapters retain their compatibility contract; canonical
+frozen group reads use GraphView.meta_subgraph. Their broad migration remains 26.1.

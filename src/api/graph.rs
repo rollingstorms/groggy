@@ -1561,6 +1561,33 @@ impl Graph {
             allocated.edge_count,
         )?;
 
+        // Every checked pooled reference must already exist. Compound creation
+        // stages its trusted managed reference after preparation and installs its
+        // validated source before execution.
+        let references: HashSet<_> = prepared
+            .node_attrs
+            .values()
+            .flatten()
+            .map(|(_, value)| value)
+            .chain(
+                prepared
+                    .edge_attrs
+                    .values()
+                    .flatten()
+                    .map(|(_, value)| value),
+            )
+            .filter_map(|value| {
+                if let AttrValue::SubgraphRef(id) = value {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for id in references {
+            self.pool.borrow().validate_stored_subgraph(id)?;
+        }
+
         let mut identity_errors = Vec::new();
         for (position, (name, entity)) in prepared.identity_bindings.iter().enumerate() {
             if let Err(error) = self.identities.validate_binding(name, *entity) {
@@ -1984,11 +2011,13 @@ impl Graph {
     /// Build an immutable snapshot of the graph at a given commit.
     pub fn snapshot_at_commit(&self, commit_id: StateId) -> Result<TemporalSnapshot, GraphError> {
         TemporalSnapshot::at_commit(&self.history, commit_id)
+            .map(|snapshot| snapshot.with_groups(self.pool.borrow().retained_groups()))
     }
 
     /// Build an immutable snapshot at or before the provided timestamp (seconds since epoch).
     pub fn snapshot_at_timestamp(&self, timestamp: u64) -> Result<TemporalSnapshot, GraphError> {
         TemporalSnapshot::at_timestamp(&self.history, timestamp)
+            .map(|snapshot| snapshot.with_groups(self.pool.borrow().retained_groups()))
     }
 
     /// Build a temporal index from the history for efficient temporal queries.
@@ -2162,14 +2191,14 @@ impl Graph {
         let snapshot = self
             .space
             .capture_read_snapshot(&self.pool.borrow(), self.current_commit)?;
-        Ok(
-            crate::state::PinnedReadState::from_snapshot(snapshot)?.with_origin(
+        Ok(crate::state::PinnedReadState::from_snapshot(snapshot)?
+            .with_groups(self.pool.borrow().retained_groups())
+            .with_origin(
                 Arc::clone(self.history.identity()),
                 self.current_branch.clone(),
                 self.current_commit,
                 !self.has_uncommitted_changes() && (self.current_commit != 0 || self.is_empty()),
-            ),
-        )
+            ))
     }
 
     /// Construct a fresh graph from a historical snapshot.

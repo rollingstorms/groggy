@@ -450,6 +450,11 @@ class AttrValue:
         ...
 
     @staticmethod
+    def subgraph_ref(id: int) -> AttrValue:
+        """Construct a typed reference to an explicitly retained group."""
+        ...
+
+    @staticmethod
     def bool_vec(*args, **kwargs) -> AttrValue:
         """
         Explicit boolean vector constructor.
@@ -3353,7 +3358,15 @@ class DurableGraph:
 
 
 
-    def read_view_at(self, effective_at: int, *, recorded_by: Optional[int] = None) -> GraphView:
+    def retain_group(self, source: GraphView, kind: str = "group") -> int:
+        """Retain a frozen source revision; changed source state produces a new ID."""
+        ...
+
+    def create_meta_node(self, group: int, *, effective_at: Optional[int] = None) -> int:
+        """Create a node referencing an explicitly retained group revision."""
+        ...
+
+    def read_view_at(self, effective_at: int, *, recorded_by: Optional[int] = None, legacy_times: Optional[Dict[int, Tuple[int, int]]] = None, group_sources: Optional[Dict[int, GraphView]] = None) -> GraphView:
         """Reconstruct branch-scoped effective-time state; legacy/invalid timelines reject."""
         ...
 
@@ -5350,7 +5363,19 @@ class Graph:
 
 
 
-    def read_view_at(self, effective_at: int, *, recorded_by: Optional[int] = None) -> GraphView:
+    def pin_legacy_group(self, group: int, source: GraphView) -> int:
+        """Upgrade membership-only storage using an explicit source view."""
+        ...
+
+    def retain_group(self, source: GraphView, kind: str = "group") -> int:
+        """Retain a frozen source revision; changed source state produces a new ID."""
+        ...
+
+    def create_meta_node(self, group: int, *, effective_at: Optional[int] = None) -> int:
+        """Create a node referencing an explicitly retained group revision."""
+        ...
+
+    def read_view_at(self, effective_at: int, *, recorded_by: Optional[int] = None, legacy_times: Optional[Dict[int, Tuple[int, int]]] = None, group_sources: Optional[Dict[int, GraphView]] = None) -> GraphView:
         """Reconstruct branch-scoped effective-time state; legacy/invalid timelines reject."""
         ...
 
@@ -10573,6 +10598,10 @@ class VizAccessor:
 
 
 class GraphView:
+    def meta_subgraph(self, node: int) -> GraphView:
+        """Return the node's frozen source group, including retained nested groups."""
+        ...
+
     @property
     def read_time(self) -> Optional[Dict[str, Any]]:
         """Effective clocks and pinned branch/head, or None for ordinary captures."""

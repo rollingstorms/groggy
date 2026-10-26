@@ -240,3 +240,50 @@ pub(crate) fn view_result_to_python(
     )?;
     Ok(output.to_object(py))
 }
+
+/// Legacy clocks are explicit (effective_at, recorded_at) pairs, never guesses.
+pub(crate) fn parse_legacy_times(
+    value: Option<&PyDict>,
+) -> PyResult<std::collections::BTreeMap<groggy::StateId, groggy::PublicationMetadata>> {
+    let mut result = std::collections::BTreeMap::new();
+    if let Some(value) = value {
+        for (id, clocks) in value {
+            if id.is_instance_of::<pyo3::types::PyBool>() {
+                return Err(PyTypeError::new_err("Legacy state ID must be an integer"));
+            }
+            let id = id.extract::<u64>()?;
+            let clocks = clocks.downcast::<pyo3::types::PyTuple>()?;
+            if clocks.len() != 2 {
+                return Err(PyTypeError::new_err(
+                    "Legacy clocks must be (effective_at, recorded_at)",
+                ));
+            }
+            result.insert(
+                id,
+                groggy::PublicationMetadata {
+                    effective_at: timestamp(clocks.get_item(0)?)?,
+                    recorded_at: timestamp(clocks.get_item(1)?)?,
+                    change_times: Default::default(),
+                },
+            );
+        }
+    }
+    Ok(result)
+}
+
+/// Extract caller-selected frozen sources; membership/revision rules stay native.
+pub(crate) fn parse_group_sources(
+    value: Option<&PyDict>,
+) -> PyResult<std::collections::BTreeMap<usize, groggy::GraphView>> {
+    let mut result = std::collections::BTreeMap::new();
+    if let Some(value) = value {
+        for (id, source) in value {
+            if id.is_instance_of::<pyo3::types::PyBool>() {
+                return Err(PyTypeError::new_err("Group ID must be an integer"));
+            }
+            let source = source.extract::<PyRef<crate::ffi::subgraphs::view::PyGraphView>>()?;
+            result.insert(id.extract::<usize>()?, source.inner.clone());
+        }
+    }
+    Ok(result)
+}

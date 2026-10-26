@@ -308,6 +308,10 @@ pub struct GraphPool {
         ),
     >,
 
+    /// Frozen source revisions; membership-only legacy references remain separate.
+    retained_groups:
+        std::sync::Arc<HashMap<SubgraphId, crate::storage::retained_group::RetainedGroup>>,
+
     /*
     === ID MANAGEMENT ===
     Simple incrementing counters for new entities
@@ -323,6 +327,7 @@ pub struct GraphPool {
 /// after prepare has checked and reserved its slot under an exclusive pool borrow.
 pub(crate) struct PreparedStoredSubgraph {
     pub id: crate::types::SubgraphId,
+    retained: Option<crate::storage::retained_group::RetainedGroup>,
     content: (
         std::collections::HashSet<NodeId>,
         std::collections::HashSet<EdgeId>,
@@ -346,6 +351,7 @@ impl GraphPool {
             edge_targets: Vec::new(),
             edge_alive: Vec::new(),
             stored_subgraphs: HashMap::new(),
+            retained_groups: Default::default(),
             next_node_id: 0,
             next_edge_id: 0,
         }
@@ -951,15 +957,108 @@ impl GraphPool {
         Ok(PreparedStoredSubgraph {
             id: subgraph_id,
             content,
+            retained: None,
         })
     }
 
     pub(crate) fn install_stored_subgraph(&mut self, prepared: PreparedStoredSubgraph) {
+        if let Some(group) = prepared.retained {
+            std::sync::Arc::make_mut(&mut self.retained_groups)
+                .entry(prepared.id)
+                .or_insert(group);
+        }
         self.stored_subgraphs
             .entry(prepared.id)
             .or_insert(prepared.content);
     }
 
+    /// Share immutable group revisions without copying source graphs or values.
+    pub(crate) fn retained_groups(
+        &self,
+    ) -> std::sync::Arc<HashMap<SubgraphId, crate::storage::retained_group::RetainedGroup>> {
+        self.retained_groups.clone()
+    }
+
+    pub(crate) fn prepare_frozen_group(
+        &mut self,
+        view: crate::GraphView,
+        kind: String,
+    ) -> GraphResult<PreparedStoredSubgraph> {
+        let group = crate::storage::retained_group::RetainedGroup::new(view, kind)?;
+        self.prepare_group_revision(group)
+    }
+    pub(crate) fn prepare_group_revision(
+        &mut self,
+        group: crate::storage::retained_group::RetainedGroup,
+    ) -> GraphResult<PreparedStoredSubgraph> {
+        let id = group.id();
+        let content = (
+            group.view.nodes().clone(),
+            group.view.edges().clone(),
+            group.kind.clone(),
+        );
+        if let Some(old) = self.stored_subgraphs.get(&id) {
+            if old != &content || !self.retained_groups.contains_key(&id) {
+                return Err(GraphError::InvalidInput(
+                    "Frozen group reference collision".into(),
+                ));
+            }
+            if !self.retained_groups[&id].same_content(&group)? {
+                return Err(GraphError::InvalidInput(
+                    "Frozen group value collision".into(),
+                ));
+            }
+            return Ok(PreparedStoredSubgraph {
+                id,
+                content,
+                retained: None,
+            });
+        }
+        self.stored_subgraphs
+            .try_reserve(1)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        std::sync::Arc::make_mut(&mut self.retained_groups)
+            .try_reserve(1)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        Ok(PreparedStoredSubgraph {
+            id,
+            content,
+            retained: Some(group),
+        })
+    }
+
+    pub(crate) fn prepare_group_documents(
+        &mut self,
+        documents: Vec<(SubgraphId, crate::storage::retained_group::GroupDocument)>,
+    ) -> GraphResult<Vec<PreparedStoredSubgraph>> {
+        let count = documents.len();
+        self.stored_subgraphs
+            .try_reserve(count)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        std::sync::Arc::make_mut(&mut self.retained_groups)
+            .try_reserve(count)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        let mut available = self.retained_groups.as_ref().clone();
+        let mut prepared = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for (id, document) in documents {
+            if !seen.insert(id) {
+                return Err(GraphError::InvalidInput(
+                    "Duplicate retained group document".into(),
+                ));
+            }
+            let group = document.restore(&available)?;
+            if group.id() != id {
+                return Err(GraphError::InvalidInput(
+                    "Retained group content hash mismatch".into(),
+                ));
+            }
+            let staged = self.prepare_group_revision(group.clone())?;
+            available.insert(id, group);
+            prepared.push(staged);
+        }
+        Ok(prepared)
+    }
     /// Check a retained reference without cloning its member sets.
     pub(crate) fn validate_stored_subgraph(&self, id: SubgraphId) -> GraphResult<()> {
         if self.stored_subgraphs.contains_key(&id) {

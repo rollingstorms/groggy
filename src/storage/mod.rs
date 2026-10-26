@@ -17,6 +17,7 @@ pub mod matrix;
 pub mod node;
 pub mod numeric;
 pub mod pool;
+pub mod retained_group;
 pub mod table; // BaseTable system
 pub(crate) mod value_codec;
 pub(crate) mod value_references;

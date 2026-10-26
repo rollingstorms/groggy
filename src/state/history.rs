@@ -59,6 +59,8 @@ pub struct HistoryForest {
     /// In-process provenance shared by snapshots, independent of numeric state IDs.
     identity: Arc<()>,
     graph_type: GraphType,
+    effective_reads:
+        parking_lot::Mutex<Option<(StateId, Arc<crate::state::effective_read::ReadContext>)>>,
     effective_topology: parking_lot::Mutex<effective_topology::EffectiveTopology>,
     /*
     === COMMIT STORAGE ===
@@ -137,6 +139,7 @@ impl HistoryForest {
 
         Self {
             effective_topology: Default::default(),
+            effective_reads: Default::default(),
             identity: Arc::new(()),
             graph_type,
             commits: HashMap::new(),
@@ -273,45 +276,52 @@ impl HistoryForest {
         author: String,
         parents: Vec<StateId>,
     ) -> Result<StateId, GraphError> {
-        // 1. Create Delta from the changes
-        let delta = Delta::from_changes(changes);
+        self.create_merge_commit_with_publication(changes, message, author, parents, None)
+    }
 
-        // 2. Compute content hash of delta for deduplication
-        let content_hash = delta.content_hash;
-
-        // 3. Check if we already have this exact delta (reuse for deduplication)
-        let delta_arc = self
-            .deltas
-            .entry(content_hash)
-            .or_insert_with(|| Arc::new(delta));
-
-        // 4. Create merge commit with multiple parents
-        let commit = Commit::new(
-            self.next_state_id,
-            parents.clone(),
-            delta_arc.clone(),
+    /// Accept an already resolved delta relative to the first parent. Conflict
+    /// detection/policy belongs to the merge planner, independently of replay.
+    pub fn create_merge_commit_with_publication(
+        &mut self,
+        changes: ChangeSet,
+        message: String,
+        author: String,
+        parents: Vec<StateId>,
+        publication: Option<crate::PublicationMetadata>,
+    ) -> GraphResult<StateId> {
+        if parents.len() < 2 {
+            return Err(GraphError::InvalidInput(
+                "Merge requires at least two parents".into(),
+            ));
+        }
+        let mut seen = HashSet::new();
+        for &parent in &parents {
+            if !seen.insert(parent) {
+                return Err(GraphError::InvalidInput("Duplicate merge parent".into()));
+            }
+            self.get_commit(parent)?;
+        }
+        let id = self.create_commit_with_publication(
+            changes,
             message,
             author,
+            Some(parents[0]),
+            publication,
+        )?;
+        let old = self.get_commit(id)?;
+        let commit = Commit::with_publication(
+            id,
+            parents.clone(),
+            old.delta.clone(),
+            old.message.clone(),
+            old.author.clone(),
+            old.publication.clone(),
         );
-
-        // 5. Store commit
-        let commit_id = self.next_state_id;
-        self.effective_topology.get_mut().append_if_current(&commit);
-        self.commits.insert(commit_id, Arc::new(commit));
-
-        // 6. Update parent-child relationships for all parents
-        for parent_id in parents {
-            self.children
-                .entry(parent_id)
-                .or_insert_with(Vec::new)
-                .push(commit_id);
+        self.commits.insert(id, Arc::new(commit));
+        for &parent in &parents[1..] {
+            self.children.entry(parent).or_default().push(id);
         }
-
-        // 7. Update state ID counter
-        self.next_state_id += 1;
-
-        // 8. Return new state ID
-        Ok(commit_id)
+        Ok(id)
     }
 
     /*
@@ -650,6 +660,66 @@ impl HistoryForest {
         GraphSnapshot::reconstruct_from_deltas(Some(&base), &deltas_to_apply)
     }
 
+    /// First-parent event index cache. A merge's delta is its accepted resolution
+    /// relative to the first parent; sibling mutations are not replayed twice.
+    pub(crate) fn effective_read_context(
+        &self,
+        head: StateId,
+    ) -> GraphResult<Arc<crate::state::effective_read::ReadContext>> {
+        let mut cached = self.effective_reads.lock();
+        if let Some((state, context)) = cached.as_ref() {
+            if *state == head {
+                return Ok(context.clone());
+            }
+        }
+        let mut commits = Vec::new();
+        let mut seen = HashSet::new();
+        let mut state = head;
+        while state != 0 {
+            if !seen.insert(state) {
+                return Err(GraphError::InvalidInput(
+                    "Cycle in effective read ancestry".into(),
+                ));
+            }
+            let commit = self.get_commit(state)?;
+            state = commit.parents.first().copied().unwrap_or(0);
+            commits.push(commit);
+        }
+        commits.reverse();
+        let context = Arc::new(crate::state::effective_read::ReadContext::new(commits));
+        *cached = Some((head, context.clone()));
+        Ok(context)
+    }
+    /// Prepare a detached temporal read of a selected first-parent lineage.
+    pub fn prepare_effective_read(
+        &self,
+        head: StateId,
+        effective_at: i64,
+        recorded_by: Option<i64>,
+        legacy_publications: std::collections::BTreeMap<StateId, crate::PublicationMetadata>,
+    ) -> GraphResult<crate::state::effective_read::EffectiveReadPlan> {
+        let context = self.effective_read_context(head)?;
+        context.validate_legacy(&legacy_publications)?;
+        let legacy_clocks = legacy_publications
+            .iter()
+            .map(|(&id, time)| (id, (time.effective_at, time.recorded_at)))
+            .collect();
+        Ok(crate::state::effective_read::EffectiveReadPlan {
+            context,
+            graph_type: self.graph_type,
+            time: crate::state::effective_read::ReadTime {
+                branch: "detached".into(),
+                published_head: head,
+                effective_at,
+                recorded_by,
+                legacy_clocks,
+                group_sources: Default::default(),
+            },
+            groups: Default::default(),
+            legacy_publications,
+        })
+    }
+
     /// Get the sequence of deltas needed to go from one commit to another
     pub fn get_delta_sequence(
         &self,
@@ -717,6 +787,7 @@ impl HistoryForest {
         for commit_id in &removed_commits {
             self.commits.remove(commit_id);
             *self.effective_topology.get_mut() = Default::default();
+            *self.effective_reads.get_mut() = None;
             removed_count += 1;
         }
 

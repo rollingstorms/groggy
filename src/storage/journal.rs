@@ -1,7 +1,7 @@
 //! Binary, checksummed, append-only transaction storage for checked publications.
 //! One locked writer owns the file. Successful writes sync the journal before
 //! publishing memory; recovery replays only complete, validated records.
-use super::value_codec;
+use super::retained_group as value_codec;
 use crate::{
     BatchChangeRef, BatchEdgeRef, BatchNodeRef, BatchResult, Graph, GraphBatch, GraphConfig,
     GraphError, GraphResult, GraphSchema, PublicationMetadata, StateId, TimestampMicros,
@@ -18,10 +18,64 @@ const FRAME: &[u8; 8] = b"GFRAME01";
 const HEADER_SIZE: usize = 32;
 const MAX_RECORD: usize = 256 * 1024 * 1024;
 
+fn validate_group_refs<'a>(
+    graph: &Graph,
+    values: impl Iterator<Item = &'a crate::AttrValue>,
+) -> GraphResult<()> {
+    let groups = graph.pool().retained_groups();
+    for value in values {
+        if let crate::AttrValue::SubgraphRef(id) = value {
+            if !groups.contains_key(id) {
+                return Err(invalid(format!(
+                    "SubgraphRef {id} requires a persisted frozen group"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+fn install_meta_kinds(
+    prepared: &mut crate::api::batch::PreparedPublication,
+    first: usize,
+    positions: &[usize],
+) -> GraphResult<()> {
+    let mut seen = std::collections::HashSet::new();
+    for &position in positions {
+        if position >= prepared.batch.add_nodes || !seen.insert(position) {
+            return Err(invalid("Invalid stored meta-node position"));
+        }
+        let id = first + position;
+        if !prepared
+            .batch
+            .node_attrs
+            .get("contains_subgraph")
+            .is_some_and(|rows| {
+                rows.iter().any(|(node, value)| {
+                    *node == id && matches!(value, crate::AttrValue::SubgraphRef(_))
+                })
+            })
+        {
+            return Err(invalid("Stored meta-node lacks a group reference"));
+        }
+    }
+    if !positions.is_empty() {
+        prepared.batch.node_attrs.insert(
+            "entity_type".into(),
+            positions
+                .iter()
+                .map(|&position| (first + position, crate::AttrValue::Text("meta".into())))
+                .collect(),
+        );
+    }
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct StoredBatch {
     add_nodes: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    meta_nodes: Vec<usize>,
     add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
     node_attrs: BTreeMap<String, Vec<(BatchNodeRef, Value)>>,
     edge_attrs: BTreeMap<String, Vec<(BatchEdgeRef, Value)>>,
@@ -36,6 +90,7 @@ impl StoredBatch {
     fn encode(batch: &GraphBatch) -> GraphResult<Self> {
         Ok(Self {
             add_nodes: batch.add_nodes,
+            meta_nodes: Vec::new(),
             add_edges: batch.add_edges.clone(),
             node_attrs: batch
                 .node_attrs
@@ -124,6 +179,12 @@ enum Record {
         message: String,
         author: String,
         additional_schema: Option<GraphSchema>,
+    },
+    RetainGroups {
+        groups: Vec<(
+            crate::types::SubgraphId,
+            super::retained_group::GroupDocument,
+        )>,
     },
     CreateBranch {
         name: String,
@@ -444,15 +505,34 @@ impl DurableGraph {
                 author,
                 additional_schema,
             } => {
+                let meta_nodes = batch.meta_nodes.clone();
+                let batch = batch.decode()?;
+                validate_group_refs(
+                    graph,
+                    batch
+                        .node_attrs
+                        .values()
+                        .flatten()
+                        .map(|(_, v)| v)
+                        .chain(batch.edge_attrs.values().flatten().map(|(_, v)| v)),
+                )?;
+                let first_node = graph.pool().statistics().node_count;
                 let mut prepared = graph.prepare_publication_with_additional_schema_at(
-                    batch.decode()?,
+                    batch,
                     expected_state,
                     schema.as_ref(),
                     additional_schema.as_ref(),
                     Some(metadata.recorded_at),
                 )?;
+                install_meta_kinds(&mut prepared, first_node, &meta_nodes)?;
                 graph.restore_publication_clock(&mut prepared, metadata)?;
                 graph.execute_publication(prepared, message, author)?;
+            }
+            Record::RetainGroups { groups } => {
+                let prepared = graph.pool_mut().prepare_group_documents(groups)?;
+                for group in prepared {
+                    graph.pool_mut().install_stored_subgraph(group);
+                }
             }
             Record::CreateBranch { name } => graph.create_branch(name)?,
             Record::CheckoutBranch { name } => {
@@ -575,6 +655,78 @@ impl DurableGraph {
         )
     }
 
+    /// Persist an explicit immutable source group before it is referenced by a batch.
+    pub fn retain_group(
+        &mut self,
+        source: &crate::GraphView,
+        kind: String,
+    ) -> GraphResult<crate::types::SubgraphId> {
+        let root = super::retained_group::RetainedGroup::new(source.clone(), kind)?;
+        self.retain_group_revision(root)
+    }
+    /// Persist a revision whose immutable payload was prepared off the owner thread.
+    pub fn retain_group_revision(
+        &mut self,
+        root: super::retained_group::RetainedGroup,
+    ) -> GraphResult<crate::types::SubgraphId> {
+        self.ready()?;
+        let id = root.id();
+        if let Some(old) = self.graph.pool().retained_groups().get(&id) {
+            if old.same_content(&root)? {
+                return Ok(id);
+            }
+            return Err(invalid("Frozen group value collision"));
+        }
+        let groups = super::retained_group::documents(&root)?;
+        let prepared = self
+            .graph
+            .pool_mut()
+            .prepare_group_documents(groups.clone())?;
+        self.append(Record::RetainGroups { groups })?;
+        for group in prepared {
+            self.graph.pool_mut().install_stored_subgraph(group);
+        }
+        Ok(id)
+    }
+
+    /// Publish a meta-node referencing an already persisted immutable group.
+    pub fn create_meta_node(
+        &mut self,
+        group: crate::types::SubgraphId,
+        expected_state: StateId,
+        effective_at: Option<i64>,
+    ) -> GraphResult<crate::NodeId> {
+        self.ready()?;
+        if !self.graph.pool().retained_groups().contains_key(&group) {
+            return Err(invalid("Meta-node requires a persisted frozen group"));
+        }
+        let batch = GraphBatch {
+            add_nodes: 1,
+            effective_at,
+            node_attrs: std::collections::HashMap::from([(
+                "contains_subgraph".into(),
+                vec![(BatchNodeRef::Added(0), crate::AttrValue::SubgraphRef(group))],
+            )]),
+            ..Default::default()
+        };
+        let mut stored = StoredBatch::encode(&batch)?;
+        stored.meta_nodes = vec![0];
+        let first = self.graph.pool().statistics().node_count;
+        let mut prepared =
+            self.graph
+                .prepare_publication(batch, expected_state, self.schema.as_ref())?;
+        install_meta_kinds(&mut prepared, first, &[0])?;
+        let result = self.execute_prepared_batch(
+            prepared,
+            stored,
+            expected_state,
+            "create_meta_node".into(),
+            "groggy".into(),
+            None,
+        )?;
+        Ok(result.added_nodes[0])
+    }
+
     /// Capture the current durable head as an immutable selection with write provenance.
     pub fn read_view(&self) -> GraphResult<crate::GraphView> {
         self.graph()?.read_view()
@@ -589,6 +741,24 @@ impl DurableGraph {
         self.graph()?.prepare_read_at(effective_at, recorded_by)
     }
 
+    /// Prepare using explicit legacy source inputs, without changing stored history.
+    pub fn prepare_effective_read(
+        &self,
+        effective_at: i64,
+        options: crate::state::effective_read::EffectiveReadOptions,
+    ) -> GraphResult<crate::state::effective_read::EffectiveReadPlan> {
+        self.graph()?.prepare_effective_read(effective_at, options)
+    }
+    /// Prepare an effective read with explicit caller-assigned legacy clocks.
+    pub fn prepare_read_at_with_legacy(
+        &self,
+        effective_at: i64,
+        recorded_by: Option<i64>,
+        legacy: std::collections::BTreeMap<StateId, crate::PublicationMetadata>,
+    ) -> GraphResult<crate::state::effective_read::EffectiveReadPlan> {
+        self.graph()?
+            .prepare_read_at_with_legacy(effective_at, recorded_by, legacy)
+    }
     /// Reconstruct a read-only effective-time state from the accepted durable head.
     pub fn read_view_at(
         &self,
@@ -649,6 +819,16 @@ impl DurableGraph {
         author: String,
         additional_schema: Option<&GraphSchema>,
     ) -> GraphResult<BatchResult> {
+        validate_group_refs(
+            &self.graph,
+            prepared
+                .batch
+                .node_attrs
+                .values()
+                .flatten()
+                .map(|(_, v)| v)
+                .chain(prepared.batch.edge_attrs.values().flatten().map(|(_, v)| v)),
+        )?;
         self.append(Record::Batch {
             expected_state,
             batch: Box::new(stored),

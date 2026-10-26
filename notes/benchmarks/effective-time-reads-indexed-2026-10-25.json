@@ -1,0 +1,43 @@
+{
+  "build": "release",
+  "cases": [
+    {
+      "cold_index_and_replay_seconds": 0.002624667,
+      "cold_prepare_seconds": 0.000015625,
+      "edges": 999,
+      "effective_at": 50,
+      "nodes": 1000,
+      "repetitions": 5,
+      "versions": 101,
+      "warm_empty_prefix_median_seconds": 5e-7,
+      "warm_prepare_median_seconds": 2.5e-7,
+      "warm_replay_median_seconds": 0.001494292
+    },
+    {
+      "cold_index_and_replay_seconds": 0.014828208,
+      "cold_prepare_seconds": 8.333e-6,
+      "edges": 9999,
+      "effective_at": 50,
+      "nodes": 10000,
+      "repetitions": 5,
+      "versions": 101,
+      "warm_empty_prefix_median_seconds": 5.42e-7,
+      "warm_prepare_median_seconds": 2.08e-7,
+      "warm_replay_median_seconds": 0.008147
+    },
+    {
+      "cold_index_and_replay_seconds": 0.154967541,
+      "cold_prepare_seconds": 0.000010958,
+      "edges": 99999,
+      "effective_at": 50,
+      "nodes": 100000,
+      "repetitions": 5,
+      "versions": 101,
+      "warm_empty_prefix_median_seconds": 4.17e-7,
+      "warm_prepare_median_seconds": 2.5e-6,
+      "warm_replay_median_seconds": 0.104518333
+    }
+  ],
+  "fixture": "chain topology at time zero; 100 scalar corrections on node zero; read at time 50",
+  "limitations": "single-process local timings; cold index build versus warm admitted-prefix replay plus frozen adjacency; no read checkpoints, RSS, durable-open, concurrent writers or production-scale guarantees"
+}

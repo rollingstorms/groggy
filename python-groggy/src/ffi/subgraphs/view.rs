@@ -9,6 +9,12 @@ pub struct PyGraphView {
 }
 #[pymethods]
 impl PyGraphView {
+    /// Retrieve the frozen group revision referenced by this captured node.
+    fn meta_subgraph(&self, py: Python<'_>, node: usize) -> PyResult<Self> {
+        py.allow_threads(|| self.inner.meta_subgraph(node))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
     /// Clocks and branch/head of an effective-time capture, or None for other views.
     #[getter]
     fn read_time(&self, py: Python<'_>) -> PyResult<PyObject> {
@@ -20,6 +26,12 @@ impl PyGraphView {
         result.set_item("published_head", time.published_head)?;
         result.set_item("effective_at", time.effective_at)?;
         result.set_item("recorded_by", time.recorded_by)?;
+        if !time.group_sources.is_empty() {
+            result.set_item("group_sources", &time.group_sources)?;
+        }
+        if !time.legacy_clocks.is_empty() {
+            result.set_item("legacy_times", &time.legacy_clocks)?;
+        }
         Ok(result.to_object(py))
     }
     /// Accepted source state for checked writeback; None for dirty/standalone captures.
