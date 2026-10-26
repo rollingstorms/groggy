@@ -11,7 +11,6 @@ use crate::algorithms::{
     Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata, ParameterType,
 };
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Girvan-Newman hierarchical community detection via edge betweenness.
@@ -99,7 +98,7 @@ impl GirvanNewman {
                 "Girvan-Newman currently requires an undirected graph"
             ));
         }
-        let checked = checked_dijkstra_weights(subgraph, self.weight_attr.as_ref())?;
+        let checked = checked_dijkstra_weights(ctx, subgraph, self.weight_attr.as_ref())?;
         if self.weight_attr.is_some() && checked.values().any(|&weight| weight <= 0.0) {
             return Err(anyhow!(
                 "Girvan-Newman requires strictly positive edge weights"
@@ -121,7 +120,7 @@ impl GirvanNewman {
                 let value = self
                     .weight_attr
                     .as_ref()
-                    .map(|attr| graph.get_edge_attr(id, attr))
+                    .map(|attr| ctx.edge_attribute(subgraph, id, attr))
                     .transpose()?
                     .flatten();
                 let length = crate::query::weights::dijkstra_weight(value.as_ref(), id)?;
@@ -205,6 +204,10 @@ impl GirvanNewman {
 }
 
 impl Algorithm for GirvanNewman {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "community.girvan_newman"
     }
@@ -224,9 +227,13 @@ impl Algorithm for GirvanNewman {
                 .map(|(&node, &comm)| (node, AttrValue::Int(comm as i64)))
                 .collect();
 
-            ctx.with_scoped_timer("girvan_newman.write_attributes", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
+            {
+                let started = Instant::now();
+                let result =
+                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                ctx.record_call("girvan_newman.write_attributes", started.elapsed());
+                result
+            }
             .map_err(|err| anyhow!("failed to persist community assignments: {err}"))?;
         }
 
@@ -279,6 +286,7 @@ mod tests {
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
     use crate::subgraphs::Subgraph;
+    use crate::traits::SubgraphOperations;
     use std::cell::RefCell;
     use std::collections::HashSet;
     use std::rc::Rc;

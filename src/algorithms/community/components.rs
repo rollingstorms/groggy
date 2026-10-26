@@ -848,6 +848,10 @@ impl ConnectedComponents {
 }
 
 impl Algorithm for ConnectedComponents {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "community.connected_components"
     }
@@ -861,7 +865,7 @@ impl Algorithm for ConnectedComponents {
         if ctx.is_cancelled() {
             return Err(anyhow!("connected components cancelled"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
         if subgraph.node_set().len() >= u32::MAX as usize {
             return Err(anyhow!(
                 "connected components requires fewer than u32::MAX nodes"
@@ -899,7 +903,7 @@ impl Algorithm for ConnectedComponents {
 
             // Write results in bulk
             let start = Instant::now();
-            subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)?;
+            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)?;
             ctx.record_call("cc.write_attributes", start.elapsed());
         } else {
             let start = Instant::now();

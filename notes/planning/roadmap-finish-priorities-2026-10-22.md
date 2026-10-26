@@ -15,7 +15,7 @@ and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
 Next: remaining native default/infallible constructors, raw pool/space escapes
-and uncertified/topology acceptance (09.4b.2), then remaining storage lifecycle
+and topology compound acceptance (09.4b.2; classic property wrappers now certified), then remaining storage lifecycle
 (10.4) and raw reclamation (15). Full retained archive/import (10.3) is complete;
 explicit Unix recovery baselines and locked journal replacement complete part of
 10.4. Explicit outer property pipelines and branch lifecycle (14.1) are complete.
@@ -1265,3 +1265,13 @@ coordinated writes and frozen sources remain immutable (A01.1). See
 `raw-storage-boundary-2026-10-26.md`. Remaining 09.4b.2 fixed inventory: **one**
 component, uncertified/topology multi-stage acceptance; native defaults and raw
 escapes are closed. **201 checked / 67 open**, no new rows or owner choices.
+
+### 2026-10-26 — classic algorithm outer property acceptance
+
+All 13 built-in classic registry algorithms now share builder Context property
+staging, including their weight/marker/heuristic/personalization/seed reads.
+Success publishes once; late failure rolls back. Evidence and remaining limits:
+`classic-atomic-algorithms-2026-10-26.md`. Existing 09.4b.2 remains open for topology
+compound acceptance and unsupported custom effects; fixed component inventory
+remains two complete plus this narrowed final component. No new checklist rows:
+**201 checked / 67 open**. Broader IR/default policy remains AR7.8/30.1.

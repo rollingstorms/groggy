@@ -363,121 +363,48 @@ impl<'a> StepScope<'a> {
         self.subgraph
     }
 
-    /// Read a node property, including prior accepted attachments in this run.
+    /// Read through the shared staged node-property overlay.
     pub fn node_attribute(
         &self,
         ctx: &Context,
         id: NodeId,
         name: &AttrName,
     ) -> crate::GraphResult<Option<AttrValue>> {
-        if let Some(value) = ctx
-            .property_batch
-            .as_ref()
-            .and_then(|batch| batch.get(true, id, name))
-        {
-            return Ok(Some(value.clone()));
-        }
-        self.subgraph.get_node_attribute(id, name)
+        ctx.node_attribute(self.subgraph, id, name)
     }
-    /// Read an edge property through the same property-only overlay.
+    /// Read through the shared staged edge-property overlay.
     pub fn edge_attribute(
         &self,
         ctx: &Context,
         id: EdgeId,
         name: &AttrName,
     ) -> crate::GraphResult<Option<AttrValue>> {
-        if let Some(value) = ctx
-            .property_batch
-            .as_ref()
-            .and_then(|batch| batch.get(false, id, name))
-        {
-            return Ok(Some(value.clone()));
-        }
-        self.subgraph.get_edge_attribute(id, name)
+        ctx.edge_attribute(self.subgraph, id, name)
     }
-
-    /// Publish a property column or return an owned output according to Context.
-    /// Transient columns still use canonical target/kind validation.
+    /// Validate and stage/publish a node column, or return an owned output.
     pub fn attach_node_column(
         &self,
         ctx: &mut Context,
         name: AttrName,
         values: Vec<(NodeId, AttrValue)>,
     ) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("node attribute attachment cancelled"));
-        }
-        if ctx.persist_results() && ctx.property_batch.is_none() {
-            return self
-                .subgraph
-                .set_node_attr_column(name, values)
-                .map_err(|err| anyhow!(err));
-        }
-        self.attach_node_attrs(ctx, HashMap::from([(name, values)]))
+        ctx.attach_node_column(self.subgraph, name, values)
     }
-
-    /// Attach multiple node columns through one validated persistence boundary.
+    /// Attach node columns through the canonical Context property boundary.
     pub fn attach_node_attrs(
         &self,
         ctx: &mut Context,
         attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("node attribute attachment cancelled"));
-        }
-        if ctx.persist_results() && ctx.property_batch.is_none() {
-            return self
-                .subgraph
-                .set_node_attrs(attrs)
-                .map_err(|err| anyhow!(err));
-        }
-        self.subgraph
-            .graph()
-            .borrow()
-            .validate_node_attrs(&attrs, None)?;
-        if let Some(batch) = ctx.property_batch.as_mut() {
-            return batch.stage(true, attrs).map_err(|err| anyhow!(err));
-        }
-        for (name, mut values) in attrs {
-            values.sort_unstable_by_key(|(id, _)| *id);
-            ctx.add_output(
-                format!("node_attributes.{name}"),
-                super::super::AlgorithmOutput::NodeAttributes(values),
-            );
-        }
-        Ok(())
+        ctx.attach_node_attrs(self.subgraph, attrs)
     }
-
-    /// Attach edge columns or expose owned results without changing graph state.
+    /// Attach edge columns through the canonical Context property boundary.
     pub fn attach_edge_attrs(
         &self,
         ctx: &mut Context,
         attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("edge attribute attachment cancelled"));
-        }
-        if ctx.persist_results() && ctx.property_batch.is_none() {
-            return self
-                .subgraph
-                .set_edge_attrs(attrs)
-                .map_err(|err| anyhow!(err));
-        }
-        self.subgraph
-            .graph()
-            .borrow()
-            .validate_edge_attrs(&attrs, None)?;
-        if let Some(batch) = ctx.property_batch.as_mut() {
-            return batch.stage(false, attrs).map_err(|err| anyhow!(err));
-        }
-        for (name, mut values) in attrs {
-            values.sort_unstable_by_key(|(id, _)| *id);
-            ctx.add_output(
-                format!("edge_attributes.{name}"),
-                super::super::AlgorithmOutput::EdgeAttributes(values),
-            );
-        }
-        Ok(())
+        ctx.attach_edge_attrs(self.subgraph, attrs)
     }
 
     pub fn variables(&self) -> &StepVariables {

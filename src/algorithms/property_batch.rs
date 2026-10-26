@@ -1,8 +1,12 @@
 //! Property-only staging for explicitly atomic builder execution.
+use super::Context;
 use crate::{
     api::graph::{kinds, Graph},
-    AttrName, AttrValue, BatchEdgeRef, BatchNodeRef, GraphBatch, GraphResult, StateId,
+    AttrName, AttrValue, BatchEdgeRef, BatchNodeRef, EdgeId, GraphBatch, GraphResult, NodeId,
+    StateId,
 };
+use crate::{subgraphs::Subgraph, traits::SubgraphOperations};
+use anyhow::{anyhow, Result};
 use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug)]
@@ -87,6 +91,118 @@ impl PropertyBatch {
             "atomic builder properties".into(),
             "groggy".into(),
         )?;
+        Ok(())
+    }
+}
+
+impl Context {
+    /// Read a node property, including prior accepted attachments in this run.
+    pub(crate) fn node_attribute(
+        &self,
+        subgraph: &Subgraph,
+        id: NodeId,
+        name: &AttrName,
+    ) -> crate::GraphResult<Option<AttrValue>> {
+        if let Some(value) = self
+            .property_batch
+            .as_ref()
+            .and_then(|batch| batch.get(true, id, name))
+        {
+            return Ok(Some(value.clone()));
+        }
+        subgraph.get_node_attribute(id, name)
+    }
+    /// Read an edge property through the same property-only overlay.
+    pub(crate) fn edge_attribute(
+        &self,
+        subgraph: &Subgraph,
+        id: EdgeId,
+        name: &AttrName,
+    ) -> crate::GraphResult<Option<AttrValue>> {
+        if let Some(value) = self
+            .property_batch
+            .as_ref()
+            .and_then(|batch| batch.get(false, id, name))
+        {
+            return Ok(Some(value.clone()));
+        }
+        subgraph.get_edge_attribute(id, name)
+    }
+
+    /// Publish a property column or return an owned output according to Context.
+    /// Transient columns still use canonical target/kind validation.
+    pub(crate) fn attach_node_column(
+        &mut self,
+        subgraph: &Subgraph,
+        name: AttrName,
+        values: Vec<(NodeId, AttrValue)>,
+    ) -> Result<()> {
+        if self.is_cancelled() {
+            return Err(anyhow!("node attribute attachment cancelled"));
+        }
+        if self.persist_results() && self.property_batch.is_none() {
+            return subgraph
+                .set_node_attr_column(name, values)
+                .map_err(|err| anyhow!(err));
+        }
+        self.attach_node_attrs(subgraph, HashMap::from([(name, values)]))
+    }
+
+    /// Attach multiple node columns through one validated persistence boundary.
+    pub(crate) fn attach_node_attrs(
+        &mut self,
+        subgraph: &Subgraph,
+        attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
+    ) -> Result<()> {
+        if self.is_cancelled() {
+            return Err(anyhow!("node attribute attachment cancelled"));
+        }
+        if self.persist_results() && self.property_batch.is_none() {
+            return subgraph.set_node_attrs(attrs).map_err(|err| anyhow!(err));
+        }
+        subgraph
+            .graph()
+            .borrow()
+            .validate_node_attrs(&attrs, None)?;
+        if let Some(batch) = self.property_batch.as_mut() {
+            return batch.stage(true, attrs).map_err(|err| anyhow!(err));
+        }
+        for (name, mut values) in attrs {
+            values.sort_unstable_by_key(|(id, _)| *id);
+            self.add_output(
+                format!("node_attributes.{name}"),
+                super::AlgorithmOutput::NodeAttributes(values),
+            );
+        }
+        Ok(())
+    }
+
+    /// Attach edge columns or expose owned results without changing graph state.
+    pub(crate) fn attach_edge_attrs(
+        &mut self,
+        subgraph: &Subgraph,
+        attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
+    ) -> Result<()> {
+        if self.is_cancelled() {
+            return Err(anyhow!("edge attribute attachment cancelled"));
+        }
+        if self.persist_results() && self.property_batch.is_none() {
+            return subgraph.set_edge_attrs(attrs).map_err(|err| anyhow!(err));
+        }
+        subgraph
+            .graph()
+            .borrow()
+            .validate_edge_attrs(&attrs, None)?;
+        if let Some(batch) = self.property_batch.as_mut() {
+            return batch.stage(false, attrs).map_err(|err| anyhow!(err));
+        }
+        for (name, mut values) in attrs {
+            values.sort_unstable_by_key(|(id, _)| *id);
+            self.add_output(
+                format!("edge_attributes.{name}"),
+                super::AlgorithmOutput::EdgeAttributes(values),
+            );
+        }
         Ok(())
     }
 }

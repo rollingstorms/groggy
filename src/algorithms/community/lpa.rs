@@ -11,7 +11,6 @@ use crate::algorithms::{
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
@@ -187,18 +186,20 @@ impl LabelPropagation {
         }
     }
 
-    fn initialise_labels(&self, nodes: &[NodeId], subgraph: &Subgraph) -> Result<LabelState> {
+    fn initialise_labels(
+        &self,
+        ctx: &Context,
+        nodes: &[NodeId],
+        subgraph: &Subgraph,
+    ) -> Result<LabelState> {
         let mut labels = Vec::with_capacity(nodes.len());
         if nodes.is_empty() {
             return Ok(LabelState::new(nodes.to_vec(), labels));
         }
 
-        let graph_handle = subgraph.graph();
-        let graph = graph_handle.borrow();
         for &node in nodes.iter() {
             let label = if let Some(seed_attr) = &self.seed_attr {
-                graph
-                    .get_node_attr(node, seed_attr)?
+                ctx.node_attribute(subgraph, node, seed_attr)?
                     .unwrap_or(AttrValue::Int(node as i64))
             } else {
                 AttrValue::Int(node as i64)
@@ -323,6 +324,10 @@ impl LabelPropagation {
 }
 
 impl Algorithm for LabelPropagation {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "community.lpa"
     }
@@ -336,7 +341,7 @@ impl Algorithm for LabelPropagation {
         if ctx.is_cancelled() {
             return Err(anyhow!("label propagation cancelled"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
 
         // === PHASE 1: Collect Nodes ===
         let collect_start = Instant::now();
@@ -412,7 +417,7 @@ impl Algorithm for LabelPropagation {
 
         // === PHASE 5: Initialize Labels ===
         let init_start = Instant::now();
-        let state = self.initialise_labels(&nodes, &subgraph)?;
+        let state = self.initialise_labels(ctx, &nodes, &subgraph)?;
         ctx.record_call("lpa.initialize_labels", init_start.elapsed());
 
         // === PHASE 6: Run Iterations ===
@@ -427,8 +432,7 @@ impl Algorithm for LabelPropagation {
         if ctx.persist_results() {
             let write_start = Instant::now();
             let attr_values = state.into_pairs();
-            subgraph
-                .set_node_attr_column(self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist labels: {err}"))?;
             ctx.record_call("lpa.write_attributes", write_start.elapsed());
         } else {

@@ -171,3 +171,30 @@ with **201 checked / 67 open** and no new rows.
 
 Raw-boundary gates: **1,250 native passed / 51 ignored**, **1,986 root Python
 passed / 1 skipped**, **157 docs examples**, strict all-target Clippy.
+
+### 2026-10-26 — classic algorithm outer property acceptance
+
+All 13 built-in classic registry algorithms now share builder Context property
+staging, including their weight/marker/heuristic/personalization/seed reads.
+Success publishes once; late failure rolls back. Evidence and remaining limits:
+`classic-atomic-algorithms-2026-10-26.md`. Existing 09.4b.2 remains open for topology
+compound acceptance and unsupported custom effects; fixed component inventory
+remains two complete plus this narrowed final component. No new checklist rows:
+**201 checked / 67 open**. Broader IR/default policy remains AR7.8/30.1.
+
+Third-window final gates: **1,254 native passed / 51 ignored**, **1,999 root
+Python passed / 1 skipped**, **158 documentation examples**, strict all-target
+Clippy. Rebuilt the in-tree extension; no wheel/package installation. Python
+owner benchmark and legacy nested survey suites remain excluded.
+
+The requested work window is complete. Three coherent implementation slices:
+native default/fallible insertion and accessor creation (`914476f6`); sealed raw
+mutation and explicit pooled attribute rejection (`34d735b0`); classic algorithm
+shared property acceptance (this commit). Checklist remains **201 checked / 67
+open** because the completed components sit inside existing 09.4b.2. Native
+defaults and raw escapes are closed; classic property wrappers are certified;
+topology compound acceptance remains open. No new checklist rows were added.
+
+Next: prepare topology compound effects with explicit ID/remapping and read-overlay
+semantics; then finish existing storage chunking/open-time/RSS and reclamation
+requirements. Checkpoint scheduling and Graphiti remain deferred per owner.

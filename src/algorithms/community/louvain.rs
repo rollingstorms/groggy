@@ -10,7 +10,6 @@ use crate::algorithms::{
     ParameterType,
 };
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 #[derive(Clone, Debug)]
@@ -88,6 +87,10 @@ impl Louvain {
 }
 
 impl Algorithm for Louvain {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "community.louvain"
     }
@@ -104,7 +107,7 @@ impl Algorithm for Louvain {
         if subgraph.graph().borrow().is_directed() {
             return Err(anyhow!("louvain currently requires an undirected graph"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
 
         let nodes = subgraph.ordered_nodes();
         let index: HashMap<_, _> = nodes
@@ -193,8 +196,7 @@ impl Louvain {
                 .map(|(&node, &community)| (node, AttrValue::Int(community as i64)))
                 .collect();
 
-            subgraph
-                .set_node_attr_column(self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist Louvain communities: {err}"))?;
 
             ctx.record_call("louvain.write_attributes", write_start.elapsed());
@@ -233,6 +235,7 @@ mod tests {
     use super::*;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::traits::SubgraphOperations;
     use crate::types::AttrName;
     use std::cell::RefCell;
     use std::collections::HashSet;

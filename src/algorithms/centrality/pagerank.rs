@@ -14,7 +14,6 @@ use crate::algorithms::{
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
@@ -345,6 +344,10 @@ impl PageRank {
 }
 
 impl Algorithm for PageRank {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "centrality.pagerank"
     }
@@ -358,7 +361,7 @@ impl Algorithm for PageRank {
         if ctx.is_cancelled() {
             return Err(anyhow!("pagerank cancelled"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
 
         // === PHASE 1: Collect Nodes ===
         let collect_start = Instant::now();
@@ -435,7 +438,7 @@ impl Algorithm for PageRank {
         // === PHASE 5: Shared captured/live value validation and power iteration ===
         let personalization = personalization(&nodes, |node| match &self.personalization_attr {
             Some(attr) => {
-                personalization_value(node, subgraph.get_node_attribute(node, attr)?.as_ref())
+                personalization_value(node, ctx.node_attribute(&subgraph, node, attr)?.as_ref())
             }
             None => Ok(1.0),
         })?;
@@ -450,8 +453,7 @@ impl Algorithm for PageRank {
                 .map(|(node, value)| (node, AttrValue::Float64(value)))
                 .collect();
 
-            subgraph
-                .set_node_attr_column(self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist PageRank scores: {err}"))?;
 
             ctx.record_call("pr.write_attributes", write_start.elapsed());

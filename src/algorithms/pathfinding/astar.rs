@@ -12,7 +12,6 @@ use crate::algorithms::{
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 #[derive(Clone, Debug)]
@@ -91,10 +90,10 @@ impl AStarPathfinding {
         }
     }
 
-    fn resolve_node(&self, subgraph: &Subgraph, attr: &AttrName) -> Result<NodeId> {
+    fn resolve_node(&self, ctx: &Context, subgraph: &Subgraph, attr: &AttrName) -> Result<NodeId> {
         let mut found = None;
         for &node in subgraph.ordered_nodes().iter() {
-            if subgraph.get_node_attribute(node, attr)?.is_some() {
+            if ctx.node_attribute(subgraph, node, attr)?.is_some() {
                 if found.is_some() {
                     return Err(anyhow!(
                         "multiple nodes carry attribute '{attr}'; expected exactly one"
@@ -106,7 +105,7 @@ impl AStarPathfinding {
         found.ok_or_else(|| anyhow!("no node in subgraph carries attribute '{attr}'"))
     }
 
-    fn heuristics_map(&self, subgraph: &Subgraph) -> Result<HashMap<NodeId, f64>> {
+    fn heuristics_map(&self, ctx: &Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, f64>> {
         let Some(attr) = &self.heuristic_attr else {
             return Ok(HashMap::new());
         };
@@ -116,6 +115,13 @@ impl AStarPathfinding {
         Ok(crate::query::weights::checked_heuristics(
             &subgraph.ordered_nodes(),
             |node| {
+                if let Some(value) = ctx
+                    .property_batch
+                    .as_ref()
+                    .and_then(|batch| batch.get(true, node, attr))
+                {
+                    return Ok(Some(value));
+                }
                 graph
                     .space()
                     .get_node_attr_index(node, attr)
@@ -136,8 +142,8 @@ impl AStarPathfinding {
         subgraph: &Subgraph,
         weights: &HashMap<(NodeId, NodeId), f64>,
     ) -> Result<Vec<(NodeId, i64)>> {
-        let start = self.resolve_node(subgraph, &self.start_attr)?;
-        let goal = self.resolve_node(subgraph, &self.goal_attr)?;
+        let start = self.resolve_node(ctx, subgraph, &self.start_attr)?;
+        let goal = self.resolve_node(ctx, subgraph, &self.goal_attr)?;
         let nodes = subgraph.ordered_nodes();
         let source = nodes
             .binary_search(&start)
@@ -145,7 +151,7 @@ impl AStarPathfinding {
         let target = nodes
             .binary_search(&goal)
             .map_err(|_| anyhow!("A* goal outside selection"))?;
-        let heuristics = self.heuristics_map(subgraph)?;
+        let heuristics = self.heuristics_map(ctx, subgraph)?;
         let add_reverse = subgraph.graph().borrow().is_undirected();
         let csr = subgraph
             .csr_cache_get(add_reverse)
@@ -313,6 +319,10 @@ pub(crate) fn search(
 }
 
 impl Algorithm for AStarPathfinding {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "pathfinding.astar"
     }
@@ -326,7 +336,7 @@ impl Algorithm for AStarPathfinding {
         if ctx.is_cancelled() {
             return Err(anyhow!("astar cancelled"));
         }
-        let weights = checked_dijkstra_weights(&subgraph, self.weight_attr.as_ref())?;
+        let weights = checked_dijkstra_weights(ctx, &subgraph, self.weight_attr.as_ref())?;
 
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
@@ -385,9 +395,13 @@ impl Algorithm for AStarPathfinding {
                 .map(|&(node, index)| (node, AttrValue::Int(index)))
                 .collect();
 
-            ctx.with_scoped_timer("astar.write_attributes", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
+            {
+                let started = Instant::now();
+                let result =
+                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                ctx.record_call("astar.write_attributes", started.elapsed());
+                result
+            }
             .map_err(|err| anyhow!("failed to persist astar path: {err}"))?;
         } else {
             ctx.add_output(

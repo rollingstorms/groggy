@@ -10,7 +10,6 @@ use crate::algorithms::{
     ParameterType,
 };
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue};
 
 /// Leiden community detection algorithm.
@@ -124,6 +123,10 @@ impl Leiden {
 }
 
 impl Algorithm for Leiden {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "community.leiden"
     }
@@ -139,7 +142,7 @@ impl Algorithm for Leiden {
         if subgraph.graph().borrow().is_directed() {
             return Err(anyhow!("leiden currently requires an undirected graph"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
 
         let nodes = subgraph.ordered_nodes();
         let index: HashMap<_, _> = nodes
@@ -224,9 +227,13 @@ impl Algorithm for Leiden {
                 .map(|(&node, c)| (node, AttrValue::Int(c as i64)))
                 .collect();
 
-            ctx.with_scoped_timer("community.leiden.write_attrs", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })?;
+            {
+                let started = std::time::Instant::now();
+                let result =
+                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                ctx.record_call("community.leiden.write_attrs", started.elapsed());
+                result
+            }?;
         }
 
         Ok(subgraph)
@@ -264,6 +271,7 @@ mod tests {
     use super::*;
     use crate::algorithms::community::utils::find_connected_components;
     use crate::api::graph::Graph;
+    use crate::traits::SubgraphOperations;
     use crate::types::NodeId;
     use std::cell::RefCell;
     use std::collections::HashSet;

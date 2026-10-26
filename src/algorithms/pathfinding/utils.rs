@@ -235,6 +235,7 @@ where
 /// Validate selected entities and build minimum weights per traversable pair.
 /// Distance-only kernels can collapse parallel weights without losing the minimum.
 pub(crate) fn checked_dijkstra_weights(
+    ctx: &crate::algorithms::Context,
     subgraph: &Subgraph,
     attr: Option<&AttrName>,
 ) -> crate::GraphResult<HashMap<(NodeId, NodeId), f64>> {
@@ -263,6 +264,13 @@ pub(crate) fn checked_dijkstra_weights(
             Ok((u, v))
         },
         |edge| {
+            if let Some(value) = attr.and_then(|name| {
+                ctx.property_batch
+                    .as_ref()
+                    .and_then(|batch| batch.get(false, edge, name))
+            }) {
+                return Ok(Some(value));
+            }
             attr.and_then(|name| {
                 graph
                     .space()

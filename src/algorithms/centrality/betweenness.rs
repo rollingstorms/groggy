@@ -16,7 +16,6 @@ use crate::algorithms::{
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
@@ -490,7 +489,7 @@ impl BetweennessCentrality {
         }
         // Validate even empty/trivial selections before early returns or CSR cache use.
         let weight_start = Instant::now();
-        let checked_weights = checked_dijkstra_weights(subgraph, self.weight_attr.as_ref())?;
+        let checked_weights = checked_dijkstra_weights(ctx, subgraph, self.weight_attr.as_ref())?;
         if self.weight_attr.is_some() && checked_weights.values().any(|&w| w <= 0.0) {
             return Err(anyhow!(
                 "weighted betweenness requires strictly positive edge weights"
@@ -527,7 +526,7 @@ impl BetweennessCentrality {
             let graph = graph.borrow();
             for &edge in edges.iter() {
                 let pair = graph.edge_endpoints(edge)?;
-                let value = graph.get_edge_attr(edge, attr)?;
+                let value = ctx.edge_attribute(subgraph, edge, attr)?;
                 let weight = crate::query::weights::dijkstra_weight(value.as_ref(), edge)?;
                 if weights.get(&pair) == Some(&weight) {
                     shortest_edges.push(edge);
@@ -616,6 +615,10 @@ impl BetweennessCentrality {
 }
 
 impl Algorithm for BetweennessCentrality {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "centrality.betweenness"
     }
@@ -640,8 +643,7 @@ impl Algorithm for BetweennessCentrality {
                 .map(|&(node, score)| (node, AttrValue::Float64(score)))
                 .collect();
 
-            subgraph
-                .set_node_attr_column(self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist betweenness scores: {err}"))?;
 
             ctx.record_call("betweenness.write_attributes", write_start.elapsed());

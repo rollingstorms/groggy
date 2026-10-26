@@ -9,7 +9,6 @@ use crate::algorithms::{
     Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata, ParameterType,
 };
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Infomap community detection algorithm.
@@ -121,6 +120,10 @@ impl Infomap {
 }
 
 impl Algorithm for Infomap {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "community.infomap"
     }
@@ -135,7 +138,7 @@ impl Algorithm for Infomap {
         if ctx.is_cancelled() {
             return Err(anyhow!("Infomap cancelled"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(&subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
         let nodes = subgraph.ordered_nodes();
         let index: HashMap<_, _> = nodes.iter().enumerate().map(|(i, &n)| (n, i)).collect();
         let mut edges = Vec::new();
@@ -171,8 +174,7 @@ impl Algorithm for Infomap {
                 .map(|(idx, &node)| (node, AttrValue::Int(partition[idx] as i64)))
                 .collect();
 
-            subgraph
-                .set_node_attr_column(self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist communities: {err}"))?;
 
             ctx.record_call("infomap.write_attributes", write_start.elapsed());

@@ -12,7 +12,6 @@ use crate::algorithms::{
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 #[derive(Clone, Debug)]
@@ -67,11 +66,16 @@ impl DijkstraShortestPath {
         }
     }
 
-    fn resolve_source(&self, subgraph: &Subgraph, nodes: &[NodeId]) -> Result<usize> {
+    fn resolve_source(
+        &self,
+        ctx: &Context,
+        subgraph: &Subgraph,
+        nodes: &[NodeId],
+    ) -> Result<usize> {
         let mut sources = Vec::new();
         for (index, &node) in nodes.iter().enumerate() {
-            if subgraph
-                .get_node_attribute(node, &self.start_attr)?
+            if ctx
+                .node_attribute(subgraph, node, &self.start_attr)?
                 .is_some()
             {
                 sources.push(index);
@@ -143,6 +147,10 @@ pub(crate) fn distances(
 }
 
 impl Algorithm for DijkstraShortestPath {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "pathfinding.dijkstra"
     }
@@ -156,14 +164,14 @@ impl Algorithm for DijkstraShortestPath {
         if ctx.is_cancelled() {
             return Err(anyhow!("dijkstra cancelled"));
         }
-        let weights = checked_dijkstra_weights(&subgraph, self.weight_attr.as_ref())?;
+        let weights = checked_dijkstra_weights(ctx, &subgraph, self.weight_attr.as_ref())?;
 
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
         let nodes = subgraph.ordered_nodes();
         ctx.record_call("dijkstra.collect_nodes", nodes_start.elapsed());
         ctx.record_stat("dijkstra.count.input_nodes", nodes.len() as f64);
-        let source = self.resolve_source(&subgraph, &nodes)?;
+        let source = self.resolve_source(ctx, &subgraph, &nodes)?;
 
         // Phase 2: Build indexer
         let idx_start = Instant::now();
@@ -229,9 +237,13 @@ impl Algorithm for DijkstraShortestPath {
                 })
                 .collect::<Result<_>>()?;
 
-            ctx.with_scoped_timer("dijkstra.write_attributes", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
+            {
+                let started = Instant::now();
+                let result =
+                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                ctx.record_call("dijkstra.write_attributes", started.elapsed());
+                result
+            }
             .map_err(|err| anyhow!("failed to persist dijkstra distances: {err}"))?;
         } else {
             ctx.add_output(

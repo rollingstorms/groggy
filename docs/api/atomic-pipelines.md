@@ -31,8 +31,12 @@ assert profile["atomic"]
 
 The core Algorithm trait defaults to uncertified. A builder algorithm certifies
 itself only when every descendant step supports the existing property overlay.
-Every outer algorithm is checked before any runs. Uncertified classic wrappers,
-streaming/topology effects and unsupported builder steps reject explicitly.
+Every outer algorithm is checked before any runs. All 13 built-in classic registry wrappers are certified: PageRank, closeness,
+betweenness, Louvain, Leiden, Girvan–Newman, label propagation, connected
+components, Infomap, A*, BFS, DFS and Dijkstra. Their source markers, weights,
+heuristics, personalization and label seeds read the same outer overlay as
+builder steps. Streaming/topology effects and unsupported custom algorithms or
+builder steps reject explicitly.
 Supported builder children can have either local atomic flag: an outer run owns
 the batch, and children borrow it without accepting intermediate versions. Execution
 uses the supplied compiled step order. Build mutation-sensitive Python children
@@ -83,7 +87,32 @@ mappings reject. An explicit owned temporal capture's `to_graph()` already has
 retained accepted history and needs no such import.
 
 This completes the certified property-only outer pipeline and selected import
-boundaries under 09.4b.2. Native infallible/default constructor migration, mutable
-raw pool/space escape auditing and uncertified/topology algorithms retain that
-item's remaining scope. It does not introduce arbitrary topology transactions or
+boundaries under 09.4b.2. Native ordinary factories now publish with fallible insertion; raw owner pool/
+space mutation is private. Remaining compound acceptance scope is topology effects
+and unsupported custom implementations. It does not introduce arbitrary topology transactions or
 a durable pipeline executor. Owner-thread graph assembly still holds the GIL.
+
+## Classic algorithm composition
+
+```python
+from groggy.algorithms import centrality
+
+graph = Graph()
+graph.add_nodes(3)
+graph.add_edge(0, 1)
+graph.add_edge(1, 2)
+copy = AlgorithmBuilder("copy rank")
+copy.attach_as("rank_copy", copy.load_attr("rank"))
+before = graph.current_state_id
+Pipeline([centrality.pagerank(output_attr="rank"), copy.build(atomic=True)])(
+    graph.view(), atomic=True
+)
+assert graph.current_state_id == before + 1
+assert graph.get_node_attr(0, "rank_copy") == graph.get_node_attr(0, "rank")
+```
+
+Classic kernels keep their existing graph-direction, weight and output contracts.
+Outside explicit atomic runs they retain per-algorithm publication; persist=False
+keeps existing owned-output behavior. Certification does not add support for
+otherwise unsupported weighted/directed modes or make topology-changing pipelines
+atomic. Property-only composition does not clone the whole graph.

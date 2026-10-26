@@ -13,7 +13,6 @@ use crate::algorithms::{
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 #[derive(Clone, Copy)]
@@ -140,14 +139,14 @@ fn execute_traversal(
     if ctx.is_cancelled() {
         return Err(anyhow!("{prefix} cancelled"));
     }
-    checked_dijkstra_weights(&subgraph, None)?;
+    checked_dijkstra_weights(ctx, &subgraph, None)?;
     let collect_start = Instant::now();
     let nodes = subgraph.ordered_nodes();
     ctx.record_call(format!("{prefix}.collect_nodes"), collect_start.elapsed());
     ctx.record_stat(format!("{prefix}.count.input_nodes"), nodes.len() as f64);
     let mut sources = Vec::new();
     for (index, &node) in nodes.iter().enumerate() {
-        if subgraph.get_node_attribute(node, start_attr)?.is_some() {
+        if ctx.node_attribute(&subgraph, node, start_attr)?.is_some() {
             sources.push(index);
         }
     }
@@ -209,9 +208,12 @@ fn execute_traversal(
             .into_iter()
             .map(|(node, value)| (node, AttrValue::Int(value)))
             .collect();
-        ctx.with_scoped_timer(format!("{prefix}.write_attributes"), || {
-            subgraph.set_node_attr_column(output_attr.clone(), values)
-        })
+        {
+            let started = Instant::now();
+            let result = ctx.attach_node_column(&subgraph, output_attr.clone(), values);
+            ctx.record_call(format!("{prefix}.write_attributes"), started.elapsed());
+            result
+        }
         .map_err(|err| anyhow!("failed to persist {prefix} results: {err}"))?;
     } else {
         ctx.add_output(kind.output_key(), AlgorithmOutput::NodeIntegers(rows));
@@ -264,6 +266,10 @@ impl BfsTraversal {
 }
 
 impl Algorithm for BfsTraversal {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "pathfinding.bfs"
     }
@@ -325,6 +331,10 @@ impl DfsTraversal {
 }
 
 impl Algorithm for DfsTraversal {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "pathfinding.dfs"
     }

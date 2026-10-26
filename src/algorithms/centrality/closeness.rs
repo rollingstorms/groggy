@@ -16,7 +16,6 @@ use crate::algorithms::{
 };
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
@@ -343,6 +342,10 @@ impl ClosenessCentrality {
 }
 
 impl Algorithm for ClosenessCentrality {
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "centrality.closeness"
     }
@@ -356,7 +359,7 @@ impl Algorithm for ClosenessCentrality {
         if ctx.is_cancelled() {
             return Err(anyhow!("closeness cancelled"));
         }
-        let weights = checked_dijkstra_weights(&subgraph, self.weight_attr.as_ref())?;
+        let weights = checked_dijkstra_weights(ctx, &subgraph, self.weight_attr.as_ref())?;
         if weights.values().any(|&weight| weight <= 0.0) {
             return Err(anyhow!("closeness edge lengths must be strictly positive"));
         }
@@ -453,9 +456,13 @@ impl Algorithm for ClosenessCentrality {
                 })
                 .collect::<Result<_>>()?;
 
-            ctx.with_scoped_timer("closeness.write_attributes", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
+            {
+                let started = Instant::now();
+                let result =
+                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                ctx.record_call("closeness.write_attributes", started.elapsed());
+                result
+            }
             .map_err(|err| anyhow!("failed to persist closeness scores: {err}"))?;
         } else {
             ctx.add_output(
