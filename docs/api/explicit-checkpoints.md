@@ -49,7 +49,9 @@ APIs. New `try_add_node`/`try_add_nodes` publish through the checked coordinator
 and return failures before allocation. The count constructor preserves one bulk
 publication; count zero is a no-op. Writers remain the interface for properties,
 explicit effective timestamps and schema policies. The Python ordinary defaults now use checked publication. Existing native
-infallible compatibility and compound pooled/meta mutation audits remain open.
+infallible/default compatibility, mutable raw storage escapes and uncertified/topology
+algorithm acceptance remain open under 09.4b.2. Checked meta composition, selected
+imports and certified outer property pipelines have their documented boundaries.
 
 ## Durable checkpoints
 

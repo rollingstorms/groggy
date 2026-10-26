@@ -12,7 +12,19 @@ The concrete integration target is [Graphiti](https://github.com/getzep/graphiti
 
 The stages describe related work, with Graphiti-specific integration and retrieval deferred until the Groggy core is finished. Each item may call for verification, repair, completion, or a new capability. Item numbers remain continuous so individual work items are easy to reference. The owner's "number 25" in the later flat list means the Graphiti ingest adapter, numbered 20 here; its "number 27" means lexical search, numbered 22 here. The related Graphiti driver is numbered 25 here.
 
-## Immediate next implementation slice
+## Current checkpoint — 2026-10-26
+
+The flat checklist has **200 checked / 68 open entries**, including overlapping
+parents. Effective reconstruction (16.2), property history/unsets (11.2), exact
+owned snapshots (12.2) and branch lifecycle (14.1) are complete within their stated
+contracts. Certified outer pipelines/import baselines and explicit history-only
+pruning complete components of 09.4b.2 and 15.1/15.2. Raw native escapes/defaults,
+persistent pool import/physical compaction, rewiring/reversals and merge planning
+remain core work. Graphiti remains deferred. See
+[the current priority slice record](priority-slices-2026-10-26.md) for commits,
+verification, measured costs and the fixed next-work inventory.
+
+## Publication foundations already implemented
 
 1. **Completed on this branch:** the existing `set_node_attrs`, `set_edge_attrs`, and column setter paths collect all inactive or unknown IDs and duplicate assignments before writing, with attribute and input positions in the error. Duplicate assignments are rejected as an implementation choice pending owner review. Vectorized pool writes and current Rust/Python entry points remain in use. Python conversion errors now aggregate with read-only Rust preflight diagnostics before rejected calls return.
 2. **Explicit batch API implemented in Rust and Python:** `GraphBatch` combines node/edge insertion, property updates, and removals. It validates semantic errors against the proposed resulting state before calling existing bulk writers. This establishes all-or-nothing behavior for rejected input in a single-process graph; crash-safe rollback and durable publication belong to the storage milestone.

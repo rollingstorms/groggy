@@ -76,3 +76,11 @@ The initial receipt above exposed quadratic node membership in recorded replay.
 second receipt: 100k warm switch-pair median **1.554 s → 0.564 s**, owned capture
 **566 ms → 100 ms**, with column lengths still unchanged. The original receipt is
 kept as the baseline rather than overwritten.
+
+## Subsequent native import boundary repair
+
+The later `0efefed9` slice stages a complete pending manual base for native
+Graph::from_snapshot and lightweight as_subgraph materialization. Accepting that
+base now preserves untouched topology/properties in history. Explicit owned
+capture restoration already has accepted history. See
+`outer-pipeline-boundary-2026-10-26.md` for this intentional compatibility repair.

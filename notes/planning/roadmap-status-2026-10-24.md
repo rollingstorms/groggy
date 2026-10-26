@@ -583,3 +583,11 @@ policy preserved. Durable removal receipts, rollback/replay/reopen/backup and a
 50k-version benchmark are recorded in `history-retention-slice-2026-10-26.md`.
 Raw pool/identity reclamation, complete referent closure and physical compaction/
 replacement remain open under 15/10.4. **200 checked / 68 open**, no new rows.
+
+## Consolidated priority pass — 2026-10-26
+
+[Priority slice record](priority-slices-2026-10-26.md) lists the seven implementation
+commits including 16.2, final verification, measured costs and the fixed remaining
+core inventory. Follow-on movement is **197/71 → 200/68**, closing existing 11.2,
+12.2 and 14.1 while advancing native boundaries and history-only retention without
+adding checklist rows. No additional owner answers were needed for these slices.

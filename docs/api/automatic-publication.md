@@ -84,13 +84,14 @@ Meta-node creation publishes its required system attributes together. Meta
 classification accepts all logical text storage representations, including
 compact text. Higher-level collapse plans now stage their aggregations, retained
 membership, boundary edges and removals as one checked operation; see
-[meta composition](meta-composition.md) for semantics and limits. Remaining
-compound algorithm/table writeback routines still need an audit. Explicit mapped
+[meta composition](meta-composition.md) for semantics and limits. [Certified outer property pipelines](atomic-pipelines.md) now share one acceptance;
+uncertified/topology algorithms still need migration. Explicit mapped
 [table property writeback](table-writeback.md) now accepts mixed selected columns
 as one checked batch. [Table materialization](table-materialization.md) now accepts
-supported active rows/properties into a new publishing graph; connected provenance
-and portable retained pool/history copying remain open. Mutable native
-pool/space escape hatches and the infallible Rust compatibility surface remain
+supported active rows/properties into an independent publishing graph; table/source
+pins retain read provenance. Explicit [owned snapshots](owned-snapshots.md) copy
+retained pool/history in memory; persistent arbitrary raw-pool import remains 10.3.
+Mutable native pool/space escape hatches and the infallible Rust compatibility surface remain
 outside this step. Native [subgraph bulk writes](subgraph-writes.md) now preserve
 complete inputs for owner validation, including algorithm output attachment;
 the all-edge convenience setter publishes one complete column.

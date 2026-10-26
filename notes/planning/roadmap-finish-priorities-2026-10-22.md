@@ -16,9 +16,8 @@ See the flat checklist for each supported scope and evidence.
 
 Next: remaining native default/infallible constructors, raw pool/space escapes
 and uncertified/topology acceptance (09.4b.2), then persistent raw-pool import and
-storage lifecycle (10.3/10.4). Explicit outer property pipelines are complete. Exact owned snapshots (12.2), property history
-(11.2) and 16.2 are
-complete: effective reconstruction, atomic endpoint validation, frozen nested group
+storage lifecycle (10.3/10.4). Explicit outer property pipelines and branch lifecycle (14.1) are complete.
+Exact owned snapshots (12.2), property history (11.2) and 16.2 are complete: effective reconstruction, atomic endpoint validation, frozen nested group
 sources/durable transfer, explicit legacy inputs, resolved first-parent merge reads
 and cached event prefixes. 16.3, checkpoint semantics (12.3), checked writeback
 (27.2), and the fixed table facade inventory (27.1/AR7.10) are complete. Merge
@@ -1209,3 +1208,6 @@ policy preserved. Durable removal receipts, rollback/replay/reopen/backup and a
 50k-version benchmark are recorded in `history-retention-slice-2026-10-26.md`.
 Raw pool/identity reclamation, complete referent closure and physical compaction/
 replacement remain open under 15/10.4. **200 checked / 68 open**, no new rows.
+
+The [consolidated priority pass](priority-slices-2026-10-26.md) is the current
+handoff: commits, verified scopes, costs/limits and the fixed next-work inventory.

@@ -30,6 +30,16 @@ Compose custom pipelines that execute in Rust
 Detailed API documentation with theory and examples
 → [API Reference](api/graph.md)
 
+### History and mutation contracts
+
+- [Effective-time graph reconstruction](api/effective-time-reads.md)
+- [Property history, null and unsets](api/property-history.md)
+- [Owned snapshots and restoration](api/owned-snapshots.md)
+- [Branch state reads and manual reset](api/branch-state-reads.md)
+- [Atomic property pipelines](api/atomic-pipelines.md)
+- [Explicit history pruning](api/history-retention.md)
+- [Durable storage and recovery](api/durable-storage.md)
+
 ### :material-lightbulb: Core Concepts
 Understand Groggy's architecture and design philosophy
 → [Concepts](concepts/overview.md)

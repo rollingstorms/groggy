@@ -36,7 +36,9 @@ and effective timestamp, the later accepted write wins. One instant's changes ar
 considered together for endpoint validity. Creation starts a fresh lifetime;
 properties written outside an active lifetime do not carry into a later
 activation. Explicit null remains a value; a never-assigned property is absent.
-Property deletion/unset is separately tracked in checklist 11.2.
+Explicit property unsets record absence until the next effective assignment; assigning
+Null keeps the key present. See [property history](property-history.md) for scalar,
+bulk, mixed-batch and durable behavior (11.2).
 
 The read pins the selected published head and excludes sibling branches and later
 publications. For an already resolved merge, reconstruction follows the first
