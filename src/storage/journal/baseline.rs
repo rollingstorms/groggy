@@ -32,6 +32,10 @@ impl<W: Write> ChunkWriter<'_, W> {
         payload.extend_from_slice(&self.parts.to_le_bytes());
         payload.extend_from_slice(&self.buffer);
         write_frame(self.writer, marker, &payload)?;
+        #[cfg(all(test, unix))]
+        if self.parts == 0 {
+            super::checkpoint::pause_for_process_test("AfterFirstFragment");
+        }
         self.parts = self
             .parts
             .checked_add(1)

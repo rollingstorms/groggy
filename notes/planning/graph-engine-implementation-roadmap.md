@@ -1310,3 +1310,13 @@ documentation examples**, strict all-target Clippy and in-tree extension rebuild
 No new checklist rows; **201 checked / 67 open**. Decoded graph/history still
 scale with retained data. The owner GraphTable grouped-view answer was reconfirmed
 and its stale appendix pending marker corrected in d5bdc24a.
+
+### Checkpoint process-death recovery verified
+
+Existing 10.4/31.4 scope now includes actual SIGKILL/reopen tests at six boundaries,
+including partial large-fragment output and before/after atomic replacement.
+Complete state/clocks/history/schema/checkpoints, released locks and continued
+append are verified. See `checkpoint-process-recovery-2026-10-26.md`. This does
+not certify sudden power loss/non-Unix replacement or add orphan maintenance.
+Gates: **1,263 native / 51 ignored**, strict all-target Clippy; production API
+unchanged. No new rows; **201 checked / 67 open**.

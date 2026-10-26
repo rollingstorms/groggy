@@ -47,6 +47,26 @@ pub struct StorageCheckpointOutcome {
     source_identity: File,
     expected_state: StateId,
 }
+// Test-only process handshake: no environment-controlled behavior exists in
+// production builds. A parent test kills this process after observing the phase.
+#[cfg(all(test, unix))]
+pub(super) fn pause_for_process_test(phase: &str) {
+    if std::env::var("GROGGY_TEST_CHECKPOINT_PHASE")
+        .ok()
+        .as_deref()
+        != Some(phase)
+    {
+        return;
+    }
+    let Some(ready) = std::env::var_os("GROGGY_TEST_CHECKPOINT_READY") else {
+        return;
+    };
+    std::fs::write(ready, phase).expect("signal checkpoint phase");
+    std::thread::sleep(std::time::Duration::from_secs(30));
+    // Prevent an orphan helper if its test parent vanished instead of killing it.
+    std::process::exit(86);
+}
+
 impl DurableGraph {
     /// Replace the operation stream with one complete retained baseline. No history,
     /// raw values or identity reservations are pruned and no graph version is created.
@@ -264,6 +284,7 @@ impl StorageCheckpointPlan {
     }
     #[cfg(all(test, unix))]
     fn inject(&self, phase: CheckpointFailure) -> GraphResult<()> {
+        pause_for_process_test(&format!("{phase:?}"));
         if self.failure == Some(phase) {
             return Err(invalid(format!(
                 "injected storage checkpoint failure {phase:?}"
@@ -313,6 +334,151 @@ mod tests {
         }
         store
     }
+    #[test]
+    fn checkpoint_process_child() {
+        let Some(path) = std::env::var_os("GROGGY_TEST_CHECKPOINT_PATH") else {
+            return;
+        };
+        let mut store = DurableGraph::open(Path::new(&path)).expect("open child journal");
+        store
+            .checkpoint_storage(store.graph.current_state_id())
+            .expect("checkpoint must reach requested phase");
+        panic!("checkpoint did not pause at requested boundary");
+    }
+
+    #[test]
+    fn killed_checkpoint_process_recovers_complete_state_and_releases_both_inode_locks() {
+        use std::os::unix::process::ExitStatusExt;
+        use std::process::{Child, Command, Stdio};
+        use std::time::{Duration, Instant};
+        struct KillOnDrop(Child);
+        impl Drop for KillOnDrop {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        for phase in [
+            "BeforeWrite",
+            "AfterFirstFragment",
+            "AfterSync",
+            "BeforeReplace",
+            "AfterReplace",
+            "AfterDirectorySync",
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("journal");
+            let ready = dir.path().join("ready");
+            let mut store = populated(&path);
+            if phase == "AfterFirstFragment" {
+                let state = store.graph.current_state_id();
+                store
+                    .apply_batch(
+                        GraphBatch {
+                            node_attrs: HashMap::from([(
+                                "large".into(),
+                                vec![(N::Existing(0), V::Text("x".repeat(9 * 1024 * 1024)))],
+                            )]),
+                            ..Default::default()
+                        },
+                        state,
+                        "large".into(),
+                        "test".into(),
+                    )
+                    .unwrap();
+            }
+            let state = store.graph.current_state_id();
+            store.set_schema(None, state, 0).unwrap();
+            store
+                .checkpoint(state, "label".into(), "test".into())
+                .unwrap();
+            let clocks = store.graph.publication_metadata(state).unwrap();
+            let history: Vec<_> = store
+                .graph
+                .history_records()
+                .iter()
+                .map(|v| (v.id, v.content_hash))
+                .collect();
+            let before = std::fs::read(&path).unwrap();
+            drop(store);
+            let mut child = KillOnDrop(
+                Command::new(std::env::current_exe().unwrap())
+                    .args([
+                        "--exact",
+                        "storage::journal::checkpoint::tests::checkpoint_process_child",
+                        "--nocapture",
+                    ])
+                    .env("GROGGY_TEST_CHECKPOINT_PATH", &path)
+                    .env("GROGGY_TEST_CHECKPOINT_PHASE", phase)
+                    .env("GROGGY_TEST_CHECKPOINT_READY", &ready)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .unwrap(),
+            );
+            let deadline = Instant::now() + Duration::from_secs(20);
+            while !ready.exists() {
+                assert!(
+                    child.0.try_wait().unwrap().is_none(),
+                    "helper exited before {phase}"
+                );
+                assert!(Instant::now() < deadline, "helper timed out at {phase}");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            child.0.kill().unwrap();
+            assert_eq!(child.0.wait().unwrap().signal(), Some(9));
+            if !matches!(phase, "AfterReplace" | "AfterDirectorySync") {
+                assert_eq!(std::fs::read(&path).unwrap(), before, "{phase}");
+            }
+            let mut recovered = DurableGraph::open(&path).unwrap();
+            assert_eq!(recovered.graph.current_state_id(), state, "{phase}");
+            assert_eq!(recovered.schema_revision, 1, "{phase}");
+            assert_eq!(
+                recovered.graph.publication_metadata(state).unwrap(),
+                clocks,
+                "{phase}"
+            );
+            assert_eq!(
+                recovered
+                    .graph
+                    .history_records()
+                    .iter()
+                    .map(|v| (v.id, v.content_hash))
+                    .collect::<Vec<_>>(),
+                history,
+                "{phase}"
+            );
+            assert_eq!(
+                recovered.graph.get_node_attr(0, &"v".into()).unwrap(),
+                Some(V::Int(10)),
+                "{phase}"
+            );
+            assert_eq!(recovered.graph.checkpoints().len(), 1, "{phase}");
+            assert!(
+                DurableGraph::open(&path).is_err(),
+                "reopened writer lock missing at {phase}"
+            );
+            let appended = recovered
+                .apply_batch(
+                    GraphBatch {
+                        add_nodes: 1,
+                        ..Default::default()
+                    },
+                    state,
+                    "after kill".into(),
+                    "test".into(),
+                )
+                .unwrap();
+            assert_eq!(appended.added_nodes, vec![1], "{phase}");
+            drop(recovered);
+            assert_eq!(
+                DurableGraph::open(&path).unwrap().graph.node_count(),
+                2,
+                "{phase}"
+            );
+        }
+    }
+
     #[test]
     fn every_failure_phase_preserves_complete_recovery_and_continuous_writer_lock() {
         for phase in [

@@ -64,8 +64,11 @@ rejects instead of replacing an unrelated file.
 Before replacement, an I/O/verification failure leaves the original journal and
 writer usable. After replacement, any reported failure marks the writer unusable:
 close and reopen the journal. Either retained baseline is complete; a directory
-sync error means the replacement's crash persistence is uncertain. The tests
-inject returned failures at five boundaries; they do not emulate a power failure.
+sync error means the replacement's crash persistence is uncertain. The tests inject returned failures at five boundaries and kill a helper process
+at six boundaries, including a partial first fragment and both sides of rename.
+Recovery checks clocks/history/schema, writer lock reacquisition and continued
+writes. These tests do not emulate sudden power loss. A killed process can leave
+an orphan sibling temporary; recovery ignores it and does not promote it.
 
 Python performs detached file I/O and candidate verification outside the GIL.
 Source capture stays on the owner thread; binary encoding now runs with detached
