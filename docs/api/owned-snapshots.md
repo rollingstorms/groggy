@@ -4,7 +4,8 @@ Ordinary `snapshot_at_commit(state)` and `snapshot_at_timestamp(seconds)` retain
 immutable selected values, direction, frozen group sources and configuration.
 They do not copy the complete backing pool or all retained history. Their
 `as_subgraph()` method creates the existing independent manual selection container,
-now preserving all configuration fields and frozen source references.
+now preserving all configuration fields and frozen source references. The selected
+base is staged as a pending manual import; accept it before checked mutation.
 
 Use `owned=True` when an independent graph must retain the original history,
 branches, inactive ID/name reservations and arbitrary backing columns.

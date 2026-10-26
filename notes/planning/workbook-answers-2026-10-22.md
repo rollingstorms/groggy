@@ -965,3 +965,13 @@ and restore independent owners. Repeated branch/reset restoration no longer
 appends duplicate values. No owner answers changed and no checklist rows added.
 See `owned-snapshot-exit-review-2026-10-26.md` and `docs/api/owned-snapshots.md`.
 Persistent archive/import and storage lifecycle remain 10.3/10.4.
+
+## 2026-10-26 — outer pipeline and import publication boundaries
+
+Completed certified whole-pipeline property acceptance and complete selected
+snapshot import baselines under existing 09.4b.2. Errors/cancellation discard
+earlier staged updates; children share one acceptance; untouched imported topology
+and properties remain in history. **199 checked / 69 open**, no new rows. The
+parent now has three explicit open components: native default/infallible migration,
+raw pool/space escapes and uncertified/topology algorithm acceptance. Effect-aware
+IR remains AR7.8. Evidence/gates: `outer-pipeline-boundary-2026-10-26.md`.

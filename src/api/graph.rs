@@ -2215,6 +2215,7 @@ impl Graph {
     pub fn from_snapshot(snapshot: crate::state::state::GraphSnapshot) -> Result<Self, GraphError> {
         let mut graph = Graph::new_with_type(snapshot.graph_type);
         graph.reset_to_snapshot(snapshot)?;
+        graph.seed_selected_import()?;
         Ok(graph)
     }
 

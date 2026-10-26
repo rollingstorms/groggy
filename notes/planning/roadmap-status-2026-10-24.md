@@ -555,3 +555,13 @@ one removal filter preserve the old semantics and column bounds. Matched 100k-no
 warm switch pairs improve from 1.554 s to 0.564 s, and owned capture from 566 ms
 to 100 ms. See `recorded-membership-scaling-2026-10-26.md`. Counts remain
 **199 checked / 69 open**; no scope or checklist rows added.
+
+## 2026-10-26 — outer pipeline and import publication boundaries
+
+Completed certified whole-pipeline property acceptance and complete selected
+snapshot import baselines under existing 09.4b.2. Errors/cancellation discard
+earlier staged updates; children share one acceptance; untouched imported topology
+and properties remain in history. **199 checked / 69 open**, no new rows. The
+parent now has three explicit open components: native default/infallible migration,
+raw pool/space escapes and uncertified/topology algorithm acceptance. Effect-aware
+IR remains AR7.8. Evidence/gates: `outer-pipeline-boundary-2026-10-26.md`.

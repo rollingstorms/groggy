@@ -126,8 +126,71 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    /// Execute the pipeline sequentially.
-    pub fn run(&self, ctx: &mut Context, mut subgraph: Subgraph) -> Result<Subgraph> {
+    /// Execute sequentially with the existing per-algorithm publication policy.
+    pub fn run(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        self.run_steps(ctx, subgraph, None)
+    }
+
+    /// Stage all certified property algorithms and accept exactly once on success.
+    /// Unsupported effects reject before any execution. Earlier staged properties
+    /// are visible to later algorithms; errors/cancellation discard the outer batch.
+    pub fn run_atomic_properties(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        if ctx.property_batch.is_some() {
+            return Err(anyhow!(
+                "Nested outer atomic pipeline execution is unsupported"
+            ));
+        }
+        for (index, step) in self.steps.iter().enumerate() {
+            if !step.algorithm.supports_atomic_properties() {
+                return Err(anyhow!(
+                    "Pipeline step {index} ({}) does not support atomic property execution",
+                    step.id
+                ));
+            }
+        }
+        let source = subgraph.graph();
+        let staged = ctx.persist_results();
+        if staged {
+            let graph = source.borrow();
+            let head = graph.current_state_id();
+            graph.validate_write_head(head)?;
+            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(head));
+        }
+        let previous_outputs = ctx.take_outputs();
+        let result = self
+            .run_steps(ctx, subgraph, Some(&source))
+            .and_then(|result| {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("pipeline cancelled before publication"));
+                }
+                if staged {
+                    let pending = ctx
+                        .property_batch
+                        .take()
+                        .ok_or_else(|| anyhow!("Atomic pipeline lost its property batch"))?;
+                    pending.accept(&mut source.borrow_mut())?;
+                }
+                Ok(result)
+            });
+        // Child algorithms borrow the outer batch; they never accept or discard it.
+        // Always clear it, including execution, validation and publication errors.
+        if staged {
+            ctx.property_batch = None;
+        }
+        let outputs = ctx.take_outputs();
+        ctx.outputs = previous_outputs;
+        if result.is_ok() {
+            ctx.outputs.extend(outputs);
+        }
+        result
+    }
+
+    fn run_steps(
+        &self,
+        ctx: &mut Context,
+        mut subgraph: Subgraph,
+        source: Option<&std::rc::Rc<std::cell::RefCell<crate::Graph>>>,
+    ) -> Result<Subgraph> {
         let pipeline_start = Instant::now();
         for (idx, step) in self.steps.iter().enumerate() {
             if ctx.is_cancelled() {
@@ -136,13 +199,15 @@ impl Pipeline {
             ctx.begin_step(idx, step.id.as_str());
             let timer_label = format!("algorithm.{}", step.id);
             let step_start = Instant::now();
-            subgraph = step.algorithm.execute(ctx, subgraph)?;
-            let step_elapsed = step_start.elapsed();
-            ctx.record_duration(timer_label, step_elapsed);
+            let result = step.algorithm.execute(ctx, subgraph);
+            ctx.record_duration(timer_label, step_start.elapsed());
             ctx.finish_step();
+            subgraph = result?;
+            if source.is_some_and(|owner| !std::rc::Rc::ptr_eq(owner, &subgraph.graph())) {
+                return Err(anyhow!("Atomic pipeline changed graph owner at step {idx}"));
+            }
         }
-        let elapsed = pipeline_start.elapsed();
-        ctx.record_duration("pipeline.run", elapsed);
+        ctx.record_duration("pipeline.run", pipeline_start.elapsed());
         Ok(subgraph)
     }
 
@@ -259,5 +324,180 @@ mod tests {
         let builder = PipelineBuilder::new().with_algorithm("   ", |_| {});
         let err = builder.build(&registry).err().expect("expected error");
         assert!(err.to_string().contains("missing an identifier"));
+    }
+}
+
+#[cfg(test)]
+mod atomic_property_tests {
+    use super::*;
+    use crate::algorithms::AlgorithmOutput;
+    use crate::{AttrValue, Graph};
+    use std::{
+        cell::RefCell,
+        collections::HashMap,
+        rc::Rc,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    };
+
+    struct Stage {
+        name: &'static str,
+        fail: bool,
+        cancel: Option<Arc<AtomicBool>>,
+    }
+    impl Algorithm for Stage {
+        fn id(&self) -> &'static str {
+            "test.stage"
+        }
+        fn supports_atomic_properties(&self) -> bool {
+            true
+        }
+        fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+            ctx.property_batch.as_mut().expect("outer staging").stage(
+                true,
+                HashMap::from([(self.name.into(), vec![(0, AttrValue::Int(7))])]),
+            )?;
+            ctx.add_output("produced", AlgorithmOutput::NodeIntegers(vec![(0, 7)]));
+            if let Some(token) = &self.cancel {
+                token.store(true, Ordering::Relaxed);
+            }
+            if self.fail {
+                return Err(anyhow!("late failure"));
+            }
+            Ok(subgraph)
+        }
+    }
+    struct Unsupported(Arc<AtomicBool>);
+    impl Algorithm for Unsupported {
+        fn id(&self) -> &'static str {
+            "test.unsupported"
+        }
+        fn execute(&self, _: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+            self.0.store(true, Ordering::Relaxed);
+            Ok(subgraph)
+        }
+    }
+    struct OtherOwner;
+    impl Algorithm for OtherOwner {
+        fn id(&self) -> &'static str {
+            "test.owner"
+        }
+        fn supports_atomic_properties(&self) -> bool {
+            true
+        }
+        fn execute(&self, _: &mut Context, _: Subgraph) -> Result<Subgraph> {
+            let mut graph = Graph::new_publishing();
+            graph.insert_nodes(1)?;
+            Ok(Subgraph::from_nodes(
+                Rc::new(RefCell::new(graph)),
+                [0].into_iter().collect(),
+                "foreign".into(),
+            )?)
+        }
+    }
+    fn pipeline(algorithms: Vec<Box<dyn Algorithm>>) -> Pipeline {
+        Pipeline {
+            steps: algorithms
+                .into_iter()
+                .map(|algorithm| PipelineStep {
+                    id: algorithm.id().into(),
+                    metadata: algorithm.metadata(),
+                    algorithm,
+                })
+                .collect(),
+        }
+    }
+    fn fixture() -> (Rc<RefCell<Graph>>, Subgraph) {
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(1).unwrap();
+        let graph = Rc::new(RefCell::new(graph));
+        let selected =
+            Subgraph::from_nodes(graph.clone(), [0].into_iter().collect(), "selected".into())
+                .unwrap();
+        (graph, selected)
+    }
+    fn stage(name: &'static str, fail: bool) -> Box<dyn Algorithm> {
+        Box::new(Stage {
+            name,
+            fail,
+            cancel: None,
+        })
+    }
+    #[test]
+    fn outer_failure_discards_earlier_properties_outputs_and_allows_context_reuse() {
+        let (graph, selected) = fixture();
+        let before = graph.borrow().current_state_id();
+        let mut ctx = Context::new();
+        ctx.add_output("previous", AlgorithmOutput::Histogram(vec![3]));
+        assert!(pipeline(vec![stage("a", false), stage("b", true)])
+            .run_atomic_properties(&mut ctx, selected.clone())
+            .is_err());
+        assert!(ctx.property_batch.is_none());
+        assert!(ctx.active_step.is_none());
+        assert_eq!(graph.borrow().current_state_id(), before);
+        assert_eq!(graph.borrow().get_node_attr(0, &"a".into()).unwrap(), None);
+        assert_eq!(ctx.outputs.len(), 1);
+        assert!(ctx.outputs.contains_key("previous"));
+        pipeline(vec![stage("a", false), stage("b", false)])
+            .run_atomic_properties(&mut ctx, selected)
+            .unwrap();
+        assert_eq!(graph.borrow().current_state_id(), before + 1);
+        assert!(ctx.outputs.contains_key("previous") && ctx.outputs.contains_key("produced"));
+    }
+    #[test]
+    fn unsupported_outer_algorithm_rejects_before_any_prefix_executes() {
+        let (graph, selected) = fixture();
+        let called = Arc::new(AtomicBool::new(false));
+        let mut ctx = Context::new();
+        let error = pipeline(vec![
+            stage("a", false),
+            Box::new(Unsupported(called.clone())),
+        ])
+        .run_atomic_properties(&mut ctx, selected)
+        .unwrap_err();
+        assert!(error.to_string().contains("step 1"));
+        assert!(!called.load(Ordering::Relaxed));
+        assert_eq!(graph.borrow().current_state_id(), 1);
+        assert!(ctx.property_batch.is_none());
+        assert_eq!(graph.borrow().get_node_attr(0, &"a".into()).unwrap(), None);
+    }
+    #[test]
+    fn cancellation_after_last_algorithm_discards_staging_without_partial_publication() {
+        let (graph, selected) = fixture();
+        let token = Arc::new(AtomicBool::new(false));
+        let mut ctx = Context::with_cancel_token(token.clone());
+        let pipeline = pipeline(vec![
+            stage("a", false),
+            Box::new(Stage {
+                name: "b",
+                fail: false,
+                cancel: Some(token),
+            }),
+        ]);
+        assert!(pipeline.run_atomic_properties(&mut ctx, selected).is_err());
+        assert_eq!(graph.borrow().current_state_id(), 1);
+        assert!(!graph.borrow().has_uncommitted_changes());
+        assert!(ctx.property_batch.is_none());
+        assert!(ctx.outputs.is_empty());
+    }
+    #[test]
+    fn atomic_owner_changes_and_final_managed_property_validation_discard_prefixes() {
+        let (graph, selected) = fixture();
+        let mut ctx = Context::new();
+        assert!(pipeline(vec![stage("a", false), Box::new(OtherOwner)])
+            .run_atomic_properties(&mut ctx, selected.clone())
+            .is_err());
+        assert_eq!(graph.borrow().current_state_id(), 1);
+        assert!(ctx.property_batch.is_none());
+        assert!(
+            pipeline(vec![stage("a", false), stage("entity_type", false)])
+                .run_atomic_properties(&mut ctx, selected)
+                .is_err()
+        );
+        assert_eq!(graph.borrow().current_state_id(), 1);
+        assert_eq!(graph.borrow().get_node_attr(0, &"a".into()).unwrap(), None);
+        assert!(ctx.property_batch.is_none() && ctx.outputs.is_empty());
     }
 }

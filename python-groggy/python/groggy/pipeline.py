@@ -9,7 +9,7 @@ from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
 
 
-def apply(subgraph, algorithm_or_pipeline, persist=True, return_profile=False):
+def apply(subgraph, algorithm_or_pipeline, persist=True, return_profile=False, *, atomic=False):
     """
     Apply an algorithm or pipeline to a subgraph.
 
@@ -24,6 +24,7 @@ def apply(subgraph, algorithm_or_pipeline, persist=True, return_profile=False):
         algorithm_or_pipeline: Algorithm handle, list of handles, or ``Pipeline``
         persist: Whether to persist algorithm results as attributes (default: True)
         return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
+        atomic: Stage certified property algorithms as one checked publication.
 
     Returns:
         Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
@@ -49,14 +50,14 @@ def apply(subgraph, algorithm_or_pipeline, persist=True, return_profile=False):
     """
     if isinstance(algorithm_or_pipeline, Pipeline):
         return algorithm_or_pipeline(
-            subgraph, persist=persist, return_profile=return_profile
+            subgraph, persist=persist, return_profile=return_profile, atomic=atomic
         )
     elif isinstance(algorithm_or_pipeline, list):
         pipe = Pipeline(algorithm_or_pipeline)
-        return pipe(subgraph, persist=persist, return_profile=return_profile)
+        return pipe(subgraph, persist=persist, return_profile=return_profile, atomic=atomic)
     elif isinstance(algorithm_or_pipeline, AlgorithmHandle):
         pipe = Pipeline([algorithm_or_pipeline])
-        return pipe(subgraph, persist=persist, return_profile=return_profile)
+        return pipe(subgraph, persist=persist, return_profile=return_profile, atomic=atomic)
     else:
         raise TypeError(
             f"Expected Pipeline, AlgorithmHandle, or list, got {type(algorithm_or_pipeline)}"
@@ -148,7 +149,7 @@ class Pipeline:
             self._handle = handle
             self._build_timings = timings
 
-    def run(self, subgraph, persist=True, return_profile=False):
+    def run(self, subgraph, persist=True, return_profile=False, *, atomic=False):
         """
         Run the pipeline on a subgraph.
 
@@ -156,6 +157,7 @@ class Pipeline:
             subgraph: The subgraph to process
             persist: Whether to persist algorithm results as attributes (default: True)
             return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
+        atomic: Stage certified property algorithms as one checked publication.
 
         Returns:
             Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
@@ -163,7 +165,7 @@ class Pipeline:
         self._ensure_built()
         run_call_start = time.perf_counter()
         result_subgraph, profile_dict = _groggy.pipeline.run_pipeline(
-            self._handle, subgraph, persist_results=persist
+            self._handle, subgraph, persist_results=persist, atomic=atomic
         )
         run_call_elapsed = time.perf_counter() - run_call_start
 
@@ -220,7 +222,7 @@ class Pipeline:
         """
         return self._last_profile
 
-    def __call__(self, subgraph, persist=True, return_profile=False):
+    def __call__(self, subgraph, persist=True, return_profile=False, *, atomic=False):
         """
         Allow pipeline to be called as a function.
 
@@ -228,11 +230,12 @@ class Pipeline:
             subgraph: The subgraph to process
             persist: Whether to persist algorithm results as attributes (default: True)
             return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
+        atomic: Stage certified property algorithms as one checked publication.
 
         Returns:
             Processed subgraph (or tuple with profile if return_profile=True)
         """
-        return self.run(subgraph, persist=persist, return_profile=return_profile)
+        return self.run(subgraph, persist=persist, return_profile=return_profile, atomic=atomic)
 
     def __del__(self):
         """Clean up the FFI pipeline handle."""

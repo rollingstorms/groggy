@@ -839,6 +839,12 @@ pub trait Algorithm: Send + Sync {
         }
     }
 
+    /// Whether all effects use Context's property overlay and keep graph ownership.
+    /// Uncertified implementations reject explicit outer atomic property runs.
+    fn supports_atomic_properties(&self) -> bool {
+        false
+    }
+
     /// Execute the algorithm, producing a new subgraph or mutating in place.
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph>;
 }

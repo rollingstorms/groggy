@@ -218,7 +218,7 @@ def _setup_widget_environment():
 
 
 # Add convenience method to Subgraph for method chaining
-def _subgraph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False):
+def _subgraph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False, *, atomic=False):
     """
     Apply an algorithm or pipeline to this subgraph.
 
@@ -228,6 +228,7 @@ def _subgraph_apply(self, algorithm_or_pipeline, persist=True, return_profile=Fa
         algorithm_or_pipeline: AlgorithmHandle, Pipeline, or list of algorithms
         persist: Whether to persist algorithm results as attributes (default: True)
         return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
+        atomic: Stage certified property algorithms as one checked publication.
 
     Returns:
         Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
@@ -238,7 +239,7 @@ def _subgraph_apply(self, algorithm_or_pipeline, persist=True, return_profile=Fa
         >>> result, profile = sg.apply(algo, return_profile=True)
     """
     return apply(
-        self, algorithm_or_pipeline, persist=persist, return_profile=return_profile
+        self, algorithm_or_pipeline, persist=persist, return_profile=return_profile, atomic=atomic
     )
 
 
@@ -247,7 +248,7 @@ Subgraph.apply = _subgraph_apply
 
 
 # Monkey-patch a direct apply method onto Graph to avoid expensive __getattr__ delegation
-def _graph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False):
+def _graph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False, *, atomic=False):
     """
     Apply an algorithm or pipeline to this graph.
 
@@ -258,6 +259,7 @@ def _graph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False
         algorithm_or_pipeline: AlgorithmHandle, Pipeline, or list of algorithms
         persist: Whether to persist algorithm results as attributes (default: True)
         return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
+        atomic: Stage certified property algorithms as one checked publication.
 
     Returns:
         Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
@@ -273,6 +275,7 @@ def _graph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False
         algorithm_or_pipeline,
         persist=persist,
         return_profile=return_profile,
+        atomic=atomic,
     )
 
 

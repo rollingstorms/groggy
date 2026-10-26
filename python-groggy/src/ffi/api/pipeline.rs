@@ -146,12 +146,13 @@ pub fn py_build_sample_pipeline(py: Python, spec: &PyAny) -> PyResult<PySamplePi
 }
 
 #[pyfunction]
-#[pyo3(name = "run_pipeline", signature = (handle, subgraph, *, persist_results = true))]
+#[pyo3(name = "run_pipeline", signature = (handle, subgraph, *, persist_results = true, atomic = false))]
 pub fn py_run_pipeline(
     py: Python,
     handle: &PyPipelineHandle,
     subgraph: &crate::ffi::subgraphs::subgraph::PySubgraph,
     persist_results: bool,
+    atomic: bool,
 ) -> PyResult<(crate::ffi::subgraphs::subgraph::PySubgraph, PyObject)> {
     let total_start = Instant::now();
 
@@ -184,9 +185,12 @@ pub fn py_run_pipeline(
     let context_elapsed = context_start.elapsed();
 
     let run_start = Instant::now();
-    let result = pipeline
-        .run(&mut context, subgraph_inner)
-        .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+    let result = if atomic {
+        pipeline.run_atomic_properties(&mut context, subgraph_inner)
+    } else {
+        pipeline.run(&mut context, subgraph_inner)
+    }
+    .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
     let run_elapsed = run_start.elapsed();
     let run_time_seconds = run_elapsed.as_secs_f64();
 
@@ -224,6 +228,7 @@ pub fn py_run_pipeline(
     stats.set_item("stats", py_stats)?;
     stats.set_item("subgraph_clone_time", clone_elapsed.as_secs_f64())?;
     stats.set_item("persist_results", persist_results)?;
+    stats.set_item("atomic", atomic)?;
 
     let outputs = context.take_outputs();
     let py_outputs = PyDict::new(py);

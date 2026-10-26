@@ -141,11 +141,20 @@ impl Algorithm for StepPipelineAlgorithm {
         }
     }
 
+    fn supports_atomic_properties(&self) -> bool {
+        self.steps
+            .iter()
+            .all(|step| step.supports_atomic_properties())
+    }
+
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let staged = self.atomic && ctx.persist_results();
-        if ctx.property_batch.is_some() {
-            return Err(anyhow!("Nested atomic property execution is unsupported"));
+        let inherited = ctx.property_batch.is_some();
+        if inherited && !self.supports_atomic_properties() {
+            return Err(anyhow!(
+                "Builder contains steps unsupported by the outer atomic property run"
+            ));
         }
+        let staged = self.atomic && ctx.persist_results() && !inherited;
         if staged {
             let binding = subgraph.graph();
             let graph = binding.borrow();

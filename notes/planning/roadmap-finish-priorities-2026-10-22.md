@@ -1180,3 +1180,13 @@ Closed full configuration restoration, explicit full backing-pool/history captur
 and independent materialization, plus repeated-switch allocation bounds. No new
 rows; **199 checked / 69 open**. The 100k fixture preserves column lengths across
 six switch pairs. See `owned-snapshot-exit-review-2026-10-26.md` for costs/limits.
+
+## 2026-10-26 — outer pipeline and import publication boundaries
+
+Completed certified whole-pipeline property acceptance and complete selected
+snapshot import baselines under existing 09.4b.2. Errors/cancellation discard
+earlier staged updates; children share one acceptance; untouched imported topology
+and properties remain in history. **199 checked / 69 open**, no new rows. The
+parent now has three explicit open components: native default/infallible migration,
+raw pool/space escapes and uncertified/topology algorithm acceptance. Effect-aware
+IR remains AR7.8. Evidence/gates: `outer-pipeline-boundary-2026-10-26.md`.

@@ -34,6 +34,7 @@ impl SnapshotMaterialization {
         // This preserves the legacy manual selection container contract. Full
         // original history/raw storage and publishing require an owned capture.
         graph.reset_to_snapshot(state.snapshot().clone())?;
+        graph.seed_selected_import()?;
         Ok(graph)
     }
 

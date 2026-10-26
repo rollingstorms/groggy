@@ -69,6 +69,9 @@ impl Graph {
     /// import as one state. This is an explicit conversion, not history recovery.
     pub fn into_publishing(mut self) -> GraphResult<Self> {
         let graph = &mut self;
+        if graph.current_state_id() == 0 && !graph.is_empty() {
+            graph.seed_selected_import()?;
+        }
         if graph.has_uncommitted_changes() {
             let now = crate::state::publication::now_micros()?;
             graph.commit_internal(
@@ -83,6 +86,42 @@ impl Graph {
         }
         graph.set_automatic_publication(true)?;
         Ok(self)
+    }
+
+    /// Stage the complete selected base before accepting an unrecorded graph.
+    /// Reuses retained indices; a first property edit must not become a history
+    /// root that silently omits the materialized topology and untouched values.
+    pub(super) fn seed_selected_import(&mut self) -> GraphResult<()> {
+        let mut pending = ChangeTracker::new();
+        pending.record_nodes_addition(&self.node_ids());
+        let pool = self.pool.borrow();
+        for edge in self.edge_ids() {
+            let (a, b) = pool.get_edge_endpoints(edge).ok_or_else(|| {
+                GraphError::InvalidInput(
+                    "Cannot import an active edge without retained endpoints".into(),
+                )
+            })?;
+            if !self.has_node(a) || !self.has_node(b) {
+                return Err(GraphError::InvalidInput(
+                    "Cannot import an edge with inactive endpoints".into(),
+                ));
+            }
+            pending.record_edge_addition(edge, a, b);
+        }
+        for is_node in [true, false] {
+            let mut changes = Vec::new();
+            for (id, name, index) in self.space.active_attr_indices(is_node) {
+                if pool.get_attr_by_index(name, index, is_node).is_none() {
+                    return Err(GraphError::InvalidInput(format!(
+                        "Cannot import missing retained property {id}.{name}"
+                    )));
+                }
+                changes.push((id, name.clone(), None, index));
+            }
+            pending.record_attr_changes(&changes, is_node);
+        }
+        self.change_tracker = pending;
+        Ok(())
     }
 
     pub(super) fn copy_graph_active(&mut self, other: &Graph) -> GraphResult<()> {

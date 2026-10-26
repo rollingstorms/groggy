@@ -790,6 +790,23 @@ impl GraphSpace {
         (edge_ids, sources, targets)
     }
 
+    /// Borrow only active mappings in column order for an explicit owned import.
+    pub(crate) fn active_attr_indices(
+        &self,
+        is_node: bool,
+    ) -> impl Iterator<Item = (usize, &AttrName, usize)> {
+        let (columns, active) = if is_node {
+            (&self.node_attribute_indices, &self.active_nodes)
+        } else {
+            (&self.edge_attribute_indices, &self.active_edges)
+        };
+        columns.iter().flat_map(move |(name, rows)| {
+            rows.iter()
+                .filter(move |(id, _)| active.contains(id))
+                .map(move |(&id, &index)| (id, name, index))
+        })
+    }
+
     /// Materialize current active values in attribute-first order for an immutable read pin.
     /// This captures uncheckpointed edits and never changes history or pool values.
     pub(crate) fn capture_read_snapshot(

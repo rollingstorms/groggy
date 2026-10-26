@@ -59,6 +59,7 @@ impl PySubgraph {
         py: Python,
         candidate: &PyAny,
         persist: bool,
+        atomic: bool,
     ) -> PyResult<Option<(PySubgraph, PyObject)>> {
         if !(candidate.hasattr("_ensure_built")? && candidate.hasattr("_handle")?) {
             return Ok(None);
@@ -77,7 +78,7 @@ impl PySubgraph {
                 PyTypeError::new_err("apply() expected pipeline._handle to be a PyPipelineHandle")
             })?;
             let handle_ref = handle_cell.borrow();
-            py_run_pipeline(py, &handle_ref, self, persist)?
+            py_run_pipeline(py, &handle_ref, self, persist, atomic)?
         };
 
         Ok(Some(result))
@@ -235,18 +236,19 @@ impl PySubgraph {
     /// 3. `subgraph.apply(pipeline.Pipeline([...]))`
     ///
     /// Use `return_profile=True` to receive `(subgraph, profile)`; otherwise returns the subgraph alone.
-    #[pyo3(signature = (algorithm_or_pipeline, persist = true, return_profile = false))]
+    #[pyo3(signature = (algorithm_or_pipeline, persist = true, return_profile = false, *, atomic = false))]
     pub fn apply(
         &self,
         py: Python,
         algorithm_or_pipeline: &PyAny,
         persist: bool,
         return_profile: bool,
+        atomic: bool,
     ) -> PyResult<PyObject> {
         let apply_total_start = Instant::now();
 
         if let Some((result, profile)) =
-            self.try_apply_pipeline_object(py, algorithm_or_pipeline, persist)?
+            self.try_apply_pipeline_object(py, algorithm_or_pipeline, persist, atomic)?
         {
             let subgraph_obj = Py::new(py, result)?.into_py(py);
             if return_profile {
@@ -269,7 +271,7 @@ impl PySubgraph {
         let build_elapsed = build_start.elapsed();
 
         let run_call_start = Instant::now();
-        let run_result = py_run_pipeline(py, &handle, self, persist);
+        let run_result = py_run_pipeline(py, &handle, self, persist, atomic);
         let run_call_elapsed = run_call_start.elapsed();
 
         let drop_start = Instant::now();
