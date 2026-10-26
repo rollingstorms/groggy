@@ -649,3 +649,14 @@ Success publishes once; late failure rolls back. Evidence and remaining limits:
 compound acceptance and unsupported custom effects; fixed component inventory
 remains two complete plus this narrowed final component. No new checklist rows:
 **201 checked / 67 open**. Broader IR/default policy remains AR7.8/30.1.
+
+### Fourth priority window — chunked storage baselines (2026-10-26)
+
+Window began 12:52:12 UTC. Existing 10.4 chunked-baseline component is complete:
+bounded 8 MiB streaming fragments, ordered/full-stream checksum verification,
+scratch-backed recovery and locked atomic initial creation/replacement. A 566 MB
+retained journal reopens in 1.30 s / 1.73 GB peak RSS locally; decoded memory
+remains material work. Evidence: `chunked-storage-baselines-2026-10-26.md`.
+Gates: 1,259 native / 51 ignored; 2,000 root Python / 1 skipped; 158 docs; strict
+Clippy. No new checklist rows: **201 checked / 67 open**. 10.4 remains partial
+for decoded-memory/migration/platform/process-failure scope; A02 schedule deferred.

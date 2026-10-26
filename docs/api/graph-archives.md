@@ -99,12 +99,14 @@ with tempfile.TemporaryDirectory() as directory:
 ```
 
 `DurableGraph.create_from_graph(path, graph, schema=None)` validates and stores the
-complete source as one synced initialization record, with no fresh acceptance clock
+complete source as one synced logical initialization record, with no fresh acceptance clock
 or ID remapping. It leaves the source independent. Optional journal schema applies
 to the imported selected state and subsequent writes; historical snapshots retain
-their original values. The existing 256 MiB maximum journal-frame size also applies
-to this baseline; oversize/dirty/schema-invalid sources reject before destination
-creation. Standalone archives do not inherit that frame-size limit. Later records,
+their original values. Large journal baselines use bounded 8 MiB physical fragments rather than a
+256 MiB aggregate limit. Dirty/schema-invalid sources reject before destination
+creation. Initialization writes and syncs a locked sibling temporary, then publishes
+without replacing an existing destination. Encoding failures do not leave a partial
+named journal. Standalone archives keep their separate framing. Later records,
 reopen, locking, partial-tail recovery and backup use the existing journal protocol.
 Old journals remain readable; older binaries cannot read the new initialization
 record. Storage migrations and recovery-checkpoint scheduling remain separate work.

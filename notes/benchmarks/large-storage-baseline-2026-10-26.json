@@ -1,0 +1,45 @@
+{
+  "benchmark": "large_storage_baseline",
+  "cases": [
+    {
+      "baseline_bytes": 2099198,
+      "checkpoint_seconds_including_sync_and_verification": 0.021156833,
+      "create_from_graph_seconds": 0.049547584,
+      "isolated_open": {
+        "nodes": 1,
+        "open_seconds": 0.001882417,
+        "raw_values": 1
+      },
+      "isolated_open_peak_rss_bytes_macos": 17104896,
+      "text_payload_mib": 1
+    },
+    {
+      "baseline_bytes": 33560233,
+      "checkpoint_seconds_including_sync_and_verification": 0.175483,
+      "create_from_graph_seconds": 0.0958105,
+      "isolated_open": {
+        "nodes": 16,
+        "open_seconds": 0.073986333,
+        "raw_values": 16
+      },
+      "isolated_open_peak_rss_bytes_macos": 120012800,
+      "text_payload_mib": 16
+    },
+    {
+      "baseline_bytes": 566301921,
+      "checkpoint_seconds_including_sync_and_verification": 4.829314875,
+      "create_from_graph_seconds": 2.445401541,
+      "isolated_open": {
+        "nodes": 270,
+        "open_seconds": 1.296948583,
+        "raw_values": 270
+      },
+      "isolated_open_peak_rss_bytes_macos": 1725808640,
+      "text_payload_mib": 270
+    }
+  ],
+  "chunk_payload_bytes": 8388608,
+  "scope": "aggregate retained text, locked local journal, warm filesystem cache; decoded graph/archive allocations remain; no automatic scheduling or SLA",
+  "recorded_at_utc": "2026-10-26T13:00:00Z",
+  "profile": "release, CARGO_INCREMENTAL=0, offline/locked"
+}

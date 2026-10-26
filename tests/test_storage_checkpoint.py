@@ -116,3 +116,32 @@ def test_physical_checkpoint_drops_pruned_operation_frames_and_keeps_raw_identit
         result = store.apply_batch(batch, root, "after", "test")
         assert result["added_nodes"] == [2]
         assert store.current_state_id > discarded
+
+
+def test_chunked_storage_baseline_preserves_large_values_and_logical_sequence(tmp_path):
+    from groggy import Graph
+
+    path = tmp_path / "chunked.ggj"
+    backup = tmp_path / "backup.ggj"
+    graph = Graph()
+    payload = "large-α\0" + "x" * (9 * 1024 * 1024)
+    graph.add_node(payload=payload)
+    state = graph.current_state_id
+    old = graph.read_view()
+    with DurableGraph.create_from_graph(path, graph) as store:
+        with path.open("rb") as stream:
+            assert stream.read(16) == b"GROGGYJ1GBEGIN01"
+        report = store.checkpoint_storage()
+        assert report["previous_records"] == 1
+        assert report["selected_state"] == state
+        batch = GraphBatch()
+        batch.set_node_attr(0, "payload", "changed")
+        store.apply_batch(batch, state, "after", "test")
+        store.backup(backup)
+    assert old.node_attr(0, "payload") == payload
+    for candidate in (path, backup):
+        with DurableGraph.open(candidate) as store:
+            assert store.current_state_id == state + 1
+            assert store.snapshot_at_commit(state).node_attr(0, "payload").value == payload
+            assert store.read_view().node_attr(0, "payload") == "changed"
+            assert store.checkpoint_storage()["previous_records"] == 2

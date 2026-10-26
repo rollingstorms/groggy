@@ -31,7 +31,7 @@ pub(super) enum CheckpointFailure {
 pub struct StorageCheckpointPlan {
     source: File,
     path: PathBuf,
-    frame: Vec<u8>,
+    record: Record,
     report: StorageCheckpointReport,
     schema_revision: u64,
     #[cfg(test)]
@@ -51,7 +51,7 @@ impl DurableGraph {
     /// Replace the operation stream with one complete retained baseline. No history,
     /// raw values or identity reservations are pruned and no graph version is created.
     /// Both inodes stay locked across atomic Unix replacement. Errors after replacement
-    /// poison this writer until reopen. The baseline must fit the 256 MiB frame limit.
+    /// poison this writer until reopen. Large baselines use bounded physical fragments.
     pub fn checkpoint_storage(
         &mut self,
         expected_state: StateId,
@@ -89,7 +89,6 @@ impl DurableGraph {
             schema: self.schema.clone(),
             schema_revision: self.schema_revision,
         };
-        let frame = encode_record(0, &record)?;
         let source = self
             .file
             .try_clone()
@@ -100,7 +99,7 @@ impl DurableGraph {
         Ok(StorageCheckpointPlan {
             source,
             path: self.path.clone(),
-            frame,
+            record,
             report,
             schema_revision: self.schema_revision,
             #[cfg(test)]
@@ -217,12 +216,11 @@ impl StorageCheckpointPlan {
         self.inject(CheckpointFailure::BeforeWrite)?;
         temporary
             .write_all(MAGIC)
-            .and_then(|_| temporary.write_all(&self.frame))
-            .and_then(|_| {
-                temporary
-                    .as_file()
-                    .set_permissions(self.source.metadata()?.permissions())
-            })
+            .map_err(|e| io_error(&self.path, "write_checkpoint_header", e))?;
+        baseline::write_initial_record(&mut temporary, &self.record)?;
+        temporary
+            .as_file()
+            .set_permissions(self.source.metadata().map_err(invalid)?.permissions())
             .and_then(|_| temporary.as_file().sync_all())
             .map_err(|e| io_error(&self.path, "write_and_sync_storage_checkpoint", e))?;
         #[cfg(test)]

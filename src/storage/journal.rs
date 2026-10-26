@@ -1,6 +1,7 @@
 //! Binary, checksummed, append-only transaction storage for checked publications.
 //! One locked writer owns the file. Successful writes sync the journal before
 //! publishing memory; recovery replays only complete, validated records.
+mod baseline;
 mod checkpoint;
 pub use checkpoint::StorageCheckpointReport;
 
@@ -308,7 +309,8 @@ impl DurableGraph {
 
     /// Start a new journal from a complete clean graph, preserving retained history,
     /// raw columns, inactive identities and allocation. Source ownership is unchanged.
-    /// Existing files are never overwritten; the baseline is one synced first record.
+    /// Existing files are never overwritten; the baseline is one synced logical record,
+    /// streamed into bounded physical fragments when larger than 8 MiB.
     pub fn create_from_graph(
         path: &Path,
         source: &Graph,
@@ -337,15 +339,24 @@ impl DurableGraph {
         if let Some(schema) = &schema {
             graph.check_schema_policy(schema)?;
         }
-        // Validate frame size/encoding before opening a destination.
-        let initial_frame = encode_record(0, &record)?;
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .map_err(|e| io_error(path, "create_graph_journal", e))?;
-        lock(&file, path)?;
+        let parent = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let mut temporary = tempfile::NamedTempFile::new_in(parent)
+            .map_err(|e| io_error(path, "prepare_graph_journal", e))?;
+        temporary
+            .write_all(MAGIC)
+            .map_err(|e| io_error(path, "write_journal_header", e))?;
+        baseline::write_initial_record(&mut temporary, &record)?;
+        temporary
+            .as_file()
+            .sync_all()
+            .map_err(|e| io_error(path, "sync_initialization", e))?;
+        lock(temporary.as_file(), path)?;
+        let file = temporary
+            .persist_noclobber(path)
+            .map_err(|e| io_error(path, "create_graph_journal", e.error))?;
         let mut store = Self {
             graph,
             file,
@@ -360,15 +371,6 @@ impl DurableGraph {
             #[cfg(test)]
             checkpoint_failure: None,
         };
-        store
-            .file
-            .write_all(MAGIC)
-            .map_err(|e| io_error(path, "write_journal_header", e))?;
-        store
-            .file
-            .write_all(&initial_frame)
-            .and_then(|_| store.file.sync_all())
-            .map_err(|e| io_error(path, "write_and_sync_initialization", e))?;
         store.next_sequence = 1;
         let parent = path
             .parent()
@@ -410,7 +412,8 @@ impl DurableGraph {
                 file.read_exact(&mut tail)
                     .map_err(|e| io_error(path, "read_journal_tail", e))?;
                 let prefix = tail.len().min(FRAME.len());
-                if tail[..prefix] != FRAME[..prefix] {
+                if tail[..prefix] != FRAME[..prefix] && tail[..prefix] != baseline::BEGIN[..prefix]
+                {
                     return Err(invalid("corrupt partial frame marker"));
                 }
                 break;
@@ -418,35 +421,43 @@ impl DurableGraph {
             let mut header = [0u8; HEADER_SIZE];
             file.read_exact(&mut header)
                 .map_err(|e| io_error(path, "read_frame_header", e))?;
-            if &header[..8] != FRAME {
-                return Err(invalid("bad frame marker"));
-            }
-            let number = |start| {
-                let mut bytes = [0; 8];
-                bytes.copy_from_slice(&header[start..start + 8]);
-                u64::from_le_bytes(bytes)
+            let (entry, consumed) = if &header[..8] == baseline::BEGIN {
+                if sequence != 0 || graph.is_some() {
+                    return Err(invalid("duplicate initialization"));
+                }
+                baseline::read_chunked(&mut file, header, position, length)?
+            } else {
+                if &header[..8] != FRAME {
+                    return Err(invalid("bad frame marker"));
+                }
+                let number = |start| {
+                    let mut bytes = [0; 8];
+                    bytes.copy_from_slice(&header[start..start + 8]);
+                    u64::from_le_bytes(bytes)
+                };
+                let count = number(8);
+                if number(16) != !count {
+                    return Err(invalid("frame length checksum mismatch"));
+                }
+                if count > MAX_RECORD as u64 {
+                    return Err(invalid("record exceeds 256 MiB limit"));
+                }
+                if count > remaining - HEADER_SIZE as u64 {
+                    break;
+                }
+                let mut payload = vec![0; count as usize];
+                file.read_exact(&mut payload)
+                    .map_err(|e| io_error(path, "read_frame_payload", e))?;
+                if xxhash_rust::xxh3::xxh3_64(&payload) != number(24) {
+                    return Err(invalid("frame checksum mismatch"));
+                }
+                let mut cursor = Cursor::new(&payload);
+                let entry: Entry = ciborium::de::from_reader(&mut cursor).map_err(invalid)?;
+                if cursor.position() != count {
+                    return Err(invalid("trailing bytes in frame"));
+                }
+                (entry, HEADER_SIZE as u64 + count)
             };
-            let count = number(8);
-            if number(16) != !count {
-                return Err(invalid("frame length checksum mismatch"));
-            }
-            if count > MAX_RECORD as u64 {
-                return Err(invalid("record exceeds 256 MiB limit"));
-            }
-            if count > remaining - HEADER_SIZE as u64 {
-                break;
-            }
-            let mut payload = vec![0; count as usize];
-            file.read_exact(&mut payload)
-                .map_err(|e| io_error(path, "read_frame_payload", e))?;
-            if xxhash_rust::xxh3::xxh3_64(&payload) != number(24) {
-                return Err(invalid("frame checksum mismatch"));
-            }
-            let mut cursor = Cursor::new(&payload);
-            let entry: Entry = ciborium::de::from_reader(&mut cursor).map_err(invalid)?;
-            if cursor.position() != count {
-                return Err(invalid("trailing bytes in frame"));
-            }
             if entry.sequence != sequence {
                 return Err(invalid("noncontiguous record sequence"));
             }
@@ -489,7 +500,7 @@ impl DurableGraph {
             sequence = sequence
                 .checked_add(1)
                 .ok_or_else(|| invalid("sequence exhausted"))?;
-            position += HEADER_SIZE as u64 + count;
+            position += consumed;
         }
         let graph = graph.ok_or_else(|| invalid("journal initialization is incomplete"))?;
         let recovered_tail_bytes = length - position;

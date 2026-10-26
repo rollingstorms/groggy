@@ -242,3 +242,7 @@ harness = false
 [[bench]]
 name = "storage_checkpoint"
 harness = false
+
+[[bench]]
+name = "large_storage_baseline"
+harness = false
