@@ -116,3 +116,33 @@ and A02 scheduling is still deferred. Counts **201 checked / 67 open**.
 - Both new release benchmarks are recorded under `notes/benchmarks/`.
 - No dependency install, push, auto-checkpoint schedule or Graphiti scope change.
   Owner benchmark/development work remains untouched.
+
+### Exact floating restoration follow-up
+
+Found and repaired signed-zero/NaN representation reuse under existing 12.2/10.3.
+Public equality and history hashes remain canonical; restoration keys preserve
+exact scalar/vector/compressed bits and matching-slot reuse. Node/edge, owned,
+archive and durable checkpoint/reopen/backup workflows have native/Python coverage.
+Evidence and repeat benchmark: `restoration-float-bits-2026-10-26.md`. No new rows,
+counts remain **201 checked / 67 open**.
+
+### Final gates and current next-work inventory
+
+After the exact-bit repair: **1,239 native passed / 51 ignored**, **1,975 root
+Python passed / 1 skipped**, **156 docs examples**, strict all-target Clippy.
+The preceding second-window gate counts are retained as intermediate receipts.
+No new checklist rows were added; one existing parent (10.3) closed, 10.4's concrete
+recovery/replacement component completed, and restoration repaired within 12.2.
+
+1. Native default/infallible construction, mutable raw-storage escapes and
+   uncertified/topology compound acceptance (remaining 09.4b.2 inventory).
+2. Remaining 10.4 chunking/large-data opening and RSS/migration/platform scope.
+   Checkpoint scheduling remains deferred per A02; explicit Unix baselines work.
+3. Raw pool/entity/value/group/identity reclamation with reference closure and
+   actual optimize, then endpoint rewiring/reversals and conflict-aware merges.
+4. Existing connected-view/query/index/pipeline and numerical/algorithm/conformance
+   remainder. The flat checklist preserves their individual IDs and limits.
+5. Graphiti/provenance/retrieval integration remains deferred behind the core.
+
+Owner development/benchmark changes remain untouched; implementation is committed
+in coherent slices, with no push or automatic maintenance policy introduced.

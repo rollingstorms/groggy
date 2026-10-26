@@ -1232,3 +1232,12 @@ See `storage-checkpoint-2026-10-26.md` for evidence and the fixed remaining scop
 **201 checked / 67 open**, no new rows. Chunking/scale/migration/non-Unix/crash
 corpora remain; automatic scheduling stays deferred under A02. Pool reclamation
 and optimize are still separate 15/06.3 work. No owner decision changed.
+
+## 2026-10-26 — exact floating restoration follow-up
+
+Repaired signed-zero/NaN-payload reuse in retained state restoration under existing
+12.2/10.3. Scalar/vector/compressed values retain exact bits through switches,
+owned copies, archives and durable checkpoint/recovery; repeated restoration does
+not append duplicate values. Public property equality/history hashes are unchanged.
+See `restoration-float-bits-2026-10-26.md` for regression and measured scope.
+Counts remain **201 checked / 67 open**; no new rows or owner decisions.

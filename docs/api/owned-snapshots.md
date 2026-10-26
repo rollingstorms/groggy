@@ -10,6 +10,11 @@ base is staged as a pending manual import; accept it before checked mutation.
 Use `owned=True` when an independent graph must retain the original history,
 branches, inactive ID/name reservations and arbitrary backing columns.
 
+State restoration preserves floating bits, including signed zero and NaN payloads
+in scalar, vector and compressed-f32 properties. Reuse requires matching stored
+representation; public property equality still groups signed zeros/NaN payloads
+according to its existing identity rules. Repeated switches reuse matching slots.
+
 ```python
 from groggy import Graph, GraphBatch
 

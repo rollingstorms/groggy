@@ -18,6 +18,10 @@ Graph writers and `groggy.AttrValue` share one conversion policy. Graph getters,
 
 Booleans remain distinct from integers. Integers outside i64 raise rather than silently becoming floats. Ordinary floating properties retain f64 precision; explicitly typed f32 values remain f32. Nested structured JSON numbers use JSON's representation rather than the native vector representation.
 
+Retained state restoration and storage keep signed-zero and NaN payload bits.
+This is stricter than public property equality, which groups those representations
+for identity. It does not change numerical IEEE comparison behavior.
+
 An empty ordinary sequence defaults to Float64Vec. Use explicit constructors when type matters:
 
 ```python

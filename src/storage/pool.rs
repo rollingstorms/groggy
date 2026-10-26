@@ -76,9 +76,11 @@ impl RestorationIndex {
                 entry.insert(index);
             }
             std::collections::hash_map::Entry::Occupied(entry) => {
-                if values[*entry.get()] != values[index] {
+                if !AttributeColumn::restoration_equal(&values[*entry.get()], &values[index]) {
                     let candidates = self.collisions.entry(hash).or_default();
-                    if !candidates.iter().any(|&old| values[old] == values[index]) {
+                    if !candidates.iter().any(|&old| {
+                        AttributeColumn::restoration_equal(&values[old], &values[index])
+                    }) {
                         candidates.push(index);
                     }
                 }
@@ -88,14 +90,14 @@ impl RestorationIndex {
     fn find(&self, value: &AttrValue, values: &[AttrValue]) -> Option<usize> {
         let hash = AttributeColumn::value_hash(value);
         let &first = self.first.get(&hash)?;
-        if &values[first] == value {
+        if AttributeColumn::restoration_equal(&values[first], value) {
             return Some(first);
         }
         self.collisions
             .get(&hash)?
             .iter()
             .copied()
-            .find(|&index| &values[index] == value)
+            .find(|&index| AttributeColumn::restoration_equal(&values[index], value))
     }
     fn memory_usage(&self) -> usize {
         self.first.capacity() * std::mem::size_of::<(u64, usize)>()
@@ -224,14 +226,86 @@ impl AttributeColumn {
         index
     }
 
+    // Query/property identity deliberately groups signed zeros and NaNs. State
+    // restoration must preserve their stored bits, so its lookup uses a stricter
+    // relation without changing public comparison or historical content hashes.
+    fn restoration_f32_values(value: &AttrValue) -> Option<std::borrow::Cow<'_, [f32]>> {
+        match value {
+            AttrValue::FloatVec(values) => Some(std::borrow::Cow::Borrowed(values)),
+            AttrValue::CompressedFloatVec(data) => data
+                .decompress_float_vec()
+                .ok()
+                .map(std::borrow::Cow::Owned),
+            _ => None,
+        }
+    }
+    fn restoration_equal(left: &AttrValue, right: &AttrValue) -> bool {
+        match (left, right) {
+            (AttrValue::Float(a), AttrValue::Float(b)) => a.to_bits() == b.to_bits(),
+            (AttrValue::Float64(a), AttrValue::Float64(b)) => a.to_bits() == b.to_bits(),
+            (AttrValue::Float64Vec(a), AttrValue::Float64Vec(b)) => a
+                .iter()
+                .map(|v| v.to_bits())
+                .eq(b.iter().map(|v| v.to_bits())),
+            (
+                AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_),
+                AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_),
+            ) => {
+                match (
+                    Self::restoration_f32_values(left),
+                    Self::restoration_f32_values(right),
+                ) {
+                    (Some(a), Some(b)) => a
+                        .iter()
+                        .map(|v| v.to_bits())
+                        .eq(b.iter().map(|v| v.to_bits())),
+                    _ => false,
+                }
+            }
+            _ => left == right,
+        }
+    }
     fn value_hash(value: &AttrValue) -> u64 {
         use std::hash::{Hash, Hasher};
         let mut hash = std::collections::hash_map::DefaultHasher::new();
-        value.hash(&mut hash);
+        match value {
+            AttrValue::Float(v) => {
+                0u8.hash(&mut hash);
+                v.to_bits().hash(&mut hash);
+            }
+            AttrValue::Float64(v) => {
+                1u8.hash(&mut hash);
+                v.to_bits().hash(&mut hash);
+            }
+            AttrValue::Float64Vec(values) => {
+                2u8.hash(&mut hash);
+                values.len().hash(&mut hash);
+                for value in values {
+                    value.to_bits().hash(&mut hash);
+                }
+            }
+            AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_) => {
+                if let Some(values) = Self::restoration_f32_values(value) {
+                    3u8.hash(&mut hash);
+                    values.len().hash(&mut hash);
+                    for value in values.iter() {
+                        value.to_bits().hash(&mut hash);
+                    }
+                } else {
+                    4u8.hash(&mut hash);
+                    value.hash(&mut hash);
+                }
+            }
+            _ => {
+                4u8.hash(&mut hash);
+                value.hash(&mut hash);
+            }
+        }
         hash.finish()
     }
 
-    /// Reuse an equal retained value for reconstruction, checking hash collisions.
+    /// Reuse an exactly represented retained logical value for reconstruction,
+    /// preserving floating bits and checking hash collisions.
     /// Ordinary mutations continue to append their own retained column values.
     pub(crate) fn restore_value(&mut self, value: &AttrValue) -> usize {
         let indices = self.restore_indices.get_or_insert_with(|| {
@@ -1320,6 +1394,31 @@ mod restoration_tests {
         column.ensure_len(7);
         assert_eq!(column.restore_value(&AttrValue::Null), 5);
         assert_eq!(column.len(), 7);
+    }
+    #[test]
+    fn restoration_preserves_float_representation_without_changing_property_equality() {
+        for (left, right) in [
+            (AttrValue::Float(0.0), AttrValue::Float(-0.0)),
+            (AttrValue::Float64(0.0), AttrValue::Float64(-0.0)),
+            (
+                AttrValue::FloatVec(vec![0.0, f32::from_bits(0x7fc00001)]),
+                AttrValue::FloatVec(vec![-0.0, f32::from_bits(0x7fc0007b)]),
+            ),
+            (
+                AttrValue::Float64Vec(vec![0.0, f64::from_bits(0x7ff8000000000001)]),
+                AttrValue::Float64Vec(vec![-0.0, f64::from_bits(0x7ff800000000007b)]),
+            ),
+        ] {
+            assert_eq!(left, right); // Public property identity remains canonical.
+            let mut column = AttributeColumn::new();
+            let a = column.push(left.clone());
+            let b = column.push(right.clone());
+            for _ in 0..3 {
+                assert_eq!(column.restore_value(&left), a);
+                assert_eq!(column.restore_value(&right), b);
+            }
+            assert_eq!(column.len(), 2);
+        }
     }
     #[test]
     fn restoration_hash_collisions_compare_values_before_reusing_indices() {
