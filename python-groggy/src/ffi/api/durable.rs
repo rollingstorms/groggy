@@ -90,16 +90,17 @@ impl PyDurableGraph {
         storage_checkpoint_report_to_py(py, &report)
     }
     /// Explicit exact-value pool compaction and verified physical replacement.
-    #[pyo3(signature=(*,expected_state=None))]
+    #[pyo3(signature=(*,expected_state=None,reclaim_unreferenced=false))]
     fn compact_storage(
         &mut self,
         py: Python<'_>,
         expected_state: Option<StateId>,
+        reclaim_unreferenced: bool,
     ) -> PyResult<PyObject> {
         let expected = expected_state.unwrap_or(self.current_state_id()?);
         let plan = self
             .core_mut()?
-            .prepare_storage_compaction(expected)
+            .prepare_storage_compaction_with_reclamation(expected, reclaim_unreferenced)
             .map_err(graph_error_to_py_err)?;
         let outcome = py.allow_threads(move || plan.execute());
         let report = self

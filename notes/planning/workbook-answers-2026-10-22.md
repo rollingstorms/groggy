@@ -1077,3 +1077,14 @@ Owner reconfirmed: `to_subgraphs` means immutable views grouped by an explicit
 caller-supplied column. Existing native/FFI/Python implementation and tests already
 match this answer; see `graph-table-grouped-views-2026-10-25.md`. Updated the
 appendix's stale pending marker. No new feature or checklist row is introduced.
+
+### 2026-10-26 — explicit property-value reclamation implementation
+
+A09's explicit/no-grace policy now has a property-slot implementation: optional
+`reclaim_unreferenced=True` on compaction discards only raw values without any
+retained-history before/after or working-mapping root. Default compaction retains
+all distinct values; history pruning remains a separate explicit call. Frozen
+source pins, inactive IDs, groups and external-name reservations remain. Durable
+installation uses verified locked atomic replacement. This implements the accepted
+policy; it does not add a retention schedule or release reserved identities. See
+`pool-compaction-2026-10-26.md`.

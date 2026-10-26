@@ -1,0 +1,45 @@
+{
+  "benchmark": "pool_value_reclamation",
+  "samples": [
+    {
+      "capture_seconds": 0.0005375,
+      "durable_total_seconds": 0.072150917,
+      "estimated_value_column_bytes_after": 57696,
+      "estimated_value_column_bytes_before": 1966712,
+      "execute_seconds": 0.022856458,
+      "file_bytes_after": 730049,
+      "file_bytes_before": 6352029,
+      "install_seconds": 0.000453708,
+      "raw_node_slots_after": 1001,
+      "raw_node_slots_before": 22000,
+      "reclaimed_orphan_node_slots": 20000
+    },
+    {
+      "capture_seconds": 0.000452375,
+      "durable_total_seconds": 0.048236167,
+      "estimated_value_column_bytes_after": 57696,
+      "estimated_value_column_bytes_before": 1966712,
+      "execute_seconds": 0.021015542,
+      "file_bytes_after": 730049,
+      "file_bytes_before": 6352029,
+      "install_seconds": 0.000457208,
+      "raw_node_slots_after": 1001,
+      "raw_node_slots_before": 22000,
+      "reclaimed_orphan_node_slots": 20000
+    },
+    {
+      "capture_seconds": 0.000453875,
+      "durable_total_seconds": 0.04148975,
+      "estimated_value_column_bytes_after": 57696,
+      "estimated_value_column_bytes_before": 1966712,
+      "execute_seconds": 0.0205735,
+      "file_bytes_after": 730053,
+      "file_bytes_before": 6352033,
+      "install_seconds": 0.000462208,
+      "raw_node_slots_after": 1001,
+      "raw_node_slots_before": 22000,
+      "reclaimed_orphan_node_slots": 20000
+    }
+  ],
+  "scope": "local release; 1000 nodes, 20 pruned bulk versions, 20000 distinct orphan values; all two retained versions and an open frozen view preserved; setup excluded; column bytes are estimated, not peak RSS"
+}

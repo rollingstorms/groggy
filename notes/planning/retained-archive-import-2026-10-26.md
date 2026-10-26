@@ -71,3 +71,10 @@ summary after the final gates.
 - Strict all-target Clippy, scoped rustfmt, Python/stub syntax and diff checks.
 - Extension rebuilt/staged in tree; the three pre-existing FFI warnings remain.
   Black/isort remain unavailable; no packages were installed.
+
+### Later 2026-10-26 maintenance update
+
+The earlier no-op optimize/raw-property/physical-compaction remainder is now
+implemented, including explicit orphan-value reclamation and verified durable
+replacement. See `pool-compaction-2026-10-26.md`. Entity/group reclamation and
+identity/reference closure remain open; the earlier receipt above is historical.

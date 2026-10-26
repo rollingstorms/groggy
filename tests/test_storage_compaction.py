@@ -53,3 +53,22 @@ def test_stale_durable_compaction_preserves_file_and_writer(tmp_path):
         assert path.read_bytes() == before
         assert store.current_state_id == 1
         store.compact_storage(expected_state=1)
+
+
+def test_durable_reclamation_releases_pruned_raw_values_without_invalidating_pins(tmp_path):
+    graph = Graph()
+    graph.add_node(value=0)
+    graph.create_branch("discard")
+    graph.checkout_branch("discard")
+    graph.set_node_attr(0, "orphan", "payload")
+    pin = graph.read_view()
+    graph.checkout_branch("main")
+    path = tmp_path / "graph.ggj"
+    with DurableGraph.create_from_graph(path, graph) as store:
+        store.prune_branch("discard", expected_state=store.current_state_id)
+        report = store.compact_storage(reclaim_unreferenced=True)
+        assert report["pool_compaction"]["reclaimed_unreferenced_node_values"] == 1
+        expected = store.check_integrity()
+    with DurableGraph.open(path) as store:
+        assert store.check_integrity() == expected
+    assert pin.node_attr(0, "orphan") == "payload"

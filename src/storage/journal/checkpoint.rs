@@ -92,7 +92,17 @@ impl DurableGraph {
         &mut self,
         expected_state: StateId,
     ) -> GraphResult<StorageCheckpointReport> {
-        let plan = self.prepare_storage_compaction(expected_state)?;
+        self.compact_storage_with_reclamation(expected_state, false)
+    }
+    /// Explicitly also discard raw values unreachable from every retained version
+    /// and working mapping, without pruning history or entities/groups/identities.
+    pub fn compact_storage_with_reclamation(
+        &mut self,
+        expected_state: StateId,
+        reclaim_unreferenced: bool,
+    ) -> GraphResult<StorageCheckpointReport> {
+        let plan =
+            self.prepare_storage_compaction_with_reclamation(expected_state, reclaim_unreferenced)?;
         self.finish_storage_checkpoint(plan.execute())
     }
     /// Capture raw columns and a full baseline for detached compaction and I/O.
@@ -102,9 +112,20 @@ impl DurableGraph {
         &mut self,
         expected_state: StateId,
     ) -> GraphResult<StorageCheckpointPlan> {
+        self.prepare_storage_compaction_with_reclamation(expected_state, false)
+    }
+    /// Capture complete retained roots for optional destructive raw-value reclamation.
+    #[doc(hidden)]
+    pub fn prepare_storage_compaction_with_reclamation(
+        &mut self,
+        expected_state: StateId,
+        reclaim_unreferenced: bool,
+    ) -> GraphResult<StorageCheckpointPlan> {
         self.ready()?;
         self.graph.validate_write_head(expected_state)?;
-        let compaction = self.graph.prepare_pool_compaction()?;
+        let compaction = self
+            .graph
+            .prepare_pool_compaction_with_reclamation(reclaim_unreferenced)?;
         let mut plan = self.prepare_storage_checkpoint(expected_state)?;
         plan.compaction = Some(compaction);
         Ok(plan)
@@ -403,7 +424,7 @@ mod tests {
         let state = store.graph.current_state_id();
         if std::env::var("GROGGY_TEST_CHECKPOINT_COMPACT").as_deref() == Ok("true") {
             store
-                .compact_storage(state)
+                .compact_storage_with_reclamation(state, true)
                 .expect("compaction must reach requested phase");
         } else {
             store
@@ -455,6 +476,28 @@ mod tests {
                             "test".into(),
                         )
                         .unwrap();
+                }
+                if compact {
+                    let state = store.graph.current_state_id();
+                    store.create_branch("orphan".into(), state).unwrap();
+                    store.checkout_branch("orphan".into(), state).unwrap();
+                    store
+                        .apply_batch(
+                            GraphBatch {
+                                node_attrs: HashMap::from([(
+                                    "v".into(),
+                                    vec![(N::Existing(0), V::Int(99))],
+                                )]),
+                                ..Default::default()
+                            },
+                            state,
+                            "orphan".into(),
+                            "test".into(),
+                        )
+                        .unwrap();
+                    let side = store.graph.current_state_id();
+                    store.checkout_branch("main".into(), side).unwrap();
+                    store.prune_branch("orphan".into(), state).unwrap();
                 }
                 if phase == "AfterFirstFragment" {
                     let state = store.graph.current_state_id();
@@ -545,7 +588,7 @@ mod tests {
                     let expected = if matches!(phase, "AfterReplace" | "AfterDirectorySync") {
                         11
                     } else {
-                        12
+                        13
                     };
                     assert_eq!(
                         recovered
@@ -586,71 +629,105 @@ mod tests {
 
     #[test]
     fn compaction_failures_keep_original_memory_and_recover_matching_old_or_new_storage() {
-        for phase in [
-            CheckpointFailure::BeforeWrite,
-            CheckpointFailure::AfterSync,
-            CheckpointFailure::BeforeReplace,
-            CheckpointFailure::AfterReplace,
-            CheckpointFailure::AfterDirectorySync,
-        ] {
-            let dir = tempfile::tempdir().unwrap();
-            let path = dir.path().join("journal");
-            let mut store = populated(&path);
-            let state = store.graph.current_state_id();
-            store
-                .apply_batch(
-                    GraphBatch {
-                        node_attrs: HashMap::from([(
-                            "v".into(),
-                            vec![(N::Existing(0), V::Int(10))],
-                        )]),
-                        ..Default::default()
-                    },
-                    state,
-                    "duplicate".into(),
-                    "test".into(),
-                )
-                .unwrap();
-            let state = store.graph.current_state_id();
-            let before = store.graph.check_integrity().unwrap();
-            let original = std::fs::read(&path).unwrap();
-            store.checkpoint_failure = Some(phase);
-            assert!(store.compact_storage(state).is_err(), "{phase:?}");
-            let replaced = matches!(
-                phase,
-                CheckpointFailure::AfterReplace | CheckpointFailure::AfterDirectorySync
-            );
-            assert_eq!(store.poisoned, replaced);
-            // Even a post-rename error never partially installs raw memory.
-            assert_eq!(store.graph.check_integrity().unwrap(), before);
-            if !replaced {
-                assert_eq!(std::fs::read(&path).unwrap(), original);
-            }
-            assert!(DurableGraph::open(&path).is_err());
-            drop(store);
-            let mut recovered = DurableGraph::open(&path).unwrap();
-            assert_eq!(recovered.graph.current_state_id(), state);
-            assert_eq!(
+        for reclaim in [false, true] {
+            for phase in [
+                CheckpointFailure::BeforeWrite,
+                CheckpointFailure::AfterSync,
+                CheckpointFailure::BeforeReplace,
+                CheckpointFailure::AfterReplace,
+                CheckpointFailure::AfterDirectorySync,
+            ] {
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("journal");
+                let mut store = populated(&path);
+                let state = store.graph.current_state_id();
+                store
+                    .apply_batch(
+                        GraphBatch {
+                            node_attrs: HashMap::from([(
+                                "v".into(),
+                                vec![(N::Existing(0), V::Int(10))],
+                            )]),
+                            ..Default::default()
+                        },
+                        state,
+                        "duplicate".into(),
+                        "test".into(),
+                    )
+                    .unwrap();
+                let state = store.graph.current_state_id();
+                if reclaim {
+                    store.create_branch("orphan".into(), state).unwrap();
+                    store.checkout_branch("orphan".into(), state).unwrap();
+                    store
+                        .apply_batch(
+                            GraphBatch {
+                                node_attrs: HashMap::from([(
+                                    "v".into(),
+                                    vec![(N::Existing(0), V::Int(99))],
+                                )]),
+                                ..Default::default()
+                            },
+                            state,
+                            "orphan".into(),
+                            "test".into(),
+                        )
+                        .unwrap();
+                    let side = store.graph.current_state_id();
+                    store.checkout_branch("main".into(), side).unwrap();
+                    store.prune_branch("orphan".into(), state).unwrap();
+                }
+                let before = store.graph.check_integrity().unwrap();
+                let original = std::fs::read(&path).unwrap();
+                store.checkpoint_failure = Some(phase);
+                assert!(
+                    store
+                        .compact_storage_with_reclamation(state, reclaim)
+                        .is_err(),
+                    "{phase:?}"
+                );
+                let replaced = matches!(
+                    phase,
+                    CheckpointFailure::AfterReplace | CheckpointFailure::AfterDirectorySync
+                );
+                assert_eq!(store.poisoned, replaced);
+                // Even a post-rename error never partially installs raw memory.
+                assert_eq!(store.graph.check_integrity().unwrap(), before);
+                if !replaced {
+                    assert_eq!(std::fs::read(&path).unwrap(), original);
+                }
+                assert!(DurableGraph::open(&path).is_err());
+                drop(store);
+                let mut recovered = DurableGraph::open(&path).unwrap();
+                assert_eq!(recovered.graph.current_state_id(), state);
+                assert_eq!(
+                    recovered
+                        .graph
+                        .pool()
+                        .get_node_attribute_column(&"v".into())
+                        .unwrap()
+                        .len(),
+                    if replaced {
+                        11
+                    } else if reclaim {
+                        13
+                    } else {
+                        12
+                    }
+                );
+                recovered.graph.check_integrity().unwrap();
                 recovered
-                    .graph
-                    .pool()
-                    .get_node_attribute_column(&"v".into())
-                    .unwrap()
-                    .len(),
-                if replaced { 11 } else { 12 }
-            );
-            recovered.graph.check_integrity().unwrap();
-            recovered
-                .apply_batch(
-                    GraphBatch {
-                        add_nodes: 1,
-                        ..Default::default()
-                    },
-                    state,
-                    "after".into(),
-                    "test".into(),
-                )
-                .unwrap();
+                    .apply_batch(
+                        GraphBatch {
+                            add_nodes: 1,
+                            ..Default::default()
+                        },
+                        state,
+                        "after".into(),
+                        "test".into(),
+                    )
+                    .unwrap();
+            }
         }
     }
 

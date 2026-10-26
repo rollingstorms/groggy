@@ -120,3 +120,82 @@ fn durable_compaction_preserves_branches_clocks_groups_reservations_and_continue
         recovered.check_integrity().unwrap();
     }
 }
+
+#[test]
+fn durable_reclamation_drops_pruned_raw_values_but_keeps_frozen_sources_and_identity_reservations()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("journal");
+    let backup = dir.path().join("backup");
+    let mut source = Graph::new();
+    source.add_node().unwrap();
+    source.create_branch("discard".into()).unwrap();
+    source.checkout_branch("discard".into()).unwrap();
+    source
+        .set_node_attr(0, "orphan".into(), V::Bytes(vec![3; 8192]))
+        .unwrap();
+    source
+        .writer("test")
+        .set_node_external_id(0, "orphan name".into())
+        .unwrap();
+    let gone = source.current_state_id();
+    let pin = source.read_view().unwrap();
+    let group = source.retain_group(&pin, "frozen".into()).unwrap();
+    source.checkout_branch("main".into()).unwrap();
+    let meta = source.create_meta_node(group).unwrap();
+    let state = source.current_state_id();
+    let mut store = DurableGraph::create_from_graph(&path, &source, None).unwrap();
+    assert!(store.prune_branch("discard".into(), state).unwrap() > 0);
+    let before = store.check_integrity().unwrap();
+    let report = store.compact_storage_with_reclamation(state, true).unwrap();
+    assert!(
+        report
+            .pool_compaction
+            .unwrap()
+            .reclaimed_unreferenced_node_values
+            >= 2
+    );
+    assert_eq!(
+        store
+            .graph()
+            .unwrap()
+            .pool()
+            .get_node_attribute_column(&"orphan".into())
+            .unwrap()
+            .len(),
+        0
+    );
+    store.backup(&backup).unwrap();
+    drop(store);
+    for path in [&path, &backup] {
+        let recovered = DurableGraph::open(path).unwrap();
+        assert_eq!(
+            recovered.check_integrity().unwrap().retained_versions,
+            before.retained_versions
+        );
+        assert!(recovered.graph().unwrap().snapshot_at_commit(gone).is_err());
+        assert_eq!(
+            recovered
+                .graph()
+                .unwrap()
+                .allocated_entity_for_external_id("orphan name"),
+            Some(groggy::ExternalEntityRef::Node(0))
+        );
+        assert_eq!(
+            recovered
+                .graph()
+                .unwrap()
+                .read_view()
+                .unwrap()
+                .meta_subgraph(meta)
+                .unwrap()
+                .node_attr(0, &"orphan".into())
+                .unwrap(),
+            Some(V::Bytes(vec![3; 8192]))
+        );
+    }
+    assert_eq!(
+        pin.node_attr(0, &"orphan".into()).unwrap(),
+        Some(V::Bytes(vec![3; 8192]))
+    );
+}

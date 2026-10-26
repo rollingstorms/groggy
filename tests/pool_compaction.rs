@@ -141,3 +141,161 @@ fn stale_foreign_and_dirty_compactions_reject_without_changing_storage() {
     assert!(manual.prepare_pool_compaction().is_err());
     assert!(manual.optimize().is_err());
 }
+
+#[test]
+fn explicit_reclamation_discards_only_values_without_any_retained_history_or_working_root() {
+    use groggy::ExternalEntityRef;
+    let mut graph = Graph::new();
+    graph.add_nodes(3).unwrap();
+    graph.add_edge(0, 1).unwrap();
+    graph
+        .set_node_attr(2, "inactive".into(), V::Int(99))
+        .unwrap();
+    graph.remove_node(2).unwrap();
+    graph.create_branch("discard".into()).unwrap();
+    graph.checkout_branch("discard".into()).unwrap();
+    graph
+        .set_node_attr(0, "ghost".into(), V::Float64(-0.0))
+        .unwrap();
+    graph
+        .set_edge_attr(0, "ghost".into(), V::Text("edge orphan".into()))
+        .unwrap();
+    graph
+        .writer("test")
+        .set_node_external_id(0, "reserved ghost".into())
+        .unwrap();
+    let gone = graph.current_state_id();
+    let pin = graph.read_view().unwrap();
+    let owned = graph.owned_snapshot_at_commit(gone).unwrap();
+    let group = graph.retain_group(&pin, "frozen ghost".into()).unwrap();
+    graph.checkout_branch("main".into()).unwrap();
+    let meta = graph.create_meta_node(group).unwrap();
+    // All versions, including non-selected and unreferenced ones, protect raw values.
+    let retained = graph.compact_pool_with_reclamation(true).unwrap();
+    assert_eq!(retained.reclaimed_unreferenced_node_values, 0);
+    assert_eq!(retained.reclaimed_unreferenced_edge_values, 0);
+    graph.prune_branch("discard").unwrap();
+    assert!(graph.snapshot_at_commit(gone).is_err());
+    graph.compact_pool().unwrap();
+    assert_eq!(
+        graph
+            .pool()
+            .get_node_attribute_column(&"ghost".into())
+            .unwrap()
+            .len(),
+        1
+    );
+    let report = graph.compact_pool_with_reclamation(true).unwrap();
+    assert!(report.reclaimed_unreferenced_node_values >= 2);
+    assert_eq!(report.reclaimed_unreferenced_edge_values, 1);
+    assert_eq!(
+        graph
+            .pool()
+            .get_node_attribute_column(&"ghost".into())
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(
+        graph
+            .pool()
+            .get_edge_attribute_column(&"ghost".into())
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(
+        graph
+            .pool()
+            .get_node_attribute_column(&"inactive".into())
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        graph.allocated_entity_for_external_id("reserved ghost"),
+        Some(ExternalEntityRef::Node(0))
+    );
+    let group_view = graph.read_view().unwrap().meta_subgraph(meta).unwrap();
+    assert!(
+        matches!(group_view.node_attr(0,&"ghost".into()).unwrap(),Some(V::Float64(x)) if x.to_bits()==(-0.0f64).to_bits())
+    );
+    assert_eq!(
+        pin.edge_attr(0, &"ghost".into()).unwrap(),
+        Some(V::Text("edge orphan".into()))
+    );
+    assert!(owned.to_graph().unwrap().snapshot_at_commit(gone).is_ok());
+    let again = graph.compact_pool_with_reclamation(true).unwrap();
+    assert_eq!(again.reclaimed_unreferenced_node_values, 0);
+    assert_eq!(again.reclaimed_unreferenced_edge_values, 0);
+    graph.check_integrity().unwrap();
+    let mut copy = graph.prepare_archive().unwrap().restore().unwrap();
+    assert_eq!(copy.add_node().unwrap(), meta + 1);
+    copy.check_integrity().unwrap();
+}
+
+#[test]
+fn explicit_reclamation_collects_discarded_manual_values_and_rejects_changed_history_roots() {
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
+    graph.set_node_attr(0, "x".into(), V::Int(1)).unwrap();
+    graph.commit("root".into(), "test".into()).unwrap();
+    graph.set_node_attr(0, "x".into(), V::Int(2)).unwrap();
+    let pin = graph.read_view().unwrap();
+    graph.reset_hard().unwrap();
+    let report = graph.compact_pool_with_reclamation(true).unwrap();
+    assert_eq!(report.reclaimed_unreferenced_node_values, 1);
+    assert_eq!(pin.node_attr(0, &"x".into()).unwrap(), Some(V::Int(2)));
+    assert_eq!(
+        graph.get_node_attr(0, &"x".into()).unwrap(),
+        Some(V::Int(1))
+    );
+    graph.create_branch("discard".into()).unwrap();
+    graph.checkout_branch("discard".into()).unwrap();
+    graph.add_node().unwrap();
+    graph.commit("other".into(), "test".into()).unwrap();
+    graph.checkout_branch("main".into()).unwrap();
+    let outcome = graph
+        .prepare_pool_compaction_with_reclamation(true)
+        .unwrap()
+        .execute()
+        .unwrap();
+    graph.prune_branch("discard").unwrap();
+    // Root-set changes invalidate a detached reclamation even with unchanged columns.
+    assert!(graph.finish_pool_compaction(outcome).is_err());
+    graph.compact_pool_with_reclamation(true).unwrap();
+    graph.check_integrity().unwrap();
+}
+
+#[test]
+fn unreferenced_retained_versions_protect_values_until_explicit_history_collection() {
+    let mut graph = Graph::new();
+    graph.add_node().unwrap();
+    let root = graph.current_state_id();
+    graph
+        .set_node_attr(0, "future".into(), V::Float64(-0.0))
+        .unwrap();
+    let future = graph.current_state_id();
+    let mut past = graph
+        .owned_snapshot_at_commit(root)
+        .unwrap()
+        .to_graph()
+        .unwrap();
+    assert_eq!(past.current_state_id(), root);
+    let report = past.compact_pool_with_reclamation(true).unwrap();
+    assert_eq!(report.reclaimed_unreferenced_node_values, 0);
+    assert!(past.snapshot_at_commit(future).is_ok());
+    let raw = past.pool();
+    assert!(
+        matches!(raw.get_node_attribute_column(&"future".into()).unwrap().get(0),Some(V::Float64(v)) if v.to_bits()==(-0.0f64).to_bits())
+    );
+    drop(raw);
+    assert_eq!(past.gc_history().unwrap(), 1);
+    assert_eq!(
+        past.compact_pool_with_reclamation(true)
+            .unwrap()
+            .reclaimed_unreferenced_node_values,
+        1
+    );
+    past.check_integrity().unwrap();
+}

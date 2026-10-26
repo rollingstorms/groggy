@@ -368,3 +368,27 @@ No new rows; **201 checked / 67 open**. Raw duplicate reclamation and verified
 physical compaction are done; deleting unreachable distinct values/entities/groups
 and releasing external identities remain separate destructive reference-closure
 work. Ordinary checkpoints continue to preserve raw column positions.
+
+### Explicit orphan raw-property reclamation completed
+
+The same compaction API now accepts `reclaim_unreferenced=True`. All retained
+before/after property values and working mappings protect raw slots; nonhead and
+unreferenced retained versions are included. History-root changes invalidate a
+detached result. Frozen source payloads and owned snapshots remain independent;
+entities, groups and identity reservations remain retained. Default compaction
+continues to preserve all distinct raw values.
+
+Existing 15.2 now has actual history collection, duplicate-slot compaction,
+orphan raw-property reclamation and verified physical replacement. Remaining
+retention scope is raw entity/group reclamation and identity/reference closure,
+not the already implemented property collector. A 1k-node fixture reclaims 20k
+orphan values and reduces physical baseline ~6.35 MB → ~0.73 MB while retaining
+both remaining versions and an open discarded-state view. Exact scope/limits and
+receipts: `pool-compaction-2026-10-26.md`. No new checkbox rows; **201 checked /
+67 open** because the broad retention parents still include that remaining scope.
+
+Reclamation gates: **1,285 native passed / 52 ignored**, serial process matrix
+**1 passed / twelve cases**, **2,011 root Python passed / 1 skipped**, **163 docs
+examples**, strict Clippy and rebuilt extension. Both-column failure atomicity and
+malformed-unused-value rejection have internal corruption regressions. Existing
+owner benchmark/nested legacy survey exclusions remain; no external packages/push.

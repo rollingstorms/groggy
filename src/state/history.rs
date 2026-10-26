@@ -130,6 +130,10 @@ impl HistoryForest {
     }
 
     /// Reserved next acceptance ID while the caller holds exclusive graph ownership.
+    pub(crate) fn retained_version_count(&self) -> usize {
+        self.commits.len()
+    }
+
     pub(crate) fn next_state_id(&self) -> StateId {
         self.next_state_id
     }

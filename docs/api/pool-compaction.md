@@ -87,3 +87,48 @@ file verification release Python's GIL. File size may shrink or grow with the
 fixture and prior operation stream; retaining history still costs storage. No
 automatic schedule, non-Unix atomic replacement or actual power-loss guarantee is
 introduced by this API.
+
+## Explicit orphan-value reclamation
+
+Pass `reclaim_unreferenced=True` to `compact_pool` or `compact_storage` to discard
+raw slots whose values are no longer referenced by **any retained version** or
+working mapping in that column. This is an explicit destructive option; the default
+remains deduplication with every distinct raw value retained.
+
+```python
+from groggy import Graph
+
+g = Graph()
+g.add_node(value=0)
+g.create_branch("discard")
+g.checkout_branch("discard")
+g.set_node_attr(0, "orphan", "payload")
+frozen = g.read_view()
+g.checkout_branch("main")
+# First explicitly prune the branch/history that owns the unwanted value.
+g.prune_branch("discard")
+report = g.compact_pool(reclaim_unreferenced=True)
+assert report["reclaimed_unreferenced_node_values"] == 1
+assert frozen.node_attr(0, "orphan") == "payload"
+assert g.get_node_attr(0, "value") == 0
+```
+
+Both before and after values of every retained delta protect matching raw values.
+Unreferenced versions still retained in history also protect values until explicit
+history collection removes those versions. Every working mapping, including an
+inactive mapping, remains a root. Exact portable identity and column/kind scope
+apply; a numerically equal value under another column does not protect an orphan.
+
+Frozen graph/table/group sources own independent payloads. Reclaiming an orphan
+slot from the owner's pool does not delete those payloads or prune their sources.
+Group registries, entity ID extents and external-name reservations remain retained.
+Empty property columns remain declared; this operation does not migrate a schema.
+A detached reclaiming result also rejects if the retained-history set changes.
+
+The report's `reclaimed_unreferenced_node_values` and
+`reclaimed_unreferenced_edge_values` count discarded orphan slots, including any
+repeated slots for an orphan value. Remaining slot reduction is deduplication.
+Native callers use `compact_pool_with_reclamation(true)` or
+`compact_storage_with_reclamation(expected_state, true)`; the no-argument/default
+methods preserve every distinct value. For durable graphs, raw-value removal uses
+the same verified atomic replacement and failure protocol described above.

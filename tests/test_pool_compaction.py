@@ -52,3 +52,22 @@ def test_pool_compaction_requires_accepted_manual_changes():
         graph.compact_pool()
     graph.commit("accept", "test")
     graph.compact_pool()
+
+
+def test_explicit_reclamation_keeps_frozen_pins_and_every_retained_version():
+    graph = Graph()
+    graph.add_node(value=0)
+    graph.create_branch("discard")
+    graph.checkout_branch("discard")
+    graph.set_node_attr(0, "orphan", "payload")
+    pin = graph.read_view()
+    graph.checkout_branch("main")
+    retained = graph.compact_pool(reclaim_unreferenced=True)
+    assert retained["reclaimed_unreferenced_node_values"] == 0
+    graph.prune_branch("discard")
+    assert graph.compact_pool()["reclaimed_unreferenced_node_values"] == 0
+    report = graph.compact_pool(reclaim_unreferenced=True)
+    assert report["reclaimed_unreferenced_node_values"] == 1
+    assert pin.node_attr(0, "orphan") == "payload"
+    assert graph.get_node_attr(0, "value") == 0
+    graph.check_integrity()

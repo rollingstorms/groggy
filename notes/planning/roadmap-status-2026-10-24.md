@@ -723,3 +723,19 @@ regressions and a release parse-cost receipt are recorded in
 Gates: **1,274 native / 52 ignored**, serial SIGKILL gate **1 passed**; **2,004
 root Python / 1 skipped**, **160 docs**, strict Clippy, in-tree extension rebuild.
 No new checklist rows; **201 checked / 67 open**.
+
+## 2026-10-26 — real property compaction and explicit orphan reclamation
+
+Existing 15.2/10.4 property maintenance is implemented: `Graph.optimize` is no
+longer a no-op; `compact_pool` deduplicates exact portable values and remaps every
+working index. Optional `reclaim_unreferenced=True` discards slots absent from
+every retained delta before/after value and working mapping. `compact_storage`
+performs the same operation with verified locked atomic baseline replacement.
+History/pins/groups/inactive IDs/external reservations survive, with explicit
+rejection of stale/dirty/foreign captures. Failure coverage includes five injected
+phases for both policies and twelve process-death cases. Local receipts and limits:
+`pool-compaction-2026-10-26.md`.
+
+Raw entity/group reclamation, complete referent closure and identity release remain
+15.1/15.2/06.3. No scheduling/Graphiti/service scope change or new checklist row.
+Current inventory remains **201 checked / 67 open**.

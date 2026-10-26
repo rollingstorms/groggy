@@ -59,3 +59,10 @@ RSS or production latency claim. Receipt: `notes/benchmarks/history-collection-2
    presented as a working compactor.
 
 This component adds no automatic collection policy. See `docs/api/history-retention.md`.
+
+### Later 2026-10-26 maintenance update
+
+The earlier no-op optimize/raw-property/physical-compaction remainder is now
+implemented, including explicit orphan-value reclamation and verified durable
+replacement. See `pool-compaction-2026-10-26.md`. Entity/group reclamation and
+identity/reference closure remain open; the earlier receipt above is historical.

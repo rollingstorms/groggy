@@ -307,14 +307,7 @@ impl GraphArchive {
          -> GraphResult<Vec<(usize, AttrName, usize)>> {
             indices
                 .iter()
-                .map(|(id, name, index)| {
-                    let offset = columns
-                        .offsets
-                        .get(name)
-                        .and_then(|offsets| offsets.get(*index))
-                        .ok_or_else(|| invalid("invalid source compaction offset"))?;
-                    Ok((*id, name.clone(), *offset))
-                })
+                .map(|(id, name, index)| Ok((*id, name.clone(), columns.offset(name, *index)?)))
                 .collect()
         };
         let node_indices = remap(&self.node_indices, nodes)?;

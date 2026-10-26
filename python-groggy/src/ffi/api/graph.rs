@@ -2076,12 +2076,13 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    /// Explicitly deduplicate raw columns without deleting distinct values/history.
-    fn compact_pool(&self, py: Python<'_>) -> PyResult<PyObject> {
+    /// Exact raw-column compaction with optional explicit orphan-value reclamation.
+    #[pyo3(signature=(*,reclaim_unreferenced=false))]
+    fn compact_pool(&self, py: Python<'_>, reclaim_unreferenced: bool) -> PyResult<PyObject> {
         let plan = self
             .inner
             .borrow()
-            .prepare_pool_compaction()
+            .prepare_pool_compaction_with_reclamation(reclaim_unreferenced)
             .map_err(graph_error_to_py_err)?;
         let outcome = py
             .allow_threads(move || plan.execute())
@@ -2095,7 +2096,7 @@ impl PyGraph {
     }
 
     fn optimize(&self, py: Python<'_>) -> PyResult<()> {
-        self.compact_pool(py).map(|_| ())
+        self.compact_pool(py, false).map(|_| ())
     }
 
     /// Build a temporal index from the graph history for efficient temporal queries.
@@ -3519,5 +3520,13 @@ pub(super) fn pool_compaction_report_to_py(
     result.set_item("current_node_values", report.current_node_values)?;
     result.set_item("previous_edge_values", report.previous_edge_values)?;
     result.set_item("current_edge_values", report.current_edge_values)?;
+    result.set_item(
+        "reclaimed_unreferenced_node_values",
+        report.reclaimed_unreferenced_node_values,
+    )?;
+    result.set_item(
+        "reclaimed_unreferenced_edge_values",
+        report.reclaimed_unreferenced_edge_values,
+    )?;
     Ok(result.into())
 }
