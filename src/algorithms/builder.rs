@@ -570,8 +570,8 @@ mod tests {
 
         let algo = registry.instantiate(&spec).unwrap();
 
-        let mut graph = Graph::new();
-        let node = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node = graph.add_node().unwrap();
         let nodes: HashSet<_> = [node].into_iter().collect();
         let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
 

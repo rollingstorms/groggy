@@ -302,7 +302,7 @@ impl DurableGraph {
         schema: Option<GraphSchema>,
     ) -> GraphResult<Self> {
         config.validate().map_err(invalid)?;
-        let graph = Graph::with_config(config.clone());
+        let graph = Graph::with_config_manual(config.clone())?;
         Self::create_initialized(path, graph, schema.clone(), Record::Init { config, schema })
     }
 
@@ -456,7 +456,7 @@ impl DurableGraph {
                     schema: policy,
                 } if graph.is_none() && sequence == 0 => {
                     config.validate().map_err(invalid)?;
-                    let candidate = Graph::with_config(config);
+                    let candidate = Graph::with_config_manual(config)?;
                     if let Some(schema) = &policy {
                         candidate.check_schema_policy(schema)?;
                     }

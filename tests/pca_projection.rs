@@ -73,7 +73,9 @@ fn projection_preserves_row_identity_and_trait_agrees_with_matrix_scores() {
     let out = engine.project_matrix(&input).unwrap();
     assert_eq!(out.row_labels(), input.row_labels());
     assert_eq!(out.column_names(), ["pc_1", "pc_2"]);
-    let positions = engine.project_embedding(&input, &Graph::new()).unwrap();
+    let positions = engine
+        .project_embedding(&input, &Graph::new_manual())
+        .unwrap();
     for (i, p) in positions.iter().enumerate() {
         assert_eq!(p.x, out.get(i, 0).unwrap());
         assert_eq!(p.y, out.get(i, 1).unwrap());

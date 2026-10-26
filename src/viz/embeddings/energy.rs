@@ -487,8 +487,8 @@ mod tests {
     use super::*;
 
     fn path_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..n).map(|_| graph.add_node().unwrap()).collect();
         for i in 0..n.saturating_sub(1) {
             graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
@@ -505,18 +505,18 @@ mod tests {
     }
 
     fn star_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let center = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let center = graph.add_node().unwrap();
         for _ in 1..n {
-            let leaf = graph.add_node();
+            let leaf = graph.add_node().unwrap();
             graph.add_edge(center, leaf).unwrap();
         }
         graph
     }
 
     fn karate_club() -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..34).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..34).map(|_| graph.add_node().unwrap()).collect();
         // Add some representative edges for karate club
         let edges = [
             (0, 1),

@@ -17,8 +17,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
-        let mut graph = Graph::new();
-        graph.add_nodes(count);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(count).unwrap();
         for id in 0..count {
             graph.add_edge(id, (id + 1) % count)?;
         }

@@ -8,9 +8,9 @@ use std::rc::Rc;
 
 #[test]
 fn live_reads_exclude_removed_edges_and_nodes() {
-    let mut graph = Graph::new();
-    let source = graph.add_node();
-    let target = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let source = graph.add_node().unwrap();
+    let target = graph.add_node().unwrap();
     let edge = graph.add_edge(source, target).unwrap();
 
     assert_eq!(graph.incident_edges(source).unwrap(), vec![edge]);
@@ -40,9 +40,9 @@ fn live_reads_exclude_removed_edges_and_nodes() {
 
 #[test]
 fn entity_handles_cannot_read_inactive_values_from_the_pool() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
-    let source = graph.borrow_mut().add_node();
-    let target = graph.borrow_mut().add_node();
+    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let source = graph.borrow_mut().add_node().unwrap();
+    let target = graph.borrow_mut().add_node().unwrap();
     let edge = graph.borrow_mut().add_edge(source, target).unwrap();
     graph
         .borrow_mut()

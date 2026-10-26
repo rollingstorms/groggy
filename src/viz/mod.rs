@@ -525,7 +525,7 @@ impl VizModule {
         // Create real-time visualization engine with the graph
         // For now, create a simple graph from the data source
         // TODO: Properly extract graph structure from data_source
-        let graph = crate::api::graph::Graph::new(); // Placeholder - will be populated from data_source
+        let graph = crate::api::graph::Graph::new_manual(); // Placeholder - will be populated from data_source
         if verbose >= 3 {
             eprintln!("📊 DEBUG: Created placeholder graph for engine");
 

@@ -46,11 +46,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut samples = Vec::new();
             for _ in 0..5 {
                 let mut graph = if mode == "core.triangle_count" || mode == "core.k_core_mark" {
-                    Graph::new_undirected()
+                    Graph::new_undirected_manual()
                 } else {
-                    Graph::new_directed()
+                    Graph::new_directed_manual()
                 };
-                graph.add_nodes(count);
+                graph.add_nodes(count).unwrap();
                 for node in 0..count {
                     graph.add_edge(node, (node + 1) % count)?;
                 }

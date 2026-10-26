@@ -52,9 +52,9 @@ fn invalid_coordinates_reject_and_rectangular_labels_match_rows() {
 }
 #[test]
 fn selected_edges_are_not_replaced_by_induced_parent_edges() {
-    let mut g = Graph::new_directed();
-    let a = g.add_node();
-    let b = g.add_node();
+    let mut g = Graph::new_directed_manual();
+    let a = g.add_node().unwrap();
+    let b = g.add_node().unwrap();
     let e = g.add_edge(a, b).unwrap();
     let other = g.add_edge(a, b).unwrap();
     let loop_edge = g.add_edge(a, a).unwrap();
@@ -76,8 +76,8 @@ fn selected_edges_are_not_replaced_by_induced_parent_edges() {
 }
 #[test]
 fn graph_sparse_exports_are_canonical_and_format_selection_is_real() {
-    let mut g = Graph::new_directed();
-    let nodes: Vec<_> = (0..10000).map(|_| g.add_node()).collect();
+    let mut g = Graph::new_directed_manual();
+    let nodes: Vec<_> = (0..10000).map(|_| g.add_node().unwrap()).collect();
     for i in 0..nodes.len() {
         g.add_edge(nodes[i], nodes[(i + 1) % nodes.len()]).unwrap();
     }
@@ -98,9 +98,9 @@ fn graph_sparse_exports_are_canonical_and_format_selection_is_real() {
 }
 #[test]
 fn missing_weight_is_one_but_invalid_weight_does_not_disappear() {
-    let mut g = Graph::new();
-    let a = g.add_node();
-    let b = g.add_node();
+    let mut g = Graph::new_manual();
+    let a = g.add_node().unwrap();
+    let b = g.add_node().unwrap();
     let e = g.add_edge(a, b).unwrap();
     assert_eq!(
         g.weighted_adjacency_matrix("w").unwrap().get(0, 1),

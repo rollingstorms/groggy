@@ -57,13 +57,13 @@ must be committed or reset before using the checked writer. The prior dirty
 migration does not silently absorb pending manual writes into a new checked
 operation.
 
-Rust `Graph::new_publishing()` enables the coordinator policy. Use the fallible
-`insert_nodes`, `add_nodes_with_attrs`, `try_add_node`, and ordinary fallible
-mutators. `set_automatic_publication` changes policy only on a clean graph.
-Existing Rust `Graph::new`/directional/config constructors and infallible
-`add_node`/`add_nodes` remain manual compatibility APIs. Retiring or changing
-those signatures is a remaining migration step; their errors are not discarded
-or converted to panics.
+Rust `Graph::new`, `Default` and directional/config constructors now publish by
+default. `add_node` and `add_nodes` return `GraphResult`; propagate errors with `?`.
+Use explicit `new_manual`/directional/config manual constructors for deferred
+assembly. `new_publishing` is an alias; `try_add_node(s)` always requests checked
+publication even on a clean manual graph. Policy changes require a clean head.
+See [native mutation migration](native-mutation-defaults.md) for exact signatures,
+manual compatibility and atomic Python `nodes.append/extend`.
 
 ## Imports and pooled operations
 
@@ -91,7 +91,7 @@ as one checked batch. [Table materialization](table-materialization.md) now acce
 supported active rows/properties into an independent publishing graph; table/source
 pins retain read provenance. Explicit [owned snapshots](owned-snapshots.md) copy
 retained pool/history in memory; persistent arbitrary raw-pool import remains 10.3.
-Mutable native pool/space escape hatches and the infallible Rust compatibility surface remain
+Mutable native pool/space escape hatches remain
 outside this step. Native [subgraph bulk writes](subgraph-writes.md) now preserve
 complete inputs for owner validation, including algorithm output attachment;
 the all-edge convenience setter publishes one complete column.

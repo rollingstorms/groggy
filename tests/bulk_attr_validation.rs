@@ -3,8 +3,8 @@ use std::collections::HashMap;
 
 #[test]
 fn node_bulk_reports_all_invalid_assignments_without_writing() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph.commit("initial".into(), "test".into()).unwrap();
 
     let mut values = HashMap::new();
@@ -34,8 +34,8 @@ fn node_bulk_reports_all_invalid_assignments_without_writing() {
 
 #[test]
 fn edge_bulk_reports_deleted_and_unknown_edges_without_writing() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(2).unwrap();
     let live = graph.add_edge(nodes[0], nodes[1]).unwrap();
     let deleted = graph.add_edge(nodes[0], nodes[1]).unwrap();
     graph.remove_edge(deleted).unwrap();
@@ -59,8 +59,8 @@ fn edge_bulk_reports_deleted_and_unknown_edges_without_writing() {
 
 #[test]
 fn column_setter_rejects_duplicates_and_invalid_ids_without_writing() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph.commit("initial".into(), "test".into()).unwrap();
 
     let error = graph
@@ -88,8 +88,8 @@ fn column_setter_rejects_duplicates_and_invalid_ids_without_writing() {
 
 #[test]
 fn bulk_node_setters_cannot_change_system_entity_type() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let mut attrs = HashMap::new();
     attrs.insert(
         "entity_type".into(),

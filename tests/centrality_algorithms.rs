@@ -9,11 +9,11 @@ use groggy::traits::SubgraphOperations;
 use groggy::types::{AttrName, AttrValue, NodeId};
 
 fn toy_graph() -> Subgraph {
-    let mut graph = Graph::new();
-    let a = graph.add_node();
-    let b = graph.add_node();
-    let c = graph.add_node();
-    let d = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let a = graph.add_node().unwrap();
+    let b = graph.add_node().unwrap();
+    let c = graph.add_node().unwrap();
+    let d = graph.add_node().unwrap();
 
     graph.add_edge(a, b).unwrap();
     graph.add_edge(b, a).unwrap();
@@ -83,10 +83,10 @@ fn pipeline_runs_betweenness_and_closeness() {
 #[test]
 fn pipeline_runs_weighted_centrality() {
     ensure_algorithms_registered();
-    let mut graph = Graph::new();
-    let a = graph.add_node();
-    let b = graph.add_node();
-    let c = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let a = graph.add_node().unwrap();
+    let b = graph.add_node().unwrap();
+    let c = graph.add_node().unwrap();
 
     let ab = graph.add_edge(a, b).unwrap();
     let ba = graph.add_edge(b, a).unwrap();

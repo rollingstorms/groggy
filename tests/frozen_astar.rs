@@ -4,12 +4,12 @@ use std::{collections::HashSet, sync::atomic::AtomicBool};
 fn paths_match_exhaustive_shortest_costs_and_actual_selected_edge_instances() {
     for directed in [false, true] {
         for mask in 0..512 {
-            let mut graph = Graph::new_with_type(if directed {
+            let mut graph = Graph::new_with_type_manual(if directed {
                 GraphType::Directed
             } else {
                 GraphType::Undirected
             });
-            let all = graph.add_nodes(4);
+            let all = graph.add_nodes(4).unwrap();
             graph.remove_node(all[1]).unwrap();
             let n = [all[0], all[2], all[3]];
             let mut distance = vec![vec![f64::INFINITY; 3]; 3];
@@ -89,8 +89,8 @@ fn paths_match_exhaustive_shortest_costs_and_actual_selected_edge_instances() {
 }
 #[test]
 fn heuristic_domain_and_scope_are_checked_before_trivial_or_unreachable_results() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let n = graph.add_nodes(4);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let n = graph.add_nodes(4).unwrap();
     let edge = graph.add_edge(n[0], n[1]).unwrap();
     graph.set_edge_attr(edge, "w".into(), V::Int(2)).unwrap();
     graph.set_node_attr(n[0], "h".into(), V::Int(2)).unwrap();
@@ -142,8 +142,8 @@ fn heuristic_domain_and_scope_are_checked_before_trivial_or_unreachable_results(
 }
 #[test]
 fn frozen_parallel_path_keeps_weights_heuristics_and_edge_scope_after_owner_drop() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let n = graph.add_nodes(3);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let n = graph.add_nodes(3).unwrap();
     let first = graph.add_edge(n[0], n[1]).unwrap();
     let second = graph.add_edge(n[1], n[2]).unwrap();
     let excluded = graph.add_edge(n[0], n[2]).unwrap();

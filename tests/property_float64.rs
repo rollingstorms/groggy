@@ -72,8 +72,8 @@ fn export_history_and_journal_retain_f64_bits_and_legacy_f32_tags() {
         V::Float64Vec(vec![-0., f64::NEG_INFINITY, 1e300]),
         V::Float64Vec(vec![]),
     ];
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph
         .set_node_attr(node, "old".into(), V::Float(0.1))
         .unwrap();

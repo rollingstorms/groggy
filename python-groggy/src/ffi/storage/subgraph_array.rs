@@ -481,7 +481,7 @@ impl PySubgraphArray {
         use groggy::viz::streaming::GraphDataSource;
 
         // For SubgraphArray, create a graph that contains all subgraphs
-        let mut viz_graph = groggy::api::graph::Graph::new();
+        let mut viz_graph = groggy::api::graph::Graph::new_manual();
 
         for subgraph in self.inner.iter() {
             let node_ids = subgraph.inner.node_ids();
@@ -491,7 +491,9 @@ impl PySubgraphArray {
             for &node_id in &node_ids {
                 // Check if node already exists to avoid duplicates
                 if !viz_graph.node_ids().contains(&node_id) {
-                    viz_graph.add_node();
+                    viz_graph
+                        .add_node()
+                        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
                     if let Ok(attrs) = subgraph.inner.graph().borrow().get_node_attrs(node_id) {
                         for (attr_name, attr_value) in attrs {
                             let _ = viz_graph.set_node_attr(node_id, attr_name, attr_value);
@@ -580,7 +582,7 @@ impl PySubgraphArray {
         use std::collections::HashSet;
 
         // Create a new graph
-        let mut merged_graph = groggy::api::graph::Graph::new();
+        let mut merged_graph = groggy::api::graph::Graph::new_manual();
         let mut seen_nodes = HashSet::new();
         let mut seen_edges = HashSet::new();
 
@@ -596,7 +598,9 @@ impl PySubgraphArray {
 
                     // Create enough nodes to include this node_id
                     while merged_graph.node_ids().len() <= node_id {
-                        merged_graph.add_node();
+                        merged_graph
+                            .add_node()
+                            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
                     }
 
                     // Copy attributes

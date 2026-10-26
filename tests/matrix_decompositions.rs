@@ -159,7 +159,7 @@ fn pca_projection_preserves_distances_in_a_rotated_rank_two_plane() {
     let data = [3., 3., 0., -3., -3., 0., 1., -1., 0., -1., 1., 0.];
     let a = matrix(&data, 4, 3);
     let positions = PCAProjection::new(true, false)
-        .project_embedding(&a, &groggy::Graph::new())
+        .project_embedding(&a, &groggy::Graph::new_manual())
         .unwrap();
     for i in 0..4 {
         for j in 0..4 {
@@ -175,8 +175,8 @@ fn pca_projection_preserves_distances_in_a_rotated_rank_two_plane() {
 #[test]
 fn spectral_embedding_uses_actual_nonconstant_laplacian_eigenvectors() {
     use groggy::viz::embeddings::{spectral::SpectralEmbedding, EmbeddingEngine};
-    let mut graph = groggy::Graph::new();
-    let allocated = graph.add_nodes(5);
+    let mut graph = groggy::Graph::new_manual();
+    let allocated = graph.add_nodes(5).unwrap();
     graph.remove_node(allocated[1]).unwrap();
     let nodes = [allocated[0], allocated[2], allocated[3], allocated[4]];
     graph

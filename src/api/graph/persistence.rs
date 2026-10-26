@@ -73,7 +73,7 @@ pub(super) fn load(path: &Path) -> GraphResult<Graph> {
             }
         };
     }
-    let mut graph = Graph::with_config(config);
+    let mut graph = Graph::with_config_manual(config)?;
     for node in document.nodes {
         if node.id == usize::MAX || graph.has_node(node.id) {
             return Err(GraphError::InvalidInput(format!(

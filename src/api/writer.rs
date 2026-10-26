@@ -16,7 +16,7 @@ pub struct GraphWriter<'a> {
     effective_at: Option<crate::TimestampMicros>,
 }
 impl Graph {
-    /// Checked, automatically published alternative to the legacy infallible constructor.
+    /// Always publish a checked node insertion, including on an explicit manual graph.
     pub fn try_add_node(&mut self) -> GraphResult<NodeId> {
         self.writer("groggy").add_node(HashMap::new())
     }

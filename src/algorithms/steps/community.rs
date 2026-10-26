@@ -425,8 +425,8 @@ mod tests {
     use std::rc::Rc;
 
     fn make_test_graph() -> (Graph, Vec<NodeId>) {
-        let mut graph = Graph::new();
-        let nodes: Vec<NodeId> = (0..6).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<NodeId> = (0..6).map(|_| graph.add_node().unwrap()).collect();
 
         // Create two clusters: 0-1-2 and 3-4-5
         graph.add_edge(nodes[0], nodes[1]).unwrap();
@@ -522,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_modularity_gain_empty_graph() {
-        let graph = Graph::new();
+        let graph = Graph::new_manual();
         let subgraph =
             Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
                 .unwrap();
@@ -647,11 +647,11 @@ mod checked_tests {
                     edges.extend([(0, 0), (0, 1), (0, 1), (1, 2)]);
                 }
                 let mut graph = if directed {
-                    Graph::new_directed()
+                    Graph::new_directed_manual()
                 } else {
-                    Graph::new_undirected()
+                    Graph::new_undirected_manual()
                 };
-                graph.add_nodes(count);
+                graph.add_nodes(count).unwrap();
                 for &(source, target) in &edges {
                     graph.add_edge(source, target).expect("edge");
                 }
@@ -718,8 +718,8 @@ mod checked_tests {
 
     #[test]
     fn random_seeds_are_isolated_and_degree_hub_ties_are_stable() {
-        let mut graph = Graph::new_undirected();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_undirected_manual();
+        graph.add_nodes(3).unwrap();
         graph.add_edge(0, 1).expect("edge");
         graph.add_edge(1, 2).expect("edge");
         graph.add_edge(0, 2).expect("edge");
@@ -768,8 +768,8 @@ mod checked_tests {
 
     #[test]
     fn sparse_columns_preserve_order_and_foreign_or_cancelled_inputs_preserve_outputs() {
-        let mut graph = Graph::new_undirected();
-        graph.add_nodes(4);
+        let mut graph = Graph::new_undirected_manual();
+        graph.add_nodes(4).unwrap();
         graph.add_edge(1, 2).expect("edge");
         graph.add_edge(2, 3).expect("edge");
         let selected = Subgraph::from_nodes(

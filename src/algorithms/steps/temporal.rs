@@ -1027,8 +1027,8 @@ mod tests {
     use std::{cell::RefCell, rc::Rc, sync::atomic::AtomicBool};
 
     fn fixture() -> Subgraph {
-        let mut graph = Graph::new();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(3).unwrap();
         graph.add_edge(0, 1).unwrap();
         graph.add_edge(1, 2).unwrap();
         graph.commit("fixture".into(), "test".into()).unwrap();

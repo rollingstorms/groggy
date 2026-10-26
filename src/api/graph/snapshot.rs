@@ -25,7 +25,7 @@ impl SnapshotMaterialization {
     }
 
     pub(crate) fn materialize_selection(&self, state: &PinnedReadState) -> GraphResult<Graph> {
-        let mut graph = Graph::with_config(self.config.clone());
+        let mut graph = Graph::with_config_manual(self.config.clone())?;
         {
             let mut pool = graph.pool.borrow_mut();
             pool.install_snapshot_groups(state.groups().clone());
@@ -44,7 +44,7 @@ impl SnapshotMaterialization {
                 "to_graph requires an owned snapshot; capture with owned=True".into(),
             )
         })?;
-        let mut graph = Graph::with_config(self.config.clone());
+        let mut graph = Graph::with_config_manual(self.config.clone())?;
         graph.pool = Rc::new(RefCell::new(owned.pool.clone()));
         graph.history = owned.history.detached_copy();
         graph.identities = owned.identities.clone();

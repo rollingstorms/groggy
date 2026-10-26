@@ -44,7 +44,9 @@ fn seeded_output_preserves_identity_ownership_and_uniform_scale() {
             assert!((a - b).abs() < 1e-8);
         }
     }
-    let positions = engine.project_embedding(&matrix, &Graph::new()).unwrap();
+    let positions = engine
+        .project_embedding(&matrix, &Graph::new_manual())
+        .unwrap();
     for (row, position) in positions.iter().enumerate() {
         assert_eq!(position.x, output.get(row, 0).unwrap());
         assert_eq!(position.y, output.get(row, 1).unwrap());
@@ -61,7 +63,7 @@ fn seeded_output_preserves_identity_ownership_and_uniform_scale() {
     };
     let factory = ProjectionEngineFactory::create_engine(&config)
         .unwrap()
-        .project_embedding(&matrix, &Graph::new())
+        .project_embedding(&matrix, &Graph::new_manual())
         .unwrap();
     for (a, b) in factory.iter().zip(positions) {
         assert_eq!((a.x, a.y), (b.x, b.y));

@@ -222,17 +222,17 @@ mod tests {
 
     #[test]
     fn test_infomap_basic() {
-        let mut graph = Graph::new();
-        let n0 = graph.add_node();
-        let n1 = graph.add_node();
-        let n2 = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let n0 = graph.add_node().unwrap();
+        let n1 = graph.add_node().unwrap();
+        let n2 = graph.add_node().unwrap();
         graph.add_edge(n0, n1).unwrap();
         graph.add_edge(n1, n2).unwrap();
         graph.add_edge(n2, n0).unwrap();
 
-        let n3 = graph.add_node();
-        let n4 = graph.add_node();
-        let n5 = graph.add_node();
+        let n3 = graph.add_node().unwrap();
+        let n4 = graph.add_node().unwrap();
+        let n5 = graph.add_node().unwrap();
         graph.add_edge(n3, n4).unwrap();
         graph.add_edge(n4, n5).unwrap();
         graph.add_edge(n5, n3).unwrap();
@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_infomap_empty() {
-        let graph = Graph::new();
+        let graph = Graph::new_manual();
         let subgraph =
             Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
                 .unwrap();

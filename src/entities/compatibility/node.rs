@@ -266,12 +266,12 @@ mod tests {
     #[test]
     fn test_entity_node_operations() {
         // Test EntityNode and NodeOperations functionality
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Create test nodes and edges
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
 
         let _edge1 = graph.add_edge(node1, node2).unwrap();
         let _edge2 = graph.add_edge(node2, node3).unwrap();

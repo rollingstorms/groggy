@@ -289,7 +289,7 @@ impl Graph {
 
         let resolved = self.prepare_node_upserts(&rows, None)?;
         let count = resolved.iter().filter(|id| id.is_none()).count();
-        let mut added = self.add_nodes(count).into_iter();
+        let mut added = self.add_nodes(count)?.into_iter();
         let mut columns: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
         let mut ids = Vec::with_capacity(rows.len());
         let mut bindings = Vec::new();

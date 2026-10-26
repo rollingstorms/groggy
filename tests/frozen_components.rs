@@ -5,12 +5,12 @@ use std::sync::atomic::AtomicBool;
 fn frozen_components_match_reachability_and_preserve_selected_edge_instances() {
     for directed in [false, true] {
         for mask in 0..256 {
-            let mut graph = Graph::new_with_type(if directed {
+            let mut graph = Graph::new_with_type_manual(if directed {
                 GraphType::Directed
             } else {
                 GraphType::Undirected
             });
-            let nodes = graph.add_nodes(5);
+            let nodes = graph.add_nodes(5).unwrap();
             let pairs = [
                 (0, 1),
                 (1, 0),
@@ -91,14 +91,14 @@ fn frozen_components_match_reachability_and_preserve_selected_edge_instances() {
 
 #[test]
 fn components_handle_empty_isolates_selection_and_cancellation() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     assert!(graph
         .read_view()
         .unwrap()
         .connected_components(ComponentMode::Strong)
         .unwrap()
         .is_empty());
-    let n = graph.add_nodes(3);
+    let n = graph.add_nodes(3).unwrap();
     let edge = graph.add_edge(n[0], n[1]).unwrap();
     let excluded = graph.add_edge(n[1], n[2]).unwrap();
     let view = graph.read_view().unwrap().select_edges(&[edge]).unwrap();

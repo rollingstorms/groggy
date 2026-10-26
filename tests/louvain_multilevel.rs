@@ -7,8 +7,8 @@ use groggy::{AttrValue, Graph};
 use std::{cell::RefCell, rc::Rc};
 
 fn ring(cliques: usize) -> Rc<RefCell<Graph>> {
-    let mut graph = Graph::new();
-    graph.add_nodes(cliques * 3 + 1);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(cliques * 3 + 1).unwrap();
     for c in 0..cliques {
         let a = c * 3;
         graph.add_edge(a, a + 1).unwrap();
@@ -121,8 +121,8 @@ fn explicit_one_level_stays_available_and_registry_default_runs_multiple_levels(
 
 #[test]
 fn original_id_gaps_loops_parallel_edges_and_isolates_survive_projection() {
-    let mut graph = Graph::new();
-    graph.add_nodes(7);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(7).unwrap();
     graph.remove_node(2).unwrap();
     graph.remove_node(6).unwrap();
     for (u, v) in [(0, 1), (0, 1), (3, 4), (4, 4)] {

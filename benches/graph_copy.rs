@@ -6,8 +6,8 @@ use std::{collections::HashMap, time::Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
-        let mut source = Graph::new_directed();
-        source.add_nodes(count + 1);
+        let mut source = Graph::new_directed_manual();
+        source.add_nodes(count + 1).unwrap();
         source.remove_node(0)?;
         let edges =
             source.add_edges(&(1..count).map(|node| (node, node + 1)).collect::<Vec<_>>())?;
@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for publishing in [false, true] {
             let mut samples = Vec::new();
             for _ in 0..5 {
-                let mut target = Graph::new();
+                let mut target = Graph::new_manual();
                 target.set_automatic_publication(publishing)?;
                 target.insert_nodes(3)?;
                 target.add_edge(0, 0)?;

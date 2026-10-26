@@ -16,8 +16,8 @@ fn matrix(rows: usize, cols: usize, base: f64) -> GraphMatrix {
 }
 #[test]
 fn interleave_all_columns_matches_sorted_round_reference_for_ragged_widths() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     for count in 1..5 {
         let matrices: Vec<_> = (0..count)
             .map(|child| matrix(2, child * 2 + 1, 100. * child as f64))
@@ -47,8 +47,8 @@ fn interleave_all_columns_matches_sorted_round_reference_for_ragged_widths() {
 }
 #[test]
 fn row_identity_is_aligned_for_all_strategies_and_inputs_remain_owned() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     graph.remove_node(1).unwrap();
     let mut a = GraphMatrix::from_row_major_data(vec![10., 20., 30., 40.], 2, 2, None).unwrap();
     a.set_row_labels(Some(vec!["node_2".into(), "node_0".into()]));
@@ -77,8 +77,8 @@ fn row_identity_is_aligned_for_all_strategies_and_inputs_remain_owned() {
 }
 #[test]
 fn composite_factory_executes_interleave_and_preserves_existing_dimension_rules() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     for (strategy, width) in [
         (CombinationStrategy::Interleave { chunk_size: 1 }, 6),
         (CombinationStrategy::Concatenate, 6),
@@ -141,8 +141,8 @@ fn composite_factory_executes_interleave_and_preserves_existing_dimension_rules(
 }
 #[test]
 fn invalid_shapes_labels_weights_and_values_return_errors_without_panics() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let a = matrix(2, 2, 0.);
     for strategy in [
         CombinationStrategy::Concatenate,
@@ -195,8 +195,8 @@ fn invalid_shapes_labels_weights_and_values_return_errors_without_panics() {
 }
 #[test]
 fn weighted_average_handles_extreme_finite_weights_and_values() {
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     let a = GraphMatrix::from_row_major_data(vec![f64::MAX, -f64::MAX, 1e-300], 1, 3, Some(&[0]))
         .unwrap();
     let b = GraphMatrix::from_row_major_data(vec![f64::MAX, f64::MAX, 3e-300], 1, 3, None).unwrap();

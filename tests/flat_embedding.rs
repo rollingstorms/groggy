@@ -18,8 +18,8 @@ fn dist(m: &GraphMatrix, u: usize, v: usize) -> f64 {
 }
 #[test]
 fn actual_topology_changes_only_its_endpoints_without_fake_or_truncated_edges() {
-    let mut graph = Graph::new();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     // Three rows map to IDs 0,2,3. Directed orientation has the same geometric energy.
     let embedding = input(3);
@@ -51,8 +51,8 @@ fn actual_topology_changes_only_its_endpoints_without_fake_or_truncated_edges() 
 }
 #[test]
 fn labeled_permutations_validate_identity_and_preserve_row_order() {
-    let mut graph = Graph::new();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     graph.add_edge(0, 3).unwrap();
     let mut embedding = input(3);
@@ -83,7 +83,7 @@ fn labeled_permutations_validate_identity_and_preserve_row_order() {
 }
 #[test]
 fn graph_free_empty_singleton_and_bounds_are_explicit() {
-    let graph = Graph::new();
+    let graph = Graph::new_manual();
     assert_eq!(
         compute_flat_embedding_matrix(&input(0), &graph, &config())
             .unwrap()
@@ -106,8 +106,8 @@ fn graph_free_empty_singleton_and_bounds_are_explicit() {
                 <= 0.01 * (1.0 + 1e-12)
         );
     }
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     assert_eq!(
         compute_flat_embedding_matrix(&input(1), &graph, &config())
             .unwrap()
@@ -117,8 +117,8 @@ fn graph_free_empty_singleton_and_bounds_are_explicit() {
 }
 #[test]
 fn controls_reject_invalid_values_and_rng_is_local_and_repeatable() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     graph.add_edge(0, 2).unwrap();
     for key in 0..6 {
         for bad in [-1., f64::NAN, f64::INFINITY] {

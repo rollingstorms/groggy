@@ -993,8 +993,8 @@ mod checked_tests {
     };
 
     fn selection() -> Subgraph {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(6);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(6).unwrap();
         for (source, target) in [(1, 3), (1, 3), (3, 3), (5, 1), (0, 1)] {
             graph.add_edge(source, target).expect("edge");
         }
@@ -1142,11 +1142,11 @@ mod subgraph_sampling_tests {
 
     fn selection(directed: bool) -> Subgraph {
         let mut graph = if directed {
-            Graph::new_directed()
+            Graph::new_directed_manual()
         } else {
-            Graph::new_undirected()
+            Graph::new_undirected_manual()
         };
-        graph.add_nodes(6);
+        graph.add_nodes(6).unwrap();
         for (u, v) in [(1, 3), (1, 3), (3, 3), (5, 1), (0, 1), (1, 1)] {
             graph.add_edge(u, v).expect("edge");
         }
@@ -1384,8 +1384,8 @@ mod foreach_tests {
     };
 
     fn fixture() -> Subgraph {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(3).unwrap();
         graph.add_edge(0, 1).expect("edge");
         graph.add_edge(1, 2).expect("edge");
         Subgraph::from_nodes(

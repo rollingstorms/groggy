@@ -146,3 +146,17 @@ recovery/replacement component completed, and restoration repaired within 12.2.
 
 Owner development/benchmark changes remain untouched; implementation is committed
 in coherent slices, with no push or automatic maintenance policy introduced.
+
+## Third priority window — began 11:18:59 UTC
+
+Completed native default/infallible migration under 09.4b.2, including validated
+configuration and registered atomic accessor node creation. Evidence and receipt:
+`native-default-migration-2026-10-26.md`. The fixed component inventory is now
+**one completed, two remaining**: raw-storage escapes and uncertified/topology
+compound acceptance. Counts remain **201 checked / 67 open**, no new rows.
+The raw audit identified a pooled-attribute setter that silently returned success;
+its rejection behavior belongs to the same existing boundary scope.
+
+Third-window first-slice gates: **1,246 native passed / 51 ignored**, **1,986
+root Python passed / 1 skipped**, **157 docs examples**, strict all-target Clippy.
+The owner benchmark and legacy nested survey suites remain excluded.

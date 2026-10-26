@@ -2,14 +2,14 @@ use groggy::{AttrValue, Graph};
 
 #[test]
 fn diff_commits_compares_typed_state_in_both_directions() {
-    let mut graph = Graph::new();
-    let alice = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let alice = graph.add_node().unwrap();
     graph
         .set_node_attr(alice, "score".into(), AttrValue::Int(1))
         .unwrap();
     let first = graph.commit("first".into(), "test".into()).unwrap();
 
-    let bob = graph.add_node();
+    let bob = graph.add_node().unwrap();
     let edge = graph.add_edge(alice, bob).unwrap();
     graph
         .set_node_attr(alice, "score".into(), AttrValue::FloatVec(vec![1.0, 2.0]))
@@ -53,8 +53,8 @@ fn diff_commits_compares_typed_state_in_both_directions() {
 
 #[test]
 fn diff_rejects_unknown_state_instead_of_treating_it_as_empty() {
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     let state = graph.commit("first".into(), "test".into()).unwrap();
     assert_eq!(graph.diff_commits(0, state).unwrap().nodes_added, vec![0]);
     assert!(graph.diff_commits(state, 999).is_err());

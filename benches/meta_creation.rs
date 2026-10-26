@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for members in [1_000, 10_000, 100_000] {
         for publishing in [false, true] {
-            let mut graph = Graph::new();
+            let mut graph = Graph::new_manual();
             graph.insert_nodes(members)?;
             let group = graph.pool_mut().store_subgraph(
                 (0..members).collect(),

@@ -82,8 +82,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             let mut samples = Vec::new();
             for _ in 0..5 {
-                let mut graph = Graph::new_directed();
-                graph.add_nodes(count);
+                let mut graph = Graph::new_directed_manual();
+                graph.add_nodes(count).unwrap();
                 for node in 0..count {
                     graph.add_edge(node, (node + 1) % count)?;
                     graph.set_node_attr(node, "score".into(), AttrValue::Int(0))?;

@@ -8,8 +8,8 @@ use std::{
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for n in [1_000, 10_000, 100_000] {
-        let mut g = Graph::new();
-        g.add_nodes(n);
+        let mut g = Graph::new_manual();
+        g.add_nodes(n).unwrap();
         g.add_edges(&(0..n - 1).map(|r| (r, r + 1)).collect::<Vec<_>>())?;
         g.set_node_attrs(HashMap::from([(
             "x".into(),

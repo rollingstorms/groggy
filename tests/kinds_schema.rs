@@ -9,7 +9,7 @@ fn labels(names: &[&str]) -> AttrValue {
 
 #[test]
 fn kinds_preserve_storage_identity_parallel_edges_and_snapshots() {
-    let mut graph = Graph::new_directed();
+    let mut graph = Graph::new_directed_manual();
     let node = graph
         .add_nodes_with_attrs(vec![HashMap::from([(
             "labels".into(),
@@ -67,14 +67,14 @@ fn kinds_preserve_storage_identity_parallel_edges_and_snapshots() {
 
 #[test]
 fn rejected_bulk_column_creation_and_batch_kind_values_leave_no_writes() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     assert!(graph
         .add_nodes_with_attrs(vec![
             HashMap::new(),
             HashMap::from([("labels".into(), labels(&["same", "same"]))])
         ])
         .is_err());
-    assert_eq!(graph.add_node(), 0);
+    assert_eq!(graph.add_node().unwrap(), 0);
     graph.commit("first".into(), "test".into()).unwrap();
     let values = HashMap::from([
         ("score".into(), vec![(0, AttrValue::Int(1))]),
@@ -98,12 +98,12 @@ fn rejected_bulk_column_creation_and_batch_kind_values_leave_no_writes() {
         .apply_batch(batch, graph.current_state_id(), "bad".into(), "test".into())
         .is_err());
     assert!(!graph.has_uncommitted_changes());
-    assert_eq!(graph.add_node(), 1);
+    assert_eq!(graph.add_node().unwrap(), 1);
 }
 
 #[test]
 fn upserts_validate_kinds_before_allocation_and_normalize_idempotently() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let row = NodeUpsert {
         external_id: "a".into(),
         attrs: HashMap::from([("labels".into(), labels(&["Person", "Entity"]))]),
@@ -126,13 +126,13 @@ fn upserts_validate_kinds_before_allocation_and_normalize_idempotently() {
             attrs: HashMap::from([("relationship_type".into(), AttrValue::Int(1))])
         }])
         .is_err());
-    assert_eq!(graph.add_node(), 1);
+    assert_eq!(graph.add_node().unwrap(), 1);
     assert_eq!(graph.add_edge(id, id).unwrap(), 0);
 }
 
 #[test]
 fn schema_audit_reports_presence_null_and_logical_types_without_mutating() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let node = graph
         .add_nodes_with_attrs(vec![HashMap::from([
             ("labels".into(), labels(&["Person", "Entity"])),
@@ -180,8 +180,8 @@ fn schema_audit_reports_presence_null_and_logical_types_without_mutating() {
 
 #[test]
 fn kinds_and_schema_applicability_survive_typed_export() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph.set_node_labels(node, vec!["Entity".into()]).unwrap();
     let edge = graph.add_edge(node, node).unwrap();
     graph

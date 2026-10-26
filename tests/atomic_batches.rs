@@ -2,7 +2,7 @@ use groggy::{AttrValue, BatchEdgeRef, BatchNodeRef, Graph, GraphBatch};
 
 #[test]
 fn mixed_batch_publishes_one_state_with_stable_prior_snapshot() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut first = GraphBatch {
         add_nodes: 2,
         add_edges: vec![(BatchNodeRef::Added(0), BatchNodeRef::Added(1))],
@@ -57,7 +57,7 @@ fn mixed_batch_publishes_one_state_with_stable_prior_snapshot() {
 
 #[test]
 fn invalid_mixed_batch_reports_all_errors_without_allocation() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut batch = GraphBatch {
         add_nodes: 1,
         add_edges: vec![(BatchNodeRef::Added(0), BatchNodeRef::Existing(99))],
@@ -88,12 +88,12 @@ fn invalid_mixed_batch_reports_all_errors_without_allocation() {
     assert_eq!(graph.current_state_id(), 0);
     assert!(graph.node_ids().is_empty());
     assert!(graph.edge_ids().is_empty());
-    assert_eq!(graph.add_node(), 0);
+    assert_eq!(graph.add_node().unwrap(), 0);
 }
 
 #[test]
 fn batch_rejects_stale_or_dirty_head_without_changes() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let first = graph
         .apply_batch(
             GraphBatch {
@@ -117,7 +117,7 @@ fn batch_rejects_stale_or_dirty_head_without_changes() {
     assert!(stale.unwrap_err().to_string().contains("Stale"));
     assert_eq!(graph.node_ids(), vec![0]);
 
-    graph.add_node();
+    graph.add_node().unwrap();
     let dirty = graph.apply_batch(
         GraphBatch {
             add_nodes: 1,
@@ -136,7 +136,7 @@ fn batch_rejects_stale_or_dirty_head_without_changes() {
 
 #[test]
 fn batch_rejects_edge_whose_endpoint_is_removed_in_same_write() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut batch = GraphBatch {
         add_nodes: 2,
         add_edges: vec![(BatchNodeRef::Added(0), BatchNodeRef::Added(1))],
@@ -153,5 +153,5 @@ fn batch_rejects_edge_whose_endpoint_is_removed_in_same_write() {
     );
     assert!(graph.node_ids().is_empty());
     assert!(graph.edge_ids().is_empty());
-    assert_eq!(graph.add_node(), 0);
+    assert_eq!(graph.add_node().unwrap(), 0);
 }

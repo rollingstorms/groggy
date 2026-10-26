@@ -127,9 +127,9 @@ mod tests {
     use std::sync::Arc;
 
     fn sample_subgraph() -> (Subgraph, Vec<NodeId>) {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
         let nodes = vec![a, b];
         let set: HashSet<NodeId> = nodes.iter().copied().collect();
         let sg =
@@ -153,9 +153,9 @@ mod tests {
 
     #[test]
     fn load_node_attr_fetches_values() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
         graph
             .set_node_attr(a, "score".into(), AttrValue::Float(0.5))
             .unwrap();
@@ -179,9 +179,9 @@ mod tests {
 
     #[test]
     fn load_entity_id_defaults_to_node_id() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
         let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
@@ -447,10 +447,10 @@ mod tests {
 
     #[test]
     fn node_degree_step_computes_degrees() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
-        let c = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
+        let c = graph.add_node().unwrap();
         graph.add_edge(a, b).unwrap();
         graph.add_edge(b, c).unwrap();
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
@@ -569,10 +569,10 @@ mod tests {
 
     #[test]
     fn weighted_degree_step_computes_weighted_degrees() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
-        let c = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
+        let c = graph.add_node().unwrap();
         let e1 = graph.add_edge(a, b).unwrap();
         let e2 = graph.add_edge(b, c).unwrap();
 
@@ -599,11 +599,11 @@ mod tests {
 
     #[test]
     fn k_core_mark_step_identifies_cores() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
-        let c = graph.add_node();
-        let d = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
+        let c = graph.add_node().unwrap();
+        let d = graph.add_node().unwrap();
 
         // Create a triangle (3-core) plus one peripheral node
         graph.add_edge(a, b).unwrap();
@@ -629,11 +629,11 @@ mod tests {
 
     #[test]
     fn triangle_count_step_counts_triangles() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
-        let c = graph.add_node();
-        let d = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
+        let c = graph.add_node().unwrap();
+        let d = graph.add_node().unwrap();
 
         // Create one triangle: a-b-c
         graph.add_edge(a, b).unwrap();
@@ -659,9 +659,9 @@ mod tests {
 
     #[test]
     fn normalize_values_step_works_on_edges() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
         let e1 = graph.add_edge(a, b).unwrap();
         let e2 = graph.add_edge(b, a).unwrap();
 
@@ -811,10 +811,10 @@ mod tests {
 
     #[test]
     fn diff_nodes_step_detects_changes() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
         let commit1 = graph.commit("c1".into(), "tester".into()).unwrap();
-        let b = graph.add_node();
+        let b = graph.add_node().unwrap();
         let commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
         let graph_rc = Rc::new(RefCell::new(graph));
@@ -844,9 +844,9 @@ mod tests {
 
     #[test]
     fn diff_edges_step_detects_changes() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
         let commit1 = graph.commit("c1".into(), "tester".into()).unwrap();
         graph.add_edge(a, b).unwrap();
         let commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
@@ -878,8 +878,8 @@ mod tests {
 
     #[test]
     fn window_aggregate_sums_history() {
-        let mut graph = Graph::new();
-        let node = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node = graph.add_node().unwrap();
         let commit1 = graph.commit("c1".into(), "tester".into()).unwrap();
         graph
             .set_node_attr(node, "score".into(), AttrValue::Int(1))
@@ -914,10 +914,10 @@ mod tests {
 
     #[test]
     fn temporal_filter_created_after_filters_nodes() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
         let commit1 = graph.commit("c1".into(), "tester".into()).unwrap();
-        let b = graph.add_node();
+        let b = graph.add_node().unwrap();
         let _commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
         let graph_rc = Rc::new(RefCell::new(graph));
@@ -938,10 +938,10 @@ mod tests {
 
     #[test]
     fn mark_changed_nodes_marks_created_nodes() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
         let commit1 = graph.commit("c1".into(), "tester".into()).unwrap();
-        let b = graph.add_node();
+        let b = graph.add_node().unwrap();
         let commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
         let graph_rc = Rc::new(RefCell::new(graph));
@@ -963,8 +963,8 @@ mod tests {
 
     #[test]
     fn snapshot_at_step_stores_snapshot() {
-        let mut graph = Graph::new();
-        let node = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node = graph.add_node().unwrap();
         let commit = graph.commit("c1".into(), "tester".into()).unwrap();
         let graph_rc = Rc::new(RefCell::new(graph));
         let nodes: HashSet<NodeId> = [node].into_iter().collect();
@@ -983,10 +983,10 @@ mod tests {
 
     #[test]
     fn temporal_window_step_marks_nodes_in_range() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
         let commit1 = graph.commit("c1".into(), "tester".into()).unwrap();
-        let b = graph.add_node();
+        let b = graph.add_node().unwrap();
         let _commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
         let graph_rc = Rc::new(RefCell::new(graph));
@@ -1009,9 +1009,9 @@ mod tests {
     fn filter_nodes_by_attr_gt() {
         use crate::algorithms::steps::filtering::{FilterNodesByAttrStep, Predicate};
 
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
         graph
             .set_node_attr(a, AttrName::from("score"), AttrValue::Int(10))
             .unwrap();

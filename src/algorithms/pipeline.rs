@@ -284,8 +284,8 @@ mod tests {
         let builder = PipelineBuilder::new().with_algorithm("identity", |_| {});
         let pipeline = builder.build(&registry).expect("build pipeline");
 
-        let mut graph = Graph::new();
-        let node = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node = graph.add_node().unwrap();
         let mut nodes = HashSet::new();
         nodes.insert(node);
         let sg =

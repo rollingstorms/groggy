@@ -113,7 +113,7 @@ impl GraphTable {
                 }
             }
         }
-        let mut graph = Graph::with_config(config);
+        let mut graph = Graph::with_config_manual(config)?;
         graph.set_automatic_publication(true)?;
         if !node_ids.is_empty() {
             graph.apply_batch(batch, 0, "materialize graph table".into(), "groggy".into())?;

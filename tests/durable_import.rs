@@ -102,8 +102,8 @@ fn imported_journal_retains_full_graph_then_accepts_and_recovers_new_writes() {
 fn rejected_imports_do_not_create_or_replace_destinations_or_accept_pending_source_writes() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("journal");
-    let mut source = Graph::new();
-    source.add_node();
+    let mut source = Graph::new_manual();
+    source.add_node().unwrap();
     assert!(DurableGraph::create_from_graph(&path, &source, None).is_err());
     assert!(!path.exists());
     source.commit("accept".into(), "test".into()).unwrap();

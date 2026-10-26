@@ -24,8 +24,8 @@ fn edge(id: &str, source: usize, target: usize, weight: i64) -> EdgeUpsert {
 
 #[test]
 fn upserts_preserve_identity_order_properties_and_clean_idempotence() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     let ids = graph
         .upsert_nodes(vec![node("alice", 1), node("bob", 2)])
         .unwrap();
@@ -55,7 +55,7 @@ fn upserts_preserve_identity_order_properties_and_clean_idempotence() {
 
 #[test]
 fn all_conflicting_node_rows_are_rejected_before_any_write_or_allocation() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let ids = graph
         .upsert_nodes(vec![node("alice", 1), node("bob", 2)])
         .unwrap();
@@ -92,12 +92,12 @@ fn all_conflicting_node_rows_are_rejected_before_any_write_or_allocation() {
         Some(AttrValue::Int(1))
     );
     assert_eq!(graph.node_by_external_id("new", None), None);
-    assert_eq!(graph.add_node(), 2);
+    assert_eq!(graph.add_node().unwrap(), 2);
 }
 
 #[test]
 fn edge_upserts_preserve_parallel_facts_and_reject_endpoint_changes_atomically() {
-    let mut graph = Graph::new_directed();
+    let mut graph = Graph::new_directed_manual();
     let nodes = graph
         .upsert_nodes(vec![node("a", 1), node("b", 2), node("c", 3)])
         .unwrap();
@@ -142,8 +142,8 @@ fn edge_upserts_preserve_parallel_facts_and_reject_endpoint_changes_atomically()
 
 #[test]
 fn undirected_upserts_accept_reversed_endpoints_without_rewiring() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(2).unwrap();
     let first = graph
         .upsert_edges(vec![edge("fact", nodes[0], nodes[1], 1)])
         .unwrap();
@@ -163,7 +163,7 @@ fn undirected_upserts_accept_reversed_endpoints_without_rewiring() {
 
 #[test]
 fn rename_and_branch_switch_preserve_current_names_and_allocation_reservations() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let id = graph.upsert_nodes(vec![node("old", 1)]).unwrap()[0];
     let first = graph.commit("initial".into(), "test".into()).unwrap();
     graph.create_branch("original".into()).unwrap();
@@ -206,14 +206,14 @@ fn rename_and_branch_switch_preserve_current_names_and_allocation_reservations()
 
 #[test]
 fn group_filters_do_not_create_separate_uuid_namespaces() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut row = node("uuid", 1);
     row.attrs
         .insert("group_id".into(), AttrValue::Text("g1".into()));
     let id = graph.upsert_nodes(vec![row]).unwrap()[0];
     assert_eq!(graph.node_by_external_id("uuid", Some("g1")), Some(id));
     assert_eq!(graph.node_by_external_id("uuid", Some("g2")), None);
-    let other = graph.add_node();
+    let other = graph.add_node().unwrap();
     assert!(graph.set_node_external_id(other, "uuid".into()).is_err());
     let edge = graph.add_edge(id, other).unwrap();
     assert!(graph.set_edge_external_id(edge, "uuid".into()).is_err());
@@ -227,8 +227,8 @@ fn group_filters_do_not_create_separate_uuid_namespaces() {
 
 #[test]
 fn managed_identity_cannot_be_bypassed_by_scalar_bulk_column_or_batch_writes() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let edge = graph.add_edge(node, node).unwrap();
     graph.commit("initial".into(), "test".into()).unwrap();
     let value = AttrValue::Text("bypass".into());
@@ -264,12 +264,12 @@ fn managed_identity_cannot_be_bypassed_by_scalar_bulk_column_or_batch_writes() {
         .apply_batch(batch, graph.current_state_id(), "bad".into(), "test".into())
         .is_err());
     assert!(!graph.has_uncommitted_changes());
-    assert_eq!(graph.add_node(), 1);
+    assert_eq!(graph.add_node().unwrap(), 1);
 }
 
 #[test]
 fn subgraph_bulk_writes_use_validation_and_change_tracking() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let ids = graph
         .upsert_nodes(vec![node("a", 1), node("b", 2)])
         .unwrap();
@@ -357,8 +357,8 @@ fn snapshot_import_rebuilds_bindings_and_rejects_cross_kind_duplicates() {
 
 #[test]
 fn live_export_import_preserves_current_managed_ids() {
-    let mut graph = Graph::new_directed();
-    let padding = graph.add_nodes(3);
+    let mut graph = Graph::new_directed_manual();
+    let padding = graph.add_nodes(3).unwrap();
     graph.remove_nodes(&padding).unwrap();
     let ids = graph
         .upsert_nodes(vec![node("a", 1), node("b", 2)])
@@ -379,7 +379,7 @@ fn live_export_import_preserves_current_managed_ids() {
 
 #[test]
 fn compressed_external_ids_remain_addressable_and_reconstructible() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let name = "external-id-".repeat(1000);
     let id = graph.upsert_nodes(vec![node(&name, 1)]).unwrap()[0];
     assert_eq!(graph.node_by_external_id(&name, None), Some(id));
@@ -393,8 +393,8 @@ fn compressed_external_ids_remain_addressable_and_reconstructible() {
 
 #[test]
 fn reset_keeps_uncommitted_identity_reservations_with_allocated_ids() {
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     graph.commit("initial".into(), "test".into()).unwrap();
     let transient = graph.upsert_nodes(vec![node("transient", 1)]).unwrap()[0];
     graph.reset_hard().unwrap();
@@ -404,13 +404,13 @@ fn reset_keeps_uncommitted_identity_reservations_with_allocated_ids() {
         Some(ExternalEntityRef::Node(transient))
     );
     assert!(graph.upsert_nodes(vec![node("transient", 2)]).is_err());
-    assert_eq!(graph.add_node(), transient + 1);
+    assert_eq!(graph.add_node().unwrap(), transient + 1);
 }
 
 #[test]
 fn edge_identity_changes_and_deletion_keep_history_and_old_names() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(2).unwrap();
     let id = graph
         .upsert_edges(vec![edge("old", nodes[0], nodes[1], 1)])
         .unwrap()[0];

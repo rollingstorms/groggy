@@ -74,11 +74,11 @@ fn all_three_node_graphs_match_a_direct_linear_solve() {
     for directed in [false, true] {
         for mask in 0..512 {
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
-            graph.add_nodes(3);
+            graph.add_nodes(3).unwrap();
             let mut adjacency = [[0.; 3]; 3];
             for bit in 0..9 {
                 let (u, v) = (bit / 3, bit % 3);
@@ -149,8 +149,8 @@ fn bad_personalization_and_stale_cancelled_runs_preserve_prior_scores() {
         AttrValue::Text("bad".into()),
         AttrValue::Null,
     ] {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(2);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(2).unwrap();
         graph.add_edge(0, 1).unwrap();
         graph.set_node_attr(0, "p".into(), bad).unwrap();
         graph
@@ -164,8 +164,8 @@ fn bad_personalization_and_stale_cancelled_runs_preserve_prior_scores() {
             Some(AttrValue::Int(7))
         );
     }
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     graph.add_edge(0, 1).unwrap();
     let g = Rc::new(RefCell::new(graph));
     let sub = selected(&g);
@@ -180,8 +180,8 @@ fn bad_personalization_and_stale_cancelled_runs_preserve_prior_scores() {
 #[test]
 fn empty_singleton_missing_personalization_sparse_ids_and_bounded_runs() {
     for n in [0, 1, 3] {
-        let mut graph = Graph::new();
-        graph.add_nodes(n);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(n).unwrap();
         let g = Rc::new(RefCell::new(graph));
         let (scores, _) = run(&g, 0.85, false, 10);
         assert_eq!(scores.len(), n);
@@ -189,8 +189,8 @@ fn empty_singleton_missing_personalization_sparse_ids_and_bounded_runs() {
             assert!((value - 1. / n as f64).abs() < 1e-14);
         }
     }
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     graph.add_edge(0, 2).unwrap();
     graph.add_edge(0, 2).unwrap();
@@ -235,7 +235,7 @@ fn invalid_controls_reject_even_for_empty_input() {
             .build(global_registry())
             .is_err());
     }
-    let g = Rc::new(RefCell::new(Graph::new()));
+    let g = Rc::new(RefCell::new(Graph::new_manual()));
     let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
     assert!(PageRank::new(0.85, 10, 1e-6, None, "pr".into())
         .unwrap()

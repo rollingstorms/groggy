@@ -15,8 +15,8 @@ use std::{
 fn all_three_node_directed_graphs_match_direct_value_propagation() {
     for mask in 0..512 {
         for initial in [[0, 1, 2], [0, 1, 0]] {
-            let mut graph = Graph::new_directed();
-            graph.add_nodes(3);
+            let mut graph = Graph::new_directed_manual();
+            graph.add_nodes(3).unwrap();
             let mut adjacency = vec![Vec::new(); 3];
             for (u, row) in adjacency.iter_mut().enumerate() {
                 for v in 0..3 {
@@ -79,8 +79,8 @@ fn all_three_node_directed_graphs_match_direct_value_propagation() {
 
 #[test]
 fn local_seed_is_repeatable_and_failure_preserves_labels() {
-    let mut graph = Graph::new();
-    graph.add_nodes(5);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(5).unwrap();
     graph.remove_node(1).unwrap();
     for (u, v) in [(0, 2), (0, 2), (2, 3), (3, 4), (4, 0), (4, 4)] {
         graph.add_edge(u, v).unwrap();
@@ -118,7 +118,7 @@ fn invalid_controls_and_empty_cancellation_reject() {
             .build(global_registry())
             .is_err());
     }
-    let g = Rc::new(RefCell::new(Graph::new()));
+    let g = Rc::new(RefCell::new(Graph::new_manual()));
     let sub = Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "empty".into()).unwrap();
     let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
     assert!(LabelPropagation::new(1, 0., "c".into(), None)
@@ -131,8 +131,8 @@ fn invalid_controls_and_empty_cancellation_reject() {
 fn nonpersistent_empty_and_edgeless_outputs_retain_node_identity() {
     use groggy::algorithms::AlgorithmOutput;
     for n in [0, 1, 3] {
-        let mut graph = Graph::new();
-        graph.add_nodes(n);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(n).unwrap();
         let g = Rc::new(RefCell::new(graph));
         let sub =
             Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap();

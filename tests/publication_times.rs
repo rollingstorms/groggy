@@ -4,7 +4,7 @@ use groggy::{
 use std::collections::HashMap;
 #[test]
 fn batch_default_and_individual_times_are_retained_with_one_recorded_clock() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let batch = GraphBatch {
         add_nodes: 1,
         effective_at: Some(100),
@@ -50,7 +50,7 @@ fn batch_default_and_individual_times_are_retained_with_one_recorded_clock() {
 }
 #[test]
 fn automatic_default_is_one_clock_and_legacy_manual_commits_are_distinct() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let id = graph.writer("test").add_node(HashMap::new()).unwrap();
     let state = graph.current_state_id();
     let metadata = graph.publication_metadata(state).unwrap().unwrap();
@@ -71,7 +71,7 @@ fn automatic_default_is_one_clock_and_legacy_manual_commits_are_distinct() {
 }
 #[test]
 fn implicit_edge_death_uses_earliest_removed_endpoint_time() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let ids = graph.writer("test").add_nodes(2).unwrap();
     let edge = graph
         .writer("test")
@@ -104,7 +104,7 @@ fn invalid_or_duplicate_time_targets_reject_before_allocation() {
             (T::NodeAdded(N::Added(0)), 20),
         ],
     ] {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
         let batch = GraphBatch {
             add_nodes: 1,
             change_times: times,
@@ -117,6 +117,6 @@ fn invalid_or_duplicate_time_targets_reject_before_allocation() {
             .contains("change_times"));
         assert_eq!(graph.current_state_id(), 0);
         assert!(!graph.has_uncommitted_changes());
-        assert_eq!(graph.add_node(), 0);
+        assert_eq!(graph.add_node().unwrap(), 0);
     }
 }

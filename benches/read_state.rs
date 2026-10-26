@@ -5,8 +5,8 @@ use std::time::Duration;
 fn read_state(c: &mut Criterion) {
     let mut group = c.benchmark_group("read_state");
     for count in [1_000, 10_000] {
-        let mut graph = Graph::new();
-        let nodes = graph.add_nodes(count);
+        let mut graph = Graph::new_manual();
+        let nodes = graph.add_nodes(count).unwrap();
         for (index, &node) in nodes.iter().enumerate() {
             graph.add_edge(node, nodes[(index + 1) % count]).unwrap();
         }
@@ -242,8 +242,8 @@ fn read_state(c: &mut Criterion) {
                 AttrValue::Float64Vec((0..count).map(|i| i as f64 / count as f64).collect()),
             ),
         ] {
-            let mut property_graph = Graph::new();
-            let node = property_graph.add_node();
+            let mut property_graph = Graph::new_manual();
+            let node = property_graph.add_node().unwrap();
             property_graph
                 .set_node_attr(node, "embedding".into(), value)
                 .unwrap();

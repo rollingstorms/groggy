@@ -7,9 +7,9 @@ use std::collections::{HashMap, HashSet};
 
 fn fixture(directed: bool, publishing: bool) -> Graph {
     let mut graph = if directed {
-        Graph::new_directed()
+        Graph::new_directed_manual()
     } else {
-        Graph::new()
+        Graph::new_manual()
     };
     graph.set_automatic_publication(publishing).unwrap();
     graph.insert_nodes(5).unwrap();
@@ -45,9 +45,9 @@ fn mixed_writes_refresh_only_selected_membership_and_can_chain() {
             // Timed topology needs a precisely timed birth, independent of the
             // ordinary/manual policy exercised by the scoped write below.
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
             graph
                 .apply_batch(
@@ -251,13 +251,15 @@ fn foreign_branch_dirty_and_historical_pins_fail_without_mutation() {
     assert!(graph
         .apply_view_batch(&historical, score(0, 2), "bad".into(), "test".into())
         .is_err());
-    graph.add_node();
+    graph.set_automatic_publication(false).unwrap();
+    graph.add_node().unwrap();
     let dirty = graph.read_view().unwrap();
     assert_eq!(dirty.write_state_id(), None);
     assert!(graph
         .apply_view_batch(&view, score(0, 2), "bad".into(), "test".into())
         .is_err());
     graph.commit("manual".into(), "test".into()).unwrap();
+    graph.set_automatic_publication(true).unwrap();
     assert!(graph
         .apply_view_batch(&dirty, score(0, 2), "bad".into(), "test".into())
         .unwrap_err()

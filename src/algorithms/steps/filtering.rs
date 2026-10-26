@@ -539,8 +539,8 @@ mod tests {
     fn stale_property_reads_propagate_without_replacing_result() {
         use crate::{algorithms::steps::StepVariables, api::graph::Graph, subgraphs::Subgraph};
         use std::{cell::RefCell, rc::Rc};
-        let mut graph = Graph::new();
-        graph.add_node();
+        let mut graph = Graph::new_manual();
+        graph.add_node().unwrap();
         let shared = Rc::new(RefCell::new(graph));
         let selection =
             Subgraph::from_nodes(shared.clone(), [0].into_iter().collect(), "stale".into())

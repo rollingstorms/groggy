@@ -40,7 +40,7 @@ fn same_config(a: &GraphConfig, b: &GraphConfig) {
 }
 #[test]
 fn owned_historical_capture_preserves_config_storage_ids_branches_and_acceptance_clocks() {
-    let mut graph = Graph::with_config(config());
+    let mut graph = Graph::with_config_manual(config()).unwrap();
     graph.set_automatic_publication(true).unwrap();
     let first = initial(&mut graph);
     graph.create_branch("old".into()).unwrap();
@@ -199,7 +199,7 @@ fn repeated_branch_switch_and_reset_reuse_retained_columns() {
 #[test]
 fn ordinary_snapshot_materialization_preserves_configuration_and_frozen_groups_without_raw_capture()
 {
-    let mut graph = Graph::with_config(config());
+    let mut graph = Graph::with_config_manual(config()).unwrap();
     graph.set_automatic_publication(true).unwrap();
     initial(&mut graph);
     let group = graph
@@ -255,8 +255,8 @@ fn full_owned_capture_preserves_raw_membership_and_unmapped_backing_values() {
 }
 #[test]
 fn owned_capture_rejects_dirty_manual_input_and_does_not_grant_source_write_provenance() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     assert!(graph.owned_snapshot_at_commit(0).is_err());
     let head = graph.commit("manual".into(), "test".into()).unwrap();
     let capture = graph.owned_snapshot_at_commit(head).unwrap();

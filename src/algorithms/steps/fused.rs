@@ -519,10 +519,10 @@ mod tests {
     #[test]
     fn test_fused_neighbor_mul_agg() {
         // Create simple test graph: 0 -> 1 -> 2
-        let mut g = Graph::new();
-        let n0 = g.add_node();
-        let n1 = g.add_node();
-        let n2 = g.add_node();
+        let mut g = Graph::new_manual();
+        let n0 = g.add_node().unwrap();
+        let n1 = g.add_node().unwrap();
+        let n2 = g.add_node().unwrap();
         g.add_edge(n0, n1).unwrap();
         g.add_edge(n1, n2).unwrap();
 
@@ -582,9 +582,9 @@ mod tests {
 
     #[test]
     fn test_fused_axpy_vectors() {
-        let mut g = Graph::new();
-        let n0 = g.add_node();
-        let n1 = g.add_node();
+        let mut g = Graph::new_manual();
+        let n0 = g.add_node().unwrap();
+        let n1 = g.add_node().unwrap();
 
         let nodes: HashSet<_> = [n0, n1].into_iter().collect();
         let subgraph =
@@ -639,9 +639,9 @@ mod tests {
 
     #[test]
     fn test_fused_madd() {
-        let mut g = Graph::new();
-        let n0 = g.add_node();
-        let n1 = g.add_node();
+        let mut g = Graph::new_manual();
+        let n0 = g.add_node().unwrap();
+        let n1 = g.add_node().unwrap();
 
         let nodes: HashSet<_> = [n0, n1].into_iter().collect();
         let subgraph =

@@ -270,8 +270,8 @@ mod tests {
     use std::rc::Rc;
 
     fn make_two_cliques() -> (Graph, Vec<NodeId>) {
-        let mut graph = Graph::new();
-        let nodes: Vec<NodeId> = (0..8).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<NodeId> = (0..8).map(|_| graph.add_node().unwrap()).collect();
 
         // First clique: 0-1-2-3
         for i in 0..4 {
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_leiden_empty_graph() {
-        let graph = Graph::new();
+        let graph = Graph::new_manual();
         let subgraph =
             Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
                 .unwrap();

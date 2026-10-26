@@ -153,9 +153,9 @@ fn topology_death_and_invalid_intervals_are_checked_at_effective_boundaries() {
 }
 #[test]
 fn legacy_or_dirty_histories_reject_and_empty_graph_is_readable() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     assert_eq!(graph.read_view_at(i64::MAX, None).unwrap().node_count(), 0);
-    graph.add_node();
+    graph.add_node().unwrap();
     assert!(graph
         .read_view_at(0, None)
         .unwrap_err()

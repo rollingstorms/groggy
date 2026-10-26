@@ -500,12 +500,12 @@ mod tests {
     #[test]
     fn test_component_subgraph_creation() {
         // Test ComponentSubgraph creation and basic functionality
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Create a simple connected component
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
         let edge1 = graph.add_edge(node1, node2).unwrap();
         let edge2 = graph.add_edge(node2, node3).unwrap();
 
@@ -544,12 +544,12 @@ mod tests {
     #[test]
     fn test_component_algorithms() {
         // Test BFS and DFS on ComponentSubgraph
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
-        let node4 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
+        let node4 = graph.add_node().unwrap();
 
         let edge1 = graph.add_edge(node1, node2).unwrap();
         let edge2 = graph.add_edge(node2, node3).unwrap();

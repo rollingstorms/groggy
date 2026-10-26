@@ -99,7 +99,7 @@ fn owned_identity_seed_factory_and_uniform_extreme_scaling_are_consistent() {
     };
     let factory = ProjectionEngineFactory::create_engine(&config)
         .unwrap()
-        .project_embedding(&matrix, &Graph::new())
+        .project_embedding(&matrix, &Graph::new_manual())
         .unwrap();
     for (row, p) in factory.iter().enumerate() {
         assert_eq!(p.x, output.get(row, 0).unwrap());

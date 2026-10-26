@@ -417,9 +417,9 @@ mod tests {
     }
 
     fn create_test_graph() -> Graph {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
         for _ in 0..5 {
-            graph.add_node();
+            graph.add_node().unwrap();
         }
         graph
     }

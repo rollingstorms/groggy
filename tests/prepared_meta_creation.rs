@@ -5,7 +5,7 @@ use std::collections::HashSet;
 #[test]
 fn retained_group_creation_keeps_exact_required_properties_and_history() {
     for publishing in [false, true] {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
         graph.set_automatic_publication(publishing).unwrap();
         graph.insert_nodes(3).unwrap();
         let edge = graph.add_edge(0, 1).unwrap();
@@ -69,7 +69,7 @@ fn retained_group_creation_keeps_exact_required_properties_and_history() {
 #[test]
 fn invalid_group_and_dirty_publishing_head_preserve_allocations() {
     for publishing in [false, true] {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
         graph.set_automatic_publication(publishing).unwrap();
         graph.insert_nodes(1).unwrap();
         graph.commit("before".into(), "test".into()).unwrap();
@@ -82,11 +82,14 @@ fn invalid_group_and_dirty_publishing_head_preserve_allocations() {
             .pool_mut()
             .store_subgraph(HashSet::from([0]), HashSet::new(), "group".into())
             .unwrap();
-        graph.add_node(); // pending infallible compatibility edit
+        graph.set_automatic_publication(false).unwrap();
+        graph.add_node().unwrap(); // explicit deferred compatibility edit
         if publishing {
-            assert!(graph.create_meta_node(group).is_err());
+            assert!(graph.set_automatic_publication(true).is_err());
+            assert!(graph.try_add_node().is_err());
             assert_eq!(graph.node_count(), 2);
             graph.commit("pending".into(), "test".into()).unwrap();
+            graph.set_automatic_publication(true).unwrap();
         }
         assert_eq!(graph.create_meta_node(group).unwrap(), 2);
         assert_eq!(graph.node_count(), 3);

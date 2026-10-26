@@ -118,8 +118,8 @@ fn absence_is_a_timed_event_distinct_from_null_and_retains_old_views() {
 }
 #[test]
 fn bulk_scalar_and_unset_coalesce_in_operation_order_in_manual_mode() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph.set_node_attr(node, "v".into(), V::Int(1)).unwrap();
     graph.commit("initial".into(), "test".into()).unwrap();
     graph

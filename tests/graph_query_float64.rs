@@ -8,8 +8,8 @@ fn ids(values: impl IntoIterator<Item = usize>) -> HashSet<usize> {
 }
 #[test]
 fn floating_literals_keep_precision_width_and_scientific_notation() {
-    let mut graph = Graph::new_directed();
-    let nodes = graph.add_nodes(5);
+    let mut graph = Graph::new_directed_manual();
+    let nodes = graph.add_nodes(5).unwrap();
     for (node, value) in nodes.iter().zip([
         V::Float64(1.),
         V::Float64(1. + 2f64.powi(-40)),

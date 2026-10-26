@@ -181,7 +181,7 @@ impl RealtimeServer {
 
                     // Create visualization engine with the snapshot data
                     // For now, create a minimal graph - in practice we'd convert the snapshot properly
-                    let temp_graph = crate::api::graph::Graph::new(); // TODO: Convert snapshot to proper graph
+                    let temp_graph = crate::api::graph::Graph::new_manual(); // TODO: Convert snapshot to proper graph
                     let engine_config = RealTimeVizConfig::default();
                     let mut engine = RealTimeVizEngine::new(temp_graph, engine_config);
                     if let Err(_e) = engine.load_snapshot(snapshot.clone()).await {
@@ -874,7 +874,7 @@ impl RealtimeServer {
             match accessor.initial_snapshot() {
                 Ok(snapshot) => {
                     // Create visualization engine with the snapshot data
-                    let temp_graph = crate::api::graph::Graph::new();
+                    let temp_graph = crate::api::graph::Graph::new_manual();
                     let engine_config = RealTimeVizConfig::default();
                     let mut engine = RealTimeVizEngine::new(temp_graph, engine_config);
 
@@ -1300,8 +1300,8 @@ mod layout_result_tests {
             missing,
             WsMessage::ControlAck { success: false, .. }
         ));
-        let mut graph = crate::Graph::new();
-        graph.add_nodes(3);
+        let mut graph = crate::Graph::new_manual();
+        graph.add_nodes(3).unwrap();
         let mut config = RealTimeVizConfig::default();
         config.embedding_config.method = EmbeddingMethod::RandomND {
             distribution: RandomDistribution::Uniform {
@@ -1339,7 +1339,8 @@ mod embedding_result_tests {
     use super::*;
     #[tokio::test]
     async fn embedding_ack_reports_actual_failure_without_queue_acceptance() {
-        let mut engine = RealTimeVizEngine::new(crate::Graph::new(), RealTimeVizConfig::default());
+        let mut engine =
+            RealTimeVizEngine::new(crate::Graph::new_manual(), RealTimeVizConfig::default());
         let missing = embedding_control_result(None, "random", 2, &Default::default()).await;
         assert!(matches!(
             missing,
@@ -1355,7 +1356,7 @@ mod embedding_result_tests {
             embedding_control_result(Some(&mut engine), "random", 2, &params).await,
             WsMessage::ControlAck { success: false, .. }
         ));
-        engine.graph().lock().unwrap().add_nodes(4);
+        engine.graph().lock().unwrap().add_nodes(4).unwrap();
         let valid =
             embedding_control_result(Some(&mut engine), "random", 2, &Default::default()).await;
         assert!(matches!(valid, WsMessage::ControlAck { success: true, .. }));

@@ -444,8 +444,8 @@ mod tests {
     use super::*;
 
     fn path_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..n).map(|_| graph.add_node().unwrap()).collect();
         for i in 0..n - 1 {
             graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
@@ -453,8 +453,8 @@ mod tests {
     }
 
     fn karate_club() -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..34).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..34).map(|_| graph.add_node().unwrap()).collect();
         // Add some representative edges for karate club
         let edges = [
             (0, 1),

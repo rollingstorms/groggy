@@ -24,11 +24,11 @@ fn every_small_graph_and_endpoint_pair_matches_floyd_warshall_cost() {
     for directed in [false, true] {
         for mask in 0..512 {
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
-            graph.add_nodes(3);
+            graph.add_nodes(3).unwrap();
             let mut edge_cost = [[f64::INFINITY; 3]; 3];
             for bit in (0..9).rev() {
                 if mask & (1 << bit) == 0 {
@@ -119,8 +119,8 @@ fn every_small_graph_and_endpoint_pair_matches_floyd_warshall_cost() {
 }
 #[test]
 fn cancelled_trivial_paths_stale_and_open_selections_preserve_old_values() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let e = graph.add_edge(0, 1).unwrap();
     graph
         .set_node_attr(0, "s".into(), AttrValue::Bool(true))
@@ -164,8 +164,8 @@ fn cancelled_trivial_paths_stale_and_open_selections_preserve_old_values() {
 }
 #[test]
 fn sparse_path_rows_and_large_f64_costs_do_not_require_f32_distance_properties() {
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     graph
         .set_node_attr(3, "s".into(), AttrValue::Int(0))

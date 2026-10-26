@@ -2,9 +2,9 @@ use groggy::{AttrValue, Graph};
 
 #[test]
 fn live_edge_reads_respect_membership_and_direction() {
-    let mut graph = Graph::new_directed();
-    let source = graph.add_node();
-    let target = graph.add_node();
+    let mut graph = Graph::new_directed_manual();
+    let source = graph.add_node().unwrap();
+    let target = graph.add_node().unwrap();
     let edge = graph.add_edge(source, target).unwrap();
 
     assert!(graph.has_edge_between(source, target).unwrap());
@@ -18,8 +18,8 @@ fn live_edge_reads_respect_membership_and_direction() {
 
 #[test]
 fn invalid_bulk_edges_report_every_position_without_mutating() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let error = graph
         .add_edges(&[(node, node), (node, 99), (100, node)])
         .unwrap_err()
@@ -32,9 +32,9 @@ fn invalid_bulk_edges_report_every_position_without_mutating() {
 
 #[test]
 fn historical_snapshots_keep_real_typed_property_values_and_removals() {
-    let mut graph = Graph::new();
-    let a = graph.add_node();
-    let b = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let a = graph.add_node().unwrap();
+    let b = graph.add_node().unwrap();
     let edge = graph.add_edge(a, b).unwrap();
     graph
         .set_node_attr(a, "score".into(), AttrValue::Int(1))
@@ -84,12 +84,12 @@ fn historical_snapshots_keep_real_typed_property_values_and_removals() {
 fn snapshots_preserve_graph_direction() {
     for directed in [false, true] {
         let mut graph = if directed {
-            Graph::new_directed()
+            Graph::new_directed_manual()
         } else {
-            Graph::new_undirected()
+            Graph::new_undirected_manual()
         };
-        let a = graph.add_node();
-        let b = graph.add_node();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
         graph.add_edge(a, b).unwrap();
         let state = graph.commit("topology".into(), "test".into()).unwrap();
         let snapshot = graph.snapshot_at_commit(state).unwrap();
@@ -103,17 +103,17 @@ fn snapshots_preserve_graph_direction() {
 
 #[test]
 fn switching_to_older_branch_does_not_reuse_historical_ids() {
-    let mut graph = Graph::new();
-    let root = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let root = graph.add_node().unwrap();
     graph.commit("root".into(), "test".into()).unwrap();
     graph.create_branch("feature".into()).unwrap();
     graph.checkout_branch("feature".into()).unwrap();
-    let feature_node = graph.add_node();
+    let feature_node = graph.add_node().unwrap();
     let feature_edge = graph.add_edge(root, feature_node).unwrap();
     graph.commit("feature".into(), "test".into()).unwrap();
 
     graph.checkout_branch("main".into()).unwrap();
-    let main_node = graph.add_node();
+    let main_node = graph.add_node().unwrap();
     let main_edge = graph.add_edge(root, main_node).unwrap();
     assert!(main_node > feature_node);
     assert!(main_edge > feature_edge);
@@ -121,10 +121,10 @@ fn switching_to_older_branch_does_not_reuse_historical_ids() {
 
 #[test]
 fn reset_hard_restores_published_state_and_preserves_allocated_ids() {
-    let mut graph = Graph::new();
-    let root = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let root = graph.add_node().unwrap();
     graph.commit("root".into(), "test".into()).unwrap();
-    let discarded = graph.add_node();
+    let discarded = graph.add_node().unwrap();
     let edge = graph.add_edge(root, discarded).unwrap();
     graph
         .set_node_attr(root, "temporary".into(), AttrValue::Int(42))
@@ -138,5 +138,5 @@ fn reset_hard_restores_published_state_and_preserves_allocated_ids() {
         graph.get_node_attr(root, &"temporary".into()).unwrap(),
         None
     );
-    assert_eq!(graph.add_node(), discarded + 1);
+    assert_eq!(graph.add_node().unwrap(), discarded + 1);
 }

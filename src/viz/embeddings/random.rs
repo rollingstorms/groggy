@@ -249,8 +249,8 @@ mod tests {
     use super::*;
 
     fn path_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..n).map(|_| graph.add_node().unwrap()).collect();
         for i in 0..n - 1 {
             graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
@@ -267,18 +267,18 @@ mod tests {
     }
 
     fn star_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let center = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let center = graph.add_node().unwrap();
         for _ in 1..n {
-            let leaf = graph.add_node();
+            let leaf = graph.add_node().unwrap();
             graph.add_edge(center, leaf).unwrap();
         }
         graph
     }
 
     fn complete_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..n).map(|_| graph.add_node().unwrap()).collect();
         for i in 0..n {
             for j in i + 1..n {
                 graph.add_edge(nodes[i], nodes[j]).unwrap();

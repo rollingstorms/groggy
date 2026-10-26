@@ -312,7 +312,7 @@ impl PyComponentsArray {
         use groggy::viz::streaming::GraphDataSource;
 
         // Create a combined graph from all components
-        let mut viz_graph = groggy::api::graph::Graph::new();
+        let mut viz_graph = groggy::api::graph::Graph::new_manual();
         let mut node_mapping = std::collections::HashMap::new();
 
         // Add all nodes and edges from all components to viz graph
@@ -321,7 +321,9 @@ impl PyComponentsArray {
             for &node_id in component_nodes {
                 use std::collections::hash_map::Entry;
                 if let Entry::Vacant(e) = node_mapping.entry(node_id) {
-                    let new_node_id = viz_graph.add_node();
+                    let new_node_id = viz_graph
+                        .add_node()
+                        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
                     e.insert(new_node_id);
 
                     // Copy node attributes

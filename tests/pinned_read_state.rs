@@ -1,8 +1,8 @@
 use groggy::{state::PinnedReadState, types::GraphType, AttrValue, Graph};
 #[test]
 fn working_capture_includes_uncheckpointed_changes_without_recording_history() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph
         .set_node_attr(node, "value".into(), AttrValue::Int(i64::MAX))
         .unwrap();
@@ -44,12 +44,12 @@ fn working_capture_includes_uncheckpointed_changes_without_recording_history() {
 #[test]
 fn read_topology_preserves_direction_parallel_occurrences_isolates_and_self_loops() {
     for directed in [false, true] {
-        let mut graph = Graph::new_with_type(if directed {
+        let mut graph = Graph::new_with_type_manual(if directed {
             GraphType::Directed
         } else {
             GraphType::Undirected
         });
-        let nodes = graph.add_nodes(3);
+        let nodes = graph.add_nodes(3).unwrap();
         let a = nodes[0];
         let b = nodes[1];
         let edge = graph.add_edge(a, b).unwrap();
@@ -76,8 +76,8 @@ fn read_topology_preserves_direction_parallel_occurrences_isolates_and_self_loop
 }
 #[test]
 fn temporal_facade_reuses_shared_state_without_duplicate_property_maps() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph
         .set_node_attr(node, "value".into(), AttrValue::Int(7))
         .unwrap();
@@ -99,8 +99,8 @@ fn temporal_facade_reuses_shared_state_without_duplicate_property_maps() {
 }
 #[test]
 fn dangling_attribute_referents_fail_capture_without_silent_missing_values() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph
         .space_mut()
         .set_node_attr_index(node, "dangling".into(), usize::MAX);
@@ -112,8 +112,8 @@ fn dangling_attribute_referents_fail_capture_without_silent_missing_values() {
 fn frozen_read_payloads_can_cross_read_only_worker_boundaries() {
     fn send_sync<T: Send + Sync>() {}
     send_sync::<PinnedReadState>();
-    let mut graph = Graph::new();
-    let id = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let id = graph.add_node().unwrap();
     let state = graph.pin_current_state().unwrap();
     assert!(
         std::thread::spawn(move || state.existence().contains_node(id))

@@ -494,8 +494,8 @@ mod tests {
 
     #[test]
     fn degree_uses_selected_edges_and_rejects_foreign_source_nodes() {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(3).unwrap();
         for (u, v) in [(0, 1), (0, 1), (0, 0), (2, 0)] {
             graph.add_edge(u, v).expect("edge");
         }
@@ -537,8 +537,8 @@ mod tests {
             .flat_map(|u| (u + 1..5).map(move |v| (u, v)))
             .collect();
         for mask in 0..(1usize << pairs.len()) {
-            let mut graph = Graph::new_undirected();
-            graph.add_nodes(5);
+            let mut graph = Graph::new_undirected_manual();
+            graph.add_nodes(5).unwrap();
             let mut adjacency = [[false; 5]; 5];
             for (bit, &(u, v)) in pairs.iter().enumerate() {
                 if mask & (1 << bit) != 0 {
@@ -610,8 +610,8 @@ mod tests {
     #[test]
     fn structural_steps_keep_selected_noncontiguous_ids_and_reject_cancellation() {
         use std::sync::{atomic::AtomicBool, Arc};
-        let mut graph = Graph::new_undirected();
-        graph.add_nodes(5);
+        let mut graph = Graph::new_undirected_manual();
+        graph.add_nodes(5).unwrap();
         for (u, v) in [(1, 2), (2, 3), (3, 1), (3, 4)] {
             graph.add_edge(u, v).expect("edge");
         }
@@ -651,7 +651,7 @@ mod tests {
     fn cancelled_degree_leaves_existing_result_intact() {
         use std::sync::{atomic::AtomicBool, Arc};
         let selection = Subgraph::from_nodes(
-            Rc::new(RefCell::new(Graph::new())),
+            Rc::new(RefCell::new(Graph::new_manual())),
             Default::default(),
             "empty".into(),
         )

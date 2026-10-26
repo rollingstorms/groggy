@@ -7,8 +7,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     let attribute = String::from("v7");
     for count in [1_000, 10_000] {
-        let mut graph = Graph::new();
-        let nodes = graph.add_nodes(count);
+        let mut graph = Graph::new_manual();
+        let nodes = graph.add_nodes(count).unwrap();
         let edges = graph.add_edges(&nodes.iter().map(|&node| (node, node)).collect::<Vec<_>>())?;
         for node_kind in [false, true] {
             let columns: HashMap<_, _> = (0..32)

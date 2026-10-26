@@ -38,8 +38,8 @@ fn check_eigenvectors(v: &GraphMatrix, l: &[[f64; 3]; 3]) -> Vec<f64> {
 fn every_three_node_undirected_multigraph_matches_independent_laplacian() {
     let pairs = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)];
     for mask in 0..64 {
-        let mut graph = Graph::new();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(3).unwrap();
         let mut a = [[0.; 3]; 3];
         for (bit, &(u, v)) in pairs.iter().enumerate() {
             if mask & (1 << bit) == 0 {
@@ -127,8 +127,8 @@ fn every_three_node_undirected_multigraph_matches_independent_laplacian() {
 }
 #[test]
 fn sparse_active_rows_are_labeled_and_materialized_independently_of_graph() {
-    let mut graph = Graph::new();
-    graph.add_nodes(5);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(5).unwrap();
     graph.remove_node(1).unwrap();
     graph.remove_node(4).unwrap();
     graph.add_edge(0, 2).unwrap();
@@ -147,8 +147,8 @@ fn sparse_active_rows_are_labeled_and_materialized_independently_of_graph() {
 }
 #[test]
 fn invalid_domain_dimensions_and_nullspace_choices_are_explicit() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     graph.add_edge(0, 1).unwrap();
     for threshold in [0., -1., f64::NAN, f64::INFINITY] {
         assert!(SpectralEmbedding::new(true, threshold)
@@ -163,18 +163,18 @@ fn invalid_domain_dimensions_and_nullspace_choices_are_explicit() {
     assert!(SpectralEmbedding::new(true, 10.)
         .compute_embedding(&graph, 1)
         .is_err());
-    let mut directed = Graph::new_directed();
-    directed.add_nodes(2);
+    let mut directed = Graph::new_directed_manual();
+    directed.add_nodes(2).unwrap();
     directed.add_edge(0, 1).unwrap();
     assert!(SpectralEmbedding::default()
         .compute_embedding(&directed, 1)
         .is_err());
-    let empty = Graph::new();
+    let empty = Graph::new_manual();
     assert!(SpectralEmbedding::default()
         .compute_embedding(&empty, 1)
         .is_err());
-    let mut singleton = Graph::new();
-    singleton.add_node();
+    let mut singleton = Graph::new_manual();
+    singleton.add_node().unwrap();
     assert!(SpectralEmbedding::default()
         .compute_embedding(&singleton, 1)
         .is_err());

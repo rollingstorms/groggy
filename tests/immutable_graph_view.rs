@@ -2,8 +2,8 @@ use groggy::{subgraphs::Subgraph, types::GraphType, AttrValue, Graph, GraphView}
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 #[test]
 fn nested_views_share_frozen_state_and_preserve_parent_edge_scope() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(3).unwrap();
     let a = nodes[0];
     let b = nodes[1];
     let first = graph.add_edge(a, b).unwrap();
@@ -50,8 +50,8 @@ fn nested_views_share_frozen_state_and_preserve_parent_edge_scope() {
 }
 #[test]
 fn directed_degrees_count_selected_instances_and_loops_once() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let nodes = graph.add_nodes(4);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let nodes = graph.add_nodes(4).unwrap();
     let a = nodes[0];
     let b = nodes[1];
     let c = nodes[2];
@@ -78,11 +78,11 @@ fn directed_degrees_count_selected_instances_and_loops_once() {
 }
 #[test]
 fn smallest_graph_empty_views_and_membership_errors_are_explicit() {
-    let empty = Graph::new().read_view().unwrap();
+    let empty = Graph::new_manual().read_view().unwrap();
     assert_eq!(empty.node_count(), 0);
     assert_eq!(empty.edge_count(), 0);
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let view = graph.read_view().unwrap();
     assert_eq!(view.node_ids(), vec![node]);
     assert_eq!(view.edge_count(), 0);
@@ -96,7 +96,7 @@ fn smallest_graph_empty_views_and_membership_errors_are_explicit() {
         HashSet::new()
     )
     .is_err());
-    let other = graph.add_node();
+    let other = graph.add_node().unwrap();
     let edge = graph.add_edge(node, other).unwrap();
     let state = graph.pin_current_state().unwrap();
     assert!(
@@ -105,8 +105,8 @@ fn smallest_graph_empty_views_and_membership_errors_are_explicit() {
 }
 #[test]
 fn legacy_selection_can_be_explicitly_pinned_and_owned_projection_is_separate() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
-    let nodes = graph.borrow_mut().add_nodes(2);
+    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let nodes = graph.borrow_mut().add_nodes(2).unwrap();
     let edge = graph.borrow_mut().add_edge(nodes[0], nodes[1]).unwrap();
     graph
         .borrow_mut()

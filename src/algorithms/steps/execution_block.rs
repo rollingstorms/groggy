@@ -857,8 +857,8 @@ mod atomic_tests {
 
     fn chain_selection() -> crate::subgraphs::Subgraph {
         use std::{cell::RefCell, rc::Rc};
-        let mut graph = crate::api::graph::Graph::new_directed();
-        graph.add_nodes(3);
+        let mut graph = crate::api::graph::Graph::new_directed_manual();
+        graph.add_nodes(3).unwrap();
         graph.add_edge(0, 1).expect("edge");
         graph.add_edge(1, 2).expect("edge");
         crate::subgraphs::Subgraph::from_nodes(

@@ -29,11 +29,11 @@ fn exhaustive_zero_weight_multigraphs_match_floyd_warshall_for_every_source() {
     for directed in [false, true] {
         for mask in 0..512 {
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
-            graph.add_nodes(3);
+            graph.add_nodes(3).unwrap();
             let mut d = [[f64::INFINITY; 3]; 3];
             for (i, row) in d.iter_mut().enumerate() {
                 row[i] = 0.;
@@ -106,8 +106,8 @@ fn exhaustive_zero_weight_multigraphs_match_floyd_warshall_for_every_source() {
 #[test]
 fn missing_ambiguous_and_cancelled_sources_reject_without_result_writes() {
     for count in [0, 2] {
-        let mut graph = Graph::new();
-        graph.add_nodes(2);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(2).unwrap();
         graph.add_edge(0, 1).unwrap();
         for node in 0..count {
             graph
@@ -129,8 +129,8 @@ fn missing_ambiguous_and_cancelled_sources_reject_without_result_writes() {
             Some(AttrValue::Int(7))
         );
     }
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     graph
         .set_node_attr(0, "source".into(), AttrValue::Int(0))
         .unwrap();
@@ -144,7 +144,7 @@ fn missing_ambiguous_and_cancelled_sources_reject_without_result_writes() {
         .unwrap()
         .is_none());
     assert_eq!(run(&algo, selected(&g)).0, vec![(0, 0.)]);
-    let empty = Rc::new(RefCell::new(Graph::new()));
+    let empty = Rc::new(RefCell::new(Graph::new_manual()));
     assert!(algo.execute(&mut Context::new(), selected(&empty)).is_err());
 }
 #[test]
@@ -157,8 +157,8 @@ fn invalid_unreachable_weights_open_and_stale_cached_selections_reject() {
         AttrValue::Null,
         AttrValue::Text("bad".into()),
     ] {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(3).unwrap();
         graph
             .set_node_attr(0, "source".into(), AttrValue::Bool(true))
             .unwrap();
@@ -174,8 +174,8 @@ fn invalid_unreachable_weights_open_and_stale_cached_selections_reject() {
         );
         assert!(ctx.take_outputs().is_empty());
     }
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let e = graph.add_edge(0, 1).unwrap();
     graph
         .set_node_attr(0, "source".into(), AttrValue::Bool(true))
@@ -200,8 +200,8 @@ fn invalid_unreachable_weights_open_and_stale_cached_selections_reject() {
 }
 #[test]
 fn f64_rows_preserve_large_distances_and_tiny_improvements_with_sparse_ids() {
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     graph
         .set_node_attr(0, "source".into(), AttrValue::Bool(true))
@@ -220,10 +220,13 @@ fn f64_rows_preserve_large_distances_and_tiny_improvements_with_sparse_ids() {
     );
     algo.execute(&mut Context::new(), selected(&g)).unwrap();
     for (n, distance) in [(0, 0.), (2, f32::MAX as f64), (3, 2. * f32::MAX as f64)] {
-        assert_eq!(g.borrow().get_node_attr(n, &"out".into()).unwrap(), Some(AttrValue::Float64(distance)));
+        assert_eq!(
+            g.borrow().get_node_attr(n, &"out".into()).unwrap(),
+            Some(AttrValue::Float64(distance))
+        );
     }
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(3).unwrap();
     graph
         .set_node_attr(0, "source".into(), AttrValue::Null)
         .unwrap();

@@ -3,9 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 
 #[test]
 fn sparse_properties_follow_node_and_edge_identity_in_live_and_frozen_exports() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
+    let graph = Rc::new(RefCell::new(Graph::new_manual()));
     let mut owner = graph.borrow_mut();
-    let nodes = owner.add_nodes(4);
+    let nodes = owner.add_nodes(4).unwrap();
     let edges = [
         owner.add_edge(nodes[0], nodes[2]).unwrap(),
         owner.add_edge(nodes[2], nodes[3]).unwrap(),
@@ -81,8 +81,8 @@ fn sparse_properties_follow_node_and_edge_identity_in_live_and_frozen_exports() 
 
 #[test]
 fn selected_tables_keep_values_types_empty_schema_and_ownership() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(3).unwrap();
     let first = graph.add_edge(nodes[0], nodes[1]).unwrap();
     let excluded = graph.add_edge(nodes[0], nodes[1]).unwrap();
     graph
@@ -127,8 +127,8 @@ fn selected_tables_keep_values_types_empty_schema_and_ownership() {
 
 #[test]
 fn structural_column_collisions_fail_without_changing_graph_properties() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(2).unwrap();
     let edge = graph.add_edge(nodes[0], nodes[1]).unwrap();
     graph
         .set_node_attr(nodes[0], "node_id".into(), AttrValue::Int(999))

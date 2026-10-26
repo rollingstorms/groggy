@@ -7720,6 +7720,14 @@ class NodeFilter:
 
 
 class NodesAccessor:
+    def append(self, attributes: Dict[str, Any]) -> int:
+        """Create one node with all properties in one checked operation."""
+        ...
+
+    def extend(self, rows: List[Dict[str, Any]]) -> List[int]:
+        """Create all rows atomically, or reject before allocating IDs."""
+        ...
+
     """
     Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
     """

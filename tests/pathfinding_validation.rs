@@ -14,8 +14,8 @@ fn weighted() -> PathFindingOptions {
 }
 #[test]
 fn direct_traversals_reject_unknown_and_removed_start_or_end_nodes() {
-    let mut g = Graph::new();
-    let n = g.add_node();
+    let mut g = Graph::new_manual();
+    let n = g.add_node().unwrap();
     g.remove_node(n).unwrap();
     for bad in [n, 999] {
         assert!(g.bfs(bad, TraversalOptions::default()).is_err());
@@ -25,7 +25,7 @@ fn direct_traversals_reject_unknown_and_removed_start_or_end_nodes() {
             .is_err());
         assert!(g.all_paths(bad, bad, 3).is_err());
     }
-    let live = g.add_node();
+    let live = g.add_node().unwrap();
     assert!(g.shortest_path(live, n, weighted()).is_err());
     assert!(g.all_paths(live, n, 3).is_err());
     assert_eq!(
@@ -42,8 +42,8 @@ fn direct_traversals_reject_unknown_and_removed_start_or_end_nodes() {
 }
 #[test]
 fn invalid_weights_reject_before_early_target_exit_and_ignoring_removed_edges() {
-    let mut g = Graph::new_directed();
-    let n = g.add_nodes(3);
+    let mut g = Graph::new_directed_manual();
+    let n = g.add_nodes(3).unwrap();
     let edge = g.add_edge(n[1], n[2]).unwrap();
     for bad in [
         AttrValue::Float(-1.),
@@ -61,8 +61,8 @@ fn invalid_weights_reject_before_early_target_exit_and_ignoring_removed_edges() 
 }
 #[test]
 fn compact_integer_missing_zero_and_parallel_weights_are_respected() {
-    let mut g = Graph::new();
-    let n = g.add_nodes(3);
+    let mut g = Graph::new_manual();
+    let n = g.add_nodes(3).unwrap();
     let expensive = g.add_edge(n[0], n[1]).unwrap();
     let cheap = g.add_edge(n[0], n[1]).unwrap();
     let end = g.add_edge(n[1], n[2]).unwrap();
@@ -84,8 +84,8 @@ fn compact_integer_missing_zero_and_parallel_weights_are_respected() {
     assert_eq!(path.total_weight, 1.);
 }
 fn algorithm_fixture(weight: AttrValue) -> (Rc<RefCell<Graph>>, Subgraph, usize) {
-    let mut g = Graph::new();
-    let n = g.add_nodes(2);
+    let mut g = Graph::new_manual();
+    let n = g.add_nodes(2).unwrap();
     g.set_node_attr(n[1], "source".into(), AttrValue::Bool(true))
         .unwrap();
     let e = g.add_edge(n[0], n[1]).unwrap();
@@ -135,8 +135,8 @@ fn algorithm_and_pipeline_share_validation_and_symmetric_minimum_parallel_weight
 }
 #[test]
 fn tiny_distance_improvements_are_not_dropped_as_epsilon_noise() {
-    let mut g = Graph::new_directed();
-    let n = g.add_nodes(3);
+    let mut g = Graph::new_directed_manual();
+    let n = g.add_nodes(3).unwrap();
     g.set_node_attr(n[0], "source".into(), AttrValue::Bool(true))
         .unwrap();
     for (u, v, w) in [(0, 1, 4e-20_f32), (0, 2, 1e-20_f32), (2, 1, 1e-20_f32)] {
@@ -162,8 +162,8 @@ fn tiny_distance_improvements_are_not_dropped_as_epsilon_noise() {
 
 #[test]
 fn algorithm_distance_overflow_rejects_before_persisting_any_result() {
-    let mut g = Graph::new_directed();
-    let nodes = g.add_nodes(3);
+    let mut g = Graph::new_directed_manual();
+    let nodes = g.add_nodes(3).unwrap();
     g.set_node_attr(nodes[0], "source".into(), AttrValue::Bool(true))
         .unwrap();
     for pair in nodes.windows(2) {
@@ -192,11 +192,11 @@ fn algorithm_distance_overflow_rejects_before_persisting_any_result() {
 fn direct_weighted_distances_match_independent_floyd_warshall_reference() {
     for directed in [false, true] {
         let mut g = if directed {
-            Graph::new_directed()
+            Graph::new_directed_manual()
         } else {
-            Graph::new()
+            Graph::new_manual()
         };
-        let nodes = g.add_nodes(7);
+        let nodes = g.add_nodes(7).unwrap();
         let mut expected = vec![vec![f64::INFINITY; 7]; 7];
         for (i, row) in expected.iter_mut().enumerate() {
             row[i] = 0.;

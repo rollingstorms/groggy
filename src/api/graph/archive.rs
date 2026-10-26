@@ -255,7 +255,7 @@ impl GraphArchive {
                 return Err(invalid("unallocated external identity reservation"));
             }
         }
-        let mut graph = Graph::with_config(self.config);
+        let mut graph = Graph::with_config_manual(self.config)?;
         graph.pool = Rc::new(RefCell::new(pool));
         graph.space = GraphSpace::new(graph.pool.clone(), self.state);
         graph.history = history;

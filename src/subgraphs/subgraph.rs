@@ -1706,7 +1706,7 @@ mod tests {
         let mut graph = if publishing {
             Graph::new_publishing()
         } else {
-            Graph::new()
+            Graph::new_manual()
         };
         graph.insert_nodes(3).expect("nodes");
         graph.add_edges(&[(0, 1), (1, 2)]).expect("edges");
@@ -1855,11 +1855,11 @@ mod tests {
     #[test]
     fn test_subgraph_creation() {
         // Test basic subgraph creation and functionality
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Add test nodes
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
 
         // Set attributes
         graph
@@ -1897,13 +1897,13 @@ mod tests {
     #[test]
     fn test_subgraph_algorithms() {
         // Test the core SubgraphOperations algorithms
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Create a small connected graph for testing
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
-        let node4 = graph.add_node(); // Isolated node to test components
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
+        let node4 = graph.add_node().unwrap(); // Isolated node to test components
 
         let edge1 = graph.add_edge(node1, node2).unwrap();
         let edge2 = graph.add_edge(node2, node3).unwrap();
@@ -1952,10 +1952,10 @@ mod tests {
     #[test]
     fn test_structural_metrics() {
         // Create a triangle graph for testing clustering coefficient
-        let mut graph = Graph::new();
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
 
         // Create edges to form a triangle
         graph.add_edge(node1, node2).unwrap();
@@ -1985,11 +1985,11 @@ mod tests {
 
     #[test]
     fn test_subgraph_set_operations() {
-        let mut graph = Graph::new();
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
-        let node4 = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
+        let node4 = graph.add_node().unwrap();
 
         graph.add_edge(node1, node2).unwrap();
         graph.add_edge(node2, node3).unwrap();

@@ -461,7 +461,7 @@ mod tests {
         let mut graph = if publishing {
             Graph::new_publishing()
         } else {
-            Graph::new()
+            Graph::new_manual()
         };
         let nodes = graph.insert_nodes(3).expect("nodes");
         graph
@@ -504,11 +504,11 @@ mod tests {
             };
             for bits in 0..(1usize << pairs.len()) {
                 let mut graph = if directed {
-                    Graph::new_directed()
+                    Graph::new_directed_manual()
                 } else {
-                    Graph::new()
+                    Graph::new_manual()
                 };
-                graph.add_nodes(4);
+                graph.add_nodes(4).unwrap();
                 let mut internal = HashSet::new();
                 let mut originals = Vec::new();
                 let mut closure = [[false; 4]; 4];
@@ -591,8 +591,8 @@ mod tests {
 
     #[test]
     fn contraction_does_not_use_owner_internal_edges_excluded_from_selection() {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(4);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(4).unwrap();
         graph.add_edge(0, 1).unwrap();
         let internal = graph.add_edge(1, 2).unwrap();
         graph.add_edge(2, 3).unwrap();

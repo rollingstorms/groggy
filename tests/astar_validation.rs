@@ -20,11 +20,11 @@ fn run(g: Graph, heuristic: bool) -> anyhow::Result<Rc<RefCell<Graph>>> {
 }
 fn fixture(directed: bool) -> Graph {
     let mut g = if directed {
-        Graph::new_directed()
+        Graph::new_directed_manual()
     } else {
-        Graph::new()
+        Graph::new_manual()
     };
-    g.add_nodes(3);
+    g.add_nodes(3).unwrap();
     g.set_node_attr(2, "start".into(), AttrValue::Bool(true))
         .unwrap();
     g.set_node_attr(0, "goal".into(), AttrValue::Bool(true))
@@ -90,8 +90,8 @@ fn ambiguous_markers_and_bad_weights_reject_even_for_trivial_paths() {
     g.set_node_attr(1, "start".into(), AttrValue::Bool(true))
         .unwrap();
     assert!(run(g, false).is_err());
-    let mut g = Graph::new();
-    g.add_nodes(2);
+    let mut g = Graph::new_manual();
+    g.add_nodes(2).unwrap();
     for attr in ["start", "goal"] {
         g.set_node_attr(0, attr.into(), AttrValue::Bool(true))
             .unwrap();

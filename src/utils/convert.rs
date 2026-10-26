@@ -255,9 +255,9 @@ pub fn subgraph_to_networkx(subgraph: &Subgraph) -> GraphResult<NetworkXGraph> {
 /// Convert NetworkX graph back to Graph (for future bidirectional conversion)
 pub fn networkx_to_graph(nx_graph: NetworkXGraph) -> GraphResult<Graph> {
     let mut graph = if nx_graph.directed {
-        Graph::new_directed()
+        Graph::new_directed_manual()
     } else {
-        Graph::new_undirected()
+        Graph::new_undirected_manual()
     };
 
     // Create a mapping from original node IDs to new node IDs
@@ -265,7 +265,7 @@ pub fn networkx_to_graph(nx_graph: NetworkXGraph) -> GraphResult<Graph> {
 
     // Add nodes
     for nx_node in &nx_graph.nodes {
-        let new_node_id = graph.add_node();
+        let new_node_id = graph.add_node()?;
         node_id_map.insert(nx_node.id, new_node_id);
 
         // Set node attributes (skip entity_type as it's automatically managed)
@@ -343,11 +343,11 @@ mod tests {
 
     #[test]
     fn test_graph_to_networkx() {
-        let mut graph = Graph::new_directed();
+        let mut graph = Graph::new_directed_manual();
 
         // Add nodes with attributes
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
         graph
             .set_node_attr(
                 node1,
@@ -393,12 +393,12 @@ mod tests {
 
     #[test]
     fn test_subgraph_to_networkx() {
-        let mut graph = Graph::new_undirected();
+        let mut graph = Graph::new_undirected_manual();
 
         // Create a simple graph
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
 
         graph
             .set_node_attr(node1, "value".to_string(), AttrValue::Int(1))
@@ -438,11 +438,11 @@ mod tests {
 
     #[test]
     fn test_bidirectional_conversion() {
-        let mut original_graph = Graph::new_undirected();
+        let mut original_graph = Graph::new_undirected_manual();
 
         // Create a simple graph
-        let node1 = original_graph.add_node();
-        let node2 = original_graph.add_node();
+        let node1 = original_graph.add_node().unwrap();
+        let node2 = original_graph.add_node().unwrap();
         original_graph
             .set_node_attr(node1, "name".to_string(), AttrValue::Text("A".to_string()))
             .unwrap();

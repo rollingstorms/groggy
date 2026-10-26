@@ -11,8 +11,8 @@ fn set(ids: impl IntoIterator<Item = usize>) -> HashSet<usize> {
 
 #[test]
 fn all_native_node_predicates_share_live_and_frozen_results() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let n = graph.add_nodes(4);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let n = graph.add_nodes(4).unwrap();
     graph.add_edge(n[0], n[1]).unwrap();
     graph.add_edge(n[0], n[1]).unwrap();
     graph.add_edge(n[1], n[1]).unwrap();
@@ -91,13 +91,13 @@ fn all_native_node_predicates_share_live_and_frozen_results() {
 #[test]
 fn scoped_queries_never_reintroduce_parent_nodes_or_excluded_parallel_instances() {
     for directed in [false, true] {
-        let graph = Rc::new(RefCell::new(Graph::new_with_type(if directed {
+        let graph = Rc::new(RefCell::new(Graph::new_with_type_manual(if directed {
             GraphType::Directed
         } else {
             GraphType::Undirected
         })));
         let mut g = graph.borrow_mut();
-        let n = g.add_nodes(4);
+        let n = g.add_nodes(4).unwrap();
         let edge = g.add_edge(n[0], n[1]).unwrap();
         let excluded = g.add_edge(n[0], n[1]).unwrap();
         let outside = g.add_edge(n[1], n[2]).unwrap();
@@ -181,8 +181,8 @@ fn scoped_queries_never_reintroduce_parent_nodes_or_excluded_parallel_instances(
 
 #[test]
 fn all_edge_predicates_keep_null_presence_boolean_rules_and_frozen_values() {
-    let mut graph = Graph::new();
-    let n = graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    let n = graph.add_nodes(3).unwrap();
     let e = [
         graph.add_edge(n[0], n[1]).unwrap(),
         graph.add_edge(n[1], n[2]).unwrap(),
@@ -283,8 +283,8 @@ fn scalar_ranges_preserve_integer_order_mixed_boundaries_and_ieee_unordered_valu
 
 #[test]
 fn parallel_attribute_columns_keep_sparse_rows_and_logical_candidate_context() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(2001);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(2001).unwrap();
     for &node in nodes.iter().step_by(2) {
         graph
             .set_node_attr(node, "score".into(), V::Int(i64::MAX))

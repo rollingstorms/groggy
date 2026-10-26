@@ -10,9 +10,9 @@ fn bulk_cascades_preserve_unselected_edges_and_immutable_history() {
     for directed in [false, true] {
         for publishing in [false, true] {
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
             graph.set_automatic_publication(publishing).unwrap();
             let nodes = graph.insert_nodes(5).unwrap();
@@ -117,13 +117,13 @@ fn mixed_batch_cascade_clocks_preserve_explicit_edge_overrides() {
 
 #[test]
 fn isolated_node_changes_invalidate_cached_csr_and_preserve_old_arrays() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let initial = graph.space().snapshot_csr(&graph.pool());
     assert!(initial.0.is_empty());
-    let first = graph.add_node();
+    let first = graph.add_node().unwrap();
     let one = graph.space().snapshot_csr(&graph.pool());
     assert_eq!(*one.0, vec![first]);
-    let added = graph.add_nodes(3);
+    let added = graph.add_nodes(3).unwrap();
     let four = graph.space().snapshot_csr(&graph.pool());
     assert_eq!(four.0.len(), 4);
     graph.remove_node(first).unwrap();
@@ -140,7 +140,7 @@ fn isolated_node_changes_invalidate_cached_csr_and_preserve_old_arrays() {
 #[test]
 fn invalid_bulk_removal_keeps_cascade_properties_and_cache_unchanged() {
     for publishing in [false, true] {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
         graph.set_automatic_publication(publishing).unwrap();
         graph.insert_nodes(2).unwrap();
         graph.add_edge(0, 1).unwrap();

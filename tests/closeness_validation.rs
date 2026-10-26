@@ -56,11 +56,11 @@ fn exhaustive_small_graphs_match_floyd_warshall_for_all_modes() {
         for weighted in [false, true] {
             for mask in 0..512 {
                 let mut graph = if directed {
-                    Graph::new_directed()
+                    Graph::new_directed_manual()
                 } else {
-                    Graph::new()
+                    Graph::new_manual()
                 };
-                graph.add_nodes(3);
+                graph.add_nodes(3).unwrap();
                 let mut d = [[f64::INFINITY; 3]; 3];
                 for (i, row) in d.iter_mut().enumerate() {
                     row[i] = 0.;
@@ -137,8 +137,8 @@ fn invalid_lengths_and_persistent_overflow_preserve_previous_values() {
         AttrValue::Null,
         AttrValue::Text("bad".into()),
     ] {
-        let mut graph = Graph::new();
-        graph.add_nodes(2);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(2).unwrap();
         let e = graph.add_edge(0, 1).unwrap();
         graph.set_edge_attr(e, "w".into(), bad).unwrap();
         graph
@@ -157,8 +157,8 @@ fn invalid_lengths_and_persistent_overflow_preserve_previous_values() {
             Some(AttrValue::Int(7))
         );
     }
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let e = graph.add_edge(0, 1).unwrap();
     graph
         .set_edge_attr(e, "w".into(), AttrValue::Float(f32::from_bits(1)))
@@ -168,23 +168,27 @@ fn invalid_lengths_and_persistent_overflow_preserve_previous_values() {
         let value = scores(&g, harmonic, false, false, true)[0].1;
         assert!(value.is_finite() && value > f32::MAX as f64);
         ClosenessCentrality::new(harmonic, Some("w".into()), "c".into())
-            .execute(&mut Context::new(), selected(&g)).unwrap();
-        assert_eq!(g.borrow().get_node_attr(0, &"c".into()).unwrap(), Some(AttrValue::Float64(value)));
+            .execute(&mut Context::new(), selected(&g))
+            .unwrap();
+        assert_eq!(
+            g.borrow().get_node_attr(0, &"c".into()).unwrap(),
+            Some(AttrValue::Float64(value))
+        );
     }
 }
 #[test]
 fn empty_singleton_sparse_parallel_and_cached_direction_cases() {
     for n in [0, 1, 3] {
-        let mut graph = Graph::new();
-        graph.add_nodes(n);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(n).unwrap();
         let g = Rc::new(RefCell::new(graph));
         assert_eq!(
             scores(&g, true, false, true, false),
             (0..n).map(|n| (n, 0.)).collect::<Vec<_>>()
         );
     }
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     let expensive = graph.add_edge(0, 2).unwrap();
     graph
@@ -232,8 +236,8 @@ fn empty_singleton_sparse_parallel_and_cached_direction_cases() {
 }
 #[test]
 fn stale_open_and_cancelled_selections_reject_before_writes() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let e = graph.add_edge(0, 1).unwrap();
     let g = Rc::new(RefCell::new(graph));
     let sub = selected(&g);

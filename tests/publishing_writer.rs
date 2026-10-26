@@ -2,7 +2,7 @@ use groggy::{AttrValue, Graph, GraphSchema};
 use std::collections::HashMap;
 #[test]
 fn checked_direct_and_bulk_writes_publish_once_per_call() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut writer = graph.writer("test");
     let nodes = writer
         .add_nodes_with_attrs(vec![
@@ -46,7 +46,7 @@ fn checked_direct_and_bulk_writes_publish_once_per_call() {
 }
 #[test]
 fn schema_policy_applies_to_every_session_write_and_rejections_preserve_head() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let schema =
         GraphSchema::from_json(r#"{"node_labels":{"Entity":{"name":{"type":"text"}}}}"#).unwrap();
     let mut writer = graph.writer("test").with_schema(&schema);

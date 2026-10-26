@@ -6,9 +6,9 @@ use groggy::{
 use std::{cell::RefCell, rc::Rc};
 #[test]
 fn compatibility_names_share_canonical_owner_and_keep_constructor_policies() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
-    let a = graph.borrow_mut().add_node();
-    let b = graph.borrow_mut().add_node();
+    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let a = graph.borrow_mut().add_node().unwrap();
+    let b = graph.borrow_mut().add_node().unwrap();
     let edge = graph.borrow_mut().add_edge(a, b).unwrap();
     let node = Node::new(a, graph.clone()).unwrap();
     let legacy: groggy::storage::node::EntityNode = EntityNode::new(a, graph.clone());
@@ -37,9 +37,9 @@ fn compatibility_names_share_canonical_owner_and_keep_constructor_policies() {
 }
 #[test]
 fn adapter_mutations_and_retained_branch_restoration_use_the_same_graph() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
-    let a = graph.borrow_mut().add_node();
-    let b = graph.borrow_mut().add_node();
+    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let a = graph.borrow_mut().add_node().unwrap();
+    let b = graph.borrow_mut().add_node().unwrap();
     let edge = graph.borrow_mut().add_edge(a, b).unwrap();
     let node = Node::new(a, graph.clone()).unwrap();
     let legacy = EntityNode::new(a, graph.clone());

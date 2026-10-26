@@ -15,8 +15,8 @@ fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
 fn triangles(reverse: bool, bridges: usize) -> Shared {
-    let mut g = Graph::new();
-    g.add_nodes(7);
+    let mut g = Graph::new_manual();
+    g.add_nodes(7).unwrap();
     for (u, v) in [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3)] {
         let (u, v) = if reverse { (v, u) } else { (u, v) };
         g.add_edge(u, v).unwrap();
@@ -122,8 +122,8 @@ fn invalid_inputs_and_cancelled_or_stale_selections_preserve_existing_output() {
     assert!(GirvanNewman::new(Some(0), None, None, "c".into())
         .execute(&mut Context::new(), sub)
         .is_err());
-    let mut directed = Graph::new_directed();
-    directed.add_node();
+    let mut directed = Graph::new_directed_manual();
+    directed.add_node().unwrap();
     let g = Rc::new(RefCell::new(directed));
     assert!(GirvanNewman::new(None, None, None, "c".into())
         .execute(&mut Context::new(), selected(&g))
@@ -145,8 +145,8 @@ fn negative_registry_level_budget_is_rejected() {
 #[test]
 fn empty_and_single_node_selections_are_valid() {
     for count in [0, 1] {
-        let mut graph = Graph::new();
-        graph.add_nodes(count);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(count).unwrap();
         let g = Rc::new(RefCell::new(graph));
         GirvanNewman::new(None, None, None, "c".into())
             .execute(&mut Context::new(), selected(&g))

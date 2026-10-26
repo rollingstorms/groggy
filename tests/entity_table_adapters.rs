@@ -134,8 +134,8 @@ fn malformed_structural_columns_reject_instead_of_compacting_row_alignment() {
 }
 #[test]
 fn table_property_edits_retain_captured_row_identity_without_mutating_graph() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let edge = graph.add_edge(0, 1).unwrap();
     let table = graph.read_view().unwrap().table().unwrap();
     let n = table

@@ -3,8 +3,8 @@ use std::sync::atomic::AtomicBool;
 
 #[test]
 fn captured_pagerank_uses_selected_occurrences_and_frozen_personalization() {
-    let mut graph = Graph::new_directed();
-    let n = graph.add_nodes(3);
+    let mut graph = Graph::new_directed_manual();
+    let n = graph.add_nodes(3).unwrap();
     let first = graph.add_edge(n[0], n[1]).unwrap();
     let parallel = graph.add_edge(n[0], n[1]).unwrap();
     let other = graph.add_edge(n[0], n[2]).unwrap();
@@ -46,7 +46,7 @@ fn captured_pagerank_uses_selected_occurrences_and_frozen_personalization() {
 
 #[test]
 fn empty_pagerank_is_explicit_and_cancellation_still_wins() {
-    let graph = Graph::new();
+    let graph = Graph::new_manual();
     let input = graph.read_view().unwrap().algorithm_input().unwrap();
     let algorithm = PageRank::new(0.85, 50, 1e-6, None, "unused".into()).unwrap();
     let result = input.pagerank(&algorithm, None).unwrap();

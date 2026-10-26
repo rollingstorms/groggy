@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut samples = Vec::new();
             for _ in 0..5 {
                 let mut graph = if mode == "contract_directed" {
-                    Graph::new_directed().into_publishing()?
+                    Graph::new_directed_manual().into_publishing()?
                 } else {
                     Graph::new_publishing()
                 };

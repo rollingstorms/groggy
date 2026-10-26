@@ -37,7 +37,7 @@ fn archive_round_trip_retains_branches_columns_clocks_inactive_ids_and_checkpoin
     let mut config = GraphConfig::performance_optimized();
     config.graph_type = groggy::types::GraphType::Directed;
     config.query_timeout_ms = 123;
-    let mut graph = Graph::with_config(config.clone())
+    let mut graph = Graph::with_config_manual(config.clone()).unwrap()
         .into_publishing()
         .unwrap();
     let root = seed(&mut graph);
@@ -126,7 +126,7 @@ fn archive_empty_and_clean_manual_graphs_restore_their_publication_policy() {
         let mut graph = if publishing {
             Graph::new_publishing()
         } else {
-            Graph::new()
+            Graph::new_manual()
         };
         let path = dir.path().join(format!("empty-{publishing}"));
         graph.save_archive(&path).unwrap();
@@ -146,8 +146,8 @@ fn archive_empty_and_clean_manual_graphs_restore_their_publication_policy() {
 fn archive_rejects_dirty_graph_overwrite_truncation_checksum_and_trailing_data() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("archive");
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     assert!(graph.save_archive(&path).is_err());
     assert!(!path.exists());
     let mut graph = Graph::new_publishing();
@@ -246,8 +246,8 @@ fn archive_preserves_unset_only_edge_column_and_clean_legacy_clock_absence() {
     let copy = Graph::load_archive(&path).unwrap();
     assert_eq!(copy.get_edge_attr(0, &"only".into()).unwrap(), None);
     assert_eq!(copy.get_edge_attr(0, &"absent".into()).unwrap(), None);
-    let mut legacy = Graph::new();
-    legacy.add_node();
+    let mut legacy = Graph::new_manual();
+    legacy.add_node().unwrap();
     let state = legacy.commit("legacy".into(), "test".into()).unwrap();
     let path = dir.path().join("legacy");
     legacy.save_archive(&path).unwrap();

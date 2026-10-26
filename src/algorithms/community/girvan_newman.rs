@@ -285,15 +285,15 @@ mod tests {
 
     #[test]
     fn test_girvan_newman_small_graph() {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Two triangles connected by a bridge
-        let n0 = graph.add_node();
-        let n1 = graph.add_node();
-        let n2 = graph.add_node();
-        let n3 = graph.add_node();
-        let n4 = graph.add_node();
-        let n5 = graph.add_node();
+        let n0 = graph.add_node().unwrap();
+        let n1 = graph.add_node().unwrap();
+        let n2 = graph.add_node().unwrap();
+        let n3 = graph.add_node().unwrap();
+        let n4 = graph.add_node().unwrap();
+        let n5 = graph.add_node().unwrap();
 
         // Triangle 1
         graph.add_edge(n0, n1).unwrap();
@@ -341,15 +341,15 @@ mod tests {
 
     #[test]
     fn test_girvan_newman_disconnected() {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Two disconnected triangles
-        let n0 = graph.add_node();
-        let n1 = graph.add_node();
-        let n2 = graph.add_node();
-        let n3 = graph.add_node();
-        let n4 = graph.add_node();
-        let n5 = graph.add_node();
+        let n0 = graph.add_node().unwrap();
+        let n1 = graph.add_node().unwrap();
+        let n2 = graph.add_node().unwrap();
+        let n3 = graph.add_node().unwrap();
+        let n4 = graph.add_node().unwrap();
+        let n5 = graph.add_node().unwrap();
 
         // Triangle 1
         graph.add_edge(n0, n1).unwrap();
@@ -388,15 +388,15 @@ mod tests {
 
     #[test]
     fn test_girvan_newman_weighted() {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Two triangles connected by TWO bridges with different weights
-        let n0 = graph.add_node();
-        let n1 = graph.add_node();
-        let n2 = graph.add_node();
-        let n3 = graph.add_node();
-        let n4 = graph.add_node();
-        let n5 = graph.add_node();
+        let n0 = graph.add_node().unwrap();
+        let n1 = graph.add_node().unwrap();
+        let n2 = graph.add_node().unwrap();
+        let n3 = graph.add_node().unwrap();
+        let n4 = graph.add_node().unwrap();
+        let n5 = graph.add_node().unwrap();
 
         // Triangle 1
         graph.add_edge(n0, n1).unwrap();

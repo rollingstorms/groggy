@@ -392,10 +392,7 @@ impl PyGraph {
             ));
         }
         let config = parse_config(config.or(_config), directed)?;
-        config
-            .validate()
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
-        let mut rust_graph = RustGraph::with_config(config);
+        let mut rust_graph = RustGraph::with_config(config).map_err(graph_error_to_py_err)?;
         rust_graph
             .set_automatic_publication(!manual)
             .map_err(graph_error_to_py_err)?;

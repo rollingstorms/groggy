@@ -2,7 +2,7 @@ use groggy::{AttrValue, DurableGraph, Graph, GraphConfig};
 
 #[test]
 fn checked_writes_publish_once_and_checkpoints_preserve_state_and_clocks() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let node = graph.try_add_node().unwrap();
     let first = graph.current_state_id();
     let frozen = graph.read_view().unwrap();
@@ -39,7 +39,7 @@ fn checked_writes_publish_once_and_checkpoints_preserve_state_and_clocks() {
 
 #[test]
 fn empty_checkpoints_and_checked_bulk_constructors_do_not_add_phantom_versions() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     assert_eq!(graph.commit("empty".into(), "test".into()).unwrap(), 0);
     assert_eq!(
         graph
@@ -59,8 +59,8 @@ fn empty_checkpoints_and_checked_bulk_constructors_do_not_add_phantom_versions()
 
 #[test]
 fn legacy_manual_writes_must_be_published_before_an_explicit_clean_checkpoint() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     assert!(graph.has_uncommitted_changes());
     assert!(graph.checkpoint("dirty".into(), "test".into()).is_err());
     assert!(graph.try_add_node().is_err());

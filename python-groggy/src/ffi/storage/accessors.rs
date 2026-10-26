@@ -13,7 +13,9 @@ use pyo3::types::{PyDict, PySlice};
 use std::collections::HashSet;
 
 // Import utils for conversion functions
-use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
+use crate::ffi::utils::{
+    attr_value_to_python_value, graph_error_to_py_err, python_value_to_attr_value,
+};
 
 // Import table FFI types
 
@@ -1132,7 +1134,7 @@ impl PyNodesAccessor {
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
         // Create a subgraph from the constrained nodes for visualization
-        let mut viz_graph = groggy::api::graph::Graph::new();
+        let mut viz_graph = groggy::api::graph::Graph::new_manual();
 
         // Get the constrained node IDs or all nodes if no constraint
         let node_ids = if let Some(ref constrained) = self.constrained_nodes {
@@ -1143,7 +1145,7 @@ impl PyNodesAccessor {
 
         // Add nodes to the viz graph (basic implementation for now)
         for _node_id in &node_ids {
-            let _new_node_id = viz_graph.add_node();
+            let _new_node_id = viz_graph.add_node().map_err(graph_error_to_py_err)?;
             // TODO: Copy attributes from original nodes
         }
 
@@ -1154,6 +1156,79 @@ impl PyNodesAccessor {
         );
 
         Py::new(py, viz_accessor)
+    }
+
+    /// Append a new node to the graph with attributes (graph-aware table.append)
+    ///
+    /// Creates a new node in the underlying graph and sets its attributes.
+    /// This maintains consistency between the graph structure and node table.
+    ///
+    /// # Arguments
+    /// * `attrs_dict` - Dictionary mapping attribute names to values
+    ///
+    /// # Returns
+    /// NodeId of the newly created node
+    ///
+    /// # Examples
+    /// ```python
+    /// # Add a new node with attributes
+    /// node_id = g.nodes.append({'name': 'Alice', 'age': 30})
+    ///
+    /// # Node is immediately available in both graph and table
+    /// print(g.get_node_attr(node_id, 'name'))  # 'Alice'
+    /// print(g.nodes.table())  # Shows Alice in the table
+    /// ```
+    pub fn append(&self, _py: Python, attrs_dict: &PyDict) -> PyResult<NodeId> {
+        let mut attributes = std::collections::HashMap::new();
+        for (key, value) in attrs_dict.iter() {
+            attributes.insert(key.extract::<String>()?, python_value_to_attr_value(value)?);
+        }
+        let mut ids = self
+            .graph
+            .borrow_mut()
+            .add_nodes_with_attrs(vec![attributes])
+            .map_err(graph_error_to_py_err)?;
+        ids.pop()
+            .ok_or_else(|| PyRuntimeError::new_err("native append returned no node ID"))
+    }
+
+    /// Extend the graph with multiple new nodes and their attributes (graph-aware table.extend)
+    ///
+    /// Creates multiple nodes in the underlying graph and sets their attributes.
+    /// This is more efficient than calling append multiple times.
+    ///
+    /// # Arguments
+    /// * `rows_data` - List of dictionaries, each representing a node's attributes
+    ///
+    /// # Returns
+    /// List of NodeIds for the newly created nodes
+    ///
+    /// # Examples
+    /// ```python
+    /// # Add multiple nodes with attributes
+    /// node_ids = g.nodes.extend([
+    ///     {'name': 'Alice', 'age': 30},
+    ///     {'name': 'Bob', 'age': 25},
+    ///     {'name': 'Carol', 'age': 35}
+    /// ])
+    ///
+    /// # All nodes are immediately available
+    /// print(len(g.nodes))  # Increased by 3
+    /// ```
+    pub fn extend(&self, _py: Python, rows_data: &pyo3::types::PyList) -> PyResult<Vec<NodeId>> {
+        let mut rows = Vec::with_capacity(rows_data.len());
+        for row_item in rows_data.iter() {
+            let row_dict: &PyDict = row_item.downcast()?;
+            let mut attributes = std::collections::HashMap::new();
+            for (key, value) in row_dict.iter() {
+                attributes.insert(key.extract::<String>()?, python_value_to_attr_value(value)?);
+            }
+            rows.push(attributes);
+        }
+        self.graph
+            .borrow_mut()
+            .add_nodes_with_attrs(rows)
+            .map_err(graph_error_to_py_err)
     }
 }
 
@@ -1449,109 +1524,6 @@ impl PyNodesAccessor {
         // Create array with repeated value
         let attr_values = vec![attr_value; node_count];
         Ok(BaseArray::from_attr_values(attr_values))
-    }
-
-    /// Append a new node to the graph with attributes (graph-aware table.append)
-    ///
-    /// Creates a new node in the underlying graph and sets its attributes.
-    /// This maintains consistency between the graph structure and node table.
-    ///
-    /// # Arguments
-    /// * `attrs_dict` - Dictionary mapping attribute names to values
-    ///
-    /// # Returns
-    /// NodeId of the newly created node
-    ///
-    /// # Examples
-    /// ```python
-    /// # Add a new node with attributes
-    /// node_id = g.nodes.append({'name': 'Alice', 'age': 30})
-    ///
-    /// # Node is immediately available in both graph and table
-    /// print(g.get_node_attr(node_id, 'name'))  # 'Alice'
-    /// print(g.nodes.table())  # Shows Alice in the table
-    /// ```
-    pub fn append(&self, _py: Python, attrs_dict: &PyDict) -> PyResult<NodeId> {
-        let mut graph = self.graph.borrow_mut();
-
-        // Create a new node in the graph
-        let node_id = graph.add_node();
-
-        // Convert Python dict to attribute map
-        let mut attributes = std::collections::HashMap::new();
-        for (key, value) in attrs_dict.iter() {
-            let attr_name: String = key.extract()?;
-            let attr_value = python_value_to_attr_value(value)?;
-            attributes.insert(attr_name, attr_value);
-        }
-
-        // Set attributes using the graph's bulk set method
-        for (attr_name, attr_value) in attributes {
-            graph
-                .set_node_attr(node_id, attr_name.clone(), attr_value)
-                .map_err(|e| {
-                    PyRuntimeError::new_err(format!(
-                        "Failed to set attribute '{}': {}",
-                        attr_name, e
-                    ))
-                })?;
-        }
-
-        Ok(node_id)
-    }
-
-    /// Extend the graph with multiple new nodes and their attributes (graph-aware table.extend)
-    ///
-    /// Creates multiple nodes in the underlying graph and sets their attributes.
-    /// This is more efficient than calling append multiple times.
-    ///
-    /// # Arguments
-    /// * `rows_data` - List of dictionaries, each representing a node's attributes
-    ///
-    /// # Returns
-    /// List of NodeIds for the newly created nodes
-    ///
-    /// # Examples
-    /// ```python
-    /// # Add multiple nodes with attributes
-    /// node_ids = g.nodes.extend([
-    ///     {'name': 'Alice', 'age': 30},
-    ///     {'name': 'Bob', 'age': 25},
-    ///     {'name': 'Carol', 'age': 35}
-    /// ])
-    ///
-    /// # All nodes are immediately available
-    /// print(len(g.nodes))  # Increased by 3
-    /// ```
-    pub fn extend(&self, _py: Python, rows_data: &pyo3::types::PyList) -> PyResult<Vec<NodeId>> {
-        let mut graph = self.graph.borrow_mut();
-        let mut new_node_ids = Vec::new();
-
-        // Process each row
-        for row_item in rows_data.iter() {
-            let row_dict: &PyDict = row_item.downcast()?;
-
-            // Create a new node in the graph
-            let node_id = graph.add_node();
-
-            // Convert Python dict to attribute map and set attributes
-            for (key, value) in row_dict.iter() {
-                let attr_name: String = key.extract()?;
-                let attr_value = python_value_to_attr_value(value)?;
-                graph
-                    .set_node_attr(node_id, attr_name.clone(), attr_value)
-                    .map_err(|e| {
-                        PyRuntimeError::new_err(format!(
-                            "Failed to set attribute '{}' on node {}: {}",
-                            attr_name, node_id, e
-                        ))
-                    })?;
-            }
-
-            new_node_ids.push(node_id);
-        }
-
-        Ok(new_node_ids)
     }
 
     /// Remove nodes from the graph by their indices in the table (graph-aware table.drop)
@@ -2562,7 +2534,7 @@ impl PyEdgesAccessor {
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
         // Create a viz graph from the constrained edges
-        let mut viz_graph = groggy::api::graph::Graph::new();
+        let mut viz_graph = groggy::api::graph::Graph::new_manual();
 
         // Get the constrained edge IDs or all edges if no constraint
         let edge_ids = if let Some(ref constrained) = self.constrained_edges {
@@ -2580,14 +2552,16 @@ impl PyEdgesAccessor {
             for &edge_id in &edge_ids {
                 if let Ok((source, target)) = graph_ref.edge_endpoints(edge_id) {
                     // Add source node if not already added
-                    node_map
-                        .entry(source)
-                        .or_insert_with(|| viz_graph.add_node());
+                    if let std::collections::hash_map::Entry::Vacant(entry) = node_map.entry(source)
+                    {
+                        entry.insert(viz_graph.add_node().map_err(graph_error_to_py_err)?);
+                    }
 
                     // Add target node if not already added
-                    node_map
-                        .entry(target)
-                        .or_insert_with(|| viz_graph.add_node());
+                    if let std::collections::hash_map::Entry::Vacant(entry) = node_map.entry(target)
+                    {
+                        entry.insert(viz_graph.add_node().map_err(graph_error_to_py_err)?);
+                    }
 
                     // Add the edge
                     if let Some(&new_source) = node_map.get(&source) {

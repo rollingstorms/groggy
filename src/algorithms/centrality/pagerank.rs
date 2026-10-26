@@ -512,10 +512,10 @@ mod tests {
 
     #[test]
     fn pagerank_handles_small_graph() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
-        let c = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
+        let c = graph.add_node().unwrap();
 
         graph.add_edge(a, b).unwrap();
         graph.add_edge(b, c).unwrap();

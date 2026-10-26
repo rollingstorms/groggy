@@ -549,10 +549,10 @@ mod tests {
 
     #[test]
     fn test_shortest_path_map_unweighted() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
-        let c = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
+        let c = graph.add_node().unwrap();
         graph.add_edge(a, b).unwrap();
         graph.add_edge(b, c).unwrap();
 
@@ -577,10 +577,10 @@ mod tests {
 
     #[test]
     fn test_random_walk_basic() {
-        let mut graph = Graph::new();
-        let a = graph.add_node();
-        let b = graph.add_node();
-        let c = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let a = graph.add_node().unwrap();
+        let b = graph.add_node().unwrap();
+        let c = graph.add_node().unwrap();
         graph.add_edge(a, b).unwrap();
         graph.add_edge(b, c).unwrap();
         graph.add_edge(c, a).unwrap();
@@ -725,8 +725,8 @@ mod checked_tests {
         }
     }
     fn selection() -> Subgraph {
-        let mut graph = Graph::new_undirected();
-        graph.add_nodes(4);
+        let mut graph = Graph::new_undirected_manual();
+        graph.add_nodes(4).unwrap();
         for (u, v, w) in [
             (0, 1, 10.0),
             (0, 1, 2.0),
@@ -809,8 +809,8 @@ mod checked_tests {
     }
     #[test]
     fn seeded_walks_are_isolated_and_huge_finite_weights_normalize_without_overflow() {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(3).unwrap();
         for (u, v, w) in [(0, 1, 0.0), (0, 2, 1e308), (0, 2, 1e308), (2, 2, 1.0)] {
             let edge = graph.add_edge(u, v).expect("edge");
             graph

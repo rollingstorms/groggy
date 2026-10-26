@@ -295,8 +295,8 @@ fn changed_legacy_data_metadata_and_manifest_never_pass_verification() {
 }
 #[test]
 fn frozen_source_captures_are_detached_after_bundle_roundtrip() {
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     graph.set_node_attr(0, "x".into(), V::Int(1)).unwrap();
     let table = graph.read_view().unwrap().table().unwrap();
     let dir = tempfile::tempdir().unwrap();

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 #[test]
 fn node_creation_rejects_all_reserved_properties_before_allocating() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let row = HashMap::from([("entity_type".into(), AttrValue::Text("meta".into()))]);
     let error = graph
         .add_nodes_with_attrs(vec![HashMap::new(), row.clone(), row])
@@ -13,12 +13,12 @@ fn node_creation_rejects_all_reserved_properties_before_allocating() {
     assert!(error.contains("2.entity_type"), "{error}");
     assert!(graph.node_ids().is_empty());
     assert!(!graph.has_uncommitted_changes());
-    assert_eq!(graph.add_node(), 0);
+    assert_eq!(graph.add_node().unwrap(), 0);
 }
 
 #[test]
 fn attributed_node_creation_preserves_sparse_rows_and_history() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let rows = vec![
         HashMap::from([("name".into(), AttrValue::Text("Ada".into()))]),
         HashMap::new(),
@@ -40,8 +40,8 @@ fn attributed_node_creation_preserves_sparse_rows_and_history() {
 
 #[test]
 fn invalid_bulk_removals_preserve_topology_and_change_tracking() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(3).unwrap();
     let edges = graph
         .add_edges(&[(nodes[0], nodes[1]), (nodes[1], nodes[2])])
         .unwrap();
@@ -75,8 +75,8 @@ fn invalid_bulk_removals_preserve_topology_and_change_tracking() {
 
 #[test]
 fn preflight_reports_original_positions_without_writing() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph.commit("initial".into(), "test".into()).unwrap();
     let attrs = HashMap::from([(
         "score".into(),

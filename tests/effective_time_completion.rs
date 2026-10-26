@@ -113,8 +113,8 @@ fn frozen_group_revisions_keep_source_properties_topology_and_nested_referents()
 }
 #[test]
 fn legacy_clocks_are_explicit_read_local_and_cannot_override_precise_publications() {
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     graph.set_node_attr(0, "v".into(), V::Int(1)).unwrap();
     let first = graph.commit("old".into(), "test".into()).unwrap();
     graph.set_node_attr(0, "v".into(), V::Null).unwrap();

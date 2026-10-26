@@ -5,7 +5,7 @@ use groggy::{
 use std::collections::HashMap;
 #[test]
 fn mixed_identity_assignments_publish_data_and_index_together() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let batch = GraphBatch {
         add_nodes: 2,
         add_edges: vec![(N::Added(0), N::Added(1))],
@@ -39,7 +39,7 @@ fn mixed_identity_assignments_publish_data_and_index_together() {
 }
 #[test]
 fn collisions_and_schema_failures_do_not_reserve_names_or_consume_ids() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let collision = GraphBatch {
         add_nodes: 1,
         add_edges: vec![(N::Added(0), N::Added(0))],
@@ -69,11 +69,11 @@ fn collisions_and_schema_failures_do_not_reserve_names_or_consume_ids() {
     assert!(graph
         .allocated_entity_for_external_id("unreserved")
         .is_none());
-    assert_eq!(graph.add_node(), 0);
+    assert_eq!(graph.add_node().unwrap(), 0);
 }
 #[test]
 fn writer_upserts_preserve_identity_and_do_not_publish_identical_payloads() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut writer = graph.writer("test");
     let row = NodeUpsert {
         external_id: "ada".into(),

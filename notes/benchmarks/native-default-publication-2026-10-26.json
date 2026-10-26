@@ -1,0 +1,253 @@
+{
+  "cases": [
+    {
+      "count": 1000,
+      "samples": [
+        {
+          "nodes": 1000,
+          "seconds": 0.003618667,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002675334,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002627959,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002479291,
+          "state_id": 1
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002486042,
+          "state_id": 1
+        }
+      ],
+      "workload": "bulk_insert"
+    },
+    {
+      "count": 1000,
+      "samples": [
+        {
+          "nodes": 1000,
+          "seconds": 0.0045215,
+          "state_id": 1000
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.004017791,
+          "state_id": 1000
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.003830792,
+          "state_id": 1000
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.003634208,
+          "state_id": 1000
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.003419916,
+          "state_id": 1000
+        }
+      ],
+      "workload": "scalar_insert"
+    },
+    {
+      "count": 1000,
+      "samples": [
+        {
+          "nodes": 1000,
+          "seconds": 0.001402833,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.001293167,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.001177083,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.001195042,
+          "state_id": 2
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.0011555,
+          "state_id": 2
+        }
+      ],
+      "workload": "bulk_set"
+    },
+    {
+      "count": 1000,
+      "samples": [
+        {
+          "nodes": 1000,
+          "seconds": 0.003054709,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002791625,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.00255,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002559417,
+          "state_id": 1001
+        },
+        {
+          "nodes": 1000,
+          "seconds": 0.002449584,
+          "state_id": 1001
+        }
+      ],
+      "workload": "scalar_set"
+    },
+    {
+      "count": 10000,
+      "samples": [
+        {
+          "nodes": 10000,
+          "seconds": 0.01331275,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.012230334,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.012106417,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.012190333,
+          "state_id": 1
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.012129166,
+          "state_id": 1
+        }
+      ],
+      "workload": "bulk_insert"
+    },
+    {
+      "count": 10000,
+      "samples": [
+        {
+          "nodes": 10000,
+          "seconds": 0.024796,
+          "state_id": 10000
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.024320792,
+          "state_id": 10000
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.023983292,
+          "state_id": 10000
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.024100042,
+          "state_id": 10000
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.023966417,
+          "state_id": 10000
+        }
+      ],
+      "workload": "scalar_insert"
+    },
+    {
+      "count": 10000,
+      "samples": [
+        {
+          "nodes": 10000,
+          "seconds": 0.009505959,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009164084,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009128583,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009166417,
+          "state_id": 2
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.009163417,
+          "state_id": 2
+        }
+      ],
+      "workload": "bulk_set"
+    },
+    {
+      "count": 10000,
+      "samples": [
+        {
+          "nodes": 10000,
+          "seconds": 0.024790583,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.02374725,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.023781458,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.023816292,
+          "state_id": 10001
+        },
+        {
+          "nodes": 10000,
+          "seconds": 0.024122334,
+          "state_id": 10001
+        }
+      ],
+      "workload": "scalar_set"
+    }
+  ],
+  "scope": "Native default Graph release operations; fixture construction excluded except bulk_insert/scalar_insert. Bulk and scalar history semantics differ; no speedup/SLA claim. Scalar_set includes its per-call name/column preparation; bulk_set includes column-map construction. No FFI or RSS measurement."
+}

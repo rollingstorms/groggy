@@ -204,8 +204,8 @@ fn recorded_selector_uses_first_parent_merge_lineage_and_exact_timestamp_ties() 
 }
 #[test]
 fn duplicate_unknown_and_dirty_branch_operations_preserve_heads_and_pending_values() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let first = graph.commit("first".into(), "test".into()).unwrap();
     graph.create_branch("other".into()).unwrap();
     assert!(graph.create_branch("other".into()).is_err());

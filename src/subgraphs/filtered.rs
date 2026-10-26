@@ -584,12 +584,12 @@ mod tests {
     #[test]
     fn test_filtered_subgraph_creation() {
         // Test FilteredSubgraph creation and basic functionality
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Create test nodes with attributes
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
 
         graph
             .set_node_attr(
@@ -651,10 +651,10 @@ mod tests {
     #[test]
     fn test_filter_combination() {
         // Test combining filters with AND/OR operations
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
 
         graph
             .set_node_attr(node1, "type".to_string(), AttrValue::Text("A".to_string()))

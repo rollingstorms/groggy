@@ -3,8 +3,8 @@ use std::collections::HashSet;
 
 #[test]
 fn deactivation_preserves_stored_membership_and_retained_pool_values() {
-    let mut g = Graph::new();
-    let nodes = g.add_nodes(2);
+    let mut g = Graph::new_manual();
+    let nodes = g.add_nodes(2).unwrap();
     let edge = g.add_edge(nodes[0], nodes[1]).unwrap();
     g.set_node_attr(nodes[1], "name".into(), AttrValue::Text("Lin".into()))
         .unwrap();
@@ -53,11 +53,11 @@ fn deactivation_preserves_stored_membership_and_retained_pool_values() {
 
 #[test]
 fn reset_keeps_other_branch_selections_endpoints_and_allocation() {
-    let mut g = Graph::new();
-    let base = g.add_node();
+    let mut g = Graph::new_manual();
+    let base = g.add_node().unwrap();
     g.commit("base".into(), "test".into()).unwrap();
     g.create_branch("base".into()).unwrap();
-    let later = g.add_node();
+    let later = g.add_node().unwrap();
     let edge = g.add_edge(base, later).unwrap();
     let selection = g
         .pool_mut()
@@ -76,14 +76,14 @@ fn reset_keeps_other_branch_selections_endpoints_and_allocation() {
         HashSet::from([base, later])
     );
     assert_eq!(g.pool().get_edge_endpoints(edge), Some((base, later)));
-    let dirty = g.add_node();
+    let dirty = g.add_node().unwrap();
     g.reset_hard().unwrap();
     assert!(!g.has_node(dirty));
     assert_eq!(
         g.pool().get_subgraph(selection).unwrap().1,
         HashSet::from([edge])
     );
-    assert_eq!(g.add_node(), dirty + 1);
+    assert_eq!(g.add_node().unwrap(), dirty + 1);
     g.reset_hard().unwrap();
     g.checkout_branch("main".into()).unwrap();
     assert!(g.has_node(meta));
@@ -92,11 +92,11 @@ fn reset_keeps_other_branch_selections_endpoints_and_allocation() {
 
 #[test]
 fn missing_referents_reject_before_creation_and_detached_materialization() {
-    let mut g = Graph::new();
+    let mut g = Graph::new_manual();
     assert!(g.create_meta_node(123).is_err());
     assert_eq!(g.node_count(), 0);
     assert!(!g.has_uncommitted_changes());
-    let n = g.add_node();
+    let n = g.add_node().unwrap();
     assert_eq!(n, 0);
     let selection = g
         .pool_mut()

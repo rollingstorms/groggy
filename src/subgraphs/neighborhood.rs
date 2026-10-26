@@ -567,7 +567,7 @@ impl NeighborhoodSampler {
         // Use the live graph when available so downstream operations mutate shared state
         let graph_ref = self
             .graph_ref()
-            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
+            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
 
         // Generate proper SubgraphId using hash of content
         let subgraph_id = {
@@ -669,7 +669,7 @@ impl NeighborhoodSampler {
                 .record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
             let graph_ref = self
                 .graph_ref()
-                .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
+                .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
             let subgraph_id = 1;
             return Ok(NeighborhoodSubgraph {
                 graph_ref,
@@ -724,7 +724,7 @@ impl NeighborhoodSampler {
 
         let graph_ref = self
             .graph_ref()
-            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
+            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
         let subgraph_id = 2;
         Ok(NeighborhoodSubgraph {
             graph_ref,
@@ -789,7 +789,7 @@ impl NeighborhoodSampler {
 
         let graph_ref = self
             .graph_ref()
-            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
+            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
         let subgraph_id = 3;
         Ok(NeighborhoodSubgraph {
             graph_ref,
@@ -872,13 +872,13 @@ mod tests {
     #[test]
     fn test_neighborhood_operations() {
         // Test NeighborhoodOperations implementation
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Create a small test graph
-        let center = graph.add_node();
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
+        let center = graph.add_node().unwrap();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
 
         let _edge1 = graph.add_edge(center, node1).unwrap();
         let _edge2 = graph.add_edge(center, node2).unwrap();

@@ -38,8 +38,8 @@ fn values() -> Vec<AttrValue> {
 fn export_round_trips_every_inline_value_and_float_bits_on_nodes_and_edges() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("graph.json");
-    let mut graph = Graph::new_directed();
-    let nodes = graph.add_nodes(2);
+    let mut graph = Graph::new_directed_manual();
+    let nodes = graph.add_nodes(2).unwrap();
     let edge = graph.add_edge(nodes[0], nodes[1]).unwrap();
     for (i, value) in values().into_iter().enumerate() {
         graph
@@ -155,8 +155,8 @@ fn encoding_errors_preserve_an_existing_destination() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("existing.json");
     for value in [AttrValue::SubgraphRef(0), AttrValue::Json("{".into())] {
-        let mut graph = Graph::new();
-        let node = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node = graph.add_node().unwrap();
         graph.set_node_attr(node, "bad".into(), value).unwrap();
         std::fs::write(&path, b"previous saved data").unwrap();
         assert!(graph.save_to_path(&path).is_err());

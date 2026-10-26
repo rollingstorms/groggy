@@ -34,7 +34,7 @@ fn people_batch() -> GraphBatch {
 
 #[test]
 fn schema_batch_publishes_once_and_preserves_prior_snapshot() {
-    let mut graph = Graph::new_directed();
+    let mut graph = Graph::new_directed_manual();
     let first = graph
         .apply_batch_with_schema(people_batch(), 0, "people".into(), "test".into(), &schema())
         .unwrap();
@@ -73,7 +73,7 @@ fn schema_batch_publishes_once_and_preserves_prior_snapshot() {
 
 #[test]
 fn all_schema_findings_reject_before_ids_properties_or_history_change() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut batch = people_batch();
     batch.node_attrs.remove("name");
     batch
@@ -92,14 +92,14 @@ fn all_schema_findings_reject_before_ids_properties_or_history_change() {
     assert_eq!(graph.current_state_id(), 0);
     assert_eq!(graph.commit_history().len(), 0);
     assert!(!graph.has_uncommitted_changes());
-    assert_eq!(graph.add_node(), 0);
+    assert_eq!(graph.add_node().unwrap(), 0);
     assert_eq!(graph.add_edge(0, 0).unwrap(), 0);
 }
 
 #[test]
 fn label_and_required_property_changes_are_validated_together() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph
         .set_node_attr(node, "name".into(), AttrValue::Int(42))
         .unwrap();
@@ -131,8 +131,8 @@ fn label_and_required_property_changes_are_validated_together() {
 
 #[test]
 fn unchanged_invalid_entities_are_checked_but_removed_entities_are_excluded() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(2).unwrap();
     graph
         .set_node_labels(nodes[0], vec!["Entity".into()])
         .unwrap();
@@ -172,8 +172,8 @@ fn unchanged_invalid_entities_are_checked_but_removed_entities_are_excluded() {
 
 #[test]
 fn clearing_selectors_and_removing_edges_use_final_state_rules() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     graph.set_node_labels(node, vec!["Entity".into()]).unwrap();
     let edge = graph.add_edge(node, node).unwrap();
     graph
@@ -204,8 +204,8 @@ fn clearing_selectors_and_removing_edges_use_final_state_rules() {
 
 #[test]
 fn failed_schema_batch_respects_retained_allocation_high_water() {
-    let mut graph = Graph::new();
-    let removed = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let removed = graph.add_node().unwrap();
     graph.remove_node(removed).unwrap();
     let head = graph.commit("removed".into(), "test".into()).unwrap();
     let mut bad = people_batch();
@@ -215,12 +215,12 @@ fn failed_schema_batch_respects_retained_allocation_high_water() {
         .unwrap_err()
         .to_string();
     assert!(error.contains("node 1 [Entity].name"));
-    assert_eq!(graph.add_node(), 1);
+    assert_eq!(graph.add_node().unwrap(), 1);
 }
 
 #[test]
 fn stale_and_dirty_guards_also_apply_to_schema_batches() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     graph
         .apply_batch_with_schema(
             people_batch(),

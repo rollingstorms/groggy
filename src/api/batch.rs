@@ -133,6 +133,13 @@ impl GraphBatch {
                 "Batch ID allocation would overflow".into(),
             ));
         }
+        if std::alloc::Layout::array::<NodeId>(self.add_nodes).is_err()
+            || std::alloc::Layout::array::<AttrValue>(self.add_nodes).is_err()
+        {
+            return Err(GraphError::InvalidInput(
+                "Batch node allocation exceeds vector capacity".into(),
+            ));
+        }
         let mut errors = Vec::new();
         let node_end = next_node_id + self.add_nodes;
         let edge_end = next_edge_id + self.add_edges.len();

@@ -10,8 +10,8 @@ use std::{
 
 type Shared = Rc<RefCell<Graph>>;
 fn ring() -> Shared {
-    let mut g = Graph::new();
-    g.add_nodes(50);
+    let mut g = Graph::new_manual();
+    g.add_nodes(50).unwrap();
     g.remove_node(48).unwrap();
     for c in 0..16 {
         let a = c * 3;

@@ -56,8 +56,8 @@ fn independent_captures_do_not_alias_even_when_shape_and_values_match() {
 
 #[test]
 fn graph_captures_have_distinct_identity_and_shared_clones_remain_frozen() {
-    let mut graph = Graph::new();
-    let id = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let id = graph.add_node().unwrap();
     graph
         .set_node_attr(id, "name".into(), V::Text("before".into()))
         .unwrap();

@@ -20,8 +20,8 @@ fn coordinates() -> GraphMatrix {
 }
 #[test]
 fn actual_edges_beyond_old_cap_and_sparse_ids_control_only_their_endpoints() {
-    let mut graph = Graph::new();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     let input = coordinates();
     let before = input.to_vec().unwrap();
@@ -47,8 +47,8 @@ fn actual_edges_beyond_old_cap_and_sparse_ids_control_only_their_endpoints() {
 }
 #[test]
 fn row_permutations_preserve_identity_and_parallel_instances_add_forces() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     graph.add_edge(0, 2).unwrap();
     let input = coordinates();
     let result = spring(1).optimize_positions(&input, &graph).unwrap();
@@ -78,8 +78,8 @@ fn row_permutations_preserve_identity_and_parallel_instances_add_forces() {
 }
 #[test]
 fn controls_identity_and_unsupported_modes_are_checked_even_without_iterations() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     for rate in [0.0, -1.0, f64::NAN, f64::INFINITY] {
         assert!(EnergyEmbeddingBuilder::new()
             .iterations(0)
@@ -112,7 +112,9 @@ fn controls_identity_and_unsupported_modes_are_checked_even_without_iterations()
             .is_err());
     }
     assert!(spring(0).compute_embedding(&graph, 0).is_err());
-    assert!(spring(0).compute_embedding(&Graph::new(), 2).is_err());
+    assert!(spring(0)
+        .compute_embedding(&Graph::new_manual(), 2)
+        .is_err());
     assert!(spring(0).compute_embedding(&graph, usize::MAX).is_err());
     assert!(spring(0)
         .optimize_positions(&GraphMatrix::zeros(2, 2), &graph)
@@ -132,8 +134,8 @@ fn controls_identity_and_unsupported_modes_are_checked_even_without_iterations()
         input.set(0, 0, value).unwrap();
         assert!(spring(0).optimize_positions(&input, &graph).is_err());
     }
-    let mut singleton = Graph::new();
-    singleton.add_node();
+    let mut singleton = Graph::new_manual();
+    singleton.add_node().unwrap();
     let result = spring(10).compute_embedding(&singleton, 1).unwrap();
     assert_eq!(result.shape(), (1, 1));
     assert_eq!(result.row_labels().unwrap(), ["node_0"]);
@@ -144,8 +146,8 @@ fn controls_identity_and_unsupported_modes_are_checked_even_without_iterations()
 }
 #[test]
 fn factory_energy_and_force_directed_honor_seed_without_global_rng_mutation() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     graph.add_edge(0, 2).unwrap();
     for method in [
         EmbeddingMethod::EnergyND {

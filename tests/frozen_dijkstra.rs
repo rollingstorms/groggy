@@ -4,12 +4,12 @@ use std::{collections::HashSet, sync::atomic::AtomicBool};
 fn frozen_weighted_distances_match_floyd_warshall_on_small_multigraphs() {
     for directed in [false, true] {
         for mask in 0..512 {
-            let mut graph = Graph::new_with_type(if directed {
+            let mut graph = Graph::new_with_type_manual(if directed {
                 GraphType::Directed
             } else {
                 GraphType::Undirected
             });
-            let all = graph.add_nodes(4);
+            let all = graph.add_nodes(4).unwrap();
             graph.remove_node(all[1]).unwrap();
             let n = [all[0], all[2], all[3]];
             let mut d = vec![vec![f64::INFINITY; 3]; 3];
@@ -60,8 +60,8 @@ fn frozen_weighted_distances_match_floyd_warshall_on_small_multigraphs() {
 }
 #[test]
 fn captured_weights_and_selected_parallel_instances_survive_mutation_and_owner_drop() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let n = graph.add_nodes(4);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let n = graph.add_nodes(4).unwrap();
     let a = graph.add_edge(n[0], n[1]).unwrap();
     let b = graph.add_edge(n[1], n[2]).unwrap();
     let excluded = graph.add_edge(n[0], n[2]).unwrap();
@@ -118,8 +118,8 @@ fn selected_weights_are_validated_even_on_unreachable_edges_and_missing_is_one()
         V::Float(f32::INFINITY),
         V::Int(-1),
     ] {
-        let mut graph = Graph::new();
-        let n = graph.add_nodes(3);
+        let mut graph = Graph::new_manual();
+        let n = graph.add_nodes(3).unwrap();
         let edge = graph.add_edge(n[1], n[2]).unwrap();
         graph.set_edge_attr(edge, "w".into(), bad).unwrap();
         let view = graph.read_view().unwrap();
@@ -129,8 +129,8 @@ fn selected_weights_are_validated_even_on_unreachable_edges_and_missing_is_one()
             vec![(n[0], 0.)]
         );
     }
-    let mut graph = Graph::new();
-    let n = graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    let n = graph.add_nodes(3).unwrap();
     let a = graph.add_edge(n[0], n[1]).unwrap();
     graph.add_edge(n[1], n[2]).unwrap();
     graph.set_edge_attr(a, "w".into(), V::Int(0)).unwrap();

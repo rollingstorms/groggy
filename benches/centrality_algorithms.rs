@@ -10,10 +10,10 @@ use groggy::subgraphs::Subgraph;
 use groggy::types::NodeId;
 
 fn build_chain(length: usize) -> Subgraph {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut nodes: Vec<NodeId> = Vec::with_capacity(length);
     for _ in 0..length {
-        nodes.push(graph.add_node());
+        nodes.push(graph.add_node().unwrap());
     }
     for window in nodes.windows(2) {
         let u = window[0];

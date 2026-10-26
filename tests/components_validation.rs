@@ -23,11 +23,11 @@ fn exhaustive_three_node_graphs_match_independent_transitive_closure() {
     for directed in [false, true] {
         for mask in 0..512 {
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
-            graph.add_nodes(3);
+            graph.add_nodes(3).unwrap();
             let mut adjacency = [[false; 3]; 3];
             for (u, row) in adjacency.iter_mut().enumerate() {
                 row[u] = true;
@@ -90,8 +90,8 @@ fn cached_membership_rejects_stale_entities_and_cancellation() {
         ComponentMode::Weak,
         ComponentMode::Strong,
     ] {
-        let mut graph = Graph::new();
-        graph.add_nodes(5);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(5).unwrap();
         graph.remove_node(1).unwrap();
         let edge = graph.add_edge(2, 0).unwrap();
         graph.add_edge(2, 0).unwrap();
@@ -118,8 +118,8 @@ fn cached_membership_rejects_stale_entities_and_cancellation() {
 #[test]
 fn empty_singleton_closed_selection_and_nonpersistent_outputs() {
     for n in [0, 1, 3] {
-        let mut graph = Graph::new_directed();
-        graph.add_nodes(n);
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(n).unwrap();
         let g = Rc::new(RefCell::new(graph));
         for mode in [
             ComponentMode::Undirected,
@@ -146,8 +146,8 @@ fn empty_singleton_closed_selection_and_nonpersistent_outputs() {
                 .is_none()));
         }
     }
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let edge = graph.add_edge(0, 1).unwrap();
     let g = Rc::new(RefCell::new(graph));
     let sub = Subgraph::new(
@@ -163,8 +163,8 @@ fn empty_singleton_closed_selection_and_nonpersistent_outputs() {
 
 #[test]
 fn long_directed_path_uses_an_explicit_stack() {
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(10_000);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(10_000).unwrap();
     for n in 1..10_000 {
         graph.add_edge(n, n - 1).unwrap();
     }

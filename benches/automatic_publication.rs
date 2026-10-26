@@ -5,11 +5,11 @@ use std::{collections::HashMap, time::Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
-        for workload in ["bulk_insert", "bulk_set", "scalar_set"] {
+        for workload in ["bulk_insert", "scalar_insert", "bulk_set", "scalar_set"] {
             let mut samples = Vec::new();
             for _ in 0..5 {
-                let mut graph = Graph::new_publishing();
-                if workload != "bulk_insert" {
+                let mut graph = Graph::new();
+                if !matches!(workload, "bulk_insert" | "scalar_insert") {
                     graph.insert_nodes(count)?;
                 }
                 let values: Vec<_> = (0..count)
@@ -18,7 +18,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let started = Instant::now();
                 match workload {
                     "bulk_insert" => {
-                        std::hint::black_box(graph.insert_nodes(count)?);
+                        std::hint::black_box(graph.add_nodes(count)?);
+                    }
+                    "scalar_insert" => {
+                        for _ in 0..count {
+                            std::hint::black_box(graph.add_node()?);
+                        }
                     }
                     "bulk_set" => {
                         graph.set_node_attrs(HashMap::from([("value".into(), values)]))?
@@ -34,6 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let expected = match workload {
                     "bulk_insert" => 1,
                     "bulk_set" => 2,
+                    "scalar_insert" => count as u64,
                     _ => count as u64 + 1,
                 };
                 if graph.current_state_id() != expected || graph.has_uncommitted_changes() {
@@ -49,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(
         &output,
         serde_json::to_vec_pretty(&json!({
-            "scope":"Native release operations; fixture construction excluded except bulk_insert. Bulk and scalar history semantics differ; no speedup/SLA claim. Scalar_set includes its per-call name/column preparation; bulk_set includes column-map construction. No FFI or RSS measurement.",
+            "scope":"Native default Graph release operations; fixture construction excluded except bulk_insert/scalar_insert. Bulk and scalar history semantics differ; no speedup/SLA claim. Scalar_set includes its per-call name/column preparation; bulk_set includes column-map construction. No FFI or RSS measurement.",
             "cases":cases
         }))?,
     )?;

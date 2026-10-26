@@ -15,8 +15,8 @@ fn selected(graph: &Rc<RefCell<Graph>>) -> Subgraph {
 }
 #[test]
 fn persisted_scores_keep_the_exact_owned_f64_result() {
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(4).unwrap();
     graph
         .set_node_attr(0, "source".into(), AttrValue::Bool(true))
         .unwrap();
@@ -82,8 +82,8 @@ fn persisted_scores_keep_the_exact_owned_f64_result() {
 }
 #[test]
 fn canonical_and_compatibility_edges_share_wide_weight_and_capacity_access() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     let id = graph.add_edge(0, 1).unwrap();
     let graph = Rc::new(RefCell::new(graph));
     let edge = Edge::new(id, graph.clone()).unwrap();

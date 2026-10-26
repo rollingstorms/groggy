@@ -952,10 +952,10 @@ mod tests {
 
     #[test]
     fn test_undirected_components() -> Result<()> {
-        let graph = Rc::new(RefCell::new(Graph::new()));
+        let graph = Rc::new(RefCell::new(Graph::new_manual()));
         let nodes = {
             let mut g = graph.borrow_mut();
-            let ids = g.add_nodes(5);
+            let ids = g.add_nodes(5).unwrap();
             g.add_edge(ids[0], ids[1]).unwrap();
             g.add_edge(ids[1], ids[2]).unwrap();
             g.add_edge(ids[3], ids[4]).unwrap();
@@ -988,10 +988,10 @@ mod tests {
 
     #[test]
     fn test_strong_components() -> Result<()> {
-        let graph = Rc::new(RefCell::new(Graph::new_directed()));
+        let graph = Rc::new(RefCell::new(Graph::new_directed_manual()));
         let nodes = {
             let mut g = graph.borrow_mut();
-            let ids = g.add_nodes(4);
+            let ids = g.add_nodes(4).unwrap();
             g.add_edge(ids[0], ids[1]).unwrap();
             g.add_edge(ids[1], ids[2]).unwrap();
             g.add_edge(ids[2], ids[0]).unwrap();
@@ -1022,10 +1022,10 @@ mod tests {
 
     #[test]
     fn test_weak_vs_strong() -> Result<()> {
-        let graph = Rc::new(RefCell::new(Graph::new_directed()));
+        let graph = Rc::new(RefCell::new(Graph::new_directed_manual()));
         let nodes = {
             let mut g = graph.borrow_mut();
-            let ids = g.add_nodes(3);
+            let ids = g.add_nodes(3).unwrap();
             g.add_edge(ids[0], ids[1]).unwrap();
             g.add_edge(ids[1], ids[2]).unwrap();
             ids

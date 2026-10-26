@@ -615,3 +615,16 @@ owned copies, archives and durable checkpoint/recovery; repeated restoration doe
 not append duplicate values. Public property equality/history hashes are unchanged.
 See `restoration-float-bits-2026-10-26.md` for regression and measured scope.
 Counts remain **201 checked / 67 open**; no new rows or owner decisions.
+
+## 2026-10-26 — native default migration component completed
+
+Ordinary native Graph construction now publishes, node insertion and custom config
+construction return visible errors, and explicit manual factories preserve deferred
+assembly. Private fixtures/imports spell out that policy; ordinary bulk creates one
+version. Node accessor append/extend are registered and validate complete inputs
+before one native bulk creation. See `native-default-migration-2026-10-26.md` for
+source migration, tests and release timings. Existing 09.4b.2 inventory shrinks from
+three components to two: raw mutable storage escapes and uncertified/topology
+compound acceptance. **201 checked / 67 open**, no new rows or owner decisions.
+The raw audit found a silent unsupported pooled-attribute setter; it remains part
+of that existing boundary repair, with no new checklist task.

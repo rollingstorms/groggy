@@ -1,16 +1,16 @@
 use groggy::{
     storage::{
-        matrix::{unified_matrix::MatrixStorage, Strides, UnifiedMatrix},
         matrix::FromAttrValue,
+        matrix::{unified_matrix::MatrixStorage, Strides, UnifiedMatrix},
     },
     types::AttrValue,
     Graph,
 };
 #[test]
 fn feature_export_reads_branch_references_and_sorts_columns() {
-    let mut graph = Graph::new();
-    let a = graph.add_node();
-    let b = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let a = graph.add_node().unwrap();
+    let b = graph.add_node().unwrap();
     graph
         .set_node_attr(a, "z".into(), AttrValue::Int(i64::MAX))
         .unwrap();
@@ -35,7 +35,7 @@ fn feature_export_reads_branch_references_and_sorts_columns() {
         [format!("node_{a}"), format!("node_{b}")]
     );
     assert_eq!(matrix.to_vec().unwrap(), vec![4, i64::MAX, 0, 0]);
-    let empty = Graph::new().to_matrix_i64().unwrap();
+    let empty = Graph::new_manual().to_matrix_i64().unwrap();
     assert_eq!(empty.shape(), (0, 0));
     assert!(empty.row_labels().unwrap().is_empty());
 }

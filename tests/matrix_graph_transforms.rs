@@ -80,10 +80,10 @@ fn sparse_operators_stay_sparse_and_domains_return_errors() {
 }
 #[test]
 fn graph_high_level_routes_execute_true_operators() {
-    let mut graph = Graph::new();
-    let a = graph.add_node();
-    let b = graph.add_node();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    let a = graph.add_node().unwrap();
+    let b = graph.add_node().unwrap();
+    graph.add_node().unwrap();
     graph.add_edge(a, b).unwrap();
     let l = graph.laplacian_matrix(true).unwrap();
     let names = l.column_names();

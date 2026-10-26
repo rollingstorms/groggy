@@ -1,17 +1,15 @@
 //! Publication policy for fallible ordinary operations and compatibility imports.
+#![doc = include_str!("../../../docs/api/native-mutation-defaults.md")]
 use super::*;
 
 impl Graph {
-    /// Create an empty publishing graph. Use the fallible insert_nodes or
-    /// try_add_node constructors; existing infallible constructors remain manual.
+    /// Explicit alias for the ordinary checked publishing constructor.
     pub fn new_publishing() -> Self {
-        let mut graph = Self::new();
-        graph.automatic_publication = true;
-        graph
+        Self::new()
     }
 
-    /// Enable checked publication for fallible ordinary operations. Infallible
-    /// legacy Rust constructors remain manual; use insert_nodes/try_add_node.
+    /// Change the policy for fallible ordinary operations. Use new_manual for
+    /// deferred construction; add_node/add_nodes always return visible errors.
     /// Changing policy requires a clean state, preventing silent mixed writers.
     pub fn set_automatic_publication(&mut self, enabled: bool) -> GraphResult<()> {
         self.validate_write_head(self.current_state_id())?;
@@ -25,10 +23,26 @@ impl Graph {
 
     /// Fallible node-count constructor respecting this graph's publication policy.
     pub fn insert_nodes(&mut self, count: usize) -> GraphResult<Vec<NodeId>> {
+        if count == 0 {
+            return Ok(Vec::new());
+        }
         if self.automatic_publication {
             self.try_add_nodes(count)
         } else {
-            Ok(self.add_nodes(count))
+            let allocated = self.pool.borrow().statistics();
+            let prepared = GraphBatch {
+                add_nodes: count,
+                ..Default::default()
+            }
+            .prepare(
+                |id| self.has_node(id),
+                |id| self.has_edge(id),
+                |id| self.pool.borrow().get_edge_endpoints(id),
+                allocated.node_count,
+                allocated.edge_count,
+            )?;
+            self.execute_prepared_mutation(prepared)
+                .map(|(nodes, _)| nodes)
         }
     }
 

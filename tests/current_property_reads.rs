@@ -37,8 +37,8 @@ fn readers(graph: &Graph, node: bool, id: usize, name: &str) -> Vec<GraphResult<
 fn every_current_reader_rejects_missing_columns_and_out_of_bounds_indices() {
     for node in [false, true] {
         for column_exists in [false, true] {
-            let mut graph = Graph::new();
-            graph.add_nodes(2);
+            let mut graph = Graph::new_manual();
+            graph.add_nodes(2).unwrap();
             graph.add_edge(0, 1).unwrap();
             if column_exists {
                 if node {
@@ -83,8 +83,8 @@ fn every_current_reader_rejects_missing_columns_and_out_of_bounds_indices() {
 
 #[test]
 fn aligned_columns_preserve_order_duplicates_null_absence_and_liveness() {
-    let mut graph = Graph::new();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(3).unwrap();
     graph.add_edges(&[(0, 0), (0, 1), (1, 2)]).unwrap();
     for node in [false, true] {
         if node {
@@ -152,8 +152,8 @@ fn aligned_columns_preserve_order_duplicates_null_absence_and_liveness() {
 
 #[test]
 fn bulk_requested_projection_ignores_corruption_outside_its_scope() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     graph.add_edges(&[(0, 0), (1, 1)]).unwrap();
     graph
         .set_node_attr(0, "v".into(), V::Bytes(vec![0, 255]))

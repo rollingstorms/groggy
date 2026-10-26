@@ -10,12 +10,12 @@ use groggy::types::NodeId;
 use std::collections::HashSet;
 
 fn build_subgraph(num_clusters: usize, cluster_size: usize) -> Subgraph {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut clusters: Vec<Vec<NodeId>> = Vec::with_capacity(num_clusters);
     for _ in 0..num_clusters {
         let mut nodes = Vec::with_capacity(cluster_size);
         for _ in 0..cluster_size {
-            nodes.push(graph.add_node());
+            nodes.push(graph.add_node().unwrap());
         }
         clusters.push(nodes);
     }

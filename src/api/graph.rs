@@ -182,22 +182,29 @@ impl Graph {
     pub fn new_with_type(graph_type: crate::types::GraphType) -> Self {
         let mut config = GraphConfig::new();
         config.graph_type = graph_type;
-        let pool = Rc::new(RefCell::new(GraphPool::new_with_type(graph_type)));
-        Self {
-            space: GraphSpace::new(pool.clone(), 0), // base state = 0
-            pool,
-            history: HistoryForest::new_with_type(graph_type),
-            current_branch: "main".to_string(),
-            current_commit: 0,
-            query_engine: QueryEngine::new(),
-            traversal_engine: TraversalEngine::new(),
-            neighborhood_sampler: NeighborhoodSampler::new(),
-            self_reference: None,
-            identities: ExternalIdentityIndex::default(),
-            change_tracker: ChangeTracker::new(),
-            automatic_publication: false,
-            config,
-        }
+        Self::from_config(config, true)
+    }
+
+    /// Explicit deferred/manual construction for private assembly or legacy edits.
+    pub fn new_manual() -> Self {
+        Self::from_config(GraphConfig::new(), false)
+    }
+
+    /// Explicit manual construction with a chosen direction.
+    pub fn new_with_type_manual(graph_type: crate::types::GraphType) -> Self {
+        let mut config = GraphConfig::new();
+        config.graph_type = graph_type;
+        Self::from_config(config, false)
+    }
+
+    /// Explicit directed manual graph.
+    pub fn new_directed_manual() -> Self {
+        Self::new_with_type_manual(crate::types::GraphType::Directed)
+    }
+
+    /// Explicit undirected manual graph.
+    pub fn new_undirected_manual() -> Self {
+        Self::new_with_type_manual(crate::types::GraphType::Undirected)
     }
 
     /// Create a new directed graph (like NetworkX DiGraph)
@@ -215,7 +222,22 @@ impl Graph {
     }
 
     /// Create a graph with custom configuration
-    pub fn with_config(config: GraphConfig) -> Self {
+    pub fn with_config(config: GraphConfig) -> GraphResult<Self> {
+        config
+            .validate()
+            .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+        Ok(Self::from_config(config, true))
+    }
+
+    /// Explicit deferred/manual construction with validated custom configuration.
+    pub fn with_config_manual(config: GraphConfig) -> GraphResult<Self> {
+        config
+            .validate()
+            .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
+        Ok(Self::from_config(config, false))
+    }
+
+    fn from_config(config: GraphConfig, automatic_publication: bool) -> Self {
         let pool = Rc::new(RefCell::new(GraphPool::new_with_type(config.graph_type)));
         Self {
             space: GraphSpace::new(pool.clone(), 0), // base state = 0
@@ -229,7 +251,7 @@ impl Graph {
             self_reference: None,
             identities: ExternalIdentityIndex::default(),
             change_tracker: ChangeTracker::new(),
-            automatic_publication: false,
+            automatic_publication,
             config,
         }
     }
@@ -349,32 +371,21 @@ impl Graph {
     /// 3. Return the node ID to caller
     ///
     /// PERFORMANCE: O(1) amortized
-    pub fn add_node(&mut self) -> NodeId {
-        let node_id = self.pool.borrow_mut().add_node(); // Pool creates and stores
-        self.space.activate_node(node_id); // Space tracks as active
-        self.change_tracker.record_node_addition(node_id); // Track change for commit
-
-        // WORF SAFETY: Set entity_type efficiently using direct pool access
-        // This bypasses the expensive validation in set_node_attr_internal
-        let entity_type_attr: AttrName = "entity_type".into();
-        let index = self.pool.borrow_mut().set_attr(
-            entity_type_attr.clone(),
-            AttrValue::Text("base".to_string()),
-            true,
-        );
-
-        // Register the index in GraphSpace so the attribute is queryable
-        self.space
-            .set_node_attr_index(node_id, entity_type_attr.clone(), index);
-        self.change_tracker
-            .record_attr_change(node_id, entity_type_attr, None, index, true);
-
-        node_id
+    pub fn add_node(&mut self) -> GraphResult<NodeId> {
+        self.add_nodes(1)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| GraphError::InvalidInput("node insertion returned no ID".into()))
     }
 
     /// Add multiple nodes efficiently
     /// OPTIMIZED: True bulk operation using vectorized pool operations
-    pub fn add_nodes(&mut self, count: usize) -> Vec<NodeId> {
+    pub fn add_nodes(&mut self, count: usize) -> GraphResult<Vec<NodeId>> {
+        self.insert_nodes(count)
+    }
+
+    // Storage executor only; caller must prepare/validate before allocation.
+    fn add_nodes_internal(&mut self, count: usize) -> Vec<NodeId> {
         if count == 0 {
             return Vec::new();
         }
@@ -491,7 +502,7 @@ impl Graph {
         }
 
         self.validate_new_node_attrs(&rows)?;
-        let nodes = self.add_nodes(rows.len());
+        let nodes = self.add_nodes(rows.len())?;
         let mut columns: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
         for (node, attrs) in nodes.iter().copied().zip(rows) {
             for (name, value) in attrs {
@@ -1668,7 +1679,7 @@ impl Graph {
         prepared: crate::api::batch::PreparedBatch,
     ) -> GraphResult<(Vec<NodeId>, Vec<EdgeId>)> {
         let added_nodes = if prepared.add_nodes > 0 {
-            self.add_nodes(prepared.add_nodes)
+            self.add_nodes_internal(prepared.add_nodes)
         } else {
             Vec::new()
         };
@@ -2218,7 +2229,7 @@ impl Graph {
 
     /// Construct a fresh graph from a historical snapshot.
     pub fn from_snapshot(snapshot: crate::state::state::GraphSnapshot) -> Result<Self, GraphError> {
-        let mut graph = Graph::new_with_type(snapshot.graph_type);
+        let mut graph = Graph::new_with_type_manual(snapshot.graph_type);
         graph.reset_to_snapshot(snapshot)?;
         graph.seed_selected_import()?;
         Ok(graph)
@@ -2978,8 +2989,8 @@ mod tests {
     #[test]
     fn test_add_node_entity_type_indexed() {
         // Test that entity_type is properly indexed after add_node
-        let mut graph = Graph::new();
-        let node_id = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node_id = graph.add_node().unwrap();
 
         // Should be able to retrieve entity_type attribute
         let entity_type = graph
@@ -2993,8 +3004,8 @@ mod tests {
     #[test]
     fn test_add_nodes_entity_type_indexed() {
         // Test that entity_type is properly indexed after add_nodes bulk operation
-        let mut graph = Graph::new();
-        let node_ids = graph.add_nodes(5);
+        let mut graph = Graph::new_manual();
+        let node_ids = graph.add_nodes(5).unwrap();
 
         assert_eq!(node_ids.len(), 5);
 
@@ -3012,8 +3023,8 @@ mod tests {
     #[test]
     fn test_bulk_node_attrs_tracked() {
         // Test that bulk attribute updates are recorded in change tracker
-        let mut graph = Graph::new();
-        let node_ids = graph.add_nodes(3);
+        let mut graph = Graph::new_manual();
+        let node_ids = graph.add_nodes(3).unwrap();
 
         // Commit initial state
         graph
@@ -3056,8 +3067,8 @@ mod tests {
     #[test]
     fn test_bulk_edge_attrs_tracked() {
         // Test that bulk edge attribute updates are recorded in change tracker
-        let mut graph = Graph::new();
-        let node_ids = graph.add_nodes(4);
+        let mut graph = Graph::new_manual();
+        let node_ids = graph.add_nodes(4).unwrap();
 
         // Add some edges
         let edge1 = graph
@@ -3111,10 +3122,10 @@ mod tests {
     #[test]
     fn test_add_graph_topology_preserved() {
         // Test that add_graph properly clones topology with remapped IDs
-        let mut source_graph = Graph::new();
+        let mut source_graph = Graph::new_manual();
 
         // Build source graph with 3 nodes and 2 edges
-        let src_nodes = source_graph.add_nodes(3);
+        let src_nodes = source_graph.add_nodes(3).unwrap();
         let src_edge1 = source_graph
             .add_edge(src_nodes[0], src_nodes[1])
             .expect("Add edge should succeed");
@@ -3163,7 +3174,7 @@ mod tests {
             .unwrap();
 
         // Create target graph and merge
-        let mut target_graph = Graph::new();
+        let mut target_graph = Graph::new_manual();
         target_graph
             .add_graph(&source_graph)
             .expect("add_graph should succeed");
@@ -3217,10 +3228,10 @@ mod tests {
         use crate::storage::table::traits::Table;
 
         // Test bulk neighbors operation returns proper BaseTable
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Create a small graph: 0->1, 0->2, 1->2, 2->3
-        let nodes = graph.add_nodes(4);
+        let nodes = graph.add_nodes(4).unwrap();
         graph.add_edge(nodes[0], nodes[1]).unwrap();
         graph.add_edge(nodes[0], nodes[2]).unwrap();
         graph.add_edge(nodes[1], nodes[2]).unwrap();

@@ -2,7 +2,7 @@ use groggy::{AttrValue as V, Graph, GraphBatch, NodeUpsert};
 use std::collections::{HashMap, HashSet};
 
 fn publishing() -> Graph {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     graph.set_automatic_publication(true).unwrap();
     graph
 }
@@ -155,14 +155,22 @@ fn meta_creation_publishes_valid_system_properties_together_and_copy_is_prefligh
     );
 }
 #[test]
-fn explicit_legacy_writes_cannot_be_silently_mixed_into_a_publishing_graph() {
+fn native_ordinary_writes_publish_and_explicit_manual_edits_cannot_cross_the_policy_guard() {
     let mut graph = publishing();
-    graph.add_node(); // Existing infallible Rust compatibility API remains manual.
-    assert!(graph.set_node_attr(0, "x".into(), V::Int(1)).is_err());
-    assert!(graph.set_automatic_publication(false).is_err());
-    graph
-        .commit("legacy boundary".into(), "test".into())
-        .unwrap();
+    graph.add_node().unwrap();
     graph.set_node_attr(0, "x".into(), V::Int(1)).unwrap();
+    assert!(!graph.has_uncommitted_changes());
+    graph.set_automatic_publication(false).unwrap();
+    graph.add_node().unwrap();
+    assert!(graph.set_automatic_publication(true).is_err());
+    assert!(graph
+        .writer("test")
+        .set_node_attr(0, "x".into(), V::Int(2))
+        .is_err());
+    graph
+        .commit("manual boundary".into(), "test".into())
+        .unwrap();
+    graph.set_automatic_publication(true).unwrap();
+    graph.set_node_attr(0, "x".into(), V::Int(2)).unwrap();
     assert!(!graph.has_uncommitted_changes());
 }

@@ -128,8 +128,8 @@ fn read(g: &Rc<RefCell<Graph>>, nodes: &[usize]) -> Vec<AttrValue> {
 fn resolution_changes_local_moves_in_both_algorithms() {
     for leiden in [false, true] {
         for gamma in [0.5, 3.] {
-            let mut graph = Graph::new();
-            graph.add_nodes(2);
+            let mut graph = Graph::new_manual();
+            graph.add_nodes(2).unwrap();
             graph.add_edge(1, 0).unwrap();
             let g = Rc::new(RefCell::new(graph));
             algorithm(leiden, gamma)
@@ -154,8 +154,8 @@ fn loop_and_parallel_topology_matches_full_objective_and_keeps_isolates() {
         (3, 3),
     ];
     for leiden in [false, true] {
-        let mut graph = Graph::new();
-        graph.add_nodes(6);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(6).unwrap();
         graph.remove_node(4).unwrap();
         for &(u, v) in &edges {
             graph.add_edge(u, v).unwrap();
@@ -193,8 +193,8 @@ fn loop_and_parallel_topology_matches_full_objective_and_keeps_isolates() {
 fn empty_edgeless_stale_directed_and_cancelled_inputs_have_explicit_behavior() {
     for leiden in [false, true] {
         for count in [0, 1, 3] {
-            let mut graph = Graph::new();
-            graph.add_nodes(count);
+            let mut graph = Graph::new_manual();
+            graph.add_nodes(count).unwrap();
             let g = Rc::new(RefCell::new(graph));
             algorithm(leiden, 1.)
                 .execute(&mut Context::new(), selected(&g))
@@ -204,19 +204,19 @@ fn empty_edgeless_stale_directed_and_cancelled_inputs_have_explicit_behavior() {
                 assert!(!values[..i].contains(v));
             }
         }
-        let mut graph = Graph::new();
-        graph.add_nodes(1);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(1).unwrap();
         let g = Rc::new(RefCell::new(graph));
         let sub = selected(&g);
         g.borrow_mut().remove_node(0).unwrap();
         assert!(algorithm(leiden, 1.)
             .execute(&mut Context::new(), sub)
             .is_err());
-        let g = Rc::new(RefCell::new(Graph::new_directed()));
+        let g = Rc::new(RefCell::new(Graph::new_directed_manual()));
         assert!(algorithm(leiden, 1.)
             .execute(&mut Context::new(), selected(&g))
             .is_err());
-        let g = Rc::new(RefCell::new(Graph::new()));
+        let g = Rc::new(RefCell::new(Graph::new_manual()));
         let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
         assert!(algorithm(leiden, 1.)
             .execute(&mut ctx, selected(&g))
@@ -243,8 +243,8 @@ fn constructors_and_registry_reject_invalid_parameters() {
 }
 #[test]
 fn seeded_leiden_is_reproducible_without_global_rng_side_effects() {
-    let mut graph = Graph::new();
-    graph.add_nodes(8);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(8).unwrap();
     for i in 0..8 {
         graph.add_edge(i, (i + 1) % 8).unwrap();
         graph.add_edge(i, (i + 3) % 8).unwrap();

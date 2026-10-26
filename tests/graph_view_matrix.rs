@@ -2,12 +2,12 @@ use groggy::{types::GraphType, AttrValue, Graph};
 #[test]
 fn weighted_parallel_scoped_operators_keep_captured_values_direction_and_identity() {
     for directed in [false, true] {
-        let mut graph = Graph::new_with_type(if directed {
+        let mut graph = Graph::new_with_type_manual(if directed {
             GraphType::Directed
         } else {
             GraphType::Undirected
         });
-        let nodes = graph.add_nodes(4);
+        let nodes = graph.add_nodes(4).unwrap();
         graph.remove_node(nodes[1]).unwrap();
         let a = nodes[0];
         let b = nodes[2];
@@ -77,8 +77,8 @@ fn weighted_parallel_scoped_operators_keep_captured_values_direction_and_identit
 }
 #[test]
 fn live_and_frozen_feature_exports_share_scoped_column_and_conversion_rules() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(3).unwrap();
     graph
         .set_node_attr(nodes[0], "a".into(), AttrValue::Int(7))
         .unwrap();
@@ -114,8 +114,8 @@ fn live_and_frozen_feature_exports_share_scoped_column_and_conversion_rules() {
 }
 #[test]
 fn missing_null_text_weight_policies_and_empty_shapes_match_graph_exports() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(2).unwrap();
     let first = graph.add_edge(nodes[0], nodes[1]).unwrap();
     let second = graph.add_edge(nodes[0], nodes[1]).unwrap();
     graph
@@ -150,14 +150,14 @@ fn missing_null_text_weight_policies_and_empty_shapes_match_graph_exports() {
         .unwrap()
         .adjacency_matrix::<f64>(true, Some("weight"))
         .is_err());
-    let empty = Graph::new().read_view().unwrap();
+    let empty = Graph::new_manual().read_view().unwrap();
     assert_eq!(empty.to_matrix::<f64>().unwrap().shape(), (0, 0));
     assert_eq!(
         empty.adjacency_matrix::<f64>(true, None).unwrap().shape(),
         (0, 0)
     );
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     assert_eq!(
         graph
             .read_view()

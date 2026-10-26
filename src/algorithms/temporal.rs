@@ -454,8 +454,8 @@ mod tests {
 
     #[test]
     fn retained_delta_reports_sorted_logical_property_changes_and_membership() {
-        let mut graph = Graph::new();
-        graph.add_nodes(4);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(4).unwrap();
         let edge = graph.add_edge(0, 1).unwrap();
         let removed_edge = graph.add_edge(2, 3).unwrap();
         graph
@@ -479,7 +479,7 @@ mod tests {
             .set_edge_attr(edge, "weight".into(), AttrValue::Float64(2.0))
             .unwrap();
         graph.remove_node(3).unwrap();
-        let new = graph.add_node();
+        let new = graph.add_node().unwrap();
         let added_edge = graph.add_edge(0, new).unwrap();
         let second = graph.commit("after".into(), "test".into()).unwrap();
         let after = graph.snapshot_at_commit(second).unwrap();
@@ -520,10 +520,10 @@ mod tests {
 
     #[test]
     fn retained_delta_rejects_foreign_history_even_when_numeric_ids_match() {
-        let mut first = Graph::new();
-        let mut second = Graph::new();
-        first.add_node();
-        second.add_node();
+        let mut first = Graph::new_manual();
+        let mut second = Graph::new_manual();
+        first.add_node().unwrap();
+        second.add_node().unwrap();
         let id = first.commit("same".into(), "test".into()).unwrap();
         assert_eq!(second.commit("same".into(), "test".into()).unwrap(), id);
         let before = first.snapshot_at_commit(id).unwrap();
@@ -582,8 +582,8 @@ mod tests {
     #[test]
     fn retained_delta_checks_cancellation_during_traversal() {
         use std::cell::Cell;
-        let mut graph = Graph::new();
-        graph.add_nodes(20);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(20).unwrap();
         let id = graph.commit("fixture".into(), "test".into()).unwrap();
         let snapshot = graph.snapshot_at_commit(id).unwrap();
         let checks = Cell::new(0);
@@ -597,8 +597,8 @@ mod tests {
 
     #[test]
     fn retained_delta_compares_sibling_branches_without_numeric_time_assumptions() {
-        let mut graph = Graph::new();
-        graph.add_node();
+        let mut graph = Graph::new_manual();
+        graph.add_node().unwrap();
         graph
             .set_node_attr(0, "x".into(), AttrValue::Int(0))
             .unwrap();

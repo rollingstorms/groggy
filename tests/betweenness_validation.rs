@@ -118,11 +118,11 @@ fn directed_and_undirected_scores_match_exhaustive_edge_path_reference() {
     ];
     for directed in [false, true] {
         let mut graph = if directed {
-            Graph::new_directed()
+            Graph::new_directed_manual()
         } else {
-            Graph::new()
+            Graph::new_manual()
         };
-        graph.add_nodes(6); // Include an isolate in normalization.
+        graph.add_nodes(6).unwrap(); // Include an isolate in normalization.
         for (i, &(u, v, w)) in edges.iter().enumerate() {
             let e = graph.add_edge(u, v).unwrap();
             if i != 4 {
@@ -192,8 +192,8 @@ fn zero_invalid_and_nonfinite_weights_preserve_prior_results() {
         AttrValue::Float(f32::NAN),
         AttrValue::Float(f32::INFINITY),
     ] {
-        let mut graph = Graph::new();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(3).unwrap();
         let e = graph.add_edge(0, 1).unwrap();
         graph.add_edge(1, 2).unwrap();
         let g = Rc::new(RefCell::new(graph));
@@ -209,8 +209,8 @@ fn zero_invalid_and_nonfinite_weights_preserve_prior_results() {
 #[test]
 fn tiny_positive_lengths_do_not_become_spurious_ties() {
     let edges = [(0, 1, 4e-20_f32), (0, 2, 1e-20), (2, 1, 1e-20)];
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(3).unwrap();
     for &(u, v, w) in &edges {
         let e = graph.add_edge(u, v).unwrap();
         graph
@@ -224,8 +224,8 @@ fn tiny_positive_lengths_do_not_become_spurious_ties() {
 
 #[test]
 fn stale_selection_rejects_even_for_a_single_node() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let g = Rc::new(RefCell::new(graph));
     let sub = selected(&g);
     g.borrow_mut().remove_node(node).unwrap();
@@ -236,8 +236,8 @@ fn stale_selection_rejects_even_for_a_single_node() {
 
 #[test]
 fn rounded_away_distance_and_path_count_overflow_reject() {
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(3);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(3).unwrap();
     for (u, v, w) in [(0, 1, 1e20_f32), (1, 2, 1.)] {
         let e = graph.add_edge(u, v).unwrap();
         graph
@@ -248,8 +248,8 @@ fn rounded_away_distance_and_path_count_overflow_reject() {
         .unwrap_err()
         .to_string()
         .contains("cannot advance"));
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(1030);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(1030).unwrap();
     for n in 0..1029 {
         graph.add_edge(n, n + 1).unwrap();
         graph.add_edge(n, n + 1).unwrap();
@@ -283,11 +283,11 @@ fn captured_small_multigraphs_match_independent_edge_path_enumeration() {
     for directed in [false, true] {
         for mask in 0..256 {
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
-            graph.add_nodes(4); // Includes an isolate.
+            graph.add_nodes(4).unwrap(); // Includes an isolate.
             let mut edges = Vec::new();
             for (bit, &(source, target)) in pairs.iter().enumerate() {
                 if mask & (1 << bit) != 0 {

@@ -10,10 +10,10 @@ use groggy::subgraphs::Subgraph;
 use groggy::types::{AttrValue, NodeId};
 
 fn make_line_graph(length: usize, start_attr: &str) -> Subgraph {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     let mut nodes: Vec<NodeId> = Vec::with_capacity(length);
     for _ in 0..length {
-        nodes.push(graph.add_node());
+        nodes.push(graph.add_node().unwrap());
     }
     if let Some(first) = nodes.first() {
         graph

@@ -22,12 +22,12 @@ fn expected_dfs(
 fn frozen_traversals_match_exhaustive_small_topologies_with_sparse_ids() {
     for directed in [false, true] {
         for mask in 0..512 {
-            let mut graph = Graph::new_with_type(if directed {
+            let mut graph = Graph::new_with_type_manual(if directed {
                 GraphType::Directed
             } else {
                 GraphType::Undirected
             });
-            let allocated = graph.add_nodes(4);
+            let allocated = graph.add_nodes(4).unwrap();
             graph.remove_node(allocated[1]).unwrap();
             let ids = [allocated[0], allocated[2], allocated[3]];
             let mut adjacency = vec![Vec::new(); 3];
@@ -93,8 +93,8 @@ fn frozen_traversals_match_exhaustive_small_topologies_with_sparse_ids() {
 
 #[test]
 fn prepared_reads_share_pins_rows_and_csr_across_mutations_owner_drop_and_threads() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let n = graph.add_nodes(5);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let n = graph.add_nodes(5).unwrap();
     let first = graph.add_edge(n[0], n[2]).unwrap();
     let onward = graph.add_edge(n[2], n[1]).unwrap();
     graph.add_edge(n[0], n[1]).unwrap(); // Excluded shortcut changes the distance if leaked.
@@ -140,11 +140,15 @@ fn prepared_reads_share_pins_rows_and_csr_across_mutations_owner_drop_and_thread
 
 #[test]
 fn empty_isolated_out_of_scope_and_cancelled_inputs_have_explicit_results() {
-    let empty = Graph::new().read_view().unwrap().algorithm_input().unwrap();
+    let empty = Graph::new_manual()
+        .read_view()
+        .unwrap()
+        .algorithm_input()
+        .unwrap();
     assert_eq!(empty.csr().offsets, vec![0]);
     assert!(empty.bfs_distances(0, None).is_err());
-    let mut graph = Graph::new();
-    let n = graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    let n = graph.add_nodes(2).unwrap();
     let view = graph.read_view().unwrap().select_nodes(&[n[1]]).unwrap();
     assert_eq!(view.bfs_distances(n[1]).unwrap(), vec![(n[1], 0)]);
     assert_eq!(view.dfs_order(n[1]).unwrap(), vec![(n[1], 0)]);
@@ -166,8 +170,8 @@ fn empty_isolated_out_of_scope_and_cancelled_inputs_have_explicit_results() {
 
 #[test]
 fn long_chain_dfs_is_iterative_and_reaches_exact_integer_rows() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let n = graph.add_nodes(10000);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let n = graph.add_nodes(10000).unwrap();
     for pair in n.windows(2) {
         graph.add_edge(pair[0], pair[1]).unwrap();
     }
@@ -179,8 +183,8 @@ fn long_chain_dfs_is_iterative_and_reaches_exact_integer_rows() {
 
 #[test]
 fn historical_recorded_state_uses_its_own_topology_after_owner_drop() {
-    let mut graph = Graph::new_with_type(GraphType::Directed);
-    let n = graph.add_nodes(3);
+    let mut graph = Graph::new_with_type_manual(GraphType::Directed);
+    let n = graph.add_nodes(3).unwrap();
     graph.add_edge(n[0], n[1]).unwrap();
     let checkpoint = graph
         .commit("before extension".into(), "test".into())

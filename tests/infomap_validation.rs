@@ -14,8 +14,8 @@ fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
 fn cliques() -> Shared {
-    let mut graph = Graph::new();
-    graph.add_nodes(10);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(10).unwrap();
     graph.remove_node(8).unwrap();
     graph.remove_node(9).unwrap();
     for start in [0, 4] {
@@ -81,11 +81,11 @@ fn real_map_equation_finds_flow_modules_and_uses_teleportation_and_all_trials() 
 fn direction_changes_stationary_code_length_and_rng_is_local() {
     for directed in [false, true] {
         let mut graph = if directed {
-            Graph::new_directed()
+            Graph::new_directed_manual()
         } else {
-            Graph::new()
+            Graph::new_manual()
         };
-        graph.add_nodes(2);
+        graph.add_nodes(2).unwrap();
         graph.add_edge(0, 1).unwrap();
         let g = Rc::new(RefCell::new(graph));
         fastrand::seed(123);
@@ -128,14 +128,14 @@ fn failed_flow_stale_selection_and_cancellation_preserve_previous_labels() {
 #[test]
 fn empty_singleton_edgeless_and_id_gap_cases_are_defined() {
     for n in [0, 1, 3] {
-        let mut graph = Graph::new();
-        graph.add_nodes(n);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(n).unwrap();
         let g = Rc::new(RefCell::new(graph));
         run(&g, 0.15, 2);
         assert_eq!(labels(&g), vec![0; n]);
     }
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     graph.add_edge(0, 2).unwrap();
     graph.add_edge(2, 3).unwrap();

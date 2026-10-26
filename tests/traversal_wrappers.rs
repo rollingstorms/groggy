@@ -36,11 +36,11 @@ fn exhaustive_directed_and_undirected_graphs_match_independent_traversals() {
     for directed in [false, true] {
         for mask in 0..512 {
             let mut graph = if directed {
-                Graph::new_directed()
+                Graph::new_directed_manual()
             } else {
-                Graph::new()
+                Graph::new_manual()
             };
-            graph.add_nodes(3);
+            graph.add_nodes(3).unwrap();
             let mut adjacency = vec![Vec::new(); 3];
             // Reverse insertion deliberately disagrees with ascending neighbor order.
             for bit in (0..9).rev() {
@@ -126,8 +126,8 @@ fn exhaustive_directed_and_undirected_graphs_match_independent_traversals() {
 #[test]
 fn missing_or_ambiguous_markers_reject_before_writes_and_empty_has_no_source() {
     for marker_count in [0, 2] {
-        let mut graph = Graph::new();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(3).unwrap();
         graph.add_edge(0, 1).unwrap();
         for node in 0..marker_count {
             graph
@@ -150,7 +150,7 @@ fn missing_or_ambiguous_markers_reject_before_writes_and_empty_has_no_source() {
             );
         }
     }
-    let g = Rc::new(RefCell::new(Graph::new()));
+    let g = Rc::new(RefCell::new(Graph::new_manual()));
     assert!(BfsTraversal::new("start".into(), "out".into())
         .execute(&mut Context::new(), selected(&g))
         .is_err());
@@ -158,8 +158,8 @@ fn missing_or_ambiguous_markers_reject_before_writes_and_empty_has_no_source() {
 #[test]
 fn stale_open_and_cancelled_selections_fail_without_outputs() {
     for dfs in [false, true] {
-        let mut graph = Graph::new();
-        graph.add_nodes(2);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(2).unwrap();
         let e = graph.add_edge(0, 1).unwrap();
         graph
             .set_node_attr(0, "start".into(), AttrValue::Int(0))
@@ -202,8 +202,8 @@ fn stale_open_and_cancelled_selections_fail_without_outputs() {
 }
 #[test]
 fn sparse_ids_singletons_and_long_paths_preserve_exact_integer_rows() {
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(4).unwrap();
     graph.remove_node(1).unwrap();
     graph.add_edge(3, 2).unwrap();
     graph.add_edge(2, 0).unwrap();
@@ -230,8 +230,8 @@ fn sparse_ids_singletons_and_long_paths_preserve_exact_integer_rows() {
         .0,
         vec![(3, 0), (2, 1), (0, 2)]
     );
-    let mut graph = Graph::new_directed();
-    graph.add_nodes(20_000);
+    let mut graph = Graph::new_directed_manual();
+    graph.add_nodes(20_000).unwrap();
     for node in 1..20_000 {
         graph.add_edge(node - 1, node).unwrap();
     }
@@ -247,8 +247,8 @@ fn sparse_ids_singletons_and_long_paths_preserve_exact_integer_rows() {
     .0;
     assert_eq!(rows.len(), 20_000);
     assert_eq!(rows[19_999], (19_999, 19_999));
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     graph
         .set_node_attr(0, "start".into(), AttrValue::Bool(false))
         .unwrap();

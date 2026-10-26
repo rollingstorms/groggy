@@ -2,8 +2,8 @@ use groggy::{algorithms::centrality::BetweennessCentrality, AttrValue, Graph};
 use std::sync::atomic::AtomicBool;
 #[test]
 fn captured_brandes_keeps_scope_values_isolates_and_cancellation() {
-    let mut graph = Graph::new_directed();
-    let n = graph.add_nodes(4);
+    let mut graph = Graph::new_directed_manual();
+    let n = graph.add_nodes(4).unwrap();
     let first = graph.add_edge(n[0], n[1]).unwrap();
     graph.add_edge(n[1], n[2]).unwrap();
     graph
@@ -25,7 +25,11 @@ fn captured_brandes_keeps_scope_values_isolates_and_cancellation() {
         .unwrap()
         .betweenness(&algorithm, Some(&AtomicBool::new(true)))
         .is_err());
-    let empty = Graph::new().read_view().unwrap().algorithm_input().unwrap();
+    let empty = Graph::new_manual()
+        .read_view()
+        .unwrap()
+        .algorithm_input()
+        .unwrap();
     assert!(empty.betweenness(&algorithm, None).unwrap().is_empty());
     assert!(empty
         .betweenness(&algorithm, Some(&AtomicBool::new(true)))

@@ -3,7 +3,7 @@ use groggy::{AttrValue as V, CalendarDate, FixedDuration, Graph, UtcInstant};
 use std::collections::{HashMap, HashSet};
 
 fn destination(publishing: bool) -> Graph {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
     graph.set_automatic_publication(publishing).unwrap();
     graph.insert_nodes(3).unwrap();
     graph.add_edge(0, 0).unwrap();
@@ -15,8 +15,8 @@ fn destination(publishing: bool) -> Graph {
 #[test]
 fn copy_remaps_typed_references_and_preserves_opaque_values() {
     for publishing in [false, true] {
-        let mut source = Graph::new_directed();
-        source.add_nodes(4);
+        let mut source = Graph::new_directed_manual();
+        source.add_nodes(4).unwrap();
         source.remove_node(0).unwrap();
         let source_edges = source.add_edges(&[(1, 2), (1, 2), (2, 2)]).unwrap();
         source
@@ -107,8 +107,8 @@ fn copy_preserves_supported_value_variants_and_null_vs_absence() {
         V::Duration(FixedDuration::new(-1, 86_399, 999_999).unwrap()),
     ];
     for publishing in [false, true] {
-        let mut source = Graph::new();
-        let nodes = source.add_nodes(values.len());
+        let mut source = Graph::new_manual();
+        let nodes = source.add_nodes(values.len()).unwrap();
         let edges = source
             .add_edges(&nodes.iter().map(|&id| (id, id)).collect::<Vec<_>>())
             .unwrap();
@@ -120,7 +120,7 @@ fn copy_preserves_supported_value_variants_and_null_vs_absence() {
                 .set_edge_attr(edges[i], "v".into(), value.clone())
                 .unwrap();
         }
-        let mut target = Graph::new();
+        let mut target = Graph::new_manual();
         target.set_automatic_publication(publishing).unwrap();
         target.add_graph(&source).unwrap();
         for (i, value) in values.iter().enumerate() {
@@ -146,8 +146,8 @@ fn unsupported_or_missing_references_reject_before_ids_or_pending_changes() {
             V::SubgraphRef(99),
         ] {
             for node_property in [false, true] {
-                let mut source = Graph::new();
-                source.add_nodes(2);
+                let mut source = Graph::new_manual();
+                source.add_nodes(2).unwrap();
                 source.add_edge(0, 1).unwrap();
                 if node_property {
                     source
@@ -176,8 +176,8 @@ fn unsupported_or_missing_references_reject_before_ids_or_pending_changes() {
 fn corrupt_source_indices_and_kinds_cannot_be_silently_dropped() {
     for publishing in [false, true] {
         for corrupt_node in [false, true] {
-            let mut source = Graph::new();
-            source.add_node();
+            let mut source = Graph::new_manual();
+            source.add_node().unwrap();
             source.add_edge(0, 0).unwrap();
             if corrupt_node {
                 source
@@ -197,8 +197,8 @@ fn corrupt_source_indices_and_kinds_cannot_be_silently_dropped() {
             assert!(!target.has_uncommitted_changes());
             assert_eq!(target.insert_nodes(1).unwrap(), vec![3]);
         }
-        let mut source = Graph::new();
-        source.add_node();
+        let mut source = Graph::new_manual();
+        source.add_node().unwrap();
         source
             .space_mut()
             .set_node_attr_index(0, "labels".into(), 0);
@@ -232,8 +232,8 @@ fn identity_meta_and_dirty_target_boundaries_are_explicit() {
             .contains("explicit upserts"));
         assert_eq!(target.insert_nodes(1).unwrap(), vec![3]);
 
-        let mut source = Graph::new();
-        source.add_node();
+        let mut source = Graph::new_manual();
+        source.add_node().unwrap();
         let reference = source
             .pool_mut()
             .store_subgraph(HashSet::from([0]), HashSet::new(), "subgraph".into())
@@ -247,12 +247,14 @@ fn identity_meta_and_dirty_target_boundaries_are_explicit() {
             .contains("pooled/meta"));
         assert_eq!(target.insert_nodes(1).unwrap(), vec![3]);
 
-        let mut source = Graph::new();
-        source.add_node();
+        let mut source = Graph::new_manual();
+        source.add_node().unwrap();
         let mut target = destination(publishing);
-        target.add_node(); // intentional manual/infallible compatibility write
+        target.set_automatic_publication(false).unwrap();
+        target.add_node().unwrap(); // explicit pending manual edit
         if publishing {
-            assert!(target.add_graph(&source).is_err());
+            assert!(target.set_automatic_publication(true).is_err());
+            assert!(target.try_add_node().is_err());
             assert_eq!(target.node_count(), 3);
         } else {
             target.add_graph(&source).unwrap();

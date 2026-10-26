@@ -116,8 +116,8 @@ fn corrupt_compression_is_detected_and_still_has_reflexive_value_identity() {
 
 #[test]
 fn typed_values_null_and_type_changes_survive_recorded_snapshots() {
-    let mut graph = Graph::new();
-    let nodes = graph.add_nodes(3);
+    let mut graph = Graph::new_manual();
+    let nodes = graph.add_nodes(3).unwrap();
     let edges = graph
         .add_edges(&[
             (nodes[0], nodes[1]),

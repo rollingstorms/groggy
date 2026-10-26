@@ -1658,12 +1658,12 @@ impl RealTimeVizEngine {
 
         {
             let mut graph = self.graph.lock().unwrap();
-            *graph = Graph::new();
+            *graph = Graph::new_manual();
 
             // Map snapshot node IDs → engine node IDs if needed
             let mut id_map = HashMap::new();
             for n in &snapshot.nodes {
-                let nid = graph.add_node();
+                let nid = graph.add_node()?;
                 id_map.insert(n.id, nid);
             }
             for e in &snapshot.edges {
@@ -2559,8 +2559,8 @@ mod tests {
     use super::*;
 
     fn flat_fixture() -> (Graph, GraphMatrix) {
-        let mut graph = Graph::new();
-        graph.add_nodes(4);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(4).unwrap();
         graph.remove_node(1).unwrap();
         graph.add_edge(0, 3).unwrap();
         let mut input = GraphMatrix::from_row_major_data(vec![1.0; 9], 3, 3, None).unwrap();
@@ -2718,7 +2718,7 @@ mod tests {
 
     #[tokio::test]
     async fn unknown_layout_request_returns_error_without_broadcasting_success() {
-        let mut engine = RealTimeVizEngine::new(Graph::new(), RealTimeVizConfig::default());
+        let mut engine = RealTimeVizEngine::new(Graph::new_manual(), RealTimeVizConfig::default());
         let mut updates = engine.subscribe();
         let error = engine
             .apply(EngineUpdate::LayoutChanged {
@@ -3161,7 +3161,7 @@ mod tests {
 
     #[test]
     fn test_engine_creation() {
-        let graph = Graph::new();
+        let graph = Graph::new_manual();
         let config = RealTimeVizConfig::default();
         let engine = RealTimeVizEngine::new(graph, config);
         assert!(!engine.is_running);
@@ -3169,7 +3169,7 @@ mod tests {
 
     #[test]
     fn test_easing_functions() {
-        let graph = Graph::new();
+        let graph = Graph::new_manual();
         let config = RealTimeVizConfig::default();
         let engine = RealTimeVizEngine::new(graph, config);
 
@@ -3183,7 +3183,7 @@ mod tests {
 
     #[test]
     fn test_position_interpolation() {
-        let graph = Graph::new();
+        let graph = Graph::new_manual();
         let config = RealTimeVizConfig::default();
         let engine = RealTimeVizEngine::new(graph, config);
 

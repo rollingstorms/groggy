@@ -4,9 +4,9 @@ use groggy::Graph;
 
 #[test]
 fn parallel_edges_remain_distinct_through_paths_and_history() {
-    let mut graph = Graph::new_directed();
-    let source = graph.add_node();
-    let target = graph.add_node();
+    let mut graph = Graph::new_directed_manual();
+    let source = graph.add_node().unwrap();
+    let target = graph.add_node().unwrap();
     let expensive = graph.add_edge(source, target).unwrap();
     let cheap = graph.add_edge(source, target).unwrap();
     graph
@@ -58,8 +58,8 @@ fn parallel_edges_remain_distinct_through_paths_and_history() {
 
 #[test]
 fn self_loop_has_one_stable_edge_identity() {
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let loop_edge = graph.add_edge(node, node).unwrap();
 
     assert_eq!(graph.edge_ids(), vec![loop_edge]);

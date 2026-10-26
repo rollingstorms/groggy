@@ -553,8 +553,8 @@ mod tests {
 
     #[test]
     fn test_meta_node_creation() {
-        let mut graph = Graph::new();
-        let node_id = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node_id = graph.add_node().unwrap();
 
         // Test node without subgraph reference (should work but be empty)
         let graph_rc = Rc::new(RefCell::new(graph));
@@ -573,10 +573,10 @@ mod tests {
     #[test]
     fn test_subgraph_collapse_to_node() {
         // Create a small graph for testing
-        let mut graph = Graph::new();
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
-        let node3 = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
+        let node3 = graph.add_node().unwrap();
 
         // Add some test attributes
         graph
@@ -628,9 +628,9 @@ mod tests {
 
     #[test]
     fn test_hierarchical_operations_trait() {
-        let mut graph = Graph::new();
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
 
         graph.add_edge(node1, node2).unwrap();
         graph

@@ -215,8 +215,8 @@ fn edge_reshapes_require_ids_and_both_endpoints() {
 }
 #[test]
 fn reshape_is_read_only_but_typed_filter_retains_direct_source_rows() {
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     graph.set_node_attr(0, "x".into(), V::Int(3)).unwrap();
     let view = graph.read_view().unwrap();
     let base = view.nodes_table().unwrap().into_base_table();

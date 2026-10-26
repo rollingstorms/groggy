@@ -18,8 +18,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Instant}
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
-        let mut graph = Graph::new();
-        graph.add_nodes(count);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(count).unwrap();
         graph.set_node_attrs(HashMap::from([(
             "score".into(),
             (0..count).map(|id| (id, AttrValue::Int(1))).collect(),

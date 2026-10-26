@@ -329,8 +329,8 @@ mod tests {
     use super::*;
 
     fn path_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..n).map(|_| graph.add_node().unwrap()).collect();
         for i in 0..n - 1 {
             graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
@@ -347,18 +347,18 @@ mod tests {
     }
 
     fn star_graph(n: usize) -> Graph {
-        let mut graph = Graph::new();
-        let center = graph.add_node();
+        let mut graph = Graph::new_manual();
+        let center = graph.add_node().unwrap();
         for _ in 1..n {
-            let leaf = graph.add_node();
+            let leaf = graph.add_node().unwrap();
             graph.add_edge(center, leaf).unwrap();
         }
         graph
     }
 
     fn karate_club() -> Graph {
-        let mut graph = Graph::new();
-        let nodes: Vec<_> = (0..34).map(|_| graph.add_node()).collect();
+        let mut graph = Graph::new_manual();
+        let nodes: Vec<_> = (0..34).map(|_| graph.add_node().unwrap()).collect();
         // Add some representative edges for karate club
         let edges = [
             (0, 1),
@@ -379,8 +379,8 @@ mod tests {
 
     #[test]
     fn laplacian_entries_accumulate_parallel_loops_and_zero_isolates() {
-        let mut graph = Graph::new();
-        graph.add_nodes(4);
+        let mut graph = Graph::new_manual();
+        graph.add_nodes(4).unwrap();
         for (u, v) in [(0, 1), (0, 1), (0, 0), (0, 0), (1, 2)] {
             graph.add_edge(u, v).unwrap();
         }
@@ -494,15 +494,15 @@ mod tests {
     #[test]
     fn test_spectral_edge_cases() {
         // Test empty graph
-        let empty_graph = Graph::new();
+        let empty_graph = Graph::new_manual();
         let engine = SpectralEmbedding::default();
 
         let result = engine.compute_embedding(&empty_graph, 2);
         assert!(result.is_err());
 
         // Test single node
-        let mut single_node = Graph::new();
-        single_node.add_node();
+        let mut single_node = Graph::new_manual();
+        single_node.add_node().unwrap();
 
         let result2 = engine.compute_embedding(&single_node, 2);
         assert!(result2.is_err());

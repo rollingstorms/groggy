@@ -598,8 +598,8 @@ mod tests {
     use std::{cell::RefCell, rc::Rc};
 
     fn path() -> Subgraph {
-        let mut graph = Graph::new_undirected();
-        graph.add_nodes(3);
+        let mut graph = Graph::new_undirected_manual();
+        graph.add_nodes(3).unwrap();
         graph.add_edge(0, 1).expect("edge");
         graph.add_edge(1, 2).expect("edge");
         Subgraph::from_nodes(

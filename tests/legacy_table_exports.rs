@@ -127,8 +127,8 @@ fn stale_subgraph_exports_reject_instead_of_synthesizing_rows() {
 }
 #[test]
 fn exports_capture_working_manual_values_but_do_not_authorize_dirty_publication() {
-    let mut g = Graph::new();
-    g.add_node();
+    let mut g = Graph::new_manual();
+    g.add_node().unwrap();
     g.set_node_attr(0, "x".into(), V::Int(3)).unwrap();
     let table = g.nodes_table().unwrap();
     assert_eq!(table.base().source_state_id(), None);
@@ -140,7 +140,7 @@ fn exports_capture_working_manual_values_but_do_not_authorize_dirty_publication(
 }
 #[test]
 fn empty_graph_and_subgraph_exports_keep_source_kinds_and_empty_row_identity() {
-    let g = Graph::new();
+    let g = Graph::new_manual();
     let t = g.table().unwrap();
     verify(&t);
     assert_eq!(t.nodes().base().source_entity_ids(), Some(&[][..]));

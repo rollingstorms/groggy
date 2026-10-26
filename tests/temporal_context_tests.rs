@@ -29,17 +29,17 @@ fn test_context_temporal_scope_setter() {
 
 #[test]
 fn test_context_delta_computation() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
 
     // Create first snapshot
-    let node_a = graph.add_node();
-    let node_b = graph.add_node();
+    let node_a = graph.add_node().unwrap();
+    let node_b = graph.add_node().unwrap();
     graph.add_edge(node_a, node_b).unwrap();
     let commit1 = graph.commit("v1".to_string(), "test".to_string()).unwrap();
     let snapshot1 = graph.snapshot_at_commit(commit1).unwrap();
 
     // Create second snapshot with changes
-    let node_c = graph.add_node();
+    let node_c = graph.add_node().unwrap();
     graph.add_edge(node_b, node_c).unwrap();
     let commit2 = graph.commit("v2".to_string(), "test".to_string()).unwrap();
     let snapshot2 = graph.snapshot_at_commit(commit2).unwrap();
@@ -58,10 +58,10 @@ fn test_context_delta_computation() {
 
 #[test]
 fn test_context_changed_entities() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
 
-    let node_a = graph.add_node();
-    let node_b = graph.add_node();
+    let node_a = graph.add_node().unwrap();
+    let node_b = graph.add_node().unwrap();
     graph.add_edge(node_a, node_b).unwrap();
     let commit1 = graph.commit("v1".to_string(), "test".to_string()).unwrap();
 
@@ -75,7 +75,7 @@ fn test_context_changed_entities() {
         .unwrap();
     let _commit2 = graph.commit("v2".to_string(), "test".to_string()).unwrap();
 
-    let node_c = graph.add_node();
+    let node_c = graph.add_node().unwrap();
     let commit3 = graph.commit("v3".to_string(), "test".to_string()).unwrap();
 
     // Build temporal index
@@ -97,14 +97,14 @@ fn test_context_changed_entities() {
 
 #[test]
 fn test_temporal_delta_summary() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
 
-    let node_a = graph.add_node();
+    let node_a = graph.add_node().unwrap();
     let commit1 = graph.commit("v1".to_string(), "test".to_string()).unwrap();
     let snapshot1 = graph.snapshot_at_commit(commit1).unwrap();
 
-    let node_b = graph.add_node();
-    let node_c = graph.add_node();
+    let node_b = graph.add_node().unwrap();
+    let node_c = graph.add_node().unwrap();
     graph.add_edge(node_a, node_b).unwrap();
     graph.add_edge(node_b, node_c).unwrap();
     let commit2 = graph.commit("v2".to_string(), "test".to_string()).unwrap();
@@ -156,15 +156,15 @@ fn test_changed_entities_merge() {
 
 #[test]
 fn test_delta_affected_entities() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
 
-    let node_a = graph.add_node();
-    let node_b = graph.add_node();
+    let node_a = graph.add_node().unwrap();
+    let node_b = graph.add_node().unwrap();
     let edge_ab = graph.add_edge(node_a, node_b).unwrap();
     let commit1 = graph.commit("v1".to_string(), "test".to_string()).unwrap();
     let snapshot1 = graph.snapshot_at_commit(commit1).unwrap();
 
-    let node_c = graph.add_node();
+    let node_c = graph.add_node().unwrap();
     let edge_bc = graph.add_edge(node_b, node_c).unwrap();
     let commit2 = graph.commit("v2".to_string(), "test".to_string()).unwrap();
     let snapshot2 = graph.snapshot_at_commit(commit2).unwrap();

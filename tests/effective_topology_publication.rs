@@ -135,8 +135,8 @@ fn same_batch_clocks_extremes_loops_parallel_edges_and_branch_rebuilds() {
 }
 #[test]
 fn legacy_untimed_compatibility_is_explicitly_distinct_from_timed_guarantees() {
-    let mut graph = Graph::new();
-    graph.add_nodes(2);
+    let mut graph = Graph::new_manual();
+    graph.add_nodes(2).unwrap();
     graph.commit("manual".into(), "test".into()).unwrap();
     assert!(apply(
         &mut graph,
@@ -160,8 +160,8 @@ fn legacy_untimed_compatibility_is_explicitly_distinct_from_timed_guarantees() {
 }
 #[test]
 fn property_time_override_does_not_turn_untimed_legacy_topology_into_a_timed_write() {
-    let mut graph = Graph::new();
-    graph.add_node();
+    let mut graph = Graph::new_manual();
+    graph.add_node().unwrap();
     graph.commit("legacy".into(), "test".into()).unwrap();
     let result = apply(
         &mut graph,

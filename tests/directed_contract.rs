@@ -20,9 +20,9 @@ fn assert_oriented(matrix: &GraphMatrix<f64>, source: usize, target: usize, weig
 
 #[test]
 fn directed_paths_follow_only_outgoing_edges() {
-    let mut graph = Graph::new_directed();
-    let source = graph.add_node();
-    let target = graph.add_node();
+    let mut graph = Graph::new_directed_manual();
+    let source = graph.add_node().unwrap();
+    let target = graph.add_node().unwrap();
     let edge = graph.add_edge(source, target).unwrap();
 
     assert!(graph.has_edge_between(source, target).unwrap());
@@ -73,9 +73,9 @@ fn directed_paths_follow_only_outgoing_edges() {
 
 #[test]
 fn directed_adjacency_preserves_edge_orientation() {
-    let mut graph = Graph::new_directed();
-    let source = graph.add_node();
-    let target = graph.add_node();
+    let mut graph = Graph::new_directed_manual();
+    let source = graph.add_node().unwrap();
+    let target = graph.add_node().unwrap();
     let edge = graph.add_edge(source, target).unwrap();
     graph
         .set_edge_attr(edge, "weight".into(), AttrValue::Float(2.0))
@@ -96,9 +96,9 @@ fn directed_adjacency_preserves_edge_orientation() {
 
 #[test]
 fn undirected_adjacency_keeps_existing_symmetric_behavior() {
-    let mut graph = Graph::new();
-    let source = graph.add_node();
-    let target = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let source = graph.add_node().unwrap();
+    let target = graph.add_node().unwrap();
     graph.add_edge(source, target).unwrap();
 
     let adjacency = graph.to_adjacency_matrix::<f64>().unwrap();

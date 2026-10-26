@@ -73,8 +73,8 @@
 //! let mut graph = Graph::new();
 //!
 //! // Build the graph structure
-//! let alice = graph.add_node();
-//! let bob = graph.add_node();
+//! let alice = graph.add_node().unwrap();
+//! let bob = graph.add_node().unwrap();
 //! let friendship = graph.add_edge(alice, bob).unwrap();
 //!
 //! // Set rich attributes
@@ -82,7 +82,7 @@
 //! graph.set_node_attr(alice, "age".to_string(), AttrValue::Int(28)).unwrap();
 //! graph.set_edge_attr(friendship, "strength".to_string(), AttrValue::Float(0.9)).unwrap();
 //!
-//! // Commit to history with metadata
+//! // Explicitly checkpoint the already published state
 //! let commit1 = graph.commit("Initial social network".to_string(), "data_team".to_string()).unwrap();
 //!
 //! // Work with branches like Git
@@ -90,7 +90,7 @@
 //! graph.checkout_branch("experiment".to_string()).unwrap();
 //!
 //! // Make experimental changes
-//! let charlie = graph.add_node();
+//! let charlie = graph.add_node().unwrap();
 //! graph.set_node_attr(charlie, "name".to_string(), AttrValue::Text("Charlie".to_string())).unwrap();
 //!
 //! // Advanced querying (TODO: Update when NodeFilter API is finalized)
@@ -124,7 +124,7 @@
 //! let results = graph.execute_query(query).unwrap();
 //!
 //! // Bulk operations for performance
-//! let node_ids = graph.add_nodes(1000); // Add 1000 nodes efficiently
+//! let node_ids = graph.add_nodes(1000).unwrap(); // Add 1000 nodes efficiently
 //! graph.set_node_attrs_bulk("initialized",
 //!     node_ids.iter().map(|&id| (id, AttrValue::Bool(true))).collect()
 //! ).unwrap();
@@ -252,11 +252,11 @@ mod tests {
     #[test]
     fn test_basic_integration() {
         // Test that all the main components work together
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Basic graph operations
-        let node1 = graph.add_node();
-        let node2 = graph.add_node();
+        let node1 = graph.add_node().unwrap();
+        let node2 = graph.add_node().unwrap();
         let edge = graph.add_edge(node1, node2).unwrap();
 
         // Attributes
@@ -281,7 +281,7 @@ mod tests {
         graph.checkout_branch("test_branch".to_string()).unwrap();
 
         // More changes
-        let node3 = graph.add_node();
+        let node3 = graph.add_node().unwrap();
         graph
             .set_node_attr(node3, "value".to_string(), AttrValue::Int(42))
             .unwrap();
@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_error_handling() {
-        let mut graph = Graph::new();
+        let mut graph = Graph::new_manual();
 
         // Test invalid operations
         let result = graph.add_edge(999, 1000);

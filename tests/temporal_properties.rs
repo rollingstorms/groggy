@@ -100,8 +100,8 @@ fn temporal_history_export_schema_and_journal_round_trip_losslessly() {
     }
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("temporal.json");
-    let mut graph = Graph::new();
-    let node = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
     let edge = graph.add_edge(node, node).unwrap();
     graph
         .set_node_attr(node, "labels".into(), V::TextVec(vec!["Event".into()]))

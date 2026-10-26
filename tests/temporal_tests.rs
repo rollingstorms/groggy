@@ -2,9 +2,9 @@ use groggy::{AttrValue, Graph};
 
 #[test]
 fn snapshot_at_commit_produces_expected_view() {
-    let mut graph = Graph::new();
-    let a = graph.add_node();
-    let b = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let a = graph.add_node().unwrap();
+    let b = graph.add_node().unwrap();
     let edge = graph.add_edge(a, b).unwrap();
 
     graph
@@ -22,7 +22,7 @@ fn snapshot_at_commit_produces_expected_view() {
         .unwrap();
 
     // Apply further changes so snapshot is immutable view of first state
-    let c = graph.add_node();
+    let c = graph.add_node().unwrap();
     let _ = graph.add_edge(b, c).unwrap();
     graph
         .set_node_attr(c, "label".to_string(), AttrValue::Text("C".into()))
@@ -54,9 +54,9 @@ fn snapshot_at_commit_produces_expected_view() {
 
 #[test]
 fn snapshot_at_timestamp_matches_commit() {
-    let mut graph = Graph::new();
-    let first = graph.add_node();
-    let second = graph.add_node();
+    let mut graph = Graph::new_manual();
+    let first = graph.add_node().unwrap();
+    let second = graph.add_node().unwrap();
     let _ = graph.add_edge(first, second).unwrap();
 
     let commit_id = graph
@@ -76,11 +76,11 @@ fn snapshot_at_timestamp_matches_commit() {
 
 #[test]
 fn test_temporal_index_from_graph_history() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
 
     // Create initial graph state
-    let node_a = graph.add_node();
-    let node_b = graph.add_node();
+    let node_a = graph.add_node().unwrap();
+    let node_b = graph.add_node().unwrap();
     let edge_ab = graph.add_edge(node_a, node_b).unwrap();
 
     graph
@@ -95,7 +95,7 @@ fn test_temporal_index_from_graph_history() {
         .unwrap();
 
     // Add more nodes and modify attributes
-    let node_c = graph.add_node();
+    let node_c = graph.add_node().unwrap();
     graph
         .set_node_attr(node_c, "label".to_string(), AttrValue::Text("C".into()))
         .unwrap();
@@ -187,10 +187,10 @@ fn test_temporal_index_from_graph_history() {
 
 #[test]
 fn test_nodes_changed_in_commit() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
 
-    let node_a = graph.add_node();
-    let node_b = graph.add_node();
+    let node_a = graph.add_node().unwrap();
+    let node_b = graph.add_node().unwrap();
     let _edge_ab = graph.add_edge(node_a, node_b).unwrap();
 
     let commit1 = graph
@@ -218,10 +218,10 @@ fn test_nodes_changed_in_commit() {
 
 #[test]
 fn test_graph_api_temporal_methods() {
-    let mut graph = Graph::new();
+    let mut graph = Graph::new_manual();
 
-    let node_a = graph.add_node();
-    let node_b = graph.add_node();
+    let node_a = graph.add_node().unwrap();
+    let node_b = graph.add_node().unwrap();
     graph.add_edge(node_a, node_b).unwrap();
 
     graph

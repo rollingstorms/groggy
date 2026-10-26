@@ -457,14 +457,14 @@ mod tests {
     use std::rc::Rc;
 
     fn create_test_graph() -> (Graph, Vec<NodeId>) {
-        let mut g = Graph::new();
+        let mut g = Graph::new_manual();
         // Create a simple graph: 0 -> 1 -> 2
         //                          |    |
         //                          v    v
         //                          3    4
         let mut nodes = Vec::new();
         for _ in 0..5 {
-            nodes.push(g.add_node());
+            nodes.push(g.add_node().unwrap());
         }
         g.add_edge(nodes[0], nodes[1]).unwrap();
         g.add_edge(nodes[1], nodes[2]).unwrap();
@@ -594,11 +594,11 @@ mod tests {
 
     #[test]
     fn test_bfs_csr_reachability() {
-        let mut g = Graph::new();
+        let mut g = Graph::new_manual();
         // Disconnected graph: 0-1-2  3-4
         let mut test_nodes = Vec::new();
         for _ in 0..5 {
-            test_nodes.push(g.add_node());
+            test_nodes.push(g.add_node().unwrap());
         }
         g.add_edge(test_nodes[0], test_nodes[1]).unwrap();
         g.add_edge(test_nodes[1], test_nodes[2]).unwrap();
