@@ -43,6 +43,22 @@ impl PyDurableGraph {
             ),
         })
     }
+    /// Begin a journal from an existing graph without changing its owner.
+    #[staticmethod]
+    #[pyo3(signature=(path, graph, *, schema=None))]
+    fn create_from_graph(
+        path: PathBuf,
+        graph: &super::graph::PyGraph,
+        schema: Option<&PyDict>,
+    ) -> PyResult<Self> {
+        let schema = schema.map(parse_schema).transpose()?;
+        Ok(Self {
+            store: Some(
+                DurableGraph::create_from_graph(&path, &graph.inner.borrow(), schema)
+                    .map_err(graph_error_to_py_err)?,
+            ),
+        })
+    }
     #[staticmethod]
     fn open(path: PathBuf) -> PyResult<Self> {
         Ok(Self {

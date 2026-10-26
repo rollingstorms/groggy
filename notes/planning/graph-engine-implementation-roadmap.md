@@ -1218,3 +1218,14 @@ policy preserved. Durable removal receipts, rollback/replay/reopen/backup and a
 50k-version benchmark are recorded in `history-retention-slice-2026-10-26.md`.
 Raw pool/identity reclamation, complete referent closure and physical compaction/
 replacement remain open under 15/10.4. **200 checked / 68 open**, no new rows.
+
+## 2026-10-26 — retained storage archive/import completed (10.3)
+
+Added complete binary embedded archives and `DurableGraph.create_from_graph` with
+original retained values, columns, versions/clocks, identities/ID counters, branches,
+configuration and frozen nested source domains preserved. Dirty writes are never
+implicitly accepted. Independent restoration, durable continuation/reopen/backup,
+schema and corruption/no-clobber boundaries are verified. **201 checked / 67 open**,
+no new checklist rows. See `retained-archive-import-2026-10-26.md` for explicit full
+copy costs and limits. Recovery checkpoints/physical compaction/migrations remain
+10.4; pool/entity/value reclamation remains 15. No owner answer changed.

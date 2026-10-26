@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **200 checked and 68 unchecked entries**. Entries overlap:
+currently contains **201 checked and 67 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -591,3 +591,6 @@ commits including 16.2, final verification, measured costs and the fixed remaini
 core inventory. Follow-on movement is **197/71 → 200/68**, closing existing 11.2,
 12.2 and 14.1 while advancing native boundaries and history-only retention without
 adding checklist rows. No additional owner answers were needed for these slices.
+
+2026-10-26: 10.3 complete retained binary archive/existing-graph journal import is
+closed; see `retained-archive-import-2026-10-26.md`. Current inventory 201/67.

@@ -35,6 +35,9 @@ This separation allows:
 - Easier testing and reasoning
 */
 
+mod archive;
+pub(crate) use archive::PoolDocument;
+
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId, SubgraphId};
 use std::collections::HashMap;

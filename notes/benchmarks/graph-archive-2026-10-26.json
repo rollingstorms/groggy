@@ -1,0 +1,29 @@
+{
+  "benchmark": "graph_archive",
+  "cases": [
+    {
+      "archive_bytes": 362363,
+      "load_seconds": 0.013732417,
+      "nodes": 1000,
+      "retained_score_values": 2000,
+      "save_seconds_including_validation_and_sync": 0.063856334,
+      "versions": 2
+    },
+    {
+      "archive_bytes": 3638351,
+      "load_seconds": 0.107709792,
+      "nodes": 10000,
+      "retained_score_values": 20000,
+      "save_seconds_including_validation_and_sync": 0.221271416,
+      "versions": 2
+    },
+    {
+      "archive_bytes": 37425515,
+      "load_seconds": 1.490761458,
+      "nodes": 100000,
+      "retained_score_values": 200000,
+      "save_seconds_including_validation_and_sync": 2.448474375,
+      "versions": 2
+    }
+  ]
+}

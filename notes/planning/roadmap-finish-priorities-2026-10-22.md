@@ -1211,3 +1211,10 @@ replacement remain open under 15/10.4. **200 checked / 68 open**, no new rows.
 
 The [consolidated priority pass](priority-slices-2026-10-26.md) is the current
 handoff: commits, verified scopes, costs/limits and the fixed next-work inventory.
+
+## 2026-10-26 — priority 10.3 completed
+
+Full retained binary archive/import and existing-graph journal initialization are
+complete (`retained-archive-import-2026-10-26.md`). **201 checked / 67 open**. Next
+storage priority is 10.4 recovery checkpoints/physical lifecycle; this archive is
+an explicit full-copy path, with opening cost measured rather than claimed bounded.

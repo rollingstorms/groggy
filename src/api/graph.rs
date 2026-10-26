@@ -11,6 +11,8 @@
 //! - HistoryForest = Version Control (immutable snapshots, branching)
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
+pub(crate) mod archive;
+pub use archive::PreparedArchive;
 mod checkpoints;
 pub(crate) mod composition;
 mod effective_read;

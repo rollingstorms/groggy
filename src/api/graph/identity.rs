@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub const EXTERNAL_ID: &str = "external_id";
 
 /// Internal identity of an allocated entity, whether currently active or not.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ExternalEntityRef {
     Node(NodeId),
     Edge(EdgeId),
@@ -33,9 +33,10 @@ pub struct EdgeUpsert {
     pub attrs: HashMap<AttrName, AttrValue>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct ExternalIdentityIndex {
-    bindings: HashMap<String, ExternalEntityRef>,
+    pub(super) bindings: HashMap<String, ExternalEntityRef>,
 }
 
 impl ExternalIdentityIndex {

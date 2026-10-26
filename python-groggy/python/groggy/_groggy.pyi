@@ -3217,6 +3217,11 @@ class DisplayConfig:
 
 
 class DurableGraph:
+    @staticmethod
+    def create_from_graph(path: str, graph: Graph, *, schema: Optional[dict] = None) -> DurableGraph:
+        """Start a journal with complete retained graph storage/history."""
+        ...
+
     @property
     def current_state_id(self) -> int:
         ...
@@ -5295,6 +5300,15 @@ class Graph:
         """
         ...
 
+
+    def save_archive(self, path: str) -> None:
+        """Save complete retained state to a new binary archive."""
+        ...
+
+    @staticmethod
+    def load_archive(path: str) -> Graph:
+        """Restore an independent graph with retained history and publication policy."""
+        ...
 
     def save_to_path(self, *args, **kwargs) -> None:
         """

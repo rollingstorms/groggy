@@ -234,3 +234,7 @@ harness = false
 [[bench]]
 name = "history_collection"
 harness = false
+
+[[bench]]
+name = "graph_archive"
+harness = false

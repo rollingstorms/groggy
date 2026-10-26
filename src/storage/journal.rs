@@ -176,6 +176,10 @@ impl StoredBatch {
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 enum Record {
+    InitArchive {
+        archive: Box<crate::api::graph::archive::GraphArchive>,
+        schema: Option<GraphSchema>,
+    },
     Init {
         config: GraphConfig,
         schema: Option<GraphSchema>,
@@ -260,8 +264,17 @@ fn lock(file: &File, path: &Path) -> GraphResult<()> {
         .map_err(|e| io_error(path, "lock_graph_journal", e))
 }
 fn encode(entry: &Entry) -> GraphResult<Vec<u8>> {
+    encode_record(entry.sequence, &entry.record)
+}
+fn encode_record(sequence: u64, record: &Record) -> GraphResult<Vec<u8>> {
+    #[derive(Serialize)]
+    struct EntryRef<'a> {
+        sequence: u64,
+        record: &'a Record,
+    }
+    let entry = EntryRef { sequence, record };
     let mut payload = Vec::new();
-    ciborium::ser::into_writer(entry, &mut payload).map_err(invalid)?;
+    ciborium::ser::into_writer(&entry, &mut payload).map_err(invalid)?;
     if payload.len() > MAX_RECORD {
         return Err(invalid("record exceeds 256 MiB limit"));
     }
@@ -283,9 +296,41 @@ impl DurableGraph {
     ) -> GraphResult<Self> {
         config.validate().map_err(invalid)?;
         let graph = Graph::with_config(config.clone());
+        Self::create_initialized(path, graph, schema.clone(), Record::Init { config, schema })
+    }
+
+    /// Start a new journal from a complete clean graph, preserving retained history,
+    /// raw columns, inactive identities and allocation. Source ownership is unchanged.
+    /// Existing files are never overwritten; the baseline is one synced first record.
+    pub fn create_from_graph(
+        path: &Path,
+        source: &Graph,
+        schema: Option<GraphSchema>,
+    ) -> GraphResult<Self> {
+        let archive = source.archive_document()?;
+        let graph = archive.clone().restore()?;
+        Self::create_initialized(
+            path,
+            graph,
+            schema.clone(),
+            Record::InitArchive {
+                archive: Box::new(archive),
+                schema,
+            },
+        )
+    }
+
+    fn create_initialized(
+        path: &Path,
+        graph: Graph,
+        schema: Option<GraphSchema>,
+        record: Record,
+    ) -> GraphResult<Self> {
         if let Some(schema) = &schema {
             graph.check_schema_policy(schema)?;
         }
+        // Validate frame size/encoding before opening a destination.
+        let initial_frame = encode_record(0, &record)?;
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -309,7 +354,12 @@ impl DurableGraph {
             .file
             .write_all(MAGIC)
             .map_err(|e| io_error(path, "write_journal_header", e))?;
-        store.append(Record::Init { config, schema })?;
+        store
+            .file
+            .write_all(&initial_frame)
+            .and_then(|_| store.file.sync_all())
+            .map_err(|e| io_error(path, "write_and_sync_initialization", e))?;
+        store.next_sequence = 1;
         let parent = path
             .parent()
             .filter(|p| !p.as_os_str().is_empty())
@@ -403,7 +453,20 @@ impl DurableGraph {
                     graph = Some(candidate);
                     schema = policy;
                 }
-                Record::Init { .. } => return Err(invalid("duplicate initialization")),
+                Record::InitArchive {
+                    archive,
+                    schema: policy,
+                } if graph.is_none() && sequence == 0 => {
+                    let candidate = archive.restore()?;
+                    if let Some(schema) = &policy {
+                        candidate.check_schema_policy(schema)?;
+                    }
+                    graph = Some(candidate);
+                    schema = policy;
+                }
+                Record::Init { .. } | Record::InitArchive { .. } => {
+                    return Err(invalid("duplicate initialization"))
+                }
                 record => {
                     let graph = graph
                         .as_mut()
@@ -582,7 +645,9 @@ impl DurableGraph {
                 *revision = next;
             }
             Record::Checkpoint { record } => graph.record_checkpoint(record)?,
-            Record::Init { .. } => return Err(invalid("duplicate initialization")),
+            Record::Init { .. } | Record::InitArchive { .. } => {
+                return Err(invalid("duplicate initialization"))
+            }
         }
         Ok(())
     }

@@ -80,3 +80,14 @@ These are the existing workstreams, not new requirements discovered by this pass
 No additional owner answers were needed for the implemented slices. Service
 concurrency/deployment and deferred adapter choices retain their original workbook
 scope. The flat checklist remains the authority for individual entries.
+
+## Second priority window — began 10:33 UTC
+
+Completed 10.3: full retained graph archives and existing-graph durable journal
+initialization. Exact backing values/column positions, allocation and identity
+reservations, branches/history/clocks/configuration and frozen independent source
+domains are preserved. Evidence: `retained-archive-import-2026-10-26.md`; local
+100k-node save/load receipt: `../benchmarks/graph-archive-2026-10-26.json`.
+**201 checked / 67 open**, no new rows. The first window's table/gates above remain
+a historical receipt. The next slice targets explicit 10.4 storage checkpoints and
+crash-safe journal replacement; automatic schedule remains deferred.

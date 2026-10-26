@@ -10,6 +10,8 @@
 //! - Git-like branching model (lightweight branches, merge capabilities)
 //! - Efficient diff-based storage (only store what changed)
 
+mod archive;
+pub(crate) use archive::HistoryDocument;
 mod effective_topology;
 pub(crate) use effective_topology::TopologyPatch;
 

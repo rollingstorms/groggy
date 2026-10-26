@@ -430,6 +430,30 @@ impl PyGraph {
         })
     }
 
+    /// Save all retained graph state without publishing pending manual changes.
+    fn save_archive(&self, py: Python<'_>, path: std::path::PathBuf) -> PyResult<()> {
+        let prepared = self
+            .inner
+            .borrow()
+            .prepare_archive()
+            .map_err(graph_error_to_py_err)?;
+        py.allow_threads(move || prepared.save(&path))
+            .map_err(graph_error_to_py_err)
+    }
+
+    /// Restore an independent complete graph, retaining its publication policy.
+    #[staticmethod]
+    fn load_archive(py: Python<'_>, path: std::path::PathBuf) -> PyResult<Self> {
+        let prepared = py
+            .allow_threads(move || groggy::api::graph::PreparedArchive::read(&path))
+            .map_err(graph_error_to_py_err)?;
+        let graph = prepared.restore().map_err(graph_error_to_py_err)?;
+        Ok(Self {
+            inner: graph.into_shared(),
+            cached_view: RefCell::new(None),
+        })
+    }
+
     /// Replace a node's semantic labels; independent of base/meta entity_type.
     fn set_node_labels(&mut self, node: NodeId, labels: Vec<String>) -> PyResult<()> {
         self.inner
