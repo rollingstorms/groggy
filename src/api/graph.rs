@@ -23,6 +23,7 @@ mod property_unset;
 mod publication;
 mod read_attributes;
 mod schema;
+pub(crate) mod snapshot;
 mod tables;
 mod view_updates;
 use identity::ExternalIdentityIndex;
@@ -2015,14 +2016,20 @@ impl Graph {
 
     /// Build an immutable snapshot of the graph at a given commit.
     pub fn snapshot_at_commit(&self, commit_id: StateId) -> Result<TemporalSnapshot, GraphError> {
-        TemporalSnapshot::at_commit(&self.history, commit_id)
-            .map(|snapshot| snapshot.with_groups(self.pool.borrow().retained_groups()))
+        TemporalSnapshot::at_commit(&self.history, commit_id).map(|snapshot| {
+            snapshot
+                .with_groups(self.pool.borrow().retained_groups())
+                .with_materialization(self.snapshot_materialization(false))
+        })
     }
 
     /// Build an immutable snapshot at or before the provided timestamp (seconds since epoch).
     pub fn snapshot_at_timestamp(&self, timestamp: u64) -> Result<TemporalSnapshot, GraphError> {
-        TemporalSnapshot::at_timestamp(&self.history, timestamp)
-            .map(|snapshot| snapshot.with_groups(self.pool.borrow().retained_groups()))
+        TemporalSnapshot::at_timestamp(&self.history, timestamp).map(|snapshot| {
+            snapshot
+                .with_groups(self.pool.borrow().retained_groups())
+                .with_materialization(self.snapshot_materialization(false))
+        })
     }
 
     /// Build a temporal index from the history for efficient temporal queries.
@@ -2147,11 +2154,10 @@ impl Graph {
             // Restore node attributes
             if let Some(attrs) = snapshot.node_attributes.get(&node_id) {
                 for (attr_name, attr_value) in attrs {
-                    let index = self.pool.borrow_mut().set_attr(
-                        attr_name.clone(),
-                        attr_value.clone(),
-                        true,
-                    );
+                    let index =
+                        self.pool
+                            .borrow_mut()
+                            .restore_attr(attr_name.clone(), attr_value, true);
                     self.space
                         .set_node_attr_index(node_id, attr_name.clone(), index);
                 }
@@ -2170,11 +2176,10 @@ impl Graph {
             // Restore edge attributes
             if let Some(attrs) = snapshot.edge_attributes.get(&edge_id) {
                 for (attr_name, attr_value) in attrs {
-                    let index = self.pool.borrow_mut().set_attr(
-                        attr_name.clone(),
-                        attr_value.clone(),
-                        false,
-                    );
+                    let index =
+                        self.pool
+                            .borrow_mut()
+                            .restore_attr(attr_name.clone(), attr_value, false);
                     self.space
                         .set_edge_attr_index(edge_id, attr_name.clone(), index);
                 }

@@ -14,8 +14,9 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Next: exact owned/configuration snapshot behavior (12.2), then native
-compatibility/compound boundaries (09.4b.2). Property history (11.2) and 16.2 are
+Next: native compatibility/compound boundaries (09.4b.2), starting with explicit
+whole-pipeline property publication. Exact owned snapshots (12.2), property history
+(11.2) and 16.2 are
 complete: effective reconstruction, atomic endpoint validation, frozen nested group
 sources/durable transfer, explicit legacy inputs, resolved first-parent merge reads
 and cached event prefixes. 16.3, checkpoint semantics (12.3), checked writeback
@@ -1172,3 +1173,10 @@ Checked off the existing item: typed absence events, scalar/bulk/mixed unsets,
 whole-operation/schema validation, exact clocks, retained values and durable
 recovery. Fixed scalar-after-bulk coalescing. **198 checked / 70 open**, no new
 rows. See `property-history-exit-review-2026-10-26.md` for verification/API details.
+
+## 2026-10-26 — owned snapshot inventory completed (12.2)
+
+Closed full configuration restoration, explicit full backing-pool/history capture
+and independent materialization, plus repeated-switch allocation bounds. No new
+rows; **199 checked / 69 open**. The 100k fixture preserves column lengths across
+six switch pairs. See `owned-snapshot-exit-review-2026-10-26.md` for costs/limits.

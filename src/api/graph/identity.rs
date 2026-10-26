@@ -33,7 +33,7 @@ pub struct EdgeUpsert {
     pub attrs: HashMap<AttrName, AttrValue>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(super) struct ExternalIdentityIndex {
     bindings: HashMap<String, ExternalEntityRef>,
 }

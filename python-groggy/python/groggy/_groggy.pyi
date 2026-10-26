@@ -3350,7 +3350,7 @@ class DurableGraph:
     def set_schema(self, *args, **kwargs) -> int:
         ...
 
-    def snapshot_at_commit(self, *args, **kwargs) -> TemporalSnapshot:
+    def snapshot_at_commit(self, state_id: int, *, owned: bool = False) -> TemporalSnapshot:
         ...
 
     def writer(self, *args, **kwargs) -> GraphWriter:
@@ -5149,13 +5149,15 @@ class Graph:
         """
         ...
 
-    def snapshot_at_commit(self, *args, **kwargs) -> Any:
+    def configuration(self) -> Dict[str, Any]: ...
+
+    def snapshot_at_commit(self, commit_id: int, *, owned: bool = False) -> TemporalSnapshot:
         """
         Build a temporal snapshot at a specific commit.
         """
         ...
 
-    def snapshot_at_timestamp(self, *args, **kwargs) -> Any:
+    def snapshot_at_timestamp(self, timestamp: int, *, owned: bool = False) -> TemporalSnapshot:
         """
         Build a temporal snapshot at or before the provided timestamp (seconds since epoch).
         """
@@ -10459,6 +10461,11 @@ class TemporalScope:
 
 
 class TemporalSnapshot:
+    @property
+    def is_owned(self) -> bool: ...
+    def configuration(self) -> Optional[Dict[str, Any]]: ...
+    def to_graph(self) -> Graph: ...
+
     @property
     def author(self) -> Any:
         ...

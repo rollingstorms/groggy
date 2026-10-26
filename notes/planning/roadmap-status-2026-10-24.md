@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **198 checked and 70 unchecked entries**. Entries overlap:
+currently contains **199 checked and 69 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 70 unchecked entries are not 70 independent tasks: 13 are overlapping AR
-architecture entries, 57 are numbered entries (including nested publication
+The 69 unchecked entries are not 69 independent tasks: 13 are overlapping AR
+architecture entries, 56 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -537,3 +537,13 @@ scalar-after-bulk coalescing. All typed representations and retained references
 remain readable; older assignment-only hashes/journal entries remain compatible.
 See `property-history-exit-review-2026-10-26.md`. Next is 12.2 owned/configuration
 snapshots and repeated-switch allocation, followed by native boundaries 09.4b.2.
+
+## 2026-10-26 — exact owned snapshots completed (12.2)
+
+Closed the existing full configuration / owned raw-pool transfer / repeated-switch
+allocation inventory: **199 checked / 69 open**, no new rows. Full capture is
+explicit; ordinary snapshots stay lightweight. All retained core storage/history
+and counters restore into independent owners. Release 100k-node evidence shows
+zero duplicate column growth through six switch pairs; reconstruction still has
+substantial costs. See `owned-snapshot-exit-review-2026-10-26.md`. Next is the
+whole-pipeline boundary under existing 09.4b.2; persistent archive/import stays 10.3.

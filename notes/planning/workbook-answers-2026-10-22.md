@@ -956,3 +956,12 @@ Old typed values and frozen sources remain retained, and durable recovery preser
 clocks and history. Fixed mixed scalar/bulk coalescing. See
 `property-history-exit-review-2026-10-26.md` and `docs/api/property-history.md`.
 12.2/10.3/10.4 retain owned snapshot/pool import/storage lifecycle requirements.
+
+## 2026-10-26 — owned snapshot contract implemented (12.2)
+
+Full configuration and frozen references survive lightweight materialization;
+explicit owned temporal captures retain all backing storage/history/reservations
+and restore independent owners. Repeated branch/reset restoration no longer
+appends duplicate values. No owner answers changed and no checklist rows added.
+See `owned-snapshot-exit-review-2026-10-26.md` and `docs/api/owned-snapshots.md`.
+Persistent archive/import and storage lifecycle remain 10.3/10.4.

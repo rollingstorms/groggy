@@ -30,6 +30,7 @@ pub struct TemporalSnapshot {
     history_identity: Arc<()>,
     lineage: LineageMetadata,
     state: PinnedReadState,
+    materialization: Option<Arc<crate::api::graph::snapshot::SnapshotMaterialization>>,
 }
 
 impl TemporalSnapshot {
@@ -69,7 +70,42 @@ impl TemporalSnapshot {
             history_identity,
             lineage,
             state: PinnedReadState::from_snapshot(snapshot)?,
+            materialization: None,
         })
+    }
+
+    pub(crate) fn with_materialization(
+        mut self,
+        context: Arc<crate::api::graph::snapshot::SnapshotMaterialization>,
+    ) -> Self {
+        self.materialization = Some(context);
+        self
+    }
+
+    /// Whether this capture explicitly owns full backing storage and retained history.
+    pub fn is_owned(&self) -> bool {
+        self.materialization
+            .as_ref()
+            .is_some_and(|context| context.is_owned())
+    }
+
+    /// Configuration captured from the graph owner, if constructed through Graph.
+    pub fn configuration(&self) -> Option<&crate::GraphConfig> {
+        self.materialization
+            .as_ref()
+            .map(|context| context.configuration())
+    }
+
+    /// Restore a full explicitly owned capture into an independent writable graph.
+    pub fn to_graph(&self) -> Result<Graph, GraphError> {
+        self.materialization
+            .as_ref()
+            .ok_or_else(|| {
+                GraphError::InvalidInput(
+                    "Snapshot has no owned backing context; capture an owned snapshot first".into(),
+                )
+            })?
+            .restore_owned(&self.state)
     }
 
     pub(crate) fn with_groups(
@@ -173,7 +209,15 @@ impl TemporalSnapshot {
     }
 
     pub fn as_subgraph(&self) -> Result<Subgraph, GraphError> {
-        let graph = Graph::from_snapshot(self.state.snapshot().clone())?;
+        let graph = if let Some(context) = &self.materialization {
+            if context.is_owned() {
+                context.restore_owned(&self.state)?
+            } else {
+                context.materialize_selection(&self.state)?
+            }
+        } else {
+            Graph::from_snapshot(self.state.snapshot().clone())?
+        };
         let rc = Rc::new(std::cell::RefCell::new(graph));
         let nodes = self.state.existence().nodes().clone();
         let edges = self.state.existence().edges().clone();

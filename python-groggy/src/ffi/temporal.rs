@@ -91,6 +91,33 @@ impl PyTemporalSnapshot {
         }
     }
 
+    #[getter]
+    fn is_owned(&self) -> bool {
+        self.inner.is_owned()
+    }
+
+    fn configuration(&self, py: Python<'_>) -> PyResult<PyObject> {
+        match self.inner.configuration() {
+            None => Ok(py.None()),
+            Some(config) => {
+                let json = serde_json::to_string(config)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                Ok(py
+                    .import("json")?
+                    .call_method1("loads", (json,))?
+                    .to_object(py))
+            }
+        }
+    }
+
+    fn to_graph(&self) -> PyResult<crate::ffi::api::graph::PyGraph> {
+        let graph = self.inner.to_graph().map_err(graph_error_to_py_err)?;
+        Ok(crate::ffi::api::graph::PyGraph {
+            inner: graph.into_shared(),
+            cached_view: std::cell::RefCell::new(None),
+        })
+    }
+
     fn as_subgraph(&self, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
         let subgraph = self.inner.as_subgraph().map_err(graph_error_to_py_err)?;
         let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;

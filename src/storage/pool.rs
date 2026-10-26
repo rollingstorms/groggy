@@ -55,6 +55,54 @@ pub struct AttributeColumn {
     values: Vec<AttrValue>,
     /// Memory pool for reused values (Memory Optimization 2)
     memory_pool: AttributeMemoryPool,
+    /// Built only for state restoration; hashes retain indices rather than duplicate values.
+    restore_indices: Option<RestorationIndex>,
+}
+
+/// One representative per distinct value; extra positions only for real hash collisions.
+#[derive(Debug, Clone, Default)]
+struct RestorationIndex {
+    first: HashMap<u64, usize>,
+    collisions: HashMap<u64, Vec<usize>>,
+}
+impl RestorationIndex {
+    fn insert(&mut self, index: usize, values: &[AttrValue]) {
+        let hash = AttributeColumn::value_hash(&values[index]);
+        match self.first.entry(hash) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(index);
+            }
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                if values[*entry.get()] != values[index] {
+                    let candidates = self.collisions.entry(hash).or_default();
+                    if !candidates.iter().any(|&old| values[old] == values[index]) {
+                        candidates.push(index);
+                    }
+                }
+            }
+        }
+    }
+    fn find(&self, value: &AttrValue, values: &[AttrValue]) -> Option<usize> {
+        let hash = AttributeColumn::value_hash(value);
+        let &first = self.first.get(&hash)?;
+        if &values[first] == value {
+            return Some(first);
+        }
+        self.collisions
+            .get(&hash)?
+            .iter()
+            .copied()
+            .find(|&index| &values[index] == value)
+    }
+    fn memory_usage(&self) -> usize {
+        self.first.capacity() * std::mem::size_of::<(u64, usize)>()
+            + self.collisions.capacity() * std::mem::size_of::<(u64, Vec<usize>)>()
+            + self
+                .collisions
+                .values()
+                .map(|rows| rows.capacity() * std::mem::size_of::<usize>())
+                .sum::<usize>()
+    }
 }
 
 /// Memory pool for reusing attribute values to reduce allocations
@@ -146,6 +194,7 @@ impl AttributeColumn {
         Self {
             values: Vec::new(),
             memory_pool: AttributeMemoryPool::new(),
+            restore_indices: None,
         }
     }
 
@@ -154,6 +203,7 @@ impl AttributeColumn {
         Self {
             values: Vec::with_capacity(capacity),
             memory_pool: AttributeMemoryPool::new(),
+            restore_indices: None,
         }
     }
 
@@ -165,7 +215,33 @@ impl AttributeColumn {
         // Optimize the value before storing (Memory Optimization 1)
         let optimized_value = value.optimize();
         self.values.push(optimized_value);
+        if let Some(indices) = &mut self.restore_indices {
+            indices.insert(index, &self.values);
+        }
         index
+    }
+
+    fn value_hash(value: &AttrValue) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hash = std::collections::hash_map::DefaultHasher::new();
+        value.hash(&mut hash);
+        hash.finish()
+    }
+
+    /// Reuse an equal retained value for reconstruction, checking hash collisions.
+    /// Ordinary mutations continue to append their own retained column values.
+    pub(crate) fn restore_value(&mut self, value: &AttrValue) -> usize {
+        let indices = self.restore_indices.get_or_insert_with(|| {
+            let mut indices = RestorationIndex::default();
+            for index in 0..self.values.len() {
+                indices.insert(index, &self.values);
+            }
+            indices
+        });
+        if let Some(index) = indices.find(value, &self.values) {
+            return index;
+        }
+        self.push(value.clone())
     }
 
     /// Bulk append values using Vec::extend (VECTORIZED - much faster than push loop)
@@ -179,6 +255,11 @@ impl AttributeColumn {
         let optimized_values: Vec<_> = values.into_iter().map(|v| v.optimize()).collect();
 
         self.values.extend(optimized_values); // Single vectorized operation!
+        if let Some(indices) = &mut self.restore_indices {
+            for index in start_index..self.values.len() {
+                indices.insert(index, &self.values);
+            }
+        }
         let end_index = self.values.len() - 1;
         (start_index, end_index)
     }
@@ -223,13 +304,18 @@ impl AttributeColumn {
         let values_size = self.values.iter().map(|v| v.memory_size()).sum::<usize>();
         let pool_overhead = std::mem::size_of::<AttributeMemoryPool>();
 
-        base_size + values_size + pool_overhead
+        let restore_overhead = self
+            .restore_indices
+            .as_ref()
+            .map_or(0, RestorationIndex::memory_usage);
+        base_size + values_size + pool_overhead + restore_overhead
     }
 
     /// Ensure the column can address up to the given index (sparse indexing support)
     pub fn ensure_len(&mut self, min_len: usize) {
         if self.values.len() < min_len {
             self.values.resize(min_len, AttrValue::Null);
+            self.restore_indices = None;
         }
     }
 
@@ -240,6 +326,7 @@ impl AttributeColumn {
         }
         let optimized_value = value.optimize();
         self.values[index] = optimized_value;
+        self.restore_indices = None;
     }
 }
 
@@ -259,7 +346,7 @@ impl AttributeColumn {
 /// - Business logic (that's Graph coordinator)
 /// - Version control (that's HistoryForest)
 /// - Change tracking (that's ChangeTracker)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GraphPool {
     /*
     === GRAPH CONFIGURATION ===
@@ -526,6 +613,24 @@ impl GraphPool {
                 .or_insert_with(AttributeColumn::new)
         };
         column.push(value)
+    }
+
+    /// Resolve a reconstructed value without growing columns on repeated switches.
+    pub(crate) fn restore_attr(
+        &mut self,
+        name: AttrName,
+        value: &AttrValue,
+        is_node: bool,
+    ) -> usize {
+        let columns = if is_node {
+            &mut self.node_attributes
+        } else {
+            &mut self.edge_attributes
+        };
+        columns
+            .entry(name)
+            .or_insert_with(AttributeColumn::new)
+            .restore_value(value)
     }
 
     /// Set multiple attributes on single entity (appends to columns and returns indices)
@@ -979,6 +1084,27 @@ impl GraphPool {
         self.retained_groups.clone()
     }
 
+    pub(crate) fn install_snapshot_groups(
+        &mut self,
+        groups: std::sync::Arc<HashMap<SubgraphId, crate::storage::retained_group::RetainedGroup>>,
+    ) {
+        for (&id, group) in groups.iter() {
+            self.stored_subgraphs.entry(id).or_insert_with(|| {
+                (
+                    group.view.nodes().clone(),
+                    group.view.edges().clone(),
+                    group.kind.clone(),
+                )
+            });
+        }
+        self.retained_groups = groups;
+    }
+
+    pub(crate) fn preserve_allocation(&mut self, nodes: usize, edges: usize) {
+        self.next_node_id = self.next_node_id.max(nodes);
+        self.next_edge_id = self.next_edge_id.max(edges);
+    }
+
     pub(crate) fn prepare_frozen_group(
         &mut self,
         view: crate::GraphView,
@@ -1172,3 +1298,36 @@ ERROR HANDLING:
 - Validate entity existence before operations
 - Fail fast and clear error messages
 */
+
+#[cfg(test)]
+mod restoration_tests {
+    use super::*;
+    #[test]
+    fn restoration_lookup_tracks_appends_bulk_extends_and_explicit_overwrites() {
+        let mut column = AttributeColumn::new();
+        let first = column.push(AttrValue::Int(1));
+        assert_eq!(column.restore_value(&AttrValue::Int(1)), first);
+        let second = column.push(AttrValue::Int(2));
+        column.extend_values(vec![AttrValue::Int(3), AttrValue::Int(4)]);
+        assert_eq!(column.restore_value(&AttrValue::Int(2)), second);
+        assert_eq!(column.restore_value(&AttrValue::Int(4)), 3);
+        column.set(first, AttrValue::Bool(true));
+        assert_eq!(column.restore_value(&AttrValue::Bool(true)), first);
+        assert_eq!(column.restore_value(&AttrValue::Int(1)), 4);
+        column.ensure_len(7);
+        assert_eq!(column.restore_value(&AttrValue::Null), 5);
+        assert_eq!(column.len(), 7);
+    }
+    #[test]
+    fn restoration_hash_collisions_compare_values_before_reusing_indices() {
+        let mut column = AttributeColumn::new();
+        column.push(AttrValue::Bool(true));
+        column.restore_indices = Some(RestorationIndex {
+            first: HashMap::from([(AttributeColumn::value_hash(&AttrValue::Int(42)), 0)]),
+            collisions: HashMap::new(),
+        });
+        assert_eq!(column.restore_value(&AttrValue::Int(42)), 1);
+        assert_eq!(column.restore_value(&AttrValue::Int(42)), 1);
+        assert_eq!(column.len(), 2);
+    }
+}

@@ -228,3 +228,6 @@ harness = false
 [[bench]]
 name = "effective_topology_publication"
 harness = false
+[[bench]]
+name = "owned_snapshot_restoration"
+harness = false

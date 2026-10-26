@@ -36,6 +36,32 @@ use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 use crate::ffi::api::graph_analysis::PyGraphAnalysis;
 use crate::ffi::api::graph_matrix::PyGraphMatrixHelper;
 
+/// Decode configuration only; defaults and validation belong to the core type.
+pub(crate) fn parse_config(
+    config: Option<&PyDict>,
+    directed: Option<bool>,
+) -> PyResult<groggy::GraphConfig> {
+    let mut config = match config {
+        Some(config) => {
+            let RustAttrValue::Json(json) = crate::ffi::utils::python_value_to_attr_value(config)?
+            else {
+                return Err(PyTypeError::new_err("config must be a dictionary"));
+            };
+            serde_json::from_str::<groggy::GraphConfig>(&json)
+                .map_err(|error| PyValueError::new_err(error.to_string()))?
+        }
+        None => groggy::GraphConfig::new(),
+    };
+    if let Some(directed) = directed {
+        config.graph_type = if directed {
+            groggy::types::GraphType::Directed
+        } else {
+            groggy::types::GraphType::Undirected
+        };
+    }
+    Ok(config)
+}
+
 /// Translate a schema dictionary; all rule semantics remain in the Rust core.
 pub(crate) fn parse_schema(schema: &PyDict) -> PyResult<groggy::GraphSchema> {
     let value = crate::ffi::utils::python_value_to_attr_value(schema)?;
@@ -353,15 +379,23 @@ impl PyGraph {
     }
 
     #[new]
-    #[pyo3(signature = (directed = None, _config = None, *, manual = false))]
-    fn new(directed: Option<bool>, _config: Option<&PyDict>, manual: bool) -> PyResult<Self> {
-        // Create graph with specified directionality (defaults to false/undirected)
-        let is_directed = directed.unwrap_or(false);
-        let mut rust_graph = if is_directed {
-            RustGraph::new_directed()
-        } else {
-            RustGraph::new_undirected()
-        };
+    #[pyo3(signature = (directed = None, _config = None, *, manual = false, config = None))]
+    fn new(
+        directed: Option<bool>,
+        _config: Option<&PyDict>,
+        manual: bool,
+        config: Option<&PyDict>,
+    ) -> PyResult<Self> {
+        if _config.is_some() && config.is_some() {
+            return Err(PyValueError::new_err(
+                "Supply config or legacy _config, not both",
+            ));
+        }
+        let config = parse_config(config.or(_config), directed)?;
+        config
+            .validate()
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let mut rust_graph = RustGraph::with_config(config);
         rust_graph
             .set_automatic_publication(!manual)
             .map_err(graph_error_to_py_err)?;
@@ -1951,24 +1985,38 @@ impl PyGraph {
         }
     }
 
-    /// Build a temporal snapshot at a specific commit.
-    fn snapshot_at_commit(&self, commit_id: StateId) -> PyResult<PyTemporalSnapshot> {
-        let snapshot = self
-            .inner
-            .borrow()
-            .snapshot_at_commit(commit_id)
-            .map_err(graph_error_to_py_err)?;
+    /// Capture a recorded snapshot; owned=True explicitly copies backing storage/history.
+    #[pyo3(signature=(commit_id,*,owned=false))]
+    fn snapshot_at_commit(&self, commit_id: StateId, owned: bool) -> PyResult<PyTemporalSnapshot> {
+        let graph = self.inner.borrow();
+        let snapshot = if owned {
+            graph.owned_snapshot_at_commit(commit_id)
+        } else {
+            graph.snapshot_at_commit(commit_id)
+        }
+        .map_err(graph_error_to_py_err)?;
         Ok(PyTemporalSnapshot { inner: snapshot })
     }
 
-    /// Build a temporal snapshot at or before the provided timestamp (seconds since epoch).
-    fn snapshot_at_timestamp(&self, timestamp: u64) -> PyResult<PyTemporalSnapshot> {
-        let snapshot = self
-            .inner
-            .borrow()
-            .snapshot_at_timestamp(timestamp)
-            .map_err(graph_error_to_py_err)?;
+    #[pyo3(signature=(timestamp,*,owned=false))]
+    fn snapshot_at_timestamp(&self, timestamp: u64, owned: bool) -> PyResult<PyTemporalSnapshot> {
+        let graph = self.inner.borrow();
+        let snapshot = if owned {
+            graph.owned_snapshot_at_timestamp(timestamp)
+        } else {
+            graph.snapshot_at_timestamp(timestamp)
+        }
+        .map_err(graph_error_to_py_err)?;
         Ok(PyTemporalSnapshot { inner: snapshot })
+    }
+
+    fn configuration(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let json = serde_json::to_string(self.inner.borrow().configuration())
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(py
+            .import("json")?
+            .call_method1("loads", (json,))?
+            .to_object(py))
     }
 
     /// Build a temporal index from the graph history for efficient temporal queries.

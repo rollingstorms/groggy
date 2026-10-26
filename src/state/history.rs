@@ -104,6 +104,25 @@ pub struct HistoryForest {
 }
 
 impl HistoryForest {
+    /// Copy retained history into a new owner with distinct write provenance.
+    /// Immutable commit/delta payloads are shared; references and caches are independent.
+    pub(crate) fn detached_copy(&self) -> Self {
+        Self {
+            identity: Arc::new(()),
+            graph_type: self.graph_type,
+            effective_reads: Default::default(),
+            effective_topology: Default::default(),
+            commits: self.commits.clone(),
+            deltas: self.deltas.clone(),
+            branches: self.branches.clone(),
+            tags: self.tags.clone(),
+            children: self.children.clone(),
+            roots: self.roots.clone(),
+            next_state_id: self.next_state_id,
+            checkpoints: self.checkpoints.clone(),
+        }
+    }
+
     pub(crate) fn identity(&self) -> &Arc<()> {
         &self.identity
     }

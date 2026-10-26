@@ -1,13 +1,10 @@
 //! Thin translation for the binary journal and its checked writer.
-use super::graph::{parse_edge_upserts, parse_node_upserts, parse_schema};
+use super::graph::{parse_config, parse_edge_upserts, parse_node_upserts, parse_schema};
 use super::graph_batch::{parse_batch, publication_to_python, timestamp};
 use crate::ffi::temporal::PyTemporalSnapshot;
-use crate::ffi::utils::{
-    attr_value_to_python_value, graph_error_to_py_err, python_value_to_attr_value,
-};
-use groggy::types::GraphType;
-use groggy::{AttrValue, DurableGraph, GraphConfig, StateId};
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use crate::ffi::utils::{attr_value_to_python_value, graph_error_to_py_err};
+use groggy::{DurableGraph, StateId};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::path::PathBuf;
@@ -38,22 +35,7 @@ impl PyDurableGraph {
         config: Option<&PyDict>,
         schema: Option<&PyDict>,
     ) -> PyResult<Self> {
-        let mut config = if let Some(config) = config {
-            let AttrValue::Json(json) = python_value_to_attr_value(config)? else {
-                return Err(PyTypeError::new_err("config must be a dictionary"));
-            };
-            serde_json::from_str::<GraphConfig>(&json)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?
-        } else {
-            GraphConfig::new()
-        };
-        if let Some(directed) = directed {
-            config.graph_type = if directed {
-                GraphType::Directed
-            } else {
-                GraphType::Undirected
-            };
-        }
+        let config = parse_config(config, directed)?;
         let schema = schema.map(parse_schema).transpose()?;
         Ok(Self {
             store: Some(
@@ -405,15 +387,16 @@ impl PyDurableGraph {
             None => Ok(py.None()),
         }
     }
-    fn snapshot_at_commit(&self, state_id: StateId) -> PyResult<PyTemporalSnapshot> {
-        Ok(PyTemporalSnapshot {
-            inner: self
-                .core()?
-                .graph()
-                .map_err(graph_error_to_py_err)?
-                .snapshot_at_commit(state_id)
-                .map_err(graph_error_to_py_err)?,
-        })
+    #[pyo3(signature=(state_id,*,owned=false))]
+    fn snapshot_at_commit(&self, state_id: StateId, owned: bool) -> PyResult<PyTemporalSnapshot> {
+        let graph = self.core()?.graph().map_err(graph_error_to_py_err)?;
+        let inner = if owned {
+            graph.owned_snapshot_at_commit(state_id)
+        } else {
+            graph.snapshot_at_commit(state_id)
+        }
+        .map_err(graph_error_to_py_err)?;
+        Ok(PyTemporalSnapshot { inner })
     }
     #[pyo3(signature=(message,author,*,expected_state=None,schema=None))]
     fn checkpoint(

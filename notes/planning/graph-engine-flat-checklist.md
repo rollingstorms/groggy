@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-10-25 on `groggy-roadmap-2026-10-20`.
+Updated 2026-10-26 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has **193 checked / 75 unchecked entries**, including overlapping
+The checklist has **199 checked / 69 unchecked entries**, including overlapping
 parents and repair slices; this is not a completion percentage. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
@@ -55,13 +55,12 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
 **Immediate next task:** finish native publication compatibility, mutable storage
-escape auditing and whole-pipeline boundaries (09.4b.2). Ordinary Python defaults,
-compound collapse, explicit table writeback, strict subgraph bulk setters and
-checked table materialization now have completed slices (09.4b.1/09.4b.2a,c–e).
-Use the checkpoint boundary (12.3a) and shared logical change model (AR7.9). F64 property migration (07.3a) and native temporal
-properties (07.3b) are complete. Broader immutable legacy-view, retained pool/meta
-recovery and effective-time reconstruction gates remain open. Preserve existing
-APIs through the documented migration and keep Graphiti deferred behind the core.
+escape auditing and whole-pipeline boundaries (09.4b.2). Effective-time reads
+(16.2), complete property history (11.2), explicit checkpoints (12.3), exact owned
+snapshots (12.2) and the fixed table facade inventory are complete within their
+stated contracts. Durable arbitrary pool import/compaction remains 10.3/10.4;
+Graphiti remains deferred behind the core. Preserve existing APIs through the
+documented migration and record unresolved choices in the workbook.
 
 ## Owner answer update — 2026-10-22
 
@@ -173,7 +172,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **11.1 — Typed recorded property states.** Historical recorded snapshots resolve typed node/edge values and typed before/after changes instead of placeholder representations.
 - [x] **11.2 — Complete property history.** Explicit node/edge unsets span scalar/bulk/mixed checked operations, optional typed old/new deltas, schema validation, recorded/effective reconstruction and durable replay. Absence remains distinct from Null, clocks/ties remain exact, pending scalar/bulk sequences coalesce correctly, and old views/all typed representations/frozen references remain readable. Existing assignment-only hashes and older journal records remain compatible. Exit: `property-history-exit-review-2026-10-26.md`; value-byte diffs are a separate encoding concern.
 - [x] **12.1 — Recorded state switching foundations.** Preserve direction, ID allocation, retained membership/endpoints, and backing column references through branch switches/reset; reject missing referents.
-- [ ] **12.2 — Partial: exact portable snapshots.** Canonical effective reads and durable frozen/nested source revisions are independent of the working head (16.2). Finish all-configuration restoration, owned temporal snapshot materialization/raw pool transfer and repeated-switch column allocation bounds.
+- [x] **12.2 — Exact owned snapshots.** Lightweight temporal materialization preserves full configuration/frozen sources. Explicit owned captures restore independent graphs with all retained raw pool values, inactive IDs/name reservations, branches/history/checkpoints/clocks/counters and distinct write provenance. Repeated branch/reset restoration reuses retained values without column growth. In-memory transfer is complete; persistent raw-pool archive/import stays 10.3/10.4. Exit and 100k-node receipt: `owned-snapshot-exit-review-2026-10-26.md`.
 - [x] **12.3 — Explicit checkpoint semantics.** Clean commit/checkpoint labels the current published state without an extra mutation delta or changed publication clocks. Ordinary Python defaults publish mutations between checkpoints; explicit manual compatibility publishes pending changes once before labeling. Native/writer/Python/durable, stale/dirty/schema failures, empty/repeated labels, branch/reopen/backup and journal-fault behavior are verified. Exit: `checkpoint-exit-review-2026-10-25.md`. Native default/escape-path migration remains 09.4b.2; materialized storage checkpoints stay in 10.4 and effective-time reconstruction in 16.2.
 - [x] **12.3a — Checkpoint published states without duplicate deltas.** `checkpoint`, writer checkpoint and clean `commit()` label the current version, preserving state IDs and publication clocks. Durable records sync/replay/backup labels with original timestamps; stale/dirty/schema failures reject, empty/repeated labels work and checkpoints are not permanent retention pins. Legacy dirty `commit()` publishes once for compatibility. See `explicit-checkpoints-2026-10-23.md`; ordinary defaults remain 09.4b.
 - [x] **13.1 — Hard reset foundations.** Restore the recorded state while preserving allocated-ID reservations and retained pool references.
