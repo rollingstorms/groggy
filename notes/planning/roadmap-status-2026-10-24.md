@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **199 checked and 69 unchecked entries**. Entries overlap:
+currently contains **200 checked and 68 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 69 unchecked entries are not 69 independent tasks: 13 are overlapping AR
-architecture entries, 56 are numbered entries (including nested publication
+The 68 unchecked entries are not 68 independent tasks: 13 are overlapping AR
+architecture entries, 55 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -565,3 +565,12 @@ and properties remain in history. **199 checked / 69 open**, no new rows. The
 parent now has three explicit open components: native default/infallible migration,
 raw pool/space escapes and uncertified/topology algorithm acceptance. Effect-aware
 IR remains AR7.8. Evidence/gates: `outer-pipeline-boundary-2026-10-26.md`.
+
+## 2026-10-26 — branch lifecycle completed (14.1)
+
+Closed the existing creation/switching/identity/read/recovery inventory. Recorded
+timestamp selection now uses selected first-parent ancestry; siblings and later
+unselected retained states cannot leak into it. Frozen groups, dirty manual
+workflows, empty branches and durable schema/failure boundaries are verified.
+**200 checked / 68 open**, no new rows. See `branch-lifecycle-exit-review-2026-10-26.md`.
+Explicit destructive pruning/history and pool reclamation remain 15/10.4.

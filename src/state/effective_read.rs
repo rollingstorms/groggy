@@ -50,6 +50,14 @@ impl ReadContext {
             index: OnceLock::new(),
         }
     }
+    pub(crate) fn commit_at_or_before(&self, timestamp: u64) -> Option<StateId> {
+        self.commits
+            .iter()
+            .filter(|commit| commit.timestamp <= timestamp)
+            .max_by_key(|commit| (commit.timestamp, commit.id))
+            .map(|commit| commit.id)
+    }
+
     pub(crate) fn validate_legacy(
         &self,
         legacy: &BTreeMap<StateId, crate::PublicationMetadata>,

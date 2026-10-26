@@ -2019,6 +2019,15 @@ impl PyGraph {
             .to_object(py))
     }
 
+    /// Discard pending manual edits and restore the selected published state.
+    /// Allocated IDs and retained backing values remain reserved.
+    fn reset_hard(&self) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .reset_hard()
+            .map_err(graph_error_to_py_err)
+    }
+
     /// Build a temporal index from the graph history for efficient temporal queries.
     ///
     /// The temporal index provides O(log n) or better lookups for:

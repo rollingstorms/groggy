@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has **199 checked / 69 unchecked entries**, including overlapping
+The checklist has **200 checked / 68 unchecked entries**, including overlapping
 parents and repair slices; this is not a completion percentage. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
@@ -178,7 +178,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **13.1 — Hard reset foundations.** Restore the recorded state while preserving allocated-ID reservations and retained pool references.
 - [x] **13.2 — State-based diffs.** Compare reconstructed states in either direction with deterministic typed property and topology changes in Rust/Python.
 - [ ] **13.3 — Open: complete reversals and rewiring.** Implement revert and endpoint changes, define destructive versus tracked operations, and cover dirty working-state examples and data preservation.
-- [ ] **14.1 — Partial: finish branch lifecycle.** Verify existing branch switching, retained identities, durable replay, and branch-scoped reads against the completed state contract.
+- [x] **14.1 — Branch lifecycle.** Verified switching/empty selections, lifetime IDs/aliases, Null/absence, frozen source pins, durable recovery/backup/schema rejection and eight journal-failure branch cases. Recorded timestamp reads now follow the selected first-parent lineage instead of leaking siblings; explicit state IDs remain inspectable across branches. Exit: `branch-lifecycle-exit-review-2026-10-26.md`. Merge planning and destructive pruning/reclamation remain 14.2/15.
 - [ ] **14.2 — Open: three-way merge.** Detect node/edge/property conflicts, accept caller resolution policies, and explicitly support preserving parallel facts where requested.
 - [ ] **15.1 — Open: implement explicit destructive retention.** Purge must preserve shared branches/open immutable views; no extra permanent checkpoint/audit pins or mandatory grace period/backup (A09, current data science library scope). Implement branch deletion/pruning and shared-referent reachability before reclaiming inactive identities/attributes.
 - [ ] **15.2 — Open: real garbage collection.** Replace no-op gc_history/optimize behavior with tested reachability, compaction, and crash-safe reclamation; preserve every retained snapshot/provenance reference.

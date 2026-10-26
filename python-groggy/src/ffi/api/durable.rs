@@ -398,6 +398,18 @@ impl PyDurableGraph {
         .map_err(graph_error_to_py_err)?;
         Ok(PyTemporalSnapshot { inner })
     }
+    #[pyo3(signature=(timestamp,*,owned=false))]
+    fn snapshot_at_timestamp(&self, timestamp: u64, owned: bool) -> PyResult<PyTemporalSnapshot> {
+        let graph = self.core()?.graph().map_err(graph_error_to_py_err)?;
+        let inner = if owned {
+            graph.owned_snapshot_at_timestamp(timestamp)
+        } else {
+            graph.snapshot_at_timestamp(timestamp)
+        }
+        .map_err(graph_error_to_py_err)?;
+        Ok(PyTemporalSnapshot { inner })
+    }
+
     #[pyo3(signature=(message,author,*,expected_state=None,schema=None))]
     fn checkpoint(
         &mut self,

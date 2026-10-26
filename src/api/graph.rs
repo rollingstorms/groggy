@@ -2023,13 +2023,15 @@ impl Graph {
         })
     }
 
-    /// Build an immutable snapshot at or before the provided timestamp (seconds since epoch).
+    /// Select a recorded snapshot on the current branch's first-parent lineage
+    /// at or before the timestamp (Unix seconds). Explicit state-ID reads remain global.
     pub fn snapshot_at_timestamp(&self, timestamp: u64) -> Result<TemporalSnapshot, GraphError> {
-        TemporalSnapshot::at_timestamp(&self.history, timestamp).map(|snapshot| {
-            snapshot
-                .with_groups(self.pool.borrow().retained_groups())
-                .with_materialization(self.snapshot_materialization(false))
-        })
+        TemporalSnapshot::at_timestamp_on_lineage(&self.history, self.current_commit, timestamp)
+            .map(|snapshot| {
+                snapshot
+                    .with_groups(self.pool.borrow().retained_groups())
+                    .with_materialization(self.snapshot_materialization(false))
+            })
     }
 
     /// Build a temporal index from the history for efficient temporal queries.

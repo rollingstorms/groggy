@@ -53,6 +53,20 @@ impl TemporalSnapshot {
         }
     }
 
+    /// Select a recorded timestamp on an explicit first-parent lineage.
+    pub fn at_timestamp_on_lineage(
+        history: &HistoryForest,
+        head: StateId,
+        timestamp: u64,
+    ) -> Result<Self, GraphError> {
+        match history.commit_at_or_before_on_lineage(head, timestamp)? {
+            Some(state) => Self::at_commit(history, state),
+            None => Err(GraphError::InvalidInput(format!(
+                "No commit found at or before timestamp {timestamp} on the selected lineage"
+            ))),
+        }
+    }
+
     fn from_components(
         commit: Arc<Commit>,
         snapshot: GraphSnapshot,

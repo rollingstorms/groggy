@@ -477,6 +477,18 @@ impl HistoryForest {
             .map(|commit| commit.id)
     }
 
+    /// Select a recorded timestamp only on the retained first-parent lineage.
+    /// Equal second-resolution timestamps use accepted state ID order.
+    pub fn commit_at_or_before_on_lineage(
+        &self,
+        head: StateId,
+        timestamp: u64,
+    ) -> GraphResult<Option<StateId>> {
+        Ok(self
+            .effective_read_context(head)?
+            .commit_at_or_before(timestamp))
+    }
+
     /// Get the commit history for a specific branch (following parent chain)
     pub fn get_branch_history(
         &self,

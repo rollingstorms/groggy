@@ -975,3 +975,12 @@ and properties remain in history. **199 checked / 69 open**, no new rows. The
 parent now has three explicit open components: native default/infallible migration,
 raw pool/space escapes and uncertified/topology algorithm acceptance. Effect-aware
 IR remains AR7.8. Evidence/gates: `outer-pipeline-boundary-2026-10-26.md`.
+
+## 2026-10-26 — branch lifecycle completed (14.1)
+
+Closed the existing creation/switching/identity/read/recovery inventory. Recorded
+timestamp selection now uses selected first-parent ancestry; siblings and later
+unselected retained states cannot leak into it. Frozen groups, dirty manual
+workflows, empty branches and durable schema/failure boundaries are verified.
+**200 checked / 68 open**, no new rows. See `branch-lifecycle-exit-review-2026-10-26.md`.
+Explicit destructive pruning/history and pool reclamation remain 15/10.4.

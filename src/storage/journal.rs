@@ -1308,3 +1308,72 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod branch_failure_tests {
+    use super::*;
+    #[test]
+    fn branch_metadata_and_selection_failures_roll_back_journal_before_exposure() {
+        for checkout in [false, true] {
+            for failure in [
+                Failure::BeforeHeader,
+                Failure::AfterHeader,
+                Failure::AfterPayload,
+                Failure::AfterSync,
+            ] {
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("branches.ggj");
+                let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+                store.create_branch("root".into(), 0).unwrap();
+                let head = store
+                    .apply_batch(
+                        GraphBatch {
+                            add_nodes: 1,
+                            ..Default::default()
+                        },
+                        0,
+                        "node".into(),
+                        "test".into(),
+                    )
+                    .unwrap()
+                    .state_id;
+                let baseline = std::fs::read(&path).unwrap();
+                let before = store.graph.list_branches();
+                store.failure = Some(failure);
+                let result = if checkout {
+                    store.checkout_branch("root".into(), head)
+                } else {
+                    store.create_branch("new".into(), head)
+                };
+                assert!(result.is_err());
+                assert_eq!(std::fs::read(&path).unwrap(), baseline);
+                assert_eq!(store.graph.current_state_id(), head);
+                assert_eq!(store.graph.node_count(), 1);
+                assert_eq!(store.graph.list_branches().len(), before.len());
+                assert_eq!(
+                    store
+                        .graph
+                        .list_branches()
+                        .iter()
+                        .filter(|b| b.is_current)
+                        .map(|b| b.name.clone())
+                        .collect::<Vec<_>>(),
+                    vec!["main"]
+                );
+                store.failure = None;
+                if checkout {
+                    store.checkout_branch("root".into(), head).unwrap();
+                } else {
+                    store.create_branch("new".into(), head).unwrap();
+                }
+                drop(store);
+                let recovered = DurableGraph::open(&path).unwrap();
+                assert_eq!(
+                    recovered.graph().unwrap().current_state_id(),
+                    if checkout { 0 } else { head }
+                );
+                assert_eq!(recovered.graph().unwrap().pool().statistics().node_count, 1);
+            }
+        }
+    }
+}
