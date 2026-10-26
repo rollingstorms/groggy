@@ -1293,27 +1293,25 @@ impl GraphPool {
         }
     }
 
-    /// Get subgraph attribute (placeholder for now)
+    /// Group handles have no independent mutable attribute store.
     pub fn get_subgraph_attribute(
         &self,
         subgraph_id: crate::types::SubgraphId,
         name: &AttrName,
     ) -> GraphResult<Option<AttrValue>> {
-        // TODO: Implement subgraph attribute storage
-        let _ = (subgraph_id, name); // Silence unused parameter warnings
-        Ok(None)
+        let _ = (subgraph_id, name);
+        Err(GraphError::NotImplemented {feature:"Pooled group attributes; use meta-node properties or an explicit frozen source revision".into(),tracking_issue:None})
     }
 
-    /// Set subgraph attribute (placeholder for now)  
+    /// Reject unsupported group attribute writes instead of silently losing data.
     pub fn set_subgraph_attribute(
         &mut self,
         subgraph_id: crate::types::SubgraphId,
         name: AttrName,
         value: AttrValue,
     ) -> GraphResult<()> {
-        // TODO: Implement subgraph attribute storage
-        let _ = (subgraph_id, name, value); // Silence unused parameter warnings
-        Ok(())
+        let _ = (subgraph_id, name, value);
+        Err(GraphError::NotImplemented {feature:"Pooled group attributes; use meta-node properties or an explicit frozen source revision".into(),tracking_issue:None})
     }
 
     /// Compatibility no-op: working-edge deletion cannot alter retained selections.

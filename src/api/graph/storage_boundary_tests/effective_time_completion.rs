@@ -1,4 +1,4 @@
-use groggy::{AttrValue as V, BatchNodeRef as N, Graph, GraphBatch, PublicationMetadata};
+use crate::{AttrValue as V, BatchNodeRef as N, Graph, GraphBatch, PublicationMetadata};
 use std::collections::{BTreeMap, HashMap};
 fn initial(graph: &mut Graph) {
     graph
@@ -192,7 +192,7 @@ fn durable_frozen_nested_groups_reopen_and_backup_without_the_source_graph() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("group.ggj");
     let backup = dir.path().join("backup.ggj");
-    let mut store = groggy::DurableGraph::create(&path, groggy::GraphConfig::new(), None).unwrap();
+    let mut store = crate::DurableGraph::create(&path, crate::GraphConfig::new(), None).unwrap();
     let group = store.retain_group(&frozen, "outer".into()).unwrap();
     let head = store.graph().unwrap().current_state_id();
     let outer = store.create_meta_node(group, head, Some(50)).unwrap();
@@ -201,7 +201,7 @@ fn durable_frozen_nested_groups_reopen_and_backup_without_the_source_graph() {
     drop(store);
     drop(source);
     for path in [&path, &backup] {
-        let store = groggy::DurableGraph::open(path).unwrap();
+        let store = crate::DurableGraph::open(path).unwrap();
         let view = store.read_view_at(50, None).unwrap();
         assert_eq!(
             view.meta_subgraph(outer)
@@ -224,7 +224,7 @@ fn durable_frozen_nested_groups_reopen_and_backup_without_the_source_graph() {
 }
 #[test]
 fn resolved_merge_replays_first_parent_and_resolution_not_sibling_changes() {
-    use groggy::state::{ChangeSet, HistoryForest};
+    use crate::state::{ChangeSet, HistoryForest};
     let time = |at| {
         Some(PublicationMetadata {
             effective_at: at,
@@ -281,7 +281,7 @@ fn resolved_merge_replays_first_parent_and_resolution_not_sibling_changes() {
 
 #[test]
 fn membership_only_legacy_groups_require_explicit_source_and_roundtrip_aliases() {
-    use groggy::state::effective_read::EffectiveReadOptions;
+    use crate::state::effective_read::EffectiveReadOptions;
     let mut graph = Graph::new_publishing();
     initial(&mut graph);
     let source = graph.read_view_at(15, None).unwrap();
@@ -331,14 +331,14 @@ fn membership_only_legacy_groups_require_explicit_source_and_roundtrip_aliases()
         .is_err());
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("legacy-pins.ggj");
-    let mut store = groggy::DurableGraph::create(&path, groggy::GraphConfig::new(), None).unwrap();
+    let mut store = crate::DurableGraph::create(&path, crate::GraphConfig::new(), None).unwrap();
     let group = store
         .retain_group(&view.select_nodes(&[meta]).unwrap(), "pinned legacy".into())
         .unwrap();
     let outer = store.create_meta_node(group, 0, Some(30)).unwrap();
     drop(store);
     drop(graph);
-    let store = groggy::DurableGraph::open(&path).unwrap();
+    let store = crate::DurableGraph::open(&path).unwrap();
     assert_eq!(
         store
             .read_view_at(30, None)

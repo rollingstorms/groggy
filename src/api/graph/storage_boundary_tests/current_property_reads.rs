@@ -1,5 +1,5 @@
 //! The fixed family of twelve current-property readers shares index validation.
-use groggy::{AttrValue as V, Graph, GraphResult};
+use crate::{AttrValue as V, Graph, GraphResult};
 use std::collections::HashMap;
 
 fn readers(graph: &Graph, node: bool, id: usize, name: &str) -> Vec<GraphResult<()>> {

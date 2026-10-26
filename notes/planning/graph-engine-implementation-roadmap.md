@@ -1264,3 +1264,14 @@ three components to two: raw mutable storage escapes and uncertified/topology
 compound acceptance. **201 checked / 67 open**, no new rows or owner decisions.
 The raw audit found a silent unsupported pooled-attribute setter; it remains part
 of that existing boundary repair, with no new checklist task.
+
+## 2026-10-26 — raw owner mutation boundary completed
+
+Public Graph pool/space access is read-only; raw mutation is crate-private/test-only.
+All 46 corruption/recovery cases moved to internal native modules without being
+skipped. Unsupported pooled attribute getter/setter operations now explicitly fail
+instead of pretending to store data. Meta/subnode properties remain independent
+coordinated writes and frozen sources remain immutable (A01.1). See
+`raw-storage-boundary-2026-10-26.md`. Remaining 09.4b.2 fixed inventory: **one**
+component, uncertified/topology multi-stage acceptance; native defaults and raw
+escapes are closed. **201 checked / 67 open**, no new rows or owner choices.

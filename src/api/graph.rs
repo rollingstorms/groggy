@@ -27,6 +27,8 @@ mod read_attributes;
 pub(crate) mod retention;
 mod schema;
 pub(crate) mod snapshot;
+#[cfg(test)]
+mod storage_boundary_tests;
 mod tables;
 mod view_updates;
 use identity::ExternalIdentityIndex;
@@ -320,7 +322,14 @@ impl Graph {
     for trait implementations and advanced operations.
     */
 
-    /// Get read-only access to the GraphPool storage component
+    /// Get read-only access to the GraphPool storage component.
+    /// Raw owner mutation is crate-private; use Graph/GraphWriter operations.
+    ///
+    /// ```compile_fail
+    /// fn bypass(graph: &mut groggy::Graph) {
+    ///     graph.pool_mut().add_node();
+    /// }
+    /// ```
     ///
     /// This provides access to the columnar attribute storage and
     /// is used by traits and advanced operations that need direct
@@ -329,7 +338,7 @@ impl Graph {
         self.pool.borrow()
     }
 
-    /// Get mutable access to the GraphPool storage component
+    /// Trusted internal pool access for prepared retention/recovery only.
     ///
     /// This provides mutable access to the columnar attribute storage
     /// for operations that need to modify the storage directly.
@@ -340,11 +349,17 @@ impl Graph {
     ///     graph.pool_mut();
     /// }
     /// ```
-    pub fn pool_mut(&mut self) -> std::cell::RefMut<'_, GraphPool> {
+    pub(crate) fn pool_mut(&mut self) -> std::cell::RefMut<'_, GraphPool> {
         self.pool.borrow_mut()
     }
 
-    /// Get read-only access to the GraphSpace active state component
+    /// Get read-only access to the GraphSpace active state component.
+    ///
+    /// ```compile_fail
+    /// fn bypass(graph: &mut groggy::Graph) {
+    ///     graph.space_mut().activate_node(42);
+    /// }
+    /// ```
     ///
     /// This provides access to the active node/edge sets and change tracking
     /// for operations that need to query the current graph state.
@@ -352,8 +367,9 @@ impl Graph {
         &self.space
     }
 
-    /// Get mutable access to the GraphSpace for operations that need to modify space state
-    pub fn space_mut(&mut self) -> &mut GraphSpace {
+    /// Internal corruption fixtures only; production mutation uses the coordinator.
+    #[cfg(test)]
+    pub(crate) fn space_mut(&mut self) -> &mut GraphSpace {
         &mut self.space
     }
 

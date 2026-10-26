@@ -1,4 +1,4 @@
-use groggy::{
+use crate::{
     AttrValue as V, BatchEdgeRef as E, BatchNodeRef as N, Graph, GraphBatch, GraphConfig,
 };
 use std::collections::HashMap;
@@ -25,7 +25,7 @@ fn initial(graph: &mut Graph) -> u64 {
 }
 fn config() -> GraphConfig {
     let mut config = GraphConfig::performance_optimized();
-    config.graph_type = groggy::types::GraphType::Directed;
+    config.graph_type = crate::types::GraphType::Directed;
     config.query_timeout_ms = 123;
     config.worker_threads = 2;
     config.enable_compression = true;
@@ -87,11 +87,11 @@ fn owned_historical_capture_preserves_config_storage_ids_branches_and_acceptance
     );
     assert_eq!(
         copy.allocated_entity_for_external_id("original"),
-        Some(groggy::ExternalEntityRef::Node(0))
+        Some(crate::ExternalEntityRef::Node(0))
     );
     assert_eq!(
         copy.allocated_entity_for_external_id("renamed"),
-        Some(groggy::ExternalEntityRef::Node(0))
+        Some(crate::ExternalEntityRef::Node(0))
     );
     assert_eq!(copy.node_by_external_id("renamed", None), None);
     assert!(copy
@@ -264,7 +264,7 @@ fn owned_capture_rejects_dirty_manual_input_and_does_not_grant_source_write_prov
     let foreign = copy.snapshot_at_commit(head).unwrap();
     let original = graph.snapshot_at_commit(head).unwrap();
     // Snapshot numeric IDs match but temporal diff provenance is independently owned.
-    assert!(groggy::algorithms::temporal::TemporalDelta::compute(&original, &foreign).is_err());
+    assert!(crate::algorithms::temporal::TemporalDelta::compute(&original, &foreign).is_err());
     graph.set_node_attr(node, "v".into(), V::Int(1)).unwrap();
     assert!(graph.owned_snapshot_at_commit(head).is_err());
     assert!(!copy.has_uncommitted_changes());

@@ -1,7 +1,7 @@
 //! Creation and validation of immutable retained membership references.
 use groggy::{AttrValue, Graph};
 use serde_json::json;
-use std::{collections::HashSet, time::Instant};
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
@@ -9,11 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for publishing in [false, true] {
             let mut graph = Graph::new_manual();
             graph.insert_nodes(members)?;
-            let group = graph.pool_mut().store_subgraph(
-                (0..members).collect(),
-                HashSet::new(),
-                "retained".into(),
-            )?;
+            let group = graph.retain_group(&graph.read_view()?, "retained".into())?;
             graph.commit("fixture".into(), "benchmark".into())?;
             graph.set_automatic_publication(publishing)?;
             let mut samples = Vec::new();
@@ -44,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(
         &path,
         serde_json::to_vec_pretty(&json!({
-            "scope":"Native optimized creation of five meta nodes referencing one retained immutable group. Setup and output checks excluded. Creation includes preparation, storage and optional publication. Separate get_meta_nodes timing scans all active nodes; it is not an O(1) global selection claim. No matched speedup, allocation/RSS, FFI or portable-pool guarantee.","cases":cases
+            "scope":"Native optimized creation of five meta nodes referencing one retained immutable frozen source group. Setup and output checks excluded. Creation includes preparation, storage and optional publication. Separate get_meta_nodes timing scans all active nodes; it is not an O(1) global selection claim. No matched speedup, allocation/RSS, FFI or portable-pool guarantee.","cases":cases
         }))?,
     )?;
     println!("Wrote meta creation receipt to {path}");

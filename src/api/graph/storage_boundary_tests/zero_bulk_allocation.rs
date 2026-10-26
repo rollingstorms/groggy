@@ -1,4 +1,4 @@
-use groggy::Graph;
+use crate::Graph;
 #[test]
 fn zero_node_batches_preserve_ids_and_do_not_create_phantom_nodes() {
     let mut graph = Graph::new_manual();

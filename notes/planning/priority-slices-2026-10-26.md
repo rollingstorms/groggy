@@ -160,3 +160,14 @@ its rejection behavior belongs to the same existing boundary scope.
 Third-window first-slice gates: **1,246 native passed / 51 ignored**, **1,986
 root Python passed / 1 skipped**, **157 docs examples**, strict all-target Clippy.
 The owner benchmark and legacy nested survey suites remain excluded.
+
+### Raw owner mutation boundary completed
+
+Sealed public pool/space mutation and repaired silent unsupported pooled attribute
+operations. Preserved all 46 raw corruption/recovery cases as internal unit tests.
+Evidence: `raw-storage-boundary-2026-10-26.md`. Native boundary fixed inventory is
+now **two completed, one remaining** (uncertified/topology multi-stage acceptance),
+with **201 checked / 67 open** and no new rows.
+
+Raw-boundary gates: **1,250 native passed / 51 ignored**, **1,986 root Python
+passed / 1 skipped**, **157 docs examples**, strict all-target Clippy.

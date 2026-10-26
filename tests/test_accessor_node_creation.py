@@ -5,12 +5,12 @@ from groggy import Graph
 
 def test_node_accessor_append_and_extend_each_publish_one_complete_version():
     graph = Graph()
-    node = graph.nodes.append({"name": "Ada", "score": 1.25})
+    node = graph.nodes.append(attrs_dict={"name": "Ada", "score": 1.25})
     assert node == 0 and graph.current_state_id == 1
     snapshot = graph.snapshot_at_commit(1)
     assert snapshot.node_attr(node, "name").value == "Ada"
     assert snapshot.node_attr(node, "score").value == 1.25
-    ids = graph.nodes.extend([{"name": "Grace", "score": 2.5}, {"name": "Katherine"}])
+    ids = graph.nodes.extend(rows_data=[{"name": "Grace", "score": 2.5}, {"name": "Katherine"}])
     assert ids == [1, 2] and graph.current_state_id == 2
     assert len(graph.commit_history()) == 2
     assert not graph.has_uncommitted_changes()

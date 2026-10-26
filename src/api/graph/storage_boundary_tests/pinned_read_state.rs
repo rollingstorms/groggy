@@ -1,4 +1,4 @@
-use groggy::{state::PinnedReadState, types::GraphType, AttrValue, Graph};
+use crate::{state::PinnedReadState, types::GraphType, AttrValue, Graph};
 #[test]
 fn working_capture_includes_uncheckpointed_changes_without_recording_history() {
     let mut graph = Graph::new_manual();

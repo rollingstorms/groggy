@@ -1,4 +1,4 @@
-use groggy::{AttrValue as V, Graph, GraphBatch, NodeUpsert};
+use crate::{AttrValue as V, Graph, GraphBatch, NodeUpsert};
 use std::collections::{HashMap, HashSet};
 
 fn publishing() -> Graph {

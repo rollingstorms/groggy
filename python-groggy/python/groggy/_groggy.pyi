@@ -7720,11 +7720,11 @@ class NodeFilter:
 
 
 class NodesAccessor:
-    def append(self, attributes: Dict[str, Any]) -> int:
+    def append(self, attrs_dict: Dict[str, Any]) -> int:
         """Create one node with all properties in one checked operation."""
         ...
 
-    def extend(self, rows: List[Dict[str, Any]]) -> List[int]:
+    def extend(self, rows_data: List[Dict[str, Any]]) -> List[int]:
         """Create all rows atomically, or reject before allocating IDs."""
         ...
 

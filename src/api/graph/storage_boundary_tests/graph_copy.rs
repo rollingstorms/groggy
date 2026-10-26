@@ -1,5 +1,5 @@
 //! A graph copy stages source validation, remapping and destination writes together.
-use groggy::{AttrValue as V, CalendarDate, FixedDuration, Graph, UtcInstant};
+use crate::{AttrValue as V, CalendarDate, FixedDuration, Graph, UtcInstant};
 use std::collections::{HashMap, HashSet};
 
 fn destination(publishing: bool) -> Graph {
@@ -219,7 +219,7 @@ fn identity_meta_and_dirty_target_boundaries_are_explicit() {
     for publishing in [false, true] {
         let mut source = Graph::new_publishing();
         source
-            .upsert_nodes(vec![groggy::NodeUpsert {
+            .upsert_nodes(vec![crate::NodeUpsert {
                 external_id: "reserved".into(),
                 attrs: HashMap::new(),
             }])

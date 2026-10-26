@@ -1,5 +1,5 @@
 //! Retained membership is independent of active state; meta creation is prepared.
-use groggy::{AttrValue as V, ChangeKey as K, Graph};
+use crate::{AttrValue as V, ChangeKey as K, Graph};
 use std::collections::HashSet;
 
 #[test]

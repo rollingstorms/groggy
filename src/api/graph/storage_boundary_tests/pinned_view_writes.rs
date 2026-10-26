@@ -1,5 +1,5 @@
 //! Scoped mutation uses a frozen source pin, prevalidated output and one acceptance.
-use groggy::{
+use crate::{
     AttrValue as V, BatchChangeRef as T, BatchEdgeRef as E, BatchNodeRef as N, ChangeKey as K,
     DurableGraph, Graph, GraphBatch, GraphConfig, GraphSchema, GraphView,
 };

@@ -1,4 +1,4 @@
-use groggy::{AttrValue, Graph};
+use crate::{AttrValue, Graph};
 use std::collections::HashSet;
 
 #[test]
