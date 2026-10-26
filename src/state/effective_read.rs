@@ -177,3 +177,65 @@ impl EffectiveReadPlan {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn raw_history_cannot_hide_an_invalid_earlier_endpoint_interval() {
+        let mut history = crate::state::HistoryForest::new();
+        let mut changes = crate::state::ChangeSet::new();
+        changes.nodes_added = vec![0, 1];
+        changes.edges_added = vec![(0, 0, 1)];
+        let first = history
+            .create_commit_with_publication(
+                changes,
+                "raw".into(),
+                "test".into(),
+                None,
+                Some(crate::PublicationMetadata {
+                    recorded_at: 100,
+                    effective_at: 10,
+                    change_times: Default::default(),
+                }),
+            )
+            .unwrap();
+        let mut changes = crate::state::ChangeSet::new();
+        changes.nodes_removed = vec![0];
+        changes.edges_removed = vec![0];
+        let second = history
+            .create_commit_with_publication(
+                changes,
+                "invalid raw".into(),
+                "test".into(),
+                Some(first),
+                Some(crate::PublicationMetadata {
+                    recorded_at: 101,
+                    effective_at: 20,
+                    change_times: std::collections::BTreeMap::from([(
+                        crate::ChangeKey::EdgeRemoved(0),
+                        30,
+                    )]),
+                }),
+            )
+            .unwrap();
+        let plan = EffectiveReadPlan {
+            commits: vec![
+                history.get_commit(first).unwrap(),
+                history.get_commit(second).unwrap(),
+            ],
+            graph_type: GraphType::Undirected,
+            time: ReadTime {
+                branch: "raw".into(),
+                published_head: second,
+                effective_at: 40,
+                recorded_by: None,
+            },
+        };
+        assert!(plan
+            .read_view()
+            .unwrap_err()
+            .to_string()
+            .contains("endpoint timeline at 20"));
+    }
+}

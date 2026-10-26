@@ -134,21 +134,21 @@ fn topology_death_and_invalid_intervals_are_checked_at_effective_boundaries() {
     assert_eq!((after.node_count(), after.edge_count()), (1, 0));
     let mut invalid = Graph::new_publishing();
     create(&mut invalid);
-    publish(
-        &mut invalid,
-        GraphBatch {
-            remove_nodes: vec![N::Existing(0)],
-            remove_edges: vec![groggy::BatchEdgeRef::Existing(0)],
-            effective_at: Some(20),
-            change_times: vec![(T::EdgeRemoved(groggy::BatchEdgeRef::Existing(0)), 30)],
-            ..Default::default()
-        },
-    );
+    let head = invalid.current_state_id();
+    let batch = GraphBatch {
+        remove_nodes: vec![N::Existing(0)],
+        remove_edges: vec![groggy::BatchEdgeRef::Existing(0)],
+        effective_at: Some(20),
+        change_times: vec![(T::EdgeRemoved(groggy::BatchEdgeRef::Existing(0)), 30)],
+        ..Default::default()
+    };
     assert!(invalid
-        .read_view_at(40, None)
+        .apply_batch(batch, head, "invalid".into(), "test".into())
         .unwrap_err()
         .to_string()
-        .contains("endpoint timeline at 20"));
+        .contains("endpoint timeline"));
+    assert_eq!(invalid.current_state_id(), head);
+    assert!(!invalid.has_uncommitted_changes());
     assert_eq!(invalid.read_view_at(19, None).unwrap().edge_count(), 1);
 }
 #[test]

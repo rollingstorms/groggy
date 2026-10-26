@@ -1533,6 +1533,23 @@ impl Graph {
         schema: Option<&GraphSchema>,
         additional_schema: Option<&GraphSchema>,
     ) -> GraphResult<crate::api::batch::PreparedPublication> {
+        self.prepare_publication_with_additional_schema_at(
+            batch,
+            expected_state,
+            schema,
+            additional_schema,
+            None,
+        )
+    }
+
+    pub(crate) fn prepare_publication_with_additional_schema_at(
+        &self,
+        batch: GraphBatch,
+        expected_state: StateId,
+        schema: Option<&GraphSchema>,
+        additional_schema: Option<&GraphSchema>,
+        recorded_at: Option<i64>,
+    ) -> GraphResult<crate::api::batch::PreparedPublication> {
         self.validate_write_head(expected_state)?;
 
         let allocated = self.pool.borrow().statistics();
@@ -1564,8 +1581,18 @@ impl Graph {
             schema::reject_violations(violations)?;
         }
 
-        let publication =
-            self.batch_publication(&prepared, allocated.node_count, allocated.edge_count)?;
+        let publication = match recorded_at {
+            Some(at) => self.batch_publication_at(
+                &prepared,
+                allocated.node_count,
+                allocated.edge_count,
+                at,
+            )?,
+            None => {
+                self.batch_publication(&prepared, allocated.node_count, allocated.edge_count)?
+            }
+        };
+        self.validate_publication_topology(&prepared, &publication, allocated.edge_count)?;
         Ok(crate::api::batch::PreparedPublication {
             batch: prepared,
             metadata: publication,

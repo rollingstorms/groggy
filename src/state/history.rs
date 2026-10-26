@@ -10,6 +10,9 @@
 //! - Git-like branching model (lightweight branches, merge capabilities)
 //! - Efficient diff-based storage (only store what changed)
 
+mod effective_topology;
+pub(crate) use effective_topology::TopologyPatch;
+
 // Preserve legacy public names while sharing the snapshot diff representation.
 pub use crate::state::change::{AttributeChange, EntityType};
 
@@ -56,6 +59,7 @@ pub struct HistoryForest {
     /// In-process provenance shared by snapshots, independent of numeric state IDs.
     identity: Arc<()>,
     graph_type: GraphType,
+    effective_topology: parking_lot::Mutex<effective_topology::EffectiveTopology>,
     /*
     === COMMIT STORAGE ===
     The DAG of all commits in the system
@@ -132,6 +136,7 @@ impl HistoryForest {
         branches.insert("main".to_string(), 0); // main branch starts at state 0
 
         Self {
+            effective_topology: Default::default(),
             identity: Arc::new(()),
             graph_type,
             commits: HashMap::new(),
@@ -239,6 +244,7 @@ impl HistoryForest {
 
         // 5. Store commit
         let commit_id = self.next_state_id;
+        self.effective_topology.get_mut().append_if_current(&commit);
         self.commits.insert(commit_id, Arc::new(commit));
 
         // 6. Update parent-child relationships
@@ -290,6 +296,7 @@ impl HistoryForest {
 
         // 5. Store commit
         let commit_id = self.next_state_id;
+        self.effective_topology.get_mut().append_if_current(&commit);
         self.commits.insert(commit_id, Arc::new(commit));
 
         // 6. Update parent-child relationships for all parents
@@ -709,6 +716,7 @@ impl HistoryForest {
         // 2. Remove commits from self.commits
         for commit_id in &removed_commits {
             self.commits.remove(commit_id);
+            *self.effective_topology.get_mut() = Default::default();
             removed_count += 1;
         }
 

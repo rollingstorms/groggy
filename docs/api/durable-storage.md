@@ -10,7 +10,7 @@ with DurableGraph.create("example.ggj", directed=True) as graph:
     nodes = writer.upsert_nodes([
         {"external_id": "ada", "name": "Ada"},
         {"external_id": "lin", "name": "Lin"},
-    ])
+    ], effective_at=0)
     writer.add_edge(*nodes, relationship_type="KNOWS", effective_at=100)
     saved_state = writer.state_id
 
@@ -25,7 +25,7 @@ Both `create` and `open` take path-like objects. Creation never overwrites a fil
 ## Acceptance and failure contract
 
 1. Parse and validate the complete proposed mutation, expected head, managed identities, installed schema and any additional session schema.
-2. Capture one engine-recorded clock and resolve per-change effective times.
+2. Capture one engine-recorded clock, resolve per-change effective times, and validate complete affected edge/endpoint lifetimes.
 3. Encode a bounded journal record, append its header/payload, and sync the file.
 4. Apply the prepared mutation and publish one in-memory state. Return success only after both the sync and publication succeed.
 
@@ -53,6 +53,6 @@ Pass `schema=` to `create` to install a policy. It applies to every durable publ
 
 The journal is format version 1 and uses CBOR records. Each record is limited to 256 MiB; larger transactions reject before append or mutation. All supported inline logical properties round-trip, including raw f32 bits and structured JSON values. Stored subgraph references and meta-node pool contents are rejected rather than silently dropped. General graph import, periodic checkpoints, compaction/pruning, format migration tooling, backup orchestration and broader multi-client support remain under storage/history/operations roadmap items. Opening replays the journal, so recovery time grows with retained operations; this is not yet a bounded-recovery storage engine.
 
-The current Python wrapper holds the GIL during journal I/O/replay because the underlying graph is thread-confined. It does not promise concurrent Python reader execution. Ordinary `Graph` publication remains in-memory, with explicit manual compatibility available. Explicit checkpoint annotations now sync/recover through the journal without creating duplicate mutation states; they are separate from materialized recovery checkpoints. See [explicit checkpoints](explicit-checkpoints.md). Effective-time reconstruction remains separate work.
+The current Python wrapper holds the GIL during journal I/O/replay because the underlying graph is thread-confined. It does not promise concurrent Python reader execution. Ordinary `Graph` publication remains in-memory, with explicit manual compatibility available. Explicit checkpoint annotations now sync/recover through the journal without creating duplicate mutation states; they are separate from materialized recovery checkpoints. See [explicit checkpoints](explicit-checkpoints.md). Immutable effective-time reconstruction is available through `read_view_at`; see [effective-time reads](effective-time-reads.md).
 
 Verification includes subprocess exit without close, replay after sync before in-memory publication, every partial-header boundary, partial payloads, checksum/length corruption, injected write/sync/rollback failures, schema rejection, stable history hashes, branches, reservations and typed property values. These tests exercise the implementation contract; they do not emulate every physical device failure.

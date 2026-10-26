@@ -225,3 +225,6 @@ harness = false
 [[bench]]
 name = "effective_time_reads"
 harness = false
+[[bench]]
+name = "effective_topology_publication"
+harness = false

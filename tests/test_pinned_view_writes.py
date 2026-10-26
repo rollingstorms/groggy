@@ -14,7 +14,13 @@ def fixture(directed=False, manual=False):
 @pytest.mark.parametrize("directed", [False, True])
 @pytest.mark.parametrize("manual", [False, True])
 def test_mixed_view_batch_returns_new_snapshot_and_preserves_exact_edge_scope(directed, manual):
-    graph = fixture(directed, manual)
+    # Explicit topology times need explicit endpoint births, in either write mode.
+    graph = Graph(directed=directed, manual=manual)
+    initial = GraphBatch(effective_at=0)
+    nodes = [initial.add_node(value=1), initial.add_node(), initial.add_node(), initial.add_node()]
+    for a, b in [(0, 1), (0, 1), (1, 1), (2, 3)]:
+        initial.add_edge(nodes[a], nodes[b])
+    graph.apply_batch(initial, 0, "timed fixture", "test")
     source = graph.read_view().select_edges([0, 2]).copy()
     before = source.write_state_id
     batch = GraphBatch(effective_at=20)

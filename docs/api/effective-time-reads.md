@@ -60,11 +60,32 @@ subgraph-reference values reject explicitly. Typed ordinary properties, topology
 loops, parallel edges and graph direction are reconstructed. Arbitrary pooled
 meta/group history remains in checklist 12.2/16.2; property unset remains 11.2.
 
-The reader rejects any invalid edge/endpoint interval through T, even if the final
-state at T would be valid. This detects invalid retained timelines; **publication
-still needs atomic whole-timeline validation**. This read-side check does not
-satisfy that write contract. Future invalid intervals after T do not change an
-earlier read.
+Checked topology publication now validates each affected edge's complete effective
+lifetime against both endpoints **before** ID allocation, working-state mutation
+or durable journal append. Backdated node removals inspect retained edges even if
+they are no longer active in the working graph. The same-time acceptance and
+lifecycle ordering is shared with the reader. Invalid future intervals reject too;
+validation is not limited to the current wall clock.
+
+The history-owned index stores lifecycle events and incident edge IDs, without
+property payloads. Accepted changes update it incrementally. Property-only writes
+skip topology validation. Switching to another ancestry rebuilds the selected
+branch's index; explicit purge releases the cache. Validation sorts the affected
+entities' lifecycle events, so cost depends on affected degree/lifetime history,
+not unrelated property history. Current bounded measurements are in
+`notes/benchmarks/effective-topology-publication-2026-10-25.json`.
+
+Legacy manually grouped ancestry has unknown effective lifetimes: explicit timed
+topology writes reject. Untimed legacy compatibility writes remain available,
+without a historical temporal guarantee; precise effective-time reads still reject
+that ancestry. Merge ancestry also remains unsupported. Journal recovery validates
+using the original recorded clocks. Older journals containing invalid timed
+topology now reject on open rather than recreating an invalid timeline.
+
+The reader retains its independent boundary check for raw/imported history that
+bypasses checked publication. An invalid earlier interval cannot disappear behind
+a valid final state. Future invalid intervals after T do not change an earlier
+read of such raw history.
 
 This first implementation walks the pinned lineage, sorts relevant logical
 changes, and builds a frozen graph plus adjacency. Preparation is O(history

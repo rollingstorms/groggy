@@ -109,7 +109,51 @@ impl Graph {
                 "Journal publication metadata does not match staged changes".into(),
             ));
         }
+        self.validate_publication_topology(&prepared.batch, &metadata, allocated.edge_count)?;
         prepared.metadata = metadata;
         Ok(())
+    }
+}
+
+impl Graph {
+    pub(super) fn validate_publication_topology(
+        &self,
+        batch: &PreparedBatch,
+        metadata: &PublicationMetadata,
+        first_edge: EdgeId,
+    ) -> GraphResult<()> {
+        // Property-only writes do not inspect ancestry or lifecycle indexes.
+        if batch.add_nodes == 0
+            && batch.add_edges.is_empty()
+            && batch.remove_nodes.is_empty()
+            && batch.remove_edges.is_empty()
+        {
+            return Ok(());
+        }
+        let additions = batch
+            .add_edges
+            .iter()
+            .enumerate()
+            .map(|(offset, &endpoints)| (first_edge + offset, endpoints))
+            .collect();
+        let patch = crate::state::history::TopologyPatch::from_metadata(
+            metadata,
+            self.history.next_state_id(),
+            &additions,
+        )?;
+        self.history.validate_effective_topology(
+            self.current_commit,
+            &patch,
+            batch.effective_at.is_some()
+                || batch.change_times.keys().any(|key| {
+                    matches!(
+                        key,
+                        ChangeKey::NodeAdded(_)
+                            | ChangeKey::NodeRemoved(_)
+                            | ChangeKey::EdgeAdded(_)
+                            | ChangeKey::EdgeRemoved(_)
+                    )
+                }),
+        )
     }
 }

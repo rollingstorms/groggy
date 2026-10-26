@@ -42,7 +42,37 @@ fn assert_current_pin(graph: &Graph, view: &GraphView) {
 fn mixed_writes_refresh_only_selected_membership_and_can_chain() {
     for directed in [false, true] {
         for publishing in [false, true] {
-            let mut graph = fixture(directed, publishing);
+            // Timed topology needs a precisely timed birth, independent of the
+            // ordinary/manual policy exercised by the scoped write below.
+            let mut graph = if directed {
+                Graph::new_directed()
+            } else {
+                Graph::new()
+            };
+            graph
+                .apply_batch(
+                    GraphBatch {
+                        add_nodes: 5,
+                        add_edges: vec![
+                            (N::Added(0), N::Added(1)),
+                            (N::Added(0), N::Added(1)),
+                            (N::Added(1), N::Added(1)),
+                            (N::Added(2), N::Added(3)),
+                            (N::Added(3), N::Added(4)),
+                        ],
+                        node_attrs: HashMap::from([(
+                            "value".into(),
+                            vec![(N::Added(0), V::Int(1))],
+                        )]),
+                        effective_at: Some(0),
+                        ..Default::default()
+                    },
+                    0,
+                    "timed fixture".into(),
+                    "test".into(),
+                )
+                .unwrap();
+            graph.set_automatic_publication(publishing).unwrap();
             let view = graph.read_view().unwrap().select_edges(&[0, 2]).unwrap();
             let head = graph.current_state_id();
             let batch = GraphBatch {

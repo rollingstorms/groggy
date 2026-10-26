@@ -1139,3 +1139,13 @@ queries/tables/reopen; atomic endpoint timeline acceptance, pooled/group history
 unset and merge/legacy limits remain explicitly scoped. See
 `effective-time-read-slice-2026-10-25.md`. Prioritize core vertical correctness and
 measured retrieval/recovery costs ahead of adjacent facade/viz audit cleanup.
+
+## 2026-10-25 — Atomic effective endpoint publication
+
+16.2's write-side endpoint/lifetime validation now runs before checked mutation,
+ID allocation and durable append. A branch-scoped incremental lifecycle index
+checks affected historical edges; property-only writes skip topology validation.
+Durable replay validates original clocks. Pooled/group history, property unset,
+merge/legacy migration and effective read indexing remain in their existing scopes.
+See effective-topology-publication-2026-10-25.md. Next core priority is retained
+property/group history rather than adjacent facade audit expansion.

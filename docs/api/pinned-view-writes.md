@@ -10,8 +10,8 @@ ordinary graph mutations use `manual=True`.
 from groggy import Graph, GraphBatch
 
 graph = Graph()
-a, b, outside = graph.add_nodes([{"score": 1}, {}, {}])
-first, excluded = graph.add_edges([(a, b), (a, b)])
+a, b, outside = graph.writer().add_nodes_with_attrs([{"score": 1}, {}, {}], effective_at=0)
+first, excluded = graph.writer().add_edges([(a, b), (a, b)], effective_at=0)
 old = graph.read_view().select_edges([first])
 batch = GraphBatch(effective_at=10)
 new = batch.add_node(score=None)

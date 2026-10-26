@@ -1,0 +1,31 @@
+{
+  "build": "release",
+  "cases": [
+    {
+      "edge_publication_median_seconds": 6.667e-6,
+      "nodes": 1000,
+      "prior_property_versions": 0,
+      "samples": 21
+    },
+    {
+      "edge_publication_median_seconds": 4.542e-6,
+      "nodes": 1000,
+      "prior_property_versions": 1000,
+      "samples": 21
+    },
+    {
+      "edge_publication_median_seconds": 2.625e-6,
+      "nodes": 100000,
+      "prior_property_versions": 0,
+      "samples": 21
+    },
+    {
+      "edge_publication_median_seconds": 2.208e-6,
+      "nodes": 100000,
+      "prior_property_versions": 1000,
+      "samples": 21
+    }
+  ],
+  "fixture": "isolated nodes born at time zero; unrelated scalar property versions; publish 21 parallel edges at time 2000",
+  "limits": "local full-operation timings, including publication and validation; no allocator/RSS, large degree, deep lifecycle, contention or production-capacity guarantee"
+}

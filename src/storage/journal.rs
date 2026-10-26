@@ -444,11 +444,12 @@ impl DurableGraph {
                 author,
                 additional_schema,
             } => {
-                let mut prepared = graph.prepare_publication_with_additional_schema(
+                let mut prepared = graph.prepare_publication_with_additional_schema_at(
                     batch.decode()?,
                     expected_state,
                     schema.as_ref(),
                     additional_schema.as_ref(),
+                    Some(metadata.recorded_at),
                 )?;
                 graph.restore_publication_clock(&mut prepared, metadata)?;
                 graph.execute_publication(prepared, message, author)?;

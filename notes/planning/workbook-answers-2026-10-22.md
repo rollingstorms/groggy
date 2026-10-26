@@ -925,3 +925,12 @@ workflows: timed bulk mutation → immutable timestamp reconstruction → query/
 16.3; atomic endpoint timeline rejection at publication remains the next priority.
 The initial full-replay benchmark is evidence for optimization choices, not a
 production latency promise. See effective-time-read-slice-2026-10-25.md.
+
+## 2026-10-25 — Endpoint lifetime rule implemented
+
+The accepted A04 rule now rejects invalid effective edge/endpoint intervals during
+checked preparation, before mutation/allocation or durable append. Retained edge
+history participates, including edges already removed from current state. Journal
+recovery uses the original acceptance clock. Explicit timed topology with unknown
+legacy lifetimes rejects; untimed legacy compatibility is retained without a
+historical temporal guarantee. Evidence: effective-topology-publication-2026-10-25.md.

@@ -472,3 +472,32 @@ passed**. Native/Python logs: /tmp/groggy-effective-native-final.log and
 Scoped rustfmt, Python stub AST parse and git diff --check passed. In-tree FFI
 rebuild retains three unrelated pre-existing warnings. Owner benchmark changes
 and untracked benchmark tests/receipts were excluded from staging and execution.
+
+## 2026-10-25 — Atomic effective endpoint publication
+
+Completed the write-side endpoint/lifetime requirement within 16.2. Checked
+preparation rejects invalid complete effective intervals before allocation,
+working-state changes or durable append. Retained removed edges participate in
+retroactive node changes. A history-owned incremental lifecycle index avoids full
+history replay for ordinary writes; property-only preparation skips topology
+validation. Branch changes rebuild the selected ancestry; GC drops the cache.
+Journal recovery prepares with original recorded clocks. Explicit timed topology
+against unknown legacy lifetimes rejects; untimed legacy compatibility remains.
+
+Current bounded release edge-publication costs: 2.2–6.7 µs median across 1k/100k
+nodes and zero/1k prior property versions. These measure full checked publication,
+not a prior-version speedup or high-degree/deep-lifetime/memory/FFI guarantee.
+See `effective-topology-publication-2026-10-25.md` and its JSON receipt.
+
+Gate: **1,178 native passed / 51 ignored; 1,903 root Python passed / 1 skipped;
+136 executable documentation examples; strict all-target Clippy passed**. Three
+additional rebuilt Python checks verify rejection/ID and identity reuse/durable
+bytes after the full run. Scoped rustfmt and git diff --check passed. Existing
+mixed timed scoped-write tests/docs now use explicit valid endpoint births;
+separate tests retain the untimed legacy compatibility boundary. Owner benchmark
+changes remain untouched and excluded from staging/test selection.
+
+The count remains **196 checked / 72 open**: this removes a concrete 16.2 blocker
+without adding rows or falsely closing the parent. Next core scope is property
+unset/retained property history (11.2), followed by retained pooled/group reads
+(12.2/16.2) and measured read indexing. Legacy/merge migration remains explicit.
