@@ -26,3 +26,23 @@ six-boundary parent matrix); full native **1,263 passed / 51 ignored**, strict
 all-target Clippy. Production API/binary behavior is unchanged by the test hooks;
 the preceding rebuilt Python **2,000 passed / 1 skipped** and **158 documentation
 examples** remain the applicable Python surface gate.
+
+## Serial subprocess gate
+
+A later full-suite run exposed a real test interaction: fork/exec can briefly
+retain unrelated parallel tests' flock descriptors until exec closes them. That
+can make another test's immediate close/reopen fail transiently. The process-death
+matrix is now an explicit ignored-by-default **serial gate**, not an unexecuted
+check. Run it alongside the normal parallel suite:
+
+```sh
+cargo test --offline --locked --lib killed_checkpoint_process -- --ignored --test-threads=1
+```
+
+The normal unit suite keeps all other writer-lock tests parallel. Production lock
+semantics are unchanged. The serial matrix must pass before claiming process-death
+coverage; final totals distinguish this gate from default-suite ignored counts.
+
+The dedicated serial gate passed locally (six termination boundaries in one matrix
+test) and is now wired after the normal Rust test step in `.github/workflows/test.yml`.
+The workflow itself was not run remotely in this slice.

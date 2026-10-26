@@ -246,3 +246,13 @@ ordinary mutation/FFI latency is not measured. Scalar-add scratch peak grows by
 Gates: **1,265 native / 51 ignored**, **2,000 root Python / 1 skipped**, **158
 documentation examples**, strict Clippy and rebuilt extension. No new rows;
 **201 checked / 67 open**. Full retained integrity scanning is the next 33.2 slice.
+
+### Process-test isolation repair
+
+A full parallel run exposed transient descriptor inheritance during fork/exec,
+which can retain an unrelated fixture's flock briefly after its owner closes.
+The six-boundary SIGKILL matrix now has a dedicated ignored-by-default serial
+gate, executed successfully locally and wired after normal Rust tests in the CI
+workflow. Default tests keep the other lock tests parallel. Production locking is
+unchanged; the serial gate is reported separately from default ignored counts.
+No new checklist row. See `checkpoint-process-recovery-2026-10-26.md`.

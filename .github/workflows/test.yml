@@ -48,6 +48,9 @@ jobs:
     - name: Run tests
       run: cargo test
 
+    - name: Run serial checkpoint process recovery
+      run: cargo test --lib killed_checkpoint_process -- --ignored --test-threads=1
+
   test-python:
     name: Test Python on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

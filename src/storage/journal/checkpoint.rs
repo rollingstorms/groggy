@@ -347,6 +347,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "run serially: spawned children briefly inherit process-wide flock descriptors"]
     fn killed_checkpoint_process_recovers_complete_state_and_releases_both_inode_locks() {
         use std::os::unix::process::ExitStatusExt;
         use std::process::{Child, Command, Stdio};
