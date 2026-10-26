@@ -19,7 +19,7 @@ use crate::state::delta::DeltaObject;
 use crate::state::history::Delta;
 use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId, StateId};
 use crate::utils::util::timestamp_now;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// Immutable state object - a point in the graph's history
@@ -287,17 +287,23 @@ impl GraphSnapshot {
         let mut new_snapshot = self.clone();
         new_snapshot.state_id = target_state;
 
-        // Apply node additions
-        for &node_id in &delta.nodes_added {
-            if !new_snapshot.active_nodes.contains(&node_id) {
-                new_snapshot.active_nodes.push(node_id);
+        // Hash membership once; scanning the growing vector for every added
+        // node made initial recorded-state reconstruction quadratic in V.
+        if !delta.nodes_added.is_empty() {
+            let mut active: HashSet<_> = new_snapshot.active_nodes.iter().copied().collect();
+            for &node_id in &delta.nodes_added {
+                if active.insert(node_id) {
+                    new_snapshot.active_nodes.push(node_id);
+                }
             }
         }
-
-        // Apply node removals
-        for &node_id in &delta.nodes_removed {
-            new_snapshot.active_nodes.retain(|&id| id != node_id);
-            new_snapshot.node_attributes.remove(&node_id);
+        // Likewise filter removals once rather than scanning V per removed node.
+        if !delta.nodes_removed.is_empty() {
+            let removed: HashSet<_> = delta.nodes_removed.iter().copied().collect();
+            new_snapshot.active_nodes.retain(|id| !removed.contains(id));
+            for node_id in removed {
+                new_snapshot.node_attributes.remove(&node_id);
+            }
         }
 
         // Apply edge additions
@@ -770,6 +776,22 @@ pub fn validate_snapshot(_snapshot: &GraphSnapshot) -> GraphResult<()> {
 mod tests {
     use super::*;
     use crate::state::delta::DeltaObject;
+
+    #[test]
+    fn recorded_node_membership_preserves_order_with_duplicate_additions_and_removals() {
+        use crate::state::{change_tracker::ChangeSet, history::Delta};
+        let mut base = GraphSnapshot::empty(1);
+        base.active_nodes = vec![3, 1];
+        base.node_attributes
+            .insert(3, HashMap::from([("v".into(), AttrValue::Int(7))]));
+        let mut changes = ChangeSet::new();
+        changes.nodes_added = vec![1, 2, 2, 0];
+        changes.nodes_removed = vec![3, 2, 2];
+        let next = base.apply_delta(&Delta::from_changes(changes), 2);
+        assert_eq!(next.active_nodes, vec![1, 0]);
+        assert!(!next.node_attributes.contains_key(&3));
+        assert_eq!(base.active_nodes, vec![3, 1]);
+    }
 
     #[test]
     fn test_state_object_creation() {

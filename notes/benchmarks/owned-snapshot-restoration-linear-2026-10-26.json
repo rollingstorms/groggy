@@ -1,0 +1,80 @@
+{
+  "benchmark": "owned_snapshot_restoration",
+  "cases": [
+    {
+      "cold_switch_pair_seconds": 0.003263417,
+      "column_lengths_after": [
+        1000,
+        2000,
+        999
+      ],
+      "column_lengths_before": [
+        1000,
+        2000,
+        999
+      ],
+      "edges": 999,
+      "nodes": 1000,
+      "owned_capture_seconds": 0.000826541,
+      "owned_restore_seconds": 0.001002875,
+      "score_column_estimated_bytes_with_lookup": 44968,
+      "warm_switch_pair_seconds": [
+        0.002863833,
+        0.002848875,
+        0.002870125,
+        0.002875041,
+        0.002878125
+      ]
+    },
+    {
+      "cold_switch_pair_seconds": 0.03526375,
+      "column_lengths_after": [
+        10000,
+        20000,
+        9999
+      ],
+      "column_lengths_before": [
+        10000,
+        20000,
+        9999
+      ],
+      "edges": 9999,
+      "nodes": 10000,
+      "owned_capture_seconds": 0.008295375,
+      "owned_restore_seconds": 0.011475167,
+      "score_column_estimated_bytes_with_lookup": 389672,
+      "warm_switch_pair_seconds": [
+        0.035739541,
+        0.033365708,
+        0.033536708,
+        0.031139792,
+        0.031381917
+      ]
+    },
+    {
+      "cold_switch_pair_seconds": 0.606735083,
+      "column_lengths_after": [
+        100000,
+        200000,
+        99999
+      ],
+      "column_lengths_before": [
+        100000,
+        200000,
+        99999
+      ],
+      "edges": 99999,
+      "nodes": 100000,
+      "owned_capture_seconds": 0.099775791,
+      "owned_restore_seconds": 0.236496167,
+      "score_column_estimated_bytes_with_lookup": 3435304,
+      "warm_switch_pair_seconds": [
+        0.574738041,
+        0.560732916,
+        0.56362925,
+        0.56365825,
+        0.562104542
+      ]
+    }
+  ]
+}

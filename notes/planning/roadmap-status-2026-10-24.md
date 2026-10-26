@@ -547,3 +547,11 @@ and counters restore into independent owners. Release 100k-node evidence shows
 zero duplicate column growth through six switch pairs; reconstruction still has
 substantial costs. See `owned-snapshot-exit-review-2026-10-26.md`. Next is the
 whole-pipeline boundary under existing 09.4b.2; persistent archive/import stays 10.3.
+
+### 2026-10-26 — measured reconstruction improvement
+
+Followed the 12.2 benchmark to a quadratic membership scan. One membership set and
+one removal filter preserve the old semantics and column bounds. Matched 100k-node
+warm switch pairs improve from 1.554 s to 0.564 s, and owned capture from 566 ms
+to 100 ms. See `recorded-membership-scaling-2026-10-26.md`. Counts remain
+**199 checked / 69 open**; no scope or checklist rows added.

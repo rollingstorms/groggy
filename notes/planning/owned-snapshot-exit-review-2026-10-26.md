@@ -68,3 +68,11 @@ Receipt: `notes/benchmarks/owned-snapshot-restoration-2026-10-26.json`.
 
 No checklist rows added. Native publication/compound migration remains 09.4b.2;
 whole-pipeline publication is the next focused boundary.
+
+## Measured reconstruction follow-through
+
+The initial receipt above exposed quadratic node membership in recorded replay.
+`recorded-membership-scaling-2026-10-26.md` records its repair and the matched
+second receipt: 100k warm switch-pair median **1.554 s → 0.564 s**, owned capture
+**566 ms → 100 ms**, with column lengths still unchanged. The original receipt is
+kept as the baseline rather than overwritten.
