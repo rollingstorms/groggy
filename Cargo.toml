@@ -278,3 +278,7 @@ harness = false
 [[bench]]
 name = "retained_purge"
 harness = false
+
+[[bench]]
+name = "recorded_diff"
+harness = false

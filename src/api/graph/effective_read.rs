@@ -42,7 +42,7 @@ impl Graph {
         if self.has_uncommitted_changes() || (self.current_commit == 0 && !self.is_empty()) {
             return Err(GraphError::InvalidInput("Effective-time reads require a clean published graph; publish pending manual edits first".into()));
         }
-        let context = self.history.effective_read_context(self.current_commit)?;
+        let context = self.history.read_context(self.current_commit)?;
         context.validate_legacy(&legacy_publications)?;
         let legacy_clocks = legacy_publications
             .iter()

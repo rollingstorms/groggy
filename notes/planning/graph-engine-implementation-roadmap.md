@@ -1393,3 +1393,20 @@ no wire format or owner policy changed. Fixed remaining inventory and evidence:
 Gates: **1,310 native / 52 ignored**, **2,017 root Python / 1 skipped**, **168 docs
 examples**, rebuilt extension and strict all-target Clippy. Same exclusions/known
 FFI warnings. **204 checked / 64 open**, no new checkbox rows.
+
+### Shared recorded-read plans and detached diffs
+
+Recorded reconstruction and effective reads now share the existing immutable
+lineage cache. Native captured diff/read plans survive prune/purge/owner destruction;
+Python recorded diff reconstruction/comparison releases the GIL. Cloned plans share
+lineage arrays, and identical-state diffs skip reconstruction after validation.
+Cold ancestry walks and Python output marshalling remain owner-bound. A local
+50k-property-version fixture measures 6.70 ms cold capture, 62.5 ns matching warm
+capture and 2.94 ms detached diff execution; this is not whole-engine/FFI latency.
+Evidence/limits: `recorded-diff-plans-2026-10-26.md`.
+
+Final gates: **1,315 native / 52 ignored**, serial **18-case** process-kill matrix,
+**2,018 root Python / 1 skipped**, **168 docs examples**, strict all-target Clippy
+and rebuilt extension. Existing owner/legacy exclusions and known FFI warnings
+remain. **204 checked / 64 open**, no new rows. Coordinated endpoint mutation,
+reversal and merge planning remain the next core work.

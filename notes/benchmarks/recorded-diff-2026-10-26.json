@@ -1,0 +1,78 @@
+{
+  "benchmark": "recorded_diff",
+  "cases": [
+    {
+      "nodes": 100000,
+      "property_versions": 0,
+      "samples": [
+        {
+          "detached_execute_seconds": 0.007632917,
+          "owner_capture_seconds": 1.2e-05,
+          "same_state_capture_seconds": 5e-07,
+          "same_state_execute_seconds": 4.2e-08
+        },
+        {
+          "detached_execute_seconds": 0.008547708,
+          "owner_capture_seconds": 8.3e-08,
+          "same_state_capture_seconds": 5.42e-07,
+          "same_state_execute_seconds": 0.0
+        },
+        {
+          "detached_execute_seconds": 0.008211625,
+          "owner_capture_seconds": 8.3e-08,
+          "same_state_capture_seconds": 2.92e-07,
+          "same_state_execute_seconds": 4.2e-08
+        },
+        {
+          "detached_execute_seconds": 0.0082985,
+          "owner_capture_seconds": 8.3e-08,
+          "same_state_capture_seconds": 3.33e-07,
+          "same_state_execute_seconds": 4.2e-08
+        },
+        {
+          "detached_execute_seconds": 0.007160708,
+          "owner_capture_seconds": 4.2e-08,
+          "same_state_capture_seconds": 7.5e-07,
+          "same_state_execute_seconds": 0.0
+        }
+      ]
+    },
+    {
+      "nodes": 1,
+      "property_versions": 50000,
+      "samples": [
+        {
+          "detached_execute_seconds": 0.003491958,
+          "owner_capture_seconds": 0.006696583,
+          "same_state_capture_seconds": 5.42e-07,
+          "same_state_execute_seconds": 1.25e-07
+        },
+        {
+          "detached_execute_seconds": 0.00295625,
+          "owner_capture_seconds": 1.25e-07,
+          "same_state_capture_seconds": 8.4e-08,
+          "same_state_execute_seconds": 1.25e-07
+        },
+        {
+          "detached_execute_seconds": 0.002987083,
+          "owner_capture_seconds": 4.2e-08,
+          "same_state_capture_seconds": 4.1e-08,
+          "same_state_execute_seconds": 0.0
+        },
+        {
+          "detached_execute_seconds": 0.002928541,
+          "owner_capture_seconds": 8.3e-08,
+          "same_state_capture_seconds": 4.2e-08,
+          "same_state_execute_seconds": 1.25e-07
+        },
+        {
+          "detached_execute_seconds": 0.002932875,
+          "owner_capture_seconds": 4.2e-08,
+          "same_state_capture_seconds": 2.08e-07,
+          "same_state_execute_seconds": 0.0
+        }
+      ]
+    }
+  ],
+  "scope": "local release; setup excluded; owner capture includes first-parent traversal, cycle checks and shared Arc handles; detached execute includes both reconstructions and typed diff; no Python marshal, RSS or before/after speed claim"
+}

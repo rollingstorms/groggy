@@ -15,6 +15,9 @@ pub(crate) use archive::HistoryDocument;
 mod effective_topology;
 pub(crate) use effective_topology::TopologyPatch;
 
+mod recorded_read;
+pub use recorded_read::{CommitDiffPlan, RecordedReadPlan};
+
 // Preserve legacy public names while sharing the snapshot diff representation.
 pub use crate::state::change::{AttributeChange, EdgeEndpointChange, EntityType};
 
@@ -61,7 +64,7 @@ pub struct HistoryForest {
     /// In-process provenance shared by snapshots, independent of numeric state IDs.
     identity: Arc<()>,
     graph_type: GraphType,
-    effective_reads:
+    read_context_cache:
         parking_lot::Mutex<Option<(StateId, Arc<crate::state::effective_read::ReadContext>)>>,
     effective_topology: parking_lot::Mutex<effective_topology::EffectiveTopology>,
     /*
@@ -112,7 +115,7 @@ impl HistoryForest {
         Self {
             identity: Arc::new(()),
             graph_type: self.graph_type,
-            effective_reads: Default::default(),
+            read_context_cache: Default::default(),
             effective_topology: Default::default(),
             commits: self.commits.clone(),
             deltas: self.deltas.clone(),
@@ -164,7 +167,7 @@ impl HistoryForest {
 
         Self {
             effective_topology: Default::default(),
-            effective_reads: Default::default(),
+            read_context_cache: Default::default(),
             identity: Arc::new(()),
             graph_type,
             commits: HashMap::new(),
@@ -490,9 +493,7 @@ impl HistoryForest {
         head: StateId,
         timestamp: u64,
     ) -> GraphResult<Option<StateId>> {
-        Ok(self
-            .effective_read_context(head)?
-            .commit_at_or_before(timestamp))
+        Ok(self.read_context(head)?.commit_at_or_before(timestamp))
     }
 
     /// Get the commit history for a specific branch (following parent chain)
@@ -627,19 +628,7 @@ impl HistoryForest {
 
     /// Compute the changes between two commits
     pub fn diff_commits(&self, from: StateId, to: StateId) -> Result<CommitDiff, GraphError> {
-        let before = self.reconstruct_state_at(from)?;
-        let after = self.reconstruct_state_at(to)?;
-        let diff = before.diff_with(&after);
-        Ok(CommitDiff {
-            from_commit: from,
-            to_commit: to,
-            nodes_added: diff.nodes_added,
-            nodes_removed: diff.nodes_removed,
-            edges_added: diff.edges_added,
-            edges_removed: diff.edges_removed,
-            edge_endpoint_changes: diff.edge_endpoint_changes,
-            attr_changes: diff.attribute_changes,
-        })
+        self.prepare_commit_diff(from, to)?.execute()
     }
 
     /// Get the delta (direct changes) introduced by a specific commit
@@ -656,44 +645,17 @@ impl HistoryForest {
     /// Reconstruct the complete graph state at a specific commit
     /// This is expensive but necessary for time-travel functionality
     pub fn reconstruct_state_at(&self, commit_id: StateId) -> Result<GraphSnapshot, GraphError> {
-        if commit_id != 0 && !self.commits.contains_key(&commit_id) {
-            return Err(GraphError::InvalidInput(format!(
-                "Commit {commit_id} not found"
-            )));
-        }
-        // Collect all deltas from root to this commit
-        let mut current_id = commit_id;
-
-        // Trace back to root, collecting commits
-        let mut commit_chain = Vec::new();
-        while let Some(commit) = self.commits.get(&current_id) {
-            commit_chain.push((current_id, commit.clone()));
-            if commit.parents.is_empty() {
-                break; // Reached root
-            }
-            current_id = commit.parents[0]; // Follow first parent for linear reconstruction
-        }
-
-        // Reverse to get chronological order (root -> target)
-        commit_chain.reverse();
-
-        // Borrow shared immutable deltas rather than cloning every historical value.
-        let base = GraphSnapshot::empty_with_type(0, self.graph_type);
-        GraphSnapshot::reconstruct_from_delta_refs(
-            Some(&base),
-            commit_chain
-                .iter()
-                .map(|(state, commit)| (commit.delta.as_ref(), *state)),
-        )
+        self.prepare_recorded_read(commit_id)?.execute()
     }
 
-    /// First-parent event index cache. A merge's delta is its accepted resolution
+    /// Shared recorded/effective first-parent context and lazy event index.
+    /// A merge's delta is its accepted resolution
     /// relative to the first parent; sibling mutations are not replayed twice.
-    pub(crate) fn effective_read_context(
+    pub(crate) fn read_context(
         &self,
         head: StateId,
     ) -> GraphResult<Arc<crate::state::effective_read::ReadContext>> {
-        let mut cached = self.effective_reads.lock();
+        let mut cached = self.read_context_cache.lock();
         if let Some((state, context)) = cached.as_ref() {
             if *state == head {
                 return Ok(context.clone());
@@ -725,7 +687,7 @@ impl HistoryForest {
         recorded_by: Option<i64>,
         legacy_publications: std::collections::BTreeMap<StateId, crate::PublicationMetadata>,
     ) -> GraphResult<crate::state::effective_read::EffectiveReadPlan> {
-        let context = self.effective_read_context(head)?;
+        let context = self.read_context(head)?;
         context.validate_legacy(&legacy_publications)?;
         let legacy_clocks = legacy_publications
             .iter()
@@ -838,7 +800,7 @@ impl HistoryForest {
             checkpoint.state_id == 0 || retained.contains_key(&checkpoint.state_id)
         });
         *self.effective_topology.get_mut() = Default::default();
-        *self.effective_reads.get_mut() = None;
+        *self.read_context_cache.get_mut() = None;
         // Acceptance IDs are lifetime reservations and never rewind after collection.
         removed
     }

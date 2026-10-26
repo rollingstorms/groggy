@@ -1899,10 +1899,13 @@ impl PyGraph {
 
     /// Compare the effective contents of two published states.
     fn diff_commits(&self, py: Python, from: StateId, to: StateId) -> PyResult<PyObject> {
-        let diff = self
+        let plan = self
             .inner
             .borrow()
-            .diff_commits(from, to)
+            .prepare_commit_diff(from, to)
+            .map_err(graph_error_to_py_err)?;
+        let diff = py
+            .allow_threads(move || plan.execute())
             .map_err(graph_error_to_py_err)?;
         let output = PyDict::new(py);
         output.set_item("from_state", diff.from_commit)?;

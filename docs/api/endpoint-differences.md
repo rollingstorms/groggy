@@ -44,3 +44,30 @@ clock validation, retained endpoint revisions, archive/journal replay, batch/bul
 interfaces and tracked/destructive revert remain under existing 04.2/13.3. Raw
 storage overwrite is not a substitute for that history path. No storage format
 version changes in this comparison/safety slice.
+
+## Detached logical reconstruction
+
+Native `Graph.prepare_commit_diff(from, to)` / `HistoryForest.prepare_commit_diff`
+return a `CommitDiffPlan`. `HistoryForest.prepare_recorded_read(state)` returns a
+`RecordedReadPlan`. Preparation uses the shared recorded/effective lineage cache and
+shares immutable commit records; execution reconstructs logical state and typed
+properties independently of the owner. Plans are Send + Sync and survive later
+mutation, history pruning, purge and owner destruction. Preparation rejects
+unknown states, missing parents and cycles rather than inventing partial states.
+
+`Graph.diff_commits` and ordinary native recorded reconstruction use these same
+kernels. Python prepares the plan while holding the owner borrow, releases that
+borrow, and releases the GIL during reconstruction/comparison. Python output
+marshalling remains under the GIL. Cold preparation is O(ancestry), runs on the owner thread and retains shared
+record handles. A matching cached head shares its lineage in O(1); empty-root
+reads do not evict that head. The existing cache retains only its most recent
+head, so alternating different heads can still need ancestry walks. This is not
+a universal latency guarantee. Cloned plans share their lineage arrays. Comparing
+a state with itself validates its lineage, then returns an empty diff without
+reconstructing either graph.
+
+These logical plans carry property values and group-reference IDs, not graph
+mutation authority or a frozen group-source registry. Use immutable GraphViews
+or explicit owned snapshots when source payload/graph restoration ownership is
+required. Other historical Python entry points retain their existing GIL behavior;
+this change specifically migrates recorded commit diffs.

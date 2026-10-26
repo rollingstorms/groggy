@@ -40,15 +40,18 @@ pub struct EffectiveReadOptions {
 /// Cached immutable ancestry and one lazily built effective event index.
 #[derive(Debug)]
 pub(crate) struct ReadContext {
-    commits: Vec<Arc<Commit>>,
+    commits: Arc<[Arc<Commit>]>,
     index: OnceLock<Arc<EffectiveReadIndex>>,
 }
 impl ReadContext {
     pub(crate) fn new(commits: Vec<Arc<Commit>>) -> Self {
         Self {
-            commits,
+            commits: commits.into(),
             index: OnceLock::new(),
         }
+    }
+    pub(crate) fn recorded_commits(&self) -> Arc<[Arc<Commit>]> {
+        Arc::clone(&self.commits)
     }
     pub(crate) fn commit_at_or_before(&self, timestamp: u64) -> Option<StateId> {
         self.commits

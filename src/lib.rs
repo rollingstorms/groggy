@@ -179,7 +179,7 @@ pub use errors::{GraphError, GraphResult};
 pub use state::change::EdgeEndpointChange;
 pub use state::checkpoint::Checkpoint;
 pub use state::publication::{ChangeKey, PublicationMetadata, TimestampMicros};
-pub use state::{HistoricalView, HistoryForest, ViewSummary};
+pub use state::{CommitDiffPlan, HistoricalView, HistoryForest, RecordedReadPlan, ViewSummary};
 pub use storage::journal::DurableGraph;
 pub use types::{
     AttrName, AttrValue, AttrValueType, BranchName, CalendarDate, EdgeId, FixedDuration, NodeId,

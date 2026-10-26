@@ -29,7 +29,8 @@ pub use topology::*;
 
 // Re-export history-specific containers; logical change types share one owner.
 pub use history::{
-    Commit, CommitDiff, Delta, HistoricalView, HistoryForest, HistoryStatistics, ViewSummary,
+    Commit, CommitDiff, CommitDiffPlan, Delta, HistoricalView, HistoryForest, HistoryStatistics,
+    RecordedReadPlan, ViewSummary,
 };
 
 // Re-export state items and their compatibility exports of canonical change types.

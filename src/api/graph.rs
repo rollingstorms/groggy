@@ -2152,6 +2152,16 @@ impl Graph {
         self.history.diff_commits(from, to)
     }
 
+    /// Capture immutable logical lineages for detached diff computation. This
+    /// does not retain graph mutation authority or owner group registrations.
+    pub fn prepare_commit_diff(
+        &self,
+        from: StateId,
+        to: StateId,
+    ) -> GraphResult<crate::CommitDiffPlan> {
+        self.history.prepare_commit_diff(from, to)
+    }
+
     /*
     === INTERNAL STATE MANAGEMENT ===
     Helper methods for branch switching and state reconstruction
