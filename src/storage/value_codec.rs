@@ -45,6 +45,15 @@ fn validate_json(text: &str) -> Result<(), GraphError> {
     parser.end().map_err(invalid)
 }
 
+/// Intrinsic syntax required for lossless portable retention. Other logical types
+/// need no parse/allocation here; JSON keeps its original text and number spelling.
+pub(crate) fn validate_property(value: &AttrValue) -> Result<(), GraphError> {
+    if let AttrValue::Json(text) = value {
+        validate_json(text)?;
+    }
+    Ok(())
+}
+
 /// Encode the logical value; storage optimizations are decoded and validated.
 pub(crate) fn encode(value: &AttrValue) -> Result<Value, GraphError> {
     use AttrValue::*;

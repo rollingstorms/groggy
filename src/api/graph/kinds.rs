@@ -10,11 +10,7 @@ fn valid_name(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
-pub(crate) fn validate_kind_property(
-    name: &str,
-    value: &AttrValue,
-    is_node: bool,
-) -> GraphResult<()> {
+fn validate_kind_property(name: &str, value: &AttrValue, is_node: bool) -> GraphResult<()> {
     if name == LABELS {
         if !is_node {
             return Err(GraphError::InvalidInput(
@@ -55,6 +51,12 @@ pub(crate) fn validate_kind_property(
     Ok(())
 }
 
+/// Shared property boundary: intrinsic value syntax plus semantic kind rules.
+pub(crate) fn validate_property(name: &str, value: &AttrValue, is_node: bool) -> GraphResult<()> {
+    crate::storage::value_codec::validate_property(value)?;
+    validate_kind_property(name, value, is_node)
+}
+
 pub(crate) fn normalize_kind_property(
     name: &str,
     mut value: AttrValue,
@@ -69,7 +71,7 @@ pub(crate) fn normalize_kind_property_in_place(
     value: &mut AttrValue,
     is_node: bool,
 ) -> GraphResult<()> {
-    validate_kind_property(name, value, is_node)?;
+    validate_property(name, value, is_node)?;
     if name == LABELS {
         match value {
             AttrValue::TextVec(labels) => labels.sort_unstable(),

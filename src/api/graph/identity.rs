@@ -71,7 +71,7 @@ fn check_attrs(
     errors: &mut Vec<String>,
 ) {
     for (name, value) in attrs {
-        if let Err(error) = super::kinds::validate_kind_property(name, value, is_node) {
+        if let Err(error) = super::kinds::validate_property(name, value, is_node) {
             errors.push(format!("{position}.{name}: {error}"));
         }
     }

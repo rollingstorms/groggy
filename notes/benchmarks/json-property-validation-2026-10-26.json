@@ -1,0 +1,96 @@
+{
+  "benchmark": "json_property_validation",
+  "cases": [
+    {
+      "body_bytes_per_json_or_text": 46,
+      "kind": "json",
+      "rows": 1000,
+      "seconds_per_validation_samples": [
+        0.00014899,
+        0.00012070417,
+        9.983250000000001e-05
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 46,
+      "kind": "text",
+      "rows": 1000,
+      "seconds_per_validation_samples": [
+        7.102417e-05,
+        6.719042e-05,
+        6.488e-05
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 46,
+      "kind": "f64",
+      "rows": 1000,
+      "seconds_per_validation_samples": [
+        6.025625e-05,
+        5.823792e-05,
+        5.7368339999999994e-05
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 16398,
+      "kind": "json",
+      "rows": 1000,
+      "seconds_per_validation_samples": [
+        0.0018201324999999999,
+        0.0017861141699999999,
+        0.00178309708
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 16398,
+      "kind": "text",
+      "rows": 1000,
+      "seconds_per_validation_samples": [
+        5.535334e-05,
+        5.472999999999999e-05,
+        5.5308750000000005e-05
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 16398,
+      "kind": "f64",
+      "rows": 1000,
+      "seconds_per_validation_samples": [
+        5.571708e-05,
+        5.503791e-05,
+        5.5199580000000005e-05
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 1048590,
+      "kind": "json",
+      "rows": 1,
+      "seconds_per_validation_samples": [
+        0.00010511958,
+        0.00010513917,
+        0.00010528917
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 1048590,
+      "kind": "text",
+      "rows": 1,
+      "seconds_per_validation_samples": [
+        9.374999999999999e-08,
+        9.334000000000001e-08,
+        9.415999999999999e-08
+      ]
+    },
+    {
+      "body_bytes_per_json_or_text": 1048590,
+      "kind": "f64",
+      "rows": 1,
+      "seconds_per_validation_samples": [
+        9.333e-08,
+        9.417e-08,
+        9.334000000000001e-08
+      ]
+    }
+  ],
+  "scope": "release; prepared inputs; shared validation only, not full writes/FFI; text is an unchecked-text control, not equivalent JSON semantics; three batches of 100 checks"
+}

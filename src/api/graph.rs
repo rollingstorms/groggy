@@ -454,7 +454,7 @@ impl Graph {
         let mut errors = Vec::new();
         for (position, attrs) in rows.iter().enumerate() {
             for (name, value) in attrs {
-                if let Err(error) = kinds::validate_kind_property(name, value, true) {
+                if let Err(error) = kinds::validate_property(name, value, true) {
                     errors.push(format!("{position}.{name}: {error}"));
                 }
             }
@@ -494,7 +494,7 @@ impl Graph {
                 if name == EXTERNAL_ID {
                     errors.push(format!("{position}.external_id: use the external-ID API"));
                 }
-                if let Err(error) = kinds::validate_kind_property(name, value, false) {
+                if let Err(error) = kinds::validate_property(name, value, false) {
                     errors.push(format!("{position}.{name}: {error}"));
                 }
             }
@@ -2588,7 +2588,7 @@ impl Graph {
                 .and_then(|positions| positions.get(offset))
                 .copied()
                 .unwrap_or(offset);
-            if let Err(error) = kinds::validate_kind_property(attr_name, value, is_node) {
+            if let Err(error) = kinds::validate_property(attr_name, value, is_node) {
                 errors.push(format!("{attr_name}[{position}]: {error}"));
             }
             let exists = if is_node {

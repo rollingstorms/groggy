@@ -154,12 +154,20 @@ fn malformed_documents_fail_instead_of_dropping_records_or_values() {
 fn encoding_errors_preserve_an_existing_destination() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("existing.json");
-    for value in [AttrValue::SubgraphRef(0), AttrValue::Json("{".into())] {
-        let mut graph = Graph::new_manual();
-        let node = graph.add_node().unwrap();
-        graph.set_node_attr(node, "bad".into(), value).unwrap();
-        std::fs::write(&path, b"previous saved data").unwrap();
-        assert!(graph.save_to_path(&path).is_err());
-        assert_eq!(std::fs::read(&path).unwrap(), b"previous saved data");
-    }
+    let mut graph = Graph::new_manual();
+    let node = graph.add_node().unwrap();
+    // Pooled references remain unsupported by active export; encoding must leave
+    // an existing destination intact even after successful in-memory assignment.
+    graph
+        .set_node_attr(node, "bad".into(), AttrValue::SubgraphRef(0))
+        .unwrap();
+    std::fs::write(&path, b"previous saved data").unwrap();
+    assert!(graph.save_to_path(&path).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), b"previous saved data");
+    // Malformed JSON now rejects at mutation time, before it can poison retention.
+    assert!(graph
+        .set_node_attr(node, "json".into(), AttrValue::Json("{".into()))
+        .is_err());
+    assert_eq!(graph.get_node_attr(node, &"json".into()).unwrap(), None);
+    assert_eq!(std::fs::read(&path).unwrap(), b"previous saved data");
 }

@@ -269,3 +269,16 @@ Gates: **1,270 native / 52 ignored**, separate serial SIGKILL gate **1 passed**;
 **2,004 root Python / 1 skipped**, **160 docs**, strict Clippy and rebuilt extension.
 No new checklist rows; **201 checked / 67 open**. Broad 33.2 retains original
 index/cache/physical-file/service diagnostic scope.
+
+### JSON mutation recoverability gap repaired (07.4 / 05.3)
+
+A reproduced native path accepted malformed typed JSON before later save failure.
+The shared graph property boundary now applies the same intrinsic syntax rule as
+retained storage, rejecting whole scalar/bulk/create/batch/upsert inputs before
+values/versions/IDs/reservations change. Valid text and large-number spelling remain
+exact; ordinary Text/non-JSON values keep their distinct behavior. Four native
+regressions and a release parse-cost receipt are recorded in
+`json-property-validation-2026-10-26.md`.
+Gates: **1,274 native / 52 ignored**, serial SIGKILL gate **1 passed**; **2,004
+root Python / 1 skipped**, **160 docs**, strict Clippy, in-tree extension rebuild.
+No new checklist rows; **201 checked / 67 open**.

@@ -120,3 +120,14 @@ assert checked.current_state_id == state + 1
 
 The twelve native entry points and their corruption/liveness/null/absence tests
 are recorded in [the reader consolidation note](../../notes/planning/current-property-reads-2026-10-25.md).
+
+### JSON syntax is checked before mutation
+
+Native `AttrValue::Json` assignments now use the same syntax rules as retained
+storage before scalar/bulk creation, updates, mixed batches and upserts. Malformed
+JSON rejects the whole input before publishing, storing values, allocating IDs or
+reserving external IDs. Valid JSON retains its original text, whitespace, large
+integers and number spelling. Plain `Text` remains arbitrary text; a JSON-looking
+string is not implicitly reclassified. Non-JSON values take a type check rather
+than a JSON parse. Validation adds work proportional to the JSON text size;
+shared-boundary cost is measured in `notes/benchmarks/json-property-validation-2026-10-26.json`.

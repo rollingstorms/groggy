@@ -254,3 +254,7 @@ harness = false
 [[bench]]
 name = "retained_integrity"
 harness = false
+
+[[bench]]
+name = "json_property_validation"
+harness = false
