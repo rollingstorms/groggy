@@ -3222,6 +3222,10 @@ class DurableGraph:
         """Start a journal with complete retained graph storage/history."""
         ...
 
+    def checkpoint_storage(self, *, expected_state: Optional[int] = None) -> Dict[str, int]:
+        """Replace the operation log with a complete retained baseline (Unix)."""
+        ...
+
     @property
     def current_state_id(self) -> int:
         ...

@@ -1,0 +1,27 @@
+{
+  "benchmark": "storage_checkpoint",
+  "cases": [
+    {
+      "baseline_open_seconds": 0.004397542,
+      "checkpoint_bytes": 235653,
+      "checkpoint_seconds_including_sync_and_verification": 0.019199208,
+      "original_property_versions": 1000,
+      "previous_bytes": 392328,
+      "previous_records": 1007,
+      "replay_open_seconds": 0.019721208,
+      "retained_raw_values": 1001,
+      "retained_versions": 501
+    },
+    {
+      "baseline_open_seconds": 0.024464375,
+      "checkpoint_bytes": 2359889,
+      "checkpoint_seconds_including_sync_and_verification": 0.049451291,
+      "original_property_versions": 10000,
+      "previous_bytes": 3924828,
+      "previous_records": 10007,
+      "replay_open_seconds": 0.073051875,
+      "retained_raw_values": 10001,
+      "retained_versions": 5001
+    }
+  ]
+}

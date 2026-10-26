@@ -70,6 +70,31 @@ impl PyDurableGraph {
             .backup(&destination)
             .map_err(graph_error_to_py_err)
     }
+    /// Explicit physical journal baseline; does not publish a graph version.
+    #[pyo3(signature=(*,expected_state=None))]
+    fn checkpoint_storage(
+        &mut self,
+        py: Python<'_>,
+        expected_state: Option<StateId>,
+    ) -> PyResult<PyObject> {
+        let expected = expected_state.unwrap_or(self.current_state_id()?);
+        let plan = self
+            .core_mut()?
+            .prepare_storage_checkpoint(expected)
+            .map_err(graph_error_to_py_err)?;
+        let outcome = py.allow_threads(move || plan.execute());
+        let report = self
+            .core_mut()?
+            .finish_storage_checkpoint(outcome)
+            .map_err(graph_error_to_py_err)?;
+        let result = PyDict::new(py);
+        result.set_item("previous_bytes", report.previous_bytes)?;
+        result.set_item("current_bytes", report.current_bytes)?;
+        result.set_item("previous_records", report.previous_records)?;
+        result.set_item("retained_versions", report.retained_versions)?;
+        result.set_item("selected_state", report.selected_state)?;
+        Ok(result.into())
+    }
     fn close(&mut self) {
         self.store = None;
     }

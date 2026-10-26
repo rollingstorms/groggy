@@ -14,13 +14,14 @@ The stages describe related work, with Graphiti-specific integration and retriev
 
 ## Current checkpoint — 2026-10-26
 
-The flat checklist has **200 checked / 68 open entries**, including overlapping
+The flat checklist has **201 checked / 67 open entries**, including overlapping
 parents. Effective reconstruction (16.2), property history/unsets (11.2), exact
 owned snapshots (12.2) and branch lifecycle (14.1) are complete within their stated
 contracts. Certified outer pipelines/import baselines and explicit history-only
 pruning complete components of 09.4b.2 and 15.1/15.2. Raw native escapes/defaults,
-persistent pool import/physical compaction, rewiring/reversals and merge planning
-remain core work. Graphiti remains deferred. See
+remaining storage lifecycle, raw reclamation, rewiring/reversals and merge planning
+remain core work. Full retained archive/import (10.3) is complete; explicit locked
+Unix recovery baselines and journal replacement complete part of 10.4. Graphiti remains deferred. See
 [the current priority slice record](priority-slices-2026-10-26.md) for commits,
 verification, measured costs and the fixed next-work inventory.
 
@@ -1229,3 +1230,15 @@ schema and corruption/no-clobber boundaries are verified. **201 checked / 67 ope
 no new checklist rows. See `retained-archive-import-2026-10-26.md` for explicit full
 copy costs and limits. Recovery checkpoints/physical compaction/migrations remain
 10.4; pool/entity/value reclamation remains 15. No owner answer changed.
+
+## 2026-10-26 — explicit physical storage checkpoint component (10.4)
+
+Added `DurableGraph.checkpoint_storage` with a complete retained baseline, locked
+atomic Unix replacement, schema revision preservation and continued replay/backup.
+No graph version is created. File/candidate recovery runs outside Python's GIL;
+pre/post-replacement failure ownership is verified at five injected boundaries.
+Local 10k-update reopen: **73.05 ms → 24.46 ms** with all raw values retained.
+See `storage-checkpoint-2026-10-26.md` for evidence and the fixed remaining scope.
+**201 checked / 67 open**, no new rows. Chunking/scale/migration/non-Unix/crash
+corpora remain; automatic scheduling stays deferred under A02. Pool reclamation
+and optimize are still separate 15/06.3 work. No owner decision changed.

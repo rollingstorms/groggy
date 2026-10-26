@@ -5,6 +5,11 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
+Current inventory after the second window's storage slices: **201 checked / 67
+open**. Completed full retained archive/import (10.3, `9d78131d`) and explicit
+recovery baseline/locked replacement component (10.4). The first-window receipts
+below retain their original counts; second-window results follow at the end.
+
 ## Completed work and commits
 
 | Existing scope | Commit | Delivered |
@@ -49,7 +54,7 @@ These are bounded local fixtures, not production/RSS/whole-engine speed guarante
 - Owner changes to development benchmark files and their untracked receipt/test
   remain untouched. All implementation slices above have separate commits.
 
-## Fixed next-work inventory
+## Fixed next-work inventory after the first window
 
 1. **Native mutation boundaries (09.4b.2):** migrate native default/infallible
    construction, audit mutable raw pool/space escapes, and certify or stage remaining
@@ -91,3 +96,23 @@ domains are preserved. Evidence: `retained-archive-import-2026-10-26.md`; local
 **201 checked / 67 open**, no new rows. The first window's table/gates above remain
 a historical receipt. The next slice targets explicit 10.4 storage checkpoints and
 crash-safe journal replacement; automatic schedule remains deferred.
+
+### Second completed storage slice (10.4 component)
+
+Explicit materialized journal baselines and locked atomic Unix replacement are
+implemented. Graph versions/raw storage/clocks/schema revision survive; file work
+and candidate verification release Python's GIL. Five injected failure boundaries,
+continued writes, backup, tail recovery and changed-path rejection are verified.
+See `storage-checkpoint-2026-10-26.md`; local 10k-update opening improved from
+73.05 ms to 24.46 ms. Chunking/scale/migration/non-Unix/crash-corpus scope remains,
+and A02 scheduling is still deferred. Counts **201 checked / 67 open**.
+
+### Second-window verification
+
+- Native full gate: **1,237 passed / 51 ignored**.
+- Root Python contract: **1,973 passed / 1 skipped**; **156 executable docs
+  examples**. Owner benchmark and legacy nested survey suites remain excluded.
+- Strict all-target Clippy; scoped Rust formatting, Python/stub syntax, diff checks.
+- Both new release benchmarks are recorded under `notes/benchmarks/`.
+- No dependency install, push, auto-checkpoint schedule or Graphiti scope change.
+  Owner benchmark/development work remains untouched.

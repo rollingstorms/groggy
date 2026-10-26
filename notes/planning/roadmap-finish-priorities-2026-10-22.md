@@ -15,13 +15,15 @@ and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
 Next: remaining native default/infallible constructors, raw pool/space escapes
-and uncertified/topology acceptance (09.4b.2), then persistent raw-pool import and
-storage lifecycle (10.3/10.4). Explicit outer property pipelines and branch lifecycle (14.1) are complete.
+and uncertified/topology acceptance (09.4b.2), then remaining storage lifecycle
+(10.4) and raw reclamation (15). Full retained archive/import (10.3) is complete;
+explicit Unix recovery baselines and locked journal replacement complete part of
+10.4. Explicit outer property pipelines and branch lifecycle (14.1) are complete.
 Exact owned snapshots (12.2), property history (11.2) and 16.2 are complete: effective reconstruction, atomic endpoint validation, frozen nested group
 sources/durable transfer, explicit legacy inputs, resolved first-parent merge reads
 and cached event prefixes. 16.3, checkpoint semantics (12.3), checked writeback
 (27.2), and the fixed table facade inventory (27.1/AR7.10) are complete. Merge
-planning (14.2), storage checkpoints/import/compaction (10.3/10.4) and broad live
+planning (14.2), remaining storage scale/migrations/compaction (10.4/15) and broad live
 adapter migration (26.1) retain their existing scopes. See the 16.2 exit review.
 
 Execution rule agreed with the owner's prioritization concern on 2026-10-25:
@@ -1218,3 +1220,15 @@ Full retained binary archive/import and existing-graph journal initialization ar
 complete (`retained-archive-import-2026-10-26.md`). **201 checked / 67 open**. Next
 storage priority is 10.4 recovery checkpoints/physical lifecycle; this archive is
 an explicit full-copy path, with opening cost measured rather than claimed bounded.
+
+## 2026-10-26 — explicit physical storage checkpoint component (10.4)
+
+Added `DurableGraph.checkpoint_storage` with a complete retained baseline, locked
+atomic Unix replacement, schema revision preservation and continued replay/backup.
+No graph version is created. File/candidate recovery runs outside Python's GIL;
+pre/post-replacement failure ownership is verified at five injected boundaries.
+Local 10k-update reopen: **73.05 ms → 24.46 ms** with all raw values retained.
+See `storage-checkpoint-2026-10-26.md` for evidence and the fixed remaining scope.
+**201 checked / 67 open**, no new rows. Chunking/scale/migration/non-Unix/crash
+corpora remain; automatic scheduling stays deferred under A02. Pool reclamation
+and optimize are still separate 15/06.3 work. No owner decision changed.

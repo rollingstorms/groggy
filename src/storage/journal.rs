@@ -1,6 +1,9 @@
 //! Binary, checksummed, append-only transaction storage for checked publications.
 //! One locked writer owns the file. Successful writes sync the journal before
 //! publishing memory; recovery replays only complete, validated records.
+mod checkpoint;
+pub use checkpoint::StorageCheckpointReport;
+
 use super::retained_group as value_codec;
 use crate::{
     BatchChangeRef, BatchEdgeRef, BatchNodeRef, BatchResult, Graph, GraphBatch, GraphConfig,
@@ -179,6 +182,8 @@ enum Record {
     InitArchive {
         archive: Box<crate::api::graph::archive::GraphArchive>,
         schema: Option<GraphSchema>,
+        #[serde(default)]
+        schema_revision: u64,
     },
     Init {
         config: GraphConfig,
@@ -248,6 +253,8 @@ pub struct DurableGraph {
     recovered_tail_bytes: u64,
     #[cfg(test)]
     failure: Option<Failure>,
+    #[cfg(test)]
+    checkpoint_failure: Option<checkpoint::CheckpointFailure>,
 }
 fn invalid(message: impl std::fmt::Display) -> GraphError {
     GraphError::InvalidInput(format!("Invalid graph journal: {message}"))
@@ -316,6 +323,7 @@ impl DurableGraph {
             Record::InitArchive {
                 archive: Box::new(archive),
                 schema,
+                schema_revision: 0,
             },
         )
     }
@@ -349,6 +357,8 @@ impl DurableGraph {
             recovered_tail_bytes: 0,
             #[cfg(test)]
             failure: None,
+            #[cfg(test)]
+            checkpoint_failure: None,
         };
         store
             .file
@@ -456,6 +466,7 @@ impl DurableGraph {
                 Record::InitArchive {
                     archive,
                     schema: policy,
+                    schema_revision: stored_revision,
                 } if graph.is_none() && sequence == 0 => {
                     let candidate = archive.restore()?;
                     if let Some(schema) = &policy {
@@ -463,6 +474,7 @@ impl DurableGraph {
                     }
                     graph = Some(candidate);
                     schema = policy;
+                    schema_revision = stored_revision;
                 }
                 Record::Init { .. } | Record::InitArchive { .. } => {
                     return Err(invalid("duplicate initialization"))
@@ -499,6 +511,8 @@ impl DurableGraph {
             recovered_tail_bytes,
             #[cfg(test)]
             failure: None,
+            #[cfg(test)]
+            checkpoint_failure: None,
         })
     }
     fn ready(&self) -> GraphResult<()> {

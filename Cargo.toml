@@ -238,3 +238,7 @@ harness = false
 [[bench]]
 name = "graph_archive"
 harness = false
+
+[[bench]]
+name = "storage_checkpoint"
+harness = false

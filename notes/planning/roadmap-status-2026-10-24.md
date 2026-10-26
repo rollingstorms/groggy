@@ -594,3 +594,15 @@ adding checklist rows. No additional owner answers were needed for these slices.
 
 2026-10-26: 10.3 complete retained binary archive/existing-graph journal import is
 closed; see `retained-archive-import-2026-10-26.md`. Current inventory 201/67.
+
+## 2026-10-26 — explicit physical storage checkpoint component (10.4)
+
+Added `DurableGraph.checkpoint_storage` with a complete retained baseline, locked
+atomic Unix replacement, schema revision preservation and continued replay/backup.
+No graph version is created. File/candidate recovery runs outside Python's GIL;
+pre/post-replacement failure ownership is verified at five injected boundaries.
+Local 10k-update reopen: **73.05 ms → 24.46 ms** with all raw values retained.
+See `storage-checkpoint-2026-10-26.md` for evidence and the fixed remaining scope.
+**201 checked / 67 open**, no new rows. Chunking/scale/migration/non-Unix/crash
+corpora remain; automatic scheduling stays deferred under A02. Pool reclamation
+and optimize are still separate 15/06.3 work. No owner decision changed.

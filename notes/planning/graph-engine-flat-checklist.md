@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has **200 checked / 68 unchecked entries**, including overlapping
+The checklist has **201 checked / 67 unchecked entries**, including overlapping
 parents and repair slices; this is not a completion percentage. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
@@ -58,7 +58,9 @@ subtasks passed. Detailed dependencies and workbook gates are in
 escape auditing and whole-pipeline boundaries (09.4b.2). Effective-time reads
 (16.2), complete property history (11.2), explicit checkpoints (12.3), exact owned
 snapshots (12.2) and the fixed table facade inventory are complete within their
-stated contracts. Durable arbitrary pool import/compaction remains 10.3/10.4;
+stated contracts. Full retained pool/archive import (10.3) is complete; explicit
+Unix recovery baselines/replacement close a component of 10.4. Its remaining
+chunking/scale/migration/platform scope is documented in the storage slice;
 Graphiti remains deferred behind the core. Preserve existing APIs through the
 documented migration and record unresolved choices in the workbook.
 
@@ -168,7 +170,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **10.1 — Recoverable checked journal.** Versioned checksummed CBOR preserves supported inline checked writes, IDs/reservations, schema/configuration, branches, typed history, and original clocks; restart/corruption/truncation/subprocess tests exist.
 - [x] **10.2 — Verified full-journal backup.** Sync and verify a temporary backup, publish without overwriting, and restore through ordinary recovery. Active graph export remains a separate narrower format.
 - [x] **10.3 — Persist all retained contents.** Complete versioned binary graph archives and existing-graph journal initialization preserve raw column positions/values, inactive allocations and identity reservations, all retained history/branches/clocks/checkpoints/configuration, and legacy/frozen nested source scopes. Dirty/inconsistent input and corruption reject; continued writes, schema, reopen and backup are verified. Active JSON export remains separate. See `retained-archive-import-2026-10-26.md`; bounded recovery, physical compaction and migrations remain 10.4.
-- [ ] **10.4 — Open: bounded storage lifecycle.** Implement checkpoints, compaction, storage-format upgrades/migrations, crash-safe replacement, and bounded recovery cost.
+- [ ] **10.4 — Partial: bounded storage lifecycle.** Explicit full retained recovery baselines and locked atomic Unix journal replacement are implemented, with schema revision, continued writes, backup, tail recovery and five injected failure boundaries verified. See `storage-checkpoint-2026-10-26.md`. Chunked baselines beyond the frame limit, large opening/RSS targets, future format migrations and non-Unix/additional crash corpora remain. Automatic schedule/budget stays deferred per A02; raw pool reclamation remains 15.
 - [x] **11.1 — Typed recorded property states.** Historical recorded snapshots resolve typed node/edge values and typed before/after changes instead of placeholder representations.
 - [x] **11.2 — Complete property history.** Explicit node/edge unsets span scalar/bulk/mixed checked operations, optional typed old/new deltas, schema validation, recorded/effective reconstruction and durable replay. Absence remains distinct from Null, clocks/ties remain exact, pending scalar/bulk sequences coalesce correctly, and old views/all typed representations/frozen references remain readable. Existing assignment-only hashes and older journal records remain compatible. Exit: `property-history-exit-review-2026-10-26.md`; value-byte diffs are a separate encoding concern.
 - [x] **12.1 — Recorded state switching foundations.** Preserve direction, ID allocation, retained membership/endpoints, and backing column references through branch switches/reset; reject missing referents.
