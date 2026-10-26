@@ -25,7 +25,7 @@ fn invalid(message: &str) -> GraphError {
 }
 impl GraphPool {
     pub(crate) fn archive_document(&self) -> GraphResult<PoolDocument> {
-        let encode = |columns: &HashMap<String, AttributeColumn>| {
+        let encode = |columns: &HashMap<String, AttributeColumn>, kind: &str| {
             columns
                 .iter()
                 .map(|(name, column)| {
@@ -34,7 +34,14 @@ impl GraphPool {
                         column
                             .values
                             .iter()
-                            .map(retained_group::encode)
+                            .enumerate()
+                            .map(|(index, value)| {
+                                retained_group::encode(value).map_err(|error| {
+                                    invalid(&format!(
+                                        "{kind} column {name:?} value {index}: {error}"
+                                    ))
+                                })
+                            })
                             .collect::<GraphResult<_>>()?,
                     ))
                 })
@@ -53,8 +60,8 @@ impl GraphPool {
         }
         Ok(PoolDocument {
             graph_type: self.graph_type,
-            node_attributes: encode(&self.node_attributes)?,
-            edge_attributes: encode(&self.edge_attributes)?,
+            node_attributes: encode(&self.node_attributes, "node")?,
+            edge_attributes: encode(&self.edge_attributes, "edge")?,
             edge_sources: self.edge_sources.clone(),
             edge_targets: self.edge_targets.clone(),
             edge_alive: self.edge_alive.clone(),

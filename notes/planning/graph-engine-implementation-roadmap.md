@@ -1333,3 +1333,16 @@ ordinary mutation/FFI latency is not measured. Scalar-add scratch peak grows by
 Gates: **1,265 native / 51 ignored**, **2,000 root Python / 1 skipped**, **158
 documentation examples**, strict Clippy and rebuilt extension. No new rows;
 **201 checked / 67 open**. Full retained integrity scanning is the next 33.2 slice.
+
+### Retained-memory integrity diagnostic completed (33.2 component)
+
+Native/Python Graph and DurableGraph now expose check_integrity, verifying
+portable recovery invariants plus every retained first-parent transition, including
+unreferenced/nonhead versions. Structured counts and contextual errors are returned
+without mutation. Detached verification releases the Python GIL; capture remains
+owner-bound. Durable scope is retained memory/current schema, not rereading an open
+journal. Evidence and exact limits: `retained-integrity-2026-10-26.md`.
+Gates: **1,270 native / 52 ignored**, separate serial SIGKILL gate **1 passed**;
+**2,004 root Python / 1 skipped**, **160 docs**, strict Clippy and rebuilt extension.
+No new checklist rows; **201 checked / 67 open**. Broad 33.2 retains original
+index/cache/physical-file/service diagnostic scope.

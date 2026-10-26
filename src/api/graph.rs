@@ -17,6 +17,8 @@ mod checkpoints;
 pub(crate) mod composition;
 mod effective_read;
 mod identity;
+mod integrity;
+pub use integrity::{IntegrityCheckPlan, IntegrityReport};
 pub(crate) mod kinds;
 mod matrices;
 mod ordinary;

@@ -250,3 +250,7 @@ harness = false
 [[bench]]
 name = "recorded_reconstruction"
 harness = false
+
+[[bench]]
+name = "retained_integrity"
+harness = false

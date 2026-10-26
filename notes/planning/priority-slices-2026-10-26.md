@@ -256,3 +256,16 @@ gate, executed successfully locally and wired after normal Rust tests in the CI
 workflow. Default tests keep the other lock tests parallel. Production locking is
 unchanged; the serial gate is reported separately from default ignored counts.
 No new checklist row. See `checkpoint-process-recovery-2026-10-26.md`.
+
+### Retained-memory integrity diagnostic completed (33.2 component)
+
+Native/Python Graph and DurableGraph now expose check_integrity, verifying
+portable recovery invariants plus every retained first-parent transition, including
+unreferenced/nonhead versions. Structured counts and contextual errors are returned
+without mutation. Detached verification releases the Python GIL; capture remains
+owner-bound. Durable scope is retained memory/current schema, not rereading an open
+journal. Evidence and exact limits: `retained-integrity-2026-10-26.md`.
+Gates: **1,270 native / 52 ignored**, separate serial SIGKILL gate **1 passed**;
+**2,004 root Python / 1 skipped**, **160 docs**, strict Clippy and rebuilt extension.
+No new checklist rows; **201 checked / 67 open**. Broad 33.2 retains original
+index/cache/physical-file/service diagnostic scope.

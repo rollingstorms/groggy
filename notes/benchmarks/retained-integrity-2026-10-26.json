@@ -1,0 +1,44 @@
+{
+  "benchmark": "retained_integrity",
+  "cases": [
+    {
+      "interleaved_mutation_branches": 1,
+      "nodes": 1000,
+      "property_updates": 1000,
+      "samples": [
+        {
+          "capture_seconds": 0.003513875,
+          "detached_verification_seconds": 0.039331208
+        },
+        {
+          "capture_seconds": 0.003483458,
+          "detached_verification_seconds": 0.038354167
+        },
+        {
+          "capture_seconds": 0.003345792,
+          "detached_verification_seconds": 0.039650792
+        }
+      ]
+    },
+    {
+      "interleaved_mutation_branches": 8,
+      "nodes": 1000,
+      "property_updates": 1000,
+      "samples": [
+        {
+          "capture_seconds": 0.003078417,
+          "detached_verification_seconds": 0.043039292
+        },
+        {
+          "capture_seconds": 0.002966625,
+          "detached_verification_seconds": 0.042554458
+        },
+        {
+          "capture_seconds": 0.002854667,
+          "detached_verification_seconds": 0.042506916
+        }
+      ]
+    }
+  ],
+  "scope": "release; full retained-state audit, current capture and detached verification; setup excluded; no universal latency/RSS budget"
+}

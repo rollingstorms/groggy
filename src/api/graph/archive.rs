@@ -122,7 +122,7 @@ fn same_selected_snapshot(
     }
     Ok(true)
 }
-fn same_value(value: &AttrValue, other: &AttrValue) -> GraphResult<bool> {
+pub(super) fn same_value(value: &AttrValue, other: &AttrValue) -> GraphResult<bool> {
     match (value, other) {
         (AttrValue::Text(a), AttrValue::Text(b)) => Ok(a == b),
         _ => Ok(retained_group::encode(value)? == retained_group::encode(other)?),

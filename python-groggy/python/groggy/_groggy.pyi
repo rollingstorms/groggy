@@ -3217,6 +3217,10 @@ class DisplayConfig:
 
 
 class DurableGraph:
+    def check_integrity(self) -> Dict[str, Any]:
+        """Verify all retained graph states and return counts; no mutation."""
+        ...
+
     @staticmethod
     def create_from_graph(path: str, graph: Graph, *, schema: Optional[dict] = None) -> DurableGraph:
         """Start a journal with complete retained graph storage/history."""
@@ -4498,6 +4502,10 @@ class Graph:
     """
     Python wrapper for the main Graph
     """
+    def check_integrity(self) -> Dict[str, Any]:
+        """Verify all retained graph states and return counts; no mutation."""
+        ...
+
     @property
     def edge_ids(self) -> NumArray:
         """

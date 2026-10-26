@@ -427,6 +427,19 @@ impl PyGraph {
         })
     }
 
+    /// Verify all retained graph states without publishing or rebuilding indexes.
+    fn check_integrity(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let plan = self
+            .inner
+            .borrow()
+            .prepare_integrity_check()
+            .map_err(graph_error_to_py_err)?;
+        let report = py
+            .allow_threads(move || plan.execute())
+            .map_err(graph_error_to_py_err)?;
+        integrity_report_to_py(py, report)
+    }
+
     /// Save all retained graph state without publishing pending manual changes.
     fn save_archive(&self, py: Python<'_>, path: std::path::PathBuf) -> PyResult<()> {
         let prepared = self
@@ -3439,4 +3452,36 @@ impl PyGraph {
 
         Ok(meta_nodes)
     }
+}
+
+/// Translate a native verification receipt without interpreting engine policy.
+pub(super) fn integrity_report_to_py(
+    py: Python<'_>,
+    report: groggy::IntegrityReport,
+) -> PyResult<PyObject> {
+    let result = PyDict::new(py);
+    result.set_item("selected_state", report.selected_state)?;
+    result.set_item("selected_branch", report.selected_branch)?;
+    result.set_item("schema_revision", report.schema_revision)?;
+    result.set_item("active_nodes", report.active_nodes)?;
+    result.set_item("active_edges", report.active_edges)?;
+    result.set_item("allocated_nodes", report.allocated_nodes)?;
+    result.set_item("allocated_edges", report.allocated_edges)?;
+    result.set_item("node_columns", report.node_columns)?;
+    result.set_item("edge_columns", report.edge_columns)?;
+    result.set_item("node_values", report.node_values)?;
+    result.set_item("edge_values", report.edge_values)?;
+    result.set_item("retained_versions", report.retained_versions)?;
+    result.set_item("verified_states", report.verified_states)?;
+    result.set_item("legacy_versions", report.legacy_versions)?;
+    result.set_item("branches", report.branches)?;
+    result.set_item(
+        "retained_group_references",
+        report.retained_group_references,
+    )?;
+    result.set_item("external_id_reservations", report.external_id_reservations)?;
+    result.set_item("maximum_active_nodes", report.maximum_active_nodes)?;
+    result.set_item("maximum_active_edges", report.maximum_active_edges)?;
+    result.set_item("current_schema_checked", report.current_schema_checked)?;
+    Ok(result.into())
 }

@@ -335,6 +335,18 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    /// Verify retained memory/schema; reopen verifies physical journal bytes.
+    fn check_integrity(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let plan = self
+            .core()?
+            .prepare_integrity_check()
+            .map_err(graph_error_to_py_err)?;
+        let report = py
+            .allow_threads(move || plan.execute())
+            .map_err(graph_error_to_py_err)?;
+        super::graph::integrity_report_to_py(py, report)
+    }
+
     /// Capture the current accepted durable head.
     fn read_view(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
         self.core()?
