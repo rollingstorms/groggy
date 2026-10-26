@@ -1005,10 +1005,10 @@ pub struct Delta {
     pub edges_removed: Vec<EdgeId>,
 
     /// Node attribute changes: (node_id, attr_name, old_value, new_value)
-    pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, AttrValue)>,
+    pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
 
     /// Edge attribute changes: (edge_id, attr_name, old_value, new_value)
-    pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, AttrValue)>,
+    pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
 }
 
 impl Delta {
@@ -1042,8 +1042,20 @@ impl Delta {
         nodes_removed.hash(&mut hasher);
         edges_added.hash(&mut hasher);
         edges_removed.hash(&mut hasher);
-        node_attr_changes.hash(&mut hasher);
-        edge_attr_changes.hash(&mut hasher);
+        // Preserve existing assignment-only hashes. Absence gets a distinct
+        // tag outside the AttrValue hash domain, never a fake Null value.
+        for changes in [&node_attr_changes, &edge_attr_changes] {
+            changes.len().hash(&mut hasher);
+            for (id, name, old, new) in changes {
+                id.hash(&mut hasher);
+                name.hash(&mut hasher);
+                old.hash(&mut hasher);
+                match new {
+                    Some(value) => value.hash(&mut hasher),
+                    None => "groggy:unset:v1".hash(&mut hasher),
+                }
+            }
+        }
         let hash_u64 = hasher.finish();
 
         // Convert u64 hash to [u8; 32]

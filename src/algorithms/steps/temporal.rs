@@ -292,7 +292,7 @@ impl AggregateFunction {
 
     fn apply_history(
         &self,
-        history: &[(StateId, AttrValue)],
+        history: &[(StateId, Option<AttrValue>)],
         ctx: &Context,
     ) -> Result<AlgorithmParamValue> {
         if matches!(self, Self::Count) {
@@ -310,9 +310,14 @@ impl AggregateFunction {
             check_cancelled(ctx)?;
             values.push((
                 *state,
-                AlgorithmParamValue::from_attr_value(value.clone()).ok_or_else(|| {
-                    anyhow!("temporal aggregate cannot represent this property value")
-                })?,
+                match value {
+                    Some(value) => {
+                        AlgorithmParamValue::from_attr_value(value.clone()).ok_or_else(|| {
+                            anyhow!("temporal aggregate cannot represent this property value")
+                        })?
+                    }
+                    None => AlgorithmParamValue::None,
+                },
             ));
         }
         self.apply(&values)
@@ -1038,7 +1043,10 @@ mod tests {
     #[test]
     fn window_reducers_preserve_literal_text_null_and_checked_numeric_semantics() {
         let ctx = Context::new();
-        let text = vec![(1, AttrValue::Text("index_0".into())), (2, AttrValue::Null)];
+        let text = vec![
+            (1, Some(AttrValue::Text("index_0".into()))),
+            (2, Some(AttrValue::Null)),
+        ];
         assert_eq!(
             AggregateFunction::First.apply_history(&text, &ctx).unwrap(),
             AlgorithmParamValue::Text("index_0".into())
@@ -1052,6 +1060,26 @@ mod tests {
             AlgorithmParamValue::Int(2)
         );
         assert!(AggregateFunction::Sum.apply_history(&text, &ctx).is_err());
+        let absent = vec![(1, Some(AttrValue::Int(7))), (2, None)];
+        assert_eq!(
+            AggregateFunction::Count
+                .apply_history(&absent, &ctx)
+                .unwrap(),
+            AlgorithmParamValue::Int(2)
+        );
+        assert_eq!(
+            AggregateFunction::First
+                .apply_history(&absent, &ctx)
+                .unwrap(),
+            AlgorithmParamValue::Int(7)
+        );
+        assert_eq!(
+            AggregateFunction::Last
+                .apply_history(&absent, &ctx)
+                .unwrap(),
+            AlgorithmParamValue::None
+        );
+        assert!(AggregateFunction::Sum.apply_history(&absent, &ctx).is_err());
         let wide = vec![
             (1, AlgorithmParamValue::Int(9_007_199_254_740_993)),
             (2, AlgorithmParamValue::Int(-9_007_199_254_740_992)),

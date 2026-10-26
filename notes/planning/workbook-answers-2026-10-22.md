@@ -946,3 +946,13 @@ reads follow existing first-parent resolution semantics; planning stays 14.2.
 See effective-time-exit-review-2026-10-26.md. Property unset remains the next 11.2
 priority. The owner authorized up to 90 minutes of priority slices after 16.2,
 aiming at task completion, separate coherent commits and explicit open-work notes.
+
+## 2026-10-26 — 11.2 property history completed
+
+Implemented the accepted distinction between absence and explicit Null, including
+node/edge scalar/bulk/mixed unsets and explicit/default effective times. Later
+accepted equal-time events win; an absent key stays absent until an assignment.
+Old typed values and frozen sources remain retained, and durable recovery preserves
+clocks and history. Fixed mixed scalar/bulk coalescing. See
+`property-history-exit-review-2026-10-26.md` and `docs/api/property-history.md`.
+12.2/10.3/10.4 retain owned snapshot/pool import/storage lifecycle requirements.

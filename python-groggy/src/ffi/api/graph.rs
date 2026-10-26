@@ -1509,6 +1509,42 @@ impl PyGraph {
         Ok(attr_handler.edge_attribute_keys(py, edge_id))
     }
 
+    /// Explicit absence; use a None assignment for an explicit null instead.
+    fn unset_node_attr(&self, node_id: usize, name: String) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .unset_node_attr(node_id, name)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn unset_node_attrs(
+        &self,
+        columns: std::collections::HashMap<String, Vec<usize>>,
+    ) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .unset_node_attrs(columns)
+            .map_err(graph_error_to_py_err)
+    }
+
+    /// Explicit absence; use a None assignment for an explicit null instead.
+    fn unset_edge_attr(&self, edge_id: usize, name: String) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .unset_edge_attr(edge_id, name)
+            .map_err(graph_error_to_py_err)
+    }
+
+    fn unset_edge_attrs(
+        &self,
+        columns: std::collections::HashMap<String, Vec<usize>>,
+    ) -> PyResult<()> {
+        self.inner
+            .borrow_mut()
+            .unset_edge_attrs(columns)
+            .map_err(graph_error_to_py_err)
+    }
+
     /// Get all unique node attribute names across the entire graph
     fn all_node_attribute_names(&self) -> Vec<String> {
         use std::collections::HashSet;
@@ -1983,7 +2019,7 @@ impl PyGraph {
         attr: &str,
         from_commit: StateId,
         to_commit: StateId,
-    ) -> PyResult<Vec<(StateId, PyAttrValue)>> {
+    ) -> PyResult<Vec<(StateId, Option<PyAttrValue>)>> {
         let history = self
             .inner
             .borrow()
@@ -1991,7 +2027,7 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)?;
         Ok(history
             .into_iter()
-            .map(|(cid, val)| (cid, PyAttrValue::new(val)))
+            .map(|(cid, val)| (cid, val.map(PyAttrValue::new)))
             .collect())
     }
 

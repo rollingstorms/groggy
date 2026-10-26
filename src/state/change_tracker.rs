@@ -130,27 +130,27 @@ impl ChangeTracker {
     {
         // Convert to appropriate type and delegate to strategy's bulk method
         if is_node {
-            let node_changes: Vec<(NodeId, AttrName, Option<usize>, usize)> = changes
+            let node_changes: Vec<(NodeId, AttrName, Option<usize>, Option<usize>)> = changes
                 .iter()
                 .map(|&(entity_id, ref attr_name, old_index, new_index)| {
                     (
                         entity_id.into() as NodeId,
                         attr_name.clone(),
                         old_index,
-                        new_index,
+                        Some(new_index),
                     )
                 })
                 .collect();
             self.strategy.record_node_attr_changes_bulk(&node_changes);
         } else {
-            let edge_changes: Vec<(EdgeId, AttrName, Option<usize>, usize)> = changes
+            let edge_changes: Vec<(EdgeId, AttrName, Option<usize>, Option<usize>)> = changes
                 .iter()
                 .map(|&(entity_id, ref attr_name, old_index, new_index)| {
                     (
                         entity_id.into() as EdgeId,
                         attr_name.clone(),
                         old_index,
-                        new_index,
+                        Some(new_index),
                     )
                 })
                 .collect();
@@ -170,6 +170,23 @@ impl ChangeTracker {
         T: Into<usize> + Copy,
     {
         self.record_attr_changes(&[(entity_id, attr_name, old_index, new_index)], is_node);
+    }
+
+    /// Record an explicit absence without allocating a sentinel pool value.
+    pub fn record_attr_unset(
+        &mut self,
+        entity: usize,
+        name: AttrName,
+        old: Option<usize>,
+        is_node: bool,
+    ) {
+        if is_node {
+            self.strategy
+                .record_node_attr_changes_bulk(&[(entity, name, old, None)]);
+        } else {
+            self.strategy
+                .record_edge_attr_changes_bulk(&[(entity, name, old, None)]);
+        }
     }
 
     // NOTE: update_change_metadata and current_timestamp are now handled by the strategy
@@ -449,7 +466,7 @@ impl ChangeTracker {
                     AttrValue::Json(s) => s.len(),
                 };
             }
-            total += match new_val {
+            total += new_val.as_ref().map_or(0, |new_val| match new_val {
                 AttrValue::Text(s) => s.len(),
                 AttrValue::Int(_) => std::mem::size_of::<i64>(),
                 AttrValue::Float(_) => std::mem::size_of::<f64>(),
@@ -473,7 +490,7 @@ impl ChangeTracker {
                 AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
                 AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
                 AttrValue::Json(s) => s.len(),
-            };
+            });
         }
 
         for (_, _attr_name, old_val, new_val) in &changeset.edge_attr_changes {
@@ -510,7 +527,7 @@ impl ChangeTracker {
                     AttrValue::Json(s) => s.len(),
                 };
             }
-            total += match new_val {
+            total += new_val.as_ref().map_or(0, |new_val| match new_val {
                 AttrValue::Text(s) => s.len(),
                 AttrValue::Int(_) => std::mem::size_of::<i64>(),
                 AttrValue::Float(_) => std::mem::size_of::<f64>(),
@@ -534,7 +551,7 @@ impl ChangeTracker {
                 AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
                 AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
                 AttrValue::Json(s) => s.len(),
-            };
+            });
         }
 
         total
@@ -576,8 +593,8 @@ pub struct ChangeSet {
     pub nodes_removed: Vec<NodeId>,
     pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
     pub edges_removed: Vec<EdgeId>,
-    pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, AttrValue)>,
-    pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, AttrValue)>,
+    pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
+    pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
 }
 
 impl ChangeSet {

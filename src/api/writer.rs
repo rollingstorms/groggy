@@ -240,6 +240,52 @@ impl<'a> GraphWriter<'a> {
             )?
             .state_id)
     }
+    /// Publish explicit absence of one node property.
+    pub fn unset_node_attr(&mut self, id: NodeId, name: AttrName) -> GraphResult<StateId> {
+        self.unset_node_attrs(HashMap::from([(name, vec![id])]))
+    }
+    /// Publish node property removals as one checked columnar batch.
+    pub fn unset_node_attrs(
+        &mut self,
+        columns: HashMap<AttrName, Vec<NodeId>>,
+    ) -> GraphResult<StateId> {
+        let unset_node_attrs = columns
+            .into_iter()
+            .map(|(name, ids)| (name, ids.into_iter().map(BatchNodeRef::Existing).collect()))
+            .collect();
+        Ok(self
+            .apply_batch(
+                GraphBatch {
+                    unset_node_attrs,
+                    ..Default::default()
+                },
+                "unset_node_attrs",
+            )?
+            .state_id)
+    }
+    /// Publish explicit absence of one edge property.
+    pub fn unset_edge_attr(&mut self, id: EdgeId, name: AttrName) -> GraphResult<StateId> {
+        self.unset_edge_attrs(HashMap::from([(name, vec![id])]))
+    }
+    /// Publish edge property removals as one checked columnar batch.
+    pub fn unset_edge_attrs(
+        &mut self,
+        columns: HashMap<AttrName, Vec<EdgeId>>,
+    ) -> GraphResult<StateId> {
+        let unset_edge_attrs = columns
+            .into_iter()
+            .map(|(name, ids)| (name, ids.into_iter().map(BatchEdgeRef::Existing).collect()))
+            .collect();
+        Ok(self
+            .apply_batch(
+                GraphBatch {
+                    unset_edge_attrs,
+                    ..Default::default()
+                },
+                "unset_edge_attrs",
+            )?
+            .state_id)
+    }
     /// Publish node removals and their incident edge removals together.
     pub fn remove_nodes(&mut self, nodes: Vec<NodeId>) -> GraphResult<StateId> {
         Ok(self

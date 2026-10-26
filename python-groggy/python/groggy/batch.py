@@ -36,6 +36,8 @@ class GraphBatch:
         self._add_edges: list[tuple[Any, Any]] = []
         self._node_attrs: dict[str, list[tuple[Any, Any]]] = {}
         self._edge_attrs: dict[str, list[tuple[Any, Any]]] = {}
+        self._unset_node_attrs: dict[str, list[Any]] = {}
+        self._unset_edge_attrs: dict[str, list[Any]] = {}
         self._remove_nodes: list[Any] = []
         self._remove_edges: list[Any] = []
         self._node_external_ids = []
@@ -72,6 +74,15 @@ class GraphBatch:
 
     def set_edge_attr(self, edge: int | AddedEdge, name: str, value: Any, *, effective_at: int | None = None) -> None:
         self._edge_attrs.setdefault(name, []).append((edge, value))
+        self._time("edge_attr", edge, effective_at, name)
+
+    def unset_node_attr(self, node: int | AddedNode, name: str, *, effective_at: int | None = None) -> None:
+        """Make a property absent, retaining its history. None assignments remain null."""
+        self._unset_node_attrs.setdefault(name, []).append(node)
+        self._time("node_attr", node, effective_at, name)
+
+    def unset_edge_attr(self, edge: int | AddedEdge, name: str, *, effective_at: int | None = None) -> None:
+        self._unset_edge_attrs.setdefault(name, []).append(edge)
         self._time("edge_attr", edge, effective_at, name)
 
     def remove_node(self, node: int | AddedNode, *, effective_at: int | None = None) -> None:
@@ -117,6 +128,14 @@ class GraphBatch:
             "edge_attrs": {
                 name: [(self._ref(edge, AddedEdge), value) for edge, value in values]
                 for name, values in self._edge_attrs.items()
+            },
+            "unset_node_attrs": {
+                name: [self._ref(node, AddedNode) for node in nodes]
+                for name, nodes in self._unset_node_attrs.items()
+            },
+            "unset_edge_attrs": {
+                name: [self._ref(edge, AddedEdge) for edge in edges]
+                for name, edges in self._unset_edge_attrs.items()
             },
             "remove_nodes": [self._ref(node, AddedNode) for node in self._remove_nodes],
             "remove_edges": [self._ref(edge, AddedEdge) for edge in self._remove_edges],

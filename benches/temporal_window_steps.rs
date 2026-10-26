@@ -84,7 +84,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     for id in 0..count {
                         if built.node_attr_history(id, &"score".into(), first, head)
-                            != vec![(first, AttrValue::Int(1)), (head, AttrValue::Int(3))]
+                            != vec![
+                                (first, Some(AttrValue::Int(1))),
+                                (head, Some(AttrValue::Int(3))),
+                            ]
                         {
                             return Err("index history mismatch".into());
                         }

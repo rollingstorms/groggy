@@ -81,6 +81,8 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
         if ![
             "add_nodes",
             "add_edges",
+            "unset_node_attrs",
+            "unset_edge_attrs",
             "node_attrs",
             "edge_attrs",
             "remove_nodes",
@@ -157,6 +159,28 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
             result
                 .add_edges
                 .push((node_ref(source)?, node_ref(target)?));
+        }
+    }
+    if let Some(columns) = description.get_item("unset_node_attrs")? {
+        for (name, ids) in columns.downcast::<PyDict>()?.iter() {
+            let name: String = name.extract()?;
+            let refs = ids
+                .downcast::<PyList>()?
+                .iter()
+                .map(node_ref)
+                .collect::<PyResult<Vec<_>>>()?;
+            result.unset_node_attrs.insert(name, refs);
+        }
+    }
+    if let Some(columns) = description.get_item("unset_edge_attrs")? {
+        for (name, ids) in columns.downcast::<PyDict>()?.iter() {
+            let name: String = name.extract()?;
+            let refs = ids
+                .downcast::<PyList>()?
+                .iter()
+                .map(edge_ref)
+                .collect::<PyResult<Vec<_>>>()?;
+            result.unset_edge_attrs.insert(name, refs);
         }
     }
     if let Some(attrs) = description.get_item("node_attrs")? {

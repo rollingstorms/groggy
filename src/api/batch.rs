@@ -38,6 +38,9 @@ pub struct GraphBatch {
     pub add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
     pub node_attrs: HashMap<AttrName, Vec<(BatchNodeRef, AttrValue)>>,
     pub edge_attrs: HashMap<AttrName, Vec<(BatchEdgeRef, AttrValue)>>,
+    /// Explicit absence, distinct from assigning AttrValue::Null.
+    pub unset_node_attrs: HashMap<AttrName, Vec<BatchNodeRef>>,
+    pub unset_edge_attrs: HashMap<AttrName, Vec<BatchEdgeRef>>,
     pub remove_edges: Vec<BatchEdgeRef>,
     pub remove_nodes: Vec<BatchNodeRef>,
     /// Explicit initial assignment or rename; ordinary external_id property writes remain forbidden.
@@ -66,6 +69,8 @@ pub(crate) struct PreparedBatch {
     pub add_edges: Vec<(NodeId, NodeId)>,
     pub node_attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     pub edge_attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
+    pub unset_node_attrs: HashMap<AttrName, Vec<NodeId>>,
+    pub unset_edge_attrs: HashMap<AttrName, Vec<EdgeId>>,
     pub remove_edges: Vec<EdgeId>,
     pub remove_nodes: Vec<NodeId>,
     pub identity_bindings: Vec<(String, crate::ExternalEntityRef)>,
@@ -102,6 +107,8 @@ impl GraphBatch {
             || !self.remove_edges.is_empty()
             || !self.node_external_ids.is_empty()
             || !self.edge_external_ids.is_empty()
+            || self.unset_node_attrs.values().any(|v| !v.is_empty())
+            || self.unset_edge_attrs.values().any(|v| !v.is_empty())
             || self.node_attrs.values().any(|v| !v.is_empty())
             || self.edge_attrs.values().any(|v| !v.is_empty())
     }
@@ -271,6 +278,84 @@ impl GraphBatch {
             edge_attrs.insert(name, resolved);
         }
 
+        let mut unset_node_attrs = HashMap::new();
+        let mut columns: Vec<_> = self.unset_node_attrs.into_iter().collect();
+        columns.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+        for (name, refs) in columns {
+            if (name == "entity_type" || name == super::graph::EXTERNAL_ID) && !refs.is_empty() {
+                errors.push(format!("unset_node_attrs.{name}: system-managed attribute"));
+            }
+            let mut seen = HashSet::new();
+            let assigned: HashSet<_> = node_attrs
+                .get(&name)
+                .into_iter()
+                .flatten()
+                .map(|(id, _)| *id)
+                .collect();
+            let mut ids = Vec::with_capacity(refs.len());
+            for (position, reference) in refs.into_iter().enumerate() {
+                match node_id(reference, next_node_id, self.add_nodes) {
+                    Ok(id) => {
+                        if !known_node(id) || seen_removed_nodes.contains(&id) {
+                            errors.push(format!("unset_node_attrs.{name}[{position}]: node {id} is not active in the resulting state"));
+                        }
+                        if !seen.insert(id) || assigned.contains(&id) {
+                            errors.push(format!("unset_node_attrs.{name}[{position}]: duplicate/conflicting node {id}"));
+                        }
+                        ids.push(id);
+                    }
+                    Err(error) => {
+                        errors.push(format!("unset_node_attrs.{name}[{position}]: {error}"))
+                    }
+                }
+            }
+            unset_node_attrs.insert(name, ids);
+        }
+
+        let mut unset_edge_attrs = HashMap::new();
+        let mut columns: Vec<_> = self.unset_edge_attrs.into_iter().collect();
+        columns.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+        for (name, refs) in columns {
+            if (name == super::graph::EXTERNAL_ID) && !refs.is_empty() {
+                errors.push(format!("unset_edge_attrs.{name}: system-managed attribute"));
+            }
+            let mut seen = HashSet::new();
+            let assigned: HashSet<_> = edge_attrs
+                .get(&name)
+                .into_iter()
+                .flatten()
+                .map(|(id, _)| *id)
+                .collect();
+            let mut ids = Vec::with_capacity(refs.len());
+            for (position, reference) in refs.into_iter().enumerate() {
+                match edge_id(reference, next_edge_id, self.add_edges.len()) {
+                    Ok(id) => {
+                        let endpoints = if (next_edge_id..edge_end).contains(&id) {
+                            resolved_edges.get(id - next_edge_id).copied()
+                        } else {
+                            edge_endpoints(id)
+                        };
+                        if !(known_edge(id)
+                            && !seen_removed_edges.contains(&id)
+                            && endpoints.is_some_and(|(a, b)| {
+                                !seen_removed_nodes.contains(&a) && !seen_removed_nodes.contains(&b)
+                            }))
+                        {
+                            errors.push(format!("unset_edge_attrs.{name}[{position}]: edge {id} is not active in the resulting state"));
+                        }
+                        if !seen.insert(id) || assigned.contains(&id) {
+                            errors.push(format!("unset_edge_attrs.{name}[{position}]: duplicate/conflicting edge {id}"));
+                        }
+                        ids.push(id);
+                    }
+                    Err(error) => {
+                        errors.push(format!("unset_edge_attrs.{name}[{position}]: {error}"))
+                    }
+                }
+            }
+            unset_edge_attrs.insert(name, ids);
+        }
+
         let mut identity_bindings = Vec::new();
         {
             use crate::ExternalEntityRef;
@@ -365,6 +450,18 @@ impl GraphBatch {
                     .map(|(id, _)| ChangeKey::EdgeAttribute(*id, name.clone())),
             );
         }
+        for (name, ids) in &unset_node_attrs {
+            available.extend(
+                ids.iter()
+                    .map(|id| ChangeKey::NodeAttribute(*id, name.clone())),
+            );
+        }
+        for (name, ids) in &unset_edge_attrs {
+            available.extend(
+                ids.iter()
+                    .map(|id| ChangeKey::EdgeAttribute(*id, name.clone())),
+            );
+        }
         let mut change_times = BTreeMap::new();
         for (position, (target, at)) in self.change_times.into_iter().enumerate() {
             let key = match target {
@@ -415,6 +512,8 @@ impl GraphBatch {
             && resolved_edges.is_empty()
             && node_attrs.values().all(Vec::is_empty)
             && edge_attrs.values().all(Vec::is_empty)
+            && unset_node_attrs.values().all(Vec::is_empty)
+            && unset_edge_attrs.values().all(Vec::is_empty)
             && removed_edges.is_empty()
             && removed_nodes.is_empty()
         {
@@ -427,6 +526,8 @@ impl GraphBatch {
             add_edges: resolved_edges,
             node_attrs,
             edge_attrs,
+            unset_node_attrs,
+            unset_edge_attrs,
             remove_edges: removed_edges,
             remove_nodes: removed_nodes,
             identity_bindings,

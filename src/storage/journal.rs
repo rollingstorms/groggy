@@ -79,6 +79,10 @@ struct StoredBatch {
     add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
     node_attrs: BTreeMap<String, Vec<(BatchNodeRef, Value)>>,
     edge_attrs: BTreeMap<String, Vec<(BatchEdgeRef, Value)>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    unset_node_attrs: BTreeMap<String, Vec<BatchNodeRef>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    unset_edge_attrs: BTreeMap<String, Vec<BatchEdgeRef>>,
     remove_nodes: Vec<BatchNodeRef>,
     remove_edges: Vec<BatchEdgeRef>,
     node_external_ids: Vec<(BatchNodeRef, String)>,
@@ -118,6 +122,8 @@ impl StoredBatch {
                     ))
                 })
                 .collect::<GraphResult<_>>()?,
+            unset_node_attrs: batch.unset_node_attrs.clone().into_iter().collect(),
+            unset_edge_attrs: batch.unset_edge_attrs.clone().into_iter().collect(),
             remove_nodes: batch.remove_nodes.clone(),
             remove_edges: batch.remove_edges.clone(),
             node_external_ids: batch.node_external_ids.clone(),
@@ -156,6 +162,8 @@ impl StoredBatch {
                     ))
                 })
                 .collect::<GraphResult<_>>()?,
+            unset_node_attrs: self.unset_node_attrs.into_iter().collect(),
+            unset_edge_attrs: self.unset_edge_attrs.into_iter().collect(),
             remove_nodes: self.remove_nodes,
             remove_edges: self.remove_edges,
             node_external_ids: self.node_external_ids,

@@ -14,8 +14,8 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Next: complete property history (11.2), then exact owned/configuration snapshot
-behavior (12.2) and native compatibility/compound boundaries (09.4b.2). 16.2 is
+Next: exact owned/configuration snapshot behavior (12.2), then native
+compatibility/compound boundaries (09.4b.2). Property history (11.2) and 16.2 are
 complete: effective reconstruction, atomic endpoint validation, frozen nested group
 sources/durable transfer, explicit legacy inputs, resolved first-parent merge reads
 and cached event prefixes. 16.3, checkpoint semantics (12.3), checked writeback
@@ -1165,3 +1165,10 @@ The immediate remaining table decision is to_subgraphs grouping/ownership;
 the three earlier owner answers are implemented and recorded. Original wider
 workbook questions and 16.2 effective-time reconstruction remain open.
 Inventory **193 checked / 75 unchecked**, no added rows.
+
+## 2026-10-26 — complete property history (11.2)
+
+Checked off the existing item: typed absence events, scalar/bulk/mixed unsets,
+whole-operation/schema validation, exact clocks, retained values and durable
+recovery. Fixed scalar-after-bulk coalescing. **198 checked / 70 open**, no new
+rows. See `property-history-exit-review-2026-10-26.md` for verification/API details.

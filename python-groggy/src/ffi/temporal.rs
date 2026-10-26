@@ -206,7 +206,7 @@ impl PyTemporalIndex {
         attr: &str,
         from_commit: u64,
         to_commit: u64,
-    ) -> Vec<(u64, PyAttrValue)> {
+    ) -> Vec<(u64, Option<PyAttrValue>)> {
         self.inner
             .node_attr_history(
                 node_id as NodeId,
@@ -215,7 +215,7 @@ impl PyTemporalIndex {
                 to_commit as StateId,
             )
             .into_iter()
-            .map(|(cid, val)| (cid, PyAttrValue::new(val)))
+            .map(|(cid, val)| (cid, val.map(PyAttrValue::new)))
             .collect()
     }
 
@@ -235,7 +235,7 @@ impl PyTemporalIndex {
         attr: &str,
         from_commit: u64,
         to_commit: u64,
-    ) -> Vec<(u64, PyAttrValue)> {
+    ) -> Vec<(u64, Option<PyAttrValue>)> {
         self.inner
             .edge_attr_history(
                 edge_id as EdgeId,
@@ -244,7 +244,7 @@ impl PyTemporalIndex {
                 to_commit as StateId,
             )
             .into_iter()
-            .map(|(cid, val)| (cid, PyAttrValue::new(val)))
+            .map(|(cid, val)| (cid, val.map(PyAttrValue::new)))
             .collect()
     }
 

@@ -57,31 +57,45 @@ impl Graph {
             let key = ChangeKey::EdgeRemoved(id);
             change_times.insert(key.clone(), time(&key));
         }
-        for (name, assignments) in &batch.node_attrs {
-            for (id, _) in assignments {
-                let key = ChangeKey::NodeAttribute(*id, name.clone());
-                let fallback = change_times
-                    .get(&ChangeKey::NodeAdded(*id))
-                    .copied()
-                    .unwrap_or(effective_at);
-                change_times.insert(
-                    key.clone(),
-                    batch.change_times.get(&key).copied().unwrap_or(fallback),
-                );
-            }
-        }
-        for (name, assignments) in &batch.edge_attrs {
-            for (id, _) in assignments {
-                let key = ChangeKey::EdgeAttribute(*id, name.clone());
-                let fallback = change_times
-                    .get(&ChangeKey::EdgeAdded(*id))
-                    .copied()
-                    .unwrap_or(effective_at);
-                change_times.insert(
-                    key.clone(),
-                    batch.change_times.get(&key).copied().unwrap_or(fallback),
-                );
-            }
+        for (is_node, name, id) in batch
+            .node_attrs
+            .iter()
+            .flat_map(|(name, rows)| rows.iter().map(move |(id, _)| (true, name, *id)))
+            .chain(
+                batch
+                    .edge_attrs
+                    .iter()
+                    .flat_map(|(name, rows)| rows.iter().map(move |(id, _)| (false, name, *id))),
+            )
+            .chain(
+                batch
+                    .unset_node_attrs
+                    .iter()
+                    .flat_map(|(name, ids)| ids.iter().map(move |id| (true, name, *id))),
+            )
+            .chain(
+                batch
+                    .unset_edge_attrs
+                    .iter()
+                    .flat_map(|(name, ids)| ids.iter().map(move |id| (false, name, *id))),
+            )
+        {
+            let (key, added) = if is_node {
+                (
+                    ChangeKey::NodeAttribute(id, name.clone()),
+                    ChangeKey::NodeAdded(id),
+                )
+            } else {
+                (
+                    ChangeKey::EdgeAttribute(id, name.clone()),
+                    ChangeKey::EdgeAdded(id),
+                )
+            };
+            let fallback = change_times.get(&added).copied().unwrap_or(effective_at);
+            change_times.insert(
+                key.clone(),
+                batch.change_times.get(&key).copied().unwrap_or(fallback),
+            );
         }
         Ok(PublicationMetadata {
             recorded_at,

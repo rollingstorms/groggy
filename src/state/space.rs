@@ -307,6 +307,21 @@ impl GraphSpace {
         }
     }
 
+    /// Remove only the current mapping; immutable pool values remain retained.
+    pub(crate) fn unset_attr_index(
+        &mut self,
+        id: usize,
+        name: &AttrName,
+        is_node: bool,
+    ) -> Option<usize> {
+        let columns = if is_node {
+            &mut self.node_attribute_indices
+        } else {
+            &mut self.edge_attribute_indices
+        };
+        columns.get_mut(name).and_then(|column| column.remove(&id))
+    }
+
     /// Get current attribute index for a node (&self - read-only)
     pub fn get_node_attr_index(&self, node_id: NodeId, attr_name: &AttrName) -> Option<usize> {
         self.node_attribute_indices

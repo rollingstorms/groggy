@@ -317,7 +317,11 @@ impl GraphSnapshot {
                 .node_attributes
                 .entry(*node_id)
                 .or_insert_with(HashMap::new);
-            attrs.insert(attr_name.clone(), new_value.clone());
+            if let Some(value) = new_value {
+                attrs.insert(attr_name.clone(), value.clone());
+            } else {
+                attrs.remove(attr_name);
+            }
         }
 
         // Apply edge attribute changes
@@ -326,7 +330,11 @@ impl GraphSnapshot {
                 .edge_attributes
                 .entry(*edge_id)
                 .or_insert_with(HashMap::new);
-            attrs.insert(attr_name.clone(), new_value.clone());
+            if let Some(value) = new_value {
+                attrs.insert(attr_name.clone(), value.clone());
+            } else {
+                attrs.remove(attr_name);
+            }
         }
 
         new_snapshot

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **197 checked and 71 unchecked entries**. Entries overlap:
+currently contains **198 checked and 70 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 71 unchecked entries are not 71 independent tasks: 13 are overlapping AR
-architecture entries, 58 are numbered entries (including nested publication
+The 70 unchecked entries are not 70 independent tasks: 13 are overlapping AR
+architecture entries, 57 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -527,3 +527,13 @@ Gate: **1,184 native passed / 51 ignored; 1,913 root Python passed / 1 skipped;
 rustfmt, stub AST parsing and git diff --check passed. In-tree FFI rebuild retains
 three unrelated pre-existing warnings. Owner benchmark edits/test/receipt remain
 untouched, unstaged and excluded from execution. Logs use /tmp/groggy-162-*-exit.
+
+## 2026-10-26 — property history completed (11.2)
+
+Closed the existing item, with no new rows: **198 checked / 70 open**. Explicit
+unsets preserve null/absence through mixed scalar/bulk changes, schema validation,
+timed replay, branch switching, immutable pins and durable reopen/backup. Fixed
+scalar-after-bulk coalescing. All typed representations and retained references
+remain readable; older assignment-only hashes/journal entries remain compatible.
+See `property-history-exit-review-2026-10-26.md`. Next is 12.2 owned/configuration
+snapshots and repeated-switch allocation, followed by native boundaries 09.4b.2.

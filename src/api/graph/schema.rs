@@ -239,7 +239,13 @@ impl GraphSchema {
         }
         let node_updates = assignment_index(&batch.node_attrs);
         let edge_updates = assignment_index(&batch.edge_attrs);
+        let node_unsets = unset_index(&batch.unset_node_attrs);
+        let edge_unsets = unset_index(&batch.unset_edge_attrs);
         self.validate_state(nodes, edges, |is_node, id, name| {
+            let unsets = if is_node { &node_unsets } else { &edge_unsets };
+            if unsets.get(name).is_some_and(|ids| ids.contains(&id)) {
+                return Ok(None);
+            }
             let updates = if is_node {
                 &node_updates
             } else {
@@ -268,6 +274,13 @@ impl GraphSchema {
         })
     }
 }
+fn unset_index(columns: &HashMap<AttrName, Vec<usize>>) -> HashMap<&str, HashSet<usize>> {
+    columns
+        .iter()
+        .map(|(name, ids)| (name.as_str(), ids.iter().copied().collect()))
+        .collect()
+}
+
 // Index only staged assignments; existing values remain in their current columns.
 fn assignment_index(
     columns: &HashMap<AttrName, Vec<(usize, AttrValue)>>,

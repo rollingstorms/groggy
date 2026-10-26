@@ -239,18 +239,18 @@ fn resolved_merge_replays_first_parent_and_resolution_not_sibling_changes() {
         .create_commit_with_publication(base, "base".into(), "test".into(), None, time(0))
         .unwrap();
     let mut left = ChangeSet::new();
-    left.node_attr_changes = vec![(0, "v".into(), None, V::Int(1))];
+    left.node_attr_changes = vec![(0, "v".into(), None, Some(V::Int(1)))];
     let left = history
         .create_commit_with_publication(left, "left".into(), "test".into(), Some(base), time(10))
         .unwrap();
     let mut right = ChangeSet::new();
     right.nodes_added = vec![99];
-    right.node_attr_changes = vec![(0, "v".into(), None, V::Int(9))];
+    right.node_attr_changes = vec![(0, "v".into(), None, Some(V::Int(9)))];
     let right = history
         .create_commit_with_publication(right, "right".into(), "test".into(), Some(base), time(10))
         .unwrap();
     let mut resolution = ChangeSet::new();
-    resolution.node_attr_changes = vec![(0, "v".into(), Some(V::Int(1)), V::Int(2))];
+    resolution.node_attr_changes = vec![(0, "v".into(), Some(V::Int(1)), Some(V::Int(2)))];
     let merged = history
         .create_merge_commit_with_publication(
             resolution,

@@ -108,8 +108,8 @@ enum Change<'a> {
     EdgeRemoved(usize),
     NodeRemoved(usize),
     EdgeAdded(usize, usize, usize),
-    NodeAttr(usize, &'a AttrName, &'a AttrValue),
-    EdgeAttr(usize, &'a AttrName, &'a AttrValue),
+    NodeAttr(usize, &'a AttrName, &'a Option<AttrValue>),
+    EdgeAttr(usize, &'a AttrName, &'a Option<AttrValue>),
 }
 impl EffectiveReadIndex {
     fn build(
@@ -284,18 +284,20 @@ impl EffectiveReadPlan {
                     touched.insert(*id);
                 }
                 Change::NodeAttr(id, name, value) if nodes.contains(id) => {
-                    snapshot
-                        .node_attributes
-                        .entry(*id)
-                        .or_default()
-                        .insert((*name).clone(), (*value).clone());
+                    let attrs = snapshot.node_attributes.entry(*id).or_default();
+                    if let Some(value) = value {
+                        attrs.insert((*name).clone(), value.clone());
+                    } else {
+                        attrs.remove(*name);
+                    }
                 }
                 Change::EdgeAttr(id, name, value) if snapshot.edges.contains_key(id) => {
-                    snapshot
-                        .edge_attributes
-                        .entry(*id)
-                        .or_default()
-                        .insert((*name).clone(), (*value).clone());
+                    let attrs = snapshot.edge_attributes.entry(*id).or_default();
+                    if let Some(value) = value {
+                        attrs.insert((*name).clone(), value.clone());
+                    } else {
+                        attrs.remove(*name);
+                    }
                 }
                 _ => {}
             }

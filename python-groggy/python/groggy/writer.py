@@ -101,6 +101,32 @@ class GraphWriter:
                 batch.set_edge_attr(edge, name, value)
         return self.apply_batch(batch, "set_edge_attrs")["state_id"]
 
+    def unset_node_attr(self, node, name, *, effective_at=None):
+        batch = GraphBatch()
+        batch.unset_node_attr(node, name, effective_at=effective_at)
+        return self.apply_batch(batch, "unset_node_attr")["state_id"]
+
+    def unset_node_attrs(self, columns, *, effective_at=None):
+        """Columns map property names to entity ID iterables."""
+        batch = GraphBatch(effective_at=effective_at)
+        for name, ids in columns.items():
+            for node in ids:
+                batch.unset_node_attr(node, name)
+        return self.apply_batch(batch, "unset_node_attrs")["state_id"]
+
+    def unset_edge_attr(self, edge, name, *, effective_at=None):
+        batch = GraphBatch()
+        batch.unset_edge_attr(edge, name, effective_at=effective_at)
+        return self.apply_batch(batch, "unset_edge_attr")["state_id"]
+
+    def unset_edge_attrs(self, columns, *, effective_at=None):
+        """Columns map property names to entity ID iterables."""
+        batch = GraphBatch(effective_at=effective_at)
+        for name, ids in columns.items():
+            for edge in ids:
+                batch.unset_edge_attr(edge, name)
+        return self.apply_batch(batch, "unset_edge_attrs")["state_id"]
+
     def set_node_labels(self, node, labels, *, effective_at=None):
         return self.set_node_attr(node, "labels", labels, effective_at=effective_at)
 

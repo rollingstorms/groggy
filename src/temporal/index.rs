@@ -39,10 +39,10 @@ pub struct TemporalIndex {
 
     /// Attribute change timeline: (node_id, attr_name) -> sorted vec of (commit, value).
     /// Sorted by commit ID for binary search.
-    node_attr_timeline: HashMap<(NodeId, AttrName), Vec<(StateId, AttrValue)>>,
+    node_attr_timeline: HashMap<(NodeId, AttrName), Vec<(StateId, Option<AttrValue>)>>,
 
     /// Edge attribute change timeline: (edge_id, attr_name) -> sorted vec of (commit, value).
-    edge_attr_timeline: HashMap<(EdgeId, AttrName), Vec<(StateId, AttrValue)>>,
+    edge_attr_timeline: HashMap<(EdgeId, AttrName), Vec<(StateId, Option<AttrValue>)>>,
 
     /// Map from edge ID to (source, target) nodes.
     /// This allows neighbor queries without reconstructing full state.
@@ -478,7 +478,11 @@ impl TemporalIndex {
         timeline
             .partition_point(|(state, _)| *state <= commit_id)
             .checked_sub(1)
-            .and_then(|index| (timeline[index].0 >= activation).then(|| timeline[index].1.clone()))
+            .and_then(|index| {
+                (timeline[index].0 >= activation)
+                    .then(|| timeline[index].1.clone())
+                    .flatten()
+            })
     }
 
     /// Get attribute timeline for a node within a commit range.
@@ -490,7 +494,7 @@ impl TemporalIndex {
         attr: &AttrName,
         from_commit: StateId,
         to_commit: StateId,
-    ) -> Vec<(StateId, AttrValue)> {
+    ) -> Vec<(StateId, Option<AttrValue>)> {
         self.node_attr_history_slice(node_id, attr, from_commit, to_commit)
             .to_vec()
     }
@@ -501,7 +505,7 @@ impl TemporalIndex {
         attr: &AttrName,
         start: StateId,
         end: StateId,
-    ) -> &[(StateId, AttrValue)] {
+    ) -> &[(StateId, Option<AttrValue>)] {
         if start > end {
             return &[];
         }
@@ -539,7 +543,11 @@ impl TemporalIndex {
         timeline
             .partition_point(|(state, _)| *state <= commit_id)
             .checked_sub(1)
-            .and_then(|index| (timeline[index].0 >= activation).then(|| timeline[index].1.clone()))
+            .and_then(|index| {
+                (timeline[index].0 >= activation)
+                    .then(|| timeline[index].1.clone())
+                    .flatten()
+            })
     }
 
     /// Get edge attribute timeline within a commit range.
@@ -549,7 +557,7 @@ impl TemporalIndex {
         attr: &AttrName,
         from_commit: StateId,
         to_commit: StateId,
-    ) -> Vec<(StateId, AttrValue)> {
+    ) -> Vec<(StateId, Option<AttrValue>)> {
         let key = (edge_id, attr.clone());
         let timeline = match self.edge_attr_timeline.get(&key) {
             Some(t) => t,
@@ -672,7 +680,7 @@ mod tests {
         let mut changes = ChangeSet::new();
         changes.nodes_added = vec![0, 1];
         changes.edges_added = vec![(0, 0, 1)];
-        changes.node_attr_changes = vec![(0, "x".into(), None, AttrValue::Int(1))];
+        changes.node_attr_changes = vec![(0, "x".into(), None, Some(AttrValue::Int(1)))];
         let first = history
             .create_commit(changes, "birth".into(), "test".into(), None)
             .unwrap();
@@ -803,9 +811,9 @@ mod tests {
         index.node_attr_timeline.insert(
             key.clone(),
             vec![
-                (5, AttrValue::Text("active".into())),
-                (10, AttrValue::Text("inactive".into())),
-                (15, AttrValue::Text("active".into())),
+                (5, Some(AttrValue::Text("active".into()))),
+                (10, Some(AttrValue::Text("inactive".into()))),
+                (15, Some(AttrValue::Text("active".into()))),
             ],
         );
 

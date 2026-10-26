@@ -63,14 +63,14 @@ pub trait TemporalStorageStrategy: std::fmt::Debug {
         node_id: NodeId,
         attr_name: AttrName,
         old_index: Option<usize>,
-        new_index: usize,
+        new_index: Option<usize>,
     );
 
     /// Record multiple node attribute changes efficiently (bulk operation)
     /// Default implementation delegates to individual calls, but strategies can optimize
     fn record_node_attr_changes_bulk(
         &mut self,
-        changes: &[(NodeId, AttrName, Option<usize>, usize)],
+        changes: &[(NodeId, AttrName, Option<usize>, Option<usize>)],
     ) {
         for &(node_id, ref attr_name, old_index, new_index) in changes {
             self.record_node_attr_change(node_id, attr_name.clone(), old_index, new_index);
@@ -83,14 +83,14 @@ pub trait TemporalStorageStrategy: std::fmt::Debug {
         edge_id: EdgeId,
         attr_name: AttrName,
         old_index: Option<usize>,
-        new_index: usize,
+        new_index: Option<usize>,
     );
 
     /// Record multiple edge attribute changes efficiently (bulk operation)
     /// Default implementation delegates to individual calls, but strategies can optimize
     fn record_edge_attr_changes_bulk(
         &mut self,
-        changes: &[(EdgeId, AttrName, Option<usize>, usize)],
+        changes: &[(EdgeId, AttrName, Option<usize>, Option<usize>)],
     ) {
         for &(edge_id, ref attr_name, old_index, new_index) in changes {
             self.record_edge_attr_change(edge_id, attr_name.clone(), old_index, new_index);
@@ -261,11 +261,11 @@ pub struct IndexDeltaStrategy {
     /// Node attribute changes since last commit
     /// Format: (node_id, attr_name, old_index, new_index)
     /// old_index = None means attribute was newly set
-    node_attr_index_changes: Vec<(NodeId, AttrName, Option<usize>, usize)>,
+    node_attr_index_changes: Vec<(NodeId, AttrName, Option<usize>, Option<usize>)>,
 
     /// Edge attribute changes since last commit
     /// Same format as node_attr_index_changes
-    edge_attr_index_changes: Vec<(EdgeId, AttrName, Option<usize>, usize)>,
+    edge_attr_index_changes: Vec<(EdgeId, AttrName, Option<usize>, Option<usize>)>,
 
     /// When the first change was made (for timing statistics)
     first_change_timestamp: Option<u64>,
@@ -296,21 +296,12 @@ impl IndexDeltaStrategy {
         node_id: NodeId,
         attr_name: AttrName,
         old_index: Option<usize>,
-        new_index: usize,
+        new_index: Option<usize>,
     ) {
-        // Look for existing change for this node/attribute
-        if let Some(existing) = self
-            .node_attr_index_changes
-            .iter_mut()
-            .find(|(id, name, _, _)| *id == node_id && name == &attr_name)
-        {
-            // Update the new index, keep the original old index
-            existing.3 = new_index;
-        } else {
-            // New change
-            self.node_attr_index_changes
-                .push((node_id, attr_name, old_index, new_index));
-        }
+        // Append in operation order. Resolution coalesces all scalar/bulk
+        // records together, keeping the first old value and final new value.
+        self.node_attr_index_changes
+            .push((node_id, attr_name, old_index, new_index));
 
         self.update_change_metadata();
     }
@@ -321,19 +312,12 @@ impl IndexDeltaStrategy {
         edge_id: EdgeId,
         attr_name: AttrName,
         old_index: Option<usize>,
-        new_index: usize,
+        new_index: Option<usize>,
     ) {
-        // Same pattern as node attributes but for edges
-        if let Some(existing) = self
-            .edge_attr_index_changes
-            .iter_mut()
-            .find(|(id, name, _, _)| *id == edge_id && name == &attr_name)
-        {
-            existing.3 = new_index;
-        } else {
-            self.edge_attr_index_changes
-                .push((edge_id, attr_name, old_index, new_index));
-        }
+        // Append in operation order. Resolution coalesces all scalar/bulk
+        // records together, keeping the first old value and final new value.
+        self.edge_attr_index_changes
+            .push((edge_id, attr_name, old_index, new_index));
 
         self.update_change_metadata();
     }
@@ -387,7 +371,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
         node_id: NodeId,
         attr_name: AttrName,
         old_index: Option<usize>,
-        new_index: usize,
+        new_index: Option<usize>,
     ) {
         // Now the trait method directly receives indices - much cleaner!
         self.record_node_attr_index_change(node_id, attr_name, old_index, new_index);
@@ -396,7 +380,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
     // Optimized bulk recording for node attributes
     fn record_node_attr_changes_bulk(
         &mut self,
-        changes: &[(NodeId, AttrName, Option<usize>, usize)],
+        changes: &[(NodeId, AttrName, Option<usize>, Option<usize>)],
     ) {
         // Reserve capacity upfront to avoid reallocations
         self.node_attr_index_changes.reserve(changes.len());
@@ -419,7 +403,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
         edge_id: EdgeId,
         attr_name: AttrName,
         old_index: Option<usize>,
-        new_index: usize,
+        new_index: Option<usize>,
     ) {
         // Same clean delegation to index-specific method
         self.record_edge_attr_index_change(edge_id, attr_name, old_index, new_index);
@@ -428,7 +412,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
     // Optimized bulk recording for edge attributes
     fn record_edge_attr_changes_bulk(
         &mut self,
-        changes: &[(EdgeId, AttrName, Option<usize>, usize)],
+        changes: &[(EdgeId, AttrName, Option<usize>, Option<usize>)],
     ) {
         // Reserve capacity upfront to avoid reallocations
         self.edge_attr_index_changes.reserve(changes.len());
@@ -489,7 +473,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
                 *node_id,
                 attr_name.clone(),
                 None, // old_value - would need to resolve from old_index
-                AttrValue::Text(format!("index_{}", _new_index)), // placeholder new value
+                _new_index.map(|index| AttrValue::Text(format!("index_{index}"))), // placeholder new value
             ));
         }
 
@@ -498,8 +482,8 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
             edge_attr_changes.push((
                 *edge_id,
                 attr_name.clone(),
-                None,                                             // old_value
-                AttrValue::Text(format!("index_{}", _new_index)), // placeholder new value
+                None,                                                              // old_value
+                _new_index.map(|index| AttrValue::Text(format!("index_{index}"))), // placeholder new value
             ));
         }
 
@@ -534,14 +518,17 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
                         )))
                 })
                 .transpose()?;
-            let new_value = pool
-                .get_attr_by_index(attr, *new_index, true)
-                .cloned()
-                .ok_or_else(|| {
-                    GraphError::InvalidInput(format!(
-                    "Missing new node attribute value for node {node_id}, {attr}, index {new_index}"
+            let new_value = new_index
+                .map(|index| {
+                    pool.get_attr_by_index(attr, index, true)
+                        .cloned()
+                        .ok_or_else(|| {
+                            GraphError::InvalidInput(format!(
+                    "Missing new node attribute value for node {node_id}, {attr}, index {index}"
                 ))
-                })?;
+                        })
+                })
+                .transpose()?;
             if let Some(&position) = node_positions.get(&(*node_id, attr.clone())) {
                 changes.node_attr_changes[position].3 = new_value;
             } else {
@@ -563,14 +550,17 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
                         )))
                 })
                 .transpose()?;
-            let new_value = pool
-                .get_attr_by_index(attr, *new_index, false)
-                .cloned()
-                .ok_or_else(|| {
-                    GraphError::InvalidInput(format!(
-                    "Missing new edge attribute value for edge {edge_id}, {attr}, index {new_index}"
+            let new_value = new_index
+                .map(|index| {
+                    pool.get_attr_by_index(attr, index, false)
+                        .cloned()
+                        .ok_or_else(|| {
+                            GraphError::InvalidInput(format!(
+                    "Missing new edge attribute value for edge {edge_id}, {attr}, index {index}"
                 ))
-                })?;
+                        })
+                })
+                .transpose()?;
             if let Some(&position) = edge_positions.get(&(*edge_id, attr.clone())) {
                 changes.edge_attr_changes[position].3 = new_value;
             } else {

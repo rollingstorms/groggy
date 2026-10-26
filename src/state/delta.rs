@@ -41,7 +41,7 @@ pub struct ColumnIndexDelta {
     /// Previous column indices (None = attribute was new)
     pub old_column_indices: Vec<Option<usize>>,
     /// New column indices
-    pub new_column_indices: Vec<usize>,
+    pub new_column_indices: Vec<Option<usize>>,
 }
 
 impl ColumnIndexDelta {
@@ -59,7 +59,7 @@ impl ColumnIndexDelta {
         &mut self,
         entity_index: usize,
         old_idx: Option<usize>,
-        new_idx: usize,
+        new_idx: Option<usize>,
     ) {
         // Find insertion point to maintain sorted order by entity_index
         let pos = self
@@ -79,7 +79,7 @@ impl ColumnIndexDelta {
     }
 
     /// Get the change at a specific entity index
-    pub fn get_change(&self, entity_index: usize) -> Option<(Option<usize>, usize)> {
+    pub fn get_change(&self, entity_index: usize) -> Option<(Option<usize>, Option<usize>)> {
         self.entity_indices
             .binary_search(&entity_index)
             .ok()

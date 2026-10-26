@@ -19,6 +19,7 @@ pub(crate) mod kinds;
 mod matrices;
 mod ordinary;
 mod persistence;
+mod property_unset;
 mod publication;
 mod read_attributes;
 mod schema;
@@ -1561,6 +1562,8 @@ impl Graph {
             allocated.edge_count,
         )?;
 
+        self.validate_unsets(&prepared)?;
+
         // Every checked pooled reference must already exist. Compound creation
         // stages its trusted managed reference after preparation and installs its
         // validated source before execution.
@@ -1668,6 +1671,8 @@ impl Graph {
         let added_edges = self.add_edges(&prepared.add_edges)?;
         self.write_node_attrs(prepared.node_attrs)?;
         self.write_edge_attrs(prepared.edge_attrs)?;
+        self.execute_unsets(prepared.unset_node_attrs, true);
+        self.execute_unsets(prepared.unset_edge_attrs, false);
         self.remove_edges(&prepared.remove_edges)?;
         self.remove_nodes(&prepared.remove_nodes)?;
         self.identities.reserve_bindings(prepared.identity_bindings);
@@ -2092,7 +2097,7 @@ impl Graph {
         attr: &AttrName,
         from_commit: StateId,
         to_commit: StateId,
-    ) -> Result<Vec<(StateId, AttrValue)>, GraphError> {
+    ) -> Result<Vec<(StateId, Option<AttrValue>)>, GraphError> {
         let index = self.build_temporal_index()?;
         Ok(index.node_attr_history(node_id, attr, from_commit, to_commit))
     }
