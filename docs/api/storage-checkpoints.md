@@ -97,3 +97,9 @@ Release evidence in `notes/benchmarks/large-storage-baseline-2026-10-26.json` co
 1/16/270 MiB of retained text. The largest journal was 566,301,921 bytes: isolated
 reopen 1.30 s, peak RSS 1,725,808,640 bytes on this macOS host, warm filesystem
 cache. These are fixture measurements, not memory or latency guarantees.
+
+Current-column validation borrows values instead of making another full snapshot
+and two encoded maps. A paired release run on the same largest fixture measured
+median reopen **1.464 → 1.306 s**, peak RSS **1.724 → 1.203 GB** (three alternating
+pairs). Decoded graph/history memory still scales with retained data. See
+`notes/benchmarks/borrowed-archive-validation-2026-10-26.json`.

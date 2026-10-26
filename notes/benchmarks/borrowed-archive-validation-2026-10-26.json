@@ -1,0 +1,104 @@
+{
+  "benchmark": "paired_archive_validation",
+  "reference_commit": "242e80e2",
+  "candidate": "borrowed current-column comparison against retained history",
+  "recorded_at_utc": "2026-10-26",
+  "profile": "release, three alternating pairs, 270 MiB unique retained text, fresh isolated open process under macOS time -l, warm filesystem cache",
+  "samples": [
+    {
+      "trial": 1,
+      "variant": "before",
+      "baseline_bytes": 566301925,
+      "checkpoint_seconds_including_sync_and_verification": 5.781681375,
+      "create_from_graph_seconds": 2.987063708,
+      "isolated_open": {
+        "nodes": 270,
+        "open_seconds": 1.745902,
+        "raw_values": 270
+      },
+      "isolated_open_peak_rss_bytes_macos": 1721892864,
+      "text_payload_mib": 270
+    },
+    {
+      "trial": 1,
+      "variant": "after",
+      "baseline_bytes": 566301933,
+      "checkpoint_seconds_including_sync_and_verification": 2.235359125,
+      "create_from_graph_seconds": 1.501354542,
+      "isolated_open": {
+        "nodes": 270,
+        "open_seconds": 1.447202334,
+        "raw_values": 270
+      },
+      "isolated_open_peak_rss_bytes_macos": 1254096896,
+      "text_payload_mib": 270
+    },
+    {
+      "trial": 2,
+      "variant": "after",
+      "baseline_bytes": 566301933,
+      "checkpoint_seconds_including_sync_and_verification": 1.9748714170000001,
+      "create_from_graph_seconds": 1.4285315,
+      "isolated_open": {
+        "nodes": 270,
+        "open_seconds": 1.299001708,
+        "raw_values": 270
+      },
+      "isolated_open_peak_rss_bytes_macos": 1159512064,
+      "text_payload_mib": 270
+    },
+    {
+      "trial": 2,
+      "variant": "before",
+      "baseline_bytes": 566301929,
+      "checkpoint_seconds_including_sync_and_verification": 2.368194833,
+      "create_from_graph_seconds": 1.58844025,
+      "isolated_open": {
+        "nodes": 270,
+        "open_seconds": 1.4636473749999999,
+        "raw_values": 270
+      },
+      "isolated_open_peak_rss_bytes_macos": 1723629568,
+      "text_payload_mib": 270
+    },
+    {
+      "trial": 3,
+      "variant": "before",
+      "baseline_bytes": 566301929,
+      "checkpoint_seconds_including_sync_and_verification": 2.062098584,
+      "create_from_graph_seconds": 1.53643475,
+      "isolated_open": {
+        "nodes": 270,
+        "open_seconds": 1.413927583,
+        "raw_values": 270
+      },
+      "isolated_open_peak_rss_bytes_macos": 1724383232,
+      "text_payload_mib": 270
+    },
+    {
+      "trial": 3,
+      "variant": "after",
+      "baseline_bytes": 566301925,
+      "checkpoint_seconds_including_sync_and_verification": 2.968269542,
+      "create_from_graph_seconds": 2.834469417,
+      "isolated_open": {
+        "nodes": 270,
+        "open_seconds": 1.30568675,
+        "raw_values": 270
+      },
+      "isolated_open_peak_rss_bytes_macos": 1203109888,
+      "text_payload_mib": 270
+    }
+  ],
+  "summary": {
+    "before": {
+      "median_open_seconds": 1.4636473749999999,
+      "median_peak_rss_bytes_macos": 1723629568
+    },
+    "after": {
+      "median_open_seconds": 1.30568675,
+      "median_peak_rss_bytes_macos": 1203109888
+    }
+  },
+  "limits": "local fixture; no universal latency/memory SLA; decoded graph/history still scale with data"
+}

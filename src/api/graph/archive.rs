@@ -35,31 +35,98 @@ fn io_error(path: &Path, operation: &str, error: impl std::fmt::Display) -> Grap
         underlying_error: error.to_string(),
     }
 }
+#[cfg(test)]
 fn same_snapshot(
     a: &crate::state::GraphSnapshot,
     b: &crate::state::GraphSnapshot,
 ) -> GraphResult<bool> {
-    let encode = |rows: &HashMap<usize, HashMap<String, AttrValue>>| {
-        rows.iter()
-            .filter(|(_, attrs)| !attrs.is_empty())
-            .map(|(id, attrs)| {
-                Ok((
-                    *id,
-                    attrs
-                        .iter()
-                        .map(|(name, value)| Ok((name.clone(), retained_group::encode(value)?)))
-                        .collect::<GraphResult<HashMap<_, _>>>()?,
-                ))
-            })
-            .collect::<GraphResult<HashMap<_, _>>>()
+    // Compare one borrowed value at a time instead of constructing two complete
+    // serialized property maps. Large restored text is already canonical Text;
+    // other types retain the exact bit/tag-aware portable codec semantics.
+    let same_rows = |left: &HashMap<usize, HashMap<String, AttrValue>>,
+                     right: &HashMap<usize, HashMap<String, AttrValue>>|
+     -> GraphResult<bool> {
+        if left.values().filter(|row| !row.is_empty()).count()
+            != right.values().filter(|row| !row.is_empty()).count()
+        {
+            return Ok(false);
+        }
+        for (id, attrs) in left.iter().filter(|(_, row)| !row.is_empty()) {
+            let Some(other) = right.get(id) else {
+                return Ok(false);
+            };
+            if attrs.len() != other.len() {
+                return Ok(false);
+            }
+            for (name, value) in attrs {
+                let Some(other) = other.get(name) else {
+                    return Ok(false);
+                };
+                let equal = same_value(value, other)?;
+                if !equal {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
     };
     Ok(a.graph_type == b.graph_type
         && a.state_id == b.state_id
         && a.active_nodes.iter().collect::<HashSet<_>>()
             == b.active_nodes.iter().collect::<HashSet<_>>()
         && a.edges == b.edges
-        && encode(&a.node_attributes)? == encode(&b.node_attributes)?
-        && encode(&a.edge_attributes)? == encode(&b.edge_attributes)?)
+        && same_rows(&a.node_attributes, &b.node_attributes)?
+        && same_rows(&a.edge_attributes, &b.edge_attributes)?)
+}
+/// Compare current mappings against accepted history without cloning current values.
+fn same_selected_snapshot(
+    graph: &Graph,
+    recorded: &crate::state::GraphSnapshot,
+) -> GraphResult<bool> {
+    if graph.graph_type() != recorded.graph_type
+        || graph.current_commit != recorded.state_id
+        || graph.space.get_active_nodes() != recorded.active_nodes.iter().copied().collect()
+        || graph.edge_count() != recorded.edges.len()
+    {
+        return Ok(false);
+    }
+    let pool = graph.pool.borrow();
+    for edge in graph.edge_ids() {
+        let endpoints = pool
+            .get_edge_endpoints(edge)
+            .ok_or_else(|| invalid("missing selected endpoints"))?;
+        if recorded.edges.get(&edge) != Some(&endpoints) {
+            return Ok(false);
+        }
+    }
+    for (is_node, rows) in [
+        (true, &recorded.node_attributes),
+        (false, &recorded.edge_attributes),
+    ] {
+        let mut count = 0usize;
+        for (id, name, index) in graph.space.active_attr_indices(is_node) {
+            let value = pool
+                .get_attr_by_index(name, index, is_node)
+                .ok_or_else(|| invalid("selected property index out of bounds"))?;
+            let Some(other) = rows.get(&id).and_then(|row| row.get(name)) else {
+                return Ok(false);
+            };
+            if !same_value(value, other)? {
+                return Ok(false);
+            }
+            count += 1;
+        }
+        if count != rows.values().map(HashMap::len).sum::<usize>() {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+fn same_value(value: &AttrValue, other: &AttrValue) -> GraphResult<bool> {
+    match (value, other) {
+        (AttrValue::Text(a), AttrValue::Text(b)) => Ok(a == b),
+        _ => Ok(retained_group::encode(value)? == retained_group::encode(other)?),
+    }
 }
 /// Detached validated archive bytes, suitable for I/O outside a language runtime lock.
 /// Encoding/decoding graph ownership remains separate from file operations.
@@ -125,11 +192,8 @@ impl Graph {
     pub(crate) fn archive_document(&self) -> GraphResult<GraphArchive> {
         self.validate_write_head(self.current_commit)?;
         self.config.validate().map_err(invalid)?;
-        let selected = self
-            .space
-            .capture_read_snapshot(&self.pool.borrow(), self.current_commit)?;
         let recorded = self.history.reconstruct_state_at(self.current_commit)?;
-        if !same_snapshot(&selected, &recorded)? {
+        if !same_selected_snapshot(self, &recorded)? {
             return Err(invalid("selected state differs from accepted history"));
         }
         let mut nodes = self.node_ids();
@@ -334,16 +398,13 @@ impl GraphArchive {
                 }
             }
         }
-        let selected = graph
-            .space
-            .capture_read_snapshot(&graph.pool.borrow(), graph.current_commit)?;
         let recorded = graph.history.reconstruct_state_at(graph.current_commit)?;
-        if !same_snapshot(&selected, &recorded)? {
+        if !same_selected_snapshot(&graph, &recorded)? {
             return Err(invalid(
                 "selected columns/topology differ from accepted version",
             ));
         }
-        let bindings = graph.snapshot_identity_bindings(&selected)?;
+        let bindings = graph.snapshot_identity_bindings(&recorded)?;
         for (name, entity) in bindings {
             if graph.identities.bindings.get(&name) != Some(&entity) {
                 return Err(invalid("missing active identity reservation"));
@@ -364,6 +425,119 @@ mod tests {
             .set_node_external_id(0, "name".into())
             .unwrap();
         graph.archive_document().unwrap()
+    }
+    #[test]
+    fn borrowed_snapshot_validation_retains_bit_tags_absence_and_empty_row_rules() {
+        use crate::state::GraphSnapshot;
+        let values = vec![
+            AttrValue::Text("large\0α".repeat(1024)),
+            AttrValue::Null,
+            AttrValue::Float(-0.0),
+            AttrValue::Float(f32::from_bits(0x7fc0_0001)),
+            AttrValue::Float64(-0.0),
+            AttrValue::Float64(f64::from_bits(0x7ff8_0000_0000_0001)),
+            AttrValue::FloatVec(vec![-0.0, f32::from_bits(0x7fc0_0001)]),
+            AttrValue::Float64Vec(vec![-0.0, f64::from_bits(0x7ff8_0000_0000_0001)]),
+            AttrValue::Json(r#"{ "x": 1 }"#.into()),
+            AttrValue::Bytes(vec![0, 255]),
+            AttrValue::Int(1),
+            AttrValue::SmallInt(1),
+            AttrValue::SubgraphRef(42),
+        ];
+        for left in &values {
+            for right in &values {
+                let mut a = GraphSnapshot::empty(1);
+                a.active_nodes = vec![0];
+                a.node_attributes
+                    .insert(0, HashMap::from([("value".into(), left.clone())]));
+                let mut b = a.clone();
+                b.node_attributes
+                    .get_mut(&0)
+                    .unwrap()
+                    .insert("value".into(), right.clone());
+                let expected =
+                    retained_group::encode(left).unwrap() == retained_group::encode(right).unwrap();
+                assert_eq!(same_snapshot(&a, &b).unwrap(), expected);
+            }
+        }
+        let mut a = GraphSnapshot::empty(1);
+        a.active_nodes = vec![0];
+        let mut b = a.clone();
+        b.node_attributes.insert(0, HashMap::new());
+        assert!(same_snapshot(&a, &b).unwrap());
+        b.node_attributes
+            .get_mut(&0)
+            .unwrap()
+            .insert("value".into(), AttrValue::Null);
+        assert!(!same_snapshot(&a, &b).unwrap());
+        a.node_attributes.insert(
+            0,
+            HashMap::from([("value".into(), AttrValue::Float64(-0.0))]),
+        );
+        b.node_attributes
+            .get_mut(&0)
+            .unwrap()
+            .insert("value".into(), AttrValue::Float64(0.0));
+        assert!(!same_snapshot(&a, &b).unwrap());
+    }
+    #[test]
+    fn direct_selected_validation_matches_snapshot_oracle_and_rejects_corruption() {
+        let mut graph = Graph::new();
+        graph.add_nodes(2).unwrap();
+        graph.add_edge(0, 1).unwrap();
+        graph
+            .set_node_attr(0, "value".into(), AttrValue::Float64(-0.0))
+            .unwrap();
+        graph
+            .set_edge_attr(
+                0,
+                "value".into(),
+                AttrValue::FloatVec(vec![f32::from_bits(0x7fc0_0001)]),
+            )
+            .unwrap();
+        let selected = graph
+            .space
+            .capture_read_snapshot(&graph.pool.borrow(), graph.current_commit)
+            .unwrap();
+        assert!(same_selected_snapshot(&graph, &selected).unwrap());
+        let mut cases = Vec::new();
+        let mut bad = selected.clone();
+        bad.node_attributes
+            .get_mut(&0)
+            .unwrap()
+            .insert("value".into(), AttrValue::Float64(0.0));
+        cases.push(bad);
+        let mut bad = selected.clone();
+        bad.edge_attributes.get_mut(&0).unwrap().remove("value");
+        cases.push(bad);
+        let mut bad = selected.clone();
+        bad.node_attributes
+            .entry(1)
+            .or_default()
+            .insert("extra".into(), AttrValue::Null);
+        cases.push(bad);
+        let mut bad = selected.clone();
+        bad.edges.insert(0, (1, 0));
+        cases.push(bad);
+        let mut bad = selected.clone();
+        bad.active_nodes.pop();
+        cases.push(bad);
+        let mut bad = selected.clone();
+        bad.state_id += 1;
+        cases.push(bad);
+        let mut same = selected.clone();
+        same.node_attributes.entry(1).or_default();
+        cases.push(same);
+        for snapshot in cases {
+            assert_eq!(
+                same_selected_snapshot(&graph, &snapshot).unwrap(),
+                same_snapshot(&selected, &snapshot).unwrap()
+            );
+        }
+        graph
+            .space
+            .set_node_attr_index(0, "value".into(), usize::MAX);
+        assert!(same_selected_snapshot(&graph, &selected).is_err());
     }
     #[test]
     fn semantic_archive_validation_rejects_bad_version_indices_ids_and_reservations() {

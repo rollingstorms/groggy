@@ -209,3 +209,17 @@ remains material work. Evidence: `chunked-storage-baselines-2026-10-26.md`.
 Gates: 1,259 native / 51 ignored; 2,000 root Python / 1 skipped; 158 docs; strict
 Clippy. No new checklist rows: **201 checked / 67 open**. 10.4 remains partial
 for decoded-memory/migration/platform/process-failure scope; A02 schedule deferred.
+
+### Borrowed archive-state validation completed
+
+Following 242e80e2, selected-state validation now borrows current column values
+instead of cloning current properties and encoding two complete maps. Paired
+release medians (three alternating pairs, 270 MiB unique text / 566 MB journal):
+open **1.464 → 1.306 s**, isolated-process peak RSS **1,723,629,568 →
+1,203,109,888 bytes** (~11% less time, ~30% less RSS). This is a local fixture,
+not a universal bound. Receipt: `borrowed-archive-validation-2026-10-26.md`.
+Gates: **1,261 native / 51 ignored**, **2,000 root Python / 1 skipped**, **158
+documentation examples**, strict all-target Clippy and in-tree extension rebuild.
+No new checklist rows; **201 checked / 67 open**. Decoded graph/history still
+scale with retained data. The owner GraphTable grouped-view answer was reconfirmed
+and its stale appendix pending marker corrected in d5bdc24a.
