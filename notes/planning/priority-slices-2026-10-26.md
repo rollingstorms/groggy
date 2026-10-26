@@ -282,3 +282,60 @@ regressions and a release parse-cost receipt are recorded in
 Gates: **1,274 native / 52 ignored**, serial SIGKILL gate **1 passed**; **2,004
 root Python / 1 skipped**, **160 docs**, strict Clippy, in-tree extension rebuild.
 No new checklist rows; **201 checked / 67 open**.
+
+## Fourth-window consolidated exit
+
+Work began 12:52:12 UTC, was interrupted during reference-build setup, and resumed
+with the retained worktree/source state preserved. All implementation work is
+committed on `groggy-roadmap-2026-10-20`; no push was performed.
+
+| Commit | Completed existing component |
+| --- | --- |
+| 242e80e2 | 10.4: streaming large baselines, complete fragment verification and atomic initial publication; 566 MB recovery evidence. |
+| 416f6db2 | 10.4/32.2: borrowed current-column archive validation; paired reopen time/RSS improvement. |
+| 146f3fc1 | 10.4/31.4: six abrupt checkpoint process-death boundaries. |
+| eee51be9 | Isolate the process-death matrix in an explicitly executed serial CI gate; remove its parallel flock-inheritance race. |
+| 5363241f | 12.2/16.2/32.2: borrowed deltas and single-buffer recorded reconstruction, stable node order and allocation evidence. |
+| 2a0a6c99 | 33.2: explicit full retained-memory/schema integrity reports, all-version transition verification and contextual errors. |
+| 09e3be15 | 07.4/05.3: reject malformed native JSON before scalar/bulk/create/batch/upsert mutation, exact valid-text retention. |
+| d5bdc24a | Reconfirm the already implemented explicit-column grouped-view converter and resolve its stale appendix marker. |
+
+Final verification: **1,274 native passed / 52 ignored**, dedicated serial SIGKILL
+matrix **1 passed** covering six phases, **2,004 root Python passed / 1 skipped**,
+**160 executable docs examples**, strict all-target Clippy and rebuilt in-tree FFI.
+The 52 default ignores include the separately executed process matrix; the other
+51 are pre-existing. Owner benchmark and legacy nested survey suites remain
+excluded. Three pre-existing FFI warnings remain. Scoped Rust formatting/diff
+checks pass; no external packages were installed.
+
+All benchmark results are local fixture evidence, not whole-engine guarantees.
+The paired 270 MiB text fixture improved median reopen **1.464 → 1.306 s** and
+peak RSS **1.724 → 1.203 GB**. The prepared 10k-node/1k-version reconstruction
+fixture improved **1.025 s → 1.722 ms** with far fewer requested allocations.
+Decoded data and branch-frontier memory still scale with retained content; JSON
+syntax checking adds its documented parse cost.
+
+Checklist remains **201 checked / 67 open**, with no added checkbox rows. These
+are completed components inside the existing broad parents, not completion of
+arbitrary topology transactions, raw reclamation, all property/index/view/API
+contracts, three-way merges, services or deferred Graphiti/retrieval work.
+
+### Existing priority work after this window
+
+1. Raw entity/value/group/identity reclamation and real compaction (15/06.3), using
+   tested explicit baseline replacement and preserving shared ancestry/open owned
+   payloads. Existing identity/reference closure rules remain part of that work.
+2. Typed endpoint changes/reversals (04.2/13.3), then explicit conflict-aware
+   three-way merges (14.2). The new integrity validator's fixed endpoint check must
+   migrate with the established endpoint-change contract when that feature lands.
+3. Remaining 09.4b.2/AR7.8 compound execution/default-policy scope. No built-in
+   owner-topology mutation steps were found in the current algorithm registry;
+   certified property effects work, unsupported effects reject. Do not invent an
+   arbitrary topology pipeline API simply to force a parent checkbox closed.
+4. Existing index/live-view/query/numerical/algorithm certification remainders and
+   migration/platform/physical-file diagnostics stay under their original IDs.
+   A02 scheduling/budgets and Graphiti/retrieval remain deferred as recorded.
+
+The temporary managed reference checkout was archived after paired measurement.
+Owner development/benchmark modifications and untracked benchmark fixtures remain
+untouched.

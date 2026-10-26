@@ -8,7 +8,7 @@ pub struct StorageCheckpointReport {
     pub previous_bytes: u64,
     /// Complete replacement file size.
     pub current_bytes: u64,
-    /// Number of prior journal frames replaced by one materialized baseline.
+    /// Number of prior logical journal records replaced by one materialized baseline.
     pub previous_records: u64,
     /// Retained graph versions inside the baseline (including unreferenced versions).
     pub retained_versions: usize,
