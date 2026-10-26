@@ -81,3 +81,32 @@ def test_node_grouping_retains_internal_edges_and_source_rows():
     groups = fixture().group_by(["group"])
     assert sorted([group.edges.edge_ids().to_list() for group in groups]) == [[900, 901, 902], [904]]
     assert all(repr(group.viz) == "VizAccessor(GraphTable)" for group in groups)
+
+
+def test_to_subgraphs_groups_explicit_node_column_into_frozen_id_preserving_views():
+    table = fixture()
+    views = table.to_subgraphs(by="group", directed=True)
+    assert len(views) == 2
+    first = next(view for view in views if 70 in view.node_ids)
+    assert set(first.edge_ids) == {900, 901, 902}
+    assert first.node_attr(70, "group") == 1
+    assert first.write_state_id is None
+    with pytest.raises(ValueError):
+        table.to_subgraphs(by="missing")
+    with pytest.raises(TypeError):
+        table.to_subgraphs()
+
+
+def test_to_subgraphs_empty_and_null_categories_keep_explicit_column_semantics():
+    empty = GraphTable(
+        NodesTable.from_base_table(BaseTable.from_dict({"node_id": [], "g": []})),
+        EdgesTable([]),
+    )
+    assert empty.to_subgraphs("g") == []
+    table = GraphTable(
+        NodesTable.from_base_table(BaseTable.from_dict({"node_id": [5, 8], "g": [None, 1]})),
+        EdgesTable.from_base_table(BaseTable.from_dict({"edge_id": [10], "source": [5], "target": [8], "g": [1]})),
+    )
+    views = table.to_subgraphs("g")
+    assert sorted(view.node_ids for view in views) == [[5], [8]]
+    assert all(view.edge_ids == [] for view in views)

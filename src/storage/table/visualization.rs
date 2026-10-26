@@ -9,7 +9,7 @@ use crate::{
 };
 use std::collections::{BTreeSet, HashMap};
 
-fn attributes(
+pub(super) fn attributes(
     table: &BaseTable,
     structural: &[&str],
 ) -> GraphResult<Vec<HashMap<String, AttrValue>>> {

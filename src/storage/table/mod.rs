@@ -3,6 +3,7 @@
 pub mod base;
 pub mod edges;
 pub mod graph_table;
+mod group_views;
 pub mod integration_tests;
 mod materialize;
 pub mod nodes;

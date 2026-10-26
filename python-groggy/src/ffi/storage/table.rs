@@ -5701,13 +5701,27 @@ impl PyGraphTable {
         }
     }
 
-    /// Convert table to SubgraphArray by creating subgraphs from table rows
-    pub fn to_subgraphs(&self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
-        // TODO: Implement proper conversion from GraphTable to SubgraphArray
-        // This requires understanding the graph context and creating appropriate subgraphs
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "GraphTable to SubgraphArray conversion not yet implemented.",
-        ))
+    /// Group an explicit node column into immutable views of the table's values.
+    #[pyo3(signature = (by, *, directed=false))]
+    pub fn to_subgraphs(
+        &self,
+        py: Python<'_>,
+        by: &str,
+        directed: bool,
+    ) -> PyResult<Vec<crate::ffi::subgraphs::view::PyGraphView>> {
+        let graph_type = if directed {
+            groggy::types::GraphType::Directed
+        } else {
+            groggy::types::GraphType::Undirected
+        };
+        py.allow_threads(|| self.table.to_subgraphs(by, graph_type))
+            .map(|views| {
+                views
+                    .into_iter()
+                    .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+                    .collect()
+            })
+            .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))
     }
 
     /// Get viz accessor for visualization operations

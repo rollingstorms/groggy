@@ -107,7 +107,7 @@ Filter retains its existing both-component predicate rule and then enforces
 internal-edge closure. Sort/reshape retain their earlier component routing.
 Node grouping validates and builds one node-to-group map, then dispatches each
 edge once. Group output row projection preserves exact source identity and policy.
-The to_subgraphs grouping/ownership choice is being clarified separately.
+The explicit to_subgraphs grouping contract is documented below.
 
 The earlier component-sharing receipt remains evidence for the earlier bundle
 policy. New induced-group costs are recorded separately; they must not be treated
@@ -138,3 +138,31 @@ uses the undirected table default; directed captures require the explicit native
 argument. The legacy DataSource layout signature cannot return an error and
 returns an empty result on rejected input; use to_viz_data_source for diagnostics.
 These repairs do not certify every legacy graph reader or layout option.
+
+## Explicit grouped graph views
+
+`table.to_subgraphs(by="category", directed=False)` groups an **explicit node
+column**, retaining only edges internal to each group. It returns a list of
+immutable `GraphView` objects sharing one frozen capture of the table's actual
+values. Original node/edge IDs, parallel edges, loops and typed properties remain
+unchanged. The group order is unspecified. Null is a category; an empty table
+with the declared grouping column returns an empty list. An edge column with the
+same name does not make the node grouping ambiguous.
+
+These are property groups, not connected components. No owned graph, history
+entry or writeback authority is created. Direction is explicit because standalone
+tables do not retain it. Duplicate IDs, dangling endpoints, missing grouping
+columns and pooled subgraph references reject. Use `to_graph()` for an owned
+graph with new IDs, or the connected-components algorithm for topology groups.
+
+```python
+grouped = GraphTable(
+    NodesTable.from_base_table(BaseTable.from_dict({
+        "node_id": [20, 40, 90], "category": [1, 1, 2]
+    })),
+    EdgesTable([(700, 20, 40), (701, 40, 90)]),
+).to_subgraphs(by="category", directed=True)
+assert sorted(view.node_ids for view in grouped) == [[20, 40], [90]]
+assert sorted(view.edge_ids for view in grouped) == [[], [700]]
+assert all(view.write_state_id is None for view in grouped)
+```

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **193 checked and 75 unchecked entries**. Entries overlap:
+currently contains **195 checked and 73 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,7 +13,7 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 75 unchecked entries are not 75 independent tasks: 14 are overlapping AR
+The 73 unchecked entries are not 73 independent tasks: 14 are overlapping AR
 architecture entries, 61 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
@@ -431,3 +431,17 @@ The immediate remaining table decision is to_subgraphs grouping/ownership;
 the three earlier owner answers are implemented and recorded. Original wider
 workbook questions and 16.2 effective-time reconstruction remain open.
 Inventory **193 checked / 75 unchecked**, no added rows.
+
+## 2026-10-25 — Close agreed table facade; return to temporal core
+
+27.1 and AR7.10 are complete against their fixed inventory. The owner accepted
+explicit `to_subgraphs(by=...)` node-property groups returning immutable views;
+native and Python implementations preserve table values and original identity,
+sharing one frozen capture. Evidence: `graph-table-grouped-views-2026-10-25.md`.
+**195 checked / 73 unchecked**, with no new checklist rows.
+
+Execution correction: recent slices overemphasized adjacent facade/viz audits.
+Prioritize usable core workflows: timed bulk mutation → reconstructed immutable
+read → query/table → save/reopen. Incidental cleanup is taken only if it blocks
+that workflow or resolves a demonstrated correctness/performance failure. Next
+core slice is 16.2/16.3; this does not retire any original roadmap scope.

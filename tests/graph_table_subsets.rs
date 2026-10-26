@@ -167,3 +167,41 @@ fn middle_and_reversed_base_ranges_keep_column_lengths_and_source_rows_aligned()
     assert_eq!(reversed.source_entity_ids(), Some(&[][..]));
     assert!(reversed.column("node_id").unwrap().is_empty());
 }
+
+#[test]
+fn grouped_views_freeze_values_preserve_ids_and_share_one_capture() {
+    let mut table = fixture();
+    let views = table
+        .to_subgraphs("group", groggy::types::GraphType::Directed)
+        .unwrap();
+    assert_eq!(views.len(), 2);
+    assert!(std::ptr::eq(
+        views[0].read_state().snapshot(),
+        views[1].read_state().snapshot()
+    ));
+    let first = views
+        .iter()
+        .find(|view| view.nodes().contains(&70))
+        .unwrap();
+    assert_eq!(
+        first.edges(),
+        &std::collections::HashSet::from([900, 901, 902])
+    );
+    assert_eq!(
+        first.node_attr(70, &"group".into()).unwrap(),
+        Some(V::Int(1))
+    );
+    assert_eq!(first.write_state_id(), None);
+    *table.nodes_mut() = table
+        .nodes()
+        .clone()
+        .with_attributes("group".into(), HashMap::from([(70, V::Int(9))]))
+        .unwrap();
+    assert_eq!(
+        first.node_attr(70, &"group".into()).unwrap(),
+        Some(V::Int(1))
+    );
+    assert!(table
+        .to_subgraphs("missing", groggy::types::GraphType::Undirected)
+        .is_err());
+}

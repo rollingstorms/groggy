@@ -6185,10 +6185,8 @@ class GraphTable:
         """Return an independent node-table snapshot wrapper."""
         ...
 
-    def to_subgraphs(self, *args, **kwargs) -> Any:
-        """
-        Convert table to SubgraphArray by creating subgraphs from table rows
-        """
+    def to_subgraphs(self, by: str, *, directed: bool = False) -> List[GraphView]:
+        """Group a node column into immutable views with exact IDs and internal edges."""
         ...
 
     def validate(self, *args, **kwargs) -> Any:

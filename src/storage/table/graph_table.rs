@@ -220,7 +220,7 @@ impl GraphTable {
     // Build a node-to-group map, then dispatch every edge once. Node grouping
     // partitions rows; crossing edges belong to no group. Row projection retains
     // captured edge identity and typed columns through the shared BaseTable path.
-    fn induced_groups(&self, groups: Vec<NodesTable>) -> GraphResult<Vec<Self>> {
+    pub(super) fn induced_groups(&self, groups: Vec<NodesTable>) -> GraphResult<Vec<Self>> {
         let original = self.nodes.node_ids()?;
         let original: HashSet<_> = original.iter().copied().collect::<HashSet<_>>();
         if original.len() != self.nodes.nrows() {
