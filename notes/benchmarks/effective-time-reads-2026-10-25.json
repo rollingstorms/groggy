@@ -1,0 +1,34 @@
+{
+  "build": "release",
+  "cases": [
+    {
+      "edges": 999,
+      "effective_at": 50,
+      "nodes": 1000,
+      "prepare_median_seconds": 0.00001675,
+      "repetitions": 5,
+      "replay_median_seconds": 0.002259083,
+      "versions": 101
+    },
+    {
+      "edges": 9999,
+      "effective_at": 50,
+      "nodes": 10000,
+      "prepare_median_seconds": 0.000015625,
+      "repetitions": 5,
+      "replay_median_seconds": 0.012835167,
+      "versions": 101
+    },
+    {
+      "edges": 99999,
+      "effective_at": 50,
+      "nodes": 100000,
+      "prepare_median_seconds": 0.000034667,
+      "repetitions": 5,
+      "replay_median_seconds": 0.14709825,
+      "versions": 101
+    }
+  ],
+  "fixture": "chain topology at time zero; 100 scalar corrections on node zero; read at time 50",
+  "limitations": "single-process local timings; full lineage replay and frozen adjacency construction; no indexes, RSS, durable-open, concurrent writers or production-scale guarantees"
+}

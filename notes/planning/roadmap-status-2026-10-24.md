@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **195 checked and 73 unchecked entries**. Entries overlap:
+currently contains **196 checked and 72 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,7 +13,7 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 73 unchecked entries are not 73 independent tasks: 14 are overlapping AR
+The 72 unchecked entries are not 72 independent tasks: 14 are overlapping AR
 architecture entries, 61 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
@@ -445,3 +445,30 @@ Prioritize usable core workflows: timed bulk mutation → reconstructed immutabl
 read → query/table → save/reopen. Incidental cleanup is taken only if it blocks
 that workflow or resolves a demonstrated correctness/performance failure. Next
 core slice is 16.2/16.3; this does not retire any original roadmap scope.
+
+## 2026-10-25 — Effective-time vertical slice
+
+16.3 is complete for precisely timed publication ancestry; 16.2 is partial with
+working Graph/DurableGraph timestamp reconstruction, accepted-order corrections,
+branch/head capture, optional recorded cutoff, immutable derived/table source
+pins, ordinary typed properties and durable reopen. Read-side endpoint interval
+validation is present; atomic write-side timeline validation remains the next
+correctness priority. Pooled/group history, unset and merge/legacy boundaries
+retain their original scopes. **196 checked / 72 unchecked**, no new rows.
+
+Release baseline: 100k-node/99,999-edge/101-version replay about 147 ms median;
+preparing owned immutable ancestry about 35 µs. This is full replay, not an index.
+See `effective-time-read-slice-2026-10-25.md` and the machine-readable receipt.
+
+Full gate before the final two native ownership/extreme-clock regressions:
+1,169 native passed / 51 ignored; 1,899 root Python passed / 1 skipped;
+136 executable documentation examples; strict all-target Clippy passed.
+Final targeted/rebuilt checks are recorded with the completion gate below.
+
+Completion gate: **1,171 native passed / 51 ignored; 1,900 root Python passed /
+1 skipped; 136 executable documentation examples; strict all-target Clippy
+passed**. Native/Python logs: /tmp/groggy-effective-native-final.log and
+/tmp/groggy-effective-python-final.log; Clippy/build logs use effective-*-final.
+Scoped rustfmt, Python stub AST parse and git diff --check passed. In-tree FFI
+rebuild retains three unrelated pre-existing warnings. Owner benchmark changes
+and untracked benchmark tests/receipts were excluded from staging and execution.

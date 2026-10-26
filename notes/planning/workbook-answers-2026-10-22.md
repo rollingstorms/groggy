@@ -911,3 +911,17 @@ The immediate remaining table decision is to_subgraphs grouping/ownership;
 the three earlier owner answers are implemented and recorded. Original wider
 workbook questions and 16.2 effective-time reconstruction remain open.
 Inventory **193 checked / 75 unchecked**, no added rows.
+
+## 2026-10-25 — Explicit grouping and execution priority
+
+Owner accepted GraphTable.to_subgraphs(by=...) as immutable graph views grouped
+by an explicit node column. Groups retain only internal edges and exact IDs;
+standalone-table direction is explicit. This closes the fixed 27.1/AR7.10 facade
+inventory rather than extending it with adjacent audits.
+
+In response to the owner's waterfall/prioritization concern, resume core vertical
+workflows: timed bulk mutation → immutable timestamp reconstruction → query/table
+→ durable reopen. Implemented read-side 16.2 slice and optional-cutoff/pin behavior
+16.3; atomic endpoint timeline rejection at publication remains the next priority.
+The initial full-replay benchmark is evidence for optimization choices, not a
+production latency promise. See effective-time-read-slice-2026-10-25.md.

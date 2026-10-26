@@ -13,6 +13,7 @@
 
 mod checkpoints;
 pub(crate) mod composition;
+mod effective_read;
 mod identity;
 pub(crate) mod kinds;
 mod matrices;

@@ -62,6 +62,7 @@ pub(crate) struct ReadOrigin {
 pub struct PinnedReadState {
     data: Arc<ReadData>,
     origin: Option<Arc<ReadOrigin>>,
+    read_time: Option<Arc<super::effective_read::ReadTime>>,
 }
 impl PinnedReadState {
     pub(crate) fn from_snapshot(snapshot: GraphSnapshot) -> GraphResult<Self> {
@@ -106,6 +107,7 @@ impl PinnedReadState {
             .collect();
         Ok(Self {
             origin: None,
+            read_time: None,
             data: Arc::new(ReadData {
                 snapshot,
                 existence: ExistenceIndex::new(nodes, edges),
@@ -113,6 +115,14 @@ impl PinnedReadState {
                 incident,
             }),
         })
+    }
+    pub(crate) fn with_read_time(mut self, time: super::effective_read::ReadTime) -> Self {
+        self.read_time = Some(Arc::new(time));
+        self
+    }
+    /// Effective clocks/head for temporal captures, retained by derived views/tables.
+    pub fn read_time(&self) -> Option<&super::effective_read::ReadTime> {
+        self.read_time.as_deref()
     }
     pub(crate) fn with_origin(
         mut self,

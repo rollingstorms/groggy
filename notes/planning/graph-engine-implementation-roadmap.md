@@ -1128,3 +1128,14 @@ The immediate remaining table decision is to_subgraphs grouping/ownership;
 the three earlier owner answers are implemented and recorded. Original wider
 workbook questions and 16.2 effective-time reconstruction remain open.
 Inventory **193 checked / 75 unchecked**, no added rows.
+
+## 2026-10-25 — Grouped facade exit and effective-time reads
+
+27.1/AR7.10's fixed inventory is complete: explicit node-column to_subgraphs
+returns immutable ID-preserving graph views sharing a frozen table capture.
+16.3 now supplies explicit recorded cutoffs and inherited time/head pins.
+16.2 has a working Graph/DurableGraph effective-time read workflow through
+queries/tables/reopen; atomic endpoint timeline acceptance, pooled/group history,
+unset and merge/legacy limits remain explicitly scoped. See
+`effective-time-read-slice-2026-10-25.md`. Prioritize core vertical correctness and
+measured retrieval/recovery costs ahead of adjacent facade/viz audit cleanup.

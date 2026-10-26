@@ -222,3 +222,6 @@ harness = false
 [[bench]]
 name = "viz_snapshot_sharing"
 harness = false
+[[bench]]
+name = "effective_time_reads"
+harness = false

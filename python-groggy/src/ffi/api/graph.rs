@@ -1030,6 +1030,28 @@ impl PyGraph {
         Ok(edge_ids)
     }
 
+    /// Reconstruct immutable effective-time state from a pinned published head.
+    #[pyo3(signature=(effective_at, *, recorded_by=None))]
+    fn read_view_at(
+        &self,
+        py: Python<'_>,
+        effective_at: &PyAny,
+        recorded_by: Option<&PyAny>,
+    ) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        let effective_at = crate::ffi::api::graph_batch::timestamp(effective_at)?;
+        let recorded_by = recorded_by
+            .map(crate::ffi::api::graph_batch::timestamp)
+            .transpose()?;
+        let plan = self
+            .inner
+            .borrow()
+            .prepare_read_at(effective_at, recorded_by)
+            .map_err(graph_error_to_py_err)?;
+        py.allow_threads(move || plan.read_view())
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(graph_error_to_py_err)
+    }
+
     /// Capture immutable current state; later working-graph writes do not alter this view.
     fn read_view(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
         self.inner

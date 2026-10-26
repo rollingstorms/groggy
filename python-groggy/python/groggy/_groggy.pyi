@@ -3353,6 +3353,10 @@ class DurableGraph:
 
 
 
+    def read_view_at(self, effective_at: int, *, recorded_by: Optional[int] = None) -> GraphView:
+        """Reconstruct branch-scoped effective-time state; legacy/invalid timelines reject."""
+        ...
+
     def read_view(self) -> GraphView:
         """
         Capture the current accepted durable head.
@@ -5345,6 +5349,10 @@ class Graph:
 
 
 
+
+    def read_view_at(self, effective_at: int, *, recorded_by: Optional[int] = None) -> GraphView:
+        """Reconstruct branch-scoped effective-time state; legacy/invalid timelines reject."""
+        ...
 
     def read_view(self) -> GraphView:
         """
@@ -10565,6 +10573,11 @@ class VizAccessor:
 
 
 class GraphView:
+    @property
+    def read_time(self) -> Optional[Dict[str, Any]]:
+        """Effective clocks and pinned branch/head, or None for ordinary captures."""
+        ...
+
     @property
     def edge_ids(self) -> List[int]:
         ...

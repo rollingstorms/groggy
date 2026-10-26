@@ -9,6 +9,19 @@ pub struct PyGraphView {
 }
 #[pymethods]
 impl PyGraphView {
+    /// Clocks and branch/head of an effective-time capture, or None for other views.
+    #[getter]
+    fn read_time(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let Some(time) = self.inner.read_state().read_time() else {
+            return Ok(py.None());
+        };
+        let result = pyo3::types::PyDict::new(py);
+        result.set_item("branch", &time.branch)?;
+        result.set_item("published_head", time.published_head)?;
+        result.set_item("effective_at", time.effective_at)?;
+        result.set_item("recorded_by", time.recorded_by)?;
+        Ok(result.to_object(py))
+    }
     /// Accepted source state for checked writeback; None for dirty/standalone captures.
     #[getter]
     fn write_state_id(&self) -> Option<groggy::StateId> {

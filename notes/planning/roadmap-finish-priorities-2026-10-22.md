@@ -14,12 +14,20 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Next: finish native compatibility and compound mutation boundaries (09.4b.2).
-Python ordinary defaults are publishing (09.4b.1), using the explicit checkpoint
-boundary (12.3, exit reviewed 2026-10-25). Reconstructed effective-time states follow.
-Source-bound table writeback is complete in 27.2; the fixed GraphTable facade
-contracts in 27.1 and broader connected-view migration in 26.1 remain open.
-The latest slice evidence and verified inventory are recorded below.
+Next: finish atomic effective endpoint/lifetime validation inside checked publication
+(16.2), followed by retained temporal/property history gaps (11.2/12.2), measured
+reconstruction/index work, and native compatibility/compound boundaries (09.4b.2).
+The temporal read workflow now runs through Graph/DurableGraph, immutable queries,
+table exports and durable reopen; 16.3 is complete for supported ancestry.
+27.1/AR7.10 fixed facade inventory is complete. Explicit checkpoint semantics
+(12.3) and source-bound writeback (27.2) are complete; broader live views remain 26.1.
+
+Execution rule agreed with the owner's prioritization concern on 2026-10-25:
+prioritize usable core vertical slices and measured workloads. Take incidental
+facade/viz cleanup only when it blocks that workflow or fixes a demonstrated
+failure. Avoid expanding adjacent audit scope while the core temporal path is open.
+This preserves the full vision while reducing the waterfall tendency of recent
+slices. The flat checklist remains the authoritative completion inventory.
 
 ## Owner answers received — 2026-10-22
 

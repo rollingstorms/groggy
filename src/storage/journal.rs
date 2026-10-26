@@ -579,6 +579,24 @@ impl DurableGraph {
         self.graph()?.read_view()
     }
 
+    /// Capture immutable publication ancestry for detached effective-time replay.
+    pub fn prepare_read_at(
+        &self,
+        effective_at: i64,
+        recorded_by: Option<i64>,
+    ) -> GraphResult<crate::state::effective_read::EffectiveReadPlan> {
+        self.graph()?.prepare_read_at(effective_at, recorded_by)
+    }
+
+    /// Reconstruct a read-only effective-time state from the accepted durable head.
+    pub fn read_view_at(
+        &self,
+        effective_at: i64,
+        recorded_by: Option<i64>,
+    ) -> GraphResult<crate::GraphView> {
+        self.prepare_read_at(effective_at, recorded_by)?.read_view()
+    }
+
     /// Sync and publish one batch scoped to a current immutable view, returning a new view.
     pub fn apply_view_batch(
         &mut self,
