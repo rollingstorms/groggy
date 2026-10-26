@@ -17,6 +17,7 @@ def test_python_commit_diff_reports_typed_values_and_topology():
     diff = graph.diff_commits(first, second)
     assert diff["nodes_added"] == [bob]
     assert diff["edges_added"] == [(edge, alice, bob)]
+    assert diff["edge_endpoint_changes"] == []
     score = next(
         change
         for change in diff["attribute_changes"]

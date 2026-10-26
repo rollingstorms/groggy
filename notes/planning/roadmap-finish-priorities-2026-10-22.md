@@ -1395,3 +1395,18 @@ and rebuilt in-tree extension. Existing Python exclusions/FFI warnings remain.
 **204 checked / 64 open**, same 268 rows. Next: typed endpoint changes/reversals
 (04.2/13.3), then three-way merges (14.2); remaining execution/default, view/index,
 numerical/scale/release and deferred integration retain their original scopes.
+
+### Endpoint comparison/safety foundation (04.2 / 13.3)
+
+Endpoint-only snapshot differences previously disappeared; raw restoration could
+silently overwrite an existing endpoint pair. Canonical typed endpoint diffs now
+preserve sorted stable edge identities/before-after tuples and reach commit diffs
+and Python output. Raw dense/sparse reconstruction rejects untracked rewiring,
+and snapshot restoration preflights before replacing working membership.
+Coordinated rewiring/reversal and recorded/effective/durable mutation remain open;
+no wire format or owner policy changed. Fixed remaining inventory and evidence:
+`endpoint-difference-foundation-2026-10-26.md`.
+
+Gates: **1,310 native / 52 ignored**, **2,017 root Python / 1 skipped**, **168 docs
+examples**, rebuilt extension and strict all-target Clippy. Same exclusions/known
+FFI warnings. **204 checked / 64 open**, no new checkbox rows.

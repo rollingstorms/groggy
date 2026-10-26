@@ -1911,6 +1911,15 @@ impl PyGraph {
         output.set_item("nodes_removed", diff.nodes_removed)?;
         output.set_item("edges_added", diff.edges_added)?;
         output.set_item("edges_removed", diff.edges_removed)?;
+        let endpoints = PyList::empty(py);
+        for change in diff.edge_endpoint_changes {
+            let item = PyDict::new(py);
+            item.set_item("edge_id", change.edge_id)?;
+            item.set_item("old", change.old_endpoints)?;
+            item.set_item("new", change.new_endpoints)?;
+            endpoints.append(item)?;
+        }
+        output.set_item("edge_endpoint_changes", endpoints)?;
         let changes = PyList::empty(py);
         for change in diff.attr_changes {
             let item = PyDict::new(py);

@@ -5,6 +5,8 @@ mod automatic_publication;
 mod current_property_reads;
 #[path = "storage_boundary_tests/effective_time_completion.rs"]
 mod effective_time_completion;
+#[path = "storage_boundary_tests/endpoint_identity.rs"]
+mod endpoint_identity;
 #[path = "storage_boundary_tests/graph_copy.rs"]
 mod graph_copy;
 #[path = "storage_boundary_tests/owned_snapshots.rs"]

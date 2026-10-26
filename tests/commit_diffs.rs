@@ -59,3 +59,58 @@ fn diff_rejects_unknown_state_instead_of_treating_it_as_empty() {
     assert_eq!(graph.diff_commits(0, state).unwrap().nodes_added, vec![0]);
     assert!(graph.diff_commits(state, 999).is_err());
 }
+
+#[test]
+fn selected_snapshot_diff_reports_ordered_endpoint_changes_without_fake_additions() {
+    use groggy::state::state::GraphSnapshot;
+    use groggy::types::GraphType;
+    use groggy::EdgeEndpointChange;
+    for kind in [GraphType::Directed, GraphType::Undirected] {
+        let mut before = GraphSnapshot::empty_with_type(1, kind);
+        before.active_nodes = vec![0, 1, 2];
+        before
+            .edges
+            .extend([(7, (0, 1)), (2, (0, 1)), (9, (2, 2)), (11, (1, 2))]);
+        let mut after = before.clone();
+        after.state_id = 2;
+        after.edges.insert(7, (2, 1));
+        after.edges.insert(2, (1, 0));
+        after.edges.remove(&11);
+        after.edges.insert(20, (0, 0));
+        let expected = vec![
+            EdgeEndpointChange {
+                edge_id: 2,
+                old_endpoints: (0, 1),
+                new_endpoints: (1, 0),
+            },
+            EdgeEndpointChange {
+                edge_id: 7,
+                old_endpoints: (0, 1),
+                new_endpoints: (2, 1),
+            },
+        ];
+        let diff = before.diff_with(&after);
+        assert_eq!(diff.edge_endpoint_changes, expected);
+        assert_eq!(diff.edges_added, vec![(20, 0, 0)]);
+        assert_eq!(diff.edges_removed, vec![11]);
+        assert_eq!(diff.summary().edges_changed, 4);
+        assert!(diff.attribute_changes.is_empty());
+        let reverse = after.diff_with(&before);
+        for (forward, backward) in diff
+            .edge_endpoint_changes
+            .iter()
+            .zip(&reverse.edge_endpoint_changes)
+        {
+            assert_eq!(forward.edge_id, backward.edge_id);
+            assert_eq!(forward.old_endpoints, backward.new_endpoints);
+            assert_eq!(forward.new_endpoints, backward.old_endpoints);
+        }
+        assert!(before.diff_with(&before).is_empty());
+        let mut endpoint_only = before.clone();
+        endpoint_only.edges.insert(9, (1, 1));
+        let diff = before.diff_with(&endpoint_only);
+        assert!(!diff.is_empty());
+        assert_eq!(diff.summary().edges_changed, 1);
+        assert!(diff.edges_added.is_empty() && diff.edges_removed.is_empty());
+    }
+}

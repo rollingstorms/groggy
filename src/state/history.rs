@@ -16,7 +16,7 @@ mod effective_topology;
 pub(crate) use effective_topology::TopologyPatch;
 
 // Preserve legacy public names while sharing the snapshot diff representation.
-pub use crate::state::change::{AttributeChange, EntityType};
+pub use crate::state::change::{AttributeChange, EdgeEndpointChange, EntityType};
 
 use crate::errors::{GraphError, GraphResult};
 use crate::state::change_tracker::ChangeSet;
@@ -637,6 +637,7 @@ impl HistoryForest {
             nodes_removed: diff.nodes_removed,
             edges_added: diff.edges_added,
             edges_removed: diff.edges_removed,
+            edge_endpoint_changes: diff.edge_endpoint_changes,
             attr_changes: diff.attribute_changes,
         })
     }
@@ -1151,6 +1152,8 @@ pub struct CommitDiff {
     pub nodes_removed: Vec<NodeId>,
     pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
     pub edges_removed: Vec<EdgeId>,
+    /// Endpoint changes of edge IDs present in both selected states.
+    pub edge_endpoint_changes: Vec<EdgeEndpointChange>,
     pub attr_changes: Vec<AttributeChange>,
 }
 

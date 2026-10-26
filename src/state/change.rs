@@ -29,3 +29,15 @@ pub enum EntityType {
     /// A graph edge instance.
     Edge,
 }
+
+/// A change to the ordered stored endpoints of an existing edge instance.
+/// Independent of property changes, clocks and raw storage offsets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EdgeEndpointChange {
+    /// Stable edge instance identity, including parallel edges and self loops.
+    pub edge_id: crate::EdgeId,
+    /// Endpoints in the source selected state.
+    pub old_endpoints: (crate::NodeId, crate::NodeId),
+    /// Endpoints in the destination selected state.
+    pub new_endpoints: (crate::NodeId, crate::NodeId),
+}

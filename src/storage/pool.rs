@@ -692,6 +692,14 @@ impl GraphPool {
                 "Cannot reconstruct an explicitly purged entity".into(),
             ));
         }
+        if self
+            .get_edge_endpoints(edge_id)
+            .is_some_and(|pair| pair != (source, target))
+        {
+            return Err(GraphError::InvalidInput(format!(
+                "Raw restoration cannot rewire edge {edge_id}; endpoint changes require coordinated history"
+            )));
+        }
         let end = edge_id
             .checked_add(1)
             .ok_or_else(|| GraphError::InvalidInput("Edge ID exhausted".into()))?;

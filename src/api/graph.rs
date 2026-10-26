@@ -27,7 +27,7 @@ mod ordinary;
 mod persistence;
 mod property_unset;
 mod purge;
-pub use purge::{PurgePlan, PurgeOutcome, PurgeReport};
+pub use purge::{PurgeOutcome, PurgePlan, PurgeReport};
 mod publication;
 mod read_attributes;
 pub(crate) mod retention;
@@ -2175,6 +2175,20 @@ impl Graph {
                 if let AttrValue::SubgraphRef(id) = value {
                     self.pool.borrow().get_subgraph(*id)?;
                 }
+            }
+        }
+        // Validate endpoint identity before replacing any working membership. Raw
+        // reconstruction cannot silently overwrite history's sole endpoint record.
+        for (&id, &pair) in &snapshot.edges {
+            if self
+                .pool
+                .borrow()
+                .get_edge_endpoints(id)
+                .is_some_and(|existing| existing != pair)
+            {
+                return Err(GraphError::InvalidInput(format!(
+                    "Snapshot endpoints differ from retained edge {id}; coordinated endpoint history is required"
+                )));
             }
         }
         // Reset selected membership and column mappings, not the retained pool.

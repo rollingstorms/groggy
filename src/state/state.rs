@@ -12,7 +12,7 @@
 //! - State comparison: Diffing and analysis utilities
 
 // Compatibility imports; the logical change record has one authoritative owner.
-pub use crate::state::change::{AttributeChange, EntityType};
+pub use crate::state::change::{AttributeChange, EdgeEndpointChange, EntityType};
 
 use crate::errors::{GraphError, GraphResult};
 use crate::state::delta::DeltaObject;
@@ -449,6 +449,20 @@ impl GraphSnapshot {
             .map(|(edge_id, _)| *edge_id)
             .collect();
 
+        let mut edge_endpoint_changes: Vec<_> = other
+            .edges
+            .iter()
+            .filter_map(|(&edge_id, &new_endpoints)| {
+                let &old_endpoints = self.edges.get(&edge_id)?;
+                (old_endpoints != new_endpoints).then_some(EdgeEndpointChange {
+                    edge_id,
+                    old_endpoints,
+                    new_endpoints,
+                })
+            })
+            .collect();
+        edge_endpoint_changes.sort_unstable_by_key(|change| change.edge_id);
+
         // Compare attributes
         let mut attribute_changes = Vec::new();
 
@@ -555,6 +569,7 @@ impl GraphSnapshot {
             nodes_removed,
             edges_added,
             edges_removed,
+            edge_endpoint_changes,
             attribute_changes,
         }
     }
@@ -710,6 +725,8 @@ pub struct StateDiff {
     pub nodes_removed: Vec<NodeId>,
     pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
     pub edges_removed: Vec<EdgeId>,
+    /// Ordered endpoint differences for IDs present in both states.
+    pub edge_endpoint_changes: Vec<EdgeEndpointChange>,
     pub attribute_changes: Vec<AttributeChange>,
 }
 
@@ -723,6 +740,7 @@ impl StateDiff {
             nodes_removed: Vec::new(),
             edges_added: Vec::new(),
             edges_removed: Vec::new(),
+            edge_endpoint_changes: Vec::new(),
             attribute_changes: Vec::new(),
         }
     }
@@ -733,6 +751,7 @@ impl StateDiff {
             && self.nodes_removed.is_empty()
             && self.edges_added.is_empty()
             && self.edges_removed.is_empty()
+            && self.edge_endpoint_changes.is_empty()
             && self.attribute_changes.is_empty()
     }
 
@@ -742,7 +761,9 @@ impl StateDiff {
             from_state: self.from_state,
             to_state: self.to_state,
             nodes_changed: self.nodes_added.len() + self.nodes_removed.len(),
-            edges_changed: self.edges_added.len() + self.edges_removed.len(),
+            edges_changed: self.edges_added.len()
+                + self.edges_removed.len()
+                + self.edge_endpoint_changes.len(),
             attributes_changed: self.attribute_changes.len(),
         }
     }
