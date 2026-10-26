@@ -2076,6 +2076,40 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    fn preview_purge(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let plan = self
+            .inner
+            .borrow()
+            .prepare_purge()
+            .map_err(graph_error_to_py_err)?;
+        let report = py
+            .allow_threads(move || plan.execute().map(|outcome| outcome.report().clone()))
+            .map_err(graph_error_to_py_err)?;
+        purge_report_to_py(py, &report)
+    }
+    fn purge_unreferenced(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let plan = self
+            .inner
+            .borrow()
+            .prepare_purge()
+            .map_err(graph_error_to_py_err)?;
+        let outcome = py
+            .allow_threads(move || plan.execute())
+            .map_err(graph_error_to_py_err)?;
+        let report = self
+            .inner
+            .borrow_mut()
+            .finish_purge(outcome)
+            .map_err(graph_error_to_py_err)?;
+        purge_report_to_py(py, &report)
+    }
+    fn is_node_allocated(&self, id: NodeId) -> bool {
+        self.inner.borrow().is_node_allocated(id)
+    }
+    fn is_edge_allocated(&self, id: EdgeId) -> bool {
+        self.inner.borrow().is_edge_allocated(id)
+    }
+
     /// Exact raw-column compaction with optional explicit orphan-value reclamation.
     #[pyo3(signature=(*,reclaim_unreferenced=false))]
     fn compact_pool(&self, py: Python<'_>, reclaim_unreferenced: bool) -> PyResult<PyObject> {
@@ -3490,6 +3524,8 @@ pub(super) fn integrity_report_to_py(
     result.set_item("active_edges", report.active_edges)?;
     result.set_item("allocated_nodes", report.allocated_nodes)?;
     result.set_item("allocated_edges", report.allocated_edges)?;
+    result.set_item("purged_nodes", report.purged_nodes)?;
+    result.set_item("purged_edges", report.purged_edges)?;
     result.set_item("node_columns", report.node_columns)?;
     result.set_item("edge_columns", report.edge_columns)?;
     result.set_item("node_values", report.node_values)?;
@@ -3528,5 +3564,23 @@ pub(super) fn pool_compaction_report_to_py(
         "reclaimed_unreferenced_edge_values",
         report.reclaimed_unreferenced_edge_values,
     )?;
+    Ok(result.into())
+}
+
+/// Pure purge receipt/preview translation.
+pub(super) fn purge_report_to_py(
+    py: Python<'_>,
+    report: &groggy::PurgeReport,
+) -> PyResult<PyObject> {
+    let result = PyDict::new(py);
+    result.set_item("selected_state", report.selected_state)?;
+    result.set_item("node_ranges", &report.node_ranges)?;
+    result.set_item("edge_ranges", &report.edge_ranges)?;
+    result.set_item("purged_nodes", report.purged_nodes)?;
+    result.set_item("purged_edges", report.purged_edges)?;
+    result.set_item("removed_groups", &report.removed_groups)?;
+    result.set_item("released_external_ids", &report.released_external_ids)?;
+    result.set_item("reclaimed_node_values", report.reclaimed_node_values)?;
+    result.set_item("reclaimed_edge_values", report.reclaimed_edge_values)?;
     Ok(result.into())
 }

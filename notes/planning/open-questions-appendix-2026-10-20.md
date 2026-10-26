@@ -301,6 +301,12 @@ Suggested: configurable grace period and an optional strict audit policy; previe
 
 Decision (2026-10-23): No mandatory grace period or backup. Explicit purge must preserve shared branches and open immutable views. Current scope is a data science library, with production retention policies deferred.
 
+Implementation (2026-10-26): `preview_purge`/`purge_unreferenced` now implement this
+policy across entities, properties, group registrations and external names, with
+all retained owner roots, immutable payload preservation and verified durable
+replacement. History pruning remains separate; no new policy decision is needed.
+See `retained-purge-2026-10-26.md` for gates and explicit cost/platform limits.
+
 Notes / conditions: ____________________
 
 Code / record context:

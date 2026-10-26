@@ -1,0 +1,127 @@
+{
+  "benchmark": "retained_purge",
+  "cases": [
+    {
+      "orphan_nodes_and_edges": 1000,
+      "samples": [
+        {
+          "candidate_seconds": 0.011092042,
+          "capture_seconds": 0.001927709,
+          "durable_total_seconds": 0.030318458,
+          "edge_interval_count": 1,
+          "file_bytes_after": 1627,
+          "file_bytes_before": 169258,
+          "node_interval_count": 1,
+          "purged_edges": 1000,
+          "purged_nodes": 1000,
+          "released_names": 1000,
+          "removed_group_registrations": 1,
+          "validate_install_seconds": 0.002200458
+        },
+        {
+          "candidate_seconds": 0.01069475,
+          "capture_seconds": 0.001929,
+          "durable_total_seconds": 0.024935792,
+          "edge_interval_count": 1,
+          "file_bytes_after": 1631,
+          "file_bytes_before": 169262,
+          "node_interval_count": 1,
+          "purged_edges": 1000,
+          "purged_nodes": 1000,
+          "released_names": 1000,
+          "removed_group_registrations": 1,
+          "validate_install_seconds": 0.002356708
+        },
+        {
+          "candidate_seconds": 0.010464333,
+          "capture_seconds": 0.002041042,
+          "durable_total_seconds": 0.028196958,
+          "edge_interval_count": 1,
+          "file_bytes_after": 1627,
+          "file_bytes_before": 169258,
+          "node_interval_count": 1,
+          "purged_edges": 1000,
+          "purged_nodes": 1000,
+          "released_names": 1000,
+          "removed_group_registrations": 1,
+          "validate_install_seconds": 0.002076875
+        }
+      ]
+    },
+    {
+      "orphan_nodes_and_edges": 100000,
+      "samples": [
+        {
+          "candidate_seconds": 1.549334666,
+          "capture_seconds": 0.675821625,
+          "durable_total_seconds": 2.035068375,
+          "edge_interval_count": 1,
+          "file_bytes_after": 1639,
+          "file_bytes_before": 8769894,
+          "node_interval_count": 1,
+          "purged_edges": 100000,
+          "purged_nodes": 100000,
+          "released_names": 1000,
+          "removed_group_registrations": 1,
+          "validate_install_seconds": 0.267207416
+        },
+        {
+          "candidate_seconds": 1.2942521249999999,
+          "capture_seconds": 0.239534667,
+          "durable_total_seconds": 2.000917292,
+          "edge_interval_count": 1,
+          "file_bytes_after": 1635,
+          "file_bytes_before": 8769890,
+          "node_interval_count": 1,
+          "purged_edges": 100000,
+          "purged_nodes": 100000,
+          "released_names": 1000,
+          "removed_group_registrations": 1,
+          "validate_install_seconds": 0.249970166
+        },
+        {
+          "candidate_seconds": 1.3325705,
+          "capture_seconds": 0.238042125,
+          "durable_total_seconds": 2.059027667,
+          "edge_interval_count": 1,
+          "file_bytes_after": 1631,
+          "file_bytes_before": 8769886,
+          "node_interval_count": 1,
+          "purged_edges": 100000,
+          "purged_nodes": 100000,
+          "released_names": 1000,
+          "removed_group_registrations": 1,
+          "validate_install_seconds": 0.260969542
+        }
+      ]
+    }
+  ],
+  "raw_endpoint_lookup": {
+    "lookups_per_sample": 500000,
+    "purged_edges": 50000,
+    "retained_edges": 50000,
+    "samples": [
+      {
+        "dense_seconds": 0.001482959,
+        "post_purge_sparse_seconds": 0.007461208
+      },
+      {
+        "dense_seconds": 0.001517417,
+        "post_purge_sparse_seconds": 0.007390333
+      },
+      {
+        "dense_seconds": 0.001496292,
+        "post_purge_sparse_seconds": 0.007380291
+      },
+      {
+        "dense_seconds": 0.001480542,
+        "post_purge_sparse_seconds": 0.011834
+      },
+      {
+        "dense_seconds": 0.001525667,
+        "post_purge_sparse_seconds": 0.00737625
+      }
+    ]
+  },
+  "scope": "local release; setup/history prune excluded; source copies and full candidate validation included; one retained live node/version; orphan frozen group unregistered; no isolated RSS/FFI/production claim"
+}

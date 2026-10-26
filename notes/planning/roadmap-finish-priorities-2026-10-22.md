@@ -14,16 +14,17 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Next: remaining native default/infallible constructors, raw pool/space escapes
-and topology compound acceptance (09.4b.2; classic property wrappers now certified), then remaining storage lifecycle
-(10.4) and raw reclamation (15). Full retained archive/import (10.3) is complete;
+Next: typed endpoint changes/reversals (04.2/13.3), then three-way merge planning
+(14.2). Remaining native default/infallible constructors, raw pool/space escapes
+and topology compound acceptance (09.4b.2), plus wider storage platform/migration/scale
+(10.4), retain their scope. Core explicit reclamation (15/06.3) is complete. Full retained archive/import (10.3) is complete;
 explicit Unix recovery baselines and locked journal replacement complete part of
 10.4. Explicit outer property pipelines and branch lifecycle (14.1) are complete.
 Exact owned snapshots (12.2), property history (11.2) and 16.2 are complete: effective reconstruction, atomic endpoint validation, frozen nested group
 sources/durable transfer, explicit legacy inputs, resolved first-parent merge reads
 and cached event prefixes. 16.3, checkpoint semantics (12.3), checked writeback
 (27.2), and the fixed table facade inventory (27.1/AR7.10) are complete. Merge
-planning (14.2), remaining storage scale/migrations/compaction (10.4/15) and broad live
+planning (14.2), remaining storage scale/migrations/platform work (10.4) and broad live
 adapter migration (26.1) retain their existing scopes. See the 16.2 exit review.
 
 Execution rule agreed with the owner's prioritization concern on 2026-10-25:
@@ -1375,3 +1376,22 @@ Native/Python tests cover byte/semantic corruption, independent cursors/locks,
 partial tails, changed paths and chunked baselines. Evidence, explicit audit costs
 and limits: `storage-verification-2026-10-26.md`. Derived index/cache and service
 diagnostics remain within the original 33.2 scope. No new checklist row.
+
+## 2026-10-26 — explicit retained-storage purge closes core retention
+
+Existing **06.3, 15.1 and 15.2** are complete under the accepted A09 embedded-library
+policy: previewable explicit purge reclaims orphan owner entities, group
+registrations, raw values and external names, with complete retained-history roots,
+independent immutable payloads and monotonic IDs. Sparse endpoint storage reclaims
+interior holes and supports later high-ID writes. Full archives, owned captures,
+verified durable replacement, reopen and backup retain purge state. No extra
+permanent pins, grace period, mandatory backup or automatic scheduling was added.
+Numeric ID arrays retain value semantics, not hidden ownership pins.
+
+Evidence, local cost trade-offs and limitations: `retained-purge-2026-10-26.md`.
+Gates: **1,308 native / 52 ignored**, dedicated serial **18-case** SIGKILL matrix,
+**2,017 root Python / 1 skipped**, **167 docs examples**, strict all-target Clippy
+and rebuilt in-tree extension. Existing Python exclusions/FFI warnings remain.
+**204 checked / 64 open**, same 268 rows. Next: typed endpoint changes/reversals
+(04.2/13.3), then three-way merges (14.2); remaining execution/default, view/index,
+numerical/scale/release and deferred integration retain their original scopes.

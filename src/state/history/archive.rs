@@ -53,14 +53,19 @@ fn encode_changes(
 }
 fn decode_changes(
     changes: Vec<StoredChange>,
-    bound: usize,
+    is_node: bool,
     pool: &GraphPool,
 ) -> GraphResult<Vec<(usize, String, Option<AttrValue>, Option<AttrValue>)>> {
     let mut seen = HashSet::new();
     changes
         .into_iter()
         .map(|(id, name, old, new)| {
-            if id >= bound || !seen.insert((id, name.clone())) {
+            if !(if is_node {
+                pool.is_node_allocated(id)
+            } else {
+                pool.is_edge_allocated(id)
+            }) || !seen.insert((id, name.clone()))
+            {
                 return Err(invalid("duplicate or unallocated property target"));
             }
             let old = old.map(retained_group::decode).transpose()?;
@@ -110,7 +115,6 @@ impl HistoryForest {
 impl HistoryDocument {
     pub(crate) fn restore(self, pool: &GraphPool) -> GraphResult<HistoryForest> {
         let mut history = HistoryForest::new_with_type(pool.graph_type());
-        let stats = pool.statistics();
         let mut previous = 0;
         for c in self.commits {
             if c.id == 0 || c.id <= previous || c.id >= self.next_state_id {
@@ -127,20 +131,26 @@ impl HistoryDocument {
                     return Err(invalid("missing, cyclic or duplicate parent"));
                 }
             }
-            let unique_ids = |ids: &[usize], bound: usize| {
+            let unique_ids = |ids: &[usize], is_node: bool| {
                 let mut seen = HashSet::new();
-                ids.iter().all(|id| *id < bound && seen.insert(*id))
+                ids.iter().all(|id| {
+                    (if is_node {
+                        pool.is_node_allocated(*id)
+                    } else {
+                        pool.is_edge_allocated(*id)
+                    }) && seen.insert(*id)
+                })
             };
-            if !unique_ids(&c.nodes_added, stats.node_count)
-                || !unique_ids(&c.nodes_removed, stats.node_count)
-                || !unique_ids(&c.edges_removed, stats.edge_count)
+            if !unique_ids(&c.nodes_added, true)
+                || !unique_ids(&c.nodes_removed, true)
+                || !unique_ids(&c.edges_removed, false)
                 || !unique_ids(
                     &c.edges_added.iter().map(|e| e.0).collect::<Vec<_>>(),
-                    stats.edge_count,
+                    false,
                 )
                 || c.edges_added
                     .iter()
-                    .any(|(_, u, v)| *u >= stats.node_count || *v >= stats.node_count)
+                    .any(|(_, u, v)| !pool.is_node_allocated(*u) || !pool.is_node_allocated(*v))
             {
                 return Err(invalid("duplicate or unallocated topology target"));
             }
@@ -149,8 +159,8 @@ impl HistoryDocument {
                 nodes_removed: c.nodes_removed,
                 edges_added: c.edges_added,
                 edges_removed: c.edges_removed,
-                node_attr_changes: decode_changes(c.node_attr_changes, stats.node_count, pool)?,
-                edge_attr_changes: decode_changes(c.edge_attr_changes, stats.edge_count, pool)?,
+                node_attr_changes: decode_changes(c.node_attr_changes, true, pool)?,
+                edge_attr_changes: decode_changes(c.edge_attr_changes, false, pool)?,
             };
             let delta = Delta::from_changes(changes);
             if delta.content_hash != c.delta_hash {

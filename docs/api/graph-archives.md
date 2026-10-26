@@ -110,3 +110,12 @@ named journal. Standalone archives keep their separate framing. Later records,
 reopen, locking, partial-tail recovery and backup use the existing journal protocol.
 Old journals remain readable; older binaries cannot read the new initialization
 record. Storage migrations and recovery-checkpoint scheduling remain separate work.
+
+## Explicit purge compatibility
+
+Full archives also retain permanent purge intervals and compact sparse raw
+endpoints after [explicit purge](retained-purge.md). Document readers accept legacy
+v1, v2 purge ledgers and v3 sparse endpoint records; ordinary nonpurged writes
+retain the v1 shape. Downgrades, malformed/overlapping purge intervals, duplicate
+sparse records and retained references to purged IDs reject. Active-only exports
+remain selected-data transfers with their own identity scope.

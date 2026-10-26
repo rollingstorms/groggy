@@ -14,13 +14,13 @@ The stages describe related work, with Graphiti-specific integration and retriev
 
 ## Current checkpoint — 2026-10-26
 
-The flat checklist has **201 checked / 67 open entries**, including overlapping
+The flat checklist has **204 checked / 64 open entries**, including overlapping
 parents. Effective reconstruction (16.2), property history/unsets (11.2), exact
 owned snapshots (12.2) and branch lifecycle (14.1) are complete within their stated
-contracts. Certified outer pipelines/import baselines and explicit history-only
-pruning complete components of 09.4b.2 and 15.1/15.2. Raw native escapes/defaults,
-remaining storage lifecycle, raw reclamation, rewiring/reversals and merge planning
-remain core work. Full retained archive/import (10.3) is complete; explicit locked
+contracts. Certified outer pipelines/import baselines complete components of
+09.4b.2. Explicit history pruning and full owner-domain purge close core retention
+15.1/15.2/06.3. Rewiring/reversals and merge planning are next; raw native
+escapes/defaults and wider storage platform/migration/scale work remain. Full retained archive/import (10.3) is complete; explicit locked
 Unix recovery baselines and journal replacement complete part of 10.4. Graphiti remains deferred. See
 [the current priority slice record](priority-slices-2026-10-26.md) for commits,
 verification, measured costs and the fixed next-work inventory.
@@ -82,7 +82,7 @@ Make changes atomic and persistent, then complete the Git-like history promised 
 12. **Make snapshots and state switching exact.** The first slice preserved direction and ID allocation across snapshots and branch switches. Retained subgraph membership, endpoints and old column indices now survive state switching because the selected space is rebuilt without replacing the pool. Missing meta referents reject before allocation; detached snapshot materialization rejects absent backing references. Extend reconstruction to all configuration and portable/pinned referents, bound repeated-switch column allocation, and verify state-pinned reads independently of the working head. See [retained subgraphs](../../docs/api/retained-subgraphs.md). Treat an explicit `commit` as a requested immutable checkpoint of the current published state after a compatible migration; automatic batch versions and deltas remain the source for reconstruction between checkpoints.
 13. **Complete diff, revert, and reset semantics.** `reset_hard` restores the recorded state and preserves allocated IDs. Rust and Python `diff_commits` now compare reconstructed states in either direction, including typed property before/after values and topology, with deterministic ordering. Revert, endpoint rewiring, and destructive pruning policy remain.
 14. **Finish branches and merges.** Implement a three-way merge for node, edge, and property changes, with conflict reporting and resolution. This follows reliable commits and snapshots.
-15. **Define retention and garbage collection.** Preserve referenced commits and provenance while allowing compaction of unreachable history. History-only reachability collection, exact raw-column compaction and optional orphan-value reclamation are implemented, including verified durable replacement (`pool-compaction-2026-10-26.md`). Raw entity/group reclamation, complete referent closure and identity release remain.
+15. **Define retention and garbage collection.** Preserve referenced commits and provenance while allowing compaction of unreachable history. History-only reachability collection, exact raw-column compaction and optional orphan-value reclamation are implemented, including verified durable replacement (`pool-compaction-2026-10-26.md`). Explicit previewable purge now reclaims orphan entities/groups/names with complete retained owner-domain closure, permanent ID intervals, sparse endpoint reclamation and verified durable replacement (`retained-purge-2026-10-26.md`). Broader platform/scale/scheduling remains in its original scope.
 
 ## Stage 3 — Temporal knowledge graph ingest
 
@@ -1359,3 +1359,22 @@ regressions and a release parse-cost receipt are recorded in
 Gates: **1,274 native / 52 ignored**, serial SIGKILL gate **1 passed**; **2,004
 root Python / 1 skipped**, **160 docs**, strict Clippy, in-tree extension rebuild.
 No new checklist rows; **201 checked / 67 open**.
+
+## 2026-10-26 — explicit retained-storage purge closes core retention
+
+Existing **06.3, 15.1 and 15.2** are complete under the accepted A09 embedded-library
+policy: previewable explicit purge reclaims orphan owner entities, group
+registrations, raw values and external names, with complete retained-history roots,
+independent immutable payloads and monotonic IDs. Sparse endpoint storage reclaims
+interior holes and supports later high-ID writes. Full archives, owned captures,
+verified durable replacement, reopen and backup retain purge state. No extra
+permanent pins, grace period, mandatory backup or automatic scheduling was added.
+Numeric ID arrays retain value semantics, not hidden ownership pins.
+
+Evidence, local cost trade-offs and limitations: `retained-purge-2026-10-26.md`.
+Gates: **1,308 native / 52 ignored**, dedicated serial **18-case** SIGKILL matrix,
+**2,017 root Python / 1 skipped**, **167 docs examples**, strict all-target Clippy
+and rebuilt in-tree extension. Existing Python exclusions/FFI warnings remain.
+**204 checked / 64 open**, same 268 rows. Next: typed endpoint changes/reversals
+(04.2/13.3), then three-way merges (14.2); remaining execution/default, view/index,
+numerical/scale/release and deferred integration retain their original scopes.

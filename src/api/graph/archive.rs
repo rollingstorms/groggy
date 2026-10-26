@@ -213,7 +213,7 @@ impl Graph {
         node_indices.sort_unstable();
         edge_indices.sort_unstable();
         Ok(GraphArchive {
-            version: VERSION,
+            version: self.pool.borrow().archive_version(),
             config: self.config.clone(),
             pool: self.pool.borrow().archive_document()?,
             history: self.history.archive_document()?,
@@ -297,6 +297,46 @@ fn read_header(header: &[u8; HEADER]) -> GraphResult<u64> {
     Ok(length)
 }
 impl GraphArchive {
+    pub(crate) fn encode_document(&self) -> GraphResult<Vec<u8>> {
+        let mut bytes = Vec::new();
+        ciborium::ser::into_writer(self, &mut bytes).map_err(invalid)?;
+        Ok(bytes)
+    }
+    pub(crate) fn decode_document(bytes: &[u8]) -> GraphResult<Self> {
+        let mut reader = std::io::Cursor::new(bytes);
+        let document = ciborium::de::from_reader(&mut reader).map_err(invalid)?;
+        if reader.position() != bytes.len() as u64 {
+            return Err(invalid("trailing purge capture bytes"));
+        }
+        Ok(document)
+    }
+    pub(crate) fn replace_purged_storage(
+        &mut self,
+        outcome: &super::purge::PurgeOutcome,
+    ) -> GraphResult<()> {
+        self.version = outcome.pool.archive_version();
+        self.pool = outcome.pool.archive_document()?;
+        self.identities = outcome.identities.clone();
+        self.node_indices = outcome
+            .nodes
+            .iter()
+            .flat_map(|(name, rows)| {
+                rows.iter()
+                    .map(move |(&id, &index)| (id, name.clone(), index))
+            })
+            .collect();
+        self.edge_indices = outcome
+            .edges
+            .iter()
+            .flat_map(|(name, rows)| {
+                rows.iter()
+                    .map(move |(&id, &index)| (id, name.clone(), index))
+            })
+            .collect();
+        self.node_indices.sort_unstable();
+        self.edge_indices.sort_unstable();
+        Ok(())
+    }
     pub(crate) fn replace_compacted_columns(
         &mut self,
         nodes: &crate::storage::pool::compaction::CompactedColumns,
@@ -320,22 +360,24 @@ impl GraphArchive {
     }
 
     pub(crate) fn restore(self) -> GraphResult<Graph> {
-        if self.version != VERSION {
+        if !(VERSION..=3).contains(&self.version) {
             return Err(invalid("unsupported document version"));
         }
         self.config.validate().map_err(invalid)?;
         let pool = self.pool.restore(self.config.graph_type)?;
+        if self.version < pool.archive_version() {
+            return Err(invalid("storage layout requires a newer document version"));
+        }
         let history = self.history.restore(&pool)?;
         if self.state != 0 {
             history.get_commit(self.state)?;
         }
         // Detached selections are valid: a branch may retain a later head.
         history.get_branch_head(&self.branch)?;
-        let stats = pool.statistics();
         for (name, entity) in &self.identities.bindings {
             let bound = match entity {
-                ExternalEntityRef::Node(id) => *id < stats.node_count,
-                ExternalEntityRef::Edge(id) => *id < stats.edge_count,
+                ExternalEntityRef::Node(id) => pool.is_node_allocated(*id),
+                ExternalEntityRef::Edge(id) => pool.is_edge_allocated(*id),
             };
             if name.is_empty() || !bound {
                 return Err(invalid("unallocated external identity reservation"));
@@ -350,7 +392,7 @@ impl GraphArchive {
         graph.current_commit = self.state;
         graph.automatic_publication = self.automatic_publication;
         for node in self.nodes {
-            if node >= stats.node_count || graph.space.is_node_active(node) {
+            if !graph.pool.borrow().is_node_allocated(node) || graph.space.is_node_active(node) {
                 return Err(invalid("duplicate or unallocated active node"));
             }
             graph.space.activate_node(node);
@@ -564,7 +606,7 @@ mod tests {
     #[test]
     fn semantic_archive_validation_rejects_bad_version_indices_ids_and_reservations() {
         let mut d = document();
-        d.version = 2;
+        d.version = 4;
         assert!(d.restore().is_err());
         let mut d = document();
         d.node_indices.push(d.node_indices[0].clone());
@@ -702,5 +744,32 @@ mod tests {
         graph.space_mut().activate_node(100);
         assert!(graph.save_archive(&path).is_err());
         assert!(!path.exists());
+    }
+    #[test]
+    fn archive_version_migration_accepts_legacy_and_rejects_purged_referents_and_downgrades() {
+        let original = document();
+        let encoded = serde_json::to_value(&original.pool).unwrap();
+        assert_eq!(original.version, 1);
+        assert!(encoded.get("purged_nodes").is_none());
+        original.restore().unwrap();
+        for version in [1, 2] {
+            let mut d = document();
+            d.version = version;
+            d.pool.set_test_purged_nodes(vec![(0, 1)]);
+            assert!(d.restore().is_err());
+        }
+        let mut graph = Graph::new();
+        graph.pool.borrow_mut().preserve_allocation(0, 100);
+        graph.purge_unreferenced().unwrap();
+        for version in [1, 2] {
+            let mut d = graph.archive_document().unwrap();
+            assert_eq!(d.version, 3);
+            d.version = version;
+            assert!(d.restore().is_err());
+        }
+        let mut d = document();
+        d.version = 2;
+        d.pool.set_test_purged_nodes(vec![(0, 1), (0, 1)]);
+        assert!(d.restore().is_err());
     }
 }

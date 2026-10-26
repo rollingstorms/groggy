@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after the second window's storage slices: **201 checked / 67
+Current inventory after core retention closure: **204 checked / 64
 open**. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
@@ -431,3 +431,27 @@ retain their prior scope. No additional questions or checkbox rows were created.
 property collection/physical maintenance and diagnostic components inside broad
 15.2/10.4/33.2; it does not claim those broad parents or all 67 entries are finished.
 Owner development/benchmark files and receipts remain unstaged and untouched.
+
+## Sixth priority window — complete explicit retention closure
+
+Completed existing **06.3/15.1/15.2**: previewable root-traced purge of orphan
+entities, values, groups and names, permanent interval ledgers, sparse endpoint
+reclamation, complete archive/owned/journal persistence and verified locked
+physical replacement with identical memory installation. Existing history-only
+pruning remains explicit and separate. A09 policy and open immutable payloads are
+preserved, including nested frozen group sources and current pin write authority.
+
+Concrete issue fixed inside this scope: dense interior holes and giant high-ID
+prefix allocation after purge. Ordinary graphs keep dense endpoints; purged graphs
+use sparse raw records. Local 100k-orphan journal fixture shrinks 8.8 MB → 1.6 KB;
+raw endpoint lookup trades ~3 ns dense for ~15 ns sparse. Details/receipts/gates:
+`retained-purge-2026-10-26.md`. No claim about universal latency/RSS/production use.
+
+**204 checked / 64 open**, same 268 rows. Final gates: **1,308 native / 52 ignored**,
+serial **18-case** SIGKILL matrix, **2,017 root Python / 1 skipped**, **167 docs
+examples**, strict all-target Clippy and rebuilt extension. Owner exclusions and
+three unrelated FFI warnings remain; owner benchmark work is untouched.
+
+Next core order: endpoint changes/reversals **04.2/13.3**, then caller-resolved
+three-way merging **14.2**, remaining execution/default boundaries, view/index/query
+and numerical/scale/release closure. Scheduling/Graphiti/service remain deferred.

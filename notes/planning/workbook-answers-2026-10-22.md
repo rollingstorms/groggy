@@ -1088,3 +1088,22 @@ source pins, inactive IDs, groups and external-name reservations remain. Durable
 installation uses verified locked atomic replacement. This implements the accepted
 policy; it does not add a retention schedule or release reserved identities. See
 `pool-compaction-2026-10-26.md`.
+
+## 2026-10-26 — explicit retained-storage purge closes core retention
+
+Existing **06.3, 15.1 and 15.2** are complete under the accepted A09 embedded-library
+policy: previewable explicit purge reclaims orphan owner entities, group
+registrations, raw values and external names, with complete retained-history roots,
+independent immutable payloads and monotonic IDs. Sparse endpoint storage reclaims
+interior holes and supports later high-ID writes. Full archives, owned captures,
+verified durable replacement, reopen and backup retain purge state. No extra
+permanent pins, grace period, mandatory backup or automatic scheduling was added.
+Numeric ID arrays retain value semantics, not hidden ownership pins.
+
+Evidence, local cost trade-offs and limitations: `retained-purge-2026-10-26.md`.
+Gates: **1,308 native / 52 ignored**, dedicated serial **18-case** SIGKILL matrix,
+**2,017 root Python / 1 skipped**, **167 docs examples**, strict all-target Clippy
+and rebuilt in-tree extension. Existing Python exclusions/FFI warnings remain.
+**204 checked / 64 open**, same 268 rows. Next: typed endpoint changes/reversals
+(04.2/13.3), then three-way merges (14.2); remaining execution/default, view/index,
+numerical/scale/release and deferred integration retain their original scopes.

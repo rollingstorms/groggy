@@ -26,6 +26,8 @@ mod matrices;
 mod ordinary;
 mod persistence;
 mod property_unset;
+mod purge;
+pub use purge::{PurgePlan, PurgeOutcome, PurgeReport};
 mod publication;
 mod read_attributes;
 pub(crate) mod retention;
@@ -2183,7 +2185,7 @@ impl Graph {
         // 2. Restore nodes
         for &node_id in &snapshot.active_nodes {
             // Ensure node ID exists in pool
-            self.pool.borrow_mut().ensure_node_id_exists(node_id);
+            self.pool.borrow_mut().ensure_node_id_exists(node_id)?;
             // Activate in space
             self.space.activate_node(node_id);
 
@@ -2205,7 +2207,7 @@ impl Graph {
             // Store topology in pool with specific ID
             self.pool
                 .borrow_mut()
-                .add_edge_with_id(edge_id, source, target);
+                .add_edge_with_id(edge_id, source, target)?;
             // Activate in space
             self.space.activate_edge(edge_id, source, target);
 

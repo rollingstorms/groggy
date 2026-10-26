@@ -61,3 +61,7 @@ Frozen group records are an additive journal record type with a versioned typed
 payload. Existing records remain readable; old binaries cannot read the new group
 records. Ordinary batches omit the new optional meta-node field when unused.
 Active JSON export and arbitrary raw pool transfer remain separate contracts.
+
+For explicit orphan entity/group/name reclamation, see
+[retained-storage purge](retained-purge.md). It uses verified atomic baseline
+replacement and preserves the monotonic lifetime ID counters.

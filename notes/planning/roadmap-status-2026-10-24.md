@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **201 checked and 67 unchecked entries**. Entries overlap:
+currently contains **204 checked and 64 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 68 unchecked entries are not 68 independent tasks: 13 are overlapping AR
-architecture entries, 55 are numbered entries (including nested publication
+The 64 unchecked entries are not 64 independent tasks: 13 are overlapping AR
+architecture entries, 51 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -749,3 +749,22 @@ Native/Python tests cover byte/semantic corruption, independent cursors/locks,
 partial tails, changed paths and chunked baselines. Evidence, explicit audit costs
 and limits: `storage-verification-2026-10-26.md`. Derived index/cache and service
 diagnostics remain within the original 33.2 scope. No new checklist row.
+
+## 2026-10-26 — explicit retained-storage purge closes core retention
+
+Existing **06.3, 15.1 and 15.2** are complete under the accepted A09 embedded-library
+policy: previewable explicit purge reclaims orphan owner entities, group
+registrations, raw values and external names, with complete retained-history roots,
+independent immutable payloads and monotonic IDs. Sparse endpoint storage reclaims
+interior holes and supports later high-ID writes. Full archives, owned captures,
+verified durable replacement, reopen and backup retain purge state. No extra
+permanent pins, grace period, mandatory backup or automatic scheduling was added.
+Numeric ID arrays retain value semantics, not hidden ownership pins.
+
+Evidence, local cost trade-offs and limitations: `retained-purge-2026-10-26.md`.
+Gates: **1,308 native / 52 ignored**, dedicated serial **18-case** SIGKILL matrix,
+**2,017 root Python / 1 skipped**, **167 docs examples**, strict all-target Clippy
+and rebuilt in-tree extension. Existing Python exclusions/FFI warnings remain.
+**204 checked / 64 open**, same 268 rows. Next: typed endpoint changes/reversals
+(04.2/13.3), then three-way merges (14.2); remaining execution/default, view/index,
+numerical/scale/release and deferred integration retain their original scopes.

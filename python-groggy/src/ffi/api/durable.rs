@@ -109,6 +109,51 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)?;
         storage_checkpoint_report_to_py(py, &report)
     }
+    fn preview_purge(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let plan = self
+            .core()?
+            .graph()
+            .map_err(graph_error_to_py_err)?
+            .prepare_purge()
+            .map_err(graph_error_to_py_err)?;
+        let report = py
+            .allow_threads(move || plan.execute().map(|outcome| outcome.report().clone()))
+            .map_err(graph_error_to_py_err)?;
+        super::graph::purge_report_to_py(py, &report)
+    }
+    #[pyo3(signature=(*,expected_state=None))]
+    fn purge_unreferenced(
+        &mut self,
+        py: Python<'_>,
+        expected_state: Option<StateId>,
+    ) -> PyResult<PyObject> {
+        let expected = expected_state.unwrap_or(self.current_state_id()?);
+        let plan = self
+            .core_mut()?
+            .prepare_storage_purge(expected)
+            .map_err(graph_error_to_py_err)?;
+        let outcome = py.allow_threads(move || plan.execute());
+        let report = self
+            .core_mut()?
+            .finish_storage_checkpoint(outcome)
+            .map_err(graph_error_to_py_err)?;
+        storage_checkpoint_report_to_py(py, &report)
+    }
+    fn is_node_allocated(&self, id: usize) -> PyResult<bool> {
+        Ok(self
+            .core()?
+            .graph()
+            .map_err(graph_error_to_py_err)?
+            .is_node_allocated(id))
+    }
+    fn is_edge_allocated(&self, id: usize) -> PyResult<bool> {
+        Ok(self
+            .core()?
+            .graph()
+            .map_err(graph_error_to_py_err)?
+            .is_edge_allocated(id))
+    }
+
     /// Verify actual journal bytes without repairing a tail or modifying storage.
     fn verify_storage(&mut self, py: Python<'_>) -> PyResult<PyObject> {
         let plan = self
@@ -647,6 +692,9 @@ fn storage_checkpoint_report_to_py(
             "pool_compaction",
             super::graph::pool_compaction_report_to_py(py, compaction)?,
         )?;
+    }
+    if let Some(purge) = &report.purge {
+        result.set_item("purge", super::graph::purge_report_to_py(py, purge)?)?;
     }
     Ok(result.into())
 }

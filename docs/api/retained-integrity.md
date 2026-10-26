@@ -98,3 +98,8 @@ For actual on-disk framing/checksums/replay and a retained graph audit, use
 [`DurableGraph.verify_storage()`](storage-verification.md). It never repairs a
 tail; verification errors require close/reopen. `check_integrity()` continues to
 check the captured in-memory graph without reading source journal bytes.
+
+Integrity reports include `purged_nodes` and `purged_edges`. Allocation counts
+remain lifetime extents, while purged interval counts identify reservations
+explicitly discarded. Archive validation rejects purged entity references and
+invalid sparse endpoint records. See [retained-storage purge](retained-purge.md).

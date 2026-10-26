@@ -171,8 +171,8 @@ pub use api::batch::{BatchChangeRef, BatchEdgeRef, BatchNodeRef, BatchResult, Gr
 pub use api::graph::{
     EdgeUpsert, ExternalEntityRef, Graph, GraphSchema, IntegrityCheckPlan, IntegrityReport,
     NodeUpsert, PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport, PreparedArchive,
-    PropertyConstraint, PropertyKind, SchemaViolation, ViewBatchResult, EXTERNAL_ID, LABELS,
-    RELATIONSHIP_TYPE,
+    PropertyConstraint, PropertyKind, PurgeOutcome, PurgePlan, PurgeReport, SchemaViolation,
+    ViewBatchResult, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
 };
 pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};

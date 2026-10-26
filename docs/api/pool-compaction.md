@@ -132,3 +132,7 @@ Native callers use `compact_pool_with_reclamation(true)` or
 `compact_storage_with_reclamation(expected_state, true)`; the no-argument/default
 methods preserve every distinct value. For durable graphs, raw-value removal uses
 the same verified atomic replacement and failure protocol described above.
+
+To also reclaim orphan entity IDs, group registrations and external names, use
+[explicit retained-storage purge](retained-purge.md). Column compaction alone
+keeps those reservations and registrations.

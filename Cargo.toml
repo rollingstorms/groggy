@@ -274,3 +274,7 @@ harness = false
 [[bench]]
 name = "storage_verification"
 harness = false
+
+[[bench]]
+name = "retained_purge"
+harness = false

@@ -98,7 +98,7 @@ with TemporaryDirectory() as directory:
         assert len(recovered.commit_history()) == 1
 ```
 
-## Remaining storage work
+## Separate pool and physical maintenance
 
 This is **history-only collection**. Raw entity slots, property column values,
 stored groups and external-ID reservations remain allocated. A removed state's
@@ -107,8 +107,10 @@ remain readable. History pruning does not release an old external name for reuse
 The journal still contains earlier frames and grows; replay applies the explicit
 collection record. This does not physically erase or compact the file.
 
-Raw pool/identity reclamation and retained-reference closure stay in 15.1/15.2;
-materialized recovery checkpoints, compaction, format migration and crash-safe
-replacement stay in 10.4. `optimize` is not certified as an implemented compactor.
-No automatic collection is enabled by this change. Owner-thread collection/FFI
-assembly retains the current GIL limitation.
+Use [explicit retained-storage purge](retained-purge.md) to reclaim orphan entities,
+group registrations and names after pruning, and [pool compaction](pool-compaction.md)
+for exact column compaction or optional orphan-value reclamation. Durable variants
+use verified physical replacement; `checkpoint_storage` alone preserves raw slots.
+Format/platform migration breadth and automatic scheduling remain separate work.
+No automatic collection is enabled. History-only owner-thread collection/FFI
+assembly retains its current GIL limitation.

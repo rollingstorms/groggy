@@ -81,7 +81,7 @@ pub(super) fn load(path: &Path) -> GraphResult<Graph> {
                 node.id
             )));
         }
-        graph.pool.borrow_mut().ensure_node_id_exists(node.id);
+        graph.pool.borrow_mut().ensure_node_id_exists(node.id)?;
         graph.space.activate_node(node.id);
         graph.change_tracker.record_node_addition(node.id);
         graph.set_node_attr_internal(
@@ -125,7 +125,7 @@ pub(super) fn load(path: &Path) -> GraphResult<Graph> {
                 graph
                     .pool
                     .borrow_mut()
-                    .add_edge_with_id(id, edge.source, edge.target);
+                    .add_edge_with_id(id, edge.source, edge.target)?;
                 graph.space.activate_edge(id, edge.source, edge.target);
                 graph
                     .change_tracker

@@ -20,6 +20,10 @@ pub struct IntegrityReport {
     pub allocated_nodes: usize,
     /// Reserved edge ID extent, including inactive IDs.
     pub allocated_edges: usize,
+    /// Explicitly purged IDs within the monotonic lifetime node extent.
+    pub purged_nodes: usize,
+    /// Explicitly purged IDs within the monotonic lifetime edge extent.
+    pub purged_edges: usize,
     /// Retained raw node property columns.
     pub node_columns: usize,
     /// Retained raw edge property columns.
@@ -106,6 +110,8 @@ impl IntegrityCheckPlan {
             active_edges: graph.edge_count(),
             allocated_nodes: stats.node_count,
             allocated_edges: stats.edge_count,
+            purged_nodes: pool.purged_node_count(),
+            purged_edges: pool.purged_edge_count(),
             node_columns: node_names.len(),
             edge_columns: edge_names.len(),
             node_values: node_names

@@ -14,9 +14,15 @@ pub(crate) struct PoolDocument {
     edge_sources: Vec<NodeId>,
     edge_targets: Vec<NodeId>,
     edge_alive: Vec<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sparse_edges: Option<Vec<(EdgeId, NodeId, NodeId)>>,
     stored_subgraphs: BTreeMap<SubgraphId, (HashSet<NodeId>, HashSet<EdgeId>, String)>,
     groups: Vec<(SubgraphId, GroupDocument)>,
     group_aliases: BTreeMap<SubgraphId, SubgraphId>,
+    #[serde(default, skip_serializing_if = "PurgedIds::is_empty")]
+    purged_nodes: PurgedIds,
+    #[serde(default, skip_serializing_if = "PurgedIds::is_empty")]
+    purged_edges: PurgedIds,
     next_node_id: NodeId,
     next_edge_id: EdgeId,
 }
@@ -65,6 +71,11 @@ impl GraphPool {
             edge_sources: self.edge_sources.clone(),
             edge_targets: self.edge_targets.clone(),
             edge_alive: self.edge_alive.clone(),
+            sparse_edges: self.sparse_edges.as_ref().map(|edges| {
+                let mut records: Vec<_> = edges.iter().map(|(&id, &(u, v))| (id, u, v)).collect();
+                records.sort_unstable_by_key(|&(id, _, _)| id);
+                records
+            }),
             stored_subgraphs: self
                 .stored_subgraphs
                 .iter()
@@ -76,12 +87,19 @@ impl GraphPool {
                 .iter()
                 .map(|(&id, group)| (id, group.id()))
                 .collect(),
+            purged_nodes: self.purged_nodes.clone(),
+            purged_edges: self.purged_edges.clone(),
             next_node_id: self.next_node_id,
             next_edge_id: self.next_edge_id,
         })
     }
 }
 impl PoolDocument {
+    #[cfg(test)]
+    pub(crate) fn set_test_purged_nodes(&mut self, ranges: Vec<(usize, usize)>) {
+        self.purged_nodes = PurgedIds(ranges);
+    }
+
     pub(crate) fn replace_compacted_columns(
         &mut self,
         nodes: &super::compaction::Columns,
@@ -119,8 +137,38 @@ impl PoolDocument {
         {
             return Err(invalid("inconsistent topology or allocation counters"));
         }
+        self.purged_nodes.validate(self.next_node_id)?;
+        self.purged_edges.validate(self.next_edge_id)?;
+        if let Some(edges) = &self.sparse_edges {
+            if !self.edge_sources.is_empty()
+                || !self.edge_targets.is_empty()
+                || !self.edge_alive.is_empty()
+            {
+                return Err(invalid("mixed sparse and dense endpoint storage"));
+            }
+            let mut previous = None;
+            for &(id, u, v) in edges {
+                if previous.is_some_and(|p| id <= p)
+                    || id >= self.next_edge_id
+                    || self.purged_edges.contains(id)
+                    || u >= self.next_node_id
+                    || v >= self.next_node_id
+                    || self.purged_nodes.contains(u)
+                    || self.purged_nodes.contains(v)
+                {
+                    return Err(invalid("invalid sparse edge record"));
+                }
+                previous = Some(id);
+            }
+        }
         for (id, (&u, &v)) in self.edge_sources.iter().zip(&self.edge_targets).enumerate() {
-            if self.edge_alive[id] && (u >= self.next_node_id || v >= self.next_node_id) {
+            if self.edge_alive[id]
+                && (u >= self.next_node_id
+                    || v >= self.next_node_id
+                    || self.purged_nodes.contains(u)
+                    || self.purged_nodes.contains(v)
+                    || self.purged_edges.contains(id))
+            {
                 return Err(invalid("edge endpoints exceed node allocation"));
             }
         }
@@ -129,8 +177,12 @@ impl PoolDocument {
             if self.group_aliases.contains_key(id) {
                 continue;
             }
-            if nodes.iter().any(|id| *id >= self.next_node_id)
-                || edges.iter().any(|id| *id >= self.next_edge_id)
+            if nodes
+                .iter()
+                .any(|id| *id >= self.next_node_id || self.purged_nodes.contains(*id))
+                || edges
+                    .iter()
+                    .any(|id| *id >= self.next_edge_id || self.purged_edges.contains(*id))
             {
                 return Err(invalid("stored membership exceeds entity allocation"));
             }
@@ -149,11 +201,16 @@ impl PoolDocument {
                 .collect::<GraphResult<_>>()
         };
         let mut pool = GraphPool::new_with_type(graph_type);
+        pool.purged_nodes = self.purged_nodes;
+        pool.purged_edges = self.purged_edges;
         pool.next_node_id = self.next_node_id;
         pool.next_edge_id = self.next_edge_id;
         pool.edge_sources = self.edge_sources;
         pool.edge_targets = self.edge_targets;
         pool.edge_alive = self.edge_alive;
+        pool.sparse_edges = self
+            .sparse_edges
+            .map(|edges| edges.into_iter().map(|(id, u, v)| (id, (u, v))).collect());
         pool.node_attributes = decode(self.node_attributes)?;
         pool.edge_attributes = decode(self.edge_attributes)?;
         // Restore frozen dependencies before legacy memberships, which may alias them.
@@ -200,5 +257,40 @@ impl GraphPool {
             return Err(invalid("dangling typed entity/group reference"));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod purge_tests {
+    use super::*;
+    #[test]
+    fn sparse_endpoint_archives_reject_duplicate_unsorted_mixed_and_invalid_records() {
+        let mut pool = GraphPool::new();
+        pool.ensure_node_id_exists(2).unwrap();
+        pool.add_edges(&[(0, 1), (1, 2), (0, 2)]);
+        let mut edges = HashSet::from([1, 2]);
+        pool.reclaim_storage(HashSet::from([0, 1, 2]), &mut edges, &HashSet::new())
+            .unwrap();
+        let valid = pool.archive_document().unwrap();
+        assert!(valid.clone().restore(pool.graph_type).is_ok());
+        for records in [
+            vec![(1, 1, 2), (1, 1, 2)],
+            vec![(2, 0, 2), (1, 1, 2)],
+            vec![(3, 0, 2)],
+            vec![(0, 0, 1)],
+            vec![(1, 3, 2)],
+        ] {
+            let mut doc = valid.clone();
+            doc.sparse_edges = Some(records);
+            assert!(doc.restore(pool.graph_type).is_err());
+        }
+        let mut doc = valid.clone();
+        doc.edge_sources.push(0);
+        doc.edge_targets.push(1);
+        doc.edge_alive.push(true);
+        assert!(doc.restore(pool.graph_type).is_err());
+        let mut doc = valid;
+        doc.purged_nodes = PurgedIds(vec![(2, 3)]);
+        assert!(doc.restore(pool.graph_type).is_err());
     }
 }

@@ -36,6 +36,8 @@ This separation allows:
 */
 
 mod archive;
+pub(crate) mod lifecycle;
+use lifecycle::PurgedIds;
 pub(crate) mod compaction;
 pub(crate) use archive::PoolDocument;
 
@@ -457,6 +459,8 @@ pub struct GraphPool {
     edge_targets: Vec<NodeId>,
     /// Tombstone bit indicating if an edge slot is currently active
     edge_alive: Vec<bool>,
+    /// Compact endpoint storage after explicit purge, preserving lifetime IDs.
+    sparse_edges: Option<HashMap<EdgeId, (NodeId, NodeId)>>,
 
     /*
     === SUBGRAPH STORAGE ===
@@ -483,6 +487,8 @@ pub struct GraphPool {
     */
     /// Next available node ID - increment on each new node
     next_node_id: NodeId,
+    purged_nodes: PurgedIds,
+    purged_edges: PurgedIds,
 
     /// Next available edge ID - increment on each new edge
     next_edge_id: EdgeId,
@@ -515,9 +521,12 @@ impl GraphPool {
             edge_sources: Vec::new(),
             edge_targets: Vec::new(),
             edge_alive: Vec::new(),
+            sparse_edges: None,
             stored_subgraphs: HashMap::new(),
             retained_groups: Default::default(),
             next_node_id: 0,
+            purged_nodes: PurgedIds::default(),
+            purged_edges: PurgedIds::default(),
             next_edge_id: 0,
         }
     }
@@ -594,11 +603,19 @@ impl GraphPool {
 
     /// Ensure a specific node ID exists (used for state reconstruction)
     /// This is used when restoring historical states during branch switching
-    pub fn ensure_node_id_exists(&mut self, node_id: NodeId) {
+    pub fn ensure_node_id_exists(&mut self, node_id: NodeId) -> GraphResult<()> {
+        if self.purged_nodes.contains(node_id) {
+            return Err(GraphError::InvalidInput(format!(
+                "Node {node_id} was explicitly purged"
+            )));
+        }
         // Update next_node_id if necessary to avoid ID collisions
         if node_id >= self.next_node_id {
-            self.next_node_id = node_id + 1;
+            self.next_node_id = node_id
+                .checked_add(1)
+                .ok_or_else(|| GraphError::InvalidInput("Node ID exhausted".into()))?;
         }
+        Ok(())
     }
 
     /// Ensure internal edge vectors can address the requested edge slot
@@ -613,6 +630,10 @@ impl GraphPool {
 
     /// Write edge endpoints into dense storage with tombstone tracking
     fn write_edge_slot(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
+        if let Some(edges) = &mut self.sparse_edges {
+            edges.insert(edge_id, (source, target));
+            return;
+        }
         self.ensure_edge_slot(edge_id);
         self.edge_sources[edge_id] = source;
         self.edge_targets[edge_id] = target;
@@ -636,9 +657,13 @@ impl GraphPool {
         let start_id = self.next_edge_id;
         let edge_ids: Vec<EdgeId> = (start_id..start_id + edges.len()).collect();
 
-        self.edge_sources.reserve(edges.len());
-        self.edge_targets.reserve(edges.len());
-        self.edge_alive.reserve(edges.len());
+        if let Some(sparse) = &mut self.sparse_edges {
+            sparse.reserve(edges.len());
+        } else {
+            self.edge_sources.reserve(edges.len());
+            self.edge_targets.reserve(edges.len());
+            self.edge_alive.reserve(edges.len());
+        }
 
         for (i, &(source, target)) in edges.iter().enumerate() {
             let edge_id = start_id + i;
@@ -653,16 +678,36 @@ impl GraphPool {
 
     /// Create an edge with a specific ID (used for state reconstruction)
     /// This is used when restoring historical states during branch switching
-    pub fn add_edge_with_id(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
+    pub fn add_edge_with_id(
+        &mut self,
+        edge_id: EdgeId,
+        source: NodeId,
+        target: NodeId,
+    ) -> GraphResult<()> {
+        if self.purged_edges.contains(edge_id)
+            || self.purged_nodes.contains(source)
+            || self.purged_nodes.contains(target)
+        {
+            return Err(GraphError::InvalidInput(
+                "Cannot reconstruct an explicitly purged entity".into(),
+            ));
+        }
+        let end = edge_id
+            .checked_add(1)
+            .ok_or_else(|| GraphError::InvalidInput("Edge ID exhausted".into()))?;
         self.write_edge_slot(edge_id, source, target);
         // Update next_edge_id if necessary to avoid ID collisions
         if edge_id >= self.next_edge_id {
-            self.next_edge_id = edge_id + 1;
+            self.next_edge_id = end;
         }
+        Ok(())
     }
 
     /// Get the endpoints of an edge from storage
     pub fn get_edge_endpoints(&self, edge_id: EdgeId) -> Option<(NodeId, NodeId)> {
+        if let Some(edges) = &self.sparse_edges {
+            return edges.get(&edge_id).copied();
+        }
         let idx = edge_id;
         if idx < self.edge_alive.len() && self.edge_alive[idx] {
             return Some((self.edge_sources[idx], self.edge_targets[idx]));
@@ -1046,6 +1091,11 @@ impl GraphPool {
 
     /// Check if there's an edge between two nodes
     pub fn has_edge_between(&self, source: NodeId, target: NodeId) -> bool {
+        if let Some(edges) = &self.sparse_edges {
+            return edges
+                .values()
+                .any(|&(u, v)| (u == source && v == target) || (u == target && v == source));
+        }
         // Check if any edge connects these two nodes
         for idx in 0..self.edge_alive.len() {
             if !self.edge_alive[idx] {
@@ -1064,6 +1114,14 @@ impl GraphPool {
 
     /// Get all edges connected to a node
     pub fn get_incident_edges(&self, node_id: NodeId) -> GraphResult<Vec<EdgeId>> {
+        if let Some(edges) = &self.sparse_edges {
+            let mut ids: Vec<_> = edges
+                .iter()
+                .filter_map(|(&id, &(u, v))| (u == node_id || v == node_id).then_some(id))
+                .collect();
+            ids.sort_unstable();
+            return Ok(ids);
+        }
         let mut incident_edges = Vec::new();
 
         // Check all edges to find ones connected to this node
