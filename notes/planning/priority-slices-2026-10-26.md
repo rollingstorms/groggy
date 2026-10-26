@@ -339,3 +339,17 @@ contracts, three-way merges, services or deferred Graphiti/retrieval work.
 The temporary managed reference checkout was archived after paired measurement.
 Owner development/benchmark modifications and untracked benchmark fixtures remain
 untouched.
+
+## Fifth priority window — explicit retained-column compaction
+
+Owner authorized up to another 90 minutes on the existing priorities. The selected
+order follows the open checklist, core-first direction and storage dependencies;
+it is an execution choice, not an owner ranking of all 67 unchecked entries.
+
+15.2's no-op optimize component is now real: native/Python exact raw-column
+compaction, complete working-index remapping, detached execution and stale-owner
+checks. All distinct raw values remain; history, groups, inactive IDs/reservations
+and immutable pins are preserved. See `pool-compaction-2026-10-26.md` for native,
+Python, archive and local release evidence. No new rows; **201 checked / 67 open**.
+Destructive distinct-value/entity/group collection and identity release still need
+complete reference closure. Durable physical installation is the next component.

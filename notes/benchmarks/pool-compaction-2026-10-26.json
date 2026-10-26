@@ -1,0 +1,86 @@
+{
+  "benchmark": "pool_compaction",
+  "cases": [
+    {
+      "bulk_revisions": 5,
+      "distinct_text_values": 10,
+      "nodes": 10000,
+      "samples": [
+        {
+          "capture_seconds": 0.001240792,
+          "execute_seconds": 0.086621208,
+          "install_seconds": 0.002153625,
+          "node_slots_after": 11,
+          "node_slots_before": 60000,
+          "text_column_estimated_bytes_after": 736,
+          "text_column_estimated_bytes_before": 2400296,
+          "text_column_slots_after": 10,
+          "text_column_slots_before": 50000
+        },
+        {
+          "capture_seconds": 0.001306292,
+          "execute_seconds": 0.07419375,
+          "install_seconds": 0.001689125,
+          "node_slots_after": 11,
+          "node_slots_before": 60000,
+          "text_column_estimated_bytes_after": 736,
+          "text_column_estimated_bytes_before": 2400296,
+          "text_column_slots_after": 10,
+          "text_column_slots_before": 50000
+        },
+        {
+          "capture_seconds": 0.000981792,
+          "execute_seconds": 0.073929833,
+          "install_seconds": 0.001689333,
+          "node_slots_after": 11,
+          "node_slots_before": 60000,
+          "text_column_estimated_bytes_after": 736,
+          "text_column_estimated_bytes_before": 2400296,
+          "text_column_slots_after": 10,
+          "text_column_slots_before": 50000
+        }
+      ]
+    },
+    {
+      "bulk_revisions": 5,
+      "distinct_text_values": 10000,
+      "nodes": 10000,
+      "samples": [
+        {
+          "capture_seconds": 0.000968584,
+          "execute_seconds": 0.088010584,
+          "install_seconds": 0.001696458,
+          "node_slots_after": 10001,
+          "node_slots_before": 60000,
+          "text_column_estimated_bytes_after": 492298,
+          "text_column_estimated_bytes_before": 2662736,
+          "text_column_slots_after": 10000,
+          "text_column_slots_before": 50000
+        },
+        {
+          "capture_seconds": 0.000988292,
+          "execute_seconds": 0.071783,
+          "install_seconds": 0.001641875,
+          "node_slots_after": 10001,
+          "node_slots_before": 60000,
+          "text_column_estimated_bytes_after": 492298,
+          "text_column_estimated_bytes_before": 2662736,
+          "text_column_slots_after": 10000,
+          "text_column_slots_before": 50000
+        },
+        {
+          "capture_seconds": 0.000957167,
+          "execute_seconds": 0.071073792,
+          "install_seconds": 0.0017085,
+          "node_slots_after": 10001,
+          "node_slots_before": 60000,
+          "text_column_estimated_bytes_after": 492298,
+          "text_column_estimated_bytes_before": 2662736,
+          "text_column_slots_after": 10000,
+          "text_column_slots_before": 50000
+        }
+      ]
+    }
+  ],
+  "scope": "local release; fixture setup excluded; memory_usage is an in-house retained-column estimate, not peak RSS; detached capture copies raw values; history payload remains retained"
+}

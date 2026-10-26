@@ -36,6 +36,7 @@ This separation allows:
 */
 
 mod archive;
+pub(crate) mod compaction;
 pub(crate) use archive::PoolDocument;
 
 use crate::errors::{GraphError, GraphResult};

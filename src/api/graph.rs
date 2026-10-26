@@ -14,6 +14,8 @@
 pub(crate) mod archive;
 pub use archive::PreparedArchive;
 mod checkpoints;
+mod compaction;
+pub use compaction::{PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport};
 pub(crate) mod composition;
 mod effective_read;
 mod identity;
@@ -2281,11 +2283,11 @@ impl Graph {
     Housekeeping, optimization, and system management.
     */
 
-    /// Optimize internal data structures for better performance
+    /// Explicitly deduplicate retained property columns without deleting history,
+    /// distinct values, groups, entities or external identity reservations.
+    /// Raw column offsets may change. Use compact_pool for a structured report.
     pub fn optimize(&mut self) -> Result<(), GraphError> {
-        // Basic implementation is a no-op
-        // Full implementation would optimize pool, history, and query structures
-        Ok(())
+        self.compact_pool().map(|_| ())
     }
 
     /// Garbage collect unreferenced historical states

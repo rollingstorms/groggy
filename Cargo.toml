@@ -258,3 +258,7 @@ harness = false
 [[bench]]
 name = "json_property_validation"
 harness = false
+
+[[bench]]
+name = "pool_compaction"
+harness = false

@@ -2076,6 +2076,28 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    /// Explicitly deduplicate raw columns without deleting distinct values/history.
+    fn compact_pool(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let plan = self
+            .inner
+            .borrow()
+            .prepare_pool_compaction()
+            .map_err(graph_error_to_py_err)?;
+        let outcome = py
+            .allow_threads(move || plan.execute())
+            .map_err(graph_error_to_py_err)?;
+        let report = self
+            .inner
+            .borrow_mut()
+            .finish_pool_compaction(outcome)
+            .map_err(graph_error_to_py_err)?;
+        pool_compaction_report_to_py(py, &report)
+    }
+
+    fn optimize(&self, py: Python<'_>) -> PyResult<()> {
+        self.compact_pool(py).map(|_| ())
+    }
+
     /// Build a temporal index from the graph history for efficient temporal queries.
     ///
     /// The temporal index provides O(log n) or better lookups for:
@@ -3483,5 +3505,19 @@ pub(super) fn integrity_report_to_py(
     result.set_item("maximum_active_nodes", report.maximum_active_nodes)?;
     result.set_item("maximum_active_edges", report.maximum_active_edges)?;
     result.set_item("current_schema_checked", report.current_schema_checked)?;
+    Ok(result.into())
+}
+
+/// Pure report marshalling shared by ordinary and durable maintenance.
+pub(super) fn pool_compaction_report_to_py(
+    py: Python<'_>,
+    report: &groggy::PoolCompactionReport,
+) -> PyResult<PyObject> {
+    let result = PyDict::new(py);
+    result.set_item("selected_state", report.selected_state)?;
+    result.set_item("previous_node_values", report.previous_node_values)?;
+    result.set_item("current_node_values", report.current_node_values)?;
+    result.set_item("previous_edge_values", report.previous_edge_values)?;
+    result.set_item("current_edge_values", report.current_edge_values)?;
     Ok(result.into())
 }

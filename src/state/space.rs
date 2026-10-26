@@ -790,6 +790,31 @@ impl GraphSpace {
         (edge_ids, sources, targets)
     }
 
+    /// All column mappings, including inactive entries, for explicit maintenance.
+    pub(crate) fn retained_attr_indices(
+        &self,
+        is_node: bool,
+    ) -> &HashMap<AttrName, HashMap<usize, usize>> {
+        if is_node {
+            &self.node_attribute_indices
+        } else {
+            &self.edge_attribute_indices
+        }
+    }
+
+    /// Install a fully validated column remapping. Does not change logical state.
+    pub(crate) fn replace_attr_indices(
+        &mut self,
+        is_node: bool,
+        indices: HashMap<AttrName, HashMap<usize, usize>>,
+    ) {
+        if is_node {
+            self.node_attribute_indices = indices;
+        } else {
+            self.edge_attribute_indices = indices;
+        }
+    }
+
     /// Borrow only active mappings in column order for an explicit owned import.
     pub(crate) fn active_attr_indices(
         &self,
