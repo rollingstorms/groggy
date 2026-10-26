@@ -91,3 +91,10 @@ is not a cheap per-write hook or a universal time/memory guarantee.
 Secondary-index/cache consistency, in-place physical-file verification, future
 migration/platform coverage and service observability remain in the existing
 index/storage/33.2 roadmap scope.
+
+## Verify the physical journal
+
+For actual on-disk framing/checksums/replay and a retained graph audit, use
+[`DurableGraph.verify_storage()`](storage-verification.md). It never repairs a
+tail; verification errors require close/reopen. `check_integrity()` continues to
+check the captured in-memory graph without reading source journal bytes.

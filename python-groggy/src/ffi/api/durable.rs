@@ -109,6 +109,27 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)?;
         storage_checkpoint_report_to_py(py, &report)
     }
+    /// Verify actual journal bytes without repairing a tail or modifying storage.
+    fn verify_storage(&mut self, py: Python<'_>) -> PyResult<PyObject> {
+        let plan = self
+            .core_mut()?
+            .prepare_storage_verification()
+            .map_err(graph_error_to_py_err)?;
+        let outcome = py.allow_threads(move || plan.execute());
+        let report = self
+            .core_mut()?
+            .finish_storage_verification(outcome)
+            .map_err(graph_error_to_py_err)?;
+        let result = PyDict::new(py);
+        result.set_item("file_bytes", report.file_bytes)?;
+        result.set_item("logical_records", report.logical_records)?;
+        result.set_item(
+            "graph",
+            super::graph::integrity_report_to_py(py, report.graph)?,
+        )?;
+        Ok(result.into())
+    }
+
     fn close(&mut self) {
         self.store = None;
     }

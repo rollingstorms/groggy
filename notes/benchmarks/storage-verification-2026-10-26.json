@@ -1,0 +1,48 @@
+{
+  "benchmark": "storage_verification",
+  "samples": [
+    {
+      "file_bytes": 706317,
+      "logical_records": 11,
+      "materialized_baseline_only": false,
+      "retained_versions": 1012,
+      "verification_seconds": 0.051682083
+    },
+    {
+      "file_bytes": 706953,
+      "logical_records": 1,
+      "materialized_baseline_only": true,
+      "retained_versions": 1012,
+      "verification_seconds": 0.053490125
+    },
+    {
+      "file_bytes": 706317,
+      "logical_records": 11,
+      "materialized_baseline_only": false,
+      "retained_versions": 1012,
+      "verification_seconds": 0.055553542
+    },
+    {
+      "file_bytes": 706917,
+      "logical_records": 1,
+      "materialized_baseline_only": true,
+      "retained_versions": 1012,
+      "verification_seconds": 0.050266917
+    },
+    {
+      "file_bytes": 706441,
+      "logical_records": 11,
+      "materialized_baseline_only": false,
+      "retained_versions": 1012,
+      "verification_seconds": 0.053194583
+    },
+    {
+      "file_bytes": 707073,
+      "logical_records": 1,
+      "materialized_baseline_only": true,
+      "retained_versions": 1012,
+      "verification_seconds": 0.049460041
+    }
+  ],
+  "scope": "local release; 1000 nodes, 1010 scalar property revisions plus initial nodes/column; physical file replay plus full retained audit; warm-cache; setup excluded; no mutation/FFI/RSS claim"
+}

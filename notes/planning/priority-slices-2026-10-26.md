@@ -392,3 +392,42 @@ Reclamation gates: **1,285 native passed / 52 ignored**, serial process matrix
 examples**, strict Clippy and rebuilt extension. Both-column failure atomicity and
 malformed-unused-value rejection have internal corruption regressions. Existing
 owner benchmark/nested legacy survey exclusions remain; no external packages/push.
+
+### Physical-file integrity verification completed
+
+Existing 33.2 now includes actual named-file verification: the same recovery parser
+performs read-only framing/checksum/sequence/semantic replay, followed by every
+retained-state transition and current schema check. Partial tails are reported,
+not silently repaired; an error blocks the owner until close/reopen. Independent
+file cursor and retained inode locks protect detached operation and append
+position. Native/Python tests include complete byte corruption, partial tails,
+changed paths, foreign/dropped owners, valid-checksum semantic corruption and real
+chunked baseline input. Scope/receipt: `storage-verification-2026-10-26.md`.
+
+Final window gates: **1,292 native passed / 52 ignored**, dedicated serial SIGKILL
+matrix **1 passed / twelve cases**, **2,014 root Python passed / 1 skipped**,
+**164 docs examples**, strict all-target Clippy, rebuilt in-tree extension, scoped
+formatting/diff checks. The owner's benchmark/nested legacy survey exclusions and
+three FFI warnings remain. No packages installed or push performed.
+
+## Fifth-window consolidated exit
+
+Four completed existing implementation slices, each committed separately:
+
+1. `338e4da2`: real native/Python exact property-pool compaction and optimize.
+2. `1e996a49`: verified locked physical compaction with atomic memory installation.
+3. `a1d9ef48`: optional orphan raw-value reclamation with all retained history roots.
+4. Physical journal verification: shared read-only recovery parser plus full
+   retained audit, with failure/lock/chunked-input coverage and a local cost receipt.
+
+Original scope still open: raw entity/group reclamation and external identity
+release with full reference closure (15/06.3); endpoint changes/reversals and
+three-way merging (04.2/13.3/14.2); remaining execution/default, view/index/query,
+numerical/scale/release contracts under their existing checklist entries. Format
+migrations/non-Unix support and the deferred schedule/service/Graphiti decisions
+retain their prior scope. No additional questions or checkbox rows were created.
+
+**201 checked / 67 open** remains the literal row count. This window completed
+property collection/physical maintenance and diagnostic components inside broad
+15.2/10.4/33.2; it does not claim those broad parents or all 67 entries are finished.
+Owner development/benchmark files and receipts remain unstaged and untouched.

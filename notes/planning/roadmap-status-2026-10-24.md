@@ -739,3 +739,13 @@ phases for both policies and twelve process-death cases. Local receipts and limi
 Raw entity/group reclamation, complete referent closure and identity release remain
 15.1/15.2/06.3. No scheduling/Graphiti/service scope change or new checklist row.
 Current inventory remains **201 checked / 67 open**.
+
+## 2026-10-26 — actual physical journal verification
+
+`DurableGraph.verify_storage` reads actual named-file bytes through the shared
+recovery parser and verifies all retained transitions/current schema. It never
+repairs a tail; incomplete/corrupt/changed sources block the owner until reopen.
+Native/Python tests cover byte/semantic corruption, independent cursors/locks,
+partial tails, changed paths and chunked baselines. Evidence, explicit audit costs
+and limits: `storage-verification-2026-10-26.md`. Derived index/cache and service
+diagnostics remain within the original 33.2 scope. No new checklist row.

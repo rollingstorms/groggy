@@ -344,4 +344,42 @@ mod tests {
         assert!(err.contains(&format!("state {id}")), "{err}");
         assert!(err.contains("inactive node"), "{err}");
     }
+    #[test]
+    fn physical_verification_detects_semantic_corruption_inside_a_valid_baseline() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("journal");
+        let mut graph = Graph::new();
+        graph.add_node().unwrap();
+        graph
+            .set_node_attr(0, "x".into(), AttrValue::Int(0))
+            .unwrap();
+        let current = graph.current_state_id();
+        let mut bad = ChangeSet::new();
+        bad.node_attr_changes.push((
+            0,
+            "x".into(),
+            Some(AttrValue::Int(999)),
+            Some(AttrValue::Int(1)),
+        ));
+        let id = graph
+            .history
+            .create_commit(
+                bad,
+                "bad retained transition".into(),
+                "test".into(),
+                Some(current),
+            )
+            .unwrap();
+        // The internal fixture has valid hashes/framing and a valid selected head,
+        // but an unreferenced retained version has an impossible before-value.
+        let mut store = crate::DurableGraph::create_from_graph(&path, &graph, None).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let error = store.verify_storage().unwrap_err().to_string();
+        assert!(
+            error.contains(&format!("state {id}")) && error.contains("before-value"),
+            "{error}"
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert!(store.graph().is_err());
+    }
 }

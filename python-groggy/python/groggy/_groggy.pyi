@@ -3226,6 +3226,10 @@ class DurableGraph:
         """Start a journal with complete retained graph storage/history."""
         ...
 
+    def verify_storage(self) -> Dict[str, Any]:
+        """Read-only verification of physical journal bytes and retained graph (Unix)."""
+        ...
+
     def compact_storage(self, *, expected_state: Optional[int] = None, reclaim_unreferenced: bool = False) -> Dict[str, Any]:
         """Deduplicate exact pool values and replace the retained baseline (Unix)."""
         ...

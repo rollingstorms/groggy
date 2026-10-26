@@ -234,18 +234,18 @@ impl DurableGraph {
     }
 }
 #[cfg(unix)]
-fn same_inode(a: &File, b: &File) -> GraphResult<bool> {
+pub(super) fn same_inode(a: &File, b: &File) -> GraphResult<bool> {
     use std::os::unix::fs::MetadataExt;
     let a = a.metadata().map_err(invalid)?;
     let b = b.metadata().map_err(invalid)?;
     Ok(a.dev() == b.dev() && a.ino() == b.ino())
 }
 #[cfg(not(unix))]
-fn same_inode(_a: &File, _b: &File) -> GraphResult<bool> {
+pub(super) fn same_inode(_a: &File, _b: &File) -> GraphResult<bool> {
     Ok(false)
 }
 #[cfg(unix)]
-fn check_path(source: &File, path: &Path) -> GraphResult<()> {
+pub(super) fn check_path(source: &File, path: &Path) -> GraphResult<()> {
     use std::os::unix::fs::MetadataExt;
     let owned = source
         .metadata()
@@ -257,6 +257,13 @@ fn check_path(source: &File, path: &Path) -> GraphResult<()> {
     }
     Ok(())
 }
+#[cfg(not(unix))]
+pub(super) fn check_path(_source: &File, _path: &Path) -> GraphResult<()> {
+    Err(invalid(
+        "inode-checked storage maintenance currently requires Unix",
+    ))
+}
+
 impl StorageCheckpointPlan {
     /// Perform detached file I/O and candidate verification. Always finish the outcome
     /// on its original owner, including errors, to preserve lock/publication ownership.

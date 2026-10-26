@@ -3,7 +3,11 @@
 //! publishing memory; recovery replays only complete, validated records.
 mod baseline;
 mod checkpoint;
+mod verification;
 pub use checkpoint::StorageCheckpointReport;
+pub use verification::{
+    StorageIntegrityReport, StorageVerificationOutcome, StorageVerificationPlan,
+};
 
 use super::retained_group as value_codec;
 use crate::{
@@ -390,119 +394,14 @@ impl DurableGraph {
             .open(path)
             .map_err(|e| io_error(path, "open_graph_journal", e))?;
         lock(&file, path)?;
-        let mut magic = [0u8; 8];
-        file.read_exact(&mut magic)
-            .map_err(|e| io_error(path, "read_journal_header", e))?;
-        if &magic != MAGIC {
-            return Err(invalid("unsupported format/version"));
-        }
-        let length = file
-            .metadata()
-            .map_err(|e| io_error(path, "stat_journal", e))?
-            .len();
-        let mut position = 8u64;
-        let mut sequence = 0u64;
-        let mut graph = None;
-        let mut schema = None;
-        let mut schema_revision = 0;
-        while position < length {
-            let remaining = length - position;
-            if remaining < HEADER_SIZE as u64 {
-                let mut tail = vec![0; remaining as usize];
-                file.read_exact(&mut tail)
-                    .map_err(|e| io_error(path, "read_journal_tail", e))?;
-                let prefix = tail.len().min(FRAME.len());
-                if tail[..prefix] != FRAME[..prefix] && tail[..prefix] != baseline::BEGIN[..prefix]
-                {
-                    return Err(invalid("corrupt partial frame marker"));
-                }
-                break;
-            }
-            let mut header = [0u8; HEADER_SIZE];
-            file.read_exact(&mut header)
-                .map_err(|e| io_error(path, "read_frame_header", e))?;
-            let (entry, consumed) = if &header[..8] == baseline::BEGIN {
-                if sequence != 0 || graph.is_some() {
-                    return Err(invalid("duplicate initialization"));
-                }
-                baseline::read_chunked(&mut file, header, position, length)?
-            } else {
-                if &header[..8] != FRAME {
-                    return Err(invalid("bad frame marker"));
-                }
-                let number = |start| {
-                    let mut bytes = [0; 8];
-                    bytes.copy_from_slice(&header[start..start + 8]);
-                    u64::from_le_bytes(bytes)
-                };
-                let count = number(8);
-                if number(16) != !count {
-                    return Err(invalid("frame length checksum mismatch"));
-                }
-                if count > MAX_RECORD as u64 {
-                    return Err(invalid("record exceeds 256 MiB limit"));
-                }
-                if count > remaining - HEADER_SIZE as u64 {
-                    break;
-                }
-                let mut payload = vec![0; count as usize];
-                file.read_exact(&mut payload)
-                    .map_err(|e| io_error(path, "read_frame_payload", e))?;
-                if xxhash_rust::xxh3::xxh3_64(&payload) != number(24) {
-                    return Err(invalid("frame checksum mismatch"));
-                }
-                let mut cursor = Cursor::new(&payload);
-                let entry: Entry = ciborium::de::from_reader(&mut cursor).map_err(invalid)?;
-                if cursor.position() != count {
-                    return Err(invalid("trailing bytes in frame"));
-                }
-                (entry, HEADER_SIZE as u64 + count)
-            };
-            if entry.sequence != sequence {
-                return Err(invalid("noncontiguous record sequence"));
-            }
-            match entry.record {
-                Record::Init {
-                    config,
-                    schema: policy,
-                } if graph.is_none() && sequence == 0 => {
-                    config.validate().map_err(invalid)?;
-                    let candidate = Graph::with_config_manual(config)?;
-                    if let Some(schema) = &policy {
-                        candidate.check_schema_policy(schema)?;
-                    }
-                    graph = Some(candidate);
-                    schema = policy;
-                }
-                Record::InitArchive {
-                    archive,
-                    schema: policy,
-                    schema_revision: stored_revision,
-                } if graph.is_none() && sequence == 0 => {
-                    let candidate = archive.restore()?;
-                    if let Some(schema) = &policy {
-                        candidate.check_schema_policy(schema)?;
-                    }
-                    graph = Some(candidate);
-                    schema = policy;
-                    schema_revision = stored_revision;
-                }
-                Record::Init { .. } | Record::InitArchive { .. } => {
-                    return Err(invalid("duplicate initialization"))
-                }
-                record => {
-                    let graph = graph
-                        .as_mut()
-                        .ok_or_else(|| invalid("missing initialization"))?;
-                    Self::replay(graph, &mut schema, &mut schema_revision, record)?;
-                }
-            }
-            sequence = sequence
-                .checked_add(1)
-                .ok_or_else(|| invalid("sequence exhausted"))?;
-            position += consumed;
-        }
-        let graph = graph.ok_or_else(|| invalid("journal initialization is incomplete"))?;
+        let RecoveredJournal {
+            graph,
+            schema,
+            schema_revision,
+            sequence,
+            length,
+            position,
+        } = read_journal(&mut file, path)?;
         let recovered_tail_bytes = length - position;
         if recovered_tail_bytes > 0 {
             file.set_len(position)
@@ -1577,4 +1476,136 @@ mod history_collection_failure_tests {
             assert!(recovered.graph().unwrap().snapshot_at_commit(gone).is_err());
         }
     }
+}
+
+/// Shared recovery parser. Framing and semantic replay never alter source bytes.
+struct RecoveredJournal {
+    graph: Graph,
+    schema: Option<GraphSchema>,
+    schema_revision: u64,
+    sequence: u64,
+    length: u64,
+    position: u64,
+}
+fn read_journal(file: &mut File, path: &Path) -> GraphResult<RecoveredJournal> {
+    let mut magic = [0u8; 8];
+    file.read_exact(&mut magic)
+        .map_err(|e| io_error(path, "read_journal_header", e))?;
+    if &magic != MAGIC {
+        return Err(invalid("unsupported format/version"));
+    }
+    let length = file
+        .metadata()
+        .map_err(|e| io_error(path, "stat_journal", e))?
+        .len();
+    let mut position = 8u64;
+    let mut sequence = 0u64;
+    let mut graph = None;
+    let mut schema = None;
+    let mut schema_revision = 0;
+    while position < length {
+        let remaining = length - position;
+        if remaining < HEADER_SIZE as u64 {
+            let mut tail = vec![0; remaining as usize];
+            file.read_exact(&mut tail)
+                .map_err(|e| io_error(path, "read_journal_tail", e))?;
+            let prefix = tail.len().min(FRAME.len());
+            if tail[..prefix] != FRAME[..prefix] && tail[..prefix] != baseline::BEGIN[..prefix] {
+                return Err(invalid("corrupt partial frame marker"));
+            }
+            break;
+        }
+        let mut header = [0u8; HEADER_SIZE];
+        file.read_exact(&mut header)
+            .map_err(|e| io_error(path, "read_frame_header", e))?;
+        let (entry, consumed) = if &header[..8] == baseline::BEGIN {
+            if sequence != 0 || graph.is_some() {
+                return Err(invalid("duplicate initialization"));
+            }
+            baseline::read_chunked(file, header, position, length)?
+        } else {
+            if &header[..8] != FRAME {
+                return Err(invalid("bad frame marker"));
+            }
+            let number = |start| {
+                let mut bytes = [0; 8];
+                bytes.copy_from_slice(&header[start..start + 8]);
+                u64::from_le_bytes(bytes)
+            };
+            let count = number(8);
+            if number(16) != !count {
+                return Err(invalid("frame length checksum mismatch"));
+            }
+            if count > MAX_RECORD as u64 {
+                return Err(invalid("record exceeds 256 MiB limit"));
+            }
+            if count > remaining - HEADER_SIZE as u64 {
+                break;
+            }
+            let mut payload = vec![0; count as usize];
+            file.read_exact(&mut payload)
+                .map_err(|e| io_error(path, "read_frame_payload", e))?;
+            if xxhash_rust::xxh3::xxh3_64(&payload) != number(24) {
+                return Err(invalid("frame checksum mismatch"));
+            }
+            let mut cursor = Cursor::new(&payload);
+            let entry: Entry = ciborium::de::from_reader(&mut cursor).map_err(invalid)?;
+            if cursor.position() != count {
+                return Err(invalid("trailing bytes in frame"));
+            }
+            (entry, HEADER_SIZE as u64 + count)
+        };
+        if entry.sequence != sequence {
+            return Err(invalid("noncontiguous record sequence"));
+        }
+        match entry.record {
+            Record::Init {
+                config,
+                schema: policy,
+            } if graph.is_none() && sequence == 0 => {
+                config.validate().map_err(invalid)?;
+                let candidate = Graph::with_config_manual(config)?;
+                if let Some(schema) = &policy {
+                    candidate.check_schema_policy(schema)?;
+                }
+                graph = Some(candidate);
+                schema = policy;
+            }
+            Record::InitArchive {
+                archive,
+                schema: policy,
+                schema_revision: stored_revision,
+            } if graph.is_none() && sequence == 0 => {
+                let candidate = archive.restore()?;
+                if let Some(schema) = &policy {
+                    candidate.check_schema_policy(schema)?;
+                }
+                graph = Some(candidate);
+                schema = policy;
+                schema_revision = stored_revision;
+            }
+            Record::Init { .. } | Record::InitArchive { .. } => {
+                return Err(invalid("duplicate initialization"))
+            }
+            record => {
+                let graph = graph
+                    .as_mut()
+                    .ok_or_else(|| invalid("missing initialization"))?;
+                DurableGraph::replay(graph, &mut schema, &mut schema_revision, record)?;
+            }
+        }
+        sequence = sequence
+            .checked_add(1)
+            .ok_or_else(|| invalid("sequence exhausted"))?;
+        position += consumed;
+    }
+    let graph = graph.ok_or_else(|| invalid("journal initialization is incomplete"))?;
+    Ok(RecoveredJournal {
+        graph,
+        schema,
+        schema_revision,
+        sequence,
+        length,
+        position,
+    })
 }

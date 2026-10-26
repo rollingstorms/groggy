@@ -270,3 +270,7 @@ harness = false
 [[bench]]
 name = "pool_value_reclamation"
 harness = false
+
+[[bench]]
+name = "storage_verification"
+harness = false
