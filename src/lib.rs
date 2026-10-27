@@ -169,10 +169,11 @@ pub mod api {
 // Re-export commonly used types and the main API
 pub use api::batch::{BatchChangeRef, BatchEdgeRef, BatchNodeRef, BatchResult, GraphBatch};
 pub use api::graph::{
-    EdgeUpsert, ExternalEntityRef, Graph, GraphSchema, IntegrityCheckPlan, IntegrityReport,
-    NodeUpsert, PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport, PreparedArchive,
-    PropertyConstraint, PropertyKind, PurgeOutcome, PurgePlan, PurgeReport, SchemaViolation,
-    StateRestoreOutcome, StateRestorePlan, ViewBatchResult, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
+    EdgeUpsert, ExternalEntityRef, Graph, GraphMergeOutcome, GraphMergePlan, GraphMergeReadPlan,
+    GraphSchema, IntegrityCheckPlan, IntegrityReport, NodeUpsert, PoolCompactionOutcome,
+    PoolCompactionPlan, PoolCompactionReport, PreparedArchive, PropertyConstraint, PropertyKind,
+    PurgeOutcome, PurgePlan, PurgeReport, SchemaViolation, StateRestoreOutcome, StateRestorePlan,
+    ViewBatchResult, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
 };
 pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};

@@ -75,3 +75,35 @@ metadata; two-parent publication; synced durable replay/recovery; and Python
 translation. These remain the fixed 14.2 remainder. In particular, importing a
 logical output through an untracked raw snapshot is not an accepted merge path.
 There is no new serialization or storage-format change in this planner component.
+
+## Owner-bound capture and read-only preflight
+
+Native `Graph.prepare_merge_read(right_state, base, expected_state)` now captures
+retained recorded inputs with the graph's identity and selected branch/head.
+`base=None` selects only a unique best common ancestor. An explicit nonzero base
+must be an ancestor of both parents. Unrelated roots require the explicit empty
+base `Some(0)`. Parents must be distinct retained published versions; dirty/stale,
+unknown, identical and non-common selections reject before reconstruction.
+
+`GraphMergeReadPlan.execute()` produces a `GraphMergePlan` off-owner. Inspect its
+`parents()`, `base_state()` and `conflicts()`, then use `into_outcome()` for a
+conflict-free plan or `resolve_with()` for explicit typed choices. Read plan,
+conflict plan and resolved outcome are owned Send + Sync values. A cold capture
+can reconstruct after owner changes/destruction because it owns immutable recorded
+inputs. It does not permanently pin the owner's lookup or grant write authority.
+
+`Graph.validate_merge_outcome(outcome, schema)` rechecks owner, current branch/head,
+retained parents/base, structural/direction compatibility, allocated/unpurged IDs,
+group references, external identities and an optional complete-target schema.
+Intervening valid pool compaction is safe; collected parent/base lookups reject.
+The right parent is an explicit version, not a subscription to a moving branch.
+No versions, IDs, properties, branch heads, reservations or clocks change during
+capture, resolution or validation. Resolved `snapshot().state_id` is zero as an
+unpublished marker; it is not an accepted graph version.
+
+Preflight alone is not durable/current-policy authority for later use. Publication
+must recheck the live owner and validate the exact resolved first-parent delta,
+effective timeline and installed durable schema immediately before acceptance.
+The owning mutation coordinator, two-parent publication, durable record/replay and
+Python translation remain unfinished; there is no `Graph.finish_merge` write API
+in this component. Do not install the logical output through raw snapshot imports.

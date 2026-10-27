@@ -1467,3 +1467,22 @@ surfaces remain. Evidence and fixed remainder: `snapshot-merge-planning-2026-10-
 Rust merge example, strict Clippy, rebuilt FFI and serial 18-case recovery matrix.
 Local 100k-node pure planning median **274.29 ms**, final validation **6.72 ms**;
 no publication/FFI/RSS/production claim. No new checklist rows.
+
+### Owner-bound merge capture/preflight (14.2 component) — 2026-10-27
+
+Native Graph now captures owner/head/branch/base and two explicit retained parent
+versions into a detached read plan. Typed caller resolution produces a privately
+provenanced unpublished outcome. Read-only preflight rejects stale/foreign/changed
+branches, collected parents/bases, unallocated IDs, missing group references,
+conflicting external identity and optional full-target schema violations. Valid
+compaction preserves logical results; explicit empty base handles unrelated roots.
+Capture/resolution/validation do not allocate IDs/versions or change working state.
+
+**14.2 remains partial**: exact first-parent delta and clock/timeline preparation,
+current-policy revalidation, guarded one-version two-parent publication, durable
+record/replay/failure evidence and Python APIs remain. There is no unchecked
+finish_merge write API. Fixed evidence/remainder: `owner-merge-capture-2026-10-27.md`.
+**205 checked / 63 open**, same 268 rows. Gates: **1,356 native / 52 ignored**,
+**2,025 root Python / 1 skipped**, **176 Python docs examples**, strict Clippy and
+rebuilt/staged in-tree FFI. The preceding planner's 18-case recovery gate remains
+the latest storage check; this component has no journal/storage change.
