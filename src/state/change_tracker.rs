@@ -114,6 +114,18 @@ impl ChangeTracker {
         }
     }
 
+    /// Whether the installed strategy can retain typed endpoint changes.
+    pub fn supports_endpoint_changes(&self) -> bool {
+        self.strategy.supports_endpoint_changes()
+    }
+    /// Retain the original and final endpoints of one stable edge instance.
+    pub fn record_edge_endpoint_change(
+        &mut self,
+        change: crate::EdgeEndpointChange,
+    ) -> GraphResult<()> {
+        self.strategy.record_edge_endpoint_change(change)
+    }
+
     /// Record that an edge was removed
     pub fn record_edge_removal(&mut self, edge_id: EdgeId) {
         self.strategy.record_edge_removal(edge_id);
@@ -368,6 +380,7 @@ impl ChangeTracker {
             nodes_removed: changeset.nodes_removed.len(),
             edges_added: changeset.edges_added.len(),
             edges_removed: changeset.edges_removed.len(),
+            edge_endpoint_changes: changeset.edge_endpoint_changes.len(),
             node_attr_changes: changeset.node_attr_changes.len(),
             edge_attr_changes: changeset.edge_attr_changes.len(),
             total_changes: self.change_count(),
@@ -430,6 +443,8 @@ impl ChangeTracker {
         total += changeset.nodes_removed.len() * std::mem::size_of::<NodeId>();
         total += changeset.edges_added.len() * std::mem::size_of::<(EdgeId, NodeId, NodeId)>();
         total += changeset.edges_removed.len() * std::mem::size_of::<EdgeId>();
+        total += changeset.edge_endpoint_changes.len()
+            * std::mem::size_of::<crate::EdgeEndpointChange>();
 
         // Size of attribute changes
         for (_, _attr_name, old_val, new_val) in &changeset.node_attr_changes {
@@ -593,6 +608,8 @@ pub struct ChangeSet {
     pub nodes_removed: Vec<NodeId>,
     pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
     pub edges_removed: Vec<EdgeId>,
+    /// Stable edge identities whose endpoints changed.
+    pub edge_endpoint_changes: Vec<crate::EdgeEndpointChange>,
     pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
     pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
 }
@@ -605,6 +622,7 @@ impl ChangeSet {
             nodes_removed: Vec::new(),
             edges_added: Vec::new(),
             edges_removed: Vec::new(),
+            edge_endpoint_changes: Vec::new(),
             node_attr_changes: Vec::new(),
             edge_attr_changes: Vec::new(),
         }
@@ -616,6 +634,7 @@ impl ChangeSet {
             && self.nodes_removed.is_empty()
             && self.edges_added.is_empty()
             && self.edges_removed.is_empty()
+            && self.edge_endpoint_changes.is_empty()
             && self.node_attr_changes.is_empty()
             && self.edge_attr_changes.is_empty()
     }
@@ -628,6 +647,7 @@ pub struct ChangeSummary {
     pub nodes_removed: usize,
     pub edges_added: usize,
     pub edges_removed: usize,
+    pub edge_endpoint_changes: usize,
     pub node_attr_changes: usize,
     pub edge_attr_changes: usize,
     pub total_changes: usize,
@@ -650,7 +670,11 @@ impl ChangeSummary {
             self.edges_removed,
             self.node_attr_changes,
             self.edge_attr_changes
-        )
+        ) + &if self.edge_endpoint_changes > 0 {
+            format!(", {} endpoint changes", self.edge_endpoint_changes)
+        } else {
+            String::new()
+        }
     }
 }
 

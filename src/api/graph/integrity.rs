@@ -166,14 +166,6 @@ impl IntegrityCheckPlan {
             };
             *count -= 1;
             validate_before(&state, &version.delta, version.id)?;
-            for &(edge, u, v) in &version.delta.edges_added {
-                if pool.get_edge_endpoints(edge) != Some((u, v)) {
-                    return Err(invalid(
-                        version.id,
-                        format!("edge {edge} differs from its allocated endpoint identity"),
-                    ));
-                }
-            }
             state.apply_delta_in_place(&version.delta, version.id);
             validate_snapshot(&state)?;
             report.verified_states += 1;
@@ -192,6 +184,23 @@ fn invalid(state: StateId, reason: impl std::fmt::Display) -> GraphError {
     ))
 }
 fn validate_before(state: &GraphSnapshot, delta: &Delta, id: StateId) -> GraphResult<()> {
+    let added: HashSet<_> = delta.edges_added.iter().map(|e| e.0).collect();
+    let removed: HashSet<_> = delta.edges_removed.iter().copied().collect();
+    let mut revised = HashSet::new();
+    for change in &delta.edge_endpoint_changes {
+        if !revised.insert(change.edge_id)
+            || removed.contains(&change.edge_id)
+            || added.contains(&change.edge_id)
+        {
+            return Err(invalid(id, "conflicting endpoint revision"));
+        }
+        if state.edges.get(&change.edge_id) != Some(&change.old_endpoints) {
+            return Err(invalid(
+                id,
+                format!("edge {} endpoint before-state mismatch", change.edge_id),
+            ));
+        }
+    }
     for node in &delta.nodes_added {
         if state.active_nodes.contains(node) {
             return Err(invalid(

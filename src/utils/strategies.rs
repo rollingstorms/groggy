@@ -53,6 +53,20 @@ pub trait TemporalStorageStrategy: std::fmt::Debug {
     /// Record that an edge was added to the graph
     fn record_edge_addition(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId);
 
+    /// Existing external strategies explicitly opt into the new typed change kind.
+    fn supports_endpoint_changes(&self) -> bool {
+        false
+    }
+    /// Reject unsupported endpoint tracking instead of losing historical topology.
+    fn record_edge_endpoint_change(
+        &mut self,
+        _change: crate::EdgeEndpointChange,
+    ) -> GraphResult<()> {
+        Err(GraphError::InvalidInput(
+            "Temporal strategy does not support endpoint changes".into(),
+        ))
+    }
+
     /// Record that an edge was removed from the graph
     fn record_edge_removal(&mut self, edge_id: EdgeId);
 
@@ -254,9 +268,11 @@ pub struct IndexDeltaStrategy {
     /// Edges that have been added since last commit
     /// Format: (edge_id, source_node, target_node)
     edges_added: Vec<(EdgeId, NodeId, NodeId)>,
+    edge_add_positions: Option<HashMap<EdgeId, usize>>,
 
     /// Edges that have been removed since last commit
     edges_removed: Vec<EdgeId>,
+    edge_endpoint_changes: HashMap<EdgeId, crate::EdgeEndpointChange>,
 
     /// Node attribute changes since last commit
     /// Format: (node_id, attr_name, old_index, new_index)
@@ -281,7 +297,9 @@ impl IndexDeltaStrategy {
             nodes_added: Vec::new(),
             nodes_removed: Vec::new(),
             edges_added: Vec::new(),
+            edge_add_positions: None,
             edges_removed: Vec::new(),
+            edge_endpoint_changes: HashMap::new(),
             node_attr_index_changes: Vec::new(),
             edge_attr_index_changes: Vec::new(),
             first_change_timestamp: None,
@@ -340,6 +358,36 @@ impl IndexDeltaStrategy {
 }
 
 impl TemporalStorageStrategy for IndexDeltaStrategy {
+    fn supports_endpoint_changes(&self) -> bool {
+        true
+    }
+    fn record_edge_endpoint_change(
+        &mut self,
+        change: crate::EdgeEndpointChange,
+    ) -> GraphResult<()> {
+        if !self.edges_added.is_empty() {
+            let positions = self.edge_add_positions.get_or_insert_with(|| {
+                self.edges_added
+                    .iter()
+                    .enumerate()
+                    .map(|(i, row)| (row.0, i))
+                    .collect()
+            });
+            if let Some(&position) = positions.get(&change.edge_id) {
+                self.edges_added[position].1 = change.new_endpoints.0;
+                self.edges_added[position].2 = change.new_endpoints.1;
+                self.update_change_metadata();
+                return Ok(());
+            }
+        }
+        self.edge_endpoint_changes
+            .entry(change.edge_id)
+            .and_modify(|old| old.new_endpoints = change.new_endpoints)
+            .or_insert(change);
+        self.update_change_metadata();
+        Ok(())
+    }
+
     fn record_node_addition(&mut self, node_id: NodeId) {
         self.nodes_added.push(node_id);
         self.update_change_metadata();
@@ -355,11 +403,15 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
 
     fn record_edge_addition(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
         self.edges_added.push((edge_id, source, target));
+        if let Some(positions) = &mut self.edge_add_positions {
+            positions.insert(edge_id, self.edges_added.len() - 1);
+        }
         self.update_change_metadata();
     }
 
     fn record_edge_removal(&mut self, edge_id: EdgeId) {
         self.edges_removed.push(edge_id);
+        self.edge_endpoint_changes.remove(&edge_id);
         // Remove any attribute changes for this edge since it's being deleted
         self.edge_attr_index_changes
             .retain(|(id, _, _, _)| *id != edge_id);
@@ -461,6 +513,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
             self.edges_added.clone(),
             self.edges_removed.clone(),
         )
+        .with_endpoint_changes(self.edge_endpoint_changes.values().copied().collect())
     }
 
     fn create_change_set(&self) -> ChangeSet {
@@ -492,6 +545,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
             nodes_removed: self.nodes_removed.clone(),
             edges_added: self.edges_added.clone(),
             edges_removed: self.edges_removed.clone(),
+            edge_endpoint_changes: self.edge_endpoint_changes.values().copied().collect(),
             node_attr_changes,
             edge_attr_changes,
         }
@@ -503,6 +557,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
             nodes_removed: self.nodes_removed.clone(),
             edges_added: self.edges_added.clone(),
             edges_removed: self.edges_removed.clone(),
+            edge_endpoint_changes: self.edge_endpoint_changes.values().copied().collect(),
             node_attr_changes: Vec::new(),
             edge_attr_changes: Vec::new(),
         };
@@ -579,6 +634,7 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
             || !self.nodes_removed.is_empty()
             || !self.edges_added.is_empty()
             || !self.edges_removed.is_empty()
+            || !self.edge_endpoint_changes.is_empty()
             || !self.node_attr_index_changes.is_empty()
             || !self.edge_attr_index_changes.is_empty()
     }
@@ -591,7 +647,9 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
         self.nodes_added.clear();
         self.nodes_removed.clear();
         self.edges_added.clear();
+        self.edge_add_positions = None;
         self.edges_removed.clear();
+        self.edge_endpoint_changes.clear();
         self.node_attr_index_changes.clear();
         self.edge_attr_index_changes.clear();
         self.first_change_timestamp = None;

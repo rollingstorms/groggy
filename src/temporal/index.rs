@@ -47,6 +47,8 @@ pub struct TemporalIndex {
     /// Map from edge ID to (source, target) nodes.
     /// This allows neighbor queries without reconstructing full state.
     edge_endpoints: HashMap<EdgeId, (NodeId, NodeId)>,
+    /// Allocated only for edges with an actual endpoint revision.
+    edge_endpoint_revisions: HashMap<EdgeId, Vec<(StateId, (NodeId, NodeId))>>,
 
     /// Commit timestamp index for range queries.
     /// Maps commit ID to timestamp for temporal window queries.
@@ -69,6 +71,7 @@ impl TemporalIndex {
             node_attr_timeline: HashMap::new(),
             edge_attr_timeline: HashMap::new(),
             edge_endpoints: HashMap::new(),
+            edge_endpoint_revisions: HashMap::new(),
             commit_timestamps: BTreeMap::new(),
             timestamp_to_commit: BTreeMap::new(),
         }
@@ -233,6 +236,46 @@ impl TemporalIndex {
     fn process_commit(&mut self, history: &HistoryForest, commit_id: StateId) -> GraphResult<()> {
         let commit = history.get_commit(commit_id)?;
         let delta = &commit.delta;
+        let (added_nodes, removed_nodes, added_edges, removed_edges): (
+            HashSet<_>,
+            HashSet<_>,
+            HashSet<_>,
+            HashSet<_>,
+        ) = if delta.edge_endpoint_changes.is_empty() {
+            (
+                HashSet::new(),
+                HashSet::new(),
+                HashSet::new(),
+                HashSet::new(),
+            )
+        } else {
+            (
+                delta.nodes_added.iter().copied().collect(),
+                delta.nodes_removed.iter().copied().collect(),
+                delta.edges_added.iter().map(|e| e.0).collect(),
+                delta.edges_removed.iter().copied().collect(),
+            )
+        };
+        let mut revisions = HashSet::new();
+        for change in &delta.edge_endpoint_changes {
+            if !revisions.insert(change.edge_id)
+                || !self.edge_exists_at(change.edge_id, commit_id.saturating_sub(1))
+                || self.edge_endpoints.get(&change.edge_id).copied() != Some(change.old_endpoints)
+                || added_edges.contains(&change.edge_id)
+                || [change.new_endpoints.0, change.new_endpoints.1]
+                    .iter()
+                    .any(|&node| {
+                        removed_nodes.contains(&node)
+                            || !(added_nodes.contains(&node)
+                                || self.node_exists_at(node, commit_id.saturating_sub(1)))
+                    })
+                || removed_edges.contains(&change.edge_id)
+            {
+                return Err(GraphError::InvalidInput(
+                    "Invalid temporal endpoint revision".into(),
+                ));
+            }
+        }
         self.records.insert(commit_id, Arc::clone(delta));
 
         // Record commit timestamp
@@ -276,6 +319,14 @@ impl TemporalIndex {
                 ));
             }
             self.edge_endpoints.insert(edge_id, (source, target));
+        }
+
+        for c in &delta.edge_endpoint_changes {
+            self.edge_endpoint_revisions
+                .entry(c.edge_id)
+                .or_insert_with(|| vec![(0, c.old_endpoints)])
+                .push((commit_id, c.new_endpoints));
+            self.edge_endpoints.insert(c.edge_id, c.new_endpoints);
         }
 
         // Track edge deletions
@@ -381,7 +432,18 @@ impl TemporalIndex {
     pub fn neighbors_at_commit(&self, node_id: NodeId, commit_id: StateId) -> Vec<NodeId> {
         let mut neighbors = Vec::new();
 
-        for (&edge_id, &(source, target)) in &self.edge_endpoints {
+        for (&edge_id, &pair) in &self.edge_endpoints {
+            let (source, target) = if let Some(values) = self.edge_endpoint_revisions.get(&edge_id)
+            {
+                let position = values.partition_point(|(state, _)| *state <= commit_id);
+                let Some((_, pair)) = position.checked_sub(1).and_then(|i| values.get(i)).copied()
+                else {
+                    continue;
+                };
+                pair
+            } else {
+                pair
+            };
             // Check if edge existed at this commit
             if !self.edge_exists_at(edge_id, commit_id) {
                 continue;
@@ -429,17 +491,38 @@ impl TemporalIndex {
     ) -> Vec<NodeId> {
         let mut neighbors = std::collections::HashSet::new();
 
-        for (&edge_id, &(source, target)) in &self.edge_endpoints {
-            let overlap = self.edge_intervals.get(&edge_id).is_some_and(|intervals| {
-                intervals.iter().any(|&(created, deleted)| {
-                    created <= end_commit && deleted.is_none_or(|deleted| start_commit < deleted)
-                })
-            });
-            if start_commit <= end_commit && overlap {
-                if source == node_id {
-                    neighbors.insert(target);
-                } else if target == node_id {
-                    neighbors.insert(source);
+        for (&edge_id, &pair) in &self.edge_endpoints {
+            let fixed = (0, pair);
+            let values = self
+                .edge_endpoint_revisions
+                .get(&edge_id)
+                .map(Vec::as_slice)
+                .unwrap_or_else(|| std::slice::from_ref(&fixed));
+            let Some(intervals) = self.edge_intervals.get(&edge_id) else {
+                continue;
+            };
+            let (mut i, mut j) = (0, 0);
+            while start_commit <= end_commit && i < values.len() && j < intervals.len() {
+                let (revision, (source, target)) = values[i];
+                let revision_end = values.get(i + 1).map(|v| v.0);
+                let (created, deleted) = intervals[j];
+                let start = start_commit.max(revision).max(created);
+                if start <= end_commit
+                    && revision_end.is_none_or(|end| start < end)
+                    && deleted.is_none_or(|end| start < end)
+                {
+                    if source == node_id {
+                        neighbors.insert(target);
+                    } else if target == node_id {
+                        neighbors.insert(source);
+                    }
+                }
+                match (revision_end, deleted) {
+                    (None, None) => break,
+                    (Some(_), None) => i += 1,
+                    (None, Some(_)) => j += 1,
+                    (Some(a), Some(b)) if a <= b => i += 1,
+                    _ => j += 1,
                 }
             }
         }
@@ -614,6 +697,7 @@ impl TemporalIndex {
             changed.extend(delta.edges_added.iter().map(|entry| entry.0));
             changed.extend(delta.edges_removed.iter().copied());
             changed.extend(delta.edge_attr_changes.iter().map(|(id, _, _, _)| *id));
+            changed.extend(delta.edge_endpoint_changes.iter().map(|c| c.edge_id));
         }
         let mut ids: Vec<_> = changed.into_iter().collect();
         ids.sort_unstable();
@@ -834,5 +918,42 @@ mod tests {
             index.node_attr_at_commit(node_id, &attr, 20),
             Some(AttrValue::Text("active".into()))
         );
+    }
+    #[test]
+    fn endpoint_timelines_allocate_only_for_revised_edges() {
+        let mut history = crate::HistoryForest::new();
+        let root = history
+            .create_commit(
+                crate::state::change_tracker::ChangeSet {
+                    nodes_added: vec![0, 1, 2],
+                    edges_added: vec![(0, 0, 1), (1, 1, 2)],
+                    ..crate::state::change_tracker::ChangeSet::new()
+                },
+                "root".into(),
+                "test".into(),
+                None,
+            )
+            .unwrap();
+        let plain = TemporalIndex::from_history(&history).unwrap();
+        assert!(plain.edge_endpoint_revisions.is_empty());
+        history
+            .create_commit(
+                crate::state::change_tracker::ChangeSet {
+                    edge_endpoint_changes: vec![crate::EdgeEndpointChange {
+                        edge_id: 0,
+                        old_endpoints: (0, 1),
+                        new_endpoints: (2, 1),
+                    }],
+                    ..crate::state::change_tracker::ChangeSet::new()
+                },
+                "revision".into(),
+                "test".into(),
+                Some(root),
+            )
+            .unwrap();
+        let revised = TemporalIndex::from_history(&history).unwrap();
+        assert_eq!(revised.edge_endpoint_revisions.len(), 1);
+        assert!(!revised.edge_endpoint_revisions.contains_key(&1));
+        assert_eq!(revised.neighbors_at_commit(0, root), vec![1]);
     }
 }

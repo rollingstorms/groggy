@@ -766,6 +766,9 @@ impl Context {
             for &id in &delta.edges_removed {
                 entities.add_edge(id, temporal::ChangeType::Deleted);
             }
+            for c in &delta.edge_endpoint_changes {
+                entities.add_edge(c.edge_id, temporal::ChangeType::EndpointModified);
+            }
             for (id, _, _, _) in &delta.edge_attr_changes {
                 entities.add_edge(*id, temporal::ChangeType::AttributeModified);
             }

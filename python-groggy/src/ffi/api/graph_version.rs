@@ -59,6 +59,7 @@ impl PyCommit {
             nodes_added: Vec::new(),
             nodes_removed: Vec::new(),
             edges_added: Vec::new(),
+            edge_endpoint_changes: Vec::new(),
             edges_removed: Vec::new(),
             node_attr_changes: Vec::new(),
             edge_attr_changes: Vec::new(),

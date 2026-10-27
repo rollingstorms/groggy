@@ -1897,6 +1897,89 @@ impl PyGraph {
         self.inner.borrow().current_state_id()
     }
 
+    #[pyo3(signature=(edge, source, target, *, effective_at=None))]
+    fn set_edge_endpoints(
+        &self,
+        edge: &PyAny,
+        source: &PyAny,
+        target: &PyAny,
+        effective_at: Option<&PyAny>,
+    ) -> PyResult<StateId> {
+        let edge = crate::ffi::api::graph_batch::existing_id(edge)?;
+        let source = crate::ffi::api::graph_batch::existing_id(source)?;
+        let target = crate::ffi::api::graph_batch::existing_id(target)?;
+        let effective_at = effective_at
+            .map(crate::ffi::api::graph_batch::timestamp)
+            .transpose()?;
+        let mut graph = self.inner.borrow_mut();
+        match effective_at {
+            Some(at) => graph
+                .writer("groggy")
+                .with_effective_at(Some(at))
+                .set_edge_endpoints(edge, source, target),
+            None => graph.set_edge_endpoints(edge, source, target),
+        }
+        .map_err(graph_error_to_py_err)
+    }
+    #[pyo3(signature=(rows, *, effective_at=None))]
+    fn set_edge_endpoints_bulk(
+        &self,
+        rows: Vec<(&PyAny, &PyAny, &PyAny)>,
+        effective_at: Option<&PyAny>,
+    ) -> PyResult<StateId> {
+        let rows: Vec<_> = rows
+            .into_iter()
+            .map(|(id, u, v)| {
+                Ok((
+                    crate::ffi::api::graph_batch::existing_id(id)?,
+                    crate::ffi::api::graph_batch::existing_id(u)?,
+                    crate::ffi::api::graph_batch::existing_id(v)?,
+                ))
+            })
+            .collect::<PyResult<_>>()?;
+        let effective_at = effective_at
+            .map(crate::ffi::api::graph_batch::timestamp)
+            .transpose()?;
+        let mut graph = self.inner.borrow_mut();
+        if rows.is_empty() {
+            return Ok(graph.current_state_id());
+        }
+        match effective_at {
+            Some(at) => graph
+                .writer("groggy")
+                .with_effective_at(Some(at))
+                .set_edge_endpoints_bulk(rows),
+            None => graph.set_edge_endpoints_bulk(rows),
+        }
+        .map_err(graph_error_to_py_err)
+    }
+    #[pyo3(signature=(edges, *, effective_at=None))]
+    fn reverse_edges(&self, edges: Vec<&PyAny>, effective_at: Option<&PyAny>) -> PyResult<StateId> {
+        let edges: Vec<_> = edges
+            .into_iter()
+            .map(crate::ffi::api::graph_batch::existing_id)
+            .collect::<PyResult<_>>()?;
+        let effective_at = effective_at
+            .map(crate::ffi::api::graph_batch::timestamp)
+            .transpose()?;
+        let mut graph = self.inner.borrow_mut();
+        if edges.is_empty() {
+            return Ok(graph.current_state_id());
+        }
+        if effective_at.is_none() {
+            return graph.reverse_edges(&edges).map_err(graph_error_to_py_err);
+        }
+        let batch = graph
+            .edge_reversal_batch(&edges)
+            .map_err(graph_error_to_py_err)?;
+        graph
+            .writer("groggy")
+            .with_effective_at(effective_at)
+            .apply_batch(batch, "reverse_edges")
+            .map(|r| r.state_id)
+            .map_err(graph_error_to_py_err)
+    }
+
     /// Compare the effective contents of two published states.
     fn diff_commits(&self, py: Python, from: StateId, to: StateId) -> PyResult<PyObject> {
         let plan = self
@@ -1914,15 +1997,13 @@ impl PyGraph {
         output.set_item("nodes_removed", diff.nodes_removed)?;
         output.set_item("edges_added", diff.edges_added)?;
         output.set_item("edges_removed", diff.edges_removed)?;
-        let endpoints = PyList::empty(py);
-        for change in diff.edge_endpoint_changes {
-            let item = PyDict::new(py);
-            item.set_item("edge_id", change.edge_id)?;
-            item.set_item("old", change.old_endpoints)?;
-            item.set_item("new", change.new_endpoints)?;
-            endpoints.append(item)?;
-        }
-        output.set_item("edge_endpoint_changes", endpoints)?;
+        output.set_item(
+            "edge_endpoint_changes",
+            crate::ffi::api::graph_batch::endpoint_changes_to_python(
+                py,
+                &diff.edge_endpoint_changes,
+            )?,
+        )?;
         let changes = PyList::empty(py);
         for change in diff.attr_changes {
             let item = PyDict::new(py);

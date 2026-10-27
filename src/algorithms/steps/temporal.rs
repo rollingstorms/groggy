@@ -186,6 +186,10 @@ impl Step for DiffEdgesStep {
         }
 
         let mut edges_modified = HashMap::new();
+        for change in delta.edge_endpoint_changes {
+            check_cancelled(ctx)?;
+            edges_modified.insert(change.edge_id, AlgorithmParamValue::Int(1));
+        }
         for change in delta.edge_attr_changes {
             check_cancelled(ctx)?;
             edges_modified.insert(change.edge_id, AlgorithmParamValue::Int(1));

@@ -26,16 +26,19 @@ pub enum BatchChangeRef {
     NodeRemoved(BatchNodeRef),
     EdgeAdded(BatchEdgeRef),
     EdgeRemoved(BatchEdgeRef),
+    EdgeEndpoints(BatchEdgeRef),
     NodeAttribute(BatchNodeRef, AttrName),
     EdgeAttribute(BatchEdgeRef, AttrName),
 }
 
 /// One mixed write. Operations execute in this order: add nodes, add edges,
-/// assign properties, remove explicit edges, then remove nodes and their edges.
+/// revise existing endpoints, assign properties, remove explicit edges, then remove nodes and their edges.
 #[derive(Debug, Clone, Default)]
 pub struct GraphBatch {
     pub add_nodes: usize,
     pub add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
+    /// Revisions of existing active edge instances.
+    pub edge_endpoints: Vec<(EdgeId, BatchNodeRef, BatchNodeRef)>,
     pub node_attrs: HashMap<AttrName, Vec<(BatchNodeRef, AttrValue)>>,
     pub edge_attrs: HashMap<AttrName, Vec<(BatchEdgeRef, AttrValue)>>,
     /// Explicit absence, distinct from assigning AttrValue::Null.
@@ -67,6 +70,7 @@ pub(crate) struct PreparedPublication {
 pub(crate) struct PreparedBatch {
     pub add_nodes: usize,
     pub add_edges: Vec<(NodeId, NodeId)>,
+    pub edge_endpoint_changes: Vec<crate::EdgeEndpointChange>,
     pub node_attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     pub edge_attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     pub unset_node_attrs: HashMap<AttrName, Vec<NodeId>>,
@@ -103,6 +107,7 @@ impl GraphBatch {
     pub fn has_operations(&self) -> bool {
         self.add_nodes > 0
             || !self.add_edges.is_empty()
+            || !self.edge_endpoints.is_empty()
             || !self.remove_nodes.is_empty()
             || !self.remove_edges.is_empty()
             || !self.node_external_ids.is_empty()
@@ -208,6 +213,30 @@ impl GraphBatch {
             }
         }
 
+        let mut endpoint_updates = HashMap::new();
+        let mut endpoint_changes = Vec::new();
+        for (position, (id, u, v)) in self.edge_endpoints.into_iter().enumerate() {
+            let pair = node_id(u, next_node_id, self.add_nodes)
+                .and_then(|u| node_id(v, next_node_id, self.add_nodes).map(|v| (u, v)));
+            match (edge_endpoints(id), pair) {
+                (Some(old), Ok(new)) if edge_active(id) && !seen_removed_edges.contains(&id)
+                    && known_node(new.0) && known_node(new.1)
+                    && !seen_removed_nodes.contains(&new.0) && !seen_removed_nodes.contains(&new.1) => {
+                    if endpoint_updates.insert(id, new).is_some() {
+                        errors.push(format!("edge_endpoints[{position}]: duplicate edge {id}"));
+                    }
+                    endpoint_changes.push(crate::EdgeEndpointChange { edge_id:id, old_endpoints:old, new_endpoints:new });
+                }
+                (_, Err(e)) => errors.push(format!("edge_endpoints[{position}]: {e}")),
+                _ => errors.push(format!("edge_endpoints[{position}]: edge and resulting endpoints must be active; removal conflicts are forbidden")),
+            }
+        }
+        let resulting_endpoints = |id| {
+            endpoint_updates
+                .get(&id)
+                .copied()
+                .or_else(|| edge_endpoints(id))
+        };
         let mut node_attrs = HashMap::new();
         let mut node_keys: Vec<_> = self.node_attrs.into_iter().collect();
         node_keys.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
@@ -261,7 +290,7 @@ impl GraphBatch {
                         let endpoints = if (next_edge_id..edge_end).contains(&id) {
                             resolved_edges.get(id - next_edge_id).copied()
                         } else {
-                            edge_endpoints(id)
+                            resulting_endpoints(id)
                         };
                         let retained = known_edge(id)
                             && !seen_removed_edges.contains(&id)
@@ -340,7 +369,7 @@ impl GraphBatch {
                         let endpoints = if (next_edge_id..edge_end).contains(&id) {
                             resolved_edges.get(id - next_edge_id).copied()
                         } else {
-                            edge_endpoints(id)
+                            resulting_endpoints(id)
                         };
                         if !(known_edge(id)
                             && !seen_removed_edges.contains(&id)
@@ -381,7 +410,7 @@ impl GraphBatch {
                                     let endpoints = if (next_edge_id..edge_end).contains(&id) {
                                         resolved_edges.get(id - next_edge_id).copied()
                                     } else {
-                                        edge_endpoints(id)
+                                        resulting_endpoints(id)
                                     };
                                     known_edge(id)
                                         && !seen_removed_edges.contains(&id)
@@ -469,6 +498,11 @@ impl GraphBatch {
                     .map(|id| ChangeKey::EdgeAttribute(*id, name.clone())),
             );
         }
+        available.extend(
+            endpoint_changes
+                .iter()
+                .map(|c| ChangeKey::EdgeEndpoints(c.edge_id)),
+        );
         let mut change_times = BTreeMap::new();
         for (position, (target, at)) in self.change_times.into_iter().enumerate() {
             let key = match target {
@@ -484,6 +518,10 @@ impl GraphBatch {
                 BatchChangeRef::EdgeRemoved(reference) => {
                     edge_id(reference, next_edge_id, self.add_edges.len())
                         .map(ChangeKey::EdgeRemoved)
+                }
+                BatchChangeRef::EdgeEndpoints(reference) => {
+                    edge_id(reference, next_edge_id, self.add_edges.len())
+                        .map(ChangeKey::EdgeEndpoints)
                 }
                 BatchChangeRef::NodeAttribute(reference, name) => {
                     node_id(reference, next_node_id, self.add_nodes)
@@ -517,6 +555,7 @@ impl GraphBatch {
         }
         if self.add_nodes == 0
             && resolved_edges.is_empty()
+            && endpoint_changes.is_empty()
             && node_attrs.values().all(Vec::is_empty)
             && edge_attrs.values().all(Vec::is_empty)
             && unset_node_attrs.values().all(Vec::is_empty)
@@ -531,6 +570,7 @@ impl GraphBatch {
         Ok(PreparedBatch {
             add_nodes: self.add_nodes,
             add_edges: resolved_edges,
+            edge_endpoint_changes: endpoint_changes,
             node_attrs,
             edge_attrs,
             unset_node_attrs,

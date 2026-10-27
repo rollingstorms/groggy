@@ -31,19 +31,13 @@ assert diff["edge_endpoint_changes"] == []
 
 ## Current mutation boundary
 
-This is the typed comparison foundation, not a completed endpoint mutation API.
-`GraphPool.add_edge_with_id` is a reconstruction helper: it accepts the same
-retained endpoints or a previously unmaterialized ID and rejects changing an
-existing edge's endpoints. Graph state restoration preflights existing endpoint
-identity before replacing working membership, so a conflicting snapshot cannot
-partially change the working state. Dense and explicitly purged sparse pools
-share this rule.
-
-Coordinated rewiring/reversal, before/after recorded deltas, effective-time indexes,
-clock validation, retained endpoint revisions, archive/journal replay, batch/bulk
-interfaces and tracked/destructive revert remain under existing 04.2/13.3. Raw
-storage overwrite is not a substitute for that history path. No storage format
-version changes in this comparison/safety slice.
+Coordinated stable-ID mutation is now implemented through the
+[endpoint revision API](endpoint-revisions.md). Raw reconstruction remains guarded;
+a caller cannot overwrite retained topology through `GraphPool.add_edge_with_id`.
+Recorded installation restores the selected typed revision, and immutable views
+retain their own endpoint pairs. Legacy membership-only groups explicitly reject
+rewiring until their source ownership is resolved; frozen sources are supported.
+General revert/rewind and three-way merge planning remain separate work.
 
 ## Detached logical reconstruction
 

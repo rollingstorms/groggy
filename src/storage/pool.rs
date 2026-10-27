@@ -684,14 +684,6 @@ impl GraphPool {
         source: NodeId,
         target: NodeId,
     ) -> GraphResult<()> {
-        if self.purged_edges.contains(edge_id)
-            || self.purged_nodes.contains(source)
-            || self.purged_nodes.contains(target)
-        {
-            return Err(GraphError::InvalidInput(
-                "Cannot reconstruct an explicitly purged entity".into(),
-            ));
-        }
         if self
             .get_edge_endpoints(edge_id)
             .is_some_and(|pair| pair != (source, target))
@@ -699,6 +691,24 @@ impl GraphPool {
             return Err(GraphError::InvalidInput(format!(
                 "Raw restoration cannot rewire edge {edge_id}; endpoint changes require coordinated history"
             )));
+        }
+        self.restore_edge_revision(edge_id, source, target)
+    }
+
+    /// Trusted state installation after coordinator/archive validation.
+    pub(crate) fn restore_edge_revision(
+        &mut self,
+        edge_id: EdgeId,
+        source: NodeId,
+        target: NodeId,
+    ) -> GraphResult<()> {
+        if self.purged_edges.contains(edge_id)
+            || self.purged_nodes.contains(source)
+            || self.purged_nodes.contains(target)
+        {
+            return Err(GraphError::InvalidInput(
+                "Cannot reconstruct an explicitly purged entity".into(),
+            ));
         }
         let end = edge_id
             .checked_add(1)
@@ -1148,6 +1158,15 @@ impl GraphPool {
         }
 
         Ok(incident_edges)
+    }
+
+    pub(crate) fn legacy_groups_own_edges(
+        &self,
+        changed: &std::collections::HashSet<EdgeId>,
+    ) -> bool {
+        self.stored_subgraphs.iter().any(|(id, (_, edges, _))| {
+            !self.retained_groups.contains_key(id) && edges.iter().any(|id| changed.contains(id))
+        })
     }
 
     /// Store immutable subgraph membership. Equal selections share a reference.

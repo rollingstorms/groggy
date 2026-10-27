@@ -213,7 +213,15 @@ impl Graph {
         node_indices.sort_unstable();
         edge_indices.sort_unstable();
         Ok(GraphArchive {
-            version: self.pool.borrow().archive_version(),
+            version: if self
+                .history_records()
+                .iter()
+                .any(|c| !c.delta.edge_endpoint_changes.is_empty())
+            {
+                4
+            } else {
+                self.pool.borrow().archive_version()
+            },
             config: self.config.clone(),
             pool: self.pool.borrow().archive_document()?,
             history: self.history.archive_document()?,
@@ -314,7 +322,7 @@ impl GraphArchive {
         &mut self,
         outcome: &super::purge::PurgeOutcome,
     ) -> GraphResult<()> {
-        self.version = outcome.pool.archive_version();
+        self.version = self.version.max(outcome.pool.archive_version());
         self.pool = outcome.pool.archive_document()?;
         self.identities = outcome.identities.clone();
         self.node_indices = outcome
@@ -360,7 +368,7 @@ impl GraphArchive {
     }
 
     pub(crate) fn restore(self) -> GraphResult<Graph> {
-        if !(VERSION..=3).contains(&self.version) {
+        if !(VERSION..=4).contains(&self.version) {
             return Err(invalid("unsupported document version"));
         }
         self.config.validate().map_err(invalid)?;
@@ -369,6 +377,14 @@ impl GraphArchive {
             return Err(invalid("storage layout requires a newer document version"));
         }
         let history = self.history.restore(&pool)?;
+        if self.version < 4
+            && history
+                .get_commit_history()
+                .iter()
+                .any(|c| !c.delta.edge_endpoint_changes.is_empty())
+        {
+            return Err(invalid("endpoint revisions require document version 4"));
+        }
         if self.state != 0 {
             history.get_commit(self.state)?;
         }
@@ -606,7 +622,7 @@ mod tests {
     #[test]
     fn semantic_archive_validation_rejects_bad_version_indices_ids_and_reservations() {
         let mut d = document();
-        d.version = 4;
+        d.version = 5;
         assert!(d.restore().is_err());
         let mut d = document();
         d.node_indices.push(d.node_indices[0].clone());
@@ -771,5 +787,20 @@ mod tests {
         d.version = 2;
         d.pool.set_test_purged_nodes(vec![(0, 1), (0, 1)]);
         assert!(d.restore().is_err());
+    }
+    #[test]
+    fn endpoint_revision_archives_require_the_new_document_version() {
+        let mut graph = Graph::new();
+        graph.add_nodes(3).unwrap();
+        graph.add_edge(0, 1).unwrap();
+        graph.set_edge_endpoints(0, 2, 1).unwrap();
+        let document = graph.archive_document().unwrap();
+        assert_eq!(document.version, 4);
+        for version in 1..4 {
+            let mut invalid = graph.archive_document().unwrap();
+            invalid.version = version;
+            assert!(invalid.restore().is_err());
+        }
+        document.restore().unwrap().check_integrity().unwrap();
     }
 }

@@ -461,6 +461,14 @@ impl PyTemporalDelta {
             .collect()
     }
 
+    #[getter]
+    fn edge_endpoint_changes(&self, py: Python) -> PyResult<PyObject> {
+        crate::ffi::api::graph_batch::endpoint_changes_to_python(
+            py,
+            &self.inner.edge_endpoint_changes,
+        )
+    }
+
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }

@@ -119,3 +119,8 @@ v1, v2 purge ledgers and v3 sparse endpoint records; ordinary nonpurged writes
 retain the v1 shape. Downgrades, malformed/overlapping purge intervals, duplicate
 sparse records and retained references to purged IDs reject. Active-only exports
 remain selected-data transfers with their own identity scope.
+
+Archives containing [typed endpoint revisions](endpoint-revisions.md) use document
+v4. Readers accept v1–v4, and purge/checkpoint/compaction preserve that requirement
+while retained revision records exist. Both old and new endpoint dependencies are
+retention roots; ordinary no-revision formats/hashes remain compatible.

@@ -51,15 +51,22 @@ impl TopologyPatch {
                     .entry(*id)
                     .or_default()
                     .push(((at, state, 1), None)),
-                ChangeKey::EdgeAdded(id) => {
+                ChangeKey::EdgeAdded(id) | ChangeKey::EdgeEndpoints(id) => {
                     let endpoints = additions.get(id).copied().ok_or_else(|| {
                         GraphError::InvalidInput("Missing effective edge addition endpoints".into())
                     })?;
-                    patch
-                        .edges
-                        .entry(*id)
-                        .or_default()
-                        .push(((at, state, 3), Some(endpoints)));
+                    patch.edges.entry(*id).or_default().push((
+                        (
+                            at,
+                            state,
+                            if matches!(key, ChangeKey::EdgeEndpoints(_)) {
+                                4
+                            } else {
+                                3
+                            },
+                        ),
+                        Some(endpoints),
+                    ));
                 }
                 _ => {}
             }
@@ -111,6 +118,13 @@ impl EffectiveTopology {
             .edges_added
             .iter()
             .map(|&(id, from, to)| (id, (from, to)))
+            .chain(
+                commit
+                    .delta
+                    .edge_endpoint_changes
+                    .iter()
+                    .map(|c| (c.edge_id, c.new_endpoints)),
+            )
             .collect();
         let Ok(patch) = TopologyPatch::from_metadata(metadata, commit.id, &additions) else {
             self.precise = false;
@@ -136,6 +150,24 @@ impl EffectiveTopology {
         }
         let mut lifetimes = HashMap::new();
         for edge in affected {
+            let mut events: Vec<_> = self
+                .edges
+                .get(&edge)
+                .into_iter()
+                .flatten()
+                .chain(patch.edges.get(&edge).into_iter().flatten())
+                .copied()
+                .collect();
+            events.sort_unstable_by_key(|e| e.0);
+            let mut alive = false;
+            for ((at, _, phase), value) in events {
+                if phase == 4 && !alive {
+                    return Err(GraphError::InvalidInput(format!(
+                        "Endpoint revision of inactive edge {edge} at {at}"
+                    )));
+                }
+                alive = value.is_some();
+            }
             for (start, end, endpoints) in segments(self.edges.get(&edge), patch.edges.get(&edge)) {
                 let Some((from, to)) = endpoints else {
                     continue;

@@ -282,3 +282,7 @@ harness = false
 [[bench]]
 name = "recorded_diff"
 harness = false
+
+[[bench]]
+name = "endpoint_revisions"
+harness = false

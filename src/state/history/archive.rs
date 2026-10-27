@@ -21,6 +21,8 @@ struct StoredCommit {
     nodes_removed: Vec<NodeId>,
     edges_added: Vec<(EdgeId, NodeId, NodeId)>,
     edges_removed: Vec<EdgeId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    edge_endpoint_changes: Vec<crate::EdgeEndpointChange>,
     node_attr_changes: Vec<StoredChange>,
     edge_attr_changes: Vec<StoredChange>,
 }
@@ -98,6 +100,7 @@ impl HistoryForest {
                     nodes_removed: d.nodes_removed.clone(),
                     edges_added: d.edges_added.clone(),
                     edges_removed: d.edges_removed.clone(),
+                    edge_endpoint_changes: d.edge_endpoint_changes.clone(),
                     node_attr_changes: encode_changes(&d.node_attr_changes)?,
                     edge_attr_changes: encode_changes(&d.edge_attr_changes)?,
                 })
@@ -159,9 +162,28 @@ impl HistoryDocument {
                 nodes_removed: c.nodes_removed,
                 edges_added: c.edges_added,
                 edges_removed: c.edges_removed,
+                edge_endpoint_changes: c.edge_endpoint_changes,
                 node_attr_changes: decode_changes(c.node_attr_changes, true, pool)?,
                 edge_attr_changes: decode_changes(c.edge_attr_changes, false, pool)?,
             };
+            let mut endpoint_ids = HashSet::new();
+            for change in &changes.edge_endpoint_changes {
+                if !endpoint_ids.insert(change.edge_id)
+                    || !pool.is_edge_allocated(change.edge_id)
+                    || changes.edges_added.iter().any(|e| e.0 == change.edge_id)
+                    || changes.edges_removed.contains(&change.edge_id)
+                    || [
+                        change.old_endpoints.0,
+                        change.old_endpoints.1,
+                        change.new_endpoints.0,
+                        change.new_endpoints.1,
+                    ]
+                    .iter()
+                    .any(|&id| !pool.is_node_allocated(id))
+                {
+                    return Err(invalid("invalid endpoint revision referents"));
+                }
+            }
             let delta = Delta::from_changes(changes);
             if delta.content_hash != c.delta_hash {
                 return Err(invalid("delta content hash mismatch"));
@@ -203,6 +225,12 @@ impl HistoryDocument {
                             delta.edge_attr_changes.iter().map(|(id, name, _, _)| {
                                 ChangeKey::EdgeAttribute(*id, name.clone())
                             }),
+                        )
+                        .chain(
+                            delta
+                                .edge_endpoint_changes
+                                .iter()
+                                .map(|c| ChangeKey::EdgeEndpoints(c.edge_id)),
                         )
                         .collect();
                 if keys != metadata.change_times.keys().cloned().collect()

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **204 checked and 64 unchecked entries**. Entries overlap:
+currently contains **205 checked and 63 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 64 unchecked entries are not 64 independent tasks: 13 are overlapping AR
-architecture entries, 51 are numbered entries (including nested publication
+The 63 unchecked entries are not 63 independent tasks: 13 are overlapping AR
+architecture entries, 50 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -800,3 +800,19 @@ Final gates: **1,315 native / 52 ignored**, serial **18-case** process-kill matr
 and rebuilt extension. Existing owner/legacy exclusions and known FFI warnings
 remain. **204 checked / 64 open**, no new rows. Coordinated endpoint mutation,
 reversal and merge planning remain the next core work.
+
+## Endpoint revisions completed — 2026-10-27 UTC
+
+Existing **04.2** is complete: stable-ID scalar/bulk/mixed endpoint changes and
+ordered reversal retain properties, names, typed before/after history and explicit/
+default clocks. Recorded/effective reads, indexes/caches, branch/older owned restore,
+manual coalescing/reset, frozen sources and full durable replay/maintenance are
+verified. Legacy membership-only groups explicitly reject unsupported rewiring;
+no implicit source migration or new owner decision. Evidence/cost/limits:
+`endpoint-revisions-2026-10-27.md`. General revert remains **13.3**; three-way
+merge planning remains **14.2**.
+
+**205 checked / 63 open**, same 268 rows. Gates: **1,335 native / 52 ignored**,
+**2,022 root Python / 1 skipped**, **172 docs examples**, strict all-target Clippy,
+rebuilt extension and serial **18-case** process-kill matrix. Existing owner/legacy
+exclusions and known FFI warnings remain. No new rows, external installs or push.

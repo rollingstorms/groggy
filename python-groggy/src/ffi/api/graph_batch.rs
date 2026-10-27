@@ -6,7 +6,19 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
+pub(crate) fn existing_id(value: &PyAny) -> PyResult<usize> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err(
+            "Entity ID must be a nonnegative integer, not bool",
+        ));
+    }
+    value.extract()
+}
+
 fn node_ref(value: &PyAny) -> PyResult<BatchNodeRef> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err("Node ID cannot be bool"));
+    }
     if let Ok(id) = value.extract::<usize>() {
         return Ok(BatchNodeRef::Existing(id));
     }
@@ -21,6 +33,9 @@ fn node_ref(value: &PyAny) -> PyResult<BatchNodeRef> {
 }
 
 fn edge_ref(value: &PyAny) -> PyResult<BatchEdgeRef> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err("Edge ID cannot be bool"));
+    }
     if let Ok(id) = value.extract::<usize>() {
         return Ok(BatchEdgeRef::Existing(id));
     }
@@ -81,6 +96,7 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
         if ![
             "add_nodes",
             "add_edges",
+            "edge_endpoints",
             "unset_node_attrs",
             "unset_edge_attrs",
             "node_attrs",
@@ -100,6 +116,21 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
         }
     }
     let mut result = GraphBatch::default();
+    if let Some(rows) = description.get_item("edge_endpoints")? {
+        for row in rows.downcast::<PyList>()?.iter() {
+            let row = row.downcast::<PyTuple>()?;
+            if row.len() != 3 {
+                return Err(PyValueError::new_err(
+                    "edge_endpoints rows must be (edge_id, source, target)",
+                ));
+            }
+            result.edge_endpoints.push((
+                existing_id(row.get_item(0)?)?,
+                node_ref(row.get_item(1)?)?,
+                node_ref(row.get_item(2)?)?,
+            ));
+        }
+    }
     if let Some(value) = description.get_item("effective_at")? {
         if !value.is_none() {
             result.effective_at = Some(timestamp(value)?);
@@ -120,6 +151,7 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
                 "node_removed" => BatchChangeRef::NodeRemoved(node_ref(entity)?),
                 "edge_added" => BatchChangeRef::EdgeAdded(edge_ref(entity)?),
                 "edge_removed" => BatchChangeRef::EdgeRemoved(edge_ref(entity)?),
+                "edge_endpoints" => BatchChangeRef::EdgeEndpoints(edge_ref(entity)?),
                 "node_attr" => {
                     BatchChangeRef::NodeAttribute(node_ref(entity)?, field("name")?.extract()?)
                 }
@@ -232,6 +264,7 @@ pub(crate) fn publication_to_python(
             ChangeKey::NodeRemoved(id) => ("node_removed", *id, None),
             ChangeKey::EdgeAdded(id) => ("edge_added", *id, None),
             ChangeKey::EdgeRemoved(id) => ("edge_removed", *id, None),
+            ChangeKey::EdgeEndpoints(id) => ("edge_endpoints", *id, None),
             ChangeKey::NodeAttribute(id, name) => ("node_attr", *id, Some(name)),
             ChangeKey::EdgeAttribute(id, name) => ("edge_attr", *id, Some(name)),
         };
@@ -310,4 +343,20 @@ pub(crate) fn parse_group_sources(
         }
     }
     Ok(result)
+}
+
+/// One endpoint diff shape across recorded and temporal comparison surfaces.
+pub(crate) fn endpoint_changes_to_python(
+    py: Python,
+    changes: &[groggy::EdgeEndpointChange],
+) -> PyResult<PyObject> {
+    let output = PyList::empty(py);
+    for change in changes {
+        let item = PyDict::new(py);
+        item.set_item("edge_id", change.edge_id)?;
+        item.set_item("old", change.old_endpoints)?;
+        item.set_item("new", change.new_endpoints)?;
+        output.append(item)?;
+    }
+    Ok(output.to_object(py))
 }

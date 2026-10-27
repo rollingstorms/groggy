@@ -204,6 +204,36 @@ impl<'a> GraphWriter<'a> {
             )?
             .state_id)
     }
+    /// Revise stable edge instances in one checked publication.
+    pub fn set_edge_endpoints_bulk(
+        &mut self,
+        rows: Vec<(EdgeId, NodeId, NodeId)>,
+    ) -> GraphResult<StateId> {
+        Ok(self
+            .apply_batch(
+                GraphBatch {
+                    edge_endpoints: rows
+                        .into_iter()
+                        .map(|(id, u, v)| {
+                            (id, BatchNodeRef::Existing(u), BatchNodeRef::Existing(v))
+                        })
+                        .collect(),
+                    ..Default::default()
+                },
+                "set_edge_endpoints",
+            )?
+            .state_id)
+    }
+    /// Revise one edge without replacing its ID, properties or external name.
+    pub fn set_edge_endpoints(
+        &mut self,
+        id: EdgeId,
+        source: NodeId,
+        target: NodeId,
+    ) -> GraphResult<StateId> {
+        self.set_edge_endpoints_bulk(vec![(id, source, target)])
+    }
+
     /// Publish one scalar edge property assignment.
     pub fn set_edge_attr(
         &mut self,

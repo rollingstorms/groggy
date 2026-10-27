@@ -34,6 +34,7 @@ class GraphBatch:
         self._owner = object()
         self._add_nodes = 0
         self._add_edges: list[tuple[Any, Any]] = []
+        self._edge_endpoints: list[tuple[int, Any, Any]] = []
         self._node_attrs: dict[str, list[tuple[Any, Any]]] = {}
         self._edge_attrs: dict[str, list[tuple[Any, Any]]] = {}
         self._unset_node_attrs: dict[str, list[Any]] = {}
@@ -59,6 +60,15 @@ class GraphBatch:
         for name, value in attrs.items():
             self.set_node_attr(node, name, value)
         return node
+
+    def set_edge_endpoints(self, edge: int, source: int | AddedNode, target: int | AddedNode, *, effective_at: int | None = None) -> None:
+        """Revise one existing edge ID; preserve its properties and identity."""
+        if not isinstance(edge, int) or isinstance(edge, bool) or edge < 0:
+            raise TypeError("Endpoint revisions require an existing nonnegative edge ID")
+        self._ref(source, AddedNode)
+        self._ref(target, AddedNode)
+        self._edge_endpoints.append((edge, source, target))
+        self._time("edge_endpoints", edge, effective_at)
 
     def add_edge(self, source: int | AddedNode, target: int | AddedNode, *, effective_at: int | None = None, **attrs: Any) -> AddedEdge:
         edge = AddedEdge(self._owner, len(self._add_edges))
@@ -116,6 +126,7 @@ class GraphBatch:
             ],
             "node_external_ids": [(self._ref(node, AddedNode), name) for node, name in self._node_external_ids],
             "edge_external_ids": [(self._ref(edge, AddedEdge), name) for edge, name in self._edge_external_ids],
+            "edge_endpoints": [(edge, self._ref(u, AddedNode), self._ref(v, AddedNode)) for edge, u, v in self._edge_endpoints],
             "add_nodes": self._add_nodes,
             "add_edges": [
                 (self._ref(source, AddedNode), self._ref(target, AddedNode))

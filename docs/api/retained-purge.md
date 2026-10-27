@@ -112,3 +112,8 @@ The local receipt in `notes/benchmarks/retained-purge-2026-10-26.json` measures
 native/durable maintenance, not isolated RSS or a universal latency budget.
 Unix atomic replacement and process-kill recovery are tested; automatic scheduling,
 non-Unix replacement and actual power-loss qualification remain separate work.
+
+Archives containing [typed endpoint revisions](endpoint-revisions.md) use document
+v4. Readers accept v1–v4, and purge/checkpoint/compaction preserve that requirement
+while retained revision records exist. Both old and new endpoint dependencies are
+retention roots; ordinary no-revision formats/hashes remain compatible.

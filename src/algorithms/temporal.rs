@@ -118,6 +118,8 @@ pub struct TemporalDelta {
 
     /// Edges that were removed between snapshots.
     pub edges_removed: Vec<EdgeId>,
+    /// Endpoint revisions of surviving edge instances.
+    pub edge_endpoint_changes: Vec<crate::EdgeEndpointChange>,
 
     /// Node attribute changes: (node_id, attr_name, old_value, new_value)
     pub node_attr_changes: Vec<NodeAttrChange>,
@@ -188,6 +190,7 @@ impl TemporalDelta {
         let mut edges_removed = Vec::new();
         let mut node_attr_changes = Vec::new();
         let mut edge_attr_changes = Vec::new();
+        let mut edge_endpoint_changes = Vec::new();
         for &id in cur_nodes {
             check()?;
             if !prev_nodes.contains(&id) {
@@ -219,9 +222,11 @@ impl TemporalDelta {
                 edges_added.push(id);
             } else {
                 if before.edges.get(&id) != after.edges.get(&id) {
-                    return Err(GraphError::InvalidInput(
-                        "Temporal edge endpoint-change deltas are not supported".into(),
-                    ));
+                    edge_endpoint_changes.push(crate::EdgeEndpointChange {
+                        edge_id: id,
+                        old_endpoints: before.edges[&id],
+                        new_endpoints: after.edges[&id],
+                    });
                 }
                 for (name, old_value, new_value) in property_changes(
                     before.edge_attributes.get(&id),
@@ -247,6 +252,7 @@ impl TemporalDelta {
         nodes_removed.sort_unstable();
         edges_added.sort_unstable();
         edges_removed.sort_unstable();
+        edge_endpoint_changes.sort_unstable_by_key(|c| c.edge_id);
         node_attr_changes.sort_by(|a, b| (a.node_id, &a.attr_name).cmp(&(b.node_id, &b.attr_name)));
         edge_attr_changes.sort_by(|a, b| (a.edge_id, &a.attr_name).cmp(&(b.edge_id, &b.attr_name)));
         check()?;
@@ -258,6 +264,7 @@ impl TemporalDelta {
             nodes_removed,
             edges_added,
             edges_removed,
+            edge_endpoint_changes,
             node_attr_changes,
             edge_attr_changes,
         })
@@ -269,6 +276,7 @@ impl TemporalDelta {
             && self.nodes_removed.is_empty()
             && self.edges_added.is_empty()
             && self.edges_removed.is_empty()
+            && self.edge_endpoint_changes.is_empty()
             && self.node_attr_changes.is_empty()
             && self.edge_attr_changes.is_empty()
     }
@@ -290,6 +298,12 @@ impl TemporalDelta {
             parts.push(format!("-{} edges", self.edges_removed.len()));
         }
 
+        if !self.edge_endpoint_changes.is_empty() {
+            parts.push(format!(
+                "{} endpoint changes",
+                self.edge_endpoint_changes.len()
+            ));
+        }
         let total_attr_changes = self.node_attr_changes.len() + self.edge_attr_changes.len();
         if total_attr_changes > 0 {
             parts.push(format!("{} attr changes", total_attr_changes));
@@ -318,6 +332,7 @@ impl TemporalDelta {
         let mut affected = HashSet::new();
         affected.extend(&self.edges_added);
         affected.extend(&self.edges_removed);
+        affected.extend(self.edge_endpoint_changes.iter().map(|c| c.edge_id));
         for change in &self.edge_attr_changes {
             affected.insert(change.edge_id);
         }
@@ -431,6 +446,8 @@ pub enum ChangeType {
     Deleted,
     /// Entity had attributes modified.
     AttributeModified,
+    /// A stable edge retained its identity while changing endpoints.
+    EndpointModified,
     /// Multiple types of changes (e.g., created and modified in same window).
     Multiple,
 }
@@ -560,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    fn retained_delta_rejects_unrepresented_endpoint_rewiring() {
+    fn retained_delta_reports_typed_endpoint_rewiring() {
         use crate::state::{change_tracker::ChangeSet, history::HistoryForest};
         let mut history = HistoryForest::new();
         let mut first = ChangeSet::new();
@@ -571,12 +588,22 @@ mod tests {
             .unwrap();
         let before = TemporalSnapshot::at_commit(&history, before_id).unwrap();
         let mut next = ChangeSet::new();
-        next.edges_added = vec![(0, 0, 2)];
+        next.edge_endpoint_changes = vec![crate::EdgeEndpointChange {
+            edge_id: 0,
+            old_endpoints: (0, 1),
+            new_endpoints: (0, 2),
+        }];
         let after_id = history
             .create_commit(next, "next".into(), "test".into(), Some(before_id))
             .unwrap();
         let after = TemporalSnapshot::at_commit(&history, after_id).unwrap();
-        assert!(TemporalDelta::compute(&before, &after).is_err());
+        assert_eq!(
+            TemporalDelta::compute(&before, &after)
+                .unwrap()
+                .edge_endpoint_changes[0]
+                .new_endpoints,
+            (0, 2)
+        );
     }
 
     #[test]
@@ -653,6 +680,7 @@ mod tests {
             nodes_removed: Vec::new(),
             edges_added: Vec::new(),
             edges_removed: Vec::new(),
+            edge_endpoint_changes: Vec::new(),
             node_attr_changes: Vec::new(),
             edge_attr_changes: Vec::new(),
         };

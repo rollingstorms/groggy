@@ -84,6 +84,15 @@ impl PurgePlan {
                 nodes.insert(u);
                 nodes.insert(v);
             }
+            for change in &d.edge_endpoint_changes {
+                edges.insert(change.edge_id);
+                nodes.extend([
+                    change.old_endpoints.0,
+                    change.old_endpoints.1,
+                    change.new_endpoints.0,
+                    change.new_endpoints.1,
+                ]);
+            }
             for (is_node, changes) in [(true, &d.node_attr_changes), (false, &d.edge_attr_changes)]
             {
                 for (id, name, old, new) in changes {

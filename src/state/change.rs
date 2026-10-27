@@ -32,7 +32,7 @@ pub enum EntityType {
 
 /// A change to the ordered stored endpoints of an existing edge instance.
 /// Independent of property changes, clocks and raw storage offsets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct EdgeEndpointChange {
     /// Stable edge instance identity, including parallel edges and self loops.
     pub edge_id: crate::EdgeId,

@@ -76,6 +76,17 @@ class GraphWriter:
                 raise ValueError("Edge rows require two endpoints and optional properties")
         return self.apply_batch(batch, "add_edges")["added_edges"]
 
+    def set_edge_endpoints(self, edge, source, target, *, effective_at=None):
+        batch = GraphBatch()
+        batch.set_edge_endpoints(edge, source, target, effective_at=effective_at)
+        return self.apply_batch(batch, "set_edge_endpoints")["state_id"]
+
+    def set_edge_endpoints_bulk(self, rows, *, effective_at=None):
+        batch = GraphBatch(effective_at=effective_at)
+        for edge, source, target in rows:
+            batch.set_edge_endpoints(edge, source, target)
+        return self.apply_batch(batch, "set_edge_endpoints")["state_id"]
+
     def set_node_attr(self, node, name, value, *, effective_at=None):
         batch = GraphBatch()
         batch.set_node_attr(node, name, value, effective_at=effective_at)

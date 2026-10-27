@@ -202,6 +202,8 @@ pub struct DeltaObject {
     pub node_active_changes: Arc<ColumnDelta>,
     /// Edges that became active/inactive
     pub edge_active_changes: Arc<ColumnDelta>,
+    /// Typed endpoint changes; retained separately from liveness.
+    pub edge_endpoint_changes: Arc<Vec<crate::EdgeEndpointChange>>,
     /// Content hash for deduplication
     pub content_hash: [u8; 32],
 }
@@ -219,6 +221,7 @@ impl DeltaObject {
             edge_attrs: Arc::new(edge_attrs),
             node_active_changes: Arc::new(node_active_changes),
             edge_active_changes: Arc::new(edge_active_changes),
+            edge_endpoint_changes: Arc::new(Vec::new()),
             content_hash: [0; 32], // Will be computed below
         };
 
@@ -253,6 +256,23 @@ impl DeltaObject {
             content_hash: hash,
             ..delta
         }
+    }
+
+    /// Attach canonical endpoint changes without altering old empty-change hashes.
+    pub(crate) fn with_endpoint_changes(
+        mut self,
+        mut changes: Vec<crate::EdgeEndpointChange>,
+    ) -> Self {
+        changes.sort_unstable_by_key(|c| c.edge_id);
+        if !changes.is_empty() {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            self.content_hash.hash(&mut hasher);
+            "groggy:endpoint:v1".hash(&mut hasher);
+            changes.hash(&mut hasher);
+            self.content_hash[..8].copy_from_slice(&hasher.finish().to_le_bytes());
+        }
+        self.edge_endpoint_changes = Arc::new(changes);
+        self
     }
 
     /// Create a new index-based delta object (placeholder for future full implementation)
@@ -295,6 +315,7 @@ impl DeltaObject {
             && self.edge_attrs.is_empty()
             && self.node_active_changes.is_empty()
             && self.edge_active_changes.is_empty()
+            && self.edge_endpoint_changes.is_empty()
     }
 
     /// Get the total number of changes in this delta
@@ -305,6 +326,7 @@ impl DeltaObject {
             + edge_attr_changes
             + self.node_active_changes.len()
             + self.edge_active_changes.len()
+            + self.edge_endpoint_changes.len()
     }
 }
 

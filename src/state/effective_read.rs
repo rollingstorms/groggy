@@ -100,6 +100,7 @@ enum Position {
     NodeAdded(usize),
     NodeRemoved(usize),
     EdgeAdded(usize, usize, usize),
+    EdgeEndpoints(usize, usize, usize),
     EdgeRemoved(usize),
     NodeAttr(usize),
     EdgeAttr(usize),
@@ -119,6 +120,7 @@ enum Change<'a> {
     EdgeRemoved(usize),
     NodeRemoved(usize),
     EdgeAdded(usize, usize, usize),
+    EdgeEndpoints(usize, usize, usize),
     NodeAttr(usize, &'a AttrName, &'a Option<AttrValue>),
     EdgeAttr(usize, &'a AttrName, &'a Option<AttrValue>),
 }
@@ -164,6 +166,17 @@ impl EffectiveReadIndex {
                     ChangeKey::EdgeAdded(id),
                     3,
                     Position::EdgeAdded(id, from, to),
+                )?;
+            }
+            for change in &delta.edge_endpoint_changes {
+                push(
+                    ChangeKey::EdgeEndpoints(change.edge_id),
+                    4,
+                    Position::EdgeEndpoints(
+                        change.edge_id,
+                        change.new_endpoints.0,
+                        change.new_endpoints.1,
+                    ),
                 )?;
             }
             for (row, (id, name, _, _)) in delta.node_attr_changes.iter().enumerate() {
@@ -238,6 +251,7 @@ impl EffectiveReadPlan {
                     Position::NodeAdded(id) => Change::NodeAdded(id),
                     Position::NodeRemoved(id) => Change::NodeRemoved(id),
                     Position::EdgeAdded(id, from, to) => Change::EdgeAdded(id, from, to),
+                    Position::EdgeEndpoints(id, from, to) => Change::EdgeEndpoints(id, from, to),
                     Position::EdgeRemoved(id) => Change::EdgeRemoved(id),
                     Position::NodeAttr(row) => {
                         let (id, name, _, value) = &commit.delta.node_attr_changes[row];
@@ -280,7 +294,14 @@ impl EffectiveReadPlan {
                     snapshot.edge_attributes.remove(id);
                     touched.insert(*id);
                 }
-                Change::EdgeAdded(id, from, to) => {
+                Change::EdgeAdded(id, from, to) | Change::EdgeEndpoints(id, from, to) => {
+                    if matches!(change, Change::EdgeEndpoints(..))
+                        && !snapshot.edges.contains_key(id)
+                    {
+                        return Err(GraphError::InvalidInput(format!(
+                            "Endpoint revision of inactive edge {id} at {at}"
+                        )));
+                    }
                     if let Some((old_from, old_to)) = snapshot.edges.insert(*id, (*from, *to)) {
                         if let Some(edges) = incident.get_mut(&old_from) {
                             edges.remove(id);
@@ -291,7 +312,9 @@ impl EffectiveReadPlan {
                     }
                     incident.entry(*from).or_default().insert(*id);
                     incident.entry(*to).or_default().insert(*id);
-                    snapshot.edge_attributes.remove(id);
+                    if matches!(change, Change::EdgeAdded(..)) {
+                        snapshot.edge_attributes.remove(id);
+                    }
                     touched.insert(*id);
                 }
                 Change::NodeAttr(id, name, value) if nodes.contains(id) => {

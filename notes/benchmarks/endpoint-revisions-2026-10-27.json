@@ -1,0 +1,70 @@
+{
+  "benchmark": "endpoint_revisions",
+  "cases": [
+    {
+      "edges": 1000,
+      "samples": [
+        {
+          "added_edge_ids": 0,
+          "checked_mutation_seconds": 0.001224041,
+          "edge_count": 1000,
+          "effective_read_seconds": 0.0009165,
+          "recorded_endpoint_changes": 1000,
+          "revised_index_build_seconds": 0.000392708,
+          "static_index_build_seconds": 0.000214125
+        },
+        {
+          "added_edge_ids": 0,
+          "checked_mutation_seconds": 0.0013595,
+          "edge_count": 1000,
+          "effective_read_seconds": 0.000963209,
+          "recorded_endpoint_changes": 1000,
+          "revised_index_build_seconds": 0.000423375,
+          "static_index_build_seconds": 0.000167917
+        },
+        {
+          "added_edge_ids": 0,
+          "checked_mutation_seconds": 0.001214833,
+          "edge_count": 1000,
+          "effective_read_seconds": 0.000955042,
+          "recorded_endpoint_changes": 1000,
+          "revised_index_build_seconds": 0.000413291,
+          "static_index_build_seconds": 0.000192
+        }
+      ]
+    },
+    {
+      "edges": 100000,
+      "samples": [
+        {
+          "added_edge_ids": 0,
+          "checked_mutation_seconds": 0.203851125,
+          "edge_count": 100000,
+          "effective_read_seconds": 0.146018,
+          "recorded_endpoint_changes": 100000,
+          "revised_index_build_seconds": 0.062856,
+          "static_index_build_seconds": 0.019234833
+        },
+        {
+          "added_edge_ids": 0,
+          "checked_mutation_seconds": 0.192842458,
+          "edge_count": 100000,
+          "effective_read_seconds": 0.110917792,
+          "recorded_endpoint_changes": 100000,
+          "revised_index_build_seconds": 0.049121041,
+          "static_index_build_seconds": 0.023417292
+        },
+        {
+          "added_edge_ids": 0,
+          "checked_mutation_seconds": 0.194362083,
+          "edge_count": 100000,
+          "effective_read_seconds": 0.125973125,
+          "recorded_endpoint_changes": 100000,
+          "revised_index_build_seconds": 0.055874208,
+          "static_index_build_seconds": 0.018305875
+        }
+      ]
+    }
+  ],
+  "scope": "local release; setup, row preparation and old-view capture excluded; one acceptance preserves stable IDs and old immutable topology; checked mutation and effective read measured separately; no FFI/RSS/production claim"
+}

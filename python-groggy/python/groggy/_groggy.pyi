@@ -5149,6 +5149,10 @@ class Graph:
         """
         ...
 
+    def set_edge_endpoints(self, edge: int, source: int, target: int, *, effective_at: Optional[int] = None) -> int: ...
+    def set_edge_endpoints_bulk(self, rows: List[Tuple[int, int, int]], *, effective_at: Optional[int] = None) -> int: ...
+    def reverse_edges(self, edges: List[int], *, effective_at: Optional[int] = None) -> int: ...
+
     def set_edge_attrs(self, *args, **kwargs) -> Any:
         """
         Set bulk edge attributes - delegates to PyGraphAttrMut
@@ -10321,6 +10325,9 @@ class TemporalDelta:
     """
     Python wrapper for TemporalDelta
     """
+    @property
+    def edge_endpoint_changes(self) -> List[Dict[str, Any]]: ...
+
     @property
     def edges_added(self) -> Any:
         ...

@@ -37,7 +37,15 @@ impl Graph {
             removal_times.insert(id, at);
         }
         let removed_nodes = removal_times.keys().copied().collect();
+        let rewired: HashSet<_> = batch
+            .edge_endpoint_changes
+            .iter()
+            .map(|c| c.edge_id)
+            .collect();
         for (edge, source, target) in self.incident_edges_for_nodes(&removed_nodes)? {
+            if rewired.contains(&edge) {
+                continue;
+            }
             // A shared implicit cascade takes the earliest removed endpoint time.
             // Explicit edge removals below retain their own override precedence.
             let at = [source, target]
@@ -50,6 +58,10 @@ impl Graph {
         }
         for id in first_edge..first_edge + batch.add_edges.len() {
             let key = ChangeKey::EdgeAdded(id);
+            change_times.insert(key.clone(), time(&key));
+        }
+        for change in &batch.edge_endpoint_changes {
+            let key = ChangeKey::EdgeEndpoints(change.edge_id);
             change_times.insert(key.clone(), time(&key));
         }
         for &id in &batch.remove_edges {
@@ -139,6 +151,7 @@ impl Graph {
         // Property-only writes do not inspect ancestry or lifecycle indexes.
         if batch.add_nodes == 0
             && batch.add_edges.is_empty()
+            && batch.edge_endpoint_changes.is_empty()
             && batch.remove_nodes.is_empty()
             && batch.remove_edges.is_empty()
         {
@@ -149,6 +162,12 @@ impl Graph {
             .iter()
             .enumerate()
             .map(|(offset, &endpoints)| (first_edge + offset, endpoints))
+            .chain(
+                batch
+                    .edge_endpoint_changes
+                    .iter()
+                    .map(|c| (c.edge_id, c.new_endpoints)),
+            )
             .collect();
         let patch = crate::state::history::TopologyPatch::from_metadata(
             metadata,
@@ -166,6 +185,7 @@ impl Graph {
                             | ChangeKey::NodeRemoved(_)
                             | ChangeKey::EdgeAdded(_)
                             | ChangeKey::EdgeRemoved(_)
+                            | ChangeKey::EdgeEndpoints(_)
                     )
                 }),
         )

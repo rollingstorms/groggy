@@ -13,6 +13,8 @@ pub enum ChangeKey {
     NodeRemoved(NodeId),
     EdgeAdded(EdgeId),
     EdgeRemoved(EdgeId),
+    /// Endpoint revision of an existing edge; not a liveness toggle.
+    EdgeEndpoints(EdgeId),
     NodeAttribute(NodeId, AttrName),
     EdgeAttribute(EdgeId, AttrName),
 }

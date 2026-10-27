@@ -55,7 +55,7 @@ impl SnapshotMaterialization {
         graph
             .history
             .update_branch_head(&graph.current_branch, graph.current_commit)?;
-        graph.reset_to_snapshot(state.snapshot().clone())?;
+        graph.install_recorded_snapshot(state.snapshot().clone())?;
         graph.automatic_publication = owned.automatic_publication;
         Ok(graph)
     }

@@ -18,6 +18,7 @@ mod compaction;
 pub use compaction::{PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport};
 pub(crate) mod composition;
 mod effective_read;
+mod endpoints;
 mod identity;
 mod integrity;
 pub use integrity::{IntegrityCheckPlan, IntegrityReport};
@@ -1599,6 +1600,7 @@ impl Graph {
             allocated.edge_count,
         )?;
 
+        self.validate_endpoint_revisions(&prepared)?;
         self.validate_unsets(&prepared)?;
 
         // Every checked pooled reference must already exist. Compound creation
@@ -1706,6 +1708,19 @@ impl Graph {
             Vec::new()
         };
         let added_edges = self.add_edges(&prepared.add_edges)?;
+        for change in prepared.edge_endpoint_changes {
+            self.pool.borrow_mut().restore_edge_revision(
+                change.edge_id,
+                change.new_endpoints.0,
+                change.new_endpoints.1,
+            )?;
+            self.space.activate_edge(
+                change.edge_id,
+                change.new_endpoints.0,
+                change.new_endpoints.1,
+            );
+            self.change_tracker.record_edge_endpoint_change(change)?;
+        }
         self.write_node_attrs(prepared.node_attrs)?;
         self.write_edge_attrs(prepared.edge_attrs)?;
         self.execute_unsets(prepared.unset_node_attrs, true);
@@ -1790,7 +1805,7 @@ impl Graph {
     /// Reset all uncommitted changes
     pub fn reset_hard(&mut self) -> Result<(), GraphError> {
         let snapshot = self.history.reconstruct_state_at(self.current_commit)?;
-        self.reset_to_snapshot(snapshot)?;
+        self.install_recorded_snapshot(snapshot)?;
         self.change_tracker.clear();
         Ok(())
     }
@@ -1820,7 +1835,7 @@ impl Graph {
             let target_snapshot = self.history.reconstruct_state_at(target_head)?;
 
             // 4. Reset the current graph state to match the target snapshot
-            self.reset_to_snapshot(target_snapshot)?;
+            self.install_recorded_snapshot(target_snapshot)?;
         }
 
         // 5. Update current branch and commit pointers
@@ -2173,6 +2188,19 @@ impl Graph {
         &mut self,
         snapshot: crate::state::state::GraphSnapshot,
     ) -> Result<(), GraphError> {
+        self.install_snapshot(snapshot, false)
+    }
+    fn install_recorded_snapshot(
+        &mut self,
+        snapshot: crate::state::state::GraphSnapshot,
+    ) -> GraphResult<()> {
+        self.install_snapshot(snapshot, true)
+    }
+    fn install_snapshot(
+        &mut self,
+        snapshot: crate::state::state::GraphSnapshot,
+        recorded: bool,
+    ) -> GraphResult<()> {
         let identity_bindings = self.snapshot_identity_bindings(&snapshot)?;
         // A standalone snapshot must not manufacture a dangling pooled reference.
         // State switches on this graph can resolve references in its retained pool.
@@ -2190,11 +2218,12 @@ impl Graph {
         // Validate endpoint identity before replacing any working membership. Raw
         // reconstruction cannot silently overwrite history's sole endpoint record.
         for (&id, &pair) in &snapshot.edges {
-            if self
-                .pool
-                .borrow()
-                .get_edge_endpoints(id)
-                .is_some_and(|existing| existing != pair)
+            if !recorded
+                && self
+                    .pool
+                    .borrow()
+                    .get_edge_endpoints(id)
+                    .is_some_and(|existing| existing != pair)
             {
                 return Err(GraphError::InvalidInput(format!(
                     "Snapshot endpoints differ from retained edge {id}; coordinated endpoint history is required"
@@ -2231,7 +2260,7 @@ impl Graph {
             // Store topology in pool with specific ID
             self.pool
                 .borrow_mut()
-                .add_edge_with_id(edge_id, source, target)?;
+                .restore_edge_revision(edge_id, source, target)?;
             // Activate in space
             self.space.activate_edge(edge_id, source, target);
 

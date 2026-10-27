@@ -323,6 +323,10 @@ impl GraphSnapshot {
             self.edge_attributes.remove(&edge_id);
         }
 
+        for change in &delta.edge_endpoint_changes {
+            self.edges.insert(change.edge_id, change.new_endpoints);
+        }
+
         // Apply node attribute changes
         for (node_id, attr_name, _old_value, new_value) in &delta.node_attr_changes {
             let attrs = self

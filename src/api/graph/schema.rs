@@ -218,12 +218,21 @@ impl GraphSchema {
         let mut nodes = graph.node_ids();
         nodes.extend(added_nodes.clone());
         nodes.retain(|id| !removed_nodes.contains(id));
+        let revised: HashMap<_, _> = batch
+            .edge_endpoint_changes
+            .iter()
+            .map(|c| (c.edge_id, c.new_endpoints))
+            .collect();
         let mut edges = Vec::new();
         for id in graph.edge_ids() {
             if removed_edges.contains(&id) {
                 continue;
             }
-            let (source, target) = graph.edge_endpoints(id)?;
+            let (source, target) = revised
+                .get(&id)
+                .copied()
+                .map(Ok)
+                .unwrap_or_else(|| graph.edge_endpoints(id))?;
             if !removed_nodes.contains(&source) && !removed_nodes.contains(&target) {
                 edges.push(id);
             }

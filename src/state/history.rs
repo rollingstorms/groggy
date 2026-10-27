@@ -239,6 +239,9 @@ impl HistoryForest {
             for id in &changes.edges_removed {
                 add(ChangeKey::EdgeRemoved(*id));
             }
+            for change in &changes.edge_endpoint_changes {
+                add(ChangeKey::EdgeEndpoints(change.edge_id));
+            }
             for (id, name, _, _) in &changes.node_attr_changes {
                 add(ChangeKey::NodeAttribute(*id, name.clone()));
             }
@@ -993,6 +996,9 @@ pub struct Delta {
     /// Edges that were removed in this commit
     pub edges_removed: Vec<EdgeId>,
 
+    /// Stable edge IDs with typed before/after endpoints.
+    pub edge_endpoint_changes: Vec<EdgeEndpointChange>,
+
     /// Node attribute changes: (node_id, attr_name, old_value, new_value)
     pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
 
@@ -1009,6 +1015,9 @@ impl Delta {
         changes.edges_added.sort_unstable_by_key(|(id, _, _)| *id);
         changes.edges_removed.sort_unstable();
         changes
+            .edge_endpoint_changes
+            .sort_unstable_by_key(|c| c.edge_id);
+        changes
             .node_attr_changes
             .sort_unstable_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
         changes
@@ -1022,6 +1031,7 @@ impl Delta {
         let nodes_removed = changes.nodes_removed.clone();
         let edges_added = changes.edges_added.clone();
         let edges_removed = changes.edges_removed.clone();
+        let edge_endpoint_changes = changes.edge_endpoint_changes.clone();
         let node_attr_changes = changes.node_attr_changes.clone();
         let edge_attr_changes = changes.edge_attr_changes.clone();
 
@@ -1045,6 +1055,10 @@ impl Delta {
                 }
             }
         }
+        if !edge_endpoint_changes.is_empty() {
+            "groggy:endpoint:v1".hash(&mut hasher);
+            edge_endpoint_changes.hash(&mut hasher);
+        }
         let hash_u64 = hasher.finish();
 
         // Convert u64 hash to [u8; 32]
@@ -1060,6 +1074,7 @@ impl Delta {
             nodes_removed,
             edges_added,
             edges_removed,
+            edge_endpoint_changes,
             node_attr_changes,
             edge_attr_changes,
         }
@@ -1071,6 +1086,7 @@ impl Delta {
             && self.nodes_removed.is_empty()
             && self.edges_added.is_empty()
             && self.edges_removed.is_empty()
+            && self.edge_endpoint_changes.is_empty()
             && self.node_attr_changes.is_empty()
             && self.edge_attr_changes.is_empty()
     }
@@ -1092,6 +1108,12 @@ impl Delta {
             parts.push(format!("-{} edges", self.edges_removed.len()));
         }
 
+        if !self.edge_endpoint_changes.is_empty() {
+            parts.push(format!(
+                "{} endpoint changes",
+                self.edge_endpoint_changes.len()
+            ));
+        }
         let total_attr_changes = self.node_attr_changes.len() + self.edge_attr_changes.len();
         if total_attr_changes > 0 {
             parts.push(format!("{} attr changes", total_attr_changes));

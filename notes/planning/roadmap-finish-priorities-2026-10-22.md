@@ -1427,3 +1427,19 @@ Final gates: **1,315 native / 52 ignored**, serial **18-case** process-kill matr
 and rebuilt extension. Existing owner/legacy exclusions and known FFI warnings
 remain. **204 checked / 64 open**, no new rows. Coordinated endpoint mutation,
 reversal and merge planning remain the next core work.
+
+## Endpoint revisions completed — 2026-10-27 UTC
+
+Existing **04.2** is complete: stable-ID scalar/bulk/mixed endpoint changes and
+ordered reversal retain properties, names, typed before/after history and explicit/
+default clocks. Recorded/effective reads, indexes/caches, branch/older owned restore,
+manual coalescing/reset, frozen sources and full durable replay/maintenance are
+verified. Legacy membership-only groups explicitly reject unsupported rewiring;
+no implicit source migration or new owner decision. Evidence/cost/limits:
+`endpoint-revisions-2026-10-27.md`. General revert remains **13.3**; three-way
+merge planning remains **14.2**.
+
+**205 checked / 63 open**, same 268 rows. Gates: **1,335 native / 52 ignored**,
+**2,022 root Python / 1 skipped**, **172 docs examples**, strict all-target Clippy,
+rebuilt extension and serial **18-case** process-kill matrix. Existing owner/legacy
+exclusions and known FFI warnings remain. No new rows, external installs or push.

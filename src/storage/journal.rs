@@ -85,6 +85,8 @@ struct StoredBatch {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     meta_nodes: Vec<usize>,
     add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    edge_endpoints: Vec<(usize, BatchNodeRef, BatchNodeRef)>,
     node_attrs: BTreeMap<String, Vec<(BatchNodeRef, Value)>>,
     edge_attrs: BTreeMap<String, Vec<(BatchEdgeRef, Value)>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -104,6 +106,7 @@ impl StoredBatch {
             add_nodes: batch.add_nodes,
             meta_nodes: Vec::new(),
             add_edges: batch.add_edges.clone(),
+            edge_endpoints: batch.edge_endpoints.clone(),
             node_attrs: batch
                 .node_attrs
                 .iter()
@@ -144,6 +147,7 @@ impl StoredBatch {
         Ok(GraphBatch {
             add_nodes: self.add_nodes,
             add_edges: self.add_edges,
+            edge_endpoints: self.edge_endpoints,
             node_attrs: self
                 .node_attrs
                 .into_iter()
@@ -1276,6 +1280,74 @@ mod tests {
             0
         );
     }
+    #[test]
+    fn endpoint_revision_append_failures_preserve_old_endpoints_and_retry_replays_original_clocks()
+    {
+        for failure in [
+            Failure::BeforeHeader,
+            Failure::AfterHeader,
+            Failure::AfterPayload,
+            Failure::AfterSync,
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("endpoint.ggj");
+            let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+            let initial = store
+                .apply_batch(
+                    GraphBatch {
+                        add_nodes: 3,
+                        add_edges: vec![(BatchNodeRef::Added(0), BatchNodeRef::Added(1))],
+                        effective_at: Some(10),
+                        ..Default::default()
+                    },
+                    0,
+                    "initial".into(),
+                    "test".into(),
+                )
+                .unwrap()
+                .state_id;
+            let pin = store.graph().unwrap().read_view().unwrap();
+            let before = std::fs::read(&path).unwrap();
+            let revision = GraphBatch {
+                edge_endpoints: vec![(0, BatchNodeRef::Existing(2), BatchNodeRef::Existing(1))],
+                effective_at: Some(20),
+                ..Default::default()
+            };
+            store.failure = Some(failure);
+            assert!(store
+                .apply_batch(revision.clone(), initial, "failed".into(), "test".into())
+                .is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), before);
+            assert_eq!(store.graph().unwrap().edge_endpoints(0).unwrap(), (0, 1));
+            store.failure = None;
+            let accepted = store
+                .apply_batch(revision, initial, "retry".into(), "test".into())
+                .unwrap()
+                .state_id;
+            let clocks = store
+                .graph()
+                .unwrap()
+                .publication_metadata(accepted)
+                .unwrap();
+            assert_eq!(pin.edge_endpoints(0).unwrap(), (0, 1));
+            drop(store);
+            let recovered = DurableGraph::open(&path).unwrap();
+            assert_eq!(
+                recovered.graph().unwrap().edge_endpoints(0).unwrap(),
+                (2, 1)
+            );
+            assert_eq!(
+                recovered
+                    .graph()
+                    .unwrap()
+                    .publication_metadata(accepted)
+                    .unwrap(),
+                clocks
+            );
+            recovered.check_integrity().unwrap();
+        }
+    }
+
     #[test]
     fn injected_failures_roll_back_before_exposing_any_graph_mutation() {
         for failure in [
