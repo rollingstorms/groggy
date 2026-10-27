@@ -66,6 +66,7 @@ if not _DISPLAY_AVAILABLE:
 
 __version__ = "0.5.1"
 GraphView = _groggy.GraphView
+GraphQueryIndex = _groggy.GraphQueryIndex
 GraphPath = _groggy.GraphPath
 PageRankResult = _groggy.PageRankResult
 TemporalSnapshot = _groggy.TemporalSnapshot
@@ -179,6 +180,7 @@ __all__ = [
     "AlgorithmBuilder",
     "VarHandle",
     "GraphView",
+    "GraphQueryIndex",
     "GraphPath",
     "PageRankResult",
     "TemporalSnapshot",

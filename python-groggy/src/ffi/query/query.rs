@@ -6,6 +6,33 @@ use groggy::query::{AttributeFilter, EdgeFilter, NodeFilter};
 use groggy::{AttrName, NodeId};
 use pyo3::prelude::*;
 
+pub(crate) fn node_filter_from_python(filter: &PyAny) -> PyResult<NodeFilter> {
+    if let Ok(filter) = filter.extract::<PyNodeFilter>() {
+        Ok(filter.inner)
+    } else if let Ok(query) = filter.extract::<String>() {
+        groggy::query::QueryParser::new()
+            .parse_node_query(&query)
+            .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))
+    } else {
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "filter must be a NodeFilter or query string",
+        ))
+    }
+}
+pub(crate) fn edge_filter_from_python(filter: &PyAny) -> PyResult<EdgeFilter> {
+    if let Ok(filter) = filter.extract::<PyEdgeFilter>() {
+        Ok(filter.inner)
+    } else if let Ok(query) = filter.extract::<String>() {
+        groggy::query::QueryParser::new()
+            .parse_edge_query(&query)
+            .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))
+    } else {
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "filter must be an EdgeFilter or query string",
+        ))
+    }
+}
+
 // Import types from our FFI modules
 
 /// Python wrapper for AttributeFilter

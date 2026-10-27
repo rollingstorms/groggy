@@ -27,6 +27,7 @@ answered questions change status. Unanswered or qualified choices remain visible
 | A09.2 | No. | **Proposal rejected:** the combined grace-period/backup/audit proposal is not accepted. **Confirmed (2026-10-23):** no mandatory grace period or backup; explicit purge still preserves shared branches and open immutable views. This is currently a data science library policy, not a production database retention guarantee. |
 | A10.1 | Conditional yes if joining duplicates things. | **Conditional interpretation:** repeated table rows can map to the same source entity; a join does not itself create graph entities. Reject ambiguous/conflicting writeback without explicit target mapping/reduction. No silent last-row-wins update. |
 | A10.2 | One batch. | **Confirmed:** one mixed atomic writeback for unambiguously identified node and edge updates. |
+| A11.1 | Keep indexes transient; rebuild explicitly. | **Confirmed (2026-10-27):** secondary read indexes are immutable transient captures. Build/rebuild explicitly for a new state or after reopening storage; do not persist definitions or automatically replay/rebuild them. Existing scan APIs remain available; allocation-lifetime external identity reservations retain their separate durable contract. |
 | A11.2 | Fail. | **Confirmed, overrides suggestion:** fail when an index required by the selected query execution is unavailable; scanning must be explicit, not an automatic fallback. This does not make today's ordinary scan API require a nonexistent optional index. |
 | A12.1 | Okay. | **Confirmed:** preserve documented compatibility default; expose explicit weak/strong component modes. This does not accept unrelated provisional self-loop degree changes. |
 | A12.2 | Yes. | **Confirmed:** one deterministic optimum by default; equal-optimum enumeration is a separate bounded operation. |
@@ -49,7 +50,7 @@ answered questions change status. Unanswered or qualified choices remain visible
 ## Questions not answered by the original message
 
 A08.1–A08.2 (rewiring/merge),
-A11.1 (index recovery versus rebuild), A13.1 (shape/broadcast policy), A14.1
+A13.1 (shape/broadcast policy), A14.1
 (stage naming), A15.2 (service limits), A16.2 (durable retry key), and A17.2
 (adapter correction/fact identity). A07.1 remains tentative. A15.1/A17.1 supply
 measurement/fixture direction, not complete production targets. A03.1, A05.2 and A09 were clarified on 2026-10-23. A question

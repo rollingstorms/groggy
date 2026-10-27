@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after the continuation: **208 checked / 60
+Current inventory after the continuation: **209 checked / 59
 open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
@@ -742,3 +742,23 @@ regressions and one rebuilt Python regression cover both entity kinds, case,
 quoted text, a property named null, missing properties and rejection. This is a
 small usable query completion within the existing inventory, not a new checklist
 row or a claim that all query/parser migration is finished. Counts stay 208/60.
+
+## Explicit transient secondary indexes — 2026-10-27 (18.2 / 18.3)
+
+Owner A11.1 decision: keep indexes transient; rebuild explicitly. Implemented
+GraphQueryIndex over exact immutable captures, named property equality and exact
+numeric/temporal ranges, labels/relationship types and optional selected topology.
+Missing requested indexes fail before Boolean execution unless scanning is explicit.
+Existing scan APIs and durable external-ID reservations retain their contracts.
+
+18.3 is complete with mutation/deactivation/branch/effective history/rejection/
+owner closure/reopen/thread coverage. Native **1,399 passed / 56 ignored**, then
+the extended journal restore test passed at four actual injected failure boundaries.
+Rebuilt Python **2,069 passed / 1 skipped**, **190 documentation examples**, strict
+core Clippy. Five alternating-order release samples and construction cost are
+recorded in `captured-query-indexes-2026-10-27.md` and its linked benchmark JSON.
+
+Fixed inventory: **209 checked / 59 open**, no rows added. 18.2 still owns
+specialized group membership and temporal interval indexes plus broader query
+integration. Ordinary immutable-Subgraph migration and compound topology execution
+retain their existing scopes. Workbook answers, appendix and roadmap are updated.

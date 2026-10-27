@@ -306,3 +306,7 @@ harness = false
 [[bench]]
 name = "topology_integrity"
 harness = false
+
+[[bench]]
+name = "query_indexes"
+harness = false

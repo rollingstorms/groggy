@@ -349,9 +349,9 @@ Code / record context:
 
 Roadmap: 18, 32 / AR2. Timing: BEFORE SECONDARY INDEXES.
 
-**Current code / problem:** The managed external-ID index exists. Label/type selection still scans columns, and broader property/time indexes remain planned. The owner requested global indexes and no rebuild unless explicit; derived recovery/cache work needs careful terminology.
+**Current code / problem:** Managed external identities remain durable. Explicit GraphQueryIndex now provides frozen global/selected property equality/range, label/type, endpoint/incidence and temporal-property queries. Ordinary Graph scan selection remains supported. Specialized retained group membership, temporal event intervals and broader query catalog integration remain 18.2.
 
-**Already agreed:** Indexes are global rather than per label by default. Updates consume the same typed changes as graph state.
+**Already agreed:** Indexes are global rather than per label by default. **Owner decision 2026-10-27:** keep secondary indexes transient and rebuild explicitly. The prior incremental-publication/recovery suggestion below is superseded; it is not an accepted policy.
 
 **Suggested direction (provisional):** Maintain declared indexes incrementally at publication. Keep user-requested rebuild distinct from cold recovery. An absent or unusable optional index should have explicit status and a correct scan fallback, never silently return incomplete results.
 
@@ -359,9 +359,9 @@ Roadmap: 18, 32 / AR2. Timing: BEFORE SECONDARY INDEXES.
 
 ### A11.1 - Does the explicit-rebuild rule allow automatic restoration of persisted index state during open, while leaving any full reindex operation manual?
 
-Suggested: restore/replay is automatic; deliberate full reindexing remains explicit.
+Suggested (superseded): restore/replay is automatic; deliberate full reindexing remains explicit.
 
-Decision: ____________________
+Decision (2026-10-27): Keep indexes transient; rebuild explicitly. An immutable captured index remains readable after changes/owner closure. New working state or reopened storage requires an explicit capture/build; no persisted secondary-index definitions or automatic replay/rebuild. Managed external-ID reservations keep their separate durable contract.
 
 ### A11.2 - When an optional index is unavailable, should queries fall back to scans with an explain flag, or fail unless the caller opts into a scan?
 

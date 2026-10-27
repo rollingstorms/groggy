@@ -442,6 +442,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<ffi::api::durable::PyDurableGraph>()?;
     m.add_class::<PySubgraph>()?;
     m.add_class::<ffi::subgraphs::view::PyGraphView>()?;
+    m.add_class::<ffi::query::index::PyGraphQueryIndex>()?;
     m.add_class::<ffi::subgraphs::view::PyGraphPath>()?;
     m.add_class::<ffi::subgraphs::view::PyPageRankResult>()?;
 

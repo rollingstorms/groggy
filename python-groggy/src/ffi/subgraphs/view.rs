@@ -9,6 +9,21 @@ pub struct PyGraphView {
 }
 #[pymethods]
 impl PyGraphView {
+    #[pyo3(signature=(*, node_properties=Vec::new(), edge_properties=Vec::new(), topology=true))]
+    fn build_index(
+        &self,
+        py: Python<'_>,
+        node_properties: Vec<String>,
+        edge_properties: Vec<String>,
+        topology: bool,
+    ) -> PyResult<crate::ffi::query::index::PyGraphQueryIndex> {
+        py.allow_threads(|| {
+            self.inner
+                .build_index(&node_properties, &edge_properties, topology)
+        })
+        .map(|inner| crate::ffi::query::index::PyGraphQueryIndex { inner })
+        .map_err(graph_error_to_py_err)
+    }
     /// Retrieve the frozen group revision referenced by this captured node.
     fn meta_subgraph(&self, py: Python<'_>, node: usize) -> PyResult<Self> {
         py.allow_threads(|| self.inner.meta_subgraph(node))
@@ -133,36 +148,14 @@ impl PyGraphView {
     }
     /// Filter captured selected nodes using a native filter or the existing query syntax.
     fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<Self> {
-        let filter = if let Ok(filter) = filter.extract::<crate::ffi::query::query::PyNodeFilter>()
-        {
-            filter.inner
-        } else if let Ok(query) = filter.extract::<String>() {
-            groggy::query::QueryParser::new()
-                .parse_node_query(&query)
-                .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?
-        } else {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "filter must be a NodeFilter or query string",
-            ));
-        };
+        let filter = crate::ffi::query::query::node_filter_from_python(filter)?;
         py.allow_threads(|| self.inner.filter_nodes(&filter))
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
     /// Filter captured selected edge instances using the shared native executor.
     fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<Self> {
-        let filter = if let Ok(filter) = filter.extract::<crate::ffi::query::query::PyEdgeFilter>()
-        {
-            filter.inner
-        } else if let Ok(query) = filter.extract::<String>() {
-            groggy::query::QueryParser::new()
-                .parse_edge_query(&query)
-                .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?
-        } else {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "filter must be an EdgeFilter or query string",
-            ));
-        };
+        let filter = crate::ffi::query::query::edge_filter_from_python(filter)?;
         py.allow_threads(|| self.inner.filter_edges(&filter))
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)

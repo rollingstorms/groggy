@@ -1903,6 +1903,11 @@ mod state_restore_failure_tests {
             let (graph, target, current) = source();
             let mut store = DurableGraph::create_from_graph(&path, &graph, None).unwrap();
             let pin = store.graph().unwrap().read_view().unwrap();
+            let index = pin.build_index(&["value".into()], &[], true).unwrap();
+            let query = crate::query::NodeFilter::AttributeEquals {
+                name: "value".into(),
+                value: AttrValue::Int(2),
+            };
             let baseline = std::fs::read(&path).unwrap();
             let versions = store.graph().unwrap().history_records().len();
             store.failure = Some(failure);
@@ -1912,6 +1917,15 @@ mod state_restore_failure_tests {
             assert_eq!(std::fs::read(&path).unwrap(), baseline);
             assert_eq!(store.graph().unwrap().current_state_id(), current);
             assert_eq!(store.graph().unwrap().history_records().len(), versions);
+            assert_eq!(index.find_nodes(&query, false).unwrap(), vec![0]);
+            assert_eq!(
+                index
+                    .rebuild(store.read_view().unwrap())
+                    .unwrap()
+                    .find_nodes(&query, false)
+                    .unwrap(),
+                vec![0]
+            );
             assert_eq!(
                 store
                     .graph()
@@ -1931,10 +1945,24 @@ mod state_restore_failure_tests {
                 pin.node_attr(0, &"value".into()).unwrap(),
                 Some(AttrValue::Int(2))
             );
+            assert_eq!(index.find_nodes(&query, false).unwrap(), vec![0]);
+            assert!(index
+                .rebuild(store.read_view().unwrap())
+                .unwrap()
+                .find_nodes(&query, false)
+                .unwrap()
+                .is_empty());
             drop(store);
             let reopened = DurableGraph::open(&path).unwrap();
             assert_eq!(reopened.graph().unwrap().current_state_id(), target);
             assert_eq!(reopened.graph().unwrap().history_records().len(), versions);
+            assert_eq!(index.find_nodes(&query, false).unwrap(), vec![0]);
+            assert!(index
+                .rebuild(reopened.read_view().unwrap())
+                .unwrap()
+                .find_nodes(&query, false)
+                .unwrap()
+                .is_empty());
             assert_eq!(
                 reopened
                     .graph()

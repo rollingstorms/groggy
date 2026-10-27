@@ -313,6 +313,20 @@ impl GraphView {
         )?;
         self.select_edges(&ids)
     }
+    /// Explicitly build immutable indexes over this exact captured selection.
+    pub fn build_index(
+        &self,
+        node_properties: &[AttrName],
+        edge_properties: &[AttrName],
+        topology: bool,
+    ) -> GraphResult<crate::query::GraphQueryIndex> {
+        crate::query::GraphQueryIndex::build(
+            self.clone(),
+            node_properties,
+            edge_properties,
+            topology,
+        )
+    }
     /// Prepare reusable immutable CSR/row identity for native algorithms.
     pub fn algorithm_input(&self) -> GraphResult<crate::algorithms::AlgorithmRead> {
         crate::algorithms::AlgorithmRead::new(self.clone())

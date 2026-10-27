@@ -1,0 +1,142 @@
+{
+  "benchmark": "captured_query_indexes",
+  "cases": [
+    {
+      "build_seconds": 0.000589916,
+      "edges": 999,
+      "iterations": 100,
+      "nodes": 1000,
+      "samples": [
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.00003279375,
+            "equality_seconds": 0.00006179333,
+            "top_100_range_seconds": 0.00006799625
+          },
+          "indexed": {
+            "endpoint_seconds": 1.4167e-7,
+            "equality_seconds": 1.48583e-6,
+            "top_100_range_seconds": 2.5095800000000004e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.00003195459,
+            "equality_seconds": 0.00005799083,
+            "top_100_range_seconds": 0.00006315209
+          },
+          "indexed": {
+            "endpoint_seconds": 1.6249999999999998e-7,
+            "equality_seconds": 1.19917e-6,
+            "top_100_range_seconds": 2.09791e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.00003222708,
+            "equality_seconds": 0.000054870409999999996,
+            "top_100_range_seconds": 0.00006107542
+          },
+          "indexed": {
+            "endpoint_seconds": 1.1625e-7,
+            "equality_seconds": 1.20542e-6,
+            "top_100_range_seconds": 1.96541e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.00003186208,
+            "equality_seconds": 0.00005469958,
+            "top_100_range_seconds": 0.00005609792
+          },
+          "indexed": {
+            "endpoint_seconds": 1.5e-7,
+            "equality_seconds": 1.21333e-6,
+            "top_100_range_seconds": 1.91959e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.00003189792,
+            "equality_seconds": 0.00004710584,
+            "top_100_range_seconds": 0.00005906584
+          },
+          "indexed": {
+            "endpoint_seconds": 1.1291000000000001e-7,
+            "equality_seconds": 1.14958e-6,
+            "top_100_range_seconds": 1.8629200000000001e-6
+          }
+        }
+      ]
+    },
+    {
+      "build_seconds": 0.091755417,
+      "edges": 99999,
+      "iterations": 10,
+      "nodes": 100000,
+      "samples": [
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.004513275,
+            "equality_seconds": 0.023422625,
+            "top_100_range_seconds": 0.0214007708
+          },
+          "indexed": {
+            "endpoint_seconds": 1.2920000000000002e-7,
+            "equality_seconds": 2.5125e-6,
+            "top_100_range_seconds": 3.3624999999999996e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.0045599208000000006,
+            "equality_seconds": 0.0216841416,
+            "top_100_range_seconds": 0.0223296625
+          },
+          "indexed": {
+            "endpoint_seconds": 5.332999999999999e-7,
+            "equality_seconds": 2.9082999999999998e-6,
+            "top_100_range_seconds": 3.5958999999999997e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.0045295792,
+            "equality_seconds": 0.0210158458,
+            "top_100_range_seconds": 0.0212168958
+          },
+          "indexed": {
+            "endpoint_seconds": 1.2500000000000002e-7,
+            "equality_seconds": 1.7125e-6,
+            "top_100_range_seconds": 2.5125e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.004462508400000001,
+            "equality_seconds": 0.0212452875,
+            "top_100_range_seconds": 0.020989291700000003
+          },
+          "indexed": {
+            "endpoint_seconds": 2.667e-7,
+            "equality_seconds": 3.0040999999999997e-6,
+            "top_100_range_seconds": 3.3207999999999996e-6
+          }
+        },
+        {
+          "explicit_scan": {
+            "endpoint_seconds": 0.0044879791,
+            "equality_seconds": 0.0208964958,
+            "top_100_range_seconds": 0.0212229833
+          },
+          "indexed": {
+            "endpoint_seconds": 1.166e-7,
+            "equality_seconds": 1.8083e-6,
+            "top_100_range_seconds": 2.4708e-6
+          }
+        }
+      ]
+    }
+  ],
+  "scope": "five alternating-order release samples, same immutable chain and values; sorted ID queries only; snapshot capture and index construction excluded from query timings; initial index build separately reported; no view materialization, RSS, production throughput or billion-node claim"
+}

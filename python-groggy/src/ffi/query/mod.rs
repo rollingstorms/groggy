@@ -2,6 +2,7 @@
 //!
 //! This module contains Python bindings for query and traversal
 
+pub mod index;
 #[allow(clippy::module_inception)]
 pub mod query;
 pub mod query_parser;

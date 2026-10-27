@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **208 checked and 60 unchecked entries**. Entries overlap:
+currently contains **209 checked and 59 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 60 unchecked entries are not 60 independent tasks: 12 are overlapping AR
-architecture entries, 48 are numbered entries (including nested publication
+The 59 unchecked entries are not 59 independent tasks: 12 are overlapping AR
+architecture entries, 47 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -1009,3 +1009,11 @@ marshaller/build configuration and testing the declared Python-version matrix
 remains existing 19.2/34.2 work; forward-ABI3 and newer Python compatibility are
 not certified by these test totals. No checklist row or owner-policy question is
 added. All six implementation slices are committed; inventory is 208/60.
+
+## Transient index lifecycle exit — 2026-10-27
+
+Owner A11.1 selected transient immutable secondary indexes with explicit rebuilding.
+18.3 is now complete; 18.2 supplies named property/label/type/topology indexes but
+retains specialized group/temporal interval and broader query integration work.
+See `captured-query-indexes-2026-10-27.md` for APIs, tests, failure checks and bounded
+release timings. Fixed inventory: **209 checked / 59 open**; no new rows.
