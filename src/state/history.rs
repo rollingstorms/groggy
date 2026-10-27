@@ -78,6 +78,8 @@ pub struct HistoryForest {
     /// Content-addressed storage for deltas (automatic deduplication)
     /// If two commits have identical changes, they share the same delta
     deltas: HashMap<[u8; 32], Arc<Delta>>,
+    // Rare exact-payload collisions retain legacy logical hash compatibility.
+    delta_collisions: HashMap<[u8; 32], Vec<Arc<Delta>>>,
 
     /*
     === BRANCH MANAGEMENT ===
@@ -119,6 +121,7 @@ impl HistoryForest {
             effective_topology: Default::default(),
             commits: self.commits.clone(),
             deltas: self.deltas.clone(),
+            delta_collisions: self.delta_collisions.clone(),
             branches: self.branches.clone(),
             tags: self.tags.clone(),
             children: self.children.clone(),
@@ -160,6 +163,35 @@ impl HistoryForest {
         Self::new_with_type(GraphType::default())
     }
 
+    // Failure to prove exact identity means a separate payload, never a failed
+    // ordinary publication after its storage writes have already executed.
+    pub(crate) fn has_exact_delta_collisions(&self) -> bool {
+        !self.delta_collisions.is_empty()
+    }
+
+    fn intern_delta(&mut self, delta: Delta) -> Arc<Delta> {
+        let hash = delta.content_hash;
+        let Some(existing) = self.deltas.get(&hash) else {
+            let delta = Arc::new(delta);
+            self.deltas.insert(hash, Arc::clone(&delta));
+            return delta;
+        };
+        if matches!(exact_delta(existing, &delta), Ok(true)) {
+            return Arc::clone(existing);
+        }
+        for existing in self.delta_collisions.get(&hash).into_iter().flatten() {
+            if matches!(exact_delta(existing, &delta), Ok(true)) {
+                return Arc::clone(existing);
+            }
+        }
+        let delta = Arc::new(delta);
+        self.delta_collisions
+            .entry(hash)
+            .or_default()
+            .push(Arc::clone(&delta));
+        delta
+    }
+
     /// Create history for a graph with explicit directionality.
     pub fn new_with_type(graph_type: GraphType) -> Self {
         let mut branches = HashMap::new();
@@ -172,6 +204,7 @@ impl HistoryForest {
             graph_type,
             commits: HashMap::new(),
             deltas: HashMap::new(),
+            delta_collisions: HashMap::new(),
             branches,
             tags: HashMap::new(),
             children: HashMap::new(),
@@ -253,14 +286,9 @@ impl HistoryForest {
         // 1. Create Delta from the changes
         let delta = Delta::from_changes(changes);
 
-        // 2. Compute content hash of delta for deduplication
-        let content_hash = delta.content_hash;
-
-        // 3. Check if we already have this exact delta (reuse for deduplication)
-        let delta_arc = self
-            .deltas
-            .entry(content_hash)
-            .or_insert_with(|| Arc::new(delta));
+        // A legacy logical hash may normalize float bits. Reuse only an exact
+        // payload match, not merely the matching bucket key.
+        let delta_arc = self.intern_delta(delta);
 
         // 4. Create Commit with metadata
         let parents = match parent {
@@ -794,11 +822,26 @@ impl HistoryForest {
             return 0;
         }
         let retained = &self.commits;
-        let hashes: HashSet<_> = retained
-            .values()
-            .map(|commit| commit.delta.content_hash)
-            .collect();
-        self.deltas.retain(|hash, _| hashes.contains(hash));
+        self.deltas.clear();
+        self.delta_collisions.clear();
+        let mut seen = HashSet::new();
+        for commit in retained.values() {
+            if !seen.insert(Arc::as_ptr(&commit.delta)) {
+                continue;
+            }
+            let hash = commit.delta.content_hash;
+            match self.deltas.entry(hash) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(Arc::clone(&commit.delta));
+                }
+                std::collections::hash_map::Entry::Occupied(_) => {
+                    self.delta_collisions
+                        .entry(hash)
+                        .or_default()
+                        .push(Arc::clone(&commit.delta));
+                }
+            }
+        }
         self.children.retain(|parent, children| {
             children.retain(|child| retained.contains_key(child));
             retained.contains_key(parent)
@@ -843,7 +886,8 @@ impl HistoryForest {
 
         // Calculate storage efficiency (higher is better)
         let total_commits = self.commits.len();
-        let unique_deltas = self.deltas.len();
+        let unique_deltas =
+            self.deltas.len() + self.delta_collisions.values().map(Vec::len).sum::<usize>();
         let storage_efficiency = if total_commits > 0 {
             unique_deltas as f64 / total_commits as f64
         } else {
@@ -1633,3 +1677,39 @@ FUTURE OPTIMIZATIONS:
 - Incremental garbage collection
 - Parallel state reconstruction
 */
+
+/// Compare payload identity only after a hash match; unique mutations keep the
+/// existing single-Arc fast path and allocate no collision bucket.
+pub(crate) fn exact_delta(a: &Delta, b: &Delta) -> GraphResult<bool> {
+    if a.nodes_added != b.nodes_added
+        || a.nodes_removed != b.nodes_removed
+        || a.edges_added != b.edges_added
+        || a.edges_removed != b.edges_removed
+        || a.edge_endpoint_changes != b.edge_endpoint_changes
+    {
+        return Ok(false);
+    }
+    for (left, right) in [
+        (&a.node_attr_changes, &b.node_attr_changes),
+        (&a.edge_attr_changes, &b.edge_attr_changes),
+    ] {
+        if left.len() != right.len() {
+            return Ok(false);
+        }
+        for ((i, n, ao, an), (j, m, bo, bn)) in left.iter().zip(right) {
+            if i != j || n != m {
+                return Ok(false);
+            }
+            for (a, b) in [(ao, bo), (an, bn)] {
+                match (a, b) {
+                    (None, None) => {}
+                    (Some(a), Some(b))
+                        if crate::storage::retained_group::encode(a)?
+                            == crate::storage::retained_group::encode(b)? => {}
+                    _ => return Ok(false),
+                }
+            }
+        }
+    }
+    Ok(true)
+}

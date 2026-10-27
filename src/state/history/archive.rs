@@ -239,11 +239,7 @@ impl HistoryDocument {
                     return Err(invalid("publication clocks do not match logical changes"));
                 }
             }
-            let delta = history
-                .deltas
-                .entry(delta.content_hash)
-                .or_insert_with(|| Arc::new(delta))
-                .clone();
+            let delta = history.intern_delta(delta);
             let commit = Commit {
                 id: c.id,
                 parents: c.parents,

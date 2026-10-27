@@ -124,3 +124,11 @@ Archives containing [typed endpoint revisions](endpoint-revisions.md) use docume
 v4. Readers accept v1–v4, and purge/checkpoint/compaction preserve that requirement
 while retained revision records exist. Both old and new endpoint dependencies are
 retention roots; ordinary no-revision formats/hashes remain compatible.
+
+Archives containing different exact delta payloads with the same legacy logical
+hash use document version **5**. Readers accept versions 1–5 and reject a downgrade
+that would expose those payloads to an older deduplicator. Original hash bytes are
+preserved; exact payload comparison distinguishes signed zero, NaN payload bits
+and other hash collisions. Archives without this feature retain their earlier
+required document version. Previously discarded payload bits cannot be recovered
+from old data that no longer contains them.

@@ -213,7 +213,9 @@ impl Graph {
         node_indices.sort_unstable();
         edge_indices.sort_unstable();
         Ok(GraphArchive {
-            version: if self
+            version: if self.history.has_exact_delta_collisions() {
+                5
+            } else if self
                 .history_records()
                 .iter()
                 .any(|c| !c.delta.edge_endpoint_changes.is_empty())
@@ -368,7 +370,7 @@ impl GraphArchive {
     }
 
     pub(crate) fn restore(self) -> GraphResult<Graph> {
-        if !(VERSION..=4).contains(&self.version) {
+        if !(VERSION..=5).contains(&self.version) {
             return Err(invalid("unsupported document version"));
         }
         self.config.validate().map_err(invalid)?;
@@ -377,6 +379,11 @@ impl GraphArchive {
             return Err(invalid("storage layout requires a newer document version"));
         }
         let history = self.history.restore(&pool)?;
+        if self.version < 5 && history.has_exact_delta_collisions() {
+            return Err(invalid(
+                "exact delta hash collisions require document version 5",
+            ));
+        }
         if self.version < 4
             && history
                 .get_commit_history()
@@ -622,7 +629,7 @@ mod tests {
     #[test]
     fn semantic_archive_validation_rejects_bad_version_indices_ids_and_reservations() {
         let mut d = document();
-        d.version = 5;
+        d.version = 6;
         assert!(d.restore().is_err());
         let mut d = document();
         d.node_indices.push(d.node_indices[0].clone());
@@ -800,6 +807,30 @@ mod tests {
             let mut invalid = graph.archive_document().unwrap();
             invalid.version = version;
             assert!(invalid.restore().is_err());
+        }
+        document.restore().unwrap().check_integrity().unwrap();
+    }
+    #[test]
+    fn exact_delta_hash_collision_archives_require_version_five_without_changing_legacy_hashes() {
+        let mut graph = Graph::new();
+        graph.add_node().unwrap();
+        graph
+            .set_node_attr(0, "value".into(), AttrValue::Int(7))
+            .unwrap();
+        graph.create_branch("minus".into()).unwrap();
+        graph
+            .set_node_attr(0, "value".into(), AttrValue::Float64(0.0))
+            .unwrap();
+        graph.checkout_branch("minus".into()).unwrap();
+        graph
+            .set_node_attr(0, "value".into(), AttrValue::Float64(-0.0))
+            .unwrap();
+        let document = graph.archive_document().unwrap();
+        assert_eq!(document.version, 5);
+        for version in 1..5 {
+            let mut old = graph.archive_document().unwrap();
+            old.version = version;
+            assert!(old.restore().is_err());
         }
         document.restore().unwrap().check_integrity().unwrap();
     }
