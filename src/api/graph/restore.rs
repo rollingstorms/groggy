@@ -93,23 +93,15 @@ impl Graph {
         }
         self.history.get_commit(outcome.target)?;
         let snapshot = &outcome.snapshot;
-        let nodes: HashSet<_> = snapshot.active_nodes.iter().copied().collect();
+        crate::state::validate_snapshot(snapshot)?;
         let pool = self.pool.borrow();
         if snapshot.state_id != outcome.target
             || snapshot.graph_type != self.graph_type()
-            || nodes.len() != snapshot.active_nodes.len()
             || snapshot
-                .node_attributes
+                .active_nodes
                 .iter()
-                .any(|(id, attrs)| !attrs.is_empty() && !nodes.contains(id))
-            || snapshot
-                .edge_attributes
-                .iter()
-                .any(|(id, attrs)| !attrs.is_empty() && !snapshot.edges.contains_key(id))
-            || nodes.iter().any(|&id| !pool.is_node_allocated(id))
-            || snapshot.edges.iter().any(|(&id, &(u, v))| {
-                !pool.is_edge_allocated(id) || !nodes.contains(&u) || !nodes.contains(&v)
-            })
+                .any(|&id| !pool.is_node_allocated(id))
+            || snapshot.edges.keys().any(|&id| !pool.is_edge_allocated(id))
         {
             return Err(GraphError::InvalidInput(
                 "Invalid retained restoration topology".into(),

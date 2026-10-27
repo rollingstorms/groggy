@@ -798,43 +798,47 @@ pub struct DiffSummary {
 Helper functions for working with states
 */
 
-/// Merge two snapshots (for branch merging)
-///
-/// ALGORITHM:
-/// 1. Union of active nodes and edges
-/// 2. Merge attributes (conflict resolution needed)
-/// 3. Create new snapshot with merged state
+/// Merge conflict-free three-way inputs. Conflicts return an error instead of
+/// choosing a policy; inspect `plan_snapshot_merge` for their typed inventory.
 pub fn merge_snapshots(
-    _base: &GraphSnapshot,
-    _branch1: &GraphSnapshot,
-    _branch2: &GraphSnapshot,
-    _target_state: StateId,
+    base: &GraphSnapshot,
+    left: &GraphSnapshot,
+    right: &GraphSnapshot,
+    target_state: StateId,
 ) -> GraphResult<GraphSnapshot> {
-    // TODO: Complex merge algorithm
-    // This is needed for git-like branch merging
-    todo!("Implement merge_snapshots")
+    super::merge::plan_snapshot_merge(base, left, right, target_state)?.into_snapshot()
 }
 
-/// Validate that a snapshot is internally consistent
-///
-/// CHECKS:
-/// 1. All edges reference active nodes
-/// 2. All attribute maps reference active entities
-/// 3. No duplicate IDs
-pub fn validate_snapshot(_snapshot: &GraphSnapshot) -> GraphResult<()> {
-    // TODO:
-    // // Check edge endpoints are active nodes
-    // for &(source, target) in snapshot.edges.values() {
-    //     if !snapshot.contains_node(source) || !snapshot.contains_node(target) {
-    //         return Err(GraphError::InvalidSnapshot);
-    //     }
-    // }
-    //
-    // // Check attribute maps only reference active entities
-    // // ... more validation logic
-    //
-    // Ok(())
-    todo!("Implement validate_snapshot")
+/// Validate structural snapshot invariants without pool/schema ownership. Empty
+/// property rows on inactive IDs are harmless legacy mappings; visible rows reject.
+pub fn validate_snapshot(snapshot: &GraphSnapshot) -> GraphResult<()> {
+    let nodes: HashSet<_> = snapshot.active_nodes.iter().copied().collect();
+    let invalid = |message: String| {
+        GraphError::InvalidInput(format!("Invalid snapshot {}: {message}", snapshot.state_id))
+    };
+    if nodes.len() != snapshot.active_nodes.len() {
+        return Err(invalid("duplicate active node".into()));
+    }
+    for (&id, &(u, v)) in &snapshot.edges {
+        if !nodes.contains(&u) || !nodes.contains(&v) {
+            return Err(invalid(format!("edge {id} has an inactive endpoint")));
+        }
+    }
+    for (&id, row) in &snapshot.node_attributes {
+        if !row.is_empty() && !nodes.contains(&id) {
+            return Err(invalid(format!(
+                "inactive node {id} has visible properties"
+            )));
+        }
+    }
+    for (&id, row) in &snapshot.edge_attributes {
+        if !row.is_empty() && !snapshot.edges.contains_key(&id) {
+            return Err(invalid(format!(
+                "inactive edge {id} has visible properties"
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -252,35 +252,7 @@ fn validate_before(state: &GraphSnapshot, delta: &Delta, id: StateId) -> GraphRe
     Ok(())
 }
 fn validate_snapshot(state: &GraphSnapshot) -> GraphResult<()> {
-    let nodes: HashSet<_> = state.active_nodes.iter().copied().collect();
-    if nodes.len() != state.active_nodes.len() {
-        return Err(invalid(state.state_id, "duplicate active node"));
-    }
-    for (&edge, &(u, v)) in &state.edges {
-        if !nodes.contains(&u) || !nodes.contains(&v) {
-            return Err(invalid(
-                state.state_id,
-                format!("edge {edge} has an inactive endpoint"),
-            ));
-        }
-    }
-    for (&node, row) in &state.node_attributes {
-        if !row.is_empty() && !nodes.contains(&node) {
-            return Err(invalid(
-                state.state_id,
-                format!("inactive node {node} has visible properties"),
-            ));
-        }
-    }
-    for (&edge, row) in &state.edge_attributes {
-        if !row.is_empty() && !state.edges.contains_key(&edge) {
-            return Err(invalid(
-                state.state_id,
-                format!("inactive edge {edge} has visible properties"),
-            ));
-        }
-    }
-    Ok(())
+    crate::state::validate_snapshot(state).map_err(|error| invalid(state.state_id, error))
 }
 
 #[cfg(test)]

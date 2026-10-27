@@ -14,6 +14,11 @@ pub mod checkpoint;
 pub mod delta;
 pub mod effective_read;
 pub mod history;
+pub mod merge;
+pub use merge::{
+    plan_snapshot_merge, MergeEntity, MergeProperties, SnapshotMergeConflict, SnapshotMergePlan,
+    SnapshotMergeResolution,
+};
 pub mod publication;
 pub mod read_state;
 pub mod ref_manager;

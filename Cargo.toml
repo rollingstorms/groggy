@@ -290,3 +290,7 @@ harness = false
 [[bench]]
 name = "state_restore"
 harness = false
+
+[[bench]]
+name = "snapshot_merge"
+harness = false

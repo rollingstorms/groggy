@@ -544,8 +544,10 @@ impl HistoryForest {
         Ok(commit.parents.clone())
     }
 
-    /// Check if one commit is an ancestor of another
+    /// Check ancestry between retained published versions; unknown/zero IDs reject.
     pub fn is_ancestor(&self, ancestor: StateId, descendant: StateId) -> Result<bool, GraphError> {
+        self.get_commit(ancestor)?;
+        self.get_commit(descendant)?;
         if ancestor == descendant {
             return Ok(true);
         }
@@ -553,7 +555,7 @@ impl HistoryForest {
         let mut to_visit = vec![descendant];
         let mut visited = HashSet::new();
 
-        // BFS from descendant back through parents to find ancestor
+        // Traverse all parents; visit each retained version at most once.
         while let Some(commit_id) = to_visit.pop() {
             if visited.contains(&commit_id) {
                 continue;
@@ -575,53 +577,57 @@ impl HistoryForest {
         Ok(false)
     }
 
-    /// Find the lowest common ancestor of two commits (useful for merging)
+    /// All best common ancestors, sorted by state ID. A common ancestor is
+    /// excluded when another common ancestor descends from it. Criss-cross merges
+    /// can have several equally valid bases; none is selected by traversal order.
+    /// Unknown states (including the unpublished zero root) reject explicitly.
+    pub fn merge_bases(&self, left: StateId, right: StateId) -> GraphResult<Vec<StateId>> {
+        let ancestors = |start: StateId| -> GraphResult<HashSet<StateId>> {
+            self.get_commit(start)?;
+            let mut seen = HashSet::new();
+            let mut pending = vec![start];
+            while let Some(id) = pending.pop() {
+                if seen.insert(id) {
+                    pending.extend(self.get_commit(id)?.parents.iter().copied());
+                }
+            }
+            Ok(seen)
+        };
+        let left = ancestors(left)?;
+        let right = ancestors(right)?;
+        let common: HashSet<_> = left.intersection(&right).copied().collect();
+        // Common ancestry is closed under parents, so each non-best ancestor is
+        // the direct parent of another common ancestor. One pass avoids pairwise
+        // ancestry searches even for long shared histories.
+        let mut shadowed = HashSet::new();
+        for &id in &common {
+            for &parent in &self.get_commit(id)?.parents {
+                if common.contains(&parent) {
+                    shadowed.insert(parent);
+                }
+            }
+        }
+        let mut best: Vec<_> = common.difference(&shadowed).copied().collect();
+        best.sort_unstable();
+        Ok(best)
+    }
+
+    /// Return the unique best common ancestor, or None for unrelated roots.
+    /// Ambiguous criss-cross bases reject so callers can choose an explicit base
+    /// or implement a separately defined recursive-base policy.
     pub fn find_common_ancestor(
         &self,
         commit1: StateId,
         commit2: StateId,
     ) -> Result<Option<StateId>, GraphError> {
-        if commit1 == commit2 {
-            return Ok(Some(commit1));
+        let bases = self.merge_bases(commit1, commit2)?;
+        match bases.as_slice() {
+            [] => Ok(None),
+            [base] => Ok(Some(*base)),
+            _ => Err(GraphError::InvalidInput(format!(
+                "Merge has multiple best common ancestors {bases:?}; choose an explicit base"
+            ))),
         }
-
-        // Get all ancestors of commit1
-        let mut ancestors1 = HashSet::new();
-        let mut to_visit = vec![commit1];
-        while let Some(commit_id) = to_visit.pop() {
-            if ancestors1.contains(&commit_id) {
-                continue;
-            }
-            ancestors1.insert(commit_id);
-
-            if let Some(commit) = self.commits.get(&commit_id) {
-                for &parent_id in &commit.parents {
-                    to_visit.push(parent_id);
-                }
-            }
-        }
-
-        // BFS from commit2 to find first common ancestor
-        let mut to_visit = vec![commit2];
-        let mut visited = HashSet::new();
-        while let Some(commit_id) = to_visit.pop() {
-            if visited.contains(&commit_id) {
-                continue;
-            }
-            visited.insert(commit_id);
-
-            if ancestors1.contains(&commit_id) {
-                return Ok(Some(commit_id));
-            }
-
-            if let Some(commit) = self.commits.get(&commit_id) {
-                for &parent_id in &commit.parents {
-                    to_visit.push(parent_id);
-                }
-            }
-        }
-
-        Ok(None)
     }
 
     /*

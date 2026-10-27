@@ -1,0 +1,48 @@
+{
+  "benchmark": "snapshot_merge",
+  "cases": [
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "samples": [
+        {
+          "conflicts": 0,
+          "plan_seconds": 0.0018155,
+          "validate_finish_seconds": 4.4458e-05
+        },
+        {
+          "conflicts": 0,
+          "plan_seconds": 0.001667584,
+          "validate_finish_seconds": 5.4667e-05
+        },
+        {
+          "conflicts": 0,
+          "plan_seconds": 0.001772833,
+          "validate_finish_seconds": 4.6792e-05
+        }
+      ]
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "samples": [
+        {
+          "conflicts": 0,
+          "plan_seconds": 0.353233875,
+          "validate_finish_seconds": 0.006723542
+        },
+        {
+          "conflicts": 0,
+          "plan_seconds": 0.274289125,
+          "validate_finish_seconds": 0.006613041
+        },
+        {
+          "conflicts": 0,
+          "plan_seconds": 0.258687958,
+          "validate_finish_seconds": 0.006785458
+        }
+      ]
+    }
+  ],
+  "scope": "three local native release samples; chain and one integer column; alternating independent left/right property changes; setup/input copies excluded; pure logical plan, no graph publication, FFI, durability, RSS or production budget claim"
+}

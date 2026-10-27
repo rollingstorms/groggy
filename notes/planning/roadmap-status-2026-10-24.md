@@ -837,3 +837,23 @@ and serial 18-case recovery matrix. Local 100k-node restoration: **30.27 ms repl
 Evidence: `state-restoration-2026-10-27.md`; API: `docs/api/state-restoration.md`.
 Next core scope is caller-resolved three-way merges (14.2), with tracked revert
 policy still explicit. No new checklist rows or owner-policy assumptions.
+
+### Native three-way merge planner (14.2 component) — 2026-10-27
+
+Native snapshot merge now combines independent node/edge/property/endpoint changes
+and inventories typed conflicts with whole base/left/right values. Explicit caller
+answers resolve entity/property/endpoints; recomputed dangling dependencies require
+explicit edge deletion or exact missing-node retention. Parallel IDs remain distinct;
+absence/Null, float types, signed zero and NaN payloads are preserved. Shared
+structural validation replaces a public panic and duplicated integrity/restore checks.
+Common-ancestor selection now returns all best bases and rejects ambiguous criss-cross
+selection rather than silently choosing an older DFS match.
+
+**14.2 is partial**, not complete: owning Graph capture/acceptance, full identity/
+schema/source/time guards, one two-parent publication, durable replay and Python
+surfaces remain. Evidence and fixed remainder: `snapshot-merge-planning-2026-10-27.md`.
+**205 checked / 63 open**, same 268 rows. Gates: **1,351 native / 52 ignored**,
+**2,025 root Python / 1 skipped**, **176 Python docs examples** plus one executable
+Rust merge example, strict Clippy, rebuilt FFI and serial 18-case recovery matrix.
+Local 100k-node pure planning median **274.29 ms**, final validation **6.72 ms**;
+no publication/FFI/RSS/production claim. No new checklist rows.
