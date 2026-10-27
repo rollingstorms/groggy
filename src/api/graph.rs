@@ -32,11 +32,13 @@ pub use purge::{PurgeOutcome, PurgePlan, PurgeReport};
 mod merge;
 mod publication;
 mod read_attributes;
-pub use merge::{GraphMergeOptions, GraphMergeOutcome, GraphMergePlan, GraphMergeReadPlan};
+pub use merge::{GraphMergeOutcome, GraphMergePlan, GraphMergeReadPlan};
+pub use snapshot_publication::{GraphMergeOptions, GraphPublicationOptions};
 mod restore;
 pub(crate) mod retention;
 mod schema;
-pub use restore::{StateRestoreOutcome, StateRestorePlan};
+mod snapshot_publication;
+pub use restore::{StateRestoreMode, StateRestoreOutcome, StateRestorePlan};
 pub(crate) mod snapshot;
 #[cfg(test)]
 mod storage_boundary_tests;

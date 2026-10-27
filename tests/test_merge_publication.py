@@ -51,12 +51,12 @@ def test_exact_side_resolution_and_custom_null_or_absence_are_distinct():
     outcome = plan.resolve(lambda c: "right")
     g.finish_merge(outcome)
     assert g.get_node_attr(0, "value") == 2
-    g.restore_state(left)
+    g.restore_state(left, mode="switch")
     outcome = g.prepare_merge(right).resolve(lambda c: {"kind": "property", "present": True, "value": None})
     g.finish_merge(outcome)
     assert g.read_view().node_attr(0, "value") is None  # explicit null has a property history event
     assert g.snapshot_at_commit(g.current_state_id).node_attr(0, "value") is not None
-    g.restore_state(left)
+    g.restore_state(left, mode="switch")
     outcome = g.prepare_merge(right).resolve(lambda c: {"kind": "property", "present": False})
     g.finish_merge(outcome)
     assert g.snapshot_at_commit(g.current_state_id).node_attr(0, "value") is None
@@ -131,7 +131,7 @@ def test_topology_conflicts_require_explicit_drop_or_missing_endpoint_nodes():
     g.finish_merge(outcome)
     assert g.get_node_attr(1, "restored") is True
     assert g.edge_endpoints(0) == (0, 1)
-    g.restore_state(left)
+    g.restore_state(left, mode="switch")
     outcome = g.prepare_merge(right).resolve(lambda c: {"kind": "drop_edge"})
     g.finish_merge(outcome)
     assert not g.has_node(1) and not g.has_edge(0)

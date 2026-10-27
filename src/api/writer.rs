@@ -132,15 +132,41 @@ impl<'a> GraphWriter<'a> {
         self.expected_state = state;
         Ok(state)
     }
-    /// Explicit reference/state restoration under this session's expected head and schema.
-    pub fn restore_state(&mut self, target: StateId) -> GraphResult<StateId> {
+    /// Explicitly select reference switching or tracked restoration under this session.
+    pub fn restore_state(
+        &mut self,
+        target: StateId,
+        mode: crate::StateRestoreMode,
+    ) -> GraphResult<StateId> {
+        self.restore_state_with_options(
+            target,
+            mode,
+            crate::GraphMergeOptions::default(),
+            "restore",
+        )
+    }
+    /// Restore with per-change clocks and this session's author/schema/head guards.
+    pub fn restore_state_with_options(
+        &mut self,
+        target: StateId,
+        mode: crate::StateRestoreMode,
+        mut options: crate::GraphMergeOptions,
+        message: impl Into<String>,
+    ) -> GraphResult<StateId> {
+        if mode == crate::StateRestoreMode::Tracked && options.effective_at.is_none() {
+            options.effective_at = self.effective_at;
+        }
         let outcome = self
             .graph
-            .prepare_state_restore(target, self.expected_state)?
+            .prepare_state_restore(target, self.expected_state, mode)?
             .execute()?;
-        let state = self
-            .graph
-            .finish_state_restore_with_schema(outcome, self.schema)?;
+        let state = self.graph.finish_state_restore_with_options(
+            outcome,
+            options,
+            message.into(),
+            self.author.clone(),
+            self.schema,
+        )?;
         self.expected_state = state;
         Ok(state)
     }

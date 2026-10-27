@@ -1,6 +1,13 @@
 # Restore an explicitly selected retained state
 
-`Graph.restore_state(state, expected_state=..., schema=...)` restores the working
+`mode` is required: `"tracked"` publishes a new delta; `"switch"` selects the
+retained state without publishing. This explicit choice applies to Graph,
+DurableGraph and both writer interfaces. Existing callers must add their intended
+mode; there is no implicit default.
+
+## Reference switching
+
+`Graph.restore_state(state, mode="switch", expected_state=..., schema=...)` restores the working
 graph and retargets its current branch to a retained published state ID. The state
 argument is required. It restores active membership, ordered endpoints, typed
 properties, external names and group references. State zero is the empty root,
@@ -25,12 +32,12 @@ g.set_node_attr(0, "value", "future")
 future = g.current_state_id
 pin = g.read_view()
 versions = len(g.commit_history())
-assert g.restore_state(first, expected_state=future) == first
+assert g.restore_state(first, mode="switch", expected_state=future) == first
 assert g.edge_endpoints(0) == (0, 1)
 assert pin.edge_endpoints(0) == (1, 0)
 assert len(g.commit_history()) == versions
 assert g.snapshot_at_commit(future).node_attr(0, "value").value == "future"
-assert g.writer().restore_state(future) == future
+assert g.writer().restore_state(future, mode="switch") == future
 assert g.get_node_attr(0, "value") == "future"
 ```
 
@@ -53,14 +60,14 @@ manual.add_node()
 target = manual.commit("initial", "example")
 manual.set_node_attr(0, "pending", True)
 try:
-    manual.restore_state(target)
+    manual.restore_state(target, mode="switch")
 except ValueError:
     pass
 else:
     raise AssertionError("Pending manual edits require an explicit decision")
 assert manual.has_uncommitted_changes()
 manual.reset_hard()
-assert manual.restore_state(target) == target
+assert manual.restore_state(target, mode="switch") == target
 assert not manual.has_uncommitted_changes()
 ```
 
@@ -79,7 +86,7 @@ old = h.current_state_id
 h.set_node_attr(0, "value", 1)
 new = h.current_state_id
 immutable = h.read_view()
-h.restore_state(old)
+h.restore_state(old, mode="switch")
 assert h.snapshot_at_commit(new).node_attr(0, "value").value == 1
 assert h.gc_history() == 1
 assert immutable.node_attr(0, "value") == 1
@@ -106,9 +113,9 @@ from groggy import DurableGraph
 with TemporaryDirectory() as directory:
     path = Path(directory) / "graph.ggj"
     with DurableGraph.create_from_graph(path, g) as store:
-        assert store.writer().restore_state(first) == first
+        assert store.writer().restore_state(first, mode="switch") == first
         before = path.read_bytes()
-        assert store.restore_state(first) == first
+        assert store.restore_state(first, mode="switch") == first
         assert path.read_bytes() == before
         store.verify_storage()
     with DurableGraph.open(path) as store:
@@ -128,4 +135,72 @@ pointer switch. It can require memory proportional to the selected graph.
 A published state ID is distinct from an effective timestamp. Use
 `read_view_at(effective_microseconds, recorded_by=...)` for an immutable reconstructed
 clock selection. Restoration here changes the working graph to an explicit
-published version; general tracked historical reverts remain a separate 13.3 item.
+published version; tracked mode records that restoration as described below.
+
+## Tracked restoration
+
+```python
+from groggy import Graph, GraphBatch
+
+tracked = Graph()
+initial = GraphBatch(effective_at=10)
+initial.add_node(value="original")
+target = tracked.writer().apply_batch(initial)["state_id"]
+tracked.writer().set_node_attr(0, "value", "edited", effective_at=20)
+before = tracked.current_state_id
+pinned = tracked.read_view()
+restored = tracked.restore_state(
+    target, mode="tracked", expected_state=before, effective_at=30,
+    message="restore original contents", author="example"
+)
+assert restored > before
+assert tracked.commit_history()[-1].parents == [before]
+assert tracked.get_node_attr(0, "value") == "original"
+assert pinned.node_attr(0, "value") == "edited"
+assert tracked.read_view_at(25).node_attr(0, "value") == "edited"
+assert tracked.read_view_at(30).node_attr(0, "value") == "original"
+assert tracked.snapshot_at_commit(before).node_attr(0, "value").value == "edited"
+```
+
+A tracked restoration publishes exactly one accepted version on the current
+branch, including an intentional data-identical restoration with an empty delta.
+Its sole parent is the previous current state. The target is a content source,
+not another parent or a permanent history pin. Original versions/clocks remain
+unchanged; explicit later history collection may discard an unreferenced sibling
+target. The newly recorded delta retains the restored payload independently.
+
+The delta contains actual whole typed property changes, membership additions and
+removals, and ordered endpoint revisions. Parallel edge identities, self-loops,
+Null/absence, exact floating payloads, external aliases and frozen group references
+retain their existing contracts. No entity IDs are allocated or reused. Later
+allocations remain monotonic. Current graph configuration and publication policy
+are preserved. Dirty manual changes must be explicitly reset before either mode.
+
+`effective_at` supplies a batch default; omit it for one engine acceptance-clock
+default. `change_times` uses the same list of `{kind, entity, name?, effective_at}`
+records as `finish_merge`. Overrides must address actual changes. Initial restored
+properties inherit node/edge reactivation time unless overridden; cascade edge
+removals inherit the earliest removed endpoint time unless overridden. Full
+selected-lineage endpoint lifetimes validate atomically before acceptance. Recorded
+time remains engine-owned, and accepted-order ties retain the existing rule.
+Switch mode rejects effective/change timestamps because it records no mutation.
+
+The native `GraphPublicationOptions` owns these timing options; `GraphMergeOptions`
+is its compatible alias. Native capture requires `StateRestoreMode::Tracked` or
+`StateRestoreMode::Switch`. The mode travels with the detached plan and cannot be
+changed after capture. `finish_state_restore_with_options` accepts explicit
+clocks/message/author/schema; native writers also inherit their session defaults.
+Target and current-parent replay plus exact comparison run outside the Python GIL.
+Current-owner validation and installation remain thread-confined.
+
+Durable tracked restoration appends and syncs a checked record of the retained
+target, expected head/branch, original options and validated publication metadata.
+Recovery reconstructs the same logical inputs and exact delta, enforces installed
+and additional schemas, and verifies the clocks before installation. Records
+never persist raw pool offsets. A later baseline stores the accepted delta so a
+collected target is no longer needed. Reference switching retains its older
+reference record. Older readers reject unknown tracked-restore records.
+
+Both modes require full target replay and graph assembly. Tracked mode additionally
+reconstructs the current parent and compares the two states. Neither mode promises
+constant-time restoration or a memory bound independent of graph size.

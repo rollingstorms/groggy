@@ -57,10 +57,12 @@ class GraphWriter:
         self._state_id = state
         return state
 
-    def restore_state(self, state):
-        """Select a retained published state; preserve history until explicit collection."""
+    def restore_state(self, state, *, mode, effective_at=None, change_times=None,
+                      message="restore"):
+        """Explicitly switch selection or publish a tracked restoration delta."""
         restored = self._graph.restore_state(
-            state, expected_state=self._state_id, schema=self._schema
+            state, mode=mode, expected_state=self._state_id, effective_at=effective_at,
+            change_times=change_times, message=message, author=self._author, schema=self._schema
         )
         self._state_id = restored
         return restored

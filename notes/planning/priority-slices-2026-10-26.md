@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after endpoint closure: **206 checked / 62
+Current inventory after endpoint closure: **207 checked / 61
 open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
@@ -573,3 +573,29 @@ writer bridge and delta-only durable replay. Verification: 1,369 native tests,
 Clippy and 23 serial real process-kill scenarios across merge/maintenance.
 See `merge-publication-exit-review-2026-10-27.md` for boundaries and benchmarks.
 No new checklist rows. Inventory: **206 checked / 62 open**.
+
+## Explicit restore modes completed — 2026-10-27
+
+Owner approved one restore_state API with required mode="tracked" or mode="switch".
+Tracked restoration records one exact current-parent delta with explicit/default
+effective clocks; switch retargets the branch without publication. Graph,
+DurableGraph and native/Python writers share the contract. Exact delta preparation
+and checked snapshot publication are shared with merges.
+
+Existing 13.3 is complete: native/Python compatibility, stale/dirty/schema/clock
+guards, frozen sources, history/identity preservation, durable replay/rollback,
+backup, explicit source-target pruning and compaction, plus five real SIGKILL
+cases. Full verification: 1,376 native / 56 ignored; 2,040 root Python / 1 skipped;
+182 executable docs; strict all-target Clippy; rebuilt in-tree FFI. The final
+focused rebuilt restore/merge suite also passes (18 tests). Three existing FFI
+warnings remain. No new checklist rows: **207 checked / 61 open**.
+
+Local release medians for 100k-node chains with all properties changed: switch
+reconstruction 30.9 ms + validation/install 132.5 ms; tracked replay/comparison
+240.2 ms + validation/publication/install 206.8 ms. This measures full-state
+restoration, not ordinary mutation overhead. Receipt:
+`../benchmarks/state-restore-modes-2026-10-27.json`. Full replay/assembly costs,
+RSS/production targets and broader lifetime/GIL work remain explicit limits.
+
+Next priority is existing canonical state/change ownership (AR7.9), followed by
+compound topology acceptance and remaining view/index/query boundaries.

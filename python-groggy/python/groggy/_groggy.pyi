@@ -3241,8 +3241,8 @@ class DurableGraph:
     def prepare_merge(self, right: int, *, base: Optional[int] = None, expected_state: Optional[int] = None) -> MergePlan: ...
     def finish_merge(self, outcome: MergeOutcome, *, effective_at: Optional[int] = None, change_times: Optional[list[dict]] = None, message: str = "merge", author: str = "writer", schema: Optional[dict] = None) -> int: ...
 
-    def restore_state(self, state: int, *, expected_state: Optional[int] = None, schema: Optional[dict] = None) -> int:
-        """Select a retained published state; preserve history until explicit collection."""
+    def restore_state(self, state: int, *, mode: str, expected_state: Optional[int] = None, effective_at: Optional[int] = None, change_times: Optional[list] = None, message: str = "restore", author: str = "writer", schema: Optional[dict] = None) -> int:
+        """Restore with required tracked (new delta) or switch (reference-only) mode."""
         ...
 
     def check_integrity(self) -> Dict[str, Any]:
@@ -5219,8 +5219,8 @@ class Graph:
         """
         ...
 
-    def restore_state(self, state: int, *, expected_state: Optional[int] = None, schema: Optional[dict] = None) -> int:
-        """Select a retained published state; preserve history until explicit collection."""
+    def restore_state(self, state: int, *, mode: str, expected_state: Optional[int] = None, effective_at: Optional[int] = None, change_times: Optional[list] = None, message: str = "restore", author: str = "writer", schema: Optional[dict] = None) -> int:
+        """Restore with required tracked (new delta) or switch (reference-only) mode."""
         ...
 
     def reset_hard(self) -> None: ...

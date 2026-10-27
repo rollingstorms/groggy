@@ -31,7 +31,9 @@ fn restore_retained_state_recovers_topology_properties_names_groups_and_keeps_fu
     let future_pin = g.read_view().unwrap();
     let versions = g.history_records().len();
     let allocation = g.check_integrity().unwrap();
-    let plan = g.prepare_state_restore(target, future).unwrap();
+    let plan = g
+        .prepare_state_restore(target, future, groggy::StateRestoreMode::Switch)
+        .unwrap();
     let outcome = std::thread::spawn(move || plan.execute().unwrap())
         .join()
         .unwrap();
@@ -90,14 +92,14 @@ fn stale_foreign_switched_branch_and_collected_targets_reject_without_mutation()
     g.add_node().unwrap();
     let root = g.current_state_id();
     let outcome = g
-        .prepare_state_restore(root, root)
+        .prepare_state_restore(root, root, groggy::StateRestoreMode::Switch)
         .unwrap()
         .execute()
         .unwrap();
     let mut foreign = g.prepare_archive().unwrap().restore().unwrap();
     assert!(foreign.finish_state_restore(outcome).is_err());
     let outcome = g
-        .prepare_state_restore(root, root)
+        .prepare_state_restore(root, root, groggy::StateRestoreMode::Switch)
         .unwrap()
         .execute()
         .unwrap();
@@ -111,7 +113,7 @@ fn stale_foreign_switched_branch_and_collected_targets_reject_without_mutation()
     let target = g.current_state_id();
     g.checkout_branch("main".into()).unwrap();
     let outcome = g
-        .prepare_state_restore(target, root)
+        .prepare_state_restore(target, root, groggy::StateRestoreMode::Switch)
         .unwrap()
         .execute()
         .unwrap();
@@ -121,14 +123,18 @@ fn stale_foreign_switched_branch_and_collected_targets_reject_without_mutation()
     assert_eq!(g.current_state_id(), root);
     assert!(!g.is_node_allocated(node));
     let outcome = g
-        .prepare_state_restore(root, root)
+        .prepare_state_restore(root, root, groggy::StateRestoreMode::Switch)
         .unwrap()
         .execute()
         .unwrap();
     g.add_node().unwrap();
     assert!(g.finish_state_restore(outcome).is_err());
-    assert!(g.prepare_state_restore(0, g.current_state_id()).is_err());
-    assert!(g.prepare_state_restore(999, g.current_state_id()).is_err());
+    assert!(g
+        .prepare_state_restore(0, g.current_state_id(), groggy::StateRestoreMode::Switch)
+        .is_err());
+    assert!(g
+        .prepare_state_restore(999, g.current_state_id(), groggy::StateRestoreMode::Switch)
+        .is_err());
     g.check_integrity().unwrap();
 }
 
@@ -140,13 +146,20 @@ fn dirty_manual_state_requires_explicit_pending_rollback_and_schema_is_checked_b
     manual
         .set_node_attr(0, "pending".into(), V::Int(9))
         .unwrap();
-    assert!(manual.restore_state(root, root).is_err());
+    assert!(manual
+        .restore_state(root, root, groggy::StateRestoreMode::Switch)
+        .is_err());
     assert_eq!(
         manual.get_node_attr(0, &"pending".into()).unwrap(),
         Some(V::Int(9))
     );
     manual.reset_hard().unwrap();
-    assert_eq!(manual.restore_state(root, root).unwrap(), root);
+    assert_eq!(
+        manual
+            .restore_state(root, root, groggy::StateRestoreMode::Switch)
+            .unwrap(),
+        root
+    );
     assert!(!manual.automatic_publication());
     let mut g = Graph::new();
     g.add_node().unwrap();
@@ -161,7 +174,7 @@ fn dirty_manual_state_requires_explicit_pending_rollback_and_schema_is_checked_b
     assert!(g
         .writer("test")
         .with_schema(&schema)
-        .restore_state(target)
+        .restore_state(target, groggy::StateRestoreMode::Switch)
         .is_err());
     assert_eq!(g.current_state_id(), current);
     assert_eq!(

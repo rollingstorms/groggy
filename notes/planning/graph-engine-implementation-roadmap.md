@@ -80,8 +80,8 @@ Make changes atomic and persistent, then complete the Git-like history promised 
 10. **Build durable storage and recovery.** Version 2 active graph export now preserves inline logical property types and rejects unsupported pooled references; it is not a complete engine backup. DurableGraph now provides a versioned checksummed CBOR journal preserving checked inline writes, allocation counters/reservations, schema revisions, configuration, branches, typed history and original clocks. Restart, partial records, corruption, subprocess exit and injected I/O failures are tested in Rust/Python. Full-journal backups now use a verified synced temporary file and publish without overwriting; they reopen with the ordinary recovery path. Stored membership and backing pool data now survive deactivation, reset and branch switches; pooled/meta serialization is still rejected. Remaining: durable subgraph/meta contents, importing existing graphs, periodic checkpoints, compaction, format upgrades and bounded recovery. See [storage guarantees/limits](../../docs/api/durable-storage.md).
 11. **Complete property history.** The first slice made commits resolve typed node and edge values and added tests for historical reads. Finish coalescing, deletion, unset/null distinctions, effective and recorded times, and all supported value types before treating the history contract as complete.
 12. **Make snapshots and state switching exact.** The first slice preserved direction and ID allocation across snapshots and branch switches. Retained subgraph membership, endpoints and old column indices now survive state switching because the selected space is rebuilt without replacing the pool. Missing meta referents reject before allocation; detached snapshot materialization rejects absent backing references. Extend reconstruction to all configuration and portable/pinned referents, bound repeated-switch column allocation, and verify state-pinned reads independently of the working head. See [retained subgraphs](../../docs/api/retained-subgraphs.md). Treat an explicit `commit` as a requested immutable checkpoint of the current published state after a compatible migration; automatic batch versions and deltas remain the source for reconstruction between checkpoints.
-13. **Complete diff, revert, and reset semantics.** `reset_hard` restores the recorded state and preserves allocated IDs. Rust and Python `diff_commits` now compare reconstructed states in either direction, including typed property before/after values and topology, with deterministic ordering. Revert, endpoint rewiring, and destructive pruning policy remain.
-14. **Finish branches and merges.** Implement a three-way merge for node, edge, and property changes, with conflict reporting and resolution. This follows reliable commits and snapshots.
+13. **Complete diff, revert, and reset semantics.** `reset_hard` restores the recorded state and preserves allocated IDs. Rust and Python `diff_commits` now compare reconstructed states in either direction, including typed property before/after values and topology, with deterministic ordering. Endpoint revisions and explicit tracked/reference restoration are complete; see the 2026-10-27 exit receipts. Explicit retention/purge remain separate operations.
+14. **Branches and merges.** Checked native/Python/durable three-way publication, exact typed conflict resolution, first-parent clocks and two retained parents are complete within the documented domain; see `merge-publication-exit-review-2026-10-27.md`.
 15. **Define retention and garbage collection.** Preserve referenced commits and provenance while allowing compaction of unreachable history. History-only reachability collection, exact raw-column compaction and optional orphan-value reclamation are implemented, including verified durable replacement (`pool-compaction-2026-10-26.md`). Explicit previewable purge now reclaims orphan entities/groups/names with complete retained owner-domain closure, permanent ID intervals, sparse endpoint reclamation and verified durable replacement (`retained-purge-2026-10-26.md`). Broader platform/scale/scheduling remains in its original scope.
 
 ## Stage 3 — Temporal knowledge graph ingest
@@ -1486,3 +1486,29 @@ finish_merge write API. Fixed evidence/remainder: `owner-merge-capture-2026-10-2
 **2,025 root Python / 1 skipped**, **176 Python docs examples**, strict Clippy and
 rebuilt/staged in-tree FFI. The preceding planner's 18-case recovery gate remains
 the latest storage check; this component has no journal/storage change.
+
+## Explicit restore modes completed — 2026-10-27
+
+Owner approved one restore_state API with required mode="tracked" or mode="switch".
+Tracked restoration records one exact current-parent delta with explicit/default
+effective clocks; switch retargets the branch without publication. Graph,
+DurableGraph and native/Python writers share the contract. Exact delta preparation
+and checked snapshot publication are shared with merges.
+
+Existing 13.3 is complete: native/Python compatibility, stale/dirty/schema/clock
+guards, frozen sources, history/identity preservation, durable replay/rollback,
+backup, explicit source-target pruning and compaction, plus five real SIGKILL
+cases. Full verification: 1,376 native / 56 ignored; 2,040 root Python / 1 skipped;
+182 executable docs; strict all-target Clippy; rebuilt in-tree FFI. The final
+focused rebuilt restore/merge suite also passes (18 tests). Three existing FFI
+warnings remain. No new checklist rows: **207 checked / 61 open**.
+
+Local release medians for 100k-node chains with all properties changed: switch
+reconstruction 30.9 ms + validation/install 132.5 ms; tracked replay/comparison
+240.2 ms + validation/publication/install 206.8 ms. This measures full-state
+restoration, not ordinary mutation overhead. Receipt:
+`../benchmarks/state-restore-modes-2026-10-27.json`. Full replay/assembly costs,
+RSS/production targets and broader lifetime/GIL work remain explicit limits.
+
+Next priority is existing canonical state/change ownership (AR7.9), followed by
+compound topology acceptance and remaining view/index/query boundaries.

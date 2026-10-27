@@ -2,10 +2,33 @@
 use super::*;
 use crate::state::GraphSnapshot;
 
+/// Explicit restoration history behavior. Neither mode implicitly collects history.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum StateRestoreMode {
+    /// Select the target state and move the current branch reference.
+    Switch,
+    /// Publish the target contents as one new delta on the current branch.
+    Tracked,
+}
+impl std::str::FromStr for StateRestoreMode {
+    type Err = GraphError;
+    fn from_str(value: &str) -> GraphResult<Self> {
+        match value {
+            "switch" => Ok(Self::Switch),
+            "tracked" => Ok(Self::Tracked),
+            _ => Err(GraphError::InvalidInput(
+                "Restore mode must be 'switch' or 'tracked'".into(),
+            )),
+        }
+    }
+}
+
 /// Detached logical target capture. It carries no mutable graph access.
 #[derive(Debug)]
 pub struct StateRestorePlan {
     read: crate::RecordedReadPlan,
+    before: Option<crate::RecordedReadPlan>,
+    mode: StateRestoreMode,
     owner: Arc<()>,
     branch: String,
     from: StateId,
@@ -15,6 +38,8 @@ pub struct StateRestorePlan {
 #[derive(Debug)]
 pub struct StateRestoreOutcome {
     snapshot: GraphSnapshot,
+    changes: Option<crate::state::ChangeSet>,
+    mode: StateRestoreMode,
     owner: Arc<()>,
     branch: String,
     from: StateId,
@@ -23,8 +48,17 @@ pub struct StateRestoreOutcome {
 impl StateRestorePlan {
     /// Reconstruct the captured target off-owner, without altering retained roots.
     pub fn execute(self) -> GraphResult<StateRestoreOutcome> {
+        let snapshot = self.read.execute()?;
+        let changes = self
+            .before
+            .map(|before| {
+                super::snapshot_publication::exact_snapshot_changes(&before.execute()?, &snapshot)
+            })
+            .transpose()?;
         Ok(StateRestoreOutcome {
-            snapshot: self.read.execute()?,
+            snapshot,
+            changes,
+            mode: self.mode,
             owner: self.owner,
             branch: self.branch,
             from: self.from,
@@ -33,6 +67,15 @@ impl StateRestorePlan {
     }
 }
 impl StateRestoreOutcome {
+    /// Captured restoration semantics; cannot be changed after detached execution.
+    pub fn mode(&self) -> StateRestoreMode {
+        self.mode
+    }
+    /// Exact current-parent delta, present only for tracked restoration.
+    pub fn changes(&self) -> Option<&crate::state::ChangeSet> {
+        self.changes.as_ref()
+    }
+
     /// Explicitly selected retained published state.
     pub fn target_state(&self) -> StateId {
         self.target
@@ -48,15 +91,17 @@ impl StateRestoreOutcome {
     }
 }
 impl Graph {
-    /// Switch the current branch to an explicit retained published state. No new
-    /// mutation version or implicit history pruning; pending manual changes reject.
+    /// Restore an explicit retained state using the required history mode.
+    /// Tracked mode publishes one new delta; switch mode retargets the branch.
+    /// Both preserve retained history and reject pending manual changes.
     pub fn restore_state(
         &mut self,
         target: StateId,
         expected_state: StateId,
+        mode: StateRestoreMode,
     ) -> GraphResult<StateId> {
         let outcome = self
-            .prepare_state_restore(target, expected_state)?
+            .prepare_state_restore(target, expected_state, mode)?
             .execute()?;
         self.finish_state_restore(outcome)
     }
@@ -65,11 +110,18 @@ impl Graph {
         &self,
         target: StateId,
         expected_state: StateId,
+        mode: StateRestoreMode,
     ) -> GraphResult<StateRestorePlan> {
         self.validate_write_head(expected_state)?;
         self.history.get_commit(target)?;
         Ok(StateRestorePlan {
             read: self.history.prepare_recorded_read(target)?,
+            before: if mode == StateRestoreMode::Tracked {
+                Some(self.history.prepare_recorded_read(expected_state)?)
+            } else {
+                None
+            },
+            mode,
             owner: Arc::clone(self.history.identity()),
             branch: self.current_branch.clone(),
             from: expected_state,
@@ -127,14 +179,91 @@ impl Graph {
         outcome: StateRestoreOutcome,
         schema: Option<&GraphSchema>,
     ) -> GraphResult<StateId> {
-        let bindings = self.validate_state_restore(&outcome, schema)?;
-        self.install_validated_state_restore(outcome, bindings)
+        self.finish_state_restore_with_options(
+            outcome,
+            GraphPublicationOptions::default(),
+            "restore".into(),
+            "writer".into(),
+            schema,
+        )
+    }
+    /// Accept the captured explicit mode, timing and current complete-target policy.
+    pub fn finish_state_restore_with_options(
+        &mut self,
+        outcome: StateRestoreOutcome,
+        options: GraphPublicationOptions,
+        message: String,
+        author: String,
+        schema: Option<&GraphSchema>,
+    ) -> GraphResult<StateId> {
+        match outcome.mode {
+            StateRestoreMode::Switch => {
+                Self::validate_switch_options(&options)?;
+                let bindings = self.validate_state_restore(&outcome, schema)?;
+                self.install_validated_state_restore(outcome, bindings)
+            }
+            StateRestoreMode::Tracked => {
+                let prepared =
+                    self.prepare_tracked_restore(outcome, &options, schema, None, None)?;
+                self.execute_snapshot_publication(prepared, message, author)
+            }
+        }
+    }
+    pub(crate) fn validate_switch_options(options: &GraphPublicationOptions) -> GraphResult<()> {
+        if options.effective_at.is_some() || !options.change_times.is_empty() {
+            return Err(GraphError::InvalidInput(
+                "Switch restoration records no changes and accepts no change timestamps".into(),
+            ));
+        }
+        Ok(())
+    }
+    pub(crate) fn prepare_tracked_restore(
+        &self,
+        outcome: StateRestoreOutcome,
+        options: &GraphPublicationOptions,
+        schema: Option<&GraphSchema>,
+        additional_schema: Option<&GraphSchema>,
+        recorded_at: Option<i64>,
+    ) -> GraphResult<super::snapshot_publication::PreparedSnapshotPublication> {
+        self.validate_state_restore(&outcome, schema)?;
+        if let Some(schema) = additional_schema {
+            outcome.check_schema(schema)?;
+        }
+        if outcome.mode != StateRestoreMode::Tracked {
+            return Err(GraphError::InvalidInput(
+                "Tracked restoration requires a tracked capture".into(),
+            ));
+        }
+        let StateRestoreOutcome {
+            mut snapshot,
+            changes,
+            from,
+            branch,
+            ..
+        } = outcome;
+        let changes = changes
+            .ok_or_else(|| GraphError::InvalidInput("Missing tracked restoration delta".into()))?;
+        snapshot.state_id = 0;
+        self.prepare_snapshot_publication(
+            snapshot,
+            changes,
+            from,
+            branch,
+            vec![from],
+            options,
+            recorded_at,
+        )
     }
     pub(crate) fn install_validated_state_restore(
         &mut self,
         outcome: StateRestoreOutcome,
         bindings: Vec<(String, ExternalEntityRef)>,
     ) -> GraphResult<StateId> {
+        if outcome.mode != StateRestoreMode::Switch {
+            return Err(GraphError::InvalidInput(
+                "Reference installation requires switch mode".into(),
+            ));
+        }
         if outcome.target == self.current_commit {
             return Ok(outcome.target);
         }

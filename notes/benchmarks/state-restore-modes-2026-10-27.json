@@ -1,0 +1,130 @@
+{
+  "benchmark": "explicit_state_restore_modes",
+  "cases": [
+    {
+      "edges": 999,
+      "mode": "switch",
+      "nodes": 1000,
+      "samples": [
+        {
+          "capture_seconds": 8.33e-07,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.000320333,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.000877458
+        },
+        {
+          "capture_seconds": 6.25e-07,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.000267833,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.000839917
+        },
+        {
+          "capture_seconds": 5.42e-07,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.00028475,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.000884291
+        }
+      ]
+    },
+    {
+      "edges": 999,
+      "mode": "tracked",
+      "nodes": 1000,
+      "samples": [
+        {
+          "capture_seconds": 1.042e-06,
+          "new_mutation_versions": 1,
+          "reconstruction_seconds": 0.001924542,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.001435833
+        },
+        {
+          "capture_seconds": 8.34e-07,
+          "new_mutation_versions": 1,
+          "reconstruction_seconds": 0.001843792,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.001435291
+        },
+        {
+          "capture_seconds": 1.208e-06,
+          "new_mutation_versions": 1,
+          "reconstruction_seconds": 0.001855792,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.001436458
+        }
+      ]
+    },
+    {
+      "edges": 99999,
+      "mode": "switch",
+      "nodes": 100000,
+      "samples": [
+        {
+          "capture_seconds": 2.916e-06,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.030650792,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.132543458
+        },
+        {
+          "capture_seconds": 3.125e-06,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.031829042,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.132055375
+        },
+        {
+          "capture_seconds": 3.542e-06,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.030896042,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.137316667
+        }
+      ]
+    },
+    {
+      "edges": 99999,
+      "mode": "tracked",
+      "nodes": 100000,
+      "samples": [
+        {
+          "capture_seconds": 3.708e-06,
+          "new_mutation_versions": 1,
+          "reconstruction_seconds": 0.240153833,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.20676325
+        },
+        {
+          "capture_seconds": 4.459e-06,
+          "new_mutation_versions": 1,
+          "reconstruction_seconds": 0.237467084,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.200575125
+        },
+        {
+          "capture_seconds": 4.708e-06,
+          "new_mutation_versions": 1,
+          "reconstruction_seconds": 0.433007708,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.482585333
+        }
+      ]
+    }
+  ],
+  "scope": "three local native release samples; setup, batch input construction and immutable future pin excluded; plan capture, detached replay/exact comparison and owner validation/install/publication measured separately; all node properties differ; no FFI/RSS/production budget claim"
+}

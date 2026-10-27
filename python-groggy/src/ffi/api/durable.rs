@@ -375,14 +375,21 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    #[pyo3(signature=(state, *, expected_state=None, schema=None))]
+    #[pyo3(signature=(state, *, mode, expected_state=None, effective_at=None, change_times=None, message="restore", author="writer", schema=None))]
     fn restore_state(
         &mut self,
         py: Python,
         state: &PyAny,
+        mode: &str,
         expected_state: Option<&PyAny>,
+        effective_at: Option<&PyAny>,
+        change_times: Option<&PyList>,
+        message: &str,
+        author: &str,
         schema: Option<&PyDict>,
     ) -> PyResult<StateId> {
+        let mode: groggy::StateRestoreMode = mode.parse().map_err(graph_error_to_py_err)?;
+        let options = super::graph_merge::options(effective_at, change_times)?;
         let target = super::graph_batch::state_id(state)?;
         let expected = expected_state
             .map(super::graph_batch::state_id)
@@ -391,14 +398,24 @@ impl PyDurableGraph {
         let plan = {
             let graph = self.core()?.graph().map_err(graph_error_to_py_err)?;
             graph
-                .prepare_state_restore(target, expected.unwrap_or_else(|| graph.current_state_id()))
+                .prepare_state_restore(
+                    target,
+                    expected.unwrap_or_else(|| graph.current_state_id()),
+                    mode,
+                )
                 .map_err(graph_error_to_py_err)?
         };
         let outcome = py
             .allow_threads(move || plan.execute())
             .map_err(graph_error_to_py_err)?;
         self.core_mut()?
-            .finish_state_restore_with_schema(outcome, policy.as_ref())
+            .finish_state_restore_with_options(
+                outcome,
+                options,
+                message.into(),
+                author.into(),
+                policy.as_ref(),
+            )
             .map_err(graph_error_to_py_err)
     }
 

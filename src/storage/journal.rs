@@ -4,6 +4,7 @@
 mod baseline;
 mod checkpoint;
 mod merge;
+mod restore;
 mod verification;
 pub use checkpoint::StorageCheckpointReport;
 pub use verification::{
@@ -226,6 +227,16 @@ enum Record {
     },
     CheckoutBranch {
         name: String,
+    },
+    TrackedRestore {
+        expected_state: StateId,
+        target_state: StateId,
+        branch: String,
+        options: crate::GraphMergeOptions,
+        metadata: PublicationMetadata,
+        message: String,
+        author: String,
+        additional_schema: Option<GraphSchema>,
     },
     RestoreState {
         expected_state: StateId,
@@ -583,6 +594,42 @@ impl DurableGraph {
                     graph.check_schema_policy(schema)?;
                 }
             }
+            Record::TrackedRestore {
+                expected_state,
+                target_state,
+                branch,
+                options,
+                metadata,
+                message,
+                author,
+                additional_schema,
+            } => {
+                let outcome = graph
+                    .prepare_state_restore(
+                        target_state,
+                        expected_state,
+                        crate::StateRestoreMode::Tracked,
+                    )?
+                    .execute()?;
+                if outcome.branch() != branch {
+                    return Err(invalid(
+                        "tracked restoration branch differs from selected branch",
+                    ));
+                }
+                let prepared = graph.prepare_tracked_restore(
+                    outcome,
+                    &options,
+                    schema.as_ref(),
+                    additional_schema.as_ref(),
+                    Some(metadata.recorded_at),
+                )?;
+                if prepared.metadata != metadata {
+                    return Err(invalid(
+                        "tracked restoration metadata differs from actual changes",
+                    ));
+                }
+                graph.execute_snapshot_publication(prepared, message, author)?;
+            }
             Record::RestoreState {
                 expected_state,
                 target_state,
@@ -590,7 +637,11 @@ impl DurableGraph {
                 additional_schema,
             } => {
                 let outcome = graph
-                    .prepare_state_restore(target_state, expected_state)?
+                    .prepare_state_restore(
+                        target_state,
+                        expected_state,
+                        crate::StateRestoreMode::Switch,
+                    )?
                     .execute()?;
                 if outcome.branch() != branch {
                     return Err(invalid("restoration branch differs from selected branch"));
@@ -1097,10 +1148,11 @@ impl DurableGraph {
         &mut self,
         target: StateId,
         expected_state: StateId,
+        mode: crate::StateRestoreMode,
     ) -> GraphResult<StateId> {
         let outcome = self
             .graph()?
-            .prepare_state_restore(target, expected_state)?
+            .prepare_state_restore(target, expected_state, mode)?
             .execute()?;
         self.finish_state_restore(outcome)
     }
@@ -1117,7 +1169,34 @@ impl DurableGraph {
         outcome: crate::StateRestoreOutcome,
         additional_schema: Option<&GraphSchema>,
     ) -> GraphResult<StateId> {
+        self.finish_state_restore_with_options(
+            outcome,
+            crate::GraphMergeOptions::default(),
+            "restore".into(),
+            "writer".into(),
+            additional_schema,
+        )
+    }
+    /// Restore the explicitly captured mode under both installed and per-call policy.
+    pub fn finish_state_restore_with_options(
+        &mut self,
+        outcome: crate::StateRestoreOutcome,
+        options: crate::GraphMergeOptions,
+        message: String,
+        author: String,
+        additional_schema: Option<&GraphSchema>,
+    ) -> GraphResult<StateId> {
         self.ready()?;
+        if outcome.mode() == crate::StateRestoreMode::Tracked {
+            return self.finish_tracked_restore(
+                outcome,
+                options,
+                message,
+                author,
+                additional_schema,
+            );
+        }
+        Graph::validate_switch_options(&options)?;
         let bindings = self
             .graph
             .validate_state_restore(&outcome, self.schema.as_ref())?;
@@ -1827,7 +1906,9 @@ mod state_restore_failure_tests {
             let baseline = std::fs::read(&path).unwrap();
             let versions = store.graph().unwrap().history_records().len();
             store.failure = Some(failure);
-            assert!(store.restore_state(target, current).is_err());
+            assert!(store
+                .restore_state(target, current, crate::StateRestoreMode::Switch)
+                .is_err());
             assert_eq!(std::fs::read(&path).unwrap(), baseline);
             assert_eq!(store.graph().unwrap().current_state_id(), current);
             assert_eq!(store.graph().unwrap().history_records().len(), versions);
@@ -1840,7 +1921,12 @@ mod state_restore_failure_tests {
                 Some(AttrValue::Int(2))
             );
             store.failure = None;
-            assert_eq!(store.restore_state(target, current).unwrap(), target);
+            assert_eq!(
+                store
+                    .restore_state(target, current, crate::StateRestoreMode::Switch)
+                    .unwrap(),
+                target
+            );
             assert_eq!(
                 pin.node_attr(0, &"value".into()).unwrap(),
                 Some(AttrValue::Int(2))

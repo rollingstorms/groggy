@@ -170,10 +170,11 @@ pub mod api {
 pub use api::batch::{BatchChangeRef, BatchEdgeRef, BatchNodeRef, BatchResult, GraphBatch};
 pub use api::graph::{
     EdgeUpsert, ExternalEntityRef, Graph, GraphMergeOptions, GraphMergeOutcome, GraphMergePlan,
-    GraphMergeReadPlan, GraphSchema, IntegrityCheckPlan, IntegrityReport, NodeUpsert,
-    PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport, PreparedArchive,
+    GraphMergeReadPlan, GraphPublicationOptions, GraphSchema, IntegrityCheckPlan, IntegrityReport,
+    NodeUpsert, PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport, PreparedArchive,
     PropertyConstraint, PropertyKind, PurgeOutcome, PurgePlan, PurgeReport, SchemaViolation,
-    StateRestoreOutcome, StateRestorePlan, ViewBatchResult, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
+    StateRestoreMode, StateRestoreOutcome, StateRestorePlan, ViewBatchResult, EXTERNAL_ID, LABELS,
+    RELATIONSHIP_TYPE,
 };
 pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};

@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **206 checked and 62 unchecked entries**. Entries overlap:
+currently contains **207 checked and 61 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 62 unchecked entries are not 62 independent tasks: 13 are overlapping AR
-architecture entries, 49 are numbered entries (including nested publication
+The 61 unchecked entries are not 61 independent tasks: 13 are overlapping AR
+architecture entries, 48 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -886,3 +886,29 @@ writer bridge and delta-only durable replay. Verification: 1,369 native tests,
 Clippy and 23 serial real process-kill scenarios across merge/maintenance.
 See `merge-publication-exit-review-2026-10-27.md` for boundaries and benchmarks.
 No new checklist rows. Inventory: **206 checked / 62 open**.
+
+## Explicit restore modes completed — 2026-10-27
+
+Owner approved one restore_state API with required mode="tracked" or mode="switch".
+Tracked restoration records one exact current-parent delta with explicit/default
+effective clocks; switch retargets the branch without publication. Graph,
+DurableGraph and native/Python writers share the contract. Exact delta preparation
+and checked snapshot publication are shared with merges.
+
+Existing 13.3 is complete: native/Python compatibility, stale/dirty/schema/clock
+guards, frozen sources, history/identity preservation, durable replay/rollback,
+backup, explicit source-target pruning and compaction, plus five real SIGKILL
+cases. Full verification: 1,376 native / 56 ignored; 2,040 root Python / 1 skipped;
+182 executable docs; strict all-target Clippy; rebuilt in-tree FFI. The final
+focused rebuilt restore/merge suite also passes (18 tests). Three existing FFI
+warnings remain. No new checklist rows: **207 checked / 61 open**.
+
+Local release medians for 100k-node chains with all properties changed: switch
+reconstruction 30.9 ms + validation/install 132.5 ms; tracked replay/comparison
+240.2 ms + validation/publication/install 206.8 ms. This measures full-state
+restoration, not ordinary mutation overhead. Receipt:
+`../benchmarks/state-restore-modes-2026-10-27.json`. Full replay/assembly costs,
+RSS/production targets and broader lifetime/GIL work remain explicit limits.
+
+Next priority is existing canonical state/change ownership (AR7.9), followed by
+compound topology acceptance and remaining view/index/query boundaries.

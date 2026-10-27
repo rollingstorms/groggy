@@ -1503,3 +1503,29 @@ finish_merge write API. Fixed evidence/remainder: `owner-merge-capture-2026-10-2
 **2,025 root Python / 1 skipped**, **176 Python docs examples**, strict Clippy and
 rebuilt/staged in-tree FFI. The preceding planner's 18-case recovery gate remains
 the latest storage check; this component has no journal/storage change.
+
+## Explicit restore modes completed — 2026-10-27
+
+Owner approved one restore_state API with required mode="tracked" or mode="switch".
+Tracked restoration records one exact current-parent delta with explicit/default
+effective clocks; switch retargets the branch without publication. Graph,
+DurableGraph and native/Python writers share the contract. Exact delta preparation
+and checked snapshot publication are shared with merges.
+
+Existing 13.3 is complete: native/Python compatibility, stale/dirty/schema/clock
+guards, frozen sources, history/identity preservation, durable replay/rollback,
+backup, explicit source-target pruning and compaction, plus five real SIGKILL
+cases. Full verification: 1,376 native / 56 ignored; 2,040 root Python / 1 skipped;
+182 executable docs; strict all-target Clippy; rebuilt in-tree FFI. The final
+focused rebuilt restore/merge suite also passes (18 tests). Three existing FFI
+warnings remain. No new checklist rows: **207 checked / 61 open**.
+
+Local release medians for 100k-node chains with all properties changed: switch
+reconstruction 30.9 ms + validation/install 132.5 ms; tracked replay/comparison
+240.2 ms + validation/publication/install 206.8 ms. This measures full-state
+restoration, not ordinary mutation overhead. Receipt:
+`../benchmarks/state-restore-modes-2026-10-27.json`. Full replay/assembly costs,
+RSS/production targets and broader lifetime/GIL work remain explicit limits.
+
+Next priority is existing canonical state/change ownership (AR7.9), followed by
+compound topology acceptance and remaining view/index/query boundaries.

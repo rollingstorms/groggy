@@ -1215,3 +1215,19 @@ finish_merge write API. Fixed evidence/remainder: `owner-merge-capture-2026-10-2
 **2,025 root Python / 1 skipped**, **176 Python docs examples**, strict Clippy and
 rebuilt/staged in-tree FFI. The preceding planner's 18-case recovery gate remains
 the latest storage check; this component has no journal/storage change.
+
+## Owner decision: explicit restoration modes — 2026-10-27 (13.3)
+
+The owner requested one restoration API instead of a separate revert_to_state
+method and approved requiring an explicit mode. `restore_state(target,
+mode="tracked")` publishes one new exact delta on the current branch, preserving
+history, with explicit effective timestamps or one engine-clock default.
+`mode="switch"` selects the retained state without publication. There is no default
+mode. The target is not an implicit permanent audit/history pin; A09 remains in
+force. The tracked version has the old current state as its sole parent.
+
+A data-identical explicit tracked action still records one version with an empty
+delta. Switch of an already-selected clean state is a no-op. Switch accepts no
+change timestamps. This section supersedes the earlier pending tracked-revert
+question and earlier reference-only restore signatures; existing history semantics
+and explicit checkpoints are unchanged. Details: `docs/api/state-restoration.md`.

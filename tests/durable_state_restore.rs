@@ -19,7 +19,7 @@ fn durable_restore_replays_reference_only_change_keeps_history_ids_and_supports_
     let outcome = store
         .graph()
         .unwrap()
-        .prepare_state_restore(target, future)
+        .prepare_state_restore(target, future, groggy::StateRestoreMode::Switch)
         .unwrap()
         .execute()
         .unwrap();
@@ -36,9 +36,16 @@ fn durable_restore_replays_reference_only_change_keeps_history_ids_and_supports_
     );
     assert!(!store.graph().unwrap().has_node(extra));
     let bytes = std::fs::read(&path).unwrap();
-    assert_eq!(store.restore_state(target, target).unwrap(), target);
+    assert_eq!(
+        store
+            .restore_state(target, target, groggy::StateRestoreMode::Switch)
+            .unwrap(),
+        target
+    );
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
-    assert!(store.restore_state(target, future).is_err());
+    assert!(store
+        .restore_state(target, future, groggy::StateRestoreMode::Switch)
+        .is_err());
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
     store.verify_storage().unwrap();
     store.backup(&backup).unwrap();
@@ -60,7 +67,9 @@ fn durable_restore_replays_reference_only_change_keeps_history_ids_and_supports_
             .unwrap();
         assert_eq!(added.added_nodes, vec![extra + 1]);
         assert!(added.state_id > future);
-        reopened.restore_state(target, added.state_id).unwrap();
+        reopened
+            .restore_state(target, added.state_id, groggy::StateRestoreMode::Switch)
+            .unwrap();
         assert!(reopened.gc_history(target).unwrap() > 0);
         assert!(reopened
             .graph()
@@ -89,7 +98,7 @@ fn restoration_checks_current_installed_policy_and_rejects_foreign_closed_owner_
     let outcome = store
         .graph()
         .unwrap()
-        .prepare_state_restore(target, current)
+        .prepare_state_restore(target, current, groggy::StateRestoreMode::Switch)
         .unwrap()
         .execute()
         .unwrap();
@@ -102,7 +111,7 @@ fn restoration_checks_current_installed_policy_and_rejects_foreign_closed_owner_
     let outcome = store
         .graph()
         .unwrap()
-        .prepare_state_restore(current, current)
+        .prepare_state_restore(current, current, groggy::StateRestoreMode::Switch)
         .unwrap()
         .execute()
         .unwrap();

@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has **206 checked / 62 unchecked entries**, including overlapping
+The checklist has **207 checked / 61 unchecked entries**, including overlapping
 parents and repair slices; this is not a completion percentage. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
@@ -54,17 +54,15 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 6 | Finish presentation/API consolidation, differential/failure/scale evidence, operational tooling and core release documentation. | AR5, AR7.6, AR7.11; 01.2, 09.5, 19.2, 31.3–31.4, 32.1–32.3, 33.2–33.3, 34.1–34.2 | Tests/docs run throughout. Service/scale commitments require A15; complete embedded and multi-user milestones separately. |
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
-**Immediate next core work:** finish the remaining historical revert/recording
-boundary (13.3)  (13.3). Three-way merge acceptance (14.2) is complete across native, Python and durable owners. Coordinated
-endpoint changes/reversals (04.2) are complete. Explicit retained-state restoration
-now selects the working/current-branch state without implicit history pruning;
-tracked inverse mutation remains separate. Native default/fallible construction,
-compound algorithm acceptance, effective reads, full property history, explicit
-checkpoints, exact owned snapshots, retained archive import and explicit retention
-have completed evidence in their existing rows. Storage chunking/scale/migration/
-platform work, remaining view/index/query/execution/API audits and release gates
-remain open as listed. Graphiti stays deferred behind the core. Preserve the fixed
-268-row inventory; update existing scope and record unresolved choices in the workbook.
+**Immediate next core work:** complete canonical state/change comparison and
+conversion ownership (AR7.9), then remaining compound topology publication
+(09.4b.2) and view/index/query boundaries. Explicit restore modes (13.3),
+three-way merge acceptance (14.2), endpoint revisions (04.2), effective reads,
+full property history, exact owned snapshots and retained storage have completed
+evidence in their existing rows. Storage scale/migration/platform, execution/API
+audits and release gates remain open as listed. Graphiti stays deferred behind
+the core. Preserve the fixed 268-row inventory; update existing scope and record
+unresolved choices in the workbook.
 
 ## Owner answer update — 2026-10-22
 
@@ -181,7 +179,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **12.3a — Checkpoint published states without duplicate deltas.** `checkpoint`, writer checkpoint and clean `commit()` label the current version, preserving state IDs and publication clocks. Durable records sync/replay/backup labels with original timestamps; stale/dirty/schema failures reject, empty/repeated labels work and checkpoints are not permanent retention pins. Legacy dirty `commit()` publishes once for compatibility. See `explicit-checkpoints-2026-10-23.md`; ordinary defaults remain 09.4b.
 - [x] **13.1 — Hard reset foundations.** Restore the recorded state while preserving allocated-ID reservations and retained pool references.
 - [x] **13.2 — State-based diffs.** Compare reconstructed states in either direction with deterministic typed property and topology changes in Rust/Python.
-- [ ] **13.3 — Partial: state revert and endpoint reversal.** Endpoint changes/ordered reversal are complete (`endpoint-revisions-2026-10-27.md`). Explicit retained-state restoration now restores working/current-branch state, preserving all history until separate collection, IDs, immutable views and clocks; stale/dirty/schema guards and durable reference replay are covered (`state-restoration-2026-10-27.md`). reset_hard explicitly discards pending manual edits. General tracked inverse mutations and their recording/effective-time policy remain separate and open; reference restoration is not an inverse delta.
+- [x] **13.3 — Explicit state restoration and tracked revert.** Required restore_state modes distinguish reference switching from one newly published exact delta with the previous current state as its sole parent. Explicit/default/per-change effective times share merge publication and complete lifetime validation. Preserve retained history, monotonic IDs, exact typed values, names, frozen groups and immutable views; reject dirty/stale/foreign/collected/schema-invalid inputs before acceptance. Durable append/replay/failure, backup, target collection and compaction plus five real SIGKILL scenarios pass. An intentional data-identical tracked action records one empty delta. Exit: `tracked-restoration-exit-2026-10-27.md`.
 - [x] **14.1 — Branch lifecycle.** Verified switching/empty selections, lifetime IDs/aliases, Null/absence, frozen source pins, durable recovery/backup/schema rejection and eight journal-failure branch cases. Recorded timestamp reads now follow the selected first-parent lineage instead of leaking siblings; explicit state IDs remain inspectable across branches. Exit: `branch-lifecycle-exit-review-2026-10-26.md`. Merge planning and destructive pruning/reclamation remain 14.2/15.
 - [x] **14.2 — Checked three-way merge.** Owner-bound detached capture, typed exact conflict resolution and topology repair publish one first-parent delta with two retained parents. Clock overrides, complete effective topology, IDs/references/identity/schema/head guards, native/Python writer APIs and synced delta-only journal replay are covered. Data-identical merges explicitly join ancestry. Fault injection and five real process-kill scenarios pass. Local 100k-node benchmarks expose remaining full-state reconstruction/installation costs; this does not certify production throughput. Exit: `merge-publication-exit-review-2026-10-27.md`.
 - [x] **15.1 — Explicit destructive retention.** Separate branch/history pruning and previewable storage purge preserve shared history and independent open immutable graph/table/group/owned payloads. No extra permanent checkpoint/audit pins, grace period or mandatory backup (A09). Complete owner-domain closure protects all retained targets, endpoints, properties and group roots; numeric entity arrays keep their existing value semantics. Stale/foreign/dirty maintenance rejects. Evidence: `retained-purge-2026-10-26.md`.
