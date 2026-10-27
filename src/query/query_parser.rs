@@ -530,6 +530,13 @@ impl QueryParser {
     }
 
     fn expect_value(&mut self) -> QueryResult<AttrValue> {
+        // Contextual literal: retain `null` as a valid property identifier on
+        // the left side, and preserve quoted "null" as ordinary text.
+        if matches!(self.current_token(), Some(Token::Identifier(name)) if name.eq_ignore_ascii_case("null"))
+        {
+            self.advance();
+            return Ok(AttrValue::Null);
+        }
         if let Some(Token::Value(value)) = self.current_token() {
             let value = value.clone();
             self.advance();

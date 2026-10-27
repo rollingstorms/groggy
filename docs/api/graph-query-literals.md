@@ -26,6 +26,12 @@ of silently applying a valid prefix. The same syntax and rejection rules apply
 to node and edge queries. Filtering a captured view continues to read its captured
 state; parsing/filtering does not publish a graph change.
 
+`null` is a case-insensitive contextual value literal. `x == null` selects only
+an explicit Null property; an absent property matches neither `x == null` nor
+`x != null`. `NOT (x == null)` also includes absence under the existing complement
+rule. `null == null` can query a property named `null`; quoted `'null'` remains
+text. Node and edge filters share these rules.
+
 ```python
 from groggy import AttrValue, Graph
 

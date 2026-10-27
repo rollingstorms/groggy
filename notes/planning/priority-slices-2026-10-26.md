@@ -731,3 +731,14 @@ examples**. Full ABI: the **17 temporal regressions** passed, including the two
 new subclass/spoof cases; the normal direct path is preserved. Three pre-existing
 FFI warnings remain. Wider declared Python versions/PyPy/platforms are unverified;
 19.2/34.2 remain open. Inventory stays **208 checked / 60 open**.
+
+## Contextual Null query literals — 2026-10-27 (21.1 / AR7.7 component)
+
+The shared native graph parser now accepts case-insensitive null in value position,
+without reserving property identifiers or changing quoted text. Explicit Null,
+absence and Boolean complement retain the existing typed predicate semantics.
+Complete-input validation still rejects malformed/trailing tokens. Two native
+regressions and one rebuilt Python regression cover both entity kinds, case,
+quoted text, a property named null, missing properties and rejection. This is a
+small usable query completion within the existing inventory, not a new checklist
+row or a claim that all query/parser migration is finished. Counts stay 208/60.
