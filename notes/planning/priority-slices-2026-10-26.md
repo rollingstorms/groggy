@@ -680,3 +680,19 @@ The current-cache component is complete. Existing 33.2 stays partial for seconda
 index/other cache/service diagnostics, and AR2 still owns broader adjacency-policy
 conformance. Receipt fields and storage formats are unchanged. Inventory remains
 **208 checked / 60 open**, fixed 268 rows.
+
+## Verified Python build profile and compatibility remainder — 2026-10-27
+
+This continuation verified an in-tree CPython 3.9.6 release extension, built with
+PYO3_USE_ABI3_FORWARD_COMPATIBILITY=0 and an explicit PYO3_PYTHON executable.
+On macOS, the direct cargo rustc build also supplied -undefined dynamic_lookup
+linker arguments; staging used an atomic file replacement. No wheel/package
+installation was performed. Three existing FFI compiler warnings remain.
+
+Building from python-groggy/ with its forced ABI3-forward-compatibility setting
+exposed a configuration conflict with the direct PyDate/PyDateTime/PyDelta imports
+in ffi/utils/temporal.rs. The verified build disables that setting. Aligning the
+marshaller/build configuration and testing the declared Python-version matrix
+remains existing 19.2/34.2 work; forward-ABI3 and newer Python compatibility are
+not certified by these test totals. No checklist row or owner-policy question is
+added. All six implementation slices are committed; inventory is 208/60.
