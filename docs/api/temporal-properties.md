@@ -80,3 +80,17 @@ new tags reject them instead of silently reducing them to text.
 A temporal property is data. Setting it does not set a mutation's effective time,
 create an extra recorded-by clock, or schedule graph reconstruction. Those
 publication/history contracts remain separate roadmap items.
+
+## Python build profiles
+
+The extension build script follows PyO3's resolved configuration and supplies
+extension-module linker arguments. Normal CPython builds keep direct datetime C
+access. Limited-ABI builds (including the configured forward-compatibility mode)
+marshal through cached standard-library datetime types and their base field
+descriptors. Both normalize aware instants to UTC with integer components, retain
+date/duration bounds, reject naive datetimes and ignore subclass field overrides
+just as direct C access does. No float epoch conversion is introduced.
+
+Both profiles have been built and exercised on CPython 3.9.6. This fixes the
+previous limited-ABI datetime import failure; certification of other Python
+versions, PyPy and platforms remains part of the compatibility matrix.

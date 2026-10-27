@@ -712,3 +712,22 @@ regressions. Full native suite: **1,392 passed / 56 ignored**. This closes
 a concrete coordinator gap within existing AR3/09.4b.2; the fixed checklist remains
 **208 checked / 60 open**. Built-in pipeline algorithms write properties, not graph
 topology; uncertified custom effects still reject explicit atomic execution.
+
+## Python datetime marshalling in both ABI profiles — 2026-10-27
+
+Fixed the configuration conflict recorded above. The configured limited-ABI build
+previously failed on PyDate/PyDateTime/PyDelta imports (reproduced before this
+change). An extension build script now forwards the actual PyO3 configuration and
+platform linker arguments. The normal CPython ABI retains the existing direct C
+marshaller; limited ABI uses cached Python standard-library types and base field
+descriptors. Both share canonical native temporal validation and exact integer
+components. Cached type identity rejects __class__ spoofing; subclass overrides
+cannot substitute stored fields, and invalid astimezone return types reject.
+
+No packages were installed. Offline locked release cargo builds succeeded with
+forward compatibility set to both 1 and 0 on CPython 3.9.6, without manual linker
+flags. Limited ABI: **2,053 Python tests passed / 1 skipped**, **185 documentation
+examples**. Full ABI: the **17 temporal regressions** passed, including the two
+new subclass/spoof cases; the normal direct path is preserved. Three pre-existing
+FFI warnings remain. Wider declared Python versions/PyPy/platforms are unverified;
+19.2/34.2 remain open. Inventory stays **208 checked / 60 open**.

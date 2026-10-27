@@ -81,6 +81,48 @@ def test_aware_datetime_normalizes_to_utc_without_float_epoch_arithmetic():
     assert early != late
 
 
+def test_temporal_subclasses_use_stored_base_fields_without_class_spoofing():
+    class Calendar(date):
+        @property
+        def year(self):
+            return 1999
+
+    class Instant(datetime):
+        @property
+        def microsecond(self):
+            return 0
+
+    class Duration(timedelta):
+        @property
+        def days(self):
+            return 100
+
+    assert AttrValue(Calendar(2024, 2, 29)).value == date(2024, 2, 29)
+    assert AttrValue(Instant(2024, 2, 29, microsecond=123456, tzinfo=UTC)).value == datetime(
+        2024, 2, 29, microsecond=123456, tzinfo=UTC
+    )
+    assert AttrValue(Duration(days=-2, microseconds=3)).value == timedelta(
+        days=-2, microseconds=3
+    )
+
+    class PretendDate:
+        @property
+        def __class__(self):
+            return date
+
+    with pytest.raises(TypeError):
+        AttrValue(PretendDate())
+
+
+def test_datetime_subclass_cannot_return_an_unrelated_normalized_value():
+    class BrokenInstant(datetime):
+        def astimezone(self, tz=None):
+            return date(2024, 2, 29)
+
+    with pytest.raises(TypeError):
+        AttrValue(BrokenInstant(2024, 2, 29, tzinfo=UTC))
+
+
 def test_naive_datetimes_and_implicit_text_dates_are_not_accepted_as_instants():
     with pytest.raises(TypeError, match="aware datetime"):
         AttrValue(datetime(2024, 1, 1))

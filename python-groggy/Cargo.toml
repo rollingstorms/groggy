@@ -16,6 +16,9 @@ experimental-delegation = []
 [lints.rust]
 non_local_definitions = "allow"
 
+[build-dependencies]
+pyo3-build-config = { version = "0.20", features = ["resolve-config"] }
+
 [dependencies]
 pyo3 = { version = "0.20", features = ["extension-module"] }
 groggy = { path = "../" }  # Path to the main Rust library
