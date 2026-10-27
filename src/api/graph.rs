@@ -32,7 +32,7 @@ pub use purge::{PurgeOutcome, PurgePlan, PurgeReport};
 mod merge;
 mod publication;
 mod read_attributes;
-pub use merge::{GraphMergeOutcome, GraphMergePlan, GraphMergeReadPlan};
+pub use merge::{GraphMergeOptions, GraphMergeOutcome, GraphMergePlan, GraphMergeReadPlan};
 mod restore;
 pub(crate) mod retention;
 mod schema;

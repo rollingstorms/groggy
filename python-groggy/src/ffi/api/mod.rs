@@ -7,6 +7,7 @@
 pub mod durable;
 pub mod graph;
 pub mod graph_batch;
+pub mod graph_merge;
 
 // Specialized operation modules
 pub mod graph_analysis;

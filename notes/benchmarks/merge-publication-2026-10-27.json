@@ -1,0 +1,142 @@
+{
+  "benchmark": "checked_merge_publication",
+  "cases": [
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "samples": [
+        {
+          "capture_seconds": 9.667e-06,
+          "durable_encode_sync_publish_seconds": 0.030088333,
+          "journal_growth_bytes": 35584,
+          "native_validate_publish_seconds": 0.001252125,
+          "reconstruct_resolve_delta_seconds": 0.004690791,
+          "reopen_seconds": 0.01272025,
+          "resolution_property_changes": 500
+        },
+        {
+          "capture_seconds": 8.583e-06,
+          "durable_encode_sync_publish_seconds": 0.0066765,
+          "journal_growth_bytes": 35584,
+          "native_validate_publish_seconds": 0.001236834,
+          "reconstruct_resolve_delta_seconds": 0.004655625,
+          "reopen_seconds": 0.012470625,
+          "resolution_property_changes": 500
+        },
+        {
+          "capture_seconds": 1.2375e-05,
+          "durable_encode_sync_publish_seconds": 0.006513542,
+          "journal_growth_bytes": 35584,
+          "native_validate_publish_seconds": 0.00126625,
+          "reconstruct_resolve_delta_seconds": 0.004567875,
+          "reopen_seconds": 0.012304333,
+          "resolution_property_changes": 500
+        }
+      ],
+      "workload": "independent-column"
+    },
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "samples": [
+        {
+          "capture_seconds": 9.833e-06,
+          "durable_encode_sync_publish_seconds": 0.006160709,
+          "journal_growth_bytes": 427,
+          "native_validate_publish_seconds": 0.000677083,
+          "reconstruct_resolve_delta_seconds": 0.003890375,
+          "reopen_seconds": 0.008750667,
+          "resolution_property_changes": 1
+        },
+        {
+          "capture_seconds": 9.375e-06,
+          "durable_encode_sync_publish_seconds": 0.005040875,
+          "journal_growth_bytes": 427,
+          "native_validate_publish_seconds": 0.00067775,
+          "reconstruct_resolve_delta_seconds": 0.003939667,
+          "reopen_seconds": 0.008748791,
+          "resolution_property_changes": 1
+        },
+        {
+          "capture_seconds": 9.25e-06,
+          "durable_encode_sync_publish_seconds": 0.006148083,
+          "journal_growth_bytes": 427,
+          "native_validate_publish_seconds": 0.00074275,
+          "reconstruct_resolve_delta_seconds": 0.004072,
+          "reopen_seconds": 0.008727667,
+          "resolution_property_changes": 1
+        }
+      ],
+      "workload": "one-key"
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "samples": [
+        {
+          "capture_seconds": 0.000131708,
+          "durable_encode_sync_publish_seconds": 0.2605135,
+          "journal_growth_bytes": 3619012,
+          "native_validate_publish_seconds": 0.175304041,
+          "reconstruct_resolve_delta_seconds": 0.641061125,
+          "reopen_seconds": 2.451695833,
+          "resolution_property_changes": 50000
+        },
+        {
+          "capture_seconds": 0.000118875,
+          "durable_encode_sync_publish_seconds": 0.243278458,
+          "journal_growth_bytes": 3619012,
+          "native_validate_publish_seconds": 0.224011917,
+          "reconstruct_resolve_delta_seconds": 0.818288875,
+          "reopen_seconds": 1.756982875,
+          "resolution_property_changes": 50000
+        },
+        {
+          "capture_seconds": 8.9459e-05,
+          "durable_encode_sync_publish_seconds": 0.650380166,
+          "journal_growth_bytes": 3619012,
+          "native_validate_publish_seconds": 0.304716125,
+          "reconstruct_resolve_delta_seconds": 1.4212424590000001,
+          "reopen_seconds": 4.317385792,
+          "resolution_property_changes": 50000
+        }
+      ],
+      "workload": "independent-column"
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "samples": [
+        {
+          "capture_seconds": 2.1958e-05,
+          "durable_encode_sync_publish_seconds": 0.154692833,
+          "journal_growth_bytes": 427,
+          "native_validate_publish_seconds": 0.108939042,
+          "reconstruct_resolve_delta_seconds": 0.530418209,
+          "reopen_seconds": 1.378018334,
+          "resolution_property_changes": 1
+        },
+        {
+          "capture_seconds": 6.6083e-05,
+          "durable_encode_sync_publish_seconds": 0.138214125,
+          "journal_growth_bytes": 427,
+          "native_validate_publish_seconds": 0.106225959,
+          "reconstruct_resolve_delta_seconds": 0.541612,
+          "reopen_seconds": 1.278598833,
+          "resolution_property_changes": 1
+        },
+        {
+          "capture_seconds": 5.8958e-05,
+          "durable_encode_sync_publish_seconds": 0.134811292,
+          "journal_growth_bytes": 427,
+          "native_validate_publish_seconds": 0.114396625,
+          "reconstruct_resolve_delta_seconds": 0.576446875,
+          "reopen_seconds": 1.281125083,
+          "resolution_property_changes": 1
+        }
+      ],
+      "workload": "one-key"
+    }
+  ],
+  "scope": "three local native release samples; setup/input/archive creation excluded; immutable first-parent view preserved; full native and durable publication measured separately; journal stores only exact resolution delta; no FFI/RSS/production latency claim"
+}

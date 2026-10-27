@@ -328,6 +328,53 @@ impl PyDurableGraph {
             .call1((slf.into_py(py), author, schema))?
             .to_object(py))
     }
+    #[pyo3(signature=(right, *, base=None, expected_state=None))]
+    fn prepare_merge(
+        &self,
+        py: Python,
+        right: &PyAny,
+        base: Option<&PyAny>,
+        expected_state: Option<&PyAny>,
+    ) -> PyResult<super::graph_merge::PyMergePlan> {
+        let (right, base, expected) = super::graph_merge::selections(right, base, expected_state)?;
+        let plan = {
+            let graph = self.core()?.graph().map_err(graph_error_to_py_err)?;
+            graph
+                .prepare_merge_read(
+                    right,
+                    base,
+                    expected.unwrap_or_else(|| graph.current_state_id()),
+                )
+                .map_err(graph_error_to_py_err)?
+        };
+        let plan = py
+            .allow_threads(move || plan.execute())
+            .map_err(graph_error_to_py_err)?;
+        Ok(super::graph_merge::PyMergePlan { inner: Some(plan) })
+    }
+    #[pyo3(signature=(outcome, *, effective_at=None, change_times=None, message="merge", author="writer", schema=None))]
+    fn finish_merge(
+        &mut self,
+        mut outcome: PyRefMut<'_, super::graph_merge::PyMergeOutcome>,
+        effective_at: Option<&PyAny>,
+        change_times: Option<&PyList>,
+        message: &str,
+        author: &str,
+        schema: Option<&PyDict>,
+    ) -> PyResult<StateId> {
+        let options = super::graph_merge::options(effective_at, change_times)?;
+        let policy = schema.map(parse_schema).transpose()?;
+        self.core_mut()?
+            .finish_merge_with_schema(
+                outcome.take()?,
+                options,
+                message.into(),
+                author.into(),
+                policy.as_ref(),
+            )
+            .map_err(graph_error_to_py_err)
+    }
+
     #[pyo3(signature=(state, *, expected_state=None, schema=None))]
     fn restore_state(
         &mut self,

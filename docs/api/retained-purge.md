@@ -114,6 +114,6 @@ Unix atomic replacement and process-kill recovery are tested; automatic scheduli
 non-Unix replacement and actual power-loss qualification remain separate work.
 
 Archives containing [typed endpoint revisions](endpoint-revisions.md) use document
-v4. Readers accept v1–v4, and purge/checkpoint/compaction preserve that requirement
+at least v4. Readers accept v1–v5, and purge/checkpoint/compaction preserve the required version
 while retained revision records exist. Both old and new endpoint dependencies are
 retention roots; ordinary no-revision formats/hashes remain compatible.

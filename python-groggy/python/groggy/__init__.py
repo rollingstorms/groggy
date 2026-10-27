@@ -10,7 +10,7 @@ from ._groggy import StatsArray  # Backward compatibility alias for NumArray
 from ._groggy import (  # Version control classes; Statistical arrays and matrices; Array factory functions for backward compatibility; Table classes; Builder functions with auto-conversion; Display functionality; Display system; Hierarchical subgraph functionality
     AggregationFunction, AggregationResult, AttributeFilter, AttrValue,
     BaseArray, BaseTable, BranchInfo, Commit, ComponentsArray, DisplayConfig,
-    ComplexEigenResult, DurableGraph, EdgeFilter, EdgesArray, EdgesTable, Graph, GraphMatrix, GraphTable,
+    ComplexEigenResult, MergePlan, MergeOutcome, DurableGraph, EdgeFilter, EdgesArray, EdgesTable, Graph, GraphMatrix, GraphTable,
     GroupedAggregationResult, HistoricalView, HistoryStatistics, MetaNode,
     MetaNodeArray, NodeFilter, NodesArray, NodesTable, NumArray,
     PyAttributeCollection, PyResultHandle, Subgraph, SubgraphArray,
@@ -74,6 +74,8 @@ ExistenceIndex = _groggy.ExistenceIndex
 __all__ = [
     "Graph",
     "DurableGraph",
+    "MergePlan",
+    "MergeOutcome",
     "GraphBatch",
     "GraphWriter",
     "AddedNode",

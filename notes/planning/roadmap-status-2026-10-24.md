@@ -1,7 +1,7 @@
 # Groggy roadmap status — 2026-10-24
 
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **205 checked and 63 unchecked entries**. Entries overlap:
+currently contains **206 checked and 62 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.
@@ -13,8 +13,8 @@ recent loop/block, structural, filtering, aggregation, transformation, mask-samp
 
 ## Fixed remaining-work inventory
 
-The 63 unchecked entries are not 63 independent tasks: 13 are overlapping AR
-architecture entries, 50 are numbered entries (including nested publication
+The 62 unchecked entries are not 62 independent tasks: 13 are overlapping AR
+architecture entries, 49 are numbered entries (including nested publication
 parents), and nine of those numbered entries explicitly say Deferred. The old
 flat-checklist header had a stale 158 checked count; the current verified count is shown above.
 Recent implementations were recorded as new checked slices while broad parents
@@ -876,3 +876,13 @@ finish_merge write API. Fixed evidence/remainder: `owner-merge-capture-2026-10-2
 **2,025 root Python / 1 skipped**, **176 Python docs examples**, strict Clippy and
 rebuilt/staged in-tree FFI. The preceding planner's 18-case recovery gate remains
 the latest storage check; this component has no journal/storage change.
+
+## Merge publication closure — 2026-10-27
+
+Existing 14.2 is complete: exact first-parent deltas, explicit typed conflict
+resolution, effective clocks/topology, guarded two-parent publication, Python
+writer bridge and delta-only durable replay. Verification: 1,369 native tests,
+2,034 root Python tests, 181 executable documentation examples, strict all-target
+Clippy and 23 serial real process-kill scenarios across merge/maintenance.
+See `merge-publication-exit-review-2026-10-27.md` for boundaries and benchmarks.
+No new checklist rows. Inventory: **206 checked / 62 open**.

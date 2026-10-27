@@ -61,6 +61,58 @@ pub enum SnapshotMergeConflict {
         endpoints: (NodeId, NodeId),
     },
 }
+/// Select an exact retained input value without round-tripping through a language
+/// binding's default numeric type conversion.
+#[derive(Debug, Clone, Copy)]
+pub enum SnapshotMergeSide {
+    Base,
+    Left,
+    Right,
+}
+impl SnapshotMergeConflict {
+    /// Expand an explicit input-side choice into a whole typed answer. Topology
+    /// repair has no implicit winning side and requires a concrete repair answer.
+    pub fn resolution_for(&self, side: SnapshotMergeSide) -> GraphResult<SnapshotMergeResolution> {
+        let select = |base, left, right| match side {
+            SnapshotMergeSide::Base => base,
+            SnapshotMergeSide::Left => left,
+            SnapshotMergeSide::Right => right,
+        };
+        match self {
+            Self::Node {
+                base, left, right, ..
+            }
+            | Self::Edge {
+                base, left, right, ..
+            } => Ok(SnapshotMergeResolution::Entity(
+                select(base, left, right).clone(),
+            )),
+            Self::NodeProperty {
+                base, left, right, ..
+            }
+            | Self::EdgeProperty {
+                base, left, right, ..
+            } => Ok(SnapshotMergeResolution::Property(
+                match side {
+                    SnapshotMergeSide::Base => base,
+                    SnapshotMergeSide::Left => left,
+                    SnapshotMergeSide::Right => right,
+                }
+                .clone(),
+            )),
+            Self::EdgeEndpoints {
+                base, left, right, ..
+            } => Ok(SnapshotMergeResolution::Endpoints(match side {
+                SnapshotMergeSide::Base => *base,
+                SnapshotMergeSide::Left => *left,
+                SnapshotMergeSide::Right => *right,
+            })),
+            Self::Topology { .. } => Err(GraphError::InvalidInput(
+                "Topology conflicts require explicit edge removal or endpoint restoration".into(),
+            )),
+        }
+    }
+}
 /// An explicit caller answer for one typed conflict. No default winner or
 /// implicit deletion is selected by the engine.
 #[derive(Debug, Clone)]

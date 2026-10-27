@@ -1,5 +1,5 @@
-//! Owner-bound immutable merge capture and resolved-target preflight. Publication
-//! remains a separate coordinator step; a validated logical result is not a version.
+//! Owner-bound merge capture, exact first-parent delta preparation and checked
+//! two-parent publication. Logical outcomes remain unpublished until acceptance.
 use super::*;
 use crate::state::{
     GraphSnapshot, SnapshotMergeConflict, SnapshotMergePlan, SnapshotMergeResolution,
@@ -26,6 +26,7 @@ pub struct GraphMergeReadPlan {
 pub struct GraphMergePlan {
     coordinate: MergeCoordinate,
     plan: SnapshotMergePlan,
+    before: GraphSnapshot,
 }
 /// Explicitly resolved logical result. It has no mutation authority and has not
 /// reserved a version. The owning graph must revalidate it before publication.
@@ -33,6 +34,7 @@ pub struct GraphMergePlan {
 pub struct GraphMergeOutcome {
     coordinate: MergeCoordinate,
     snapshot: GraphSnapshot,
+    changes: crate::state::ChangeSet,
 }
 impl GraphMergeReadPlan {
     /// Reconstruct three first-parent selections and plan outside the owner/GIL.
@@ -44,6 +46,7 @@ impl GraphMergeReadPlan {
         Ok(GraphMergePlan {
             coordinate: self.coordinate,
             plan,
+            before: left,
         })
     }
 }
@@ -62,23 +65,44 @@ impl GraphMergePlan {
     }
     /// Finish conflict-free planning. No owner mutation or version allocation.
     pub fn into_outcome(self) -> GraphResult<GraphMergeOutcome> {
-        Ok(GraphMergeOutcome {
-            coordinate: self.coordinate,
-            snapshot: self.plan.into_snapshot()?,
-        })
+        merge_outcome(self.coordinate, &self.before, self.plan.into_snapshot()?)
     }
     /// Explicit typed resolution, with topology recomputed after direct answers.
     pub fn resolve_with(
         self,
         resolve: impl FnMut(&SnapshotMergeConflict) -> GraphResult<SnapshotMergeResolution>,
     ) -> GraphResult<GraphMergeOutcome> {
-        Ok(GraphMergeOutcome {
-            coordinate: self.coordinate,
-            snapshot: self.plan.resolve_with(resolve)?,
-        })
+        merge_outcome(
+            self.coordinate,
+            &self.before,
+            self.plan.resolve_with(resolve)?,
+        )
     }
 }
+/// Effective-time options for one resolved merge. Recorded time is engine-owned.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphMergeOptions {
+    /// Batch default effective time; None uses the engine acceptance clock.
+    pub effective_at: Option<crate::TimestampMicros>,
+    /// Overrides for actual first-parent resolution changes only.
+    pub change_times: std::collections::BTreeMap<crate::ChangeKey, crate::TimestampMicros>,
+}
+pub(crate) struct PreparedMerge {
+    pub outcome: GraphMergeOutcome,
+    pub metadata: crate::PublicationMetadata,
+    bindings: Vec<(String, ExternalEntityRef)>,
+}
 impl GraphMergeOutcome {
+    /// Exact typed resolution delta relative to the first parent, not the base.
+    pub fn changes(&self) -> &crate::state::ChangeSet {
+        &self.changes
+    }
+    /// Captured branch receiving the resolved merge.
+    pub fn branch(&self) -> &str {
+        &self.coordinate.branch
+    }
+
     /// Captured explicit base, without a newly allocated merge version.
     pub fn base_state(&self) -> StateId {
         self.coordinate.base
@@ -189,5 +213,326 @@ impl Graph {
             schema::reject_violations(schema.validate_snapshot(snapshot)?)?;
         }
         Ok(())
+    }
+}
+
+fn merge_outcome(
+    coordinate: MergeCoordinate,
+    before: &GraphSnapshot,
+    snapshot: GraphSnapshot,
+) -> GraphResult<GraphMergeOutcome> {
+    let changes = exact_merge_changes(before, &snapshot)?;
+    Ok(GraphMergeOutcome {
+        coordinate,
+        snapshot,
+        changes,
+    })
+}
+fn exact_merge_changes(
+    before: &GraphSnapshot,
+    after: &GraphSnapshot,
+) -> GraphResult<crate::state::ChangeSet> {
+    use std::collections::BTreeSet;
+    let mut changes = crate::state::ChangeSet::new();
+    let old_nodes: HashSet<_> = before.active_nodes.iter().copied().collect();
+    let new_nodes: HashSet<_> = after.active_nodes.iter().copied().collect();
+    changes.nodes_added = new_nodes.difference(&old_nodes).copied().collect();
+    changes.nodes_removed = old_nodes.difference(&new_nodes).copied().collect();
+    changes.nodes_added.sort_unstable();
+    changes.nodes_removed.sort_unstable();
+    for (&id, &(u, v)) in &after.edges {
+        match before.edges.get(&id) {
+            None => changes.edges_added.push((id, u, v)),
+            Some(&old) if old != (u, v) => {
+                changes
+                    .edge_endpoint_changes
+                    .push(crate::EdgeEndpointChange {
+                        edge_id: id,
+                        old_endpoints: old,
+                        new_endpoints: (u, v),
+                    })
+            }
+            _ => {}
+        }
+    }
+    changes.edges_added.sort_unstable();
+    changes.edges_removed = before
+        .edges
+        .keys()
+        .filter(|id| !after.edges.contains_key(id))
+        .copied()
+        .collect();
+    changes.edges_removed.sort_unstable();
+    changes
+        .edge_endpoint_changes
+        .sort_unstable_by_key(|c| c.edge_id);
+    for (nodes, old_rows, new_rows, output) in [
+        (
+            true,
+            &before.node_attributes,
+            &after.node_attributes,
+            &mut changes.node_attr_changes,
+        ),
+        (
+            false,
+            &before.edge_attributes,
+            &after.edge_attributes,
+            &mut changes.edge_attr_changes,
+        ),
+    ] {
+        let ids: BTreeSet<_> = if nodes {
+            new_nodes.iter().copied().collect()
+        } else {
+            after.edges.keys().copied().collect()
+        };
+        for id in ids {
+            let was_active = if nodes {
+                old_nodes.contains(&id)
+            } else {
+                before.edges.contains_key(&id)
+            };
+            let old = was_active.then(|| old_rows.get(&id)).flatten();
+            let new = new_rows.get(&id);
+            let names: BTreeSet<_> = old
+                .into_iter()
+                .flat_map(|row| row.keys())
+                .chain(new.into_iter().flat_map(|row| row.keys()))
+                .collect();
+            for name in names {
+                let a = old.and_then(|r| r.get(name));
+                let b = new.and_then(|r| r.get(name));
+                let equal = match (a, b) {
+                    (None, None) => true,
+                    (Some(a), Some(b)) => archive::same_value(a, b)?,
+                    _ => false,
+                };
+                if !equal {
+                    output.push((id, name.clone(), a.cloned(), b.cloned()));
+                }
+            }
+        }
+    }
+    Ok(changes)
+}
+impl Graph {
+    /// Publish one explicitly resolved two-parent merge, including data-identical
+    /// merges which still join ancestry. No node/edge IDs are allocated.
+    pub fn finish_merge(
+        &mut self,
+        outcome: GraphMergeOutcome,
+        options: GraphMergeOptions,
+        message: String,
+        author: String,
+    ) -> GraphResult<StateId> {
+        self.finish_merge_with_schema(outcome, options, message, author, None)
+    }
+    /// Publish under an optional complete-target schema; ordinary publication
+    /// policy is preserved, and pending manual writes reject.
+    pub fn finish_merge_with_schema(
+        &mut self,
+        outcome: GraphMergeOutcome,
+        options: GraphMergeOptions,
+        message: String,
+        author: String,
+        schema: Option<&GraphSchema>,
+    ) -> GraphResult<StateId> {
+        let prepared = self.prepare_merge_publication(outcome, &options, schema, None, None)?;
+        self.execute_merge_publication(prepared, message, author)
+    }
+    pub(crate) fn prepare_merge_publication(
+        &self,
+        outcome: GraphMergeOutcome,
+        options: &GraphMergeOptions,
+        schema: Option<&GraphSchema>,
+        additional_schema: Option<&GraphSchema>,
+        recorded_at: Option<i64>,
+    ) -> GraphResult<PreparedMerge> {
+        self.validate_merge_outcome(&outcome, schema)?;
+        if let Some(policy) = additional_schema {
+            schema::reject_violations(policy.validate_snapshot(&outcome.snapshot)?)?;
+        }
+        let bindings = self.snapshot_identity_bindings(&outcome.snapshot)?;
+        let changes = &outcome.changes;
+        if !changes.edge_endpoint_changes.is_empty()
+            && !self.change_tracker.supports_endpoint_changes()
+        {
+            return Err(GraphError::InvalidInput(
+                "Temporal strategy does not support endpoint changes".into(),
+            ));
+        }
+        let pool = self.pool.borrow();
+        let rewired: HashSet<_> = outcome
+            .snapshot
+            .edges
+            .iter()
+            .filter_map(|(&id, &pair)| (pool.get_edge_endpoints(id) != Some(pair)).then_some(id))
+            .collect();
+        if pool.legacy_groups_own_edges(&rewired) {
+            return Err(GraphError::InvalidInput("Merge endpoint changes require frozen group sources; edge belongs to a legacy membership-only group".into()));
+        }
+        drop(pool);
+        let recorded_at = match recorded_at {
+            Some(time) => time,
+            None => crate::state::publication::now_micros()?,
+        };
+        let effective_at = options.effective_at.unwrap_or(recorded_at);
+        let mut metadata = crate::PublicationMetadata {
+            recorded_at,
+            effective_at,
+            change_times: Default::default(),
+        };
+        use crate::ChangeKey as K;
+        let keys = changes
+            .nodes_added
+            .iter()
+            .map(|&id| K::NodeAdded(id))
+            .chain(changes.nodes_removed.iter().map(|&id| K::NodeRemoved(id)))
+            .chain(
+                changes
+                    .edges_added
+                    .iter()
+                    .map(|&(id, _, _)| K::EdgeAdded(id)),
+            )
+            .chain(changes.edges_removed.iter().map(|&id| K::EdgeRemoved(id)))
+            .chain(
+                changes
+                    .edge_endpoint_changes
+                    .iter()
+                    .map(|c| K::EdgeEndpoints(c.edge_id)),
+            )
+            .chain(
+                changes
+                    .node_attr_changes
+                    .iter()
+                    .map(|(id, name, _, _)| K::NodeAttribute(*id, name.clone())),
+            )
+            .chain(
+                changes
+                    .edge_attr_changes
+                    .iter()
+                    .map(|(id, name, _, _)| K::EdgeAttribute(*id, name.clone())),
+            );
+        for key in keys {
+            let fallback = match &key {
+                K::NodeAttribute(id, _) => metadata
+                    .change_times
+                    .get(&K::NodeAdded(*id))
+                    .copied()
+                    .unwrap_or(effective_at),
+                K::EdgeAttribute(id, _) => metadata
+                    .change_times
+                    .get(&K::EdgeAdded(*id))
+                    .copied()
+                    .unwrap_or(effective_at),
+                K::EdgeRemoved(id) => {
+                    let (u, v) = self.edge_endpoints(*id)?;
+                    [u, v]
+                        .iter()
+                        .filter_map(|id| metadata.change_times.get(&K::NodeRemoved(*id)))
+                        .min()
+                        .copied()
+                        .unwrap_or(effective_at)
+                }
+                _ => effective_at,
+            };
+            metadata.change_times.insert(
+                key.clone(),
+                options.change_times.get(&key).copied().unwrap_or(fallback),
+            );
+        }
+        if options
+            .change_times
+            .keys()
+            .any(|key| !metadata.change_times.contains_key(key))
+        {
+            return Err(GraphError::InvalidInput(
+                "Merge timestamp override does not target an actual resolution change".into(),
+            ));
+        }
+        let additions = changes
+            .edges_added
+            .iter()
+            .map(|&(id, u, v)| (id, (u, v)))
+            .chain(
+                changes
+                    .edge_endpoint_changes
+                    .iter()
+                    .map(|c| (c.edge_id, c.new_endpoints)),
+            )
+            .collect();
+        let patch = crate::state::history::TopologyPatch::from_metadata(
+            &metadata,
+            self.history.next_state_id(),
+            &additions,
+        )?;
+        self.history.validate_effective_topology(
+            outcome.coordinate.left,
+            &patch,
+            options.effective_at.is_some()
+                || options
+                    .change_times
+                    .keys()
+                    .any(|key| !matches!(key, K::NodeAttribute(..) | K::EdgeAttribute(..))),
+        )?;
+        Ok(PreparedMerge {
+            outcome,
+            metadata,
+            bindings,
+        })
+    }
+    pub(crate) fn execute_merge_publication(
+        &mut self,
+        prepared: PreparedMerge,
+        message: String,
+        author: String,
+    ) -> GraphResult<StateId> {
+        // Every fallible caller/input check precedes this exclusive installation.
+        // Retained allocated IDs and logical values were preflighted; payload
+        // installation cannot encounter a normal input failure after publication.
+        let PreparedMerge {
+            outcome,
+            metadata,
+            bindings,
+        } = prepared;
+        let GraphMergeOutcome {
+            coordinate,
+            mut snapshot,
+            changes,
+        } = outcome;
+        let id = self.history.create_merge_commit_with_publication(
+            changes,
+            message,
+            author,
+            vec![coordinate.left, coordinate.right],
+            Some(metadata),
+        )?;
+        snapshot.state_id = id;
+        self.install_snapshot_payload(snapshot, bindings)?;
+        self.history.update_branch_head(&coordinate.branch, id)?;
+        self.current_commit = id;
+        Ok(id)
+    }
+}
+
+impl Graph {
+    pub(crate) fn resolved_merge_for_replay(
+        &self,
+        left: StateId,
+        right: StateId,
+        base: StateId,
+        changes: crate::state::ChangeSet,
+    ) -> GraphResult<GraphMergeOutcome> {
+        let plan = self.prepare_merge_read(right, Some(base), left)?;
+        let before = plan.left.execute()?;
+        let declared = crate::state::Delta::from_changes(changes);
+        let snapshot = before.apply_delta(&declared, 0);
+        let outcome = merge_outcome(plan.coordinate, &before, snapshot)?;
+        let actual = crate::state::Delta::from_changes(outcome.changes.clone());
+        if !crate::state::history::exact_delta(&declared, &actual)? {
+            return Err(GraphError::InvalidInput(
+                "Merge record delta differs from exact first-parent resolution".into(),
+            ));
+        }
+        Ok(outcome)
     }
 }

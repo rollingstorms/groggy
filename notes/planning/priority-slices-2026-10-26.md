@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after endpoint closure: **205 checked / 63
+Current inventory after endpoint closure: **206 checked / 62
 open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
@@ -563,3 +563,13 @@ finish_merge write API. Fixed evidence/remainder: `owner-merge-capture-2026-10-2
 **2,025 root Python / 1 skipped**, **176 Python docs examples**, strict Clippy and
 rebuilt/staged in-tree FFI. The preceding planner's 18-case recovery gate remains
 the latest storage check; this component has no journal/storage change.
+
+## Merge publication closure — 2026-10-27
+
+Existing 14.2 is complete: exact first-parent deltas, explicit typed conflict
+resolution, effective clocks/topology, guarded two-parent publication, Python
+writer bridge and delta-only durable replay. Verification: 1,369 native tests,
+2,034 root Python tests, 181 executable documentation examples, strict all-target
+Clippy and 23 serial real process-kill scenarios across merge/maintenance.
+See `merge-publication-exit-review-2026-10-27.md` for boundaries and benchmarks.
+No new checklist rows. Inventory: **206 checked / 62 open**.

@@ -3,6 +3,7 @@
 //! publishing memory; recovery replays only complete, validated records.
 mod baseline;
 mod checkpoint;
+mod merge;
 mod verification;
 pub use checkpoint::StorageCheckpointReport;
 pub use verification::{
@@ -201,6 +202,14 @@ enum Record {
     Batch {
         expected_state: StateId,
         batch: Box<StoredBatch>,
+        metadata: PublicationMetadata,
+        message: String,
+        author: String,
+        additional_schema: Option<GraphSchema>,
+    },
+    Merge {
+        resolved: Box<merge::StoredMerge>,
+        options: crate::GraphMergeOptions,
         metadata: PublicationMetadata,
         message: String,
         author: String,
@@ -537,6 +546,29 @@ impl DurableGraph {
                 install_meta_kinds(&mut prepared, first_node, &meta_nodes)?;
                 graph.restore_publication_clock(&mut prepared, metadata)?;
                 graph.execute_publication(prepared, message, author)?;
+            }
+            Record::Merge {
+                resolved,
+                options,
+                metadata,
+                message,
+                author,
+                additional_schema,
+            } => {
+                let outcome = resolved.outcome(graph)?;
+                let prepared = graph.prepare_merge_publication(
+                    outcome,
+                    &options,
+                    schema.as_ref(),
+                    additional_schema.as_ref(),
+                    Some(metadata.recorded_at),
+                )?;
+                if metadata != prepared.metadata {
+                    return Err(invalid(
+                        "merge publication metadata does not match resolved changes",
+                    ));
+                }
+                graph.execute_merge_publication(prepared, message, author)?;
             }
             Record::RetainGroups { groups } => {
                 let prepared = graph.pool_mut().prepare_group_documents(groups)?;

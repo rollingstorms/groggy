@@ -17,7 +17,7 @@ pub mod history;
 pub mod merge;
 pub use merge::{
     plan_snapshot_merge, MergeEntity, MergeProperties, SnapshotMergeConflict, SnapshotMergePlan,
-    SnapshotMergeResolution,
+    SnapshotMergeResolution, SnapshotMergeSide,
 };
 pub mod publication;
 pub mod read_state;

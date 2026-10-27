@@ -1,8 +1,8 @@
 # Native three-way snapshot merge planning
 
 The Rust state layer now has a pure merge planner. It does not mutate a Graph or
-publish a version. Python Graph/DurableGraph merge APIs and durable merge acceptance
-remain unfinished under checklist 14.2.
+publish a version. Graph/DurableGraph publication and Python APIs are now available; see
+[checked graph merges](graph-merges.md) for the complete acceptance contract.
 
 ## Choose a real base
 
@@ -68,13 +68,12 @@ properties on inactive entities reject. Empty inactive legacy property maps are
 harmless. This validator does not prove allocated IDs, external-name uniqueness,
 valid pooled/group references, schema, write provenance or effective-time validity.
 
-Those require a prepared owner coordinator before any merge can be published:
-owner/head/branch/base guards; identity/schema/reference validation; a complete
-typed resolution delta relative to the first parent; original/explicit temporal
-metadata; two-parent publication; synced durable replay/recovery; and Python
-translation. These remain the fixed 14.2 remainder. In particular, importing a
-logical output through an untracked raw snapshot is not an accepted merge path.
-There is no new serialization or storage-format change in this planner component.
+The owning coordinator now supplies head/branch/base and identity/schema/source
+guards, a complete exact first-parent delta, explicit/default clocks, one two-parent
+publication and durable synced delta replay. Python provides prepare/resolve/finish
+and a checked writer convenience. Importing a logical output through an untracked
+raw snapshot is not an accepted merge path. The planner itself has no wire format;
+see the linked complete API for journal/archive compatibility and verified limits.
 
 ## Owner-bound capture and read-only preflight
 
@@ -104,6 +103,6 @@ unpublished marker; it is not an accepted graph version.
 Preflight alone is not durable/current-policy authority for later use. Publication
 must recheck the live owner and validate the exact resolved first-parent delta,
 effective timeline and installed durable schema immediately before acceptance.
-The owning mutation coordinator, two-parent publication, durable record/replay and
-Python translation remain unfinished; there is no `Graph.finish_merge` write API
-in this component. Do not install the logical output through raw snapshot imports.
+Use the checked `Graph.finish_merge` or DurableGraph counterpart for publication;
+they rebuild/recheck current policy and exact resolution clocks before acceptance.
+Do not install the logical output through raw snapshot imports.

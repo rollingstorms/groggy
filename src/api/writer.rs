@@ -102,6 +102,36 @@ impl<'a> GraphWriter<'a> {
         self.expected_state = result.state_id;
         Ok(result)
     }
+    /// Capture retained merge inputs at this session's expected head.
+    pub fn prepare_merge(
+        &self,
+        right: StateId,
+        base: Option<StateId>,
+    ) -> GraphResult<crate::GraphMergeReadPlan> {
+        self.graph
+            .prepare_merge_read(right, base, self.expected_state)
+    }
+    /// Publish one resolved merge under this session's schema and author.
+    pub fn finish_merge(
+        &mut self,
+        outcome: crate::GraphMergeOutcome,
+        mut options: crate::GraphMergeOptions,
+        message: impl Into<String>,
+    ) -> GraphResult<StateId> {
+        self.graph.validate_write_head(self.expected_state)?;
+        if options.effective_at.is_none() {
+            options.effective_at = self.effective_at;
+        }
+        let state = self.graph.finish_merge_with_schema(
+            outcome,
+            options,
+            message.into(),
+            self.author.clone(),
+            self.schema,
+        )?;
+        self.expected_state = state;
+        Ok(state)
+    }
     /// Explicit reference/state restoration under this session's expected head and schema.
     pub fn restore_state(&mut self, target: StateId) -> GraphResult<StateId> {
         let outcome = self

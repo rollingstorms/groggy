@@ -43,6 +43,20 @@ class GraphWriter:
         self._state_id = result["state_id"]
         return result
 
+    def merge(self, right, *, base=None, resolver=None, effective_at=None,
+              change_times=None, message="merge"):
+        """Resolve a retained state and publish one checked two-parent version."""
+        plan = self._graph.prepare_merge(
+            right, base=base, expected_state=self._state_id
+        )
+        outcome = plan.resolve(resolver)
+        state = self._graph.finish_merge(
+            outcome, effective_at=effective_at, change_times=change_times,
+            message=message, author=self._author, schema=self._schema
+        )
+        self._state_id = state
+        return state
+
     def restore_state(self, state):
         """Select a retained published state; preserve history until explicit collection."""
         restored = self._graph.restore_state(

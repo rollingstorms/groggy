@@ -294,3 +294,7 @@ harness = false
 [[bench]]
 name = "snapshot_merge"
 harness = false
+
+[[bench]]
+name = "merge_publication"
+harness = false
