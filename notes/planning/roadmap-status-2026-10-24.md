@@ -940,3 +940,28 @@ not whole-engine/RSS/production guarantees. Receipt:
 Fixed inventory now **208 checked / 60 open**; no new rows. Remaining native
 compound topology acceptance and coordinator compatibility guards stay in
 09.4b.2/AR3; broader view/index/query/release work remains unchanged.
+
+## Writer coordinate guard — 2026-10-27 (09.5 / AR3 / 19.2)
+
+Reproduced and fixed a Python session writing to a different branch when both
+branches shared a state ID. Writers now capture owner, branch and expected head;
+native acceptance validates the full coordinate before mutation or durable append.
+All batch/upsert/checkpoint/merge/restore entries are covered. Explicit refresh
+retargets the session. A callback refresh cannot replace an in-flight call's
+coordinate. Immutable markers share a small owner/branch binding and pin no history.
+
+Native writers remain protected by their exclusive graph borrow. Physical
+checkpoint/compaction preserves the owning identity; reopen creates a new owner
+and rejects old markers. No persisted format or result shape changes.
+
+Verification: 1,386 native / 56 ignored; 2,049 root Python / 1 skipped; 184
+executable documentation examples, strict all-target Clippy and rebuilt release
+FFI (three existing warnings). Bounded matched Python release medians on the same
+extension: scalar writer update 8.47 → 8.66 microseconds (about 0.19 microseconds
+extra); 1k-row bulk batch 1.464 → 1.459 ms (within local timing variation).
+Receipt: `../benchmarks/write-coordinate-overhead-2026-10-27.json`. This does not
+certify an FFI latency budget or production/RSS throughput.
+
+This advances existing 09.5/AR3/19.2 without closing their remaining service,
+compound topology and wider API scopes. Inventory remains **208 checked / 60 open**.
+No new rows.

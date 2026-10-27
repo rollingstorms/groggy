@@ -328,17 +328,28 @@ impl PyDurableGraph {
             .call1((slf.into_py(py), author, schema))?
             .to_object(py))
     }
-    #[pyo3(signature=(right, *, base=None, expected_state=None))]
+    fn write_coordinate(&self) -> PyResult<super::write_coordinate::PyWriteCoordinate> {
+        Ok(super::write_coordinate::PyWriteCoordinate {
+            inner: self
+                .core()?
+                .graph()
+                .map_err(graph_error_to_py_err)?
+                .write_coordinate(),
+        })
+    }
+    #[pyo3(signature=(right, *, base=None, expected_state=None, expected_coordinate=None))]
     fn prepare_merge(
         &self,
         py: Python,
         right: &PyAny,
         base: Option<&PyAny>,
         expected_state: Option<&PyAny>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<super::graph_merge::PyMergePlan> {
         let (right, base, expected) = super::graph_merge::selections(right, base, expected_state)?;
         let plan = {
             let graph = self.core()?.graph().map_err(graph_error_to_py_err)?;
+            super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
             graph
                 .prepare_merge_read(
                     right,
@@ -375,7 +386,7 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    #[pyo3(signature=(state, *, mode, expected_state=None, effective_at=None, change_times=None, message="restore", author="writer", schema=None))]
+    #[pyo3(signature=(state, *, mode, expected_state=None, effective_at=None, change_times=None, message="restore", author="writer", schema=None, expected_coordinate=None))]
     fn restore_state(
         &mut self,
         py: Python,
@@ -387,6 +398,7 @@ impl PyDurableGraph {
         message: &str,
         author: &str,
         schema: Option<&PyDict>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<StateId> {
         let mode: groggy::StateRestoreMode = mode.parse().map_err(graph_error_to_py_err)?;
         let options = super::graph_merge::options(effective_at, change_times)?;
@@ -397,6 +409,7 @@ impl PyDurableGraph {
         let policy = schema.map(parse_schema).transpose()?;
         let plan = {
             let graph = self.core()?.graph().map_err(graph_error_to_py_err)?;
+            super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
             graph
                 .prepare_state_restore(
                     target,
@@ -419,7 +432,7 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    #[pyo3(signature=(batch,expected_state,message,author,*,schema=None))]
+    #[pyo3(signature=(batch,expected_state,message,author,*,schema=None, expected_coordinate=None))]
     fn apply_batch(
         &mut self,
         py: Python,
@@ -428,9 +441,14 @@ impl PyDurableGraph {
         message: String,
         author: String,
         schema: Option<&PyDict>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<PyObject> {
         let batch = parse_batch(batch)?;
         let schema = schema.map(parse_schema).transpose()?;
+        super::write_coordinate::validate(
+            self.core()?.graph().map_err(graph_error_to_py_err)?,
+            expected_coordinate.as_deref(),
+        )?;
         let result = self
             .core_mut()?
             .apply_batch_with_schema(batch, expected_state, message, author, schema.as_ref())
@@ -545,7 +563,7 @@ impl PyDurableGraph {
         crate::ffi::api::graph_batch::view_result_to_python(py, result)
     }
 
-    #[pyo3(signature=(rows,expected_state,*,author="upsert",uid_key="external_id",schema=None,effective_at=None))]
+    #[pyo3(signature=(rows,expected_state,*,author="upsert",uid_key="external_id",schema=None,effective_at=None, expected_coordinate=None))]
     fn publish_upsert_nodes(
         &mut self,
         py: Python,
@@ -555,6 +573,7 @@ impl PyDurableGraph {
         uid_key: &str,
         schema: Option<&PyDict>,
         effective_at: Option<&PyAny>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<PyObject> {
         let rows = parse_node_upserts(
             self.core()?.graph().map_err(graph_error_to_py_err)?,
@@ -563,6 +582,10 @@ impl PyDurableGraph {
         )?;
         let schema = schema.map(parse_schema).transpose()?;
         let at = effective_at.map(timestamp).transpose()?;
+        super::write_coordinate::validate(
+            self.core()?.graph().map_err(graph_error_to_py_err)?,
+            expected_coordinate.as_deref(),
+        )?;
         let (ids, state) = self
             .core_mut()?
             .upsert_nodes(rows, expected_state, author.to_owned(), at, schema.as_ref())
@@ -572,7 +595,7 @@ impl PyDurableGraph {
         output.set_item("state_id", state)?;
         Ok(output.to_object(py))
     }
-    #[pyo3(signature=(rows,expected_state,*,author="upsert",uid_key="external_id",schema=None,effective_at=None))]
+    #[pyo3(signature=(rows,expected_state,*,author="upsert",uid_key="external_id",schema=None,effective_at=None, expected_coordinate=None))]
     fn publish_upsert_edges(
         &mut self,
         py: Python,
@@ -582,6 +605,7 @@ impl PyDurableGraph {
         uid_key: &str,
         schema: Option<&PyDict>,
         effective_at: Option<&PyAny>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<PyObject> {
         let rows = parse_edge_upserts(
             self.core()?.graph().map_err(graph_error_to_py_err)?,
@@ -590,6 +614,10 @@ impl PyDurableGraph {
         )?;
         let schema = schema.map(parse_schema).transpose()?;
         let at = effective_at.map(timestamp).transpose()?;
+        super::write_coordinate::validate(
+            self.core()?.graph().map_err(graph_error_to_py_err)?,
+            expected_coordinate.as_deref(),
+        )?;
         let (ids, state) = self
             .core_mut()?
             .upsert_edges(rows, expected_state, author.to_owned(), at, schema.as_ref())
@@ -659,15 +687,20 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    #[pyo3(signature=(message,author,*,expected_state=None,schema=None))]
+    #[pyo3(signature=(message,author,*,expected_state=None,schema=None, expected_coordinate=None))]
     fn checkpoint(
         &mut self,
         message: String,
         author: String,
         expected_state: Option<StateId>,
         schema: Option<&PyDict>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<StateId> {
         let schema = schema.map(parse_schema).transpose()?;
+        super::write_coordinate::validate(
+            self.core()?.graph().map_err(graph_error_to_py_err)?,
+            expected_coordinate.as_deref(),
+        )?;
         let expected = match expected_state {
             Some(state) => state,
             None => self
@@ -682,7 +715,7 @@ impl PyDurableGraph {
     }
     /// An explicit checkpoint; durable mutations have already been published.
     fn commit(&mut self, message: String, author: String) -> PyResult<StateId> {
-        self.checkpoint(message, author, None, None)
+        self.checkpoint(message, author, None, None, None)
     }
     fn checkpoints(&self, py: Python) -> PyResult<PyObject> {
         super::graph_version::checkpoints_to_python(

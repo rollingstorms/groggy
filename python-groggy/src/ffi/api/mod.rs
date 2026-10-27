@@ -18,3 +18,5 @@ pub mod graph_version;
 pub mod pipeline;
 
 // Re-export API FFI types
+
+pub mod write_coordinate;

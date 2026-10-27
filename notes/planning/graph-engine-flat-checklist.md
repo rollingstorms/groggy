@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-10-26 on `groggy-roadmap-2026-10-20`.
+Updated 2026-10-27 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -166,7 +166,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 
 
 
-- [ ] **09.5 — Open: service transaction/concurrency contract.** Define reader snapshots, writer serialization/conflicts, multi-user boundaries, and episode/meta-node grouping before calling the embedded checked writer a multi-client database.
+- [ ] **09.5 — Partial: service transaction/concurrency contract.** Embedded Python writers now bind owner/branch/head across batches, upserts, checkpoints, merge preparation and explicit restore; same-head branch switching requires refresh. Native writers retain exclusive borrow and durable owners retain exclusive file locks. Coordinates pin no history and survive physical maintenance; reopened owners reject old coordinates. Evidence: `write-coordinate-guards-2026-10-27.md`. Multi-client service scheduling/isolation and episode/meta grouping remain open; embedded sessions are not a service database.
 - [x] **10.1 — Recoverable checked journal.** Versioned checksummed CBOR preserves supported inline checked writes, IDs/reservations, schema/configuration, branches, typed history, and original clocks; restart/corruption/truncation/subprocess tests exist.
 - [x] **10.2 — Verified full-journal backup.** Sync and verify a temporary backup, publish without overwriting, and restore through ordinary recovery. Active graph export remains a separate narrower format.
 - [x] **10.3 — Persist all retained contents.** Complete versioned binary graph archives and existing-graph journal initialization preserve raw column positions/values, inactive allocations and identity reservations, all retained history/branches/clocks/checkpoints/configuration, and legacy/frozen nested source scopes. Dirty/inconsistent input and corruption reject; continued writes, schema, reopen and backup are verified. Active JSON export remains separate. See `retained-archive-import-2026-10-26.md`; bounded recovery, physical compaction and migrations remain 10.4.

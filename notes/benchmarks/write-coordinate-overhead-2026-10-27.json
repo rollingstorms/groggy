@@ -1,0 +1,121 @@
+{
+  "benchmark": "python_write_coordinate_overhead",
+  "control_commit": "4c68b7df",
+  "scope": "five alternating-order matched samples on the same loaded extension; fresh owner per sample; current branch unchanged; setup and scalar warmup excluded; bulk Python row preparation included; no RSS/whole-engine guarantee",
+  "cases": [
+    {
+      "nodes_per_batch": 1,
+      "operations": 5000,
+      "samples": [
+        {
+          "previous": {
+            "wall_seconds": 0.043254875000000026,
+            "cpu_seconds": 0.043254000000000015
+          },
+          "coordinate": {
+            "wall_seconds": 0.04332608299999996,
+            "cpu_seconds": 0.043325999999999976
+          }
+        },
+        {
+          "coordinate": {
+            "wall_seconds": 0.043323583,
+            "cpu_seconds": 0.04332400000000003
+          },
+          "previous": {
+            "wall_seconds": 0.04256983400000003,
+            "cpu_seconds": 0.04257
+          }
+        },
+        {
+          "previous": {
+            "wall_seconds": 0.042178541999999986,
+            "cpu_seconds": 0.04217900000000002
+          },
+          "coordinate": {
+            "wall_seconds": 0.043185665999999956,
+            "cpu_seconds": 0.043186
+          }
+        },
+        {
+          "coordinate": {
+            "wall_seconds": 0.043164083999999936,
+            "cpu_seconds": 0.04316500000000001
+          },
+          "previous": {
+            "wall_seconds": 0.042132792000000086,
+            "cpu_seconds": 0.042132999999999976
+          }
+        },
+        {
+          "previous": {
+            "wall_seconds": 0.04235708300000007,
+            "cpu_seconds": 0.04233500000000001
+          },
+          "coordinate": {
+            "wall_seconds": 0.04782279199999995,
+            "cpu_seconds": 0.047726999999999964
+          }
+        }
+      ]
+    },
+    {
+      "nodes_per_batch": 1000,
+      "operations": 20,
+      "samples": [
+        {
+          "previous": {
+            "wall_seconds": 0.03032079200000004,
+            "cpu_seconds": 0.03028300000000006
+          },
+          "coordinate": {
+            "wall_seconds": 0.028798542000000094,
+            "cpu_seconds": 0.02879799999999999
+          }
+        },
+        {
+          "coordinate": {
+            "wall_seconds": 0.028977791999999947,
+            "cpu_seconds": 0.02897700000000003
+          },
+          "previous": {
+            "wall_seconds": 0.02921770899999998,
+            "cpu_seconds": 0.029218000000000077
+          }
+        },
+        {
+          "previous": {
+            "wall_seconds": 0.028908749999999928,
+            "cpu_seconds": 0.028900999999999955
+          },
+          "coordinate": {
+            "wall_seconds": 0.029218999999999995,
+            "cpu_seconds": 0.029218999999999995
+          }
+        },
+        {
+          "coordinate": {
+            "wall_seconds": 0.02918799999999999,
+            "cpu_seconds": 0.02918799999999999
+          },
+          "previous": {
+            "wall_seconds": 0.02927908400000001,
+            "cpu_seconds": 0.029278999999999944
+          }
+        },
+        {
+          "previous": {
+            "wall_seconds": 0.029327915999999954,
+            "cpu_seconds": 0.02932800000000002
+          },
+          "coordinate": {
+            "wall_seconds": 0.02928083300000006,
+            "cpu_seconds": 0.029281000000000112
+          }
+        }
+      ]
+    }
+  ],
+  "build_profile": "release",
+  "binding": "shared immutable owner/branch binding; one new head marker per accepted writer call"
+}

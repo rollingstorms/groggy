@@ -436,6 +436,7 @@ fn int_array_factory(values: Vec<i64>) -> PyNumArray {
 fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register core graph components
     m.add_class::<PyGraph>()?;
+    m.add_class::<ffi::api::write_coordinate::PyWriteCoordinate>()?;
     m.add_class::<ffi::api::graph_merge::PyMergePlan>()?;
     m.add_class::<ffi::api::graph_merge::PyMergeOutcome>()?;
     m.add_class::<ffi::api::durable::PyDurableGraph>()?;

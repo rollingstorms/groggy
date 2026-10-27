@@ -19,52 +19,64 @@ class GraphWriter:
         self._graph = graph
         self._author = author
         self._schema = deepcopy(schema)
-        self._state_id = graph.current_state_id
+        self._coordinate = graph.write_coordinate()
 
     @property
     def state_id(self):
-        return self._state_id
+        return self._coordinate.state_id
+
+    @property
+    def branch(self):
+        return self._coordinate.branch
 
     def refresh(self):
-        """Explicitly target the graph's latest published head on the next call."""
-        self._state_id = self._graph.current_state_id
-        return self._state_id
+        """Explicitly retarget this session to the current owner/branch/head."""
+        self._coordinate = self._graph.write_coordinate()
+        return self.state_id
 
     def checkpoint(self, message="checkpoint"):
         """Label this published state without allocating another mutation version."""
+        coordinate = self._coordinate
         return self._graph.checkpoint(
-            message, self._author, expected_state=self._state_id, schema=self._schema
+            message, self._author, expected_state=coordinate.state_id,
+            schema=self._schema, expected_coordinate=coordinate
         )
 
     def apply_batch(self, batch, message="write"):
+        coordinate = self._coordinate
         result = self._graph.apply_batch(
-            batch, self._state_id, message, self._author, schema=self._schema
+            batch, coordinate.state_id, message, self._author, schema=self._schema,
+            expected_coordinate=coordinate
         )
-        self._state_id = result["state_id"]
+        self._coordinate = coordinate._advance(result["state_id"])
         return result
 
     def merge(self, right, *, base=None, resolver=None, effective_at=None,
               change_times=None, message="merge"):
         """Resolve a retained state and publish one checked two-parent version."""
+        coordinate = self._coordinate
         plan = self._graph.prepare_merge(
-            right, base=base, expected_state=self._state_id
+            right, base=base, expected_state=coordinate.state_id,
+            expected_coordinate=coordinate
         )
         outcome = plan.resolve(resolver)
         state = self._graph.finish_merge(
             outcome, effective_at=effective_at, change_times=change_times,
             message=message, author=self._author, schema=self._schema
         )
-        self._state_id = state
+        self._coordinate = coordinate._advance(state)
         return state
 
     def restore_state(self, state, *, mode, effective_at=None, change_times=None,
                       message="restore"):
         """Explicitly switch selection or publish a tracked restoration delta."""
+        coordinate = self._coordinate
         restored = self._graph.restore_state(
-            state, mode=mode, expected_state=self._state_id, effective_at=effective_at,
-            change_times=change_times, message=message, author=self._author, schema=self._schema
+            state, mode=mode, expected_state=coordinate.state_id, effective_at=effective_at,
+            change_times=change_times, message=message, author=self._author,
+            schema=self._schema, expected_coordinate=coordinate
         )
-        self._state_id = restored
+        self._coordinate = coordinate._advance(restored)
         return restored
 
     def add_node(self, **attrs):
@@ -198,17 +210,19 @@ class GraphWriter:
         return self.apply_batch(batch, "set_edge_external_id")["state_id"]
 
     def upsert_nodes(self, rows, *, uid_key="external_id", effective_at=None):
+        coordinate = self._coordinate
         result = self._graph.publish_upsert_nodes(
-            rows, self._state_id, author=self._author, uid_key=uid_key,
-            schema=self._schema, effective_at=effective_at,
+            rows, coordinate.state_id, author=self._author, uid_key=uid_key,
+            schema=self._schema, effective_at=effective_at, expected_coordinate=coordinate,
         )
-        self._state_id = result["state_id"]
+        self._coordinate = coordinate._advance(result["state_id"])
         return result["node_ids"]
 
     def upsert_edges(self, rows, *, uid_key="external_id", effective_at=None):
+        coordinate = self._coordinate
         result = self._graph.publish_upsert_edges(
-            rows, self._state_id, author=self._author, uid_key=uid_key,
-            schema=self._schema, effective_at=effective_at,
+            rows, coordinate.state_id, author=self._author, uid_key=uid_key,
+            schema=self._schema, effective_at=effective_at, expected_coordinate=coordinate,
         )
-        self._state_id = result["state_id"]
+        self._coordinate = coordinate._advance(result["state_id"])
         return result["edge_ids"]

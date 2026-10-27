@@ -44,11 +44,13 @@ pub(crate) mod snapshot;
 mod storage_boundary_tests;
 mod tables;
 mod view_updates;
+mod write_coordinate;
 use identity::ExternalIdentityIndex;
 pub use identity::{EdgeUpsert, ExternalEntityRef, NodeUpsert, EXTERNAL_ID};
 pub use kinds::{LABELS, RELATIONSHIP_TYPE};
 pub use schema::{GraphSchema, PropertyConstraint, PropertyKind, SchemaViolation};
 pub use view_updates::ViewBatchResult;
+pub use write_coordinate::WriteCoordinate;
 
 use crate::api::batch::{BatchResult, GraphBatch};
 use crate::errors::{GraphError, GraphResult};

@@ -692,7 +692,7 @@ impl PyGraph {
     }
 
     /// Publish managed node upserts and identity-index updates through one checked batch.
-    #[pyo3(signature = (rows, expected_state, *, author="upsert", uid_key="external_id", schema=None, effective_at=None))]
+    #[pyo3(signature = (rows, expected_state, *, author="upsert", uid_key="external_id", schema=None, effective_at=None, expected_coordinate=None))]
     fn publish_upsert_nodes(
         &mut self,
         py: Python,
@@ -702,29 +702,34 @@ impl PyGraph {
         uid_key: &str,
         schema: Option<&PyDict>,
         effective_at: Option<&PyAny>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<PyObject> {
         let rows = parse_node_upserts(&self.inner.borrow(), rows, uid_key)?;
         let schema = schema.map(parse_schema).transpose()?;
         let at = effective_at
             .map(crate::ffi::api::graph_batch::timestamp)
             .transpose()?;
-        let mut graph = self.inner.borrow_mut();
-        let mut writer = graph
-            .writer(author)
-            .expect_state(expected_state)
-            .with_effective_at(at);
-        if let Some(schema) = &schema {
-            writer = writer.with_schema(schema);
-        }
-        let ids = writer.upsert_nodes(rows).map_err(graph_error_to_py_err)?;
+        let (ids, state) = {
+            let mut graph = self.inner.borrow_mut();
+            super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
+            let mut writer = graph
+                .writer(author)
+                .expect_state(expected_state)
+                .with_effective_at(at);
+            if let Some(schema) = &schema {
+                writer = writer.with_schema(schema);
+            }
+            let ids = writer.upsert_nodes(rows).map_err(graph_error_to_py_err)?;
+            (ids, writer.state_id())
+        };
         let output = PyDict::new(py);
         output.set_item("node_ids", ids)?;
-        output.set_item("state_id", writer.state_id())?;
+        output.set_item("state_id", state)?;
         Ok(output.to_object(py))
     }
 
     /// Publish managed edge upserts and identity-index updates through one checked batch.
-    #[pyo3(signature = (rows, expected_state, *, author="upsert", uid_key="external_id", schema=None, effective_at=None))]
+    #[pyo3(signature = (rows, expected_state, *, author="upsert", uid_key="external_id", schema=None, effective_at=None, expected_coordinate=None))]
     fn publish_upsert_edges(
         &mut self,
         py: Python,
@@ -734,24 +739,29 @@ impl PyGraph {
         uid_key: &str,
         schema: Option<&PyDict>,
         effective_at: Option<&PyAny>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<PyObject> {
         let rows = parse_edge_upserts(&self.inner.borrow(), rows, uid_key)?;
         let schema = schema.map(parse_schema).transpose()?;
         let at = effective_at
             .map(crate::ffi::api::graph_batch::timestamp)
             .transpose()?;
-        let mut graph = self.inner.borrow_mut();
-        let mut writer = graph
-            .writer(author)
-            .expect_state(expected_state)
-            .with_effective_at(at);
-        if let Some(schema) = &schema {
-            writer = writer.with_schema(schema);
-        }
-        let ids = writer.upsert_edges(rows).map_err(graph_error_to_py_err)?;
+        let (ids, state) = {
+            let mut graph = self.inner.borrow_mut();
+            super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
+            let mut writer = graph
+                .writer(author)
+                .expect_state(expected_state)
+                .with_effective_at(at);
+            if let Some(schema) = &schema {
+                writer = writer.with_schema(schema);
+            }
+            let ids = writer.upsert_edges(rows).map_err(graph_error_to_py_err)?;
+            (ids, writer.state_id())
+        };
         let output = PyDict::new(py);
         output.set_item("edge_ids", ids)?;
-        output.set_item("state_id", writer.state_id())?;
+        output.set_item("state_id", state)?;
         Ok(output.to_object(py))
     }
 
@@ -1816,7 +1826,7 @@ impl PyGraph {
     /// Apply one validated mixed write against an expected published state.
     /// Optional schema checks the entire proposed result before any mutation.
     /// This call does not install a schema policy on subsequent writes.
-    #[pyo3(signature = (batch, expected_state, message, author, *, schema=None))]
+    #[pyo3(signature = (batch, expected_state, message, author, *, schema=None, expected_coordinate=None))]
     fn apply_batch(
         &mut self,
         py: Python,
@@ -1825,23 +1835,19 @@ impl PyGraph {
         message: String,
         author: String,
         schema: Option<&PyDict>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<PyObject> {
         let batch = parse_batch(batch)?;
         let schema = schema.map(parse_schema).transpose()?;
+        let mut graph = self.inner.borrow_mut();
+        super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
         let result = if let Some(schema) = &schema {
-            self.inner.borrow_mut().apply_batch_with_schema(
-                batch,
-                expected_state,
-                message,
-                author,
-                schema,
-            )
+            graph.apply_batch_with_schema(batch, expected_state, message, author, schema)
         } else {
-            self.inner
-                .borrow_mut()
-                .apply_batch(batch, expected_state, message, author)
+            graph.apply_batch(batch, expected_state, message, author)
         }
         .map_err(graph_error_to_py_err)?;
+        drop(graph);
         let output = PyDict::new(py);
         output.set_item("state_id", result.state_id)?;
         output.set_item("added_nodes", result.added_nodes)?;
@@ -1980,17 +1986,24 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    #[pyo3(signature=(right, *, base=None, expected_state=None))]
+    fn write_coordinate(&self) -> super::write_coordinate::PyWriteCoordinate {
+        super::write_coordinate::PyWriteCoordinate {
+            inner: self.inner.borrow().write_coordinate(),
+        }
+    }
+    #[pyo3(signature=(right, *, base=None, expected_state=None, expected_coordinate=None))]
     fn prepare_merge(
         &self,
         py: Python,
         right: &PyAny,
         base: Option<&PyAny>,
         expected_state: Option<&PyAny>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<super::graph_merge::PyMergePlan> {
         let (right, base, expected) = super::graph_merge::selections(right, base, expected_state)?;
         let plan = {
             let graph = self.inner.borrow();
+            super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
             graph
                 .prepare_merge_read(
                     right,
@@ -2028,7 +2041,7 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    #[pyo3(signature=(state, *, mode, expected_state=None, effective_at=None, change_times=None, message="restore", author="writer", schema=None))]
+    #[pyo3(signature=(state, *, mode, expected_state=None, effective_at=None, change_times=None, message="restore", author="writer", schema=None, expected_coordinate=None))]
     fn restore_state(
         &self,
         py: Python,
@@ -2040,6 +2053,7 @@ impl PyGraph {
         message: &str,
         author: &str,
         schema: Option<&PyDict>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<StateId> {
         let mode: groggy::StateRestoreMode = mode.parse().map_err(graph_error_to_py_err)?;
         let options = super::graph_merge::options(effective_at, change_times)?;
@@ -2050,6 +2064,7 @@ impl PyGraph {
         let policy = schema.map(parse_schema).transpose()?;
         let plan = {
             let graph = self.inner.borrow();
+            super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
             graph
                 .prepare_state_restore(
                     target,
@@ -2138,16 +2153,18 @@ impl PyGraph {
     }
 
     /// Explicitly checkpoint a clean published state, preserving its ID.
-    #[pyo3(signature=(message,author,*,expected_state=None,schema=None))]
+    #[pyo3(signature=(message,author,*,expected_state=None,schema=None, expected_coordinate=None))]
     fn checkpoint(
         &mut self,
         message: String,
         author: String,
         expected_state: Option<StateId>,
         schema: Option<&PyDict>,
+        expected_coordinate: Option<PyRef<'_, super::write_coordinate::PyWriteCoordinate>>,
     ) -> PyResult<StateId> {
-        let mut graph = self.inner.borrow_mut();
         let schema = schema.map(parse_schema).transpose()?;
+        let mut graph = self.inner.borrow_mut();
+        super::write_coordinate::validate(&graph, expected_coordinate.as_deref())?;
         let expected = expected_state.unwrap_or_else(|| graph.current_state_id());
         graph
             .checkpoint_with_schema(expected, message, author, schema.as_ref())

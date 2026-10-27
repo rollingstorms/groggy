@@ -3216,6 +3216,13 @@ class DisplayConfig:
         ...
 
 
+class WriteCoordinate:
+    @property
+    def state_id(self) -> int: ...
+    @property
+    def branch(self) -> str: ...
+    def _advance(self, state: int) -> WriteCoordinate: ...
+
 class MergePlan:
     @property
     def is_consumed(self) -> bool: ...
@@ -3238,10 +3245,13 @@ class MergeOutcome:
     def branch(self) -> str: ...
 
 class DurableGraph:
-    def prepare_merge(self, right: int, *, base: Optional[int] = None, expected_state: Optional[int] = None) -> MergePlan: ...
+    def write_coordinate(self) -> WriteCoordinate: ...
+    def checkpoint(self, message: str, author: str, *, expected_state: Optional[int] = None, schema: Optional[dict] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> int: ...
+
+    def prepare_merge(self, right: int, *, base: Optional[int] = None, expected_state: Optional[int] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> MergePlan: ...
     def finish_merge(self, outcome: MergeOutcome, *, effective_at: Optional[int] = None, change_times: Optional[list[dict]] = None, message: str = "merge", author: str = "writer", schema: Optional[dict] = None) -> int: ...
 
-    def restore_state(self, state: int, *, mode: str, expected_state: Optional[int] = None, effective_at: Optional[int] = None, change_times: Optional[list] = None, message: str = "restore", author: str = "writer", schema: Optional[dict] = None) -> int:
+    def restore_state(self, state: int, *, mode: str, expected_state: Optional[int] = None, effective_at: Optional[int] = None, change_times: Optional[list] = None, message: str = "restore", author: str = "writer", schema: Optional[dict] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> int:
         """Restore with required tracked (new delta) or switch (reference-only) mode."""
         ...
 
@@ -3330,7 +3340,7 @@ class DurableGraph:
     def allocated_entity_for_external_id(self, *args, **kwargs) -> Optional[Tuple[str, int]]:
         ...
 
-    def apply_batch(self, *args, **kwargs) -> Dict[str, Any]:
+    def apply_batch(self, batch: Any, expected_state: int, message: str, author: str, *, schema: Optional[dict] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> Dict[str, Any]:
         ...
 
     def checkout_branch(self, *args, **kwargs) -> None:
@@ -3395,10 +3405,10 @@ class DurableGraph:
     def publication_metadata(self, *args, **kwargs) -> Optional[Dict[str, Any]]:
         ...
 
-    def publish_upsert_edges(self, *args, **kwargs) -> Dict[str, Any]:
+    def publish_upsert_edges(self, rows: Any, expected_state: int, *, author: str = "upsert", uid_key: str = "external_id", schema: Optional[dict] = None, effective_at: Optional[int] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> Dict[str, Any]:
         ...
 
-    def publish_upsert_nodes(self, *args, **kwargs) -> Dict[str, Any]:
+    def publish_upsert_nodes(self, rows: Any, expected_state: int, *, author: str = "upsert", uid_key: str = "external_id", schema: Optional[dict] = None, effective_at: Optional[int] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> Dict[str, Any]:
         ...
 
     def schema(self, *args, **kwargs) -> Optional[Dict[str, Any]]:
@@ -4540,7 +4550,10 @@ class ExistenceIndex:
 
 
 class Graph:
-    def prepare_merge(self, right: int, *, base: Optional[int] = None, expected_state: Optional[int] = None) -> MergePlan: ...
+    def write_coordinate(self) -> WriteCoordinate: ...
+    def checkpoint(self, message: str, author: str, *, expected_state: Optional[int] = None, schema: Optional[dict] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> int: ...
+
+    def prepare_merge(self, right: int, *, base: Optional[int] = None, expected_state: Optional[int] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> MergePlan: ...
     def finish_merge(self, outcome: MergeOutcome, *, effective_at: Optional[int] = None, change_times: Optional[list[dict]] = None, message: str = "merge", author: str = "writer", schema: Optional[dict] = None) -> int: ...
 
     """
@@ -5219,7 +5232,7 @@ class Graph:
         """
         ...
 
-    def restore_state(self, state: int, *, mode: str, expected_state: Optional[int] = None, effective_at: Optional[int] = None, change_times: Optional[list] = None, message: str = "restore", author: str = "writer", schema: Optional[dict] = None) -> int:
+    def restore_state(self, state: int, *, mode: str, expected_state: Optional[int] = None, effective_at: Optional[int] = None, change_times: Optional[list] = None, message: str = "restore", author: str = "writer", schema: Optional[dict] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> int:
         """Restore with required tracked (new delta) or switch (reference-only) mode."""
         ...
 
@@ -5419,7 +5432,7 @@ class Graph:
         """
         ...
 
-    def apply_batch(self, batch: Any, expected_state: int, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def apply_batch(self, batch: Any, expected_state: int, message: str, author: str, *, schema: Optional[Dict[str, Any]] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> Dict[str, Any]:
         """
         Apply one validated mixed write against an expected published state.
         """
@@ -5438,14 +5451,14 @@ class Graph:
         """
         ...
 
-    def publish_upsert_edges(self, *args, **kwargs) -> Dict[str, Any]:
+    def publish_upsert_edges(self, rows: Any, expected_state: int, *, author: str = "upsert", uid_key: str = "external_id", schema: Optional[dict] = None, effective_at: Optional[int] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> Dict[str, Any]:
         """
         Publish managed edge upserts and identity-index updates through one checked batch.
         """
         ...
 
 
-    def publish_upsert_nodes(self, *args, **kwargs) -> Dict[str, Any]:
+    def publish_upsert_nodes(self, rows: Any, expected_state: int, *, author: str = "upsert", uid_key: str = "external_id", schema: Optional[dict] = None, effective_at: Optional[int] = None, expected_coordinate: Optional[WriteCoordinate] = None) -> Dict[str, Any]:
         """
         Publish managed node upserts and identity-index updates through one checked batch.
         """
