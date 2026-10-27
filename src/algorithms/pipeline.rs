@@ -154,7 +154,9 @@ impl Pipeline {
             let graph = source.borrow();
             let head = graph.current_state_id();
             graph.validate_write_head(head)?;
-            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(head));
+            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(
+                graph.write_coordinate(),
+            ));
         }
         let previous_outputs = ctx.take_outputs();
         let result = self
@@ -397,6 +399,22 @@ mod atomic_property_tests {
             )?)
         }
     }
+    struct SwitchBranch;
+    impl Algorithm for SwitchBranch {
+        fn id(&self) -> &'static str {
+            "test.switch_branch"
+        }
+        fn supports_atomic_properties(&self) -> bool {
+            true
+        }
+        fn execute(&self, _: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+            subgraph
+                .graph()
+                .borrow_mut()
+                .checkout_branch("other".into())?;
+            Ok(subgraph)
+        }
+    }
     fn pipeline(algorithms: Vec<Box<dyn Algorithm>>) -> Pipeline {
         Pipeline {
             steps: algorithms
@@ -499,5 +517,29 @@ mod atomic_property_tests {
         assert_eq!(graph.borrow().current_state_id(), 1);
         assert_eq!(graph.borrow().get_node_attr(0, &"a".into()).unwrap(), None);
         assert!(ctx.property_batch.is_none() && ctx.outputs.is_empty());
+    }
+
+    #[test]
+    fn same_head_branch_switch_discards_staging_and_outputs_then_context_can_be_reused() {
+        let (graph, selected) = fixture();
+        graph.borrow_mut().create_branch("other".into()).unwrap();
+        let head = graph.borrow().current_state_id();
+        let mut ctx = Context::new();
+        ctx.add_output("previous", AlgorithmOutput::Histogram(vec![3]));
+        let error = pipeline(vec![stage("a", false), Box::new(SwitchBranch)])
+            .run_atomic_properties(&mut ctx, selected.clone())
+            .unwrap_err();
+        assert!(error.to_string().contains("coordinate"));
+        assert_eq!(graph.borrow().current_state_id(), head);
+        assert!(!graph.borrow().has_uncommitted_changes());
+        assert_eq!(graph.borrow().get_node_attr(0, &"a".into()).unwrap(), None);
+        assert!(ctx.property_batch.is_none() && ctx.active_step.is_none());
+        assert_eq!(ctx.outputs.len(), 1);
+        assert!(ctx.outputs.contains_key("previous"));
+        // A fresh invocation intentionally targets the now-selected branch.
+        pipeline(vec![stage("a", false)])
+            .run_atomic_properties(&mut ctx, selected)
+            .unwrap();
+        assert_eq!(graph.borrow().current_state_id(), head + 1);
     }
 }

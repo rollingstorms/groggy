@@ -696,3 +696,19 @@ marshaller/build configuration and testing the declared Python-version matrix
 remains existing 19.2/34.2 work; forward-ABI3 and newer Python compatibility are
 not certified by these test totals. No checklist row or owner-policy question is
 added. All six implementation slices are committed; inventory is 208/60.
+
+## Atomic pipeline write coordinates — 2026-10-27
+
+The property overlay now captures the canonical owner/branch/head write coordinate
+for standalone atomic builders and outer atomic pipelines. Acceptance validates
+that complete coordinate even for an empty batch. A same-head branch switch or
+foreign owner rejects before property publication; existing stale/dirty checks
+remain. Failed outer runs discard staged properties and partial outputs, preserve
+prior outputs and allow context reuse on a fresh invocation. No entity IDs are
+allocated by rejection. The coordinate retains identity only.
+
+Focused algorithm suite: **232 passed / 1 ignored**, including two new coordinate
+regressions. Full native suite: **1,392 passed / 56 ignored**. This closes
+a concrete coordinator gap within existing AR3/09.4b.2; the fixed checklist remains
+**208 checked / 60 open**. Built-in pipeline algorithms write properties, not graph
+topology; uncertified custom effects still reject explicit atomic execution.

@@ -45,7 +45,9 @@ order; an outer run cannot recover steps reordered before compilation. Effect-aw
 IR migration remains AR7.8.
 
 The outer run requires a clean graph head for persistent updates, preserves the
-selected node/edge scope and rejects a change of graph owner. Validation at final
+selected node/edge scope. Its staged batch binds the write owner, selected branch
+and published head; even a switch to another branch at the same head rejects
+before acceptance. This expectation pins no history. Validation at final
 acceptance, runtime errors and cancellation—including after the last algorithm—
 discard staging. A failed run clears its pending batch, preserves pre-existing
 Context outputs and discards partial outputs; telemetry remains available. Success

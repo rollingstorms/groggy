@@ -1,9 +1,9 @@
 //! Property-only staging for explicitly atomic builder execution.
 use super::Context;
 use crate::{
+    api::graph::WriteCoordinate,
     api::graph::{kinds, Graph},
     AttrName, AttrValue, BatchEdgeRef, BatchNodeRef, EdgeId, GraphBatch, GraphResult, NodeId,
-    StateId,
 };
 use crate::{subgraphs::Subgraph, traits::SubgraphOperations};
 use anyhow::{anyhow, Result};
@@ -11,14 +11,14 @@ use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug)]
 pub(crate) struct PropertyBatch {
-    pub expected_state: StateId,
+    coordinate: WriteCoordinate,
     nodes: BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
     edges: BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
 }
 impl PropertyBatch {
-    pub fn new(expected_state: StateId) -> Self {
+    pub fn new(coordinate: WriteCoordinate) -> Self {
         Self {
-            expected_state,
+            coordinate,
             nodes: BTreeMap::new(),
             edges: BTreeMap::new(),
         }
@@ -54,7 +54,7 @@ impl PropertyBatch {
         Ok(())
     }
     pub fn accept(self, graph: &mut Graph) -> GraphResult<()> {
-        graph.validate_write_head(self.expected_state)?;
+        graph.validate_write_coordinate(&self.coordinate)?;
         if self.nodes.is_empty() && self.edges.is_empty() {
             return Ok(());
         }
@@ -87,7 +87,7 @@ impl PropertyBatch {
         };
         graph.apply_batch(
             batch,
-            self.expected_state,
+            self.coordinate.state_id(),
             "atomic builder properties".into(),
             "groggy".into(),
         )?;
@@ -216,7 +216,7 @@ mod tests {
         graph.insert_nodes(2).expect("nodes");
         graph.add_edge(0, 1).expect("edge");
         let before = graph.current_state_id();
-        let mut pending = PropertyBatch::new(before);
+        let mut pending = PropertyBatch::new(graph.write_coordinate());
         pending
             .stage(
                 true,
@@ -257,7 +257,7 @@ mod tests {
         let mut graph = Graph::new_publishing();
         graph.insert_nodes(1).expect("node");
         let before = graph.current_state_id();
-        let mut pending = PropertyBatch::new(before);
+        let mut pending = PropertyBatch::new(graph.write_coordinate());
         pending
             .stage(
                 true,
@@ -271,7 +271,7 @@ mod tests {
             pending.get(true, 0, &"labels".into()),
             Some(&AttrValue::TextVec(Vec::new()))
         );
-        let mut empty = PropertyBatch::new(before);
+        let mut empty = PropertyBatch::new(graph.write_coordinate());
         empty
             .stage(true, HashMap::from([("x".into(), Vec::new())]))
             .expect("empty");
@@ -282,7 +282,7 @@ mod tests {
     fn stale_or_dirty_heads_reject_without_accepting_staged_values() {
         let mut graph = Graph::new_publishing();
         graph.insert_nodes(1).expect("node");
-        let mut pending = PropertyBatch::new(graph.current_state_id());
+        let mut pending = PropertyBatch::new(graph.write_coordinate());
         pending
             .stage(
                 true,
@@ -295,7 +295,7 @@ mod tests {
         assert!(pending.accept(&mut graph).is_err());
         assert_eq!(graph.get_node_attr(0, &"x".into()).expect("x"), None);
         graph.set_automatic_publication(false).expect("manual");
-        let mut pending = PropertyBatch::new(graph.current_state_id());
+        let mut pending = PropertyBatch::new(graph.write_coordinate());
         pending
             .stage(
                 true,
@@ -307,5 +307,35 @@ mod tests {
             .expect("dirty write");
         assert!(pending.accept(&mut graph).is_err());
         assert_eq!(graph.get_node_attr(0, &"x".into()).expect("x"), None);
+    }
+
+    #[test]
+    fn branch_or_owner_changes_reject_even_when_the_head_and_ids_match() {
+        for foreign_owner in [false, true] {
+            let mut graph = Graph::new_publishing();
+            graph.insert_nodes(1).expect("node");
+            let head = graph.current_state_id();
+            let mut pending = PropertyBatch::new(graph.write_coordinate());
+            pending
+                .stage(
+                    true,
+                    HashMap::from([("x".into(), vec![(0, AttrValue::Int(1))])]),
+                )
+                .expect("stage");
+            if foreign_owner {
+                graph = Graph::new_publishing();
+                graph.insert_nodes(1).expect("same foreign head");
+            } else {
+                graph.create_branch("other".into()).expect("branch");
+                graph.checkout_branch("other".into()).expect("switch");
+            }
+            assert_eq!(graph.current_state_id(), head);
+            let error = pending.accept(&mut graph).expect_err("coordinate rejects");
+            assert!(error.to_string().contains("coordinate"));
+            assert_eq!(graph.current_state_id(), head);
+            assert!(!graph.has_uncommitted_changes());
+            assert_eq!(graph.get_node_attr(0, &"x".into()).expect("x"), None);
+            assert_eq!(graph.add_node().expect("no consumed IDs"), 1);
+        }
     }
 }

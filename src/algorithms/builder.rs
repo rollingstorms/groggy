@@ -160,7 +160,9 @@ impl Algorithm for StepPipelineAlgorithm {
             let graph = binding.borrow();
             let state = graph.current_state_id();
             graph.validate_write_head(state)?;
-            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(state));
+            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(
+                graph.write_coordinate(),
+            ));
         }
         let result: Result<()> = (|| {
             let execution_id = EXECUTION_COUNTER.fetch_add(1, Ordering::SeqCst);
