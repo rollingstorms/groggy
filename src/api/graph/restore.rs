@@ -51,9 +51,7 @@ impl StateRestorePlan {
         let snapshot = self.read.execute()?;
         let changes = self
             .before
-            .map(|before| {
-                super::snapshot_publication::exact_snapshot_changes(&before.execute()?, &snapshot)
-            })
+            .map(|before| crate::state::change::snapshot_changes(&before.execute()?, &snapshot))
             .transpose()?;
         Ok(StateRestoreOutcome {
             snapshot,

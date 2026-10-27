@@ -38,6 +38,7 @@ WHAT DOESN'T BELONG HERE:
 use crate::state::delta::DeltaObject;
 use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, EdgeId, NodeId, StateId};
+use crate::{GraphError, GraphResult};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
@@ -925,9 +926,10 @@ impl GraphSpace {
         self.base_state
     }
 
-    /// Create a delta object representing current changes (placeholder)
-    pub fn create_change_delta(&self, _pool: &GraphPool) -> DeltaObject {
-        DeltaObject::empty()
+    /// GraphSpace owns selected membership, not pending mutation history.
+    /// Use the graph coordinator or an explicit ChangeTracker to obtain changes.
+    pub fn create_change_delta(&self, _pool: &GraphPool) -> GraphResult<DeltaObject> {
+        Err(GraphError::InvalidInput("GraphSpace has no pending change authority; use the Graph coordinator or ChangeTracker".into()))
     }
 
     /*

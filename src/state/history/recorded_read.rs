@@ -46,7 +46,10 @@ impl CommitDiffPlan {
                 attr_changes: Vec::new(),
             });
         }
-        let diff = self.before.execute()?.diff_with(&self.after.execute()?);
+        let diff = self
+            .before
+            .execute()?
+            .try_diff_with(&self.after.execute()?)?;
         Ok(CommitDiff {
             from_commit: self.from,
             to_commit: self.to,

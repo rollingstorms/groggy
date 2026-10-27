@@ -207,7 +207,7 @@ fn merge_outcome(
     before: &GraphSnapshot,
     snapshot: GraphSnapshot,
 ) -> GraphResult<GraphMergeOutcome> {
-    let changes = super::snapshot_publication::exact_snapshot_changes(before, &snapshot)?;
+    let changes = crate::state::change::snapshot_changes(before, &snapshot)?;
     Ok(GraphMergeOutcome {
         coordinate,
         snapshot,

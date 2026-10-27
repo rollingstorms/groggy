@@ -29,12 +29,12 @@ KEY INSIGHTS:
 */
 
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 /// Index-based columnar delta for efficient temporal versioning
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnIndexDelta {
     /// Entity indices that changed (sorted)
     pub entity_indices: Vec<usize>,
@@ -191,9 +191,46 @@ impl Hash for ColumnDelta {
     }
 }
 
+/// Owned physical column-reference delta. It is not a portable logical history record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexDeltaObject {
+    /// Node property physical references, deterministically ordered by name.
+    pub node_attrs: BTreeMap<AttrName, ColumnIndexDelta>,
+    /// Edge property physical references, deterministically ordered by name.
+    pub edge_attrs: BTreeMap<AttrName, ColumnIndexDelta>,
+    /// Node additions retained by stable identity.
+    pub nodes_added: Vec<NodeId>,
+    /// Node removals retained by stable identity.
+    pub nodes_removed: Vec<NodeId>,
+    /// Edge additions retained with ordered endpoints.
+    pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
+    /// Edge removals retained by stable identity.
+    pub edges_removed: Vec<EdgeId>,
+}
+impl IndexDeltaObject {
+    fn change_count(&self) -> usize {
+        self.node_attrs
+            .values()
+            .map(ColumnIndexDelta::len)
+            .sum::<usize>()
+            + self
+                .edge_attrs
+                .values()
+                .map(ColumnIndexDelta::len)
+                .sum::<usize>()
+            + self.nodes_added.len()
+            + self.nodes_removed.len()
+            + self.edges_added.len()
+            + self.edges_removed.len()
+    }
+}
+
 /// Immutable delta object representing changes between states
 #[derive(Debug, Clone)]
 pub struct DeltaObject {
+    /// Explicit physical index payload, when constructed from pending index changes.
+    /// Never interpret its offsets as logical property values.
+    pub index_changes: Option<Arc<IndexDeltaObject>>,
     /// Node attribute changes stored columnarly
     pub node_attrs: Arc<HashMap<AttrName, ColumnDelta>>,
     /// Edge attribute changes stored columnarly  
@@ -217,6 +254,7 @@ impl DeltaObject {
         edge_active_changes: ColumnDelta,
     ) -> Self {
         let delta = Self {
+            index_changes: None,
             node_attrs: Arc::new(node_attrs),
             edge_attrs: Arc::new(edge_attrs),
             node_active_changes: Arc::new(node_active_changes),
@@ -275,28 +313,60 @@ impl DeltaObject {
         self
     }
 
-    /// Create a new index-based delta object (placeholder for future full implementation)
-    /// Currently adapts to existing value-based structure
+    /// Create a validated, complete physical index delta. Pool-independent fields
+    /// remain in `index_changes`; resolving values requires a matching pool.
     pub fn new_with_indices(
-        _node_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
-        _edge_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
-        _nodes_added: Vec<NodeId>,
-        _nodes_removed: Vec<NodeId>,
-        _edges_added: Vec<(EdgeId, NodeId, NodeId)>,
-        _edges_removed: Vec<EdgeId>,
-    ) -> Self {
-        // NOTE: This is a temporary adapter implementation
-        // In a full implementation, we'd have a separate IndexDeltaObject
-        // or modify DeltaObject to natively support index-based deltas
-
-        // For now, create an empty value-based delta
-        // The index information is preserved in the ChangeTracker
-        Self::new(
-            HashMap::new(), // Would need Pool access to resolve indices to values
-            HashMap::new(),
-            ColumnDelta::new(),
-            ColumnDelta::new(),
-        )
+        node_attrs: HashMap<AttrName, ColumnIndexDelta>,
+        edge_attrs: HashMap<AttrName, ColumnIndexDelta>,
+        mut nodes_added: Vec<NodeId>,
+        mut nodes_removed: Vec<NodeId>,
+        mut edges_added: Vec<(EdgeId, NodeId, NodeId)>,
+        mut edges_removed: Vec<EdgeId>,
+    ) -> crate::GraphResult<Self> {
+        for columns in [&node_attrs, &edge_attrs] {
+            for (name, column) in columns {
+                if column.entity_indices.len() != column.old_column_indices.len()
+                    || column.entity_indices.len() != column.new_column_indices.len()
+                    || column.entity_indices.windows(2).any(|w| w[0] >= w[1])
+                {
+                    return Err(crate::GraphError::InvalidInput(format!(
+                        "Malformed indexed delta column {name}"
+                    )));
+                }
+            }
+        }
+        nodes_added.sort_unstable();
+        nodes_removed.sort_unstable();
+        edges_added.sort_unstable();
+        edges_removed.sort_unstable();
+        let indices = IndexDeltaObject {
+            node_attrs: node_attrs.into_iter().collect(),
+            edge_attrs: edge_attrs.into_iter().collect(),
+            nodes_added,
+            nodes_removed,
+            edges_added,
+            edges_removed,
+        };
+        let mut result = Self::empty();
+        if indices.change_count() == 0 {
+            return Ok(result);
+        }
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        "groggy:index-delta:v1".hash(&mut hasher);
+        for columns in [&indices.node_attrs, &indices.edge_attrs] {
+            columns.len().hash(&mut hasher);
+            for (name, column) in columns {
+                name.hash(&mut hasher);
+                column.hash(&mut hasher);
+            }
+        }
+        indices.nodes_added.hash(&mut hasher);
+        indices.nodes_removed.hash(&mut hasher);
+        indices.edges_added.hash(&mut hasher);
+        indices.edges_removed.hash(&mut hasher);
+        result.content_hash[..8].copy_from_slice(&hasher.finish().to_le_bytes());
+        result.index_changes = Some(Arc::new(indices));
+        Ok(result)
     }
 
     /// Create an empty delta object
@@ -311,7 +381,10 @@ impl DeltaObject {
 
     /// Check if this delta is empty (no changes)
     pub fn is_empty(&self) -> bool {
-        self.node_attrs.is_empty()
+        self.index_changes
+            .as_ref()
+            .is_none_or(|changes| changes.change_count() == 0)
+            && self.node_attrs.is_empty()
             && self.edge_attrs.is_empty()
             && self.node_active_changes.is_empty()
             && self.edge_active_changes.is_empty()
@@ -322,7 +395,10 @@ impl DeltaObject {
     pub fn change_count(&self) -> usize {
         let node_attr_changes: usize = self.node_attrs.values().map(|d| d.len()).sum();
         let edge_attr_changes: usize = self.edge_attrs.values().map(|d| d.len()).sum();
-        node_attr_changes
+        self.index_changes
+            .as_ref()
+            .map_or(0, |changes| changes.change_count())
+            + node_attr_changes
             + edge_attr_changes
             + self.node_active_changes.len()
             + self.edge_active_changes.len()
@@ -338,7 +414,34 @@ impl Hash for DeltaObject {
 
 impl PartialEq for DeltaObject {
     fn eq(&self, other: &Self) -> bool {
+        fn column(a: &ColumnDelta, b: &ColumnDelta) -> bool {
+            a.indices == b.indices
+                && a.values.len() == b.values.len()
+                && a.values.iter().zip(&b.values).all(|(a, b)| {
+                    match super::change::same_value(a, b) {
+                        Ok(same) => same,
+                        // Raw legacy objects may contain unencodable values. Keep
+                        // Eq reflexive by comparing their exact derived representation;
+                        // checked history resolution still rejects these payloads.
+                        Err(_) => match (serde_json::to_value(a), serde_json::to_value(b)) {
+                            (Ok(a), Ok(b)) => a == b,
+                            _ => std::ptr::eq(a, b),
+                        },
+                    }
+                })
+        }
+        fn columns(a: &HashMap<AttrName, ColumnDelta>, b: &HashMap<AttrName, ColumnDelta>) -> bool {
+            a.len() == b.len()
+                && a.iter()
+                    .all(|(name, a)| b.get(name).is_some_and(|b| column(a, b)))
+        }
         self.content_hash == other.content_hash
+            && self.index_changes == other.index_changes
+            && self.edge_endpoint_changes == other.edge_endpoint_changes
+            && columns(&self.node_attrs, &other.node_attrs)
+            && columns(&self.edge_attrs, &other.edge_attrs)
+            && column(&self.node_active_changes, &other.node_active_changes)
+            && column(&self.edge_active_changes, &other.edge_active_changes)
     }
 }
 

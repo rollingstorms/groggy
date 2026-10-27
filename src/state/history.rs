@@ -1076,14 +1076,17 @@ impl Delta {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        // Extract changes from ChangeSet
-        let nodes_added = changes.nodes_added.clone();
-        let nodes_removed = changes.nodes_removed.clone();
-        let edges_added = changes.edges_added.clone();
-        let edges_removed = changes.edges_removed.clone();
-        let edge_endpoint_changes = changes.edge_endpoint_changes.clone();
-        let node_attr_changes = changes.node_attr_changes.clone();
-        let edge_attr_changes = changes.edge_attr_changes.clone();
+        // Move owned buffers; hashing below only borrows them. No property/vector
+        // payload is cloned during conversion to an immutable delta.
+        let ChangeSet {
+            nodes_added,
+            nodes_removed,
+            edges_added,
+            edges_removed,
+            edge_endpoint_changes,
+            node_attr_changes,
+            edge_attr_changes,
+        } = changes;
 
         // Compute content hash from all changes
         let mut hasher = DefaultHasher::new();
@@ -1568,7 +1571,7 @@ impl<'a> HistoricalView<'a> {
         let our_snapshot = self.get_snapshot()?;
         let their_snapshot = other.get_snapshot()?;
 
-        Ok(our_snapshot.diff_with(their_snapshot))
+        our_snapshot.try_diff_with(their_snapshot)
     }
 
     /// Get the path of changes from this state to another state
@@ -1703,9 +1706,7 @@ pub(crate) fn exact_delta(a: &Delta, b: &Delta) -> GraphResult<bool> {
             for (a, b) in [(ao, bo), (an, bn)] {
                 match (a, b) {
                     (None, None) => {}
-                    (Some(a), Some(b))
-                        if crate::storage::retained_group::encode(a)?
-                            == crate::storage::retained_group::encode(b)? => {}
+                    (Some(a), Some(b)) if super::change::same_value(a, b)? => {}
                     _ => return Ok(false),
                 }
             }

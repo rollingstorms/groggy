@@ -303,8 +303,7 @@ fn set_property(
 fn equal_value(a: Option<&AttrValue>, b: Option<&AttrValue>) -> GraphResult<bool> {
     match (a, b) {
         (None, None) => Ok(true),
-        (Some(a), Some(b)) => Ok(crate::storage::retained_group::encode(a)?
-            == crate::storage::retained_group::encode(b)?),
+        (Some(a), Some(b)) => super::change::same_value(a, b),
         _ => Ok(false),
     }
 }

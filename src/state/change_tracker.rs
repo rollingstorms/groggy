@@ -7,7 +7,7 @@
 //!
 //! DESIGN PHILOSOPHY:
 //! - Strategy Pattern: Pluggable algorithms for different storage approaches
-//! - Backward Compatibility: Existing APIs continue to work unchanged
+//! - Compatibility: Legacy import paths remain; logical extraction is fallible.
 //! - Performance Transparency: Each strategy optimizes for different workloads
 //! - Configuration Driven: Strategy selection based on requirements
 
@@ -243,14 +243,14 @@ impl ChangeTracker {
     /// Get all nodes that have been modified (added, removed, or attrs changed)
     pub fn get_modified_nodes(&self) -> HashSet<NodeId> {
         let mut modified = HashSet::new();
-        let changeset = self.strategy.create_change_set();
+        let changeset = self.strategy.indexed_changes();
 
         // Add all nodes that were added or removed
         modified.extend(changeset.nodes_added.iter());
         modified.extend(changeset.nodes_removed.iter());
 
         // Add all nodes that had attribute changes
-        for (node_id, _, _, _) in &changeset.node_attr_changes {
+        for (node_id, _, _, _) in changeset.node_attr_changes {
             modified.insert(*node_id);
         }
 
@@ -260,16 +260,17 @@ impl ChangeTracker {
     /// Get all edges that have been modified
     pub fn get_modified_edges(&self) -> HashSet<EdgeId> {
         let mut modified = HashSet::new();
-        let changeset = self.strategy.create_change_set();
+        let changeset = self.strategy.indexed_changes();
 
         // Add all edges that were added or removed
-        for (edge_id, _, _) in &changeset.edges_added {
+        for (edge_id, _, _) in changeset.edges_added {
             modified.insert(*edge_id);
         }
         modified.extend(changeset.edges_removed.iter());
+        modified.extend(changeset.edge_endpoint_changes.keys());
 
         // Add all edges that had attribute changes
-        for (edge_id, _, _, _) in &changeset.edge_attr_changes {
+        for (edge_id, _, _, _) in changeset.edge_attr_changes {
             modified.insert(*edge_id);
         }
 
@@ -278,7 +279,7 @@ impl ChangeTracker {
 
     /// Check if a specific node has been modified
     pub fn is_node_modified(&self, node_id: NodeId) -> bool {
-        let changeset = self.strategy.create_change_set();
+        let changeset = self.strategy.indexed_changes();
 
         // Check if node was added or removed
         if changeset.nodes_added.contains(&node_id) || changeset.nodes_removed.contains(&node_id) {
@@ -294,7 +295,7 @@ impl ChangeTracker {
 
     /// Check if a specific edge has been modified
     pub fn is_edge_modified(&self, edge_id: EdgeId) -> bool {
-        let changeset = self.strategy.create_change_set();
+        let changeset = self.strategy.indexed_changes();
 
         // Check if edge was added or removed
         if changeset
@@ -302,6 +303,7 @@ impl ChangeTracker {
             .iter()
             .any(|(id, _, _)| *id == edge_id)
             || changeset.edges_removed.contains(&edge_id)
+            || changeset.edge_endpoint_changes.contains_key(&edge_id)
         {
             return true;
         }
@@ -322,19 +324,23 @@ impl ChangeTracker {
     === DELTA CREATION API ===
     */
 
-    /// Create a delta object representing all current changes
-    /// This is used when committing to history
-    pub fn create_delta(&self) -> DeltaObject {
+    /// Borrow actual pending physical references without cloning or synthesizing values.
+    pub fn indexed_changes(&self) -> crate::state::change::IndexChangeView<'_> {
+        self.strategy.indexed_changes()
+    }
+
+    /// Create an explicitly indexed pending delta; portable history requires pool resolution.
+    pub fn create_delta(&self) -> GraphResult<DeltaObject> {
         self.strategy.create_delta()
     }
 
-    /// Create a change set that can be passed to HistoryForest
-    pub fn create_change_set(&self) -> ChangeSet {
+    /// Extract topology-only logical changes; property references require explicit pool resolution.
+    pub fn create_change_set(&self) -> GraphResult<ChangeSet> {
         self.strategy.create_change_set()
     }
 
     /// Alias for create_change_set (backward compatibility)
-    pub fn create_changeset(&self) -> ChangeSet {
+    pub fn create_changeset(&self) -> GraphResult<ChangeSet> {
         self.create_change_set()
     }
 
@@ -373,7 +379,7 @@ impl ChangeTracker {
 
     /// Get a summary of what has changed (compatibility method)
     pub fn change_summary(&self) -> ChangeSummary {
-        let changeset = self.strategy.create_change_set();
+        let changeset = self.strategy.indexed_changes();
 
         ChangeSummary {
             nodes_added: changeset.nodes_added.len(),
@@ -435,141 +441,7 @@ impl ChangeTracker {
 
     /// Estimate the memory usage of the change tracker
     pub fn memory_usage(&self) -> usize {
-        let changeset = self.strategy.create_change_set();
-        let mut total = 0;
-
-        // Size of vectors holding IDs
-        total += changeset.nodes_added.len() * std::mem::size_of::<NodeId>();
-        total += changeset.nodes_removed.len() * std::mem::size_of::<NodeId>();
-        total += changeset.edges_added.len() * std::mem::size_of::<(EdgeId, NodeId, NodeId)>();
-        total += changeset.edges_removed.len() * std::mem::size_of::<EdgeId>();
-        total += changeset.edge_endpoint_changes.len()
-            * std::mem::size_of::<crate::EdgeEndpointChange>();
-
-        // Size of attribute changes
-        for (_, _attr_name, old_val, new_val) in &changeset.node_attr_changes {
-            total += std::mem::size_of::<NodeId>();
-            total += std::mem::size_of::<AttrName>();
-            if let Some(val) = old_val {
-                total += match val {
-                    AttrValue::Text(s) => s.len(),
-                    AttrValue::Int(_) => std::mem::size_of::<i64>(),
-                    AttrValue::Float(_) => std::mem::size_of::<f64>(),
-                    AttrValue::Float64(_) => std::mem::size_of::<f64>(),
-                    AttrValue::UtcInstant(_) => std::mem::size_of::<crate::types::UtcInstant>(),
-                    AttrValue::Date(_) => std::mem::size_of::<crate::types::CalendarDate>(),
-                    AttrValue::Duration(_) => std::mem::size_of::<crate::types::FixedDuration>(),
-                    AttrValue::Float64Vec(v) => v.len() * std::mem::size_of::<f64>(),
-                    AttrValue::Bool(_) => std::mem::size_of::<bool>(),
-                    AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
-                    AttrValue::CompactText(cs) => cs.memory_size(),
-                    AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
-                    AttrValue::Bytes(b) => b.len(),
-                    AttrValue::CompressedText(cd) => cd.memory_size(),
-                    AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
-                    AttrValue::Null => 0,
-                    AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
-                    AttrValue::NodeArray(nodes) => {
-                        nodes.len() * std::mem::size_of::<crate::types::NodeId>()
-                    }
-                    AttrValue::EdgeArray(edges) => {
-                        edges.len() * std::mem::size_of::<crate::types::EdgeId>()
-                    }
-                    AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
-                    AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
-                    AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
-                    AttrValue::Json(s) => s.len(),
-                };
-            }
-            total += new_val.as_ref().map_or(0, |new_val| match new_val {
-                AttrValue::Text(s) => s.len(),
-                AttrValue::Int(_) => std::mem::size_of::<i64>(),
-                AttrValue::Float(_) => std::mem::size_of::<f64>(),
-                AttrValue::Float64(_) => std::mem::size_of::<f64>(),
-                AttrValue::UtcInstant(_) => std::mem::size_of::<crate::types::UtcInstant>(),
-                AttrValue::Date(_) => std::mem::size_of::<crate::types::CalendarDate>(),
-                AttrValue::Duration(_) => std::mem::size_of::<crate::types::FixedDuration>(),
-                AttrValue::Float64Vec(v) => v.len() * std::mem::size_of::<f64>(),
-                AttrValue::Bool(_) => std::mem::size_of::<bool>(),
-                AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
-                AttrValue::CompactText(cs) => cs.memory_size(),
-                AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
-                AttrValue::Bytes(b) => b.len(),
-                AttrValue::CompressedText(cd) => cd.memory_size(),
-                AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
-                AttrValue::Null => 0,
-                AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
-                AttrValue::NodeArray(v) => v.len() * std::mem::size_of::<crate::types::NodeId>(),
-                AttrValue::EdgeArray(v) => v.len() * std::mem::size_of::<crate::types::EdgeId>(),
-                AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
-                AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
-                AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
-                AttrValue::Json(s) => s.len(),
-            });
-        }
-
-        for (_, _attr_name, old_val, new_val) in &changeset.edge_attr_changes {
-            total += std::mem::size_of::<EdgeId>();
-            total += std::mem::size_of::<AttrName>();
-            if let Some(val) = old_val {
-                total += match val {
-                    AttrValue::Text(s) => s.len(),
-                    AttrValue::Int(_) => std::mem::size_of::<i64>(),
-                    AttrValue::Float(_) => std::mem::size_of::<f64>(),
-                    AttrValue::Float64(_) => std::mem::size_of::<f64>(),
-                    AttrValue::UtcInstant(_) => std::mem::size_of::<crate::types::UtcInstant>(),
-                    AttrValue::Date(_) => std::mem::size_of::<crate::types::CalendarDate>(),
-                    AttrValue::Duration(_) => std::mem::size_of::<crate::types::FixedDuration>(),
-                    AttrValue::Float64Vec(v) => v.len() * std::mem::size_of::<f64>(),
-                    AttrValue::Bool(_) => std::mem::size_of::<bool>(),
-                    AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
-                    AttrValue::CompactText(cs) => cs.memory_size(),
-                    AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
-                    AttrValue::Bytes(b) => b.len(),
-                    AttrValue::CompressedText(cd) => cd.memory_size(),
-                    AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
-                    AttrValue::Null => 0,
-                    AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
-                    AttrValue::NodeArray(nodes) => {
-                        nodes.len() * std::mem::size_of::<crate::types::NodeId>()
-                    }
-                    AttrValue::EdgeArray(edges) => {
-                        edges.len() * std::mem::size_of::<crate::types::EdgeId>()
-                    }
-                    AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
-                    AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
-                    AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
-                    AttrValue::Json(s) => s.len(),
-                };
-            }
-            total += new_val.as_ref().map_or(0, |new_val| match new_val {
-                AttrValue::Text(s) => s.len(),
-                AttrValue::Int(_) => std::mem::size_of::<i64>(),
-                AttrValue::Float(_) => std::mem::size_of::<f64>(),
-                AttrValue::Float64(_) => std::mem::size_of::<f64>(),
-                AttrValue::UtcInstant(_) => std::mem::size_of::<crate::types::UtcInstant>(),
-                AttrValue::Date(_) => std::mem::size_of::<crate::types::CalendarDate>(),
-                AttrValue::Duration(_) => std::mem::size_of::<crate::types::FixedDuration>(),
-                AttrValue::Float64Vec(v) => v.len() * std::mem::size_of::<f64>(),
-                AttrValue::Bool(_) => std::mem::size_of::<bool>(),
-                AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
-                AttrValue::CompactText(cs) => cs.memory_size(),
-                AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
-                AttrValue::Bytes(b) => b.len(),
-                AttrValue::CompressedText(cd) => cd.memory_size(),
-                AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
-                AttrValue::Null => 0,
-                AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
-                AttrValue::NodeArray(v) => v.len() * std::mem::size_of::<crate::types::NodeId>(),
-                AttrValue::EdgeArray(v) => v.len() * std::mem::size_of::<crate::types::EdgeId>(),
-                AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
-                AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
-                AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
-                AttrValue::Json(s) => s.len(),
-            });
-        }
-
-        total
+        self.strategy.indexed_changes().estimated_bytes()
     }
 
     /*
@@ -601,44 +473,8 @@ impl ChangeTracker {
 === SUPPORTING DATA STRUCTURES ===
 */
 
-/// A set of changes that can be committed to history
-#[derive(Debug, Clone)]
-pub struct ChangeSet {
-    pub nodes_added: Vec<NodeId>,
-    pub nodes_removed: Vec<NodeId>,
-    pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
-    pub edges_removed: Vec<EdgeId>,
-    /// Stable edge identities whose endpoints changed.
-    pub edge_endpoint_changes: Vec<crate::EdgeEndpointChange>,
-    pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
-    pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, Option<AttrValue>)>,
-}
-
-impl ChangeSet {
-    /// Create an empty change set
-    pub fn new() -> Self {
-        Self {
-            nodes_added: Vec::new(),
-            nodes_removed: Vec::new(),
-            edges_added: Vec::new(),
-            edges_removed: Vec::new(),
-            edge_endpoint_changes: Vec::new(),
-            node_attr_changes: Vec::new(),
-            edge_attr_changes: Vec::new(),
-        }
-    }
-
-    /// Check if the change set is empty
-    pub fn is_empty(&self) -> bool {
-        self.nodes_added.is_empty()
-            && self.nodes_removed.is_empty()
-            && self.edges_added.is_empty()
-            && self.edges_removed.is_empty()
-            && self.edge_endpoint_changes.is_empty()
-            && self.node_attr_changes.is_empty()
-            && self.edge_attr_changes.is_empty()
-    }
-}
+/// Compatibility export of the canonical logical mutation payload.
+pub use super::change::ChangeSet;
 
 /// Summary of all changes in the tracker
 #[derive(Debug, Clone)]
@@ -800,13 +636,13 @@ STRATEGY SELECTION:
 
 INTEGRATION POINTS:
 - Space: Calls index-specific methods for IndexDeltaStrategy
-- History: Uses create_delta() output regardless of strategy
+- History: Resolves create_changeset_resolved(pool) into typed logical deltas.
 - Graph: Same API regardless of underlying strategy
 - Config: Strategy selection happens at ChangeTracker creation
 
 BACKWARD COMPATIBILITY:
-- All existing APIs work unchanged
+- No-pool extraction returns GraphResult and rejects unresolved properties.
 - Performance characteristics preserved for default strategy
 - New strategy-specific methods available for optimization
-- Migration path: zero code changes required
+- Use indexed_changes() for borrowed diagnostics and pool resolution for logical values.
 */

@@ -1,0 +1,61 @@
+{
+  "benchmark": "canonical_state_changes",
+  "cases": [
+    {
+      "changed_properties": 0,
+      "f64_vector_width": 0,
+      "nodes": 100000,
+      "samples": [
+        {
+          "canonical_exact_diff_seconds": 0.007062375,
+          "previous_diff_seconds": 0.007467583
+        },
+        {
+          "canonical_exact_diff_seconds": 0.006804459,
+          "previous_diff_seconds": 0.007299417
+        },
+        {
+          "canonical_exact_diff_seconds": 0.005309125,
+          "previous_diff_seconds": 0.007052042
+        },
+        {
+          "canonical_exact_diff_seconds": 0.00529125,
+          "previous_diff_seconds": 0.005908084
+        },
+        {
+          "canonical_exact_diff_seconds": 0.005221542,
+          "previous_diff_seconds": 0.005942917
+        }
+      ]
+    },
+    {
+      "changed_properties": 1,
+      "f64_vector_width": 256,
+      "nodes": 10000,
+      "samples": [
+        {
+          "canonical_exact_diff_seconds": 0.007805208,
+          "previous_diff_seconds": 0.01137175
+        },
+        {
+          "canonical_exact_diff_seconds": 0.008201541,
+          "previous_diff_seconds": 0.013242917
+        },
+        {
+          "canonical_exact_diff_seconds": 0.008010334,
+          "previous_diff_seconds": 0.012089375
+        },
+        {
+          "canonical_exact_diff_seconds": 0.010214208,
+          "previous_diff_seconds": 0.012376
+        },
+        {
+          "canonical_exact_diff_seconds": 0.008211541,
+          "previous_diff_seconds": 0.012140625
+        }
+      ]
+    }
+  ],
+  "control_commit": "d2abe891",
+  "scope": "five alternating-order matched native release samples; setup excluded; finite values where both algorithms agree; previous logical equality is not an exact-history correctness reference; no RSS/FFI/production claim"
+}

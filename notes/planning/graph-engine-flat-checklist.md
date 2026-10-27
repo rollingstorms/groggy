@@ -21,7 +21,7 @@ separate operations. Ordinary connected views still need migration to the
 accepted pinned-state model.
 
 Current overview: [roadmap status — 2026-10-24](roadmap-status-2026-10-24.md).
-The checklist has **207 checked / 61 unchecked entries**, including overlapping
+The checklist has **208 checked / 60 unchecked entries**, including overlapping
 parents and repair slices; this is not a completion percentage. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
@@ -54,9 +54,9 @@ subtasks passed. Detailed dependencies and workbook gates are in
 | 6 | Finish presentation/API consolidation, differential/failure/scale evidence, operational tooling and core release documentation. | AR5, AR7.6, AR7.11; 01.2, 09.5, 19.2, 31.3–31.4, 32.1–32.3, 33.2–33.3, 34.1–34.2 | Tests/docs run throughout. Service/scale commitments require A15; complete embedded and multi-user milestones separately. |
 | 7 | Resume provenance/Graphiti ingest, retrieval and driver; prove integration end to end. | 17.1–17.2, 20.1–20.2, 22.1, 23.1–23.2, 24.1, 25.1–25.2, 32.4 | Still deferred behind the core. Provenance foundations can be prepared earlier; A17 defines integration compatibility. |
 
-**Immediate next core work:** complete canonical state/change comparison and
-conversion ownership (AR7.9), then remaining compound topology publication
-(09.4b.2) and view/index/query boundaries. Explicit restore modes (13.3),
+**Immediate next core work:** finish remaining compound topology publication
+(09.4b.2), coordinator compatibility guards (AR3) and view/index/query boundaries.
+Canonical state/change ownership (AR7.9), explicit restore modes (13.3),
 three-way merge acceptance (14.2), endpoint revisions (04.2), effective reads,
 full property history, exact owned snapshots and retained storage have completed
 evidence in their existing rows. Storage scale/migration/platform, execution/API
@@ -327,7 +327,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **AR7.6 — One display foundation.** Consolidate display/viz-display configuration, data formatting and truncation; use thin Python/interactive adapters. Preserve intentional presentation differences and examples. Move presentation responsibilities out of misleading core compatibility exports after callers migrate.
 - [ ] **AR7.7 — Shared expression/query semantics.** Inventory array filters, graph query parsing and builder expressions; share supported scalar predicate/value semantics and explicit lowering. Preserve distinct graph traversal planning and documented language features; test current APIs before retiring parallel parsing paths.
 - [ ] **AR7.8 — Coherent algorithm execution boundary.** Map algorithm pipelines, steps, Python IR and batch plans to one validation/lowering/execution contract, retaining distinct composition levels. Remove overlapping execution paths only after feature parity/cancellation/state ownership evidence; resolve A14 before changing naming/history policy.
-- [ ] **AR7.9 — Canonical state/change records.** Consolidate duplicate AttributeChange/EntityType definitions and overlapping change conversions. Preserve selected state, retained history lineage and effective-time indexing as distinct responsibilities; verify typed deltas/reconstruction/storage compatibility before migrating serialization.
+- [x] **AR7.9 — Canonical state/change records.** AttributeChange, EntityType and ChangeSet have one native owner with legacy aliases. Snapshot/history/merge/restore comparisons, archive checks and exact delta collision checks share typed payload semantics. Pending physical references use a borrowed IndexChangeView and complete indexed DeltaObject instead of fabricated values or empty projections; logical extraction requires explicit pool resolution. Delta conversion moves owned buffers. Existing history/archive/journal encodings remain unchanged. Native API fallibility/strategy migrations and bounded matched release results are documented in `canonical-change-records-exit-2026-10-27.md`. Selected space, retained lineage, effective clocks and physical indices remain distinct responsibilities.
 - [x] **AR7.9a — One logical attribute-change record owner.** Snapshot/history diffs share state::change::AttributeChange and its node/edge target type. Preserve legacy Rust imports/fields and Python diff output; remove redundant record conversion. Diagnostic/sampling scopes intentionally remain distinct. Evidence: `change-record-owner-2026-10-23.md`; publication/change tracking/delta/serialization migration remains open.
 - [x] **AR7.10 — Explicit table foundation and graph adapters.** Shared column/table ownership, schema checks, pinned projection/writeback, joins/rows/collections, specialized merges, typed bundles, composite routing, induced subsets and explicit graph converters complete the fixed 27.1 inventory. Node/edge bundles and collections retain distinct roles; no blanket merger of all table types. Exit: `graph-table-grouped-views-2026-10-25.md`. Legacy live views and pooled portability retain their existing scopes.
 - [ ] **AR7.11 — Consolidation compatibility and retirement gate.** For each move, migrate internal/FFI/Python callers, keep documented compatibility imports, verify examples and relevant persistence schemas, and compare numerical/graph behavior and benchmark receipts. Retire old implementation paths only when no supported behavior depends on them. Record any public-name removal separately rather than silently breaking users.

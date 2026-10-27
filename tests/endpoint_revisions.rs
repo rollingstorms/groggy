@@ -270,12 +270,12 @@ fn endpoint_tracker_coalesces_before_after_and_all_delta_forms_expose_changes() 
             new_endpoints: (2, 0),
         })
         .unwrap();
-    let changes = tracker.create_changeset();
+    let changes = tracker.create_changeset().unwrap();
     assert_eq!(changes.edge_endpoint_changes.len(), 1);
     assert_eq!(changes.edge_endpoint_changes[0].old_endpoints, (0, 1));
     assert_eq!(changes.edge_endpoint_changes[0].new_endpoints, (2, 0));
-    assert!(!tracker.create_delta().is_empty());
-    assert_eq!(tracker.create_delta().change_count(), 1);
+    assert!(!tracker.create_delta().unwrap().is_empty());
+    assert_eq!(tracker.create_delta().unwrap().change_count(), 1);
     assert_eq!(tracker.change_summary().edge_endpoint_changes, 1);
     let empty = groggy::state::Delta::from_changes(groggy::state::change_tracker::ChangeSet::new());
     assert_ne!(

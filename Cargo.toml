@@ -298,3 +298,7 @@ harness = false
 [[bench]]
 name = "merge_publication"
 harness = false
+
+[[bench]]
+name = "canonical_state_changes"
+harness = false

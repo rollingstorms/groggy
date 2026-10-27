@@ -328,3 +328,31 @@ The remaining Rust default/infallible compatibility surface and higher-level
 compound meta/collapse, algorithm and table writeback boundaries remain 09.4b.2.
 The broad 09.4 parent and pool portability/effective-time reconstruction are not
 closed by this core default migration. Existing owner authorization remains.
+
+## Canonical change-record closure — 2026-10-27
+
+Existing AR7.9 is complete within its typed-record/representation/compatibility
+scope. One native ChangeSet owner and snapshot difference builder serve recorded
+diffs, merge and tracked restore. Exact value comparison also serves archive
+validation and delta interning. Signed zero, NaN payloads, dtype and inactive-row
+regressions are covered; owned payload buffers move into immutable deltas.
+
+Physical offsets have an explicit borrowed IndexChangeView and complete indexed
+DeltaObject projection. Fabricated index_N values and the silently empty adapter
+are removed. Pool-independent logical extraction now rejects property offsets;
+explicit retained-pool resolution preserves actual values and absence. Raw-space
+delta extraction rejects because GraphSpace owns no pending changes. Native
+fallibility/strategy compatibility changes are documented; persisted formats and
+Python shapes are unchanged.
+
+Verification: 1,383 native / 56 ignored; 2,042 root Python / 1 skipped; strict
+all-target Clippy and rebuilt FFI. All **183 executable documentation examples** pass, including the new
+change-record guide. Matched alternating-order local release medians:
+100k property-free snapshot differences 7.05 → 5.31 ms; 10k nodes with 256-wide
+f64 vectors and one change 12.14 → 8.20 ms. These are two fixture comparisons,
+not whole-engine/RSS/production guarantees. Receipt:
+`../benchmarks/canonical-state-changes-2026-10-27.json`.
+
+Fixed inventory now **208 checked / 60 open**; no new rows. Remaining native
+compound topology acceptance and coordinator compatibility guards stay in
+09.4b.2/AR3; broader view/index/query/release work remains unchanged.

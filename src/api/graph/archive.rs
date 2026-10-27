@@ -1,7 +1,9 @@
 //! Full retained graph archives. Active JSON export deliberately has a smaller contract.
 use super::*;
 use crate::state::history::HistoryDocument;
-use crate::storage::{pool::PoolDocument, retained_group};
+use crate::storage::pool::PoolDocument;
+#[cfg(test)]
+use crate::storage::retained_group;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
@@ -122,12 +124,8 @@ fn same_selected_snapshot(
     }
     Ok(true)
 }
-pub(super) fn same_value(value: &AttrValue, other: &AttrValue) -> GraphResult<bool> {
-    match (value, other) {
-        (AttrValue::Text(a), AttrValue::Text(b)) => Ok(a == b),
-        _ => Ok(retained_group::encode(value)? == retained_group::encode(other)?),
-    }
-}
+pub(super) use crate::state::change::same_value;
+
 /// Detached validated archive bytes, suitable for I/O outside a language runtime lock.
 /// Encoding/decoding graph ownership remains separate from file operations.
 #[derive(Debug)]
