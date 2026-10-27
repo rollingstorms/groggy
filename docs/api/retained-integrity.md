@@ -103,3 +103,37 @@ Integrity reports include `purged_nodes` and `purged_edges`. Allocation counts
 remain lifetime extents, while purged interval counts identify reservations
 explicitly discarded. Archive validation rejects purged entity references and
 invalid sparse endpoint records. See [retained-storage purge](retained-purge.md).
+
+## Current topology cache
+
+The in-memory check also captures an eligible current GraphSpace topology cache
+before archive reconstruction. It verifies edge/source/target alignment, active
+edge IDs and endpoints, sorted active node membership including isolates, neighbor
+map rows, and complete CSR offsets/neighbor/edge columns with exact incidence
+multiplicity. Malformed ranges fail before slicing; a poisoned lock or inconsistent
+cache version raises a contextual error.
+
+```python
+warm = Graph()
+warm.add_nodes(3)
+warm.add_edge(0, 1)
+warm.neighbors(0)  # populate the current topology cache
+head = warm.current_state_id
+receipt = warm.check_integrity()
+assert receipt["active_nodes"] == 3
+assert receipt["active_edges"] == 1
+assert warm.current_state_id == head
+```
+
+Cold or stale caches remain untouched. The checker does not build, repair or
+invalidate indexes. Capture shares immutable cached arrays and copies authoritative
+active IDs/endpoints; sorting and comparison run in the detached verification
+phase without the Python GIL. A captured plan verifies its captured state even if
+the owner subsequently changes. Receipt fields and persisted formats are unchanged.
+
+The current cache factory and verifier share their existing incidence convention;
+this does not certify the broader AR2 adjacency policy across algorithms/views.
+Secondary query indexes, Subgraph component caches, frozen lazy caches and service
+metrics remain separate scopes. Durable verify_storage checks physical bytes and
+reconstructed retained state; derived caches are not serialized. Use check_integrity
+to inspect the current owner's in-memory cache as well.

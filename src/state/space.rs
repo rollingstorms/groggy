@@ -1,47 +1,40 @@
-//! Graph Space - Active State Tracker
+//! Selected graph state: active membership, column mappings and derived topology.
 //!
-//! ARCHITECTURE ROLE:
-//! GraphSpace is a **minimal active state tracker**. It simply knows which
-//! nodes and edges are currently "active" and tracks changes. The actual
-//! graph operations happen in the Graph coordinator.
+//! GraphSpace owns the selected node/edge sets, their property-column indices and
+//! topology cache generation. These storage primitives do not publish history.
+//! The Graph coordinator validates operations and owns pending ChangeTracker
+//! records; HistoryForest owns accepted logical deltas. GraphPool retains raw
+//! allocation/content, including inactive identities and retained values.
 //!
-//! DESIGN PHILOSOPHY:
-//! - GraphSpace = Active Set + Change Tracking (minimal responsibility)
-//! - Graph = Operations & Coordination (delegates to pool for data)
-//! - GraphPool = Pure Data Storage (the "database tables")
-//! - Keep GraphSpace minimal and focused
+//! Keep history, mutation coordination and algorithms outside this selected-state
+//! container. Compatibility change queries here describe no local pending queue;
+//! callers needing uncommitted changes must query the owning Graph.
 
-/*
-=== GRAPH SPACE RESPONSIBILITIES ===
-
-GraphSpace is JUST the active state tracker and change recorder.
-It's not a full interface - that's Graph's job.
-
-KEY RESPONSIBILITIES:
-1. ACTIVE SET MANAGEMENT: Track which nodes/edges are currently active
-2. CHANGE TRACKING: Record every modification for history commits
-3. WORKSPACE STATE: Basic queries about current active state
-
-WHAT BELONGS HERE:
-- active_nodes, active_edges HashSets
-- NOTE: change tracking moved to Graph for cleaner separation
-- Simple queries: node_count(), contains_node(), etc.
-- Workspace management: reset(), state queries, etc.
-
-WHAT DOESN'T BELONG HERE:
-- Graph operations like add_node(), set_attr() (that's Graph's job)
-- Complex topology queries (Graph delegates to Pool)
-- History operations (that's HistoryForest's job)
-- Analytics (that's QueryEngine's job)
-*/
-
+mod integrity;
 use crate::state::delta::DeltaObject;
 use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, EdgeId, NodeId, StateId};
 use crate::{GraphError, GraphResult};
+pub(crate) use integrity::CachedTopologyCheck;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
+
+/// Current-space incidence convention. Kept in one owner for cache assembly and
+/// verification; algorithm-specific/frozen adjacency policy remains separate.
+fn incidence_neighbors(
+    edges: impl IntoIterator<Item = (EdgeId, NodeId, NodeId)>,
+    graph_type: crate::types::GraphType,
+) -> HashMap<NodeId, Vec<(NodeId, EdgeId)>> {
+    let mut neighbors = HashMap::<NodeId, Vec<(NodeId, EdgeId)>>::new();
+    for (edge, u, v) in edges {
+        neighbors.entry(u).or_default().push((v, edge));
+        if graph_type == crate::types::GraphType::Undirected {
+            neighbors.entry(v).or_default().push((u, edge));
+        }
+    }
+    neighbors
+}
 
 /// Snapshot of topology data that can be used without holding locks
 #[derive(Debug, Clone)]
@@ -92,11 +85,11 @@ impl CacheState {
 /// Minimal active state tracker for the current graph
 ///
 /// DESIGN: GraphSpace is just the "active set" tracker. It knows which
-/// nodes and edges are currently active, and tracks changes for commits.
-/// The Graph coordinator handles actual operations.
+/// nodes and edges are currently active and maps their selected column indices.
+/// The Graph coordinator owns pending changes, publication and retained history.
 ///
 /// KEY INSIGHT:
-/// - GraphSpace = Active Sets + Change Tracking (minimal)
+/// - GraphSpace = Selected active sets + column mappings + derived topology cache
 /// - Graph = Operations & Coordination
 /// - GraphPool = Pure Data Storage
 ///
@@ -671,21 +664,14 @@ impl GraphSpace {
         // Build adjacency map from columnar topology (O(E))
         // DIRECTED: Only add source → target edges
         // UNDIRECTED: Add both source ↔ target edges for traversal
-        let mut neighbors = HashMap::<NodeId, Vec<(NodeId, EdgeId)>>::new();
-        let graph_type = pool.graph_type();
-
-        for (i, &edge_id) in edge_ids.iter().enumerate() {
-            let u = sources[i];
-            let v = targets[i];
-
-            // Always add the primary direction (source → target)
-            neighbors.entry(u).or_default().push((v, edge_id));
-
-            // For undirected graphs, also add the reverse direction (target → source)
-            if graph_type == crate::types::GraphType::Undirected {
-                neighbors.entry(v).or_default().push((u, edge_id));
-            }
-        }
+        let neighbors = incidence_neighbors(
+            edge_ids
+                .iter()
+                .zip(&sources)
+                .zip(&targets)
+                .map(|((&edge, &u), &v)| (edge, u, v)),
+            pool.graph_type(),
+        );
 
         // Build CSR adjacency representation for fast traversal access
         let mut node_ids: Vec<NodeId> = self.active_nodes.iter().copied().collect();
@@ -903,21 +889,22 @@ impl GraphSpace {
     === CHANGE TRACKING ===
     Workspace state and change management
     */
-    /// Check if there are uncommitted changes
+    /// Compatibility query for this selected space, which owns no pending queue.
+    /// Ask the owning Graph for actual uncommitted changes.
     pub fn has_uncommitted_changes(&self) -> bool {
         // NOTE: Graph manages change tracking now - Space doesn't track changes
         false
     }
 
-    /// Get the number of uncommitted changes
+    /// This selected space has no pending change records; the owning Graph does.
     pub fn uncommitted_change_count(&self) -> usize {
         // NOTE: Graph manages change tracking now - Space doesn't count changes
         0
     }
 
-    /// Get summary of uncommitted changes
+    /// Describe this space's lack of a pending queue, not the owning Graph's writes.
     pub fn change_summary(&self) -> String {
-        // TODO: Graph provides change summary now - placeholder for now
+        // Pending change summaries belong to the Graph coordinator.
         "No changes tracked in Space".to_string()
     }
 

@@ -1,0 +1,158 @@
+{
+  "benchmark": "current_topology_integrity",
+  "cases": [
+    {
+      "edges": 1001,
+      "nodes": 1000,
+      "samples": [
+        {
+          "cold": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.002589083,
+            "detached_verify_seconds": 0.004657375
+          },
+          "warm": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.002078833,
+            "detached_verify_seconds": 0.004267375
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.001733667,
+            "detached_verify_seconds": 0.003650792
+          },
+          "warm": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.00151625,
+            "detached_verify_seconds": 0.00348975
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.001606875,
+            "detached_verify_seconds": 0.003171167
+          },
+          "warm": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.001589625,
+            "detached_verify_seconds": 0.003764458
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.001450792,
+            "detached_verify_seconds": 0.002879917
+          },
+          "warm": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.001531666,
+            "detached_verify_seconds": 0.003281625
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.001370583,
+            "detached_verify_seconds": 0.002715875
+          },
+          "warm": {
+            "active_edges": 1001,
+            "active_nodes": 1000,
+            "capture_seconds": 0.001307417,
+            "detached_verify_seconds": 0.002918542
+          }
+        }
+      ]
+    },
+    {
+      "edges": 100001,
+      "nodes": 100000,
+      "samples": [
+        {
+          "cold": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.178881333,
+            "detached_verify_seconds": 0.367190666
+          },
+          "warm": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.177210458,
+            "detached_verify_seconds": 0.436164041
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.178519375,
+            "detached_verify_seconds": 0.385248958
+          },
+          "warm": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.19553875,
+            "detached_verify_seconds": 0.421806958
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.184379625,
+            "detached_verify_seconds": 0.373126333
+          },
+          "warm": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.179815792,
+            "detached_verify_seconds": 0.420076792
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.175270458,
+            "detached_verify_seconds": 0.376307291
+          },
+          "warm": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.177389875,
+            "detached_verify_seconds": 0.418252833
+          }
+        },
+        {
+          "cold": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.184920792,
+            "detached_verify_seconds": 0.391381209
+          },
+          "warm": {
+            "active_edges": 100001,
+            "active_nodes": 100000,
+            "capture_seconds": 0.177241167,
+            "detached_verify_seconds": 0.435596459
+          }
+        }
+      ]
+    }
+  ],
+  "scope": "five alternating-order native release samples; setup and warming excluded; same retained one-version chain/parallel/loop topology; capture versus detached full archive/history/schema-independent verification; warm adds current-cache checks; no ordinary mutation, RSS or production latency claim"
+}

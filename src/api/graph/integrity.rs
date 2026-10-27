@@ -52,10 +52,11 @@ pub struct IntegrityReport {
     pub current_schema_checked: bool,
 }
 
-/// Owned portable capture. Verification can run outside a language runtime lock;
-/// it does not retain a mutable graph or grant mutation authority.
+/// Owned retained-state capture plus immutable current-cache inputs. Verification
+/// can run outside a language runtime lock without mutable graph access or authority.
 pub struct IntegrityCheckPlan {
     archive: archive::GraphArchive,
+    cached_topology: Option<crate::state::space::CachedTopologyCheck>,
     schema: Option<GraphSchema>,
     schema_revision: Option<u64>,
 }
@@ -66,9 +67,14 @@ impl Graph {
         self.prepare_integrity_check()?.execute()
     }
     /// Freeze input for detached full retained-state verification. Capture itself
-    /// runs on the owner thread and owns portable copies of retained values.
+    /// runs on the owner thread, copying retained values and sharing cache arrays.
     pub fn prepare_integrity_check(&self) -> GraphResult<IntegrityCheckPlan> {
+        self.validate_write_head(self.current_state_id())?;
+        let cached_topology = self
+            .space
+            .prepare_cached_topology_check(&self.pool.borrow())?;
         Ok(IntegrityCheckPlan {
+            cached_topology,
             archive: self.archive_document()?,
             schema: None,
             schema_revision: None,
@@ -90,11 +96,15 @@ impl crate::storage::journal::DurableGraph {
     }
 }
 impl IntegrityCheckPlan {
-    /// Revalidate archive/config/allocation/references/hashes/clocks, then verify
+    /// Check captured current topology, revalidate archive/config/allocation/references/
+    /// hashes/clocks, then verify
     /// every first-parent transition, including unreferenced retained versions.
     /// It keeps only parent snapshots still needed by first-parent descendants;
     /// a linear history reuses one buffer. Wide branch frontiers can cost memory.
     pub fn execute(self) -> GraphResult<IntegrityReport> {
+        if let Some(cache) = self.cached_topology {
+            cache.verify()?;
+        }
         let graph = self.archive.restore()?;
         if let Some(schema) = &self.schema {
             graph.check_schema_policy(schema)?;
