@@ -394,11 +394,15 @@ impl ChangeTracker {
         }
     }
 
-    /// Generate the reverse operations needed to undo all changes
-    /// This is useful for implementing rollback functionality
-    pub fn generate_reverse_operations(&self) -> Vec<ReverseOperation> {
-        // Basic implementation returns empty - full implementation would analyze changes and generate reverses
-        Vec::new()
+    /// Empty trackers need no reversal. Pending changes require an explicit
+    /// retained-state target; a physical tracker cannot infer inverse payloads.
+    pub fn generate_reverse_operations(&self) -> GraphResult<Vec<ReverseOperation>> {
+        if !self.has_changes() {
+            return Ok(Vec::new());
+        }
+        Err(crate::GraphError::InvalidInput(
+            "Reverse operations require an explicit retained state; use Graph::restore_state with Tracked mode".into()
+        ))
     }
 
     /*
@@ -406,25 +410,26 @@ impl ChangeTracker {
     Combine changes from different sources (useful for merging branches)
     */
 
-    /// Merge changes from another change tracker
-    /// This is complex because changes might conflict
-    pub fn merge(&mut self, other: &ChangeTracker) -> Result<(), MergeConflict> {
-        let _ = other; // Silence unused parameter warning
-                       // Basic implementation returns error - merging not yet implemented
-        Err(MergeConflict {
-            conflict_type: ConflictType::NodeAttributeConflict,
-            entity_id: 0,
-            attribute: None,
-            our_change: "not implemented".to_string(),
-            their_change: "not implemented".to_string(),
-        })
+    /// An empty source is a no-op. Nonempty trackers lack retained parent/base
+    /// provenance and cannot authorize merging physical column references.
+    pub fn merge(&mut self, other: &ChangeTracker) -> GraphResult<()> {
+        if !other.has_changes() {
+            return Ok(());
+        }
+        Err(crate::GraphError::InvalidInput(
+            "Tracker merging requires retained parents and a merge base; use Graph::prepare_merge_read".into()
+        ))
     }
 
-    /// Check if merging with another change tracker would cause conflicts
-    pub fn would_conflict_with(&self, other: &ChangeTracker) -> Vec<MergeConflict> {
-        let _ = other; // Silence unused parameter warning
-                       // Basic implementation returns empty - conflict analysis not yet implemented
-        Vec::new()
+    /// Conflict-free empty inputs are trivial; pending trackers require retained
+    /// parent/base provenance rather than a fabricated empty conflict result.
+    pub fn would_conflict_with(&self, other: &ChangeTracker) -> GraphResult<Vec<MergeConflict>> {
+        if !self.has_changes() && !other.has_changes() {
+            return Ok(Vec::new());
+        }
+        Err(crate::GraphError::InvalidInput(
+            "Conflict analysis requires retained parents and a merge base; use Graph::prepare_merge_read".into()
+        ))
     }
 
     /*

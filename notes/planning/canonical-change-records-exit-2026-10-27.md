@@ -72,3 +72,7 @@ placeholders; replace those with explicit supported behavior or visible errors
 before certifying that legacy surface. High-level tracked restoration and merge
 use the tested owner-bound APIs, not these helpers. Compound topology execution
 remains 09.4b.2; view/query/index lifetimes and production gates remain separate.
+
+Following compatibility slice: the three legacy tracker history helpers now
+reject nontrivial unsupported requests explicitly rather than fabricate empty
+inverses/conflict results. See tracker-history-guards-2026-10-27.md.

@@ -104,3 +104,17 @@ references keep separate responsibilities; they are not interchangeable records.
 No persisted format or automatic retention/index rebuild policy changes in this
 consolidation. Broader coordinator, legacy view, query/index, service and throughput
 work remains in its existing checklist rows.
+
+## Legacy tracker history helpers
+
+A physical tracker has no retained parent/base or explicit restore target.
+`generate_reverse_operations`, `would_conflict_with` and `merge` now return
+GraphResult and reject nontrivial unsupported history work with a message naming
+the owning Graph API. They no longer report an empty inverse or conflict-free
+result for pending changes. Empty reverse/conflict inputs and merging an empty
+source remain no-ops. Failure preserves all pending records.
+
+Use `restore_state(target, mode="tracked")` for tracked restoration and
+`prepare_merge` / `finish_merge` for owner-bound three-way conflict resolution.
+Those APIs retain identity, branch/head/base, schema and clock checks. These native
+compatibility corrections do not alter Python APIs or persisted formats.
