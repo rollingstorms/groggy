@@ -102,6 +102,18 @@ impl<'a> GraphWriter<'a> {
         self.expected_state = result.state_id;
         Ok(result)
     }
+    /// Explicit reference/state restoration under this session's expected head and schema.
+    pub fn restore_state(&mut self, target: StateId) -> GraphResult<StateId> {
+        let outcome = self
+            .graph
+            .prepare_state_restore(target, self.expected_state)?
+            .execute()?;
+        let state = self
+            .graph
+            .finish_state_restore_with_schema(outcome, self.schema)?;
+        self.expected_state = state;
+        Ok(state)
+    }
     /// Create one node with all its initial properties in the same version.
     pub fn add_node(&mut self, attrs: HashMap<AttrName, AttrValue>) -> GraphResult<NodeId> {
         Ok(self.add_nodes_with_attrs(vec![attrs])?[0])

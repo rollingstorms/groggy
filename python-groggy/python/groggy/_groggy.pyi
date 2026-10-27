@@ -3217,6 +3217,10 @@ class DisplayConfig:
 
 
 class DurableGraph:
+    def restore_state(self, state: int, *, expected_state: Optional[int] = None, schema: Optional[dict] = None) -> int:
+        """Select a retained published state; preserve history until explicit collection."""
+        ...
+
     def check_integrity(self) -> Dict[str, Any]:
         """Verify all retained graph states and return counts; no mutation."""
         ...
@@ -5186,6 +5190,10 @@ class Graph:
         """
         Get shortest path as subgraph - delegates via Python.
         """
+        ...
+
+    def restore_state(self, state: int, *, expected_state: Optional[int] = None, schema: Optional[dict] = None) -> int:
+        """Select a retained published state; preserve history until explicit collection."""
         ...
 
     def reset_hard(self) -> None: ...

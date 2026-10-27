@@ -6,6 +6,15 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
+pub(crate) fn state_id(value: &PyAny) -> PyResult<groggy::StateId> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err(
+            "State ID must be a nonnegative integer, not bool",
+        ));
+    }
+    value.extract()
+}
+
 pub(crate) fn existing_id(value: &PyAny) -> PyResult<usize> {
     if value.is_instance_of::<pyo3::types::PyBool>() {
         return Err(PyTypeError::new_err(

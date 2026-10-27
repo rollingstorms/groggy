@@ -5,8 +5,8 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after core retention closure: **204 checked / 64
-open**. Completed full retained archive/import (10.3, `9d78131d`) and explicit
+Current inventory after endpoint closure: **205 checked / 63
+open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
 
@@ -503,3 +503,24 @@ merge planning remains **14.2**.
 **2,022 root Python / 1 skipped**, **172 docs examples**, strict all-target Clippy,
 rebuilt extension and serial **18-case** process-kill matrix. Existing owner/legacy
 exclusions and known FFI warnings remain. No new rows, external installs or push.
+
+### Explicit retained-state restoration (13.3 component) — 2026-10-27
+
+Graph/DurableGraph and writers now restore an explicitly selected retained
+published state, retargeting only the working/current-branch selection. Topology,
+typed properties, external bindings and group revisions restore; future history,
+other branches, allocation/name reservations, clocks and immutable pins remain.
+Dirty/stale/foreign/collected/schema targets reject before mutation. Native detached
+reconstruction runs off-owner/GIL, and durable reference records validate and replay
+after sync with rollback/recovery/backup/maintenance coverage. No new mutation or
+implicit history pruning. Same-state durable restores append no frame.
+
+Existing **13.3 remains partial** for general tracked inverse mutations and their
+recording/effective-time policy; this reference switch does not choose that policy.
+**205 checked / 63 open**, same 268 rows. Gates: **1,342 native / 52 ignored**,
+**2,025 root Python / 1 skipped**, **176 docs examples**, strict Clippy, in-tree FFI
+and serial 18-case recovery matrix. Local 100k-node restoration: **30.27 ms replay /
+126.42 ms validation-install**; owner capture **2.54 µs**, no RSS/production claim.
+Evidence: `state-restoration-2026-10-27.md`; API: `docs/api/state-restoration.md`.
+Next core scope is caller-resolved three-way merges (14.2), with tracked revert
+policy still explicit. No new checklist rows or owner-policy assumptions.

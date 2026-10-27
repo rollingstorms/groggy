@@ -286,3 +286,7 @@ harness = false
 [[bench]]
 name = "endpoint_revisions"
 harness = false
+
+[[bench]]
+name = "state_restore"
+harness = false

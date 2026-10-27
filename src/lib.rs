@@ -172,7 +172,7 @@ pub use api::graph::{
     EdgeUpsert, ExternalEntityRef, Graph, GraphSchema, IntegrityCheckPlan, IntegrityReport,
     NodeUpsert, PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport, PreparedArchive,
     PropertyConstraint, PropertyKind, PurgeOutcome, PurgePlan, PurgeReport, SchemaViolation,
-    ViewBatchResult, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
+    StateRestoreOutcome, StateRestorePlan, ViewBatchResult, EXTERNAL_ID, LABELS, RELATIONSHIP_TYPE,
 };
 pub use api::writer::GraphWriter;
 pub use errors::{GraphError, GraphResult};

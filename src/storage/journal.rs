@@ -218,6 +218,12 @@ enum Record {
     CheckoutBranch {
         name: String,
     },
+    RestoreState {
+        expected_state: StateId,
+        target_state: StateId,
+        branch: String,
+        additional_schema: Option<GraphSchema>,
+    },
     CollectHistory {
         expected_state: StateId,
         branch: Option<String>,
@@ -544,6 +550,24 @@ impl DurableGraph {
                 if let Some(schema) = schema {
                     graph.check_schema_policy(schema)?;
                 }
+            }
+            Record::RestoreState {
+                expected_state,
+                target_state,
+                branch,
+                additional_schema,
+            } => {
+                let outcome = graph
+                    .prepare_state_restore(target_state, expected_state)?
+                    .execute()?;
+                if outcome.branch() != branch {
+                    return Err(invalid("restoration branch differs from selected branch"));
+                }
+                let bindings = graph.validate_state_restore(&outcome, schema.as_ref())?;
+                if let Some(policy) = additional_schema {
+                    outcome.check_schema(&policy)?;
+                }
+                graph.install_validated_state_restore(outcome, bindings)?;
             }
             Record::CollectHistory {
                 expected_state,
@@ -1029,6 +1053,59 @@ impl DurableGraph {
         })?;
         match self.graph.execute_history_collection(prepared) {
             Ok(removed) => Ok(removed),
+            Err(error) => {
+                self.poisoned = true;
+                Err(error)
+            }
+        }
+    }
+
+    /// Restore an explicit retained published state; preserve history until separate collection.
+    pub fn restore_state(
+        &mut self,
+        target: StateId,
+        expected_state: StateId,
+    ) -> GraphResult<StateId> {
+        let outcome = self
+            .graph()?
+            .prepare_state_restore(target, expected_state)?
+            .execute()?;
+        self.finish_state_restore(outcome)
+    }
+    /// Finish detached reconstruction using the currently installed schema.
+    pub fn finish_state_restore(
+        &mut self,
+        outcome: crate::StateRestoreOutcome,
+    ) -> GraphResult<StateId> {
+        self.finish_state_restore_with_schema(outcome, None)
+    }
+    /// Apply an optional stricter call policy in addition to the installed schema.
+    pub fn finish_state_restore_with_schema(
+        &mut self,
+        outcome: crate::StateRestoreOutcome,
+        additional_schema: Option<&GraphSchema>,
+    ) -> GraphResult<StateId> {
+        self.ready()?;
+        let bindings = self
+            .graph
+            .validate_state_restore(&outcome, self.schema.as_ref())?;
+        if let Some(schema) = additional_schema {
+            outcome.check_schema(schema)?;
+        }
+        if outcome.target_state() == self.graph.current_state_id() {
+            return Ok(outcome.target_state());
+        }
+        self.append(Record::RestoreState {
+            expected_state: outcome.expected_state(),
+            target_state: outcome.target_state(),
+            branch: outcome.branch().to_owned(),
+            additional_schema: additional_schema.cloned(),
+        })?;
+        match self
+            .graph
+            .install_validated_state_restore(outcome, bindings)
+        {
+            Ok(state) => Ok(state),
             Err(error) => {
                 self.poisoned = true;
                 Err(error)
@@ -1680,4 +1757,119 @@ fn read_journal(file: &mut File, path: &Path) -> GraphResult<RecoveredJournal> {
         length,
         position,
     })
+}
+
+#[cfg(test)]
+mod state_restore_failure_tests {
+    use super::*;
+    use crate::AttrValue;
+
+    fn source() -> (Graph, StateId, StateId) {
+        let mut graph = Graph::new();
+        graph.add_node().unwrap();
+        graph.set_node_labels(0, vec!["Entity".into()]).unwrap();
+        graph
+            .set_node_attr(0, "value".into(), AttrValue::Text("old".into()))
+            .unwrap();
+        let target = graph.current_state_id();
+        graph
+            .set_node_attr(0, "value".into(), AttrValue::Int(2))
+            .unwrap();
+        let current = graph.current_state_id();
+        (graph, target, current)
+    }
+
+    #[test]
+    fn restore_append_failures_leave_selection_bytes_history_and_pins_unchanged() {
+        for failure in [
+            Failure::BeforeHeader,
+            Failure::AfterHeader,
+            Failure::AfterPayload,
+            Failure::AfterSync,
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("restore.ggj");
+            let (graph, target, current) = source();
+            let mut store = DurableGraph::create_from_graph(&path, &graph, None).unwrap();
+            let pin = store.graph().unwrap().read_view().unwrap();
+            let baseline = std::fs::read(&path).unwrap();
+            let versions = store.graph().unwrap().history_records().len();
+            store.failure = Some(failure);
+            assert!(store.restore_state(target, current).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), baseline);
+            assert_eq!(store.graph().unwrap().current_state_id(), current);
+            assert_eq!(store.graph().unwrap().history_records().len(), versions);
+            assert_eq!(
+                store
+                    .graph()
+                    .unwrap()
+                    .get_node_attr(0, &"value".into())
+                    .unwrap(),
+                Some(AttrValue::Int(2))
+            );
+            store.failure = None;
+            assert_eq!(store.restore_state(target, current).unwrap(), target);
+            assert_eq!(
+                pin.node_attr(0, &"value".into()).unwrap(),
+                Some(AttrValue::Int(2))
+            );
+            drop(store);
+            let reopened = DurableGraph::open(&path).unwrap();
+            assert_eq!(reopened.graph().unwrap().current_state_id(), target);
+            assert_eq!(reopened.graph().unwrap().history_records().len(), versions);
+            assert_eq!(
+                reopened
+                    .graph()
+                    .unwrap()
+                    .get_node_attr(0, &"value".into())
+                    .unwrap(),
+                Some(AttrValue::Text("old".into()))
+            );
+        }
+    }
+
+    #[test]
+    fn synced_restore_before_memory_install_recovers_and_semantic_corruption_never_repairs_bytes() {
+        for variant in 0..5 {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("restore.ggj");
+            let (graph, target, current) = source();
+            let mut store = DurableGraph::create_from_graph(&path, &graph, None).unwrap();
+            let additional_schema = if variant == 4 {
+                Some(
+                    GraphSchema::from_json(
+                        r#"{"node_labels":{"Entity":{"value":{"type":"int"}}}}"#,
+                    )
+                    .unwrap(),
+                )
+            } else {
+                None
+            };
+            store
+                .append(Record::RestoreState {
+                    expected_state: if variant == 1 { target } else { current },
+                    target_state: if variant == 2 { current + 100 } else { target },
+                    branch: if variant == 3 { "other" } else { "main" }.into(),
+                    additional_schema,
+                })
+                .unwrap();
+            // Simulate termination after sync but before in-memory selection.
+            assert_eq!(store.graph().unwrap().current_state_id(), current);
+            drop(store);
+            let bytes = std::fs::read(&path).unwrap();
+            let recovered = DurableGraph::open(&path);
+            if variant == 0 {
+                let recovered = recovered.unwrap();
+                assert_eq!(recovered.graph().unwrap().current_state_id(), target);
+                assert!(recovered
+                    .graph()
+                    .unwrap()
+                    .snapshot_at_commit(current)
+                    .is_ok());
+            } else {
+                assert!(recovered.is_err(), "variant {variant}");
+            }
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        }
+    }
 }

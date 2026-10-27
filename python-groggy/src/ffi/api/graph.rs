@@ -1980,6 +1980,34 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    #[pyo3(signature=(state, *, expected_state=None, schema=None))]
+    fn restore_state(
+        &self,
+        py: Python,
+        state: &PyAny,
+        expected_state: Option<&PyAny>,
+        schema: Option<&PyDict>,
+    ) -> PyResult<StateId> {
+        let target = super::graph_batch::state_id(state)?;
+        let expected = expected_state
+            .map(super::graph_batch::state_id)
+            .transpose()?;
+        let policy = schema.map(parse_schema).transpose()?;
+        let plan = {
+            let graph = self.inner.borrow();
+            graph
+                .prepare_state_restore(target, expected.unwrap_or_else(|| graph.current_state_id()))
+                .map_err(graph_error_to_py_err)?
+        };
+        let outcome = py
+            .allow_threads(move || plan.execute())
+            .map_err(graph_error_to_py_err)?;
+        self.inner
+            .borrow_mut()
+            .finish_state_restore_with_schema(outcome, policy.as_ref())
+            .map_err(graph_error_to_py_err)
+    }
+
     /// Compare the effective contents of two published states.
     fn diff_commits(&self, py: Python, from: StateId, to: StateId) -> PyResult<PyObject> {
         let plan = self

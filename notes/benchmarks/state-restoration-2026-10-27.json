@@ -1,0 +1,66 @@
+{
+  "benchmark": "state_restore",
+  "cases": [
+    {
+      "edges": 999,
+      "nodes": 1000,
+      "samples": [
+        {
+          "capture_seconds": 7.5e-07,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.000315167,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.000843458
+        },
+        {
+          "capture_seconds": 5e-07,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.000269334,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.000837542
+        },
+        {
+          "capture_seconds": 3.75e-07,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.000261625,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.000825875
+        }
+      ]
+    },
+    {
+      "edges": 99999,
+      "nodes": 100000,
+      "samples": [
+        {
+          "capture_seconds": 2.459e-06,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.031901875,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.124887958
+        },
+        {
+          "capture_seconds": 2.542e-06,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.03027475,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.126415667
+        },
+        {
+          "capture_seconds": 2.708e-06,
+          "new_mutation_versions": 0,
+          "reconstruction_seconds": 0.028183709,
+          "retained_versions": 2,
+          "reused_entity_ids": 0,
+          "validation_install_seconds": 0.129131791
+        }
+      ]
+    }
+  ],
+  "scope": "three local native release samples; setup, batch input construction and immutable future pin excluded; plan capture, detached replay and owner validation/install measured separately; no FFI/RSS/production budget claim"
+}

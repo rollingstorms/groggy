@@ -8,6 +8,7 @@ class GraphWriter:
     """Each mutation stages one native batch and publishes exactly one state.
 
     Explicit checkpoints label the selected state without publishing a new one.
+    Explicit restore_state selects retained state and retargets this session.
 
     Keep the owning graph for reads. Another writer advancing its head makes this
     session stale until explicitly refreshed. A private copy of the schema is
@@ -41,6 +42,14 @@ class GraphWriter:
         )
         self._state_id = result["state_id"]
         return result
+
+    def restore_state(self, state):
+        """Select a retained published state; preserve history until explicit collection."""
+        restored = self._graph.restore_state(
+            state, expected_state=self._state_id, schema=self._schema
+        )
+        self._state_id = restored
+        return restored
 
     def add_node(self, **attrs):
         batch = GraphBatch()

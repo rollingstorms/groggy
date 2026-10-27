@@ -31,8 +31,10 @@ mod purge;
 pub use purge::{PurgeOutcome, PurgePlan, PurgeReport};
 mod publication;
 mod read_attributes;
+mod restore;
 pub(crate) mod retention;
 mod schema;
+pub use restore::{StateRestoreOutcome, StateRestorePlan};
 pub(crate) mod snapshot;
 #[cfg(test)]
 mod storage_boundary_tests;
@@ -2211,7 +2213,7 @@ impl Graph {
         {
             for value in attrs.values() {
                 if let AttrValue::SubgraphRef(id) = value {
-                    self.pool.borrow().get_subgraph(*id)?;
+                    self.pool.borrow().validate_stored_subgraph(*id)?;
                 }
             }
         }
@@ -2230,55 +2232,7 @@ impl Graph {
                 )));
             }
         }
-        // Reset selected membership and column mappings, not the retained pool.
-        // Older branches, stored subgraphs and column indices still own data here.
-        self.space = crate::state::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
-        self.config.graph_type = snapshot.graph_type;
-
-        // 2. Restore nodes
-        for &node_id in &snapshot.active_nodes {
-            // Ensure node ID exists in pool
-            self.pool.borrow_mut().ensure_node_id_exists(node_id)?;
-            // Activate in space
-            self.space.activate_node(node_id);
-
-            // Restore node attributes
-            if let Some(attrs) = snapshot.node_attributes.get(&node_id) {
-                for (attr_name, attr_value) in attrs {
-                    let index =
-                        self.pool
-                            .borrow_mut()
-                            .restore_attr(attr_name.clone(), attr_value, true);
-                    self.space
-                        .set_node_attr_index(node_id, attr_name.clone(), index);
-                }
-            }
-        }
-
-        // 3. Restore edges
-        for (&edge_id, &(source, target)) in &snapshot.edges {
-            // Store topology in pool with specific ID
-            self.pool
-                .borrow_mut()
-                .restore_edge_revision(edge_id, source, target)?;
-            // Activate in space
-            self.space.activate_edge(edge_id, source, target);
-
-            // Restore edge attributes
-            if let Some(attrs) = snapshot.edge_attributes.get(&edge_id) {
-                for (attr_name, attr_value) in attrs {
-                    let index =
-                        self.pool
-                            .borrow_mut()
-                            .restore_attr(attr_name.clone(), attr_value, false);
-                    self.space
-                        .set_edge_attr_index(edge_id, attr_name.clone(), index);
-                }
-            }
-        }
-
-        self.retain_snapshot_identity_bindings(identity_bindings);
-        Ok(())
+        self.install_snapshot_payload(snapshot, identity_bindings)
     }
 
     /// Capture a full immutable read selection of the current working graph.
