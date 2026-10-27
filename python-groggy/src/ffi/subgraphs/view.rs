@@ -9,6 +9,25 @@ pub struct PyGraphView {
 }
 #[pymethods]
 impl PyGraphView {
+    #[pyo3(signature=(seeds, max_hops, *, direction="outgoing"))]
+    fn within_hops(
+        &self,
+        py: Python<'_>,
+        seeds: &PyAny,
+        max_hops: &PyAny,
+        direction: &str,
+    ) -> PyResult<Self> {
+        use crate::ffi::query::query::nonnegative_count;
+        let seeds = seeds
+            .iter()?
+            .map(|v| v.and_then(|v| nonnegative_count(v, "seed ID")))
+            .collect::<PyResult<Vec<_>>>()?;
+        let hops = nonnegative_count(max_hops, "max_hops")?;
+        let direction = direction.parse().map_err(graph_error_to_py_err)?;
+        py.allow_threads(|| self.inner.within_hops(&seeds, hops, direction))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
     #[pyo3(signature=(*, node_properties=Vec::new(), edge_properties=Vec::new(), topology=true))]
     fn build_index(
         &self,

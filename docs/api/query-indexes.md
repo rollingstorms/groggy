@@ -147,3 +147,6 @@ indexes remain separate work in 18.2. A group ID stored as an ordinary property
 can already use the generic equality index. Ordinary live Subgraph migration and
 broader query languages remain open; no automatic maintenance or production
 latency guarantee is implied.
+
+For deterministic scalar ordering, pagination and bounded captured traversal, see
+[ordered pinned queries](ordered-pinned-queries.md).

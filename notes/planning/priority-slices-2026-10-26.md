@@ -762,3 +762,25 @@ Fixed inventory: **209 checked / 59 open**, no rows added. 18.2 still owns
 specialized group membership and temporal interval indexes plus broader query
 integration. Ordinary immutable-Subgraph migration and compound topology execution
 retain their existing scopes. Workbook answers, appendix and roadmap are updated.
+
+## Ordered/paged captured queries and bounded traversal — 2026-10-27
+
+Completed existing 21.1 components: native/Python scalar and ID ordering, exact
+mixed numeric/tie/missing policies, overflow-safe pages and explicit ordering-index
+availability; captured multi-source outgoing/incoming/both hop traversal with
+complete seed validation and induced selected-edge closure. Finite property pages
+validate all matches, partition the rank interval and sort the selected page.
+Read/time pins and owner-independent threaded reads are preserved; no publication.
+
+Evidence: `ordered-pinned-queries-2026-10-27.md`. Final **1,404 native / 56 ignored**,
+**2,089 Python / 1 skipped**, **195 doc examples**, strict all-target core Clippy.
+Independent exhaustive small-topology distance reference, exact ranking/page
+fixtures and release checksums pass. The measured 100k shuffled-property page
+improved from a local full-sort reference median 38.25 ms to 28.02 ms; all-match
+validation/memory remains and no production bound is claimed.
+
+Fixed inventory remains **209 checked / 59 open**, no rows added. 21.1 retains
+arbitrary multi-edge patterns and wider ordinary Graph/Subgraph integration;
+21.2/26.1, specialized 18.2 indexes and compound topology retain their stated
+existing scopes. Updated the finish plan's stale next-work paragraph to reflect
+already completed endpoint/restore/merge/native-boundary work.

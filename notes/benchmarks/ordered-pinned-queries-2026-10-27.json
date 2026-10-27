@@ -1,0 +1,148 @@
+{
+  "benchmark": "ordered_pinned_queries_comparison",
+  "scope": "Five local native release samples per implementation, sequential runs with identical fixture construction and ID checksum assertions; full-sort reference measured before replacing page sorting with partial selection. Traversal implementation is unchanged; its timing variation is not an optimization claim. No RSS, production SLA or arbitrary graph-shape claim.",
+  "full_sort_reference": {
+    "benchmark": "ordered_pinned_queries",
+    "cases": [
+      {
+        "capture_seconds": 0.000981375,
+        "edges": 999,
+        "nodes": 1000,
+        "property_index_build_seconds": 0.000259125,
+        "samples": [
+          {
+            "hundred_hop_view_seconds": 7.774999999999999e-05,
+            "ordered_page_seconds": 0.000142958,
+            "two_hop_view_seconds": 1.97875e-06
+          },
+          {
+            "hundred_hop_view_seconds": 7.73583e-05,
+            "ordered_page_seconds": 0.000172917,
+            "two_hop_view_seconds": 1.91166e-06
+          },
+          {
+            "hundred_hop_view_seconds": 7.1925e-05,
+            "ordered_page_seconds": 0.000166625,
+            "two_hop_view_seconds": 1.92583e-06
+          },
+          {
+            "hundred_hop_view_seconds": 7.89458e-05,
+            "ordered_page_seconds": 0.000178666,
+            "two_hop_view_seconds": 1.46292e-06
+          },
+          {
+            "hundred_hop_view_seconds": 7.51708e-05,
+            "ordered_page_seconds": 0.000142375,
+            "two_hop_view_seconds": 1.9266699999999997e-06
+          }
+        ]
+      },
+      {
+        "capture_seconds": 0.122882791,
+        "edges": 99999,
+        "nodes": 100000,
+        "property_index_build_seconds": 0.04518975,
+        "samples": [
+          {
+            "hundred_hop_view_seconds": 5.83167e-05,
+            "ordered_page_seconds": 0.033758084,
+            "two_hop_view_seconds": 1.3591699999999999e-06
+          },
+          {
+            "hundred_hop_view_seconds": 7.29708e-05,
+            "ordered_page_seconds": 0.054599,
+            "two_hop_view_seconds": 1.4566700000000002e-06
+          },
+          {
+            "hundred_hop_view_seconds": 0.000151775,
+            "ordered_page_seconds": 0.149246875,
+            "two_hop_view_seconds": 3.9300000000000005e-06
+          },
+          {
+            "hundred_hop_view_seconds": 5.9225e-05,
+            "ordered_page_seconds": 0.03825375,
+            "two_hop_view_seconds": 1.3612499999999999e-06
+          },
+          {
+            "hundred_hop_view_seconds": 6.10125e-05,
+            "ordered_page_seconds": 0.031483333,
+            "two_hop_view_seconds": 1.35625e-06
+          }
+        ]
+      }
+    ],
+    "scope": "five local native release samples; fixed shuffled integer property and directed chain; ordered query filters/sorts all matches then returns 100 IDs after offset 10; hop queries include induced selected-edge view construction; snapshot capture/index build reported separately; no RSS, production, top-k optimization or arbitrary graph-shape claim"
+  },
+  "partitioned_page": {
+    "benchmark": "ordered_pinned_queries",
+    "cases": [
+      {
+        "capture_seconds": 0.000702,
+        "edges": 999,
+        "nodes": 1000,
+        "property_index_build_seconds": 0.000161833,
+        "samples": [
+          {
+            "hundred_hop_view_seconds": 4.86208e-05,
+            "ordered_page_seconds": 5.9333e-05,
+            "two_hop_view_seconds": 1.28375e-06
+          },
+          {
+            "hundred_hop_view_seconds": 4.82334e-05,
+            "ordered_page_seconds": 5.625e-05,
+            "two_hop_view_seconds": 1.23458e-06
+          },
+          {
+            "hundred_hop_view_seconds": 4.79458e-05,
+            "ordered_page_seconds": 6.15e-05,
+            "two_hop_view_seconds": 1.2416700000000001e-06
+          },
+          {
+            "hundred_hop_view_seconds": 4.86709e-05,
+            "ordered_page_seconds": 7.9417e-05,
+            "two_hop_view_seconds": 1.2287499999999999e-06
+          },
+          {
+            "hundred_hop_view_seconds": 4.7620900000000003e-05,
+            "ordered_page_seconds": 6.1166e-05,
+            "two_hop_view_seconds": 1.245e-06
+          }
+        ]
+      },
+      {
+        "capture_seconds": 0.166031791,
+        "edges": 99999,
+        "nodes": 100000,
+        "property_index_build_seconds": 0.053392292,
+        "samples": [
+          {
+            "hundred_hop_view_seconds": 5.87458e-05,
+            "ordered_page_seconds": 0.02802375,
+            "two_hop_view_seconds": 1.34708e-06
+          },
+          {
+            "hundred_hop_view_seconds": 5.84458e-05,
+            "ordered_page_seconds": 0.025704125,
+            "two_hop_view_seconds": 1.34166e-06
+          },
+          {
+            "hundred_hop_view_seconds": 6.0641600000000006e-05,
+            "ordered_page_seconds": 0.026757708,
+            "two_hop_view_seconds": 1.32208e-06
+          },
+          {
+            "hundred_hop_view_seconds": 6.48458e-05,
+            "ordered_page_seconds": 0.028317584,
+            "two_hop_view_seconds": 2.2824999999999997e-06
+          },
+          {
+            "hundred_hop_view_seconds": 6.142079999999999e-05,
+            "ordered_page_seconds": 0.0319085,
+            "two_hop_view_seconds": 1.32875e-06
+          }
+        ]
+      }
+    ],
+    "scope": "five local native release samples; fixed shuffled integer property and directed chain; ordered query filters/validates all matches, partitions a page and sorts 100 IDs after offset 10; hop queries include induced selected-edge view construction; snapshot capture/index build reported separately; no RSS, production, top-k optimization or arbitrary graph-shape claim"
+  }
+}

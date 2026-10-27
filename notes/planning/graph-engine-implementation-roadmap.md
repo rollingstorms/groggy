@@ -1593,3 +1593,19 @@ The current-cache component is complete. Existing 33.2 stays partial for seconda
 index/other cache/service diagnostics, and AR2 still owns broader adjacency-policy
 conformance. Receipt fields and storage formats are unchanged. Inventory remains
 **208 checked / 60 open**, fixed 268 rows.
+
+## Ordered/paged captured query slice — 2026-10-27 (21.1)
+
+GraphQueryIndex.query_nodes/query_edges now add deterministic scalar/ID ordering
+and checked offset/limit pages. GraphView.within_hops provides selected captured
+multi-source outgoing/incoming/both traversal with induced internal edge closure.
+Both reuse immutable source/time ownership and read without publication. Property
+pages validate all matches before partitioning/sorting the requested rank interval.
+See `ordered-pinned-queries-2026-10-27.md` for API/domain boundaries, exhaustive
+reference checks, 1,404 native / 2,089 Python / 195 doc-example verification,
+strict core lint and bounded release before/after measurements.
+
+This completes ordering, pagination and bounded traversal components of existing
+21.1. Arbitrary multi-edge patterns and wider ordinary Graph/Subgraph query/view
+integration remain, alongside specialized 18.2 indexes and compound topology.
+Inventory stays **209 checked / 59 open** with no new rows.

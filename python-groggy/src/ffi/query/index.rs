@@ -4,6 +4,24 @@ use crate::ffi::{subgraphs::view::PyGraphView, utils::graph_error_to_py_err};
 use groggy::query::GraphQueryIndex;
 use pyo3::prelude::*;
 
+fn options(
+    order_by: Option<String>,
+    descending: bool,
+    offset: Option<&PyAny>,
+    limit: Option<&PyAny>,
+) -> PyResult<groggy::query::QueryOptions> {
+    use super::query::nonnegative_count;
+    Ok(groggy::query::QueryOptions {
+        order_by,
+        descending,
+        offset: offset
+            .map(|v| nonnegative_count(v, "offset"))
+            .transpose()?
+            .unwrap_or(0),
+        limit: limit.map(|v| nonnegative_count(v, "limit")).transpose()?,
+    })
+}
+
 #[pyclass(name = "GraphQueryIndex")]
 #[derive(Clone)]
 pub struct PyGraphQueryIndex {
@@ -11,6 +29,38 @@ pub struct PyGraphQueryIndex {
 }
 #[pymethods]
 impl PyGraphQueryIndex {
+    #[pyo3(signature=(filter, *, order_by=None, descending=false, offset=None, limit=None, allow_scan=false))]
+    fn query_nodes(
+        &self,
+        py: Python<'_>,
+        filter: &PyAny,
+        order_by: Option<String>,
+        descending: bool,
+        offset: Option<&PyAny>,
+        limit: Option<&PyAny>,
+        allow_scan: bool,
+    ) -> PyResult<Vec<usize>> {
+        let filter = node_filter_from_python(filter)?;
+        let options = options(order_by, descending, offset, limit)?;
+        py.allow_threads(|| self.inner.query_nodes(&filter, &options, allow_scan))
+            .map_err(graph_error_to_py_err)
+    }
+    #[pyo3(signature=(filter, *, order_by=None, descending=false, offset=None, limit=None, allow_scan=false))]
+    fn query_edges(
+        &self,
+        py: Python<'_>,
+        filter: &PyAny,
+        order_by: Option<String>,
+        descending: bool,
+        offset: Option<&PyAny>,
+        limit: Option<&PyAny>,
+        allow_scan: bool,
+    ) -> PyResult<Vec<usize>> {
+        let filter = edge_filter_from_python(filter)?;
+        let options = options(order_by, descending, offset, limit)?;
+        py.allow_threads(|| self.inner.query_edges(&filter, &options, allow_scan))
+            .map_err(graph_error_to_py_err)
+    }
     #[getter]
     fn view(&self) -> PyGraphView {
         PyGraphView {

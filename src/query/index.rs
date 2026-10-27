@@ -360,6 +360,53 @@ impl GraphQueryIndex {
         }
         Ok(self.edge_ids(filter)?.into_iter().collect())
     }
+    /// Order matching node IDs, then apply an overflow-safe offset/limit. Scalar
+    /// validation covers all matching rows even when the requested page is empty.
+    pub fn query_nodes(
+        &self,
+        filter: &NodeFilter,
+        options: &super::QueryOptions,
+        allow_scan: bool,
+    ) -> GraphResult<Vec<usize>> {
+        self.check_order(true, options, allow_scan)?;
+        super::ordering::page(
+            &self.view,
+            true,
+            self.find_nodes(filter, allow_scan)?,
+            options,
+        )
+    }
+    /// Ordered/paged edge-instance IDs, preserving parallel identities.
+    pub fn query_edges(
+        &self,
+        filter: &EdgeFilter,
+        options: &super::QueryOptions,
+        allow_scan: bool,
+    ) -> GraphResult<Vec<usize>> {
+        self.check_order(false, options, allow_scan)?;
+        super::ordering::page(
+            &self.view,
+            false,
+            self.find_edges(filter, allow_scan)?,
+            options,
+        )
+    }
+    fn check_order(
+        &self,
+        node: bool,
+        options: &super::QueryOptions,
+        allow_scan: bool,
+    ) -> GraphResult<()> {
+        if let Some(name) = &options.order_by {
+            if name.trim().is_empty() {
+                return Err(invalid("order_by must be a nonempty property name"));
+            }
+            if !allow_scan {
+                self.require_column(node, name)?;
+            }
+        }
+        Ok(())
+    }
     /// Select a semantic node label through an explicitly requested labels index.
     pub fn nodes_with_label(&self, label: &str) -> GraphResult<GraphView> {
         if label.trim().is_empty() {

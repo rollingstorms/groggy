@@ -310,3 +310,7 @@ harness = false
 [[bench]]
 name = "query_indexes"
 harness = false
+
+[[bench]]
+name = "ordered_queries"
+harness = false

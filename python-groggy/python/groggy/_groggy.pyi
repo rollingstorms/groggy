@@ -5,7 +5,7 @@
 
 from __future__ import annotations  # Enable forward references
 from .writer import GraphWriter
-from typing import Any, List, Dict, Optional, Tuple, Union, Iterator
+from typing import Any, List, Dict, Optional, Tuple, Union, Iterator, Iterable
 
 # Module-level functions
 
@@ -10728,6 +10728,8 @@ class VizAccessor:
 
 
 class GraphQueryIndex:
+    def query_nodes(self, filter: Union[NodeFilter, str], *, order_by: Optional[str] = None, descending: bool = False, offset: Optional[int] = None, limit: Optional[int] = None, allow_scan: bool = False) -> List[int]: ...
+    def query_edges(self, filter: Union[EdgeFilter, str], *, order_by: Optional[str] = None, descending: bool = False, offset: Optional[int] = None, limit: Optional[int] = None, allow_scan: bool = False) -> List[int]: ...
     @property
     def view(self) -> GraphView: ...
     @property
@@ -10746,6 +10748,10 @@ class GraphQueryIndex:
 
 
 class GraphView:
+    def within_hops(self, seeds: Iterable[int], max_hops: int, *, direction: str = "outgoing") -> GraphView:
+        """Captured bounded traversal including seeds, with induced selected edges."""
+        ...
+
     def build_index(self, *, node_properties: List[str] = [], edge_properties: List[str] = [], topology: bool = True) -> GraphQueryIndex:
         """Explicitly build indexes over this immutable selection; no implicit rebuilding."""
         ...

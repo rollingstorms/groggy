@@ -14,18 +14,22 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Next: typed endpoint changes/reversals (04.2/13.3), then three-way merge planning
-(14.2). Remaining native default/infallible constructors, raw pool/space escapes
-and topology compound acceptance (09.4b.2), plus wider storage platform/migration/scale
-(10.4), retain their scope. Core explicit reclamation (15/06.3) is complete. Full retained archive/import (10.3) is complete;
-explicit Unix recovery baselines and locked journal replacement complete part of
-10.4. Explicit outer property pipelines and branch lifecycle (14.1) are complete.
-Exact owned snapshots (12.2), property history (11.2) and 16.2 are complete: effective reconstruction, atomic endpoint validation, frozen nested group
-sources/durable transfer, explicit legacy inputs, resolved first-parent merge reads
-and cached event prefixes. 16.3, checkpoint semantics (12.3), checked writeback
-(27.2), and the fixed table facade inventory (27.1/AR7.10) are complete. Merge
-planning (14.2), remaining storage scale/migrations/platform work (10.4) and broad live
-adapter migration (26.1) retain their existing scopes. See the 16.2 exit review.
+Current remainder (2026-10-27): compound topology execution and typed effects
+(09.4b.2), ordinary connected Subgraph ownership (26.1/AR4/AR7.5), specialized
+indexes and broader query/pattern integration (18.2/21.1/21.2). Native default and
+raw storage escape migrations are complete. Endpoint revisions (04.2), explicit
+tracked/reference restoration (13.3), checked three-way merges (14.2) and transient
+secondary-index lifecycle (18.3) are complete within their documented domains.
+Ordered/paged indexed queries and captured bounded traversal complete components
+of 21.1; arbitrary multi-edge patterns remain open.
+
+Core reclamation (15/06.3), full retained archive/import (10.3), explicit outer
+property pipelines, branch lifecycle (14.1), exact owned snapshots (12.2), property
+history (11.2), effective reconstruction (16.2/16.3), checkpoint semantics (12.3),
+and table facade/writeback (27.1/27.2/AR7.10) are complete within their recorded
+scopes. Wider storage platform/migration/scale (10.4), numerical production gates
+and service/Graphiti work retain their original boundaries. See the current flat
+checklist and linked exit receipts; fixed inventory is 209 checked / 59 open.
 
 Execution rule agreed with the owner's prioritization concern on 2026-10-25:
 prioritize usable core vertical slices and measured workloads. Take incidental

@@ -6,6 +6,15 @@ use groggy::query::{AttributeFilter, EdgeFilter, NodeFilter};
 use groggy::{AttrName, NodeId};
 use pyo3::prelude::*;
 
+pub(crate) fn nonnegative_count(value: &PyAny, name: &str) -> PyResult<usize> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+            "{name} must be a nonnegative integer, not bool"
+        )));
+    }
+    value.extract()
+}
+
 pub(crate) fn node_filter_from_python(filter: &PyAny) -> PyResult<NodeFilter> {
     if let Ok(filter) = filter.extract::<PyNodeFilter>() {
         Ok(filter.inner)
