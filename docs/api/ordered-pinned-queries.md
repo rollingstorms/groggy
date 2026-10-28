@@ -1,5 +1,8 @@
 # Ordered pages and bounded captured queries
 
+For the explicit `graph.query()` capture and ordered scan methods on GraphView,
+see [query captures](query-capture.md). They share the ordering kernel below.
+
 `GraphQueryIndex.query_nodes/query_edges` filter matching IDs, order them, then
 apply pagination. `GraphView.within_hops` creates a bounded immutable graph
 selection. These reads create no graph version or checkpoint and rebuild no index.

@@ -2044,14 +2044,10 @@ impl Graph {
         self.neighborhood_sampler.stats()
     }
 
-    // TODO: Implement complex query composition when needed
-
-    /// Create a new complex query builder
-    pub fn query(&self) -> Result<(), GraphError> {
-        Err(GraphError::NotImplemented {
-            feature: "complex query builder".to_string(),
-            tracking_issue: None,
-        })
+    /// Capture immutable values/topology for composable filtering, traversal,
+    /// ordered pages and explicit indexes. Subsequent owner writes cannot alter it.
+    pub fn query(&self) -> Result<crate::GraphView, GraphError> {
+        self.read_view()
     }
 
     /// Create a read-only view of the graph for analysis

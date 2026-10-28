@@ -1,4 +1,5 @@
 //! Deterministic scalar ordering and pagination over captured entity identities.
+use super::{EdgeFilter, NodeFilter};
 use crate::{
     storage::numeric::scalar::{attribute_number, compare_inputs, NumericInput},
     AttrName, AttrValue, GraphError, GraphResult, GraphView,
@@ -17,6 +18,30 @@ pub struct QueryOptions {
     pub offset: usize,
     /// Maximum returned rows; None returns every remaining match.
     pub limit: Option<usize>,
+}
+
+impl GraphView {
+    /// Scan this immutable selection, then order/page matching node identities.
+    /// This explicit scan does not construct indexes or silently recover one.
+    pub fn query_nodes(
+        &self,
+        filter: &NodeFilter,
+        options: &QueryOptions,
+    ) -> GraphResult<Vec<usize>> {
+        let ids =
+            super::filtering::nodes(&super::filtering::Frozen(self), &self.node_ids(), filter)?;
+        page(self, true, ids, options)
+    }
+    /// Scan captured edge instances, preserving selection, direction and parallel IDs.
+    pub fn query_edges(
+        &self,
+        filter: &EdgeFilter,
+        options: &QueryOptions,
+    ) -> GraphResult<Vec<usize>> {
+        let ids =
+            super::filtering::edges(&super::filtering::Frozen(self), &self.edge_ids(), filter)?;
+        page(self, false, ids, options)
+    }
 }
 enum Key<'a> {
     Missing,

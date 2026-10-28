@@ -1,26 +1,8 @@
 //! Translation and detached native calls only; index semantics live in Rust.
-use super::query::{edge_filter_from_python, node_filter_from_python};
+use super::query::{edge_filter_from_python, node_filter_from_python, query_options};
 use crate::ffi::{subgraphs::view::PyGraphView, utils::graph_error_to_py_err};
 use groggy::query::GraphQueryIndex;
 use pyo3::prelude::*;
-
-fn options(
-    order_by: Option<String>,
-    descending: bool,
-    offset: Option<&PyAny>,
-    limit: Option<&PyAny>,
-) -> PyResult<groggy::query::QueryOptions> {
-    use super::query::nonnegative_count;
-    Ok(groggy::query::QueryOptions {
-        order_by,
-        descending,
-        offset: offset
-            .map(|v| nonnegative_count(v, "offset"))
-            .transpose()?
-            .unwrap_or(0),
-        limit: limit.map(|v| nonnegative_count(v, "limit")).transpose()?,
-    })
-}
 
 #[pyclass(name = "GraphQueryIndex")]
 #[derive(Clone)]
@@ -73,7 +55,7 @@ impl PyGraphQueryIndex {
         allow_scan: bool,
     ) -> PyResult<Vec<usize>> {
         let filter = node_filter_from_python(filter)?;
-        let options = options(order_by, descending, offset, limit)?;
+        let options = query_options(order_by, descending, offset, limit)?;
         py.allow_threads(|| self.inner.query_nodes(&filter, &options, allow_scan))
             .map_err(graph_error_to_py_err)
     }
@@ -89,7 +71,7 @@ impl PyGraphQueryIndex {
         allow_scan: bool,
     ) -> PyResult<Vec<usize>> {
         let filter = edge_filter_from_python(filter)?;
-        let options = options(order_by, descending, offset, limit)?;
+        let options = query_options(order_by, descending, offset, limit)?;
         py.allow_threads(|| self.inner.query_edges(&filter, &options, allow_scan))
             .map_err(graph_error_to_py_err)
     }

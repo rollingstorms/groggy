@@ -133,6 +133,13 @@ impl PySubgraph {
 impl PySubgraph {
     // === Basic Properties - delegate to SubgraphOperations ===
 
+    fn query(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        self.inner
+            .query()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     fn build_group_index(
         &self,
         py: Python<'_>,

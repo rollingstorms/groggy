@@ -338,3 +338,7 @@ harness = false
 [[bench]]
 name = "group_membership_index"
 harness = false
+
+[[bench]]
+name = "query_capture"
+harness = false

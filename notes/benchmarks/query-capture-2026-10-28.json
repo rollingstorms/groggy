@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "capture_seconds": 0.000473833,
+      "index_build_seconds": 9.9e-05,
+      "matching_rows": 100,
+      "nodes": 1000,
+      "page_rows": 10,
+      "samples": [
+        {
+          "indexed_page_seconds": 7.4791999999999995e-06,
+          "scan_page_seconds": 6.52083e-05
+        },
+        {
+          "indexed_page_seconds": 7.0917e-06,
+          "scan_page_seconds": 7.2525e-05
+        },
+        {
+          "indexed_page_seconds": 1.79792e-05,
+          "scan_page_seconds": 0.0001787042
+        },
+        {
+          "indexed_page_seconds": 1.6899999999999997e-05,
+          "scan_page_seconds": 0.0001040958
+        },
+        {
+          "indexed_page_seconds": 6.6542e-06,
+          "scan_page_seconds": 6.15084e-05
+        }
+      ]
+    },
+    {
+      "capture_seconds": 0.138665125,
+      "index_build_seconds": 0.052162125,
+      "matching_rows": 100,
+      "nodes": 100000,
+      "page_rows": 10,
+      "samples": [
+        {
+          "indexed_page_seconds": 9.5541e-06,
+          "scan_page_seconds": 0.0614055208
+        },
+        {
+          "indexed_page_seconds": 9.8625e-06,
+          "scan_page_seconds": 0.032661945799999995
+        },
+        {
+          "indexed_page_seconds": 9.1584e-06,
+          "scan_page_seconds": 0.0332475792
+        },
+        {
+          "indexed_page_seconds": 7.4541e-06,
+          "scan_page_seconds": 0.0334265042
+        },
+        {
+          "indexed_page_seconds": 9.2334e-06,
+          "scan_page_seconds": 0.0333571
+        }
+      ]
+    }
+  ],
+  "fixture": "one bulk-created score column; largest hundred values ordered descending with ten-row page",
+  "profile": "release"
+}

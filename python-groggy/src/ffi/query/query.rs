@@ -15,6 +15,23 @@ pub(crate) fn nonnegative_count(value: &PyAny, name: &str) -> PyResult<usize> {
     value.extract()
 }
 
+pub(crate) fn query_options(
+    order_by: Option<String>,
+    descending: bool,
+    offset: Option<&PyAny>,
+    limit: Option<&PyAny>,
+) -> PyResult<groggy::query::QueryOptions> {
+    Ok(groggy::query::QueryOptions {
+        order_by,
+        descending,
+        offset: offset
+            .map(|v| nonnegative_count(v, "offset"))
+            .transpose()?
+            .unwrap_or(0),
+        limit: limit.map(|v| nonnegative_count(v, "limit")).transpose()?,
+    })
+}
+
 pub(crate) fn node_filter_from_python(filter: &PyAny) -> PyResult<NodeFilter> {
     if let Ok(filter) = filter.extract::<PyNodeFilter>() {
         Ok(filter.inner)

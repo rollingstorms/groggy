@@ -9,6 +9,36 @@ pub struct PyGraphView {
 }
 #[pymethods]
 impl PyGraphView {
+    #[pyo3(signature=(filter, *, order_by=None, descending=false, offset=None, limit=None))]
+    fn query_nodes(
+        &self,
+        py: Python<'_>,
+        filter: &PyAny,
+        order_by: Option<String>,
+        descending: bool,
+        offset: Option<&PyAny>,
+        limit: Option<&PyAny>,
+    ) -> PyResult<Vec<usize>> {
+        let filter = crate::ffi::query::query::node_filter_from_python(filter)?;
+        let options = crate::ffi::query::query::query_options(order_by, descending, offset, limit)?;
+        py.allow_threads(|| self.inner.query_nodes(&filter, &options))
+            .map_err(graph_error_to_py_err)
+    }
+    #[pyo3(signature=(filter, *, order_by=None, descending=false, offset=None, limit=None))]
+    fn query_edges(
+        &self,
+        py: Python<'_>,
+        filter: &PyAny,
+        order_by: Option<String>,
+        descending: bool,
+        offset: Option<&PyAny>,
+        limit: Option<&PyAny>,
+    ) -> PyResult<Vec<usize>> {
+        let filter = crate::ffi::query::query::edge_filter_from_python(filter)?;
+        let options = crate::ffi::query::query::query_options(order_by, descending, offset, limit)?;
+        py.allow_threads(|| self.inner.query_edges(&filter, &options))
+            .map_err(graph_error_to_py_err)
+    }
     fn build_group_index(
         &self,
         py: Python<'_>,

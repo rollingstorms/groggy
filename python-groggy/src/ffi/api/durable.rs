@@ -565,6 +565,13 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    fn query(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        self.core()?
+            .query()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(graph_error_to_py_err)
+    }
+
     fn build_group_index(
         &self,
         py: Python<'_>,

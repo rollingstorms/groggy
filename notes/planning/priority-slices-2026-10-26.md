@@ -904,3 +904,23 @@ Fixed checklist moves **210 checked / 58 open → 211 checked / 57 open**, with 
 new rows. Next core priorities retain their original scope: 09.4b.2 compound
 execution/effects, 26.1/AR4/AR7.5 connected-view ownership, and 21.2 legacy pinned
 query migration. Wider scale/storage/platform and service/Graphiti items remain.
+
+
+## Canonical immutable query entry point — 2026-10-28
+
+Completed an existing 21.2 component: native Graph.query no longer returns an
+unimplemented placeholder. Graph/DurableGraph/Subgraph expose canonical GraphView
+capture; GraphView.query_nodes/query_edges share the existing column predicates
+and exact ordering/page kernel with explicit indexes. FFI options translation is
+shared. No new query engine, automatic index work or changed legacy filter return
+type. `query-capture-2026-10-28.md`: **1,431 native / 56 ignored**, **2,305 root
+Python / 1 skipped**, **222 docs**, strict all-target core Clippy and checked
+1k/100k native release receipts. At 100k nodes, current read capture costs 138.665
+ms; ten-row pages measured 33.357 ms scanned versus 9.233 µs indexed, with a
+separate 52.162 ms explicit index build. These expose existing materialization
+costs, not a production latency claim.
+
+21.2 remains partial with the legacy connected-view migration. Inspection also
+identified owner-only selected-property checks in shared SubgraphOperations and
+the Context overlay; that follow-up remains inside 26.1/09.4b.2, with no new row.
+Fixed checklist remains **211 checked / 57 open**.

@@ -18,6 +18,10 @@ impl Graph {
     }
 }
 impl Subgraph {
+    /// Freeze this connected selection for composable immutable queries.
+    pub fn query(&self) -> GraphResult<crate::GraphView> {
+        self.pin_view()
+    }
     /// Capture the current connected selection before building a frozen index.
     pub fn build_group_index(&self) -> GraphResult<super::GroupMembershipIndex> {
         self.pin_view()?.build_group_index()
@@ -35,6 +39,10 @@ impl Subgraph {
     }
 }
 impl DurableGraph {
+    /// Capture the accepted durable state without keeping the writer lock alive.
+    pub fn query(&self) -> GraphResult<crate::GraphView> {
+        self.read_view()
+    }
     /// Explicit group capture/build without appending or retaining a storage lock.
     pub fn build_group_index(&self) -> GraphResult<super::GroupMembershipIndex> {
         self.read_view()?.build_group_index()
