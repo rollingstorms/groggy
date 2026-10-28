@@ -6,6 +6,10 @@ publication in the selected branch's pinned first-parent ancestry. Supplying `U`
 excludes publications whose engine-recorded acceptance clock is later than `U`.
 Both `Graph` and `DurableGraph` support this, including after durable reopen.
 
+Use an explicit [effective-time index](effective-time-indexes.md) to retain one
+lineage for repeated reads, event-window searches and structural activation
+intervals. It shares this reconstruction engine and its clock/source rules.
+
 ```python
 from groggy import Graph, GraphBatch
 

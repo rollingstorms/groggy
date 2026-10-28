@@ -1,5 +1,8 @@
 # Explicit indexes over immutable graph views
 
+For retained change events, structural activation intervals and repeated
+effective-time reconstruction, see [effective-time indexes](effective-time-indexes.md).
+
 `GraphView.build_index(...)` explicitly builds named property indexes and optional
 topology indexes. A full `graph.read_view()` gives global selection; a selected
 view bounds every posting and result. Index construction never publishes a graph

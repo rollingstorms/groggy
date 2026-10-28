@@ -850,3 +850,18 @@ are verified. `builder-division-2026-10-28.md`: **1,417 native / 56 ignored**,
 **2,236 Python / 1 skipped**, **208 docs**, strict all-target core Clippy. No rows
 added/closed; **210 checked / 58 open**. Broader existing builder/effect and
 compound-topology scopes remain unchanged.
+
+
+## Effective-time event/activation indexes — 2026-10-28
+
+Completed the existing 18.2 component with explicit immutable EffectiveTimeIndex
+captures on Graph/DurableGraph: indexed global/entity event windows, structural
+activation intervals and repeated canonical historical reconstruction. Explicit
+recorded cutoffs, inactive IDs, retained source clocks, branch/head isolation and
+transient rebuild policy are preserved. No new replay engine or automatic
+mutation maintenance. `effective-time-indexes-2026-10-28.md`: **1,420 native /
+56 ignored**, **2,250 root Python / 1 skipped**, **211 docs**, strict all-target
+core Clippy, local 100/10k property-event release receipts. Whole-state reads
+still replay the selected prefix; the larger narrow window measured 0.603 µs
+indexed versus 7.346 µs scanned. Group-membership and attribute/fact validity
+indexes remain within 18.2. No rows added/closed: **210 checked / 58 open**.

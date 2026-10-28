@@ -326,3 +326,7 @@ harness = false
 [[bench]]
 name = "builder_unary_math"
 harness = false
+
+[[bench]]
+name = "effective_time_index"
+harness = false

@@ -67,6 +67,7 @@ if not _DISPLAY_AVAILABLE:
 __version__ = "0.5.1"
 GraphView = _groggy.GraphView
 GraphQueryIndex = _groggy.GraphQueryIndex
+EffectiveTimeIndex = _groggy.EffectiveTimeIndex
 GraphPattern = _groggy.GraphPattern
 PatternMatches = _groggy.PatternMatches
 GraphPath = _groggy.GraphPath
@@ -183,6 +184,7 @@ __all__ = [
     "VarHandle",
     "GraphView",
     "GraphQueryIndex",
+    "EffectiveTimeIndex",
     "GraphPattern",
     "PatternMatches",
     "GraphPath",

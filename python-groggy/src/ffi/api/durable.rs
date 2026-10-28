@@ -494,6 +494,27 @@ impl PyDurableGraph {
             .create_meta_node(group, state, at)
             .map_err(graph_error_to_py_err)
     }
+    /// Explicitly build a transient effective-time event index over this branch.
+    #[pyo3(signature=(*, legacy_times=None, group_sources=None))]
+    fn build_effective_index(
+        &self,
+        py: Python<'_>,
+        legacy_times: Option<&PyDict>,
+        group_sources: Option<&PyDict>,
+    ) -> PyResult<crate::ffi::query::effective::PyEffectiveTimeIndex> {
+        let options = groggy::state::effective_read::EffectiveReadOptions {
+            legacy_publications: crate::ffi::api::graph_batch::parse_legacy_times(legacy_times)?,
+            group_sources: crate::ffi::api::graph_batch::parse_group_sources(group_sources)?,
+            ..Default::default()
+        };
+        let plan = self
+            .core()?
+            .prepare_effective_read(0, options)
+            .map_err(graph_error_to_py_err)?;
+        py.allow_threads(|| plan.build_index())
+            .map(|inner| crate::ffi::query::effective::PyEffectiveTimeIndex { inner })
+            .map_err(graph_error_to_py_err)
+    }
     /// Reconstruct immutable effective-time state from a pinned published head.
     #[pyo3(signature=(effective_at, *, recorded_by=None, legacy_times=None, group_sources=None))]
     fn read_view_at(

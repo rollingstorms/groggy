@@ -106,7 +106,7 @@ enum Position {
     EdgeAttr(usize),
 }
 /// Owned immutable input: no mutable graph or GIL is needed for indexed replay.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EffectiveReadPlan {
     pub(crate) context: Arc<ReadContext>,
     pub(crate) graph_type: GraphType,
@@ -211,8 +211,11 @@ impl EffectiveReadPlan {
     /// order; properties outside an entity's active lifetime do not carry into a
     /// later activation. Invalid endpoint intervals through T reject the read.
     pub fn read_view(self) -> GraphResult<GraphView> {
-        let invalid = |message: &str| GraphError::InvalidInput(message.into());
-        let index = if self.legacy_publications.is_empty() {
+        let index = self.event_index()?;
+        self.read_indexed(&index)
+    }
+    fn event_index(&self) -> GraphResult<Arc<EffectiveReadIndex>> {
+        Ok(if self.legacy_publications.is_empty() {
             if let Some(index) = self.context.index.get() {
                 index.clone()
             } else {
@@ -228,7 +231,10 @@ impl EffectiveReadPlan {
                 &self.context.commits,
                 &self.legacy_publications,
             )?)
-        };
+        })
+    }
+    fn read_indexed(self, index: &EffectiveReadIndex) -> GraphResult<GraphView> {
+        let invalid = |message: &str| GraphError::InvalidInput(message.into());
         let end = index
             .events
             .partition_point(|(at, _, _, _)| *at <= self.time.effective_at);
@@ -359,6 +365,269 @@ impl EffectiveReadPlan {
                 .with_groups(self.groups)
                 .with_read_time(self.time),
         ))
+    }
+}
+
+/// An accepted logical change, ordered by effective time and canonical replay order.
+/// Values remain in retained deltas; this record identifies their entity/property.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectiveTimeEvent {
+    pub state_id: StateId,
+    pub effective_at: i64,
+    pub recorded_at: i64,
+    pub change: ChangeKey,
+}
+/// Structural activation interval [start, end); None is an unbounded end.
+/// Attribute-based validity and endpoint predicates are separate from activation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActivationInterval {
+    pub start: i64,
+    pub end: Option<i64>,
+}
+/// Explicit immutable event index over one retained first-parent lineage.
+/// Captures survive owner edits/closure/pruning; replacement is always explicit.
+#[derive(Debug, Clone)]
+pub struct EffectiveTimeIndex {
+    plan: EffectiveReadPlan,
+    events: Arc<EffectiveReadIndex>,
+    by_entity: Arc<HashMap<(bool, usize), Vec<usize>>>,
+    by_activation: Arc<HashMap<(bool, usize), Vec<usize>>>,
+}
+impl Position {
+    fn entity(self, delta: &super::Delta) -> (bool, usize) {
+        match self {
+            Self::NodeAdded(id) | Self::NodeRemoved(id) => (true, id),
+            Self::EdgeAdded(id, ..) | Self::EdgeRemoved(id) | Self::EdgeEndpoints(id, ..) => {
+                (false, id)
+            }
+            Self::NodeAttr(row) => (true, delta.node_attr_changes[row].0),
+            Self::EdgeAttr(row) => (false, delta.edge_attr_changes[row].0),
+        }
+    }
+    fn key(self, delta: &super::Delta) -> ChangeKey {
+        match self {
+            Self::NodeAdded(id) => ChangeKey::NodeAdded(id),
+            Self::NodeRemoved(id) => ChangeKey::NodeRemoved(id),
+            Self::EdgeAdded(id, ..) => ChangeKey::EdgeAdded(id),
+            Self::EdgeRemoved(id) => ChangeKey::EdgeRemoved(id),
+            Self::EdgeEndpoints(id, ..) => ChangeKey::EdgeEndpoints(id),
+            Self::NodeAttr(row) => {
+                let (id, name, ..) = &delta.node_attr_changes[row];
+                ChangeKey::NodeAttribute(*id, name.clone())
+            }
+            Self::EdgeAttr(row) => {
+                let (id, name, ..) = &delta.edge_attr_changes[row];
+                ChangeKey::EdgeAttribute(*id, name.clone())
+            }
+        }
+    }
+}
+impl EffectiveReadPlan {
+    /// Explicitly index the complete prepared lineage, independently of effective_at.
+    /// Apply recorded cutoffs per query, rather than silently binding one at build.
+    pub fn build_index(self) -> GraphResult<EffectiveTimeIndex> {
+        if self.time.recorded_by.is_some() {
+            return Err(GraphError::InvalidInput(
+                "Build a temporal index without recorded_by; supply the cutoff when querying"
+                    .into(),
+            ));
+        }
+        let events = self.event_index()?;
+        let mut by_entity: HashMap<_, Vec<_>> = HashMap::new();
+        let mut by_activation: HashMap<_, Vec<_>> = HashMap::new();
+        for (ordinal, &(_, accepted, _, position)) in events.events.iter().enumerate() {
+            by_entity
+                .entry(position.entity(&self.context.commits[accepted].delta))
+                .or_default()
+                .push(ordinal);
+            if matches!(
+                position,
+                Position::NodeAdded(_)
+                    | Position::NodeRemoved(_)
+                    | Position::EdgeAdded(..)
+                    | Position::EdgeRemoved(_)
+            ) {
+                by_activation
+                    .entry(position.entity(&self.context.commits[accepted].delta))
+                    .or_default()
+                    .push(ordinal);
+            }
+        }
+        Ok(EffectiveTimeIndex {
+            plan: self,
+            events,
+            by_entity: Arc::new(by_entity),
+            by_activation: Arc::new(by_activation),
+        })
+    }
+}
+impl EffectiveTimeIndex {
+    /// Captured branch name; later branch switching cannot change this index.
+    pub fn branch(&self) -> &str {
+        &self.plan.time.branch
+    }
+    /// Last accepted version bounding this captured lineage.
+    pub fn captured_head(&self) -> StateId {
+        self.plan.time.published_head
+    }
+    /// Number of logical events, including inactive entities and unset properties.
+    pub fn event_count(&self) -> usize {
+        self.events.events.len()
+    }
+    /// Reconstruct through the canonical engine using the already built event index.
+    pub fn read_view_at(
+        &self,
+        effective_at: i64,
+        recorded_by: Option<i64>,
+    ) -> GraphResult<GraphView> {
+        let mut plan = self.plan.clone();
+        plan.time.effective_at = effective_at;
+        plan.time.recorded_by = recorded_by;
+        plan.read_indexed(&self.events)
+    }
+    fn event(&self, ordinal: usize, cutoff: Option<i64>) -> Option<EffectiveTimeEvent> {
+        let (at, accepted, _, position) = self.events.events[ordinal];
+        let commit = &self.plan.context.commits[accepted];
+        let metadata = commit
+            .publication
+            .as_ref()
+            .or_else(|| self.plan.legacy_publications.get(&commit.id))?;
+        if cutoff.is_some_and(|u| metadata.recorded_at > u) {
+            return None;
+        }
+        Some(EffectiveTimeEvent {
+            state_id: commit.id,
+            effective_at: at,
+            recorded_at: metadata.recorded_at,
+            change: position.key(&commit.delta),
+        })
+    }
+    fn check_range(start: i64, end: i64) -> GraphResult<()> {
+        if start > end {
+            return Err(GraphError::InvalidInput(
+                "Temporal range start exceeds end".into(),
+            ));
+        }
+        Ok(())
+    }
+    /// Accepted change events in the inclusive effective window [start, end].
+    /// This is an event stream, not a filter for current liveness or fact validity.
+    pub fn events_between(
+        &self,
+        start: i64,
+        end: i64,
+        recorded_by: Option<i64>,
+    ) -> GraphResult<Vec<EffectiveTimeEvent>> {
+        Self::check_range(start, end)?;
+        let lower = self.events.events.partition_point(|(at, ..)| *at < start);
+        let upper = self.events.events.partition_point(|(at, ..)| *at <= end);
+        Ok((lower..upper)
+            .filter_map(|n| self.event(n, recorded_by))
+            .collect())
+    }
+    /// Entity-local change events, including its retained inactive periods.
+    fn entity_events(
+        &self,
+        node: bool,
+        id: usize,
+        start: i64,
+        end: i64,
+        recorded_by: Option<i64>,
+    ) -> GraphResult<Vec<EffectiveTimeEvent>> {
+        Self::check_range(start, end)?;
+        let Some(rows) = self.by_entity.get(&(node, id)) else {
+            return Ok(Vec::new());
+        };
+        let lower = rows.partition_point(|&n| self.events.events[n].0 < start);
+        let upper = rows.partition_point(|&n| self.events.events[n].0 <= end);
+        Ok(rows[lower..upper]
+            .iter()
+            .filter_map(|&n| self.event(n, recorded_by))
+            .collect())
+    }
+    /// Node-local events in an inclusive effective-time window.
+    pub fn node_events(
+        &self,
+        id: usize,
+        start: i64,
+        end: i64,
+        recorded_by: Option<i64>,
+    ) -> GraphResult<Vec<EffectiveTimeEvent>> {
+        self.entity_events(true, id, start, end, recorded_by)
+    }
+    /// Edge-local events, including endpoint revisions and property unsets.
+    pub fn edge_events(
+        &self,
+        id: usize,
+        start: i64,
+        end: i64,
+        recorded_by: Option<i64>,
+    ) -> GraphResult<Vec<EffectiveTimeEvent>> {
+        self.entity_events(false, id, start, end, recorded_by)
+    }
+    /// Node structural activation intervals; these do not infer attribute validity.
+    pub fn node_activation_intervals(
+        &self,
+        id: usize,
+        recorded_by: Option<i64>,
+    ) -> Vec<ActivationInterval> {
+        self.activation_intervals(true, id, recorded_by)
+    }
+    /// Edge structural activation intervals; endpoint validity is checked by reads.
+    pub fn edge_activation_intervals(
+        &self,
+        id: usize,
+        recorded_by: Option<i64>,
+    ) -> Vec<ActivationInterval> {
+        self.activation_intervals(false, id, recorded_by)
+    }
+    /// Structural activation from accepted add/remove events. Equal-time changes
+    /// resolve in replay order; zero-duration gaps and intervals are coalesced.
+    /// This does not validate graph endpoints or attribute-based fact validity.
+    fn activation_intervals(
+        &self,
+        node: bool,
+        id: usize,
+        recorded_by: Option<i64>,
+    ) -> Vec<ActivationInterval> {
+        let mut toggles: Vec<(i64, bool)> = Vec::new();
+        for &ordinal in self.by_activation.get(&(node, id)).into_iter().flatten() {
+            let Some(event) = self.event(ordinal, recorded_by) else {
+                continue;
+            };
+            let active = match event.change {
+                ChangeKey::NodeAdded(_) | ChangeKey::EdgeAdded(_) => true,
+                ChangeKey::NodeRemoved(_) | ChangeKey::EdgeRemoved(_) => false,
+                _ => continue,
+            };
+            if let Some(last) = toggles
+                .last_mut()
+                .filter(|last| last.0 == event.effective_at)
+            {
+                last.1 = active;
+            } else {
+                toggles.push((event.effective_at, active));
+            }
+        }
+        let mut intervals = Vec::new();
+        let mut open = None;
+        for (at, active) in toggles {
+            match (open, active) {
+                (None, true) => open = Some(at),
+                (Some(start), false) => {
+                    intervals.push(ActivationInterval {
+                        start,
+                        end: Some(at),
+                    });
+                    open = None;
+                }
+                _ => {}
+            }
+        }
+        if let Some(start) = open {
+            intervals.push(ActivationInterval { start, end: None });
+        }
+        intervals
     }
 }
 

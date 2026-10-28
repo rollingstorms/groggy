@@ -2,6 +2,7 @@
 //!
 //! This module contains Python bindings for query and traversal
 
+pub mod effective;
 pub mod index;
 pub mod pattern;
 #[allow(clippy::module_inception)]

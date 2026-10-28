@@ -257,30 +257,39 @@ pub(crate) fn parse_batch(batch: &PyAny) -> PyResult<GraphBatch> {
     Ok(result)
 }
 
+/// Marshal one canonical logical change key for publication and query results.
+pub(crate) fn change_key_to_python<'py>(
+    py: Python<'py>,
+    key: &groggy::ChangeKey,
+) -> PyResult<&'py PyDict> {
+    use groggy::ChangeKey;
+    let (kind, id, name) = match key {
+        ChangeKey::NodeAdded(id) => ("node_added", *id, None),
+        ChangeKey::NodeRemoved(id) => ("node_removed", *id, None),
+        ChangeKey::EdgeAdded(id) => ("edge_added", *id, None),
+        ChangeKey::EdgeRemoved(id) => ("edge_removed", *id, None),
+        ChangeKey::EdgeEndpoints(id) => ("edge_endpoints", *id, None),
+        ChangeKey::NodeAttribute(id, name) => ("node_attr", *id, Some(name)),
+        ChangeKey::EdgeAttribute(id, name) => ("edge_attr", *id, Some(name)),
+    };
+    let row = PyDict::new(py);
+    row.set_item("kind", kind)?;
+    row.set_item("entity_id", id)?;
+    row.set_item("name", name)?;
+    Ok(row)
+}
+
 /// Translate immutable core publication metadata without changing clock semantics.
 pub(crate) fn publication_to_python(
     py: Python,
     metadata: &groggy::PublicationMetadata,
 ) -> PyResult<PyObject> {
-    use groggy::ChangeKey;
     let output = PyDict::new(py);
     output.set_item("recorded_at", metadata.recorded_at)?;
     output.set_item("effective_at", metadata.effective_at)?;
     let changes = PyList::empty(py);
     for (key, at) in &metadata.change_times {
-        let (kind, id, name) = match key {
-            ChangeKey::NodeAdded(id) => ("node_added", *id, None),
-            ChangeKey::NodeRemoved(id) => ("node_removed", *id, None),
-            ChangeKey::EdgeAdded(id) => ("edge_added", *id, None),
-            ChangeKey::EdgeRemoved(id) => ("edge_removed", *id, None),
-            ChangeKey::EdgeEndpoints(id) => ("edge_endpoints", *id, None),
-            ChangeKey::NodeAttribute(id, name) => ("node_attr", *id, Some(name)),
-            ChangeKey::EdgeAttribute(id, name) => ("edge_attr", *id, Some(name)),
-        };
-        let row = PyDict::new(py);
-        row.set_item("kind", kind)?;
-        row.set_item("entity_id", id)?;
-        row.set_item("name", name)?;
+        let row = change_key_to_python(py, key)?;
         row.set_item("effective_at", at)?;
         changes.append(row)?;
     }

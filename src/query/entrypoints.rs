@@ -38,3 +38,16 @@ impl DurableGraph {
             .build_index(node_properties, edge_properties, topology)
     }
 }
+
+impl Graph {
+    /// Explicitly capture/index the current branch's effective-time event lineage.
+    pub fn build_effective_index(&self) -> GraphResult<super::EffectiveTimeIndex> {
+        self.prepare_read_at(0, None)?.build_index()
+    }
+}
+impl DurableGraph {
+    /// Capture/index retained events without appending or retaining a storage lock.
+    pub fn build_effective_index(&self) -> GraphResult<super::EffectiveTimeIndex> {
+        self.prepare_read_at(0, None)?.build_index()
+    }
+}

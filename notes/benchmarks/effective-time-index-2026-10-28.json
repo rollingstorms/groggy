@@ -1,0 +1,72 @@
+{
+  "cases": [
+    {
+      "build_seconds": 4.1708e-05,
+      "property_events": 100,
+      "samples": [
+        {
+          "full_prefix_read_seconds": 8.958e-06,
+          "indexed_window_seconds": 6.1125e-07,
+          "linear_window_seconds": 5.3e-07
+        },
+        {
+          "full_prefix_read_seconds": 1.0208e-05,
+          "indexed_window_seconds": 5.733300000000001e-07,
+          "linear_window_seconds": 5.2208e-07
+        },
+        {
+          "full_prefix_read_seconds": 1.0792e-05,
+          "indexed_window_seconds": 5.775e-07,
+          "linear_window_seconds": 5.6e-07
+        },
+        {
+          "full_prefix_read_seconds": 8.708e-06,
+          "indexed_window_seconds": 5.5833e-07,
+          "linear_window_seconds": 5.250000000000001e-07
+        },
+        {
+          "full_prefix_read_seconds": 8.041e-06,
+          "indexed_window_seconds": 6.037499999999999e-07,
+          "linear_window_seconds": 5.262499999999999e-07
+        }
+      ],
+      "total_events": 102,
+      "window_hits": 10
+    },
+    {
+      "build_seconds": 0.004655583,
+      "property_events": 10000,
+      "samples": [
+        {
+          "full_prefix_read_seconds": 0.000932,
+          "indexed_window_seconds": 6.025000000000001e-07,
+          "linear_window_seconds": 7.41875e-06
+        },
+        {
+          "full_prefix_read_seconds": 0.00097325,
+          "indexed_window_seconds": 6.1125e-07,
+          "linear_window_seconds": 7.4750000000000004e-06
+        },
+        {
+          "full_prefix_read_seconds": 0.000821083,
+          "indexed_window_seconds": 6.0125e-07,
+          "linear_window_seconds": 7.17667e-06
+        },
+        {
+          "full_prefix_read_seconds": 0.000974042,
+          "indexed_window_seconds": 5.9666e-07,
+          "linear_window_seconds": 7.32709e-06
+        },
+        {
+          "full_prefix_read_seconds": 0.000893708,
+          "indexed_window_seconds": 6.550000000000001e-07,
+          "linear_window_seconds": 7.3458300000000004e-06
+        }
+      ],
+      "total_events": 10002,
+      "window_hits": 10
+    }
+  ],
+  "fixture": "one entity with monotonic effective property events; final ten-event window",
+  "profile": "release"
+}
