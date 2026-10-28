@@ -425,6 +425,21 @@ class BuiltAlgorithm(AlgorithmHandle):
                 },
             }
 
+        if step_type in {"core.min", "core.max"}:
+            return {"id": step_type, "params": {
+                "left": self._resolve_operand(step.get("left", step.get("a")), alias_map),
+                "right": self._resolve_operand(step.get("right", step.get("b")), alias_map),
+                "target": step["output"],
+            }}
+
+        if step_type in {"core.abs", "core.sqrt", "core.exp", "core.log"}:
+            source = step.get("source", step.get("input"))
+            params = {"source": self._resolve_operand(source, alias_map),
+                      "target": step["output"]}
+            if "base" in step:
+                params["base"] = step["base"]
+            return {"id": step_type, "params": params}
+
         if step_type in ["core.recip", "recip"]:
             source = step.get("source", step.get("input"))
             return {

@@ -457,6 +457,68 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
     )?;
 
+    for (id, operation) in [
+        ("core.min", BinaryOperation::Min),
+        ("core.max", BinaryOperation::Max),
+    ] {
+        registry.register(
+            id,
+            StepMetadata {
+                id: id.into(),
+                description: operation.description().into(),
+                cost_hint: CostHint::Linear,
+            },
+            move |spec| {
+                let (left, right, target) = read_binary_operands(spec, id)?;
+                Ok(Box::new(BinaryArithmeticStep::new(
+                    id, left, right, target, operation,
+                )))
+            },
+        )?;
+    }
+
+    for (id, operation) in [
+        ("core.abs", super::expression::UnaryOp::Abs),
+        ("core.sqrt", super::expression::UnaryOp::Sqrt),
+        ("core.exp", super::expression::UnaryOp::Exp),
+        ("core.log", super::expression::UnaryOp::Log),
+    ] {
+        registry.register(
+            id,
+            StepMetadata {
+                id: id.into(),
+                description: "Checked element-wise math".into(),
+                cost_hint: CostHint::Linear,
+            },
+            move |spec| {
+                let source = spec
+                    .params
+                    .get_text("source")
+                    .or_else(|| spec.params.get_text("input"))
+                    .ok_or_else(|| anyhow!("{id} requires source"))?
+                    .to_string();
+                let target = spec
+                    .params
+                    .get_text("target")
+                    .or_else(|| spec.params.get_text("output"))
+                    .ok_or_else(|| anyhow!("{id} requires target"))?
+                    .to_string();
+                let base = spec
+                    .params
+                    .get("base")
+                    .map(|value| match value {
+                        AlgorithmParamValue::Int(v) => Ok(*v as f64),
+                        AlgorithmParamValue::Float(v) => Ok(*v),
+                        _ => Err(anyhow!("log base must be numeric")),
+                    })
+                    .transpose()?;
+                Ok(Box::new(super::arithmetic::UnaryMathStep::new(
+                    id, source, target, operation, base,
+                )?))
+            },
+        )?;
+    }
+
     registry.register(
         "core.recip",
         StepMetadata {

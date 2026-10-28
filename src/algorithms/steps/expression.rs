@@ -482,7 +482,7 @@ pub(super) fn eval_binary_op(
     Ok(result)
 }
 
-fn eval_unary_op(op: UnaryOp, arg: &AlgorithmParamValue) -> Result<AlgorithmParamValue> {
+pub(super) fn eval_unary_op(op: UnaryOp, arg: &AlgorithmParamValue) -> Result<AlgorithmParamValue> {
     use AlgorithmParamValue::*;
     validate_value(arg)?;
     if let Int(value) = arg {

@@ -1647,3 +1647,16 @@ real powers and atomic failure behavior. Receipt: `builder-power-2026-10-27.md`.
 all-target core Clippy. Bounded release receipts validate every result at 1k/100k
 map rows. No rows added/closed; **210 checked / 58 open**. Other facades, alternate
 plans, complete typed effects and compound topology remain in the existing scope.
+
+
+## Checked elementary builder math — 2026-10-27
+
+Completed existing abs/sqrt/exp/log and exact element-wise min/max facade methods
+through shared native scalar kernels/comparison and existing map/atomic execution.
+Legacy/IR lowering, selected scope, scalar fusion/broadcast, integer precision,
+invalid domains/controls, cancellation and atomic rollback are covered.
+`builder-elementary-math-2026-10-27.md`: **1,416 native / 56 ignored**, **2,212 Python
+/ 1 skipped**, **207 docs**, strict all-target Clippy, bounded 1k/100k unary release
+receipts. Initial matrix GIL worker-progress timing failure passed isolated/full
+rechecks and is recorded under existing 29.26. No rows added/closed: **210 / 58**.
+Other facades/effects/alternate plans and compound topology remain open.

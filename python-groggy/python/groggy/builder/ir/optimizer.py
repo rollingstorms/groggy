@@ -211,7 +211,7 @@ class IROptimizer:
             # identity that this IR does not yet represent.
             if node.domain != IRDomain.CORE or node.op_type not in {
                 "constant", "scalar", "add", "sub", "mul", "div", "pow",
-                "neg", "recip", "sqrt", "abs", "sum", "mean", "min", "max",
+                "neg", "recip", "sqrt", "abs", "exp", "log", "sum", "mean", "min", "max",
                 "norm", "compare", "where", "broadcast_scalar", "reduce_scalar",
             }:
                 seen_ops.clear()
@@ -401,6 +401,10 @@ class IROptimizer:
         if not def_node:
             return False
 
+        # Element-wise min/max preserve map kind; only scalar pairs are scalar.
+        if def_node.op_type in {"min", "max"} and len(def_node.inputs) == 2:
+            return all(self._is_scalar_variable(value) for value in def_node.inputs)
+
         # Check for operations that produce scalars
         scalar_ops = {
             "constant",
@@ -418,7 +422,7 @@ class IROptimizer:
             return True
 
         # Recip of a scalar is also scalar
-        if def_node.op_type == "recip" and len(def_node.inputs) >= 1:
+        if def_node.op_type in {"recip", "abs", "sqrt", "exp", "log"} and len(def_node.inputs) >= 1:
             return self._is_scalar_variable(def_node.inputs[0])
 
         # Division/multiplication of scalars produces scalar

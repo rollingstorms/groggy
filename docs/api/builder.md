@@ -63,3 +63,8 @@ read-after-write semantics, compatibility and limits.
 
 See [builder power](builder-power.md) for `CoreOps.pow`, `**`, reflected power,
 checked integer/f64 domains, selected scope and atomic failure behavior.
+
+## Checked elementary math
+
+[Elementary builder math](builder-elementary-math.md) covers native `abs`, `sqrt`,
+`exp`, `log` and exact element-wise `min`/`max`, with domains and atomic behavior.

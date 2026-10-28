@@ -19,6 +19,8 @@ pub(crate) enum BinaryOperation {
     Mul,
     Div,
     Pow,
+    Min,
+    Max,
 }
 
 impl BinaryOperation {
@@ -29,6 +31,8 @@ impl BinaryOperation {
             BinaryOperation::Mul => "Element-wise multiplication",
             BinaryOperation::Div => "Element-wise division",
             BinaryOperation::Pow => "Checked element-wise power",
+            BinaryOperation::Min => "Exact element-wise minimum",
+            BinaryOperation::Max => "Exact element-wise maximum",
         }
     }
 
@@ -44,6 +48,24 @@ impl BinaryOperation {
             BinaryOperation::Sub => apply_sub(lhs, rhs, lhs_name, rhs_name),
             BinaryOperation::Mul => apply_mul(lhs, rhs, lhs_name, rhs_name),
             BinaryOperation::Div => apply_div(lhs, rhs, lhs_name, rhs_name),
+            BinaryOperation::Min | BinaryOperation::Max => {
+                NumericValue::from(lhs, lhs_name)?;
+                NumericValue::from(rhs, rhs_name)?;
+                if [lhs, rhs]
+                    .iter()
+                    .any(|value| matches!(value, AlgorithmParamValue::Float(v) if !v.is_finite()))
+                {
+                    bail!("minimum/maximum requires finite numbers");
+                }
+                let order = super::filtering::compare_values(lhs, rhs)
+                    .ok_or_else(|| anyhow!("minimum/maximum requires comparable numbers"))?;
+                let left = if self == BinaryOperation::Min {
+                    !order.is_gt()
+                } else {
+                    !order.is_lt()
+                };
+                Ok(if left { lhs.clone() } else { rhs.clone() })
+            }
             BinaryOperation::Pow => {
                 super::expression::eval_binary_op(super::expression::BinaryOp::Pow, lhs, rhs)
             }
@@ -146,7 +168,12 @@ impl Step for BinaryArithmeticStep {
                     .set_edge_map(self.target.clone(), result);
                 Ok(())
             }
-            (Operand::Scalar(lhs), Operand::Scalar(rhs)) if self.op == BinaryOperation::Pow => {
+            (Operand::Scalar(lhs), Operand::Scalar(rhs))
+                if matches!(
+                    self.op,
+                    BinaryOperation::Pow | BinaryOperation::Min | BinaryOperation::Max
+                ) =>
+            {
                 let result = self.op.apply(lhs, rhs, &self.left, &self.right)?;
                 scope
                     .variables_mut()
@@ -162,6 +189,127 @@ impl Step for BinaryArithmeticStep {
                 self.id
             )),
         }
+    }
+}
+
+/// Checked value math using the canonical expression kernels, with preserved map kind.
+pub(crate) struct UnaryMathStep {
+    id: &'static str,
+    source: String,
+    target: String,
+    operation: super::expression::UnaryOp,
+    log_divisor: Option<AlgorithmParamValue>,
+}
+impl UnaryMathStep {
+    pub(crate) fn new(
+        id: &'static str,
+        source: String,
+        target: String,
+        operation: super::expression::UnaryOp,
+        base: Option<f64>,
+    ) -> Result<Self> {
+        let log_divisor = base
+            .map(|base| {
+                if operation != super::expression::UnaryOp::Log
+                    || !base.is_finite()
+                    || base <= 0.
+                    || base == 1.
+                {
+                    bail!("log base must be finite, positive and different from one");
+                }
+                super::expression::eval_unary_op(
+                    super::expression::UnaryOp::Log,
+                    &AlgorithmParamValue::Float(base),
+                )
+            })
+            .transpose()?;
+        Ok(Self {
+            id,
+            source,
+            target,
+            operation,
+            log_divisor,
+        })
+    }
+    fn evaluate(&self, value: &AlgorithmParamValue) -> Result<AlgorithmParamValue> {
+        let result = super::expression::eval_unary_op(self.operation, value)?;
+        match &self.log_divisor {
+            Some(divisor) => super::expression::eval_binary_op(
+                super::expression::BinaryOp::Div,
+                &result,
+                divisor,
+            ),
+            None => Ok(result),
+        }
+    }
+    fn map<K: Copy + Ord + Eq + Hash>(
+        &self,
+        values: &HashMap<K, AlgorithmParamValue>,
+        ctx: &Context,
+    ) -> Result<HashMap<K, AlgorithmParamValue>> {
+        let mut keys: Vec<_> = values.keys().copied().collect();
+        keys.sort_unstable();
+        let mut result = HashMap::with_capacity(keys.len());
+        for key in keys {
+            if ctx.is_cancelled() {
+                bail!("{} cancelled", self.id);
+            }
+            let value = values
+                .get(&key)
+                .ok_or_else(|| anyhow!("{} missing input entry", self.id))?;
+            result.insert(key, self.evaluate(value)?);
+        }
+        Ok(result)
+    }
+}
+impl Step for UnaryMathStep {
+    fn id(&self) -> &'static str {
+        self.id
+    }
+    fn supports_atomic_properties(&self) -> bool {
+        true
+    }
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id.into(),
+            description: "Checked element-wise scalar/node/edge math".into(),
+            cost_hint: CostHint::Linear,
+        }
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            bail!("{} cancelled", self.id);
+        }
+        match resolve_operand(scope, &self.source)? {
+            Operand::NodeMap(values) => {
+                let result = self.map(values, ctx)?;
+                if ctx.is_cancelled() {
+                    bail!("{} cancelled", self.id);
+                }
+                scope
+                    .variables_mut()
+                    .set_node_map(self.target.clone(), result);
+            }
+            Operand::EdgeMap(values) => {
+                let result = self.map(values, ctx)?;
+                if ctx.is_cancelled() {
+                    bail!("{} cancelled", self.id);
+                }
+                scope
+                    .variables_mut()
+                    .set_edge_map(self.target.clone(), result);
+            }
+            Operand::Scalar(value) => {
+                let result = self.evaluate(value)?;
+                if ctx.is_cancelled() {
+                    bail!("{} cancelled", self.id);
+                }
+                scope
+                    .variables_mut()
+                    .set_scalar(self.target.clone(), result);
+            }
+        }
+        Ok(())
     }
 }
 

@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "nodes": 1000,
+      "operation": "core.abs",
+      "samples_seconds": [
+        0.000297875,
+        0.000173541,
+        0.000156291,
+        0.000153458,
+        0.000154417
+      ]
+    },
+    {
+      "nodes": 1000,
+      "operation": "core.sqrt",
+      "samples_seconds": [
+        0.000137417,
+        0.000141292,
+        0.000138166,
+        0.000137916,
+        0.00013775
+      ]
+    },
+    {
+      "nodes": 1000,
+      "operation": "core.exp",
+      "samples_seconds": [
+        0.000152166,
+        0.000155125,
+        0.000122,
+        0.000106208,
+        0.000127875
+      ]
+    },
+    {
+      "nodes": 1000,
+      "operation": "core.log",
+      "samples_seconds": [
+        0.000147792,
+        0.000149208,
+        0.000148292,
+        0.000147208,
+        0.000146917
+      ]
+    },
+    {
+      "nodes": 100000,
+      "operation": "core.abs",
+      "samples_seconds": [
+        0.009251875,
+        0.01042375,
+        0.009134208,
+        0.009497125,
+        0.00929975
+      ]
+    },
+    {
+      "nodes": 100000,
+      "operation": "core.sqrt",
+      "samples_seconds": [
+        0.008866083,
+        0.009104875,
+        0.009089708,
+        0.010144125,
+        0.010019208
+      ]
+    },
+    {
+      "nodes": 100000,
+      "operation": "core.exp",
+      "samples_seconds": [
+        0.008366208,
+        0.008916958,
+        0.008599208,
+        0.009002542,
+        0.009347333
+      ]
+    },
+    {
+      "nodes": 100000,
+      "operation": "core.log",
+      "samples_seconds": [
+        0.009931667,
+        0.011299834,
+        0.009678958,
+        0.009291583,
+        0.009017708
+      ]
+    }
+  ],
+  "fixture": "registered checked unary math over node maps",
+  "profile": "release"
+}

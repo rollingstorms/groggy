@@ -322,3 +322,7 @@ harness = false
 [[bench]]
 name = "builder_power"
 harness = false
+
+[[bench]]
+name = "builder_unary_math"
+harness = false

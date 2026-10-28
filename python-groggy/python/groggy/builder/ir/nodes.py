@@ -124,8 +124,10 @@ class CoreIRNode(IRNode):
                 step["a"] = self.inputs[0]
             if len(self.inputs) >= 2:
                 step["b"] = self.inputs[1]
-        elif self.op_type in ["neg", "recip", "sqrt", "abs"]:
+        elif self.op_type in ["neg", "recip", "sqrt", "abs", "exp", "log"]:
             step["input"] = self.inputs[0]
+        elif self.op_type in {"min", "max"} and len(self.inputs) == 2:
+            step["a"], step["b"] = self.inputs
         elif self.op_type in ["sum", "mean", "min", "max"]:
             step["input"] = self.inputs[0]
         elif self.op_type == "where":
