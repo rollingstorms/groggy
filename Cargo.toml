@@ -342,3 +342,7 @@ harness = false
 [[bench]]
 name = "query_capture"
 harness = false
+
+[[bench]]
+name = "selected_property_scope"
+harness = false

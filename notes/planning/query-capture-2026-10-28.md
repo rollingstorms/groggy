@@ -57,10 +57,10 @@ capture implementation; it adds no automatic mutation work and makes no producti
 latency claim. Larger capture/storage/scale gates retain their existing scope.
 
 21.2 remains partial: legacy filter APIs still return connected Subgraph and their
-full immutable migration remains tied to 26.1/AR4/AR7.5. During inspection, shared
-SubgraphOperations property getters/bulk setters and the Context property overlay
-also showed owner-only rather than selected-membership checks. That concrete scope
-gap is follow-up work within the existing 26.1/09.4b.2 boundaries; it is not fixed
-by this query entry point. Compound topology/custom effects remain
-09.4b.2/AR3/AR7.8. No new checklist rows or parent closure:
-**211 checked / 57 unchecked**.
+full immutable migration remains tied to 26.1/AR4/AR7.5. Follow-on read guards are
+recorded in `selected-property-scope-2026-10-28.md`. Full-suite review confirmed
+that native property-map attachments intentionally target active owner IDs,
+including retained temporal diffs on an empty invocation selection; that existing
+writeback contract is preserved. Broader read/write ownership unification and
+compound topology/custom effects remain 26.1/09.4b.2/AR3/AR7.8. No new checklist
+rows or parent closure: **211 checked / 57 unchecked**.

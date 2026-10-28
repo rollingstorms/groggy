@@ -1773,3 +1773,24 @@ costs, not a production latency claim.
 identified owner-only selected-property checks in shared SubgraphOperations and
 the Context overlay; that follow-up remains inside 26.1/09.4b.2, with no new row.
 Fixed checklist remains **211 checked / 57 open**.
+
+
+## Selected property read guards and writeback clarification — 2026-10-28
+
+Shared connected property getters and Context/StepScope staged reads now enforce
+selected membership and current liveness. Excluded parallel edge identities and
+values cached by wider scopes cannot bypass the read boundary. No new state owner,
+snapshot, mutation path or FFI business logic. `selected-property-scope-2026-10-28.md`
+records native/manual/staged and Python coverage plus bounded 1k/10k scalar-read
+release comparisons.
+
+Full-suite review confirmed that native map attachment intentionally supports
+active owner IDs outside an invocation selection for full-owner retained diffs.
+That behavior is preserved, including the existing empty-invocation regression;
+no attachment entries are dropped or regression tests weakened. Broader ownership
+unification stays in 26.1/AR3. Python bulk accessor and pinned apply_view_batch
+selection contracts remain unchanged.
+
+Gates: **1,433 native / 56 ignored**, **2,309 root Python / 1 skipped**, **224 docs**,
+strict all-target core Clippy. The query-capture and selected-read slices are
+committed separately. No rows added/closed: **211 checked / 57 open**.

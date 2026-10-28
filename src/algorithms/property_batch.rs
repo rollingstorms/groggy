@@ -103,11 +103,21 @@ impl Context {
         id: NodeId,
         name: &AttrName,
     ) -> crate::GraphResult<Option<AttrValue>> {
+        if !subgraph.contains_node(id) {
+            return Err(crate::GraphError::InvalidInput(format!(
+                "Node {id} is outside the subgraph selection"
+            )));
+        }
         if let Some(value) = self
             .property_batch
             .as_ref()
             .and_then(|batch| batch.get(true, id, name))
         {
+            if !subgraph.graph().borrow().has_node(id) {
+                return Err(crate::GraphError::InvalidInput(format!(
+                    "Node {id} is inactive"
+                )));
+            }
             return Ok(Some(value.clone()));
         }
         subgraph.get_node_attribute(id, name)
@@ -119,11 +129,21 @@ impl Context {
         id: EdgeId,
         name: &AttrName,
     ) -> crate::GraphResult<Option<AttrValue>> {
+        if !subgraph.contains_edge(id) {
+            return Err(crate::GraphError::InvalidInput(format!(
+                "Edge {id} is outside the subgraph selection"
+            )));
+        }
         if let Some(value) = self
             .property_batch
             .as_ref()
             .and_then(|batch| batch.get(false, id, name))
         {
+            if !subgraph.graph().borrow().has_edge(id) {
+                return Err(crate::GraphError::InvalidInput(format!(
+                    "Edge {id} is inactive"
+                )));
+            }
             return Ok(Some(value.clone()));
         }
         subgraph.get_edge_attribute(id, name)
@@ -210,6 +230,44 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn overlay_reads_cannot_escape_selection_or_serve_deactivated_entities() {
+        let mut graph = Graph::new();
+        graph.add_nodes(3).unwrap();
+        graph.add_edges(&[(0, 1), (0, 1)]).unwrap();
+        let owner = graph.into_shared();
+        let subgraph = Subgraph::new(owner.clone(), [0, 1].into(), [0].into(), "selected".into());
+        let mut pending = PropertyBatch::new(owner.borrow().write_coordinate());
+        pending
+            .stage(
+                true,
+                HashMap::from([(
+                    "x".into(),
+                    vec![(0, AttrValue::Int(7)), (2, AttrValue::Int(8))],
+                )]),
+            )
+            .unwrap();
+        pending
+            .stage(
+                false,
+                HashMap::from([(
+                    "x".into(),
+                    vec![(0, AttrValue::Int(7)), (1, AttrValue::Int(8))],
+                )]),
+            )
+            .unwrap();
+        let mut ctx = Context::new();
+        ctx.property_batch = Some(pending);
+        assert_eq!(
+            ctx.node_attribute(&subgraph, 0, &"x".into()).unwrap(),
+            Some(AttrValue::Int(7))
+        );
+        assert!(ctx.node_attribute(&subgraph, 2, &"x".into()).is_err());
+        assert!(ctx.edge_attribute(&subgraph, 1, &"x".into()).is_err());
+        owner.borrow_mut().remove_node(0).unwrap();
+        assert!(ctx.node_attribute(&subgraph, 0, &"x".into()).is_err());
+        assert!(ctx.edge_attribute(&subgraph, 0, &"x".into()).is_err());
+    }
     #[test]
     fn final_values_are_one_mixed_batch_and_prior_graph_values_stay_unchanged_until_accept() {
         let mut graph = Graph::new_publishing();

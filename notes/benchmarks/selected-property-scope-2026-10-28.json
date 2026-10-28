@@ -1,0 +1,58 @@
+{
+  "cases": [
+    {
+      "reads_per_sample": 100000,
+      "samples": [
+        {
+          "owner_read_seconds": 1.1348917e-07,
+          "selected_read_seconds": 1.0512458000000001e-07
+        },
+        {
+          "owner_read_seconds": 1.01715e-07,
+          "selected_read_seconds": 1.0484959e-07
+        },
+        {
+          "owner_read_seconds": 1.0091332999999999e-07,
+          "selected_read_seconds": 1.0522208e-07
+        },
+        {
+          "owner_read_seconds": 1.1851000000000001e-07,
+          "selected_read_seconds": 1.0625542e-07
+        },
+        {
+          "owner_read_seconds": 9.900916e-08,
+          "selected_read_seconds": 1.0534167000000001e-07
+        }
+      ],
+      "selected_nodes": 1000
+    },
+    {
+      "reads_per_sample": 100000,
+      "samples": [
+        {
+          "owner_read_seconds": 1.1185792e-07,
+          "selected_read_seconds": 1.2418167000000001e-07
+        },
+        {
+          "owner_read_seconds": 1.188225e-07,
+          "selected_read_seconds": 1.2474125e-07
+        },
+        {
+          "owner_read_seconds": 1.1754208000000001e-07,
+          "selected_read_seconds": 1.1781083e-07
+        },
+        {
+          "owner_read_seconds": 1.2058625e-07,
+          "selected_read_seconds": 1.2137542e-07
+        },
+        {
+          "owner_read_seconds": 1.1509208e-07,
+          "selected_read_seconds": 1.20405e-07
+        }
+      ],
+      "selected_nodes": 10000
+    }
+  ],
+  "fixture": "sequential scalar reads; selected graph excludes one otherwise active owner node",
+  "profile": "release"
+}

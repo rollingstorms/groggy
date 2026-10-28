@@ -361,6 +361,11 @@ pub trait SubgraphOperations: GraphEntity {
         node_id: NodeId,
         name: &AttrName,
     ) -> GraphResult<Option<AttrValue>> {
+        if !self.contains_node(node_id) {
+            return Err(GraphError::InvalidInput(format!(
+                "Node {node_id} is outside the subgraph selection"
+            )));
+        }
         let binding = self.graph_ref();
         let graph = binding.borrow();
         // Use the proper space-mapped attribute access instead of direct pool access
@@ -386,6 +391,11 @@ pub trait SubgraphOperations: GraphEntity {
         edge_id: EdgeId,
         name: &AttrName,
     ) -> GraphResult<Option<AttrValue>> {
+        if !self.contains_edge(edge_id) {
+            return Err(GraphError::InvalidInput(format!(
+                "Edge {edge_id} is outside the subgraph selection"
+            )));
+        }
         let binding = self.graph_ref();
         let graph = binding.borrow();
         graph.get_edge_attr(edge_id, name)
