@@ -1685,3 +1685,14 @@ invalid domains/controls, cancellation and atomic rollback are covered.
 receipts. Initial matrix GIL worker-progress timing failure passed isolated/full
 rechecks and is recorded under existing 29.26. No rows added/closed: **210 / 58**.
 Other facades/effects/alternate plans and compound topology remain open.
+
+
+## Tiny-divisor repair completed — 2026-10-28
+
+Completed the interrupted native builder division fix: valid tiny/subnormal
+nonzero divisors are accepted; exact signed zero still rejects. Node/edge and
+Python lowering modes, atomic rollback and cross-language subnormal conversion
+are verified. `builder-division-2026-10-28.md`: **1,417 native / 56 ignored**,
+**2,236 Python / 1 skipped**, **208 docs**, strict all-target core Clippy. No rows
+added/closed; **210 checked / 58 open**. Broader existing builder/effect and
+compound-topology scopes remain unchanged.

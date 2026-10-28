@@ -545,7 +545,7 @@ fn apply_div(
     let right = NumericValue::from(rhs, rhs_name)?;
 
     let divisor = right.as_f64();
-    if divisor.abs() <= f64::EPSILON {
+    if divisor == 0.0 {
         bail!(
             "division by zero: '{}' value is zero while evaluating '{}'",
             rhs_name,

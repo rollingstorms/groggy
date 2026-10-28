@@ -197,3 +197,57 @@ fn elementwise_extrema_preserve_exact_mixed_numbers_left_ties_and_map_kind() {
         assert_eq!(vars.scalar("out").unwrap(), &V::Int(99));
     }
 }
+
+#[test]
+fn division_accepts_tiny_nonzero_divisors_and_rejects_only_signed_zero() {
+    ensure_core_steps_registered();
+    let selected = selected();
+    let mut params = AlgorithmParams::new();
+    params.set_text("left", "a");
+    params.set_text("right", "b");
+    params.set_text("target", "out");
+    let step = global_step_registry()
+        .instantiate(&StepSpec {
+            id: "core.div".into(),
+            params,
+            inputs: vec![],
+            outputs: vec![],
+        })
+        .unwrap();
+    for value in [1e-20, -1e-20, f64::from_bits(1), -f64::from_bits(1), 1e-300] {
+        for edge in [false, true] {
+            let mut vars = StepVariables::default();
+            if edge {
+                vars.set_edge_map("a", HashMap::from([(0, V::Float(value))]));
+            } else {
+                vars.set_node_map("a", HashMap::from([(0, V::Float(value))]));
+            }
+            vars.set_scalar("b", V::Float(value));
+            step.apply(
+                &mut Context::new(),
+                &mut StepScope::new(&selected, &mut vars),
+            )
+            .unwrap();
+            let out = if edge {
+                vars.edge_map("out")
+            } else {
+                vars.node_map("out")
+            }
+            .unwrap();
+            assert_eq!(out[&0], V::Float(1.));
+        }
+    }
+    for zero in [0., -0.] {
+        let mut vars = StepVariables::default();
+        vars.set_node_map("a", HashMap::from([(0, V::Float(1.))]));
+        vars.set_scalar("b", V::Float(zero));
+        vars.set_scalar("out", V::Int(99));
+        assert!(step
+            .apply(
+                &mut Context::new(),
+                &mut StepScope::new(&selected, &mut vars)
+            )
+            .is_err());
+        assert_eq!(vars.scalar("out").unwrap(), &V::Int(99));
+    }
+}

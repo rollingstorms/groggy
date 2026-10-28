@@ -105,3 +105,32 @@ def test_scalar_extrema_preserve_left_ties_and_fuse_with_maps(name, optimize):
     graph.view().apply(builder.build(optimize=optimize), persist=True)
     assert graph.get_node_attr(0, "result") == 15
     assert isinstance(graph.get_node_attr(0, "tie"), int)
+
+
+@pytest.mark.parametrize("value", [1e-20, -1e-20, float.fromhex("0x0.0000000000001p-1022"),
+                                    -float.fromhex("0x0.0000000000001p-1022"), 1e-300])
+@pytest.mark.parametrize("atomic", [False, True])
+@pytest.mark.parametrize("optimize", [False, True])
+def test_tiny_nonzero_divisors_work_across_builder_modes(value, atomic, optimize):
+    graph = Graph()
+    graph.add_node()
+    builder = AlgorithmBuilder("tiny division")
+    values = builder.init_nodes(default=value)
+    builder.attach_as("ratio", values / value)
+    graph.view().apply(builder.build(atomic=atomic, optimize=optimize), persist=True)
+    assert graph.get_node_attr(0, "ratio") == 1.0
+
+
+@pytest.mark.parametrize("zero", [0.0, -0.0])
+@pytest.mark.parametrize("optimize", [False, True])
+def test_true_zero_division_discards_an_atomic_prefix(zero, optimize):
+    graph = Graph()
+    graph.add_node()
+    head = graph.current_state_id
+    builder = AlgorithmBuilder("zero division")
+    builder.attach_as("prefix", builder.init_nodes(default=9))
+    builder.attach_as("ratio", builder.init_nodes(default=1.0) / zero)
+    with pytest.raises(RuntimeError, match="division by zero"):
+        graph.view().apply(builder.build(atomic=True, optimize=optimize), persist=True)
+    assert graph.current_state_id == head
+    assert graph.get_node_attr(0, "prefix") is None

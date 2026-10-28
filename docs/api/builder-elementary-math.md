@@ -71,3 +71,18 @@ Legacy/IR and optimized/unoptimized registered step pipelines are covered. This
 completion does not certify alternate batch executors, all mathematical facades,
 all numeric fusion/folding domains or the broader typed-effects contract in
 AR7.8/30.1. See also [checked power](builder-power.md).
+
+
+## Tiny divisors
+
+Registered builder division rejects exact positive or negative zero. A finite
+nonzero divisor remains valid even below machine epsilon, including subnormals.
+For example, equal tiny values divide to one:
+
+```python
+builder = AlgorithmBuilder("tiny division")
+values = builder.init_nodes(default=1e-300)
+builder.attach_as("ratio", values / 1e-300)
+graph.view().apply(builder.build(atomic=True), persist=True)
+assert graph.get_node_attr(0, "ratio") == 1.0
+```
