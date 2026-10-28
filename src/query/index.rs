@@ -32,8 +32,7 @@ struct ColumnIndex {
 }
 #[derive(Debug, Default)]
 struct TopologyIndex {
-    endpoints: HashMap<(usize, usize), Vec<usize>>,
-    incident: HashMap<usize, Vec<usize>>,
+    endpoints: super::endpoints::EndpointIndex,
     neighbors: HashMap<usize, BTreeSet<usize>>,
     degrees: Vec<(usize, usize)>,
 }
@@ -195,19 +194,13 @@ impl GraphQueryIndex {
             None
         };
         let topology = if topology {
-            let mut index = TopologyIndex::default();
+            let mut index = TopologyIndex {
+                endpoints: super::endpoints::EndpointIndex::new(view.is_directed()),
+                ..Default::default()
+            };
             for edge in view.edge_ids() {
                 let (s, t) = view.edge_endpoints(edge)?;
-                let pair = if !view.is_directed() && s > t {
-                    (t, s)
-                } else {
-                    (s, t)
-                };
-                index.endpoints.entry(pair).or_default().push(edge);
-                index.incident.entry(s).or_default().push(edge);
-                if s != t {
-                    index.incident.entry(t).or_default().push(edge);
-                }
+                index.endpoints.insert(edge, s, t);
                 index.neighbors.entry(s).or_default().insert(t);
                 index.neighbors.entry(t).or_default().insert(s);
             }
@@ -258,6 +251,9 @@ impl GraphQueryIndex {
     /// Whether selected incidence, endpoints and degrees were explicitly indexed.
     pub fn has_topology(&self) -> bool {
         self.data.topology.is_some()
+    }
+    pub(crate) fn endpoint_index(&self) -> Option<&super::endpoints::EndpointIndex> {
+        self.data.topology.as_ref().map(|t| &t.endpoints)
     }
     fn require_column(&self, node: bool, name: &AttrName) -> GraphResult<&ColumnIndex> {
         (if node {
@@ -496,25 +492,17 @@ impl GraphQueryIndex {
             EdgeFilter::AttributeFilter { name, filter } => {
                 self.property(false, name, Some(filter))?
             }
-            EdgeFilter::ConnectsNodes { source, target } => {
-                let pair = if !self.view.is_directed() && source > target {
-                    (*target, *source)
-                } else {
-                    (*source, *target)
-                };
-                self.topology()?
-                    .endpoints
-                    .get(&pair)
-                    .into_iter()
-                    .flatten()
-                    .copied()
-                    .collect()
-            }
+            EdgeFilter::ConnectsNodes { source, target } => self
+                .topology()?
+                .endpoints
+                .between(*source, *target, super::TraversalDirection::Outgoing)
+                .into_iter()
+                .collect(),
             EdgeFilter::ConnectsAny(nodes) => {
                 let topology = self.topology()?;
                 nodes
                     .iter()
-                    .flat_map(|n| topology.incident.get(n).into_iter().flatten())
+                    .flat_map(|&n| topology.endpoints.incident(n))
                     .copied()
                     .collect()
             }

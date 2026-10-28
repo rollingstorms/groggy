@@ -90,7 +90,7 @@ Complete Groggy's temporal and provenance primitives. The Graphiti-specific inge
 
 16. **Add effective time separately from recorded time.** Graphiti facts have valid and invalid times, and property changes also need an effective timestamp. Use an explicit per-change time when supplied, otherwise the batch's publication clock; the engine separately records when the batch was accepted. Reconstruct a branch-scoped graph view for “what was true at T”, using the latest published version on that branch at view creation. Apply a `recorded_by=U` cutoff only when the caller explicitly requests “what did we know by U?”; the resulting view remains pinned. This uses the same immutable view and graph-to-table interface as a present-state selection; derived subgraphs and tables inherit the state/time pins. The current `snapshot_at_timestamp` selects only a whole-second commit timestamp across all commits and is insufficient for these reads.
 17. **Model episodes and provenance directly.** Store raw episode identity and content, the entities and facts derived from it, and links back to the source. Invalidate or supersede facts without erasing their evidence.
-18. **Extend primary and secondary indexes.** Item 6 adds an allocation-lifetime external-ID index with active-state/group checks; historical identity lookup currently scans snapshot properties. Explicit immutable secondary indexes now cover selected/global label, edge type, endpoint/incidence/degree, property equality and exact numeric/temporal ranges. A11.1 owner decision (2026-10-27): keep secondary indexes transient and rebuild explicitly for changed or reopened state; no persisted definitions or automatic maintenance/recovery. Captures preserve correctness across update/deletion, branch switches, effective history and recovery. Specialized retained group membership, temporal event/validity intervals and broader query integration remain 18.2. Allocation reservations retain their durable item 10 contract. See `captured-query-indexes-2026-10-27.md`.
+18. **Extend primary and secondary indexes.** Item 6 adds an allocation-lifetime external-ID index with active-state/group checks; historical identity lookup currently scans snapshot properties. Explicit immutable secondary indexes now cover selected/global label, edge type, endpoint/incidence/degree, property equality and exact numeric/temporal ranges. A11.1 owner decision (2026-10-27): keep secondary indexes transient and rebuild explicitly for changed or reopened state; no persisted definitions or automatic maintenance/recovery. Captures preserve correctness across update/deletion, branch switches, effective history and recovery. Specialized retained group membership and temporal event/validity intervals remain 18.2; owner capture/build and finite pattern integration are complete in 21.1. Allocation reservations retain their durable item 10 contract. See `captured-query-indexes-2026-10-27.md`.
 19. **Expose one coherent Python API.** Mirror the Rust contract for IDs, transactions, queries, temporal reads, properties, and errors. Verify the built Python extension end to end; passing Rust tests does not establish Python behavior.
 20. **Deferred — build a Graphiti data adapter.** After the Groggy core is finished, prove a round trip for Graphiti episodes, entities, facts, embeddings, attributes, UUIDs, group IDs, provenance, and time fields. Re-ingesting the same episode must be idempotent; invalidating a fact must preserve its history.
 
@@ -1609,3 +1609,13 @@ This completes ordering, pagination and bounded traversal components of existing
 21.1. Arbitrary multi-edge patterns and wider ordinary Graph/Subgraph query/view
 integration remain, alongside specialized 18.2 indexes and compound topology.
 Inventory stays **209 checked / 59 open** with no new rows.
+
+
+## Finite captured native query completion — 2026-10-27
+
+21.1 now includes finite graph-shaped named bindings over captured predicates and
+endpoint indexes, explicit direction/reuse, deterministic bounded pages and exact
+bound graph views. Native/Python owner capture/build entry points are implemented.
+See `graph-patterns-2026-10-27.md` for limits, independent exhaustive references,
+full verification and bounded release evidence. 21.2/26.1 legacy query ownership,
+specialized 18.2 indexes and compound topology acceptance remain open.

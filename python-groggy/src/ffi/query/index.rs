@@ -29,6 +29,38 @@ pub struct PyGraphQueryIndex {
 }
 #[pymethods]
 impl PyGraphQueryIndex {
+    #[pyo3(signature=(pattern, *, distinct_nodes=false, distinct_edges=false, offset=None, limit=None, max_expansions=None, allow_scan=false))]
+    fn match_pattern(
+        &self,
+        py: Python<'_>,
+        pattern: &super::pattern::PyGraphPattern,
+        distinct_nodes: bool,
+        distinct_edges: bool,
+        offset: Option<&PyAny>,
+        limit: Option<&PyAny>,
+        max_expansions: Option<&PyAny>,
+        allow_scan: bool,
+    ) -> PyResult<super::pattern::PyPatternMatches> {
+        use super::query::nonnegative_count;
+        let options = groggy::query::PatternOptions {
+            distinct_nodes,
+            distinct_edges,
+            offset: offset
+                .map(|v| nonnegative_count(v, "offset"))
+                .transpose()?
+                .unwrap_or(0),
+            limit: limit.map(|v| nonnegative_count(v, "limit")).transpose()?,
+            max_expansions: max_expansions
+                .map(|v| nonnegative_count(v, "max_expansions"))
+                .transpose()?,
+        };
+        py.allow_threads(|| {
+            self.inner
+                .match_pattern(&pattern.inner, &options, allow_scan)
+        })
+        .map(|inner| super::pattern::PyPatternMatches { inner })
+        .map_err(graph_error_to_py_err)
+    }
     #[pyo3(signature=(filter, *, order_by=None, descending=false, offset=None, limit=None, allow_scan=false))]
     fn query_nodes(
         &self,

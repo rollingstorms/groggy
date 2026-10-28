@@ -443,6 +443,8 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySubgraph>()?;
     m.add_class::<ffi::subgraphs::view::PyGraphView>()?;
     m.add_class::<ffi::query::index::PyGraphQueryIndex>()?;
+    m.add_class::<ffi::query::pattern::PyGraphPattern>()?;
+    m.add_class::<ffi::query::pattern::PyPatternMatches>()?;
     m.add_class::<ffi::subgraphs::view::PyGraphPath>()?;
     m.add_class::<ffi::subgraphs::view::PyPageRankResult>()?;
 

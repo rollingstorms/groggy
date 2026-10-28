@@ -1,0 +1,117 @@
+{
+  "cases": [
+    {
+      "capture_and_index_seconds": 0.001157875,
+      "edges": 999,
+      "nodes": 1000,
+      "samples": [
+        {
+          "full_expansions": 4993,
+          "full_seconds": 0.00091175,
+          "page_100_seconds": 0.000101375,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 4993,
+          "full_seconds": 0.0019345,
+          "page_100_seconds": 0.000106625,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 4993,
+          "full_seconds": 0.000797792,
+          "page_100_seconds": 9.0375e-05,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 4993,
+          "full_seconds": 0.0007665,
+          "page_100_seconds": 8.6959e-05,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 4993,
+          "full_seconds": 0.000768792,
+          "page_100_seconds": 9.1125e-05,
+          "page_expansions": 505
+        }
+      ]
+    },
+    {
+      "capture_and_index_seconds": 0.0130305,
+      "edges": 9999,
+      "nodes": 10000,
+      "samples": [
+        {
+          "full_expansions": 49993,
+          "full_seconds": 0.0123875,
+          "page_100_seconds": 0.000250541,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 49993,
+          "full_seconds": 0.009620792,
+          "page_100_seconds": 0.000251667,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 49993,
+          "full_seconds": 0.015031834,
+          "page_100_seconds": 0.000254958,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 49993,
+          "full_seconds": 0.009968875,
+          "page_100_seconds": 0.000204583,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 49993,
+          "full_seconds": 0.01089125,
+          "page_100_seconds": 0.000243417,
+          "page_expansions": 505
+        }
+      ]
+    },
+    {
+      "capture_and_index_seconds": 0.250187666,
+      "edges": 99999,
+      "nodes": 100000,
+      "samples": [
+        {
+          "full_expansions": 499993,
+          "full_seconds": 0.152393459,
+          "page_100_seconds": 0.001514458,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 499993,
+          "full_seconds": 0.162484209,
+          "page_100_seconds": 0.001510833,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 499993,
+          "full_seconds": 0.155080875,
+          "page_100_seconds": 0.001546583,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 499993,
+          "full_seconds": 0.159150167,
+          "page_100_seconds": 0.001497542,
+          "page_expansions": 505
+        },
+        {
+          "full_expansions": 499993,
+          "full_seconds": 0.156815417,
+          "page_100_seconds": 0.001615583,
+          "page_expansions": 505
+        }
+      ]
+    }
+  ],
+  "fixture": "directed two-edge chain pattern, no predicates",
+  "profile": "release"
+}

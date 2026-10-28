@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after the continuation: **209 checked / 59
+Current inventory after the continuation: **210 checked / 58
 open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
@@ -784,3 +784,17 @@ arbitrary multi-edge patterns and wider ordinary Graph/Subgraph integration;
 21.2/26.1, specialized 18.2 indexes and compound topology retain their stated
 existing scopes. Updated the finish plan's stale next-work paragraph to reflect
 already completed endpoint/restore/merge/native-boundary work.
+
+
+## Finite captured graph patterns — 2026-10-27
+
+Completed 21.1 with arbitrary finite named graph conjunctions, existing predicates,
+all directions, explicit reuse/distinctness, parallel identities, assignment
+budgets, deterministic pages and exact-bound pinned graph views. Shared endpoint
+postings serve entity filters and pattern joins. Graph/Subgraph/DurableGraph offer
+explicit capture/build entry points. Legacy connected query migration stays open.
+
+Evidence: `graph-patterns-2026-10-27.md`; **1,410 native / 56 ignored**,
+**2,103 Python / 1 skipped**, **199 docs**, strict all-target core Clippy. Analytic
+release receipts cover 1k/10k/100k chain nodes. Existing 21.1 closes; no new rows.
+Fixed inventory: **210 checked / 58 open**.

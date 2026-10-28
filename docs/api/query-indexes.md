@@ -150,3 +150,7 @@ latency guarantee is implied.
 
 For deterministic scalar ordering, pagination and bounded captured traversal, see
 [ordered pinned queries](ordered-pinned-queries.md).
+
+For finite named graph patterns (including branches, cycles and parallel edge
+bindings), see [captured graph patterns](graph-patterns.md). Owners also expose
+`build_index(...)` directly to capture and build explicitly.

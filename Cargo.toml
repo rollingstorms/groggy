@@ -314,3 +314,7 @@ harness = false
 [[bench]]
 name = "ordered_queries"
 harness = false
+
+[[bench]]
+name = "graph_patterns"
+harness = false

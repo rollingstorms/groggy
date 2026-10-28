@@ -16,12 +16,12 @@ See the flat checklist for each supported scope and evidence.
 
 Current remainder (2026-10-27): compound topology execution and typed effects
 (09.4b.2), ordinary connected Subgraph ownership (26.1/AR4/AR7.5), specialized
-indexes and broader query/pattern integration (18.2/21.1/21.2). Native default and
+indexes (18.2) and legacy pinned query migration (21.2). Native default and
 raw storage escape migrations are complete. Endpoint revisions (04.2), explicit
 tracked/reference restoration (13.3), checked three-way merges (14.2) and transient
 secondary-index lifecycle (18.3) are complete within their documented domains.
-Ordered/paged indexed queries and captured bounded traversal complete components
-of 21.1; arbitrary multi-edge patterns remain open.
+Indexed predicates, ordering/pages, captured bounded traversal, finite graph
+patterns and owner capture/build complete 21.1. See `graph-patterns-2026-10-27.md`.
 
 Core reclamation (15/06.3), full retained archive/import (10.3), explicit outer
 property pipelines, branch lifecycle (14.1), exact owned snapshots (12.2), property
@@ -29,7 +29,7 @@ history (11.2), effective reconstruction (16.2/16.3), checkpoint semantics (12.3
 and table facade/writeback (27.1/27.2/AR7.10) are complete within their recorded
 scopes. Wider storage platform/migration/scale (10.4), numerical production gates
 and service/Graphiti work retain their original boundaries. See the current flat
-checklist and linked exit receipts; fixed inventory is 209 checked / 59 open.
+checklist and linked exit receipts; fixed inventory is 210 checked / 58 open.
 
 Execution rule agreed with the owner's prioritization concern on 2026-10-25:
 prioritize usable core vertical slices and measured workloads. Take incidental
@@ -1630,3 +1630,17 @@ marshaller/build configuration and testing the declared Python-version matrix
 remains existing 19.2/34.2 work; forward-ABI3 and newer Python compatibility are
 not certified by these test totals. No checklist row or owner-policy question is
 added. All six implementation slices are committed; inventory is 208/60.
+
+
+## Finite native query completion — 2026-10-27
+
+21.1 is complete: named finite graph patterns join captured predicates/topology,
+with explicit node/edge reuse, direction, budgets, deterministic pages and exact
+bound graph views. Owner capture/build entry points are available in native and
+Python APIs. No rows added; fixed inventory is **210 checked / 58 open**.
+
+Receipt: `graph-patterns-2026-10-27.md`. Gates: **1,410 native / 56 ignored**,
+**2,103 Python / 1 skipped**, **199 docs**, strict all-target core Clippy. Bounded
+release checks cover 1k/10k/100k chain nodes, capture/index cost and full/page
+queries. Remaining connected-view migration, specialized 18.2 indexes and compound
+topology acceptance keep their existing priority; this does not close 21.2/26.1.

@@ -544,6 +544,20 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    #[pyo3(signature=(*, node_properties=Vec::new(), edge_properties=Vec::new(), topology=true))]
+    fn build_index(
+        &self,
+        py: Python<'_>,
+        node_properties: Vec<String>,
+        edge_properties: Vec<String>,
+        topology: bool,
+    ) -> PyResult<crate::ffi::query::index::PyGraphQueryIndex> {
+        let view = self.core()?.read_view().map_err(graph_error_to_py_err)?;
+        py.allow_threads(|| view.build_index(&node_properties, &edge_properties, topology))
+            .map(|inner| crate::ffi::query::index::PyGraphQueryIndex { inner })
+            .map_err(graph_error_to_py_err)
+    }
+
     #[pyo3(signature=(view,batch,message,author,*,schema=None))]
     fn apply_view_batch(
         &mut self,

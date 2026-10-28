@@ -1191,6 +1191,20 @@ impl PyGraph {
             .map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
+    #[pyo3(signature=(*, node_properties=Vec::new(), edge_properties=Vec::new(), topology=true))]
+    fn build_index(
+        &self,
+        py: Python<'_>,
+        node_properties: Vec<String>,
+        edge_properties: Vec<String>,
+        topology: bool,
+    ) -> PyResult<crate::ffi::query::index::PyGraphQueryIndex> {
+        let view = self.inner.borrow().read_view().map_err(graph_error_to_py_err)?;
+        py.allow_threads(|| view.build_index(&node_properties, &edge_properties, topology))
+            .map(|inner| crate::ffi::query::index::PyGraphQueryIndex { inner })
+            .map_err(graph_error_to_py_err)
+    }
+
     /// Filter nodes using NodeFilter object or string query
     ///
     /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
