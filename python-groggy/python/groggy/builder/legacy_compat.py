@@ -413,6 +413,18 @@ class BuiltAlgorithm(AlgorithmHandle):
                 },
             }
 
+        if step_type in ["core.pow", "pow"]:
+            left = step.get("left", step.get("a", step.get("base")))
+            right = step.get("right", step.get("b", step.get("exponent")))
+            return {
+                "id": "core.pow",
+                "params": {
+                    "left": self._resolve_operand(left, alias_map),
+                    "right": self._resolve_operand(right, alias_map),
+                    "target": step["output"],
+                },
+            }
+
         if step_type in ["core.recip", "recip"]:
             source = step.get("source", step.get("input"))
             return {

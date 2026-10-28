@@ -1660,3 +1660,15 @@ optimization/reference receipts document the conservative fallback cost. No rows
 added/closed: **210 checked / 58 open**. Broader typed effects/alias/lowering and
 compound topology acceptance remain AR7.8/30.1/09.4b.2. The existing unfinished
 builder power facade is documented under 30.1 without adding an audit row.
+
+
+## Checked builder power — 2026-10-27
+
+The preceding builder power gap is implemented for registered step pipelines:
+explicit/reflected ** and CoreOps.pow share the existing checked native expression
+kernel over node/edge maps and scalar operands, including exact integers, checked
+real powers and atomic failure behavior. Receipt: `builder-power-2026-10-27.md`.
+**1,413 native / 56 ignored**, **2,144 Python / 1 skipped**, **204 docs**, strict
+all-target core Clippy. Bounded release receipts validate every result at 1k/100k
+map rows. No rows added/closed; **210 checked / 58 open**. Other facades, alternate
+plans, complete typed effects and compound topology remain in the existing scope.

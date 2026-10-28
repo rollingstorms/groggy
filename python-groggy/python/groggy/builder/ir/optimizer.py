@@ -422,7 +422,7 @@ class IROptimizer:
             return self._is_scalar_variable(def_node.inputs[0])
 
         # Division/multiplication of scalars produces scalar
-        if def_node.op_type in ["div", "mul"] and len(def_node.inputs) >= 2:
+        if def_node.op_type in ["div", "mul", "pow"] and len(def_node.inputs) >= 2:
             return self._is_scalar_variable(
                 def_node.inputs[0]
             ) and self._is_scalar_variable(def_node.inputs[1])

@@ -672,16 +672,9 @@ class CoreOps:
             >>> # Variable exponent
             >>> result = builder.core.pow(values, exponents)
         """
-        var = self.builder._new_var("pow")
-        self.builder.steps.append(
-            {
-                "type": "core.pow",
-                "base": self._ensure_var(base),
-                "exponent": self._ensure_var(exponent),
-                "output": var.name,
-            }
+        return self._add_op(
+            "pow", [self._ensure_var(base), self._ensure_var(exponent)]
         )
-        return var
 
     def abs(self, values: VarHandle) -> VarHandle:
         """

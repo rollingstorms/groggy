@@ -11,13 +11,14 @@ use crate::types::{EdgeId, NodeId};
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope, StepSpec};
 
-/// Binary arithmetic operations (add, sub, mul, div).
+/// Binary arithmetic operations over scalar/node/edge values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BinaryOperation {
     Add,
     Sub,
     Mul,
     Div,
+    Pow,
 }
 
 impl BinaryOperation {
@@ -27,6 +28,7 @@ impl BinaryOperation {
             BinaryOperation::Sub => "Element-wise subtraction",
             BinaryOperation::Mul => "Element-wise multiplication",
             BinaryOperation::Div => "Element-wise division",
+            BinaryOperation::Pow => "Checked element-wise power",
         }
     }
 
@@ -42,6 +44,9 @@ impl BinaryOperation {
             BinaryOperation::Sub => apply_sub(lhs, rhs, lhs_name, rhs_name),
             BinaryOperation::Mul => apply_mul(lhs, rhs, lhs_name, rhs_name),
             BinaryOperation::Div => apply_div(lhs, rhs, lhs_name, rhs_name),
+            BinaryOperation::Pow => {
+                super::expression::eval_binary_op(super::expression::BinaryOp::Pow, lhs, rhs)
+            }
         }
     }
 }
@@ -139,6 +144,13 @@ impl Step for BinaryArithmeticStep {
                 scope
                     .variables_mut()
                     .set_edge_map(self.target.clone(), result);
+                Ok(())
+            }
+            (Operand::Scalar(lhs), Operand::Scalar(rhs)) if self.op == BinaryOperation::Pow => {
+                let result = self.op.apply(lhs, rhs, &self.left, &self.right)?;
+                scope
+                    .variables_mut()
+                    .set_scalar(self.target.clone(), result);
                 Ok(())
             }
             (Operand::Scalar(_), Operand::Scalar(_)) => {

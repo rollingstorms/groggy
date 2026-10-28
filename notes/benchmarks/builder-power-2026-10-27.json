@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "nodes": 1000,
+      "samples_seconds": [
+        0.000154625,
+        8.2542e-05,
+        6.2459e-05,
+        6.1375e-05,
+        6.225e-05
+      ]
+    },
+    {
+      "nodes": 100000,
+      "samples_seconds": [
+        0.011195375,
+        0.0142955,
+        0.010159625,
+        0.010725791,
+        0.010715958
+      ]
+    }
+  ],
+  "fixture": "checked integer cube-of-cube column power, scalar exponent 9",
+  "profile": "release"
+}

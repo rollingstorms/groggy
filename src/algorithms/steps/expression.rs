@@ -407,7 +407,7 @@ pub(super) fn validate_value(value: &AlgorithmParamValue) -> Result<()> {
     }
 }
 
-fn eval_binary_op(
+pub(super) fn eval_binary_op(
     op: BinaryOp,
     left: &AlgorithmParamValue,
     right: &AlgorithmParamValue,

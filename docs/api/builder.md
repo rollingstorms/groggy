@@ -58,3 +58,8 @@ read semantics and the remaining persistent pipeline boundary.
 mutation on success. It preserves original step order and rejects unmigrated step
 families. See [atomic builder properties](atomic-builder-properties.md) for
 read-after-write semantics, compatibility and limits.
+
+## Checked power
+
+See [builder power](builder-power.md) for `CoreOps.pow`, `**`, reflected power,
+checked integer/f64 domains, selected scope and atomic failure behavior.

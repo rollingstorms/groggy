@@ -439,6 +439,25 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
     )?;
 
     registry.register(
+        "core.pow",
+        StepMetadata {
+            id: "core.pow".to_string(),
+            description: BinaryOperation::Pow.description().to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let (left, right, target) = read_binary_operands(spec, "core.pow")?;
+            Ok(Box::new(BinaryArithmeticStep::new(
+                "core.pow",
+                left,
+                right,
+                target,
+                BinaryOperation::Pow,
+            )))
+        },
+    )?;
+
+    registry.register(
         "core.recip",
         StepMetadata {
             id: "core.recip".to_string(),

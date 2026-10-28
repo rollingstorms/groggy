@@ -76,8 +76,11 @@ class VarHandle:
 
     def __pow__(self, other: Union["VarHandle", float, int]) -> "VarHandle":
         """Power: a ** b"""
-        # Will be implemented in Phase 2 when we add pow to CoreOps
-        raise NotImplementedError("Power operator not yet implemented")
+        return self.builder.core.pow(self, other)
+
+    def __rpow__(self, other: Union[float, int]) -> "VarHandle":
+        """Power with a scalar base: scalar ** values."""
+        return self.builder.core.pow(other, self)
 
     # Comparison operators (return mask VarHandles with 0.0/1.0 values)
     def __eq__(self, other: Union["VarHandle", float, int]) -> "VarHandle":
