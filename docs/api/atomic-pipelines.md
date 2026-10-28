@@ -39,10 +39,11 @@ builder steps. Streaming/topology effects and unsupported custom algorithms or
 builder steps reject explicitly.
 Supported builder children can have either local atomic flag: an outer run owns
 the batch, and children borrow it without accepting intermediate versions. Execution
-uses the supplied compiled step order. Build mutation-sensitive Python children
-with `atomic=True` (or disable optimization), which preserves their original step
-order; an outer run cannot recover steps reordered before compilation. Effect-aware
-IR migration remains AR7.8.
+uses the supplied compiled step order. Default Python builder compilation now
+preserves interleaved effects and subsequent computations in statement order,
+including children built with their default local atomic flag. Explicit atomic
+builds still bypass optimization entirely. Arbitrary effect-aware IR migration
+remains AR7.8; custom precompiled plans remain responsible for their supplied order.
 
 The outer run requires a clean graph head for persistent updates, preserves the
 selected node/edge scope. Its staged batch binds the write owner, selected branch

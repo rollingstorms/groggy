@@ -1,0 +1,287 @@
+{
+  "extension": "in-tree release",
+  "fixture": "builder order correctness receipts",
+  "ordering": "alternating optimize=False/True each sample",
+  "cases": [
+    {
+      "nodes": 1000,
+      "ordered_effects": false,
+      "samples": {
+        "False": [
+          {
+            "compile_seconds": 2.0459000000028205e-05,
+            "execute_seconds": 0.014998457999999992,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.2833999999961598e-05,
+            "execute_seconds": 0.0012649579999999272,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.1957999999978597e-05,
+            "execute_seconds": 0.0012176669999999223,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.4500000000028379e-05,
+            "execute_seconds": 0.0012889160000000288,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.4749999999952301e-05,
+            "execute_seconds": 0.0013012909999999822,
+            "compiled_steps": 6
+          }
+        ],
+        "True": [
+          {
+            "compile_seconds": 0.00036720899999997947,
+            "execute_seconds": 0.0026645830000000537,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.00016929200000004307,
+            "execute_seconds": 0.0013445839999999265,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.0001607500000000428,
+            "execute_seconds": 0.0013006670000000886,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.0001530409999999094,
+            "execute_seconds": 0.001318667000000051,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.00018333300000006325,
+            "execute_seconds": 0.0014107920000000496,
+            "compiled_steps": 7
+          }
+        ]
+      },
+      "medians": {
+        "False": {
+          "compile_seconds": 1.4500000000028379e-05,
+          "execute_seconds": 0.0012889160000000288
+        },
+        "True": {
+          "compile_seconds": 0.00016929200000004307,
+          "execute_seconds": 0.0013445839999999265
+        }
+      }
+    },
+    {
+      "nodes": 1000,
+      "ordered_effects": true,
+      "samples": {
+        "False": [
+          {
+            "compile_seconds": 1.3541999999922005e-05,
+            "execute_seconds": 0.0036717910000000353,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.3124999999947207e-05,
+            "execute_seconds": 0.003290832999999993,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.3959000000007826e-05,
+            "execute_seconds": 0.0032318329999999618,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.5125000000004718e-05,
+            "execute_seconds": 0.00442854199999998,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.8000000000073513e-05,
+            "execute_seconds": 0.003433457999999945,
+            "compiled_steps": 6
+          }
+        ],
+        "True": [
+          {
+            "compile_seconds": 2.187500000006004e-05,
+            "execute_seconds": 0.0033242500000000286,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.8125000000090985e-05,
+            "execute_seconds": 0.0032061249999999486,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.5375000000039662e-05,
+            "execute_seconds": 0.0032501660000000543,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.5166000000066404e-05,
+            "execute_seconds": 0.0032415000000000083,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.7416000000047838e-05,
+            "execute_seconds": 0.0032385420000000664,
+            "compiled_steps": 6
+          }
+        ]
+      },
+      "medians": {
+        "False": {
+          "compile_seconds": 1.3959000000007826e-05,
+          "execute_seconds": 0.003433457999999945
+        },
+        "True": {
+          "compile_seconds": 1.7416000000047838e-05,
+          "execute_seconds": 0.0032415000000000083
+        }
+      }
+    },
+    {
+      "nodes": 10000,
+      "ordered_effects": false,
+      "samples": {
+        "False": [
+          {
+            "compile_seconds": 2.5374999999994152e-05,
+            "execute_seconds": 0.01328087500000008,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.8791000000017988e-05,
+            "execute_seconds": 0.013083708999999999,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.7000000000044757e-05,
+            "execute_seconds": 0.01465170799999993,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.8791000000017988e-05,
+            "execute_seconds": 0.01183962499999991,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.8750000000178346e-05,
+            "execute_seconds": 0.016104707999999857,
+            "compiled_steps": 6
+          }
+        ],
+        "True": [
+          {
+            "compile_seconds": 0.00023062500000003983,
+            "execute_seconds": 0.01300749999999995,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.0001734999999999376,
+            "execute_seconds": 0.012338167000000011,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.0001747920000000347,
+            "execute_seconds": 0.012638958000000033,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.00017674999999994778,
+            "execute_seconds": 0.014455458000000032,
+            "compiled_steps": 7
+          },
+          {
+            "compile_seconds": 0.00016762500000000458,
+            "execute_seconds": 0.012077832999999982,
+            "compiled_steps": 7
+          }
+        ]
+      },
+      "medians": {
+        "False": {
+          "compile_seconds": 1.8791000000017988e-05,
+          "execute_seconds": 0.01328087500000008
+        },
+        "True": {
+          "compile_seconds": 0.0001747920000000347,
+          "execute_seconds": 0.012638958000000033
+        }
+      }
+    },
+    {
+      "nodes": 10000,
+      "ordered_effects": true,
+      "samples": {
+        "False": [
+          {
+            "compile_seconds": 1.7457999999859197e-05,
+            "execute_seconds": 0.039849542000000016,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.6875000000027285e-05,
+            "execute_seconds": 0.032476584000000086,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.5499999999946112e-05,
+            "execute_seconds": 0.03337316700000015,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.883400000002311e-05,
+            "execute_seconds": 0.048004332999999955,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.9416999999855022e-05,
+            "execute_seconds": 0.033742417000000025,
+            "compiled_steps": 6
+          }
+        ],
+        "True": [
+          {
+            "compile_seconds": 2.1666999999947478e-05,
+            "execute_seconds": 0.05089620799999994,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 2.1749999999931546e-05,
+            "execute_seconds": 0.037719832999999925,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 2.0249999999943924e-05,
+            "execute_seconds": 0.033165083000000095,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.8917000000007178e-05,
+            "execute_seconds": 0.033810334,
+            "compiled_steps": 6
+          },
+          {
+            "compile_seconds": 1.833299999987048e-05,
+            "execute_seconds": 0.03722329199999996,
+            "compiled_steps": 6
+          }
+        ]
+      },
+      "medians": {
+        "False": {
+          "compile_seconds": 1.7457999999859197e-05,
+          "execute_seconds": 0.033742417000000025
+        },
+        "True": {
+          "compile_seconds": 2.0249999999943924e-05,
+          "execute_seconds": 0.03722329199999996
+        }
+      }
+    }
+  ]
+}

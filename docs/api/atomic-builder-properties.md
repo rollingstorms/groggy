@@ -64,11 +64,14 @@ cancellation between iterations and child steps. An alternate `batch_plan` rejec
 in atomic mode because its executor bypasses property staging. Temporal and other remaining graph-dependent families still require migration/certification.
 Sampler pipelines reject an atomic property request rather than ignoring it.
 
-Atomic mode uses the builder's original ordered steps. The current IR optimizer
-has no graph-property effect edges and can move attachments past later reads, so
-its optimization pass is bypassed for atomic builds, including when optimize=True.
-The normal build path keeps its existing optimizer behavior. Effect-aware
-optimization remains AR7.8 work.
+Atomic mode uses the builder's original ordered steps, including when optimize=True.
+Ordinary algorithm and sampler builds also preserve their original program when
+an output-free effect precedes a later computation, preventing attachments from
+moving past subsequent reads. Terminal-output value programs retain optimization.
+Expression reuse preserves operand positions and is restricted to known value
+operations; graph/property reads and opaque effects are not assumed reusable.
+Complete effect-aware optimization remains AR7.8 work. See
+[builder optimization order](builder-optimization-order.md).
 
 ## Compatibility and limits
 

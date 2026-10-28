@@ -115,7 +115,7 @@ class IROptimizer:
         if node.domain == IRDomain.ATTR and node.op_type in ("attach", "store"):
             return True
         # Control flow operations have side effects
-        if node.domain == IRDomain.CONTROL:
+        if node.domain in {IRDomain.CONTROL, IRDomain.EXECUTION, IRDomain.UNKNOWN}:
             return True
         return False
 
@@ -203,6 +203,18 @@ class IROptimizer:
         for node in self.ir.nodes:
             # Skip nodes with side effects
             if self._has_side_effects(node):
+                seen_ops.clear()
+                continue
+
+            # Only certified value operations are reusable. Graph/property reads
+            # and opaque/custom operations require effects and source-version
+            # identity that this IR does not yet represent.
+            if node.domain != IRDomain.CORE or node.op_type not in {
+                "constant", "scalar", "add", "sub", "mul", "div", "pow",
+                "neg", "recip", "sqrt", "abs", "sum", "mean", "min", "max",
+                "norm", "compare", "where", "broadcast_scalar", "reduce_scalar",
+            }:
+                seen_ops.clear()
                 continue
 
             # Skip nodes without outputs
@@ -231,22 +243,15 @@ class IROptimizer:
         Create a unique signature for an operation.
         Two nodes with the same signature compute the same result.
         """
-        # Include domain and operation type
-        sig_parts = [f"{node.domain.value}.{node.op_type}"]
-
-        # Include sorted inputs
-        input_str = ",".join(sorted(node.inputs))
-        sig_parts.append(input_str)
-
-        # Include relevant metadata (skip output names)
-        meta_parts = []
-        for key in sorted(node.metadata.keys()):
-            if key not in {"output", "name", "id", "line"}:
-                meta_parts.append(f"{key}={node.metadata[key]}")
-        if meta_parts:
-            sig_parts.append(",".join(meta_parts))
-
-        return "::".join(sig_parts)
+        # Operand positions matter for subtraction, division, powers, comparisons
+        # and conditional branches. Preserve them even for commutative operators;
+        # a future canonicalization must prove its dtype/numeric semantics.
+        metadata = tuple(
+            (key, node.metadata[key])
+            for key in sorted(node.metadata)
+            if key not in {"output", "name", "id", "line"}
+        )
+        return repr((node.domain.value, node.op_type, tuple(node.inputs), metadata))
 
     def _apply_replacements(self, replacements: Dict[str, str]):
         """Replace all uses of old variable names with new ones."""

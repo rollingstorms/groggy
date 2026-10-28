@@ -1644,3 +1644,19 @@ Receipt: `graph-patterns-2026-10-27.md`. Gates: **1,410 native / 56 ignored**,
 release checks cover 1k/10k/100k chain nodes, capture/index cost and full/page
 queries. Remaining connected-view migration, specialized 18.2 indexes and compound
 topology acceptance keep their existing priority; this does not close 21.2/26.1.
+
+
+## Builder operand/effect-order repairs — 2026-10-27
+
+Default compilation now preserves interleaved effects and subsequent reads for
+algorithm/sampler builders. CSE keeps operand positions, limits reuse to known
+value operations, and retains observable execution blocks in DCE. Reproduced wrong
+results (7 instead of 2 after a write, 16 instead of 0 for reversed subtraction)
+are fixed. Evidence: `builder-optimization-order-2026-10-27.md`.
+
+Sixteen new cases; **2,119 root Python / 1 skipped**, **201 docs**; native baseline
+unchanged at **1,410 / 56 ignored**, strict Clippy. Local 1k/10k alternating
+optimization/reference receipts document the conservative fallback cost. No rows
+added/closed: **210 checked / 58 open**. Broader typed effects/alias/lowering and
+compound topology acceptance remain AR7.8/30.1/09.4b.2. The existing unfinished
+builder power facade is documented under 30.1 without adding an audit row.

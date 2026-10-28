@@ -23,6 +23,23 @@ from groggy.builder.varhandle import (GraphHandle, SubgraphArrayHandle,
                                       SubgraphHandle, VarHandle)
 
 
+def _requires_statement_order(steps: List[Dict[str, Any]]) -> bool:
+    """Keep ordered effects in place until the IR represents their dependencies.
+
+    Legacy lowering appends output-free effects after the regenerated value
+    graph. That is safe for a terminal output suffix, but changes the program
+    when a later computation reads an earlier write or control block.
+    """
+    saw_effect = False
+    for step in steps:
+        if step.get("output"):
+            if saw_effect:
+                return True
+        elif step.get("type") != "alias":
+            saw_effect = True
+    return False
+
+
 class AlgorithmBuilder:
     """
     Orchestrator for building algorithms via domain traits.
@@ -769,6 +786,7 @@ class AlgorithmBuilder:
             optimize
             and not atomic
             and not _has_histogram_output(steps)
+            and not _requires_statement_order(steps)
             and self.use_ir
             and self.ir_graph is not None
         ):
@@ -855,7 +873,13 @@ class AlgorithmBuilder:
         """
         steps = self.steps
 
-        if optimize and self.use_ir and self.ir_graph is not None:
+        if (
+            optimize
+            and not _has_histogram_output(steps)
+            and not _requires_statement_order(steps)
+            and self.use_ir
+            and self.ir_graph is not None
+        ):
             from groggy.builder.ir.optimizer import optimize_ir
 
             self._rebuild_ir_from_steps()
