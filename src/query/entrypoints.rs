@@ -2,6 +2,10 @@
 use super::GraphQueryIndex;
 use crate::{subgraphs::Subgraph, AttrName, DurableGraph, Graph, GraphResult};
 impl Graph {
+    /// Capture current selected references and their retained source membership.
+    pub fn build_group_index(&self) -> GraphResult<super::GroupMembershipIndex> {
+        self.read_view()?.build_group_index()
+    }
     /// Capture current values and explicitly build transient query indexes.
     pub fn build_index(
         &self,
@@ -14,6 +18,10 @@ impl Graph {
     }
 }
 impl Subgraph {
+    /// Capture the current connected selection before building a frozen index.
+    pub fn build_group_index(&self) -> GraphResult<super::GroupMembershipIndex> {
+        self.pin_view()?.build_group_index()
+    }
     /// Freeze the current selected values before explicit index construction.
     /// Stale selections reject rather than silently dropping inactive identities.
     pub fn build_index(
@@ -27,6 +35,10 @@ impl Subgraph {
     }
 }
 impl DurableGraph {
+    /// Explicit group capture/build without appending or retaining a storage lock.
+    pub fn build_group_index(&self) -> GraphResult<super::GroupMembershipIndex> {
+        self.read_view()?.build_group_index()
+    }
     /// Explicit read-index construction publishes/appends no durable state.
     pub fn build_index(
         &self,

@@ -103,5 +103,6 @@ These intervals describe individual stored values. A boolean property such as
 `valid` can express fact validity explicitly, as above. Cross-property/domain
 inference and automatic text/vector indexing are separate concerns. Edge
 intervals do not certify endpoint validity; use canonical `read_view_at()` when
-a valid whole graph is required. Group-membership indexes remain open in 18.2.
+a valid whole graph is required. See [group-membership indexes](group-membership-indexes.md)
+for retained source membership and nested reverse references.
 No index definitions are persisted or maintained automatically during mutation.

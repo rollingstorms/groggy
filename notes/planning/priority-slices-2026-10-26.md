@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after the continuation: **210 checked / 58
+Current inventory after the continuation: **211 checked / 57
 open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
@@ -880,3 +880,27 @@ strict all-target core Clippy and bounded 100/10k unrelated-event release receip
 The larger fixture measured 0.173 µs indexed versus 4.128 µs scanned; build cost
 was 5.549 ms. Group-membership indexes remain in 18.2. No new rows or premature
 parent closure: **210 checked / 58 open**.
+
+
+## Secondary-index family completed — 2026-10-28
+
+GroupMembershipIndex completes the remaining 18.2 family: selected typed root
+node/edge references, reachable nested revision links, source-qualified frozen
+membership and deterministic direct/recursive reverse references. Canonical IDs
+resolve local legacy aliases per source; plain integers do not imply references.
+GraphView/Graph/DurableGraph/Subgraph expose explicit capture/build; rebuild/copy
+preserve old captures and source/time pins. No implicit storage registration or
+automatic maintenance. `secondary-indexes-exit-review-2026-10-28.md` reviews the
+complete fixed index-family inventory and closes the existing 18.2 row.
+
+Gates: **1,428 native / 56 ignored**, **2,285 root Python / 1 skipped**, **218 docs**,
+strict all-target core Clippy. Native release 101/10,001-root fixtures compare
+indexed reverse lookup against a borrowed selected-property scan, checking every
+result. At 10,001 roots, medians were 0.203 µs for one direct hit, 644.510 µs for
+the scan, and 0.779 ms to emit all 10,001 recursive references; build from an
+already captured view cost 2.031 ms. No production/RSS/whole-owner-capture claim.
+
+Fixed checklist moves **210 checked / 58 open → 211 checked / 57 open**, with no
+new rows. Next core priorities retain their original scope: 09.4b.2 compound
+execution/effects, 26.1/AR4/AR7.5 connected-view ownership, and 21.2 legacy pinned
+query migration. Wider scale/storage/platform and service/Graphiti items remain.

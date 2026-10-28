@@ -565,6 +565,16 @@ impl PyDurableGraph {
             .map_err(graph_error_to_py_err)
     }
 
+    fn build_group_index(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<crate::ffi::query::groups::PyGroupMembershipIndex> {
+        let view = self.core()?.read_view().map_err(graph_error_to_py_err)?;
+        py.allow_threads(|| view.build_group_index())
+            .map(|inner| crate::ffi::query::groups::PyGroupMembershipIndex { inner })
+            .map_err(graph_error_to_py_err)
+    }
+
     #[pyo3(signature=(*, node_properties=Vec::new(), edge_properties=Vec::new(), topology=true))]
     fn build_index(
         &self,

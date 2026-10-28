@@ -8,6 +8,7 @@
 pub(crate) mod endpoints;
 mod entrypoints;
 pub(crate) mod filtering;
+pub mod groups;
 pub mod index;
 pub mod ordering;
 pub mod pattern;
@@ -17,6 +18,7 @@ pub mod selection;
 pub mod traversal;
 pub(crate) mod weights;
 
+pub use groups::{GroupMembershipIndex, GroupReference};
 pub use index::GraphQueryIndex;
 pub use ordering::QueryOptions;
 pub use pattern::{

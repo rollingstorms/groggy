@@ -349,7 +349,7 @@ Code / record context:
 
 Roadmap: 18, 32 / AR2. Timing: BEFORE SECONDARY INDEXES.
 
-**Current code / problem:** Managed external identities remain durable. Explicit GraphQueryIndex now provides frozen global/selected property equality/range, label/type, endpoint/incidence and temporal-property queries. Ordinary Graph scan selection remains supported. EffectiveTimeIndex now provides retained effective event windows, structural activation and exact property-value/absence intervals, with explicit recorded cutoffs (2026-10-28). Specialized retained group membership remains 18.2; broader legacy query migration remains 21.2.
+**Current code / problem:** Managed external identities remain durable. Explicit GraphQueryIndex now provides frozen global/selected property equality/range, label/type, endpoint/incidence and temporal-property queries. Ordinary Graph scan selection remains supported. EffectiveTimeIndex now provides retained effective event windows, structural activation and exact property-value/absence intervals, with explicit recorded cutoffs (2026-10-28). GroupMembershipIndex completes retained membership, nested revision links and selected root reverse references (2026-10-28). The fixed 18.2 family inventory is complete; broader legacy query migration remains 21.2.
 
 **Already agreed:** Indexes are global rather than per label by default. **Owner decision 2026-10-27:** keep secondary indexes transient and rebuild explicitly. The prior incremental-publication/recovery suggestion below is superseded; it is not an accepted policy.
 

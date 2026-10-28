@@ -68,6 +68,7 @@ __version__ = "0.5.1"
 GraphView = _groggy.GraphView
 GraphQueryIndex = _groggy.GraphQueryIndex
 EffectiveTimeIndex = _groggy.EffectiveTimeIndex
+GroupMembershipIndex = _groggy.GroupMembershipIndex
 GraphPattern = _groggy.GraphPattern
 PatternMatches = _groggy.PatternMatches
 GraphPath = _groggy.GraphPath
@@ -185,6 +186,7 @@ __all__ = [
     "GraphView",
     "GraphQueryIndex",
     "EffectiveTimeIndex",
+    "GroupMembershipIndex",
     "GraphPattern",
     "PatternMatches",
     "GraphPath",

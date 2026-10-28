@@ -15,11 +15,11 @@ and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
 Current remainder (2026-10-28): compound topology execution and typed effects
-(09.4b.2), ordinary connected Subgraph ownership (26.1/AR4/AR7.5), specialized
-group-membership indexes (18.2) and legacy pinned query migration
-(21.2). Effective event windows, structural activation and exact property-value intervals
-now complete their 18.2 components; see `effective-time-indexes-2026-10-28.md`
-and `property-intervals-2026-10-28.md`. Native default and
+(09.4b.2), ordinary connected Subgraph ownership (26.1/AR4/AR7.5) and legacy pinned
+query migration (21.2). The listed secondary-index families now complete 18.2:
+property/label/type/topology, effective events/activation, exact property intervals
+and retained group membership/reverse references. See
+`secondary-indexes-exit-review-2026-10-28.md`. Native default and
 raw storage escape migrations are complete. Endpoint revisions (04.2), explicit
 tracked/reference restoration (13.3), checked three-way merges (14.2) and transient
 secondary-index lifecycle (18.3) are complete within their documented domains.
@@ -32,7 +32,7 @@ history (11.2), effective reconstruction (16.2/16.3), checkpoint semantics (12.3
 and table facade/writeback (27.1/27.2/AR7.10) are complete within their recorded
 scopes. Wider storage platform/migration/scale (10.4), numerical production gates
 and service/Graphiti work retain their original boundaries. See the current flat
-checklist and linked exit receipts; fixed inventory is 210 checked / 58 open.
+checklist and linked exit receipts; fixed inventory is 211 checked / 57 open.
 
 Execution rule agreed with the owner's prioritization concern on 2026-10-25:
 prioritize usable core vertical slices and measured workloads. Take incidental
@@ -1729,3 +1729,27 @@ strict all-target core Clippy and bounded 100/10k unrelated-event release receip
 The larger fixture measured 0.173 µs indexed versus 4.128 µs scanned; build cost
 was 5.549 ms. Group-membership indexes remain in 18.2. No new rows or premature
 parent closure: **210 checked / 58 open**.
+
+
+## Secondary-index family completed — 2026-10-28
+
+GroupMembershipIndex completes the remaining 18.2 family: selected typed root
+node/edge references, reachable nested revision links, source-qualified frozen
+membership and deterministic direct/recursive reverse references. Canonical IDs
+resolve local legacy aliases per source; plain integers do not imply references.
+GraphView/Graph/DurableGraph/Subgraph expose explicit capture/build; rebuild/copy
+preserve old captures and source/time pins. No implicit storage registration or
+automatic maintenance. `secondary-indexes-exit-review-2026-10-28.md` reviews the
+complete fixed index-family inventory and closes the existing 18.2 row.
+
+Gates: **1,428 native / 56 ignored**, **2,285 root Python / 1 skipped**, **218 docs**,
+strict all-target core Clippy. Native release 101/10,001-root fixtures compare
+indexed reverse lookup against a borrowed selected-property scan, checking every
+result. At 10,001 roots, medians were 0.203 µs for one direct hit, 644.510 µs for
+the scan, and 0.779 ms to emit all 10,001 recursive references; build from an
+already captured view cost 2.031 ms. No production/RSS/whole-owner-capture claim.
+
+Fixed checklist moves **210 checked / 58 open → 211 checked / 57 open**, with no
+new rows. Next core priorities retain their original scope: 09.4b.2 compound
+execution/effects, 26.1/AR4/AR7.5 connected-view ownership, and 21.2 legacy pinned
+query migration. Wider scale/storage/platform and service/Graphiti items remain.

@@ -133,6 +133,19 @@ impl PySubgraph {
 impl PySubgraph {
     // === Basic Properties - delegate to SubgraphOperations ===
 
+    fn build_group_index(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<crate::ffi::query::groups::PyGroupMembershipIndex> {
+        let view = self
+            .inner
+            .pin_view()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        py.allow_threads(|| view.build_group_index())
+            .map(|inner| crate::ffi::query::groups::PyGroupMembershipIndex { inner })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     #[pyo3(signature=(*, node_properties=Vec::new(), edge_properties=Vec::new(), topology=true))]
     fn build_index(
         &self,

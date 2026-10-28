@@ -334,3 +334,7 @@ harness = false
 [[bench]]
 name = "property_intervals"
 harness = false
+
+[[bench]]
+name = "group_membership_index"
+harness = false

@@ -90,7 +90,7 @@ Complete Groggy's temporal and provenance primitives. The Graphiti-specific inge
 
 16. **Add effective time separately from recorded time.** Graphiti facts have valid and invalid times, and property changes also need an effective timestamp. Use an explicit per-change time when supplied, otherwise the batch's publication clock; the engine separately records when the batch was accepted. Reconstruct a branch-scoped graph view for “what was true at T”, using the latest published version on that branch at view creation. Apply a `recorded_by=U` cutoff only when the caller explicitly requests “what did we know by U?”; the resulting view remains pinned. This uses the same immutable view and graph-to-table interface as a present-state selection; derived subgraphs and tables inherit the state/time pins. The current `snapshot_at_timestamp` selects only a whole-second commit timestamp across all commits and is insufficient for these reads.
 17. **Model episodes and provenance directly.** Store raw episode identity and content, the entities and facts derived from it, and links back to the source. Invalidate or supersede facts without erasing their evidence.
-18. **Extend primary and secondary indexes.** Item 6 adds an allocation-lifetime external-ID index with active-state/group checks; historical identity lookup currently scans snapshot properties. Explicit immutable secondary indexes now cover selected/global label, edge type, endpoint/incidence/degree, property equality and exact numeric/temporal ranges. A11.1 owner decision (2026-10-27): keep secondary indexes transient and rebuild explicitly for changed or reopened state; no persisted definitions or automatic maintenance/recovery. Captures preserve correctness across update/deletion, branch switches, effective history and recovery. EffectiveTimeIndex adds indexed effective-time events, structural activation and exact property-value/absence intervals with explicit recorded cutoffs. Specialized retained group membership remains 18.2; owner capture/build and finite pattern integration are complete in 21.1. Allocation reservations retain their durable item 10 contract. See `captured-query-indexes-2026-10-27.md`.
+18. **Extend primary and secondary indexes.** Item 6 adds an allocation-lifetime external-ID index with active-state/group checks; historical identity lookup currently scans snapshot properties. Explicit immutable secondary indexes now cover selected/global label, edge type, endpoint/incidence/degree, property equality and exact numeric/temporal ranges. A11.1 owner decision (2026-10-27): keep secondary indexes transient and rebuild explicitly for changed or reopened state; no persisted definitions or automatic maintenance/recovery. Captures preserve correctness across update/deletion, branch switches, effective history and recovery. EffectiveTimeIndex adds indexed effective-time events, structural activation and exact property-value/absence intervals with explicit recorded cutoffs. GroupMembershipIndex completes retained source membership, nested links and direct/recursive selected root reverse references. The fixed 18.2 family inventory is complete; see `secondary-indexes-exit-review-2026-10-28.md`. Owner capture/build and finite pattern integration are complete in 21.1; broader legacy query migration remains 21.2. Allocation reservations retain their durable item 10 contract. See `captured-query-indexes-2026-10-27.md`.
 19. **Expose one coherent Python API.** Mirror the Rust contract for IDs, transactions, queries, temporal reads, properties, and errors. Verify the built Python extension end to end; passing Rust tests does not establish Python behavior.
 20. **Deferred — build a Graphiti data adapter.** After the Groggy core is finished, prove a round trip for Graphiti episodes, entities, facts, embeddings, attributes, UUIDs, group IDs, provenance, and time fields. Re-ingesting the same episode must be idempotent; invalidating a fact must preserve its history.
 
@@ -1701,3 +1701,27 @@ strict all-target core Clippy and bounded 100/10k unrelated-event release receip
 The larger fixture measured 0.173 µs indexed versus 4.128 µs scanned; build cost
 was 5.549 ms. Group-membership indexes remain in 18.2. No new rows or premature
 parent closure: **210 checked / 58 open**.
+
+
+## Secondary-index family completed — 2026-10-28
+
+GroupMembershipIndex completes the remaining 18.2 family: selected typed root
+node/edge references, reachable nested revision links, source-qualified frozen
+membership and deterministic direct/recursive reverse references. Canonical IDs
+resolve local legacy aliases per source; plain integers do not imply references.
+GraphView/Graph/DurableGraph/Subgraph expose explicit capture/build; rebuild/copy
+preserve old captures and source/time pins. No implicit storage registration or
+automatic maintenance. `secondary-indexes-exit-review-2026-10-28.md` reviews the
+complete fixed index-family inventory and closes the existing 18.2 row.
+
+Gates: **1,428 native / 56 ignored**, **2,285 root Python / 1 skipped**, **218 docs**,
+strict all-target core Clippy. Native release 101/10,001-root fixtures compare
+indexed reverse lookup against a borrowed selected-property scan, checking every
+result. At 10,001 roots, medians were 0.203 µs for one direct hit, 644.510 µs for
+the scan, and 0.779 ms to emit all 10,001 recursive references; build from an
+already captured view cost 2.031 ms. No production/RSS/whole-owner-capture claim.
+
+Fixed checklist moves **210 checked / 58 open → 211 checked / 57 open**, with no
+new rows. Next core priorities retain their original scope: 09.4b.2 compound
+execution/effects, 26.1/AR4/AR7.5 connected-view ownership, and 21.2 legacy pinned
+query migration. Wider scale/storage/platform and service/Graphiti items remain.

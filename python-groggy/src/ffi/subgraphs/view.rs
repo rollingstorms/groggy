@@ -9,6 +9,14 @@ pub struct PyGraphView {
 }
 #[pymethods]
 impl PyGraphView {
+    fn build_group_index(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<crate::ffi::query::groups::PyGroupMembershipIndex> {
+        py.allow_threads(|| self.inner.build_group_index())
+            .map(|inner| crate::ffi::query::groups::PyGroupMembershipIndex { inner })
+            .map_err(graph_error_to_py_err)
+    }
     #[pyo3(signature=(seeds, max_hops, *, direction="outgoing"))]
     fn within_hops(
         &self,

@@ -86,7 +86,8 @@ assert new_index.read_view_at(50).node_ids == []
 
 Activation describes structural add/remove history. For value/absence intervals
 and explicitly stored boolean validity, see [property intervals](property-intervals.md).
-Retained group-membership indexes remain work under checklist 18.2.
+See [group-membership indexes](group-membership-indexes.md) for retained source
+membership and nested reverse references.
 An edge activation interval alone does not certify endpoint
 validity. `read_view_at()` applies the canonical complete affected endpoint
 timeline checks and frozen group-source checks before returning a graph.

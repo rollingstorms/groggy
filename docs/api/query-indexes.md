@@ -145,7 +145,8 @@ definition, including incoming directed edges. Degrees share GraphView's selecte
 loop/multiedge semantics. These queries do not expand the captured edge scope.
 
 These indexes use one explicit immutable lifecycle. Specialized retained
-group-membership indexes remain work in 18.2. Effective-time event/activation
+[group-membership indexes](group-membership-indexes.md) now support selected
+reverse references, nested revisions and source-qualified membership. Effective-time event/activation
 indexes and [property-value intervals](property-intervals.md) are available through
 explicit `build_effective_index()`. A group ID stored as an ordinary property
 can already use the generic equality index. Ordinary live Subgraph migration and

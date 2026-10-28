@@ -1,0 +1,74 @@
+{
+  "cases": [
+    {
+      "build_seconds": 1.8916e-05,
+      "direct_hits": 1,
+      "reachable_groups": 2,
+      "recursive_hits": 101,
+      "root_nodes": 101,
+      "samples": [
+        {
+          "indexed_direct_seconds": 2.3708e-07,
+          "indexed_recursive_seconds": 6.917e-06,
+          "selected_column_scan_seconds": 3.6041699999999997e-06
+        },
+        {
+          "indexed_direct_seconds": 2.1625e-07,
+          "indexed_recursive_seconds": 6.292e-06,
+          "selected_column_scan_seconds": 3.58375e-06
+        },
+        {
+          "indexed_direct_seconds": 1.9625e-07,
+          "indexed_recursive_seconds": 8.083e-06,
+          "selected_column_scan_seconds": 3.57e-06
+        },
+        {
+          "indexed_direct_seconds": 2.1542e-07,
+          "indexed_recursive_seconds": 5.875e-06,
+          "selected_column_scan_seconds": 3.71167e-06
+        },
+        {
+          "indexed_direct_seconds": 2.1084e-07,
+          "indexed_recursive_seconds": 5.583e-06,
+          "selected_column_scan_seconds": 3.7554199999999998e-06
+        }
+      ]
+    },
+    {
+      "build_seconds": 0.002031166,
+      "direct_hits": 1,
+      "reachable_groups": 2,
+      "recursive_hits": 10001,
+      "root_nodes": 10001,
+      "samples": [
+        {
+          "indexed_direct_seconds": 2.0333e-07,
+          "indexed_recursive_seconds": 0.000851417,
+          "selected_column_scan_seconds": 0.00057910083
+        },
+        {
+          "indexed_direct_seconds": 2.4208e-07,
+          "indexed_recursive_seconds": 0.000785833,
+          "selected_column_scan_seconds": 0.00066658416
+        },
+        {
+          "indexed_direct_seconds": 1.9709e-07,
+          "indexed_recursive_seconds": 0.000779292,
+          "selected_column_scan_seconds": 0.0006445095900000001
+        },
+        {
+          "indexed_direct_seconds": 2.5375e-07,
+          "indexed_recursive_seconds": 0.00076875,
+          "selected_column_scan_seconds": 0.00063907541
+        },
+        {
+          "indexed_direct_seconds": 1.9499999999999999e-07,
+          "indexed_recursive_seconds": 0.000751833,
+          "selected_column_scan_seconds": 0.0007021266700000001
+        }
+      ]
+    }
+  ],
+  "fixture": "two retained revisions; many roots refer to parent and one directly to nested leaf",
+  "profile": "release"
+}
