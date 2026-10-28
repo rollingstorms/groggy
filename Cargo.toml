@@ -330,3 +330,7 @@ harness = false
 [[bench]]
 name = "effective_time_index"
 harness = false
+
+[[bench]]
+name = "property_intervals"
+harness = false

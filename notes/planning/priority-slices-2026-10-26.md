@@ -865,3 +865,18 @@ core Clippy, local 100/10k property-event release receipts. Whole-state reads
 still replay the selected prefix; the larger narrow window measured 0.603 µs
 indexed versus 7.346 µs scanned. Group-membership and attribute/fact validity
 indexes remain within 18.2. No rows added/closed: **210 checked / 58 open**.
+
+
+## Exact property-value intervals — 2026-10-28
+
+Completed the next existing 18.2 component: EffectiveTimeIndex now returns exact
+node/edge property-value and absence intervals inside active lifetimes, with
+explicit recorded cutoffs, accepted-order ties and canonical retained-value
+coalescing. Property/lifecycle postings skip unrelated history; no whole-graph
+snapshot replay or automatic mutation maintenance. Stored boolean properties
+express fact validity through the same API. `property-intervals-2026-10-28.md`:
+**1,423 native / 56 ignored**, **2,274 root Python / 1 skipped**, **214 docs**,
+strict all-target core Clippy and bounded 100/10k unrelated-event release receipts.
+The larger fixture measured 0.173 µs indexed versus 4.128 µs scanned; build cost
+was 5.549 ms. Group-membership indexes remain in 18.2. No new rows or premature
+parent closure: **210 checked / 58 open**.

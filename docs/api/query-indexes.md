@@ -144,9 +144,10 @@ is interchangeable. Neighbor predicates retain their existing incident-neighbor
 definition, including incoming directed edges. Degrees share GraphView's selected
 loop/multiedge semantics. These queries do not expand the captured edge scope.
 
-These indexes use one explicit immutable lifecycle. Working-Graph index catalogs,
-specialized retained group-membership indexes and temporal event/validity-interval
-indexes remain separate work in 18.2. A group ID stored as an ordinary property
+These indexes use one explicit immutable lifecycle. Specialized retained
+group-membership indexes remain work in 18.2. Effective-time event/activation
+indexes and [property-value intervals](property-intervals.md) are available through
+explicit `build_effective_index()`. A group ID stored as an ordinary property
 can already use the generic equality index. Ordinary live Subgraph migration and
 broader query languages remain open; no automatic maintenance or production
 latency guarantee is implied.

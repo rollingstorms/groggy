@@ -90,7 +90,7 @@ Complete Groggy's temporal and provenance primitives. The Graphiti-specific inge
 
 16. **Add effective time separately from recorded time.** Graphiti facts have valid and invalid times, and property changes also need an effective timestamp. Use an explicit per-change time when supplied, otherwise the batch's publication clock; the engine separately records when the batch was accepted. Reconstruct a branch-scoped graph view for “what was true at T”, using the latest published version on that branch at view creation. Apply a `recorded_by=U` cutoff only when the caller explicitly requests “what did we know by U?”; the resulting view remains pinned. This uses the same immutable view and graph-to-table interface as a present-state selection; derived subgraphs and tables inherit the state/time pins. The current `snapshot_at_timestamp` selects only a whole-second commit timestamp across all commits and is insufficient for these reads.
 17. **Model episodes and provenance directly.** Store raw episode identity and content, the entities and facts derived from it, and links back to the source. Invalidate or supersede facts without erasing their evidence.
-18. **Extend primary and secondary indexes.** Item 6 adds an allocation-lifetime external-ID index with active-state/group checks; historical identity lookup currently scans snapshot properties. Explicit immutable secondary indexes now cover selected/global label, edge type, endpoint/incidence/degree, property equality and exact numeric/temporal ranges. A11.1 owner decision (2026-10-27): keep secondary indexes transient and rebuild explicitly for changed or reopened state; no persisted definitions or automatic maintenance/recovery. Captures preserve correctness across update/deletion, branch switches, effective history and recovery. Specialized retained group membership and temporal event/validity intervals remain 18.2; owner capture/build and finite pattern integration are complete in 21.1. Allocation reservations retain their durable item 10 contract. See `captured-query-indexes-2026-10-27.md`.
+18. **Extend primary and secondary indexes.** Item 6 adds an allocation-lifetime external-ID index with active-state/group checks; historical identity lookup currently scans snapshot properties. Explicit immutable secondary indexes now cover selected/global label, edge type, endpoint/incidence/degree, property equality and exact numeric/temporal ranges. A11.1 owner decision (2026-10-27): keep secondary indexes transient and rebuild explicitly for changed or reopened state; no persisted definitions or automatic maintenance/recovery. Captures preserve correctness across update/deletion, branch switches, effective history and recovery. EffectiveTimeIndex adds indexed effective-time events, structural activation and exact property-value/absence intervals with explicit recorded cutoffs. Specialized retained group membership remains 18.2; owner capture/build and finite pattern integration are complete in 21.1. Allocation reservations retain their durable item 10 contract. See `captured-query-indexes-2026-10-27.md`.
 19. **Expose one coherent Python API.** Mirror the Rust contract for IDs, transactions, queries, temporal reads, properties, and errors. Verify the built Python extension end to end; passing Rust tests does not establish Python behavior.
 20. **Deferred — build a Graphiti data adapter.** After the Groggy core is finished, prove a round trip for Graphiti episodes, entities, facts, embeddings, attributes, UUIDs, group IDs, provenance, and time fields. Re-ingesting the same episode must be idempotent; invalidating a fact must preserve its history.
 
@@ -1686,3 +1686,18 @@ core Clippy, local 100/10k property-event release receipts. Whole-state reads
 still replay the selected prefix; the larger narrow window measured 0.603 µs
 indexed versus 7.346 µs scanned. Group-membership and attribute/fact validity
 indexes remain within 18.2. No rows added/closed: **210 checked / 58 open**.
+
+
+## Exact property-value intervals — 2026-10-28
+
+Completed the next existing 18.2 component: EffectiveTimeIndex now returns exact
+node/edge property-value and absence intervals inside active lifetimes, with
+explicit recorded cutoffs, accepted-order ties and canonical retained-value
+coalescing. Property/lifecycle postings skip unrelated history; no whole-graph
+snapshot replay or automatic mutation maintenance. Stored boolean properties
+express fact validity through the same API. `property-intervals-2026-10-28.md`:
+**1,423 native / 56 ignored**, **2,274 root Python / 1 skipped**, **214 docs**,
+strict all-target core Clippy and bounded 100/10k unrelated-event release receipts.
+The larger fixture measured 0.173 µs indexed versus 4.128 µs scanned; build cost
+was 5.549 ms. Group-membership indexes remain in 18.2. No new rows or premature
+parent closure: **210 checked / 58 open**.

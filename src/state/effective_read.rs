@@ -8,6 +8,10 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
+mod property_intervals;
+pub use property_intervals::PropertyInterval;
+type PropertyPostings = HashMap<(bool, usize), HashMap<AttrName, Vec<usize>>>;
+
 /// The branch/head and clocks captured for an immutable effective-time read.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ReadTime {
@@ -392,6 +396,7 @@ pub struct EffectiveTimeIndex {
     events: Arc<EffectiveReadIndex>,
     by_entity: Arc<HashMap<(bool, usize), Vec<usize>>>,
     by_activation: Arc<HashMap<(bool, usize), Vec<usize>>>,
+    by_property: Arc<PropertyPostings>,
 }
 impl Position {
     fn entity(self, delta: &super::Delta) -> (bool, usize) {
@@ -435,7 +440,22 @@ impl EffectiveReadPlan {
         let events = self.event_index()?;
         let mut by_entity: HashMap<_, Vec<_>> = HashMap::new();
         let mut by_activation: HashMap<_, Vec<_>> = HashMap::new();
+        let mut by_property = PropertyPostings::new();
         for (ordinal, &(_, accepted, _, position)) in events.events.iter().enumerate() {
+            let delta = &self.context.commits[accepted].delta;
+            let property = match position {
+                Position::NodeAttr(row) => Some(&delta.node_attr_changes[row].1),
+                Position::EdgeAttr(row) => Some(&delta.edge_attr_changes[row].1),
+                _ => None,
+            };
+            if let Some(name) = property {
+                by_property
+                    .entry(position.entity(delta))
+                    .or_default()
+                    .entry(name.clone())
+                    .or_default()
+                    .push(ordinal);
+            }
             by_entity
                 .entry(position.entity(&self.context.commits[accepted].delta))
                 .or_default()
@@ -458,6 +478,7 @@ impl EffectiveReadPlan {
             events,
             by_entity: Arc::new(by_entity),
             by_activation: Arc::new(by_activation),
+            by_property: Arc::new(by_property),
         })
     }
 }

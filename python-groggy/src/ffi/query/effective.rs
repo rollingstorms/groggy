@@ -2,10 +2,13 @@
 use crate::ffi::{
     api::graph_batch::{change_key_to_python, timestamp},
     subgraphs::view::PyGraphView,
-    utils::graph_error_to_py_err,
+    utils::{attr_value_to_python_value, graph_error_to_py_err},
 };
-use groggy::query::{EffectiveTimeEvent, EffectiveTimeIndex};
-use pyo3::{prelude::*, types::PyList};
+use groggy::query::{EffectiveTimeEvent, EffectiveTimeIndex, PropertyInterval};
+use pyo3::{
+    prelude::*,
+    types::{PyDict, PyList},
+};
 fn cutoff(value: Option<&PyAny>) -> PyResult<Option<i64>> {
     value.map(timestamp).transpose()
 }
@@ -16,6 +19,22 @@ fn rows(py: Python<'_>, events: Vec<EffectiveTimeEvent>) -> PyResult<PyObject> {
         row.set_item("state_id", event.state_id)?;
         row.set_item("effective_at", event.effective_at)?;
         row.set_item("recorded_at", event.recorded_at)?;
+        rows.append(row)?;
+    }
+    Ok(rows.into())
+}
+fn intervals(py: Python<'_>, intervals: Vec<PropertyInterval>) -> PyResult<PyObject> {
+    let rows = PyList::empty(py);
+    for interval in intervals {
+        let row = PyDict::new(py);
+        row.set_item("start", interval.start)?;
+        row.set_item("end", interval.end)?;
+        row.set_item("present", interval.value.is_some())?;
+        let value = match interval.value {
+            Some(value) => attr_value_to_python_value(py, &value)?,
+            None => py.None(),
+        };
+        row.set_item("value", value)?;
         rows.append(row)?;
     }
     Ok(rows.into())
@@ -38,6 +57,38 @@ impl PyEffectiveTimeIndex {
     #[getter]
     fn event_count(&self) -> usize {
         self.inner.event_count()
+    }
+    #[pyo3(signature=(node, name, *, recorded_by=None))]
+    fn node_property_intervals(
+        &self,
+        py: Python<'_>,
+        node: &PyAny,
+        name: &str,
+        recorded_by: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
+        let id = super::query::nonnegative_count(node, "node")?;
+        let by = cutoff(recorded_by)?;
+        intervals(
+            py,
+            py.allow_threads(|| self.inner.node_property_intervals(id, name, by))
+                .map_err(graph_error_to_py_err)?,
+        )
+    }
+    #[pyo3(signature=(edge, name, *, recorded_by=None))]
+    fn edge_property_intervals(
+        &self,
+        py: Python<'_>,
+        edge: &PyAny,
+        name: &str,
+        recorded_by: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
+        let id = super::query::nonnegative_count(edge, "edge")?;
+        let by = cutoff(recorded_by)?;
+        intervals(
+            py,
+            py.allow_threads(|| self.inner.edge_property_intervals(id, name, by))
+                .map_err(graph_error_to_py_err)?,
+        )
     }
     #[pyo3(signature=(effective_at, *, recorded_by=None))]
     fn read_view_at(

@@ -267,3 +267,191 @@ fn captures_are_branch_scoped_thread_safe_and_builds_reject_pending_manual_chang
         .node_ids()
         .is_empty());
 }
+
+#[test]
+fn property_intervals_match_point_reads_across_null_absence_ties_and_lifetimes() {
+    let (mut g, first) = fixture();
+    update(&mut g, 30, V::Int(3));
+    update(&mut g, 20, V::Int(2));
+    update(&mut g, 20, V::Null);
+    publish(
+        &mut g,
+        GraphBatch {
+            unset_node_attrs: [("x".into(), vec![N::Existing(0)])].into(),
+            effective_at: Some(25),
+            ..Default::default()
+        },
+    );
+    publish(
+        &mut g,
+        GraphBatch {
+            remove_nodes: vec![N::Existing(0)],
+            effective_at: Some(40),
+            ..Default::default()
+        },
+    );
+    restore(&mut g, first, 50);
+    let index = g.build_effective_index().unwrap();
+    let rows = index.node_property_intervals(0, "x", None).unwrap();
+    let tuples: Vec<_> = rows
+        .iter()
+        .map(|r| (r.start, r.end, r.value.clone()))
+        .collect();
+    assert_eq!(
+        tuples,
+        vec![
+            (10, Some(20), Some(V::Int(1))),
+            (20, Some(25), Some(V::Null)),
+            (25, Some(30), None),
+            (30, Some(40), Some(V::Int(3))),
+            (50, None, Some(V::Int(1))),
+        ]
+    );
+    let cutoffs = [
+        None,
+        Some(i64::MIN),
+        Some(g.publication_metadata(first).unwrap().unwrap().recorded_at),
+    ];
+    for cutoff in cutoffs {
+        for node in [true, false] {
+            for name in ["x", "never_assigned"] {
+                let rows = if node {
+                    index.node_property_intervals(0, name, cutoff)
+                } else {
+                    index.edge_property_intervals(0, name, cutoff)
+                }
+                .unwrap();
+                for at in [
+                    i64::MIN,
+                    9,
+                    10,
+                    19,
+                    20,
+                    24,
+                    25,
+                    29,
+                    30,
+                    39,
+                    40,
+                    49,
+                    50,
+                    i64::MAX,
+                ] {
+                    let view = index.read_view_at(at, cutoff).unwrap();
+                    let found = rows
+                        .iter()
+                        .find(|r| r.start <= at && r.end.is_none_or(|end| at < end));
+                    let active = if node {
+                        view.nodes().contains(&0)
+                    } else {
+                        view.edges().contains(&0)
+                    };
+                    assert_eq!(found.is_some(), active);
+                    if let Some(row) = found {
+                        let value = if node {
+                            view.node_attr(0, &name.into())
+                        } else {
+                            view.edge_attr(0, &name.into())
+                        }
+                        .unwrap();
+                        assert_eq!(row.value, value);
+                    }
+                }
+            }
+        }
+    }
+    assert!(index
+        .node_property_intervals(999, "x", None)
+        .unwrap()
+        .is_empty());
+    assert!(index
+        .edge_property_intervals(999, "x", None)
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn property_intervals_ignore_inactive_writes_and_preserve_exact_float_payloads() {
+    use groggy::BatchChangeRef as C;
+    let mut g = Graph::new();
+    publish(
+        &mut g,
+        GraphBatch {
+            add_nodes: 1,
+            node_attrs: [("x".into(), vec![(N::Added(0), V::Int(1))])].into(),
+            effective_at: Some(i64::MIN),
+            change_times: vec![
+                (C::NodeAdded(N::Added(0)), 10),
+                (C::NodeAttribute(N::Added(0), "x".into()), i64::MIN),
+            ],
+            ..Default::default()
+        },
+    );
+    let absent = g
+        .build_effective_index()
+        .unwrap()
+        .node_property_intervals(0, "x", None)
+        .unwrap();
+    assert_eq!(absent.len(), 1);
+    assert_eq!(
+        (absent[0].start, absent[0].end, &absent[0].value),
+        (10, None, &None)
+    );
+    let values = [
+        V::Float64(0.),
+        V::Float64(-0.),
+        V::Float(0.),
+        V::Float64(f64::from_bits(0x7ff8_0000_0000_0001)),
+        V::Float64(f64::from_bits(0x7ff8_0000_0000_0002)),
+    ];
+    for (i, value) in values.iter().enumerate() {
+        update(&mut g, 20 + i as i64, value.clone());
+    }
+    let index = g.build_effective_index().unwrap();
+    let rows = index.node_property_intervals(0, "x", None).unwrap();
+    assert_eq!(rows.len(), 6);
+    for (row, value) in rows[1..].iter().zip(&values) {
+        match (&row.value, value) {
+            (Some(V::Float64(a)), V::Float64(b)) => assert_eq!(a.to_bits(), b.to_bits()),
+            (Some(V::Float(a)), V::Float(b)) => assert_eq!(a.to_bits(), b.to_bits()),
+            _ => panic!("Unexpected type"),
+        }
+    }
+}
+
+#[test]
+fn property_intervals_coalesce_equal_time_reactivation_and_extreme_bounds() {
+    for restored_at in [40, 50] {
+        let (mut g, first) = fixture();
+        publish(
+            &mut g,
+            GraphBatch {
+                remove_nodes: vec![N::Existing(0)],
+                effective_at: Some(40),
+                ..Default::default()
+            },
+        );
+        restore(&mut g, first, restored_at);
+        let index = g.build_effective_index().unwrap();
+        let rows = index.node_property_intervals(0, "x", None).unwrap();
+        assert_eq!(rows.len(), if restored_at == 40 { 1 } else { 2 });
+        assert_eq!(rows[0].end, if restored_at == 40 { None } else { Some(40) });
+        let missing = index.node_property_intervals(0, "missing", None).unwrap();
+        assert_eq!(missing.len(), rows.len());
+        assert!(missing.iter().all(|r| r.value.is_none()));
+    }
+    let mut g = Graph::new();
+    publish(
+        &mut g,
+        GraphBatch {
+            add_nodes: 1,
+            effective_at: Some(i64::MIN),
+            ..Default::default()
+        },
+    );
+    update(&mut g, i64::MAX, V::Int(7));
+    let index = g.build_effective_index().unwrap();
+    let rows = index.node_property_intervals(0, "x", None).unwrap();
+    assert_eq!((rows[0].start, rows[0].end), (i64::MIN, Some(i64::MAX)));
+    assert_eq!((rows[1].start, rows[1].end), (i64::MAX, None));
+}

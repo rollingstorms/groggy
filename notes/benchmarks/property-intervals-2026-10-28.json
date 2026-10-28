@@ -1,0 +1,62 @@
+{
+  "cases": [
+    {
+      "build_seconds": 3.8375e-05,
+      "intervals": 2,
+      "samples": [
+        {
+          "indexed_interval_seconds": 2.0375e-07,
+          "linear_timeline_seconds": 1.0292000000000001e-07
+        },
+        {
+          "indexed_interval_seconds": 2.3916e-07,
+          "linear_timeline_seconds": 1.0625e-07
+        },
+        {
+          "indexed_interval_seconds": 1.8208e-07,
+          "linear_timeline_seconds": 1.9375e-07
+        },
+        {
+          "indexed_interval_seconds": 1.9e-07,
+          "linear_timeline_seconds": 9.334000000000001e-08
+        },
+        {
+          "indexed_interval_seconds": 1.6291999999999998e-07,
+          "linear_timeline_seconds": 8.958e-08
+        }
+      ],
+      "total_events": 104,
+      "unrelated_property_events": 100
+    },
+    {
+      "build_seconds": 0.005548666,
+      "intervals": 2,
+      "samples": [
+        {
+          "indexed_interval_seconds": 1.65e-07,
+          "linear_timeline_seconds": 4.04542e-06
+        },
+        {
+          "indexed_interval_seconds": 1.7958999999999998e-07,
+          "linear_timeline_seconds": 4.1275e-06
+        },
+        {
+          "indexed_interval_seconds": 1.7917e-07,
+          "linear_timeline_seconds": 4.25208e-06
+        },
+        {
+          "indexed_interval_seconds": 1.7292e-07,
+          "linear_timeline_seconds": 4.21917e-06
+        },
+        {
+          "indexed_interval_seconds": 1.6916e-07,
+          "linear_timeline_seconds": 4.11125e-06
+        }
+      ],
+      "total_events": 10004,
+      "unrelated_property_events": 10000
+    }
+  ],
+  "fixture": "one continuously active node; two x assignments and 100/10000 intervening noise assignments",
+  "profile": "release"
+}
