@@ -417,3 +417,9 @@ Captured selections also support exact membership union/intersection/difference,
 node-membership similarity and typed node/edge grouping. See
 [captured view algebra](api/captured-view-algebra.md) for common-capture rules,
 endpoint closure and connected compatibility behavior.
+
+`bfs`/`dfs` return exact captured discovery trees; `has_path` and
+`shortest_path_subgraph` restrict every traversal step to selected membership.
+`is_connected` defines empty/weak/strong cases explicitly. See
+[captured traversal](api/captured-view-traversal.md) for tree-versus-neighborhood
+semantics and connected compatibility repairs.

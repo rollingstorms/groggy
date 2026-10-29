@@ -1,0 +1,122 @@
+{
+  "capturing_adapter": {
+    "cases": [
+      {
+        "captured_bfs_seconds": [
+          1.959e-06,
+          1.334e-06,
+          1.041e-06,
+          9.17e-07,
+          8.34e-07
+        ],
+        "connected_after_last_reader_release_seconds": 0.000666541,
+        "connected_bfs_with_payload_retained_seconds": [
+          0.000123625,
+          6.0209e-05,
+          5.9625e-05,
+          5.7542e-05,
+          5.775e-05
+        ],
+        "edges": 999,
+        "initial_capture_seconds": 0.000720125,
+        "nodes": 1000,
+        "whole_owner_engine_bfs_seconds": [
+          0.000143583,
+          1.125e-06,
+          9.58e-07,
+          9.17e-07,
+          9.17e-07
+        ]
+      },
+      {
+        "captured_bfs_seconds": [
+          1.4333e-05,
+          1.2e-05,
+          3.875e-06,
+          3e-06,
+          3.208e-06
+        ],
+        "connected_after_last_reader_release_seconds": 0.190769042,
+        "connected_bfs_with_payload_retained_seconds": [
+          0.049684333,
+          0.084343667,
+          0.035173958,
+          0.03159575,
+          0.037499666
+        ],
+        "edges": 99999,
+        "initial_capture_seconds": 0.550405,
+        "nodes": 100000,
+        "whole_owner_engine_bfs_seconds": [
+          0.184639583,
+          8.667e-06,
+          8.208e-06,
+          8.333e-06,
+          7.291e-06
+        ]
+      }
+    ],
+    "fixture": "undirected chain, no properties; three-hop BFS of a full selection; global engine is a performance reference only, invalid as a selected-scope substitute",
+    "profile": "release"
+  },
+  "topology_adapter": {
+    "cases": [
+      {
+        "captured_bfs_seconds": [
+          1.4125e-05,
+          1.167e-06,
+          9.58e-07,
+          8.75e-07,
+          2.375e-06
+        ],
+        "connected_after_last_reader_release_seconds": 1.958e-06,
+        "connected_bfs_with_payload_retained_seconds": [
+          0.00024275,
+          1.875e-06,
+          1.625e-06,
+          1.666e-06,
+          1.834e-06
+        ],
+        "edges": 999,
+        "initial_capture_seconds": 0.000676958,
+        "nodes": 1000,
+        "whole_owner_engine_bfs_seconds": [
+          2.542e-06,
+          1.125e-06,
+          1e-06,
+          8.75e-07,
+          9.17e-07
+        ]
+      },
+      {
+        "captured_bfs_seconds": [
+          1.3e-05,
+          2.3458e-05,
+          1e-06,
+          8.34e-07,
+          8.34e-07
+        ],
+        "connected_after_last_reader_release_seconds": 2.0125e-05,
+        "connected_bfs_with_payload_retained_seconds": [
+          0.031965834,
+          3.375e-06,
+          1.5e-06,
+          4.375e-06,
+          1.541e-06
+        ],
+        "edges": 99999,
+        "initial_capture_seconds": 0.202574916,
+        "nodes": 100000,
+        "whole_owner_engine_bfs_seconds": [
+          5.416e-06,
+          9.58e-07,
+          8.75e-07,
+          7.92e-07,
+          7.5e-07
+        ]
+      }
+    ],
+    "fixture": "undirected chain, no properties; three-hop BFS of a full selection; global engine is a performance reference only, invalid as a selected-scope substitute",
+    "profile": "release"
+  }
+}

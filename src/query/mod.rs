@@ -14,6 +14,7 @@ pub mod ordering;
 pub mod pattern;
 pub mod query;
 pub mod query_parser;
+pub(crate) mod scoped_traversal;
 pub mod selection;
 pub mod traversal;
 pub(crate) mod weights;

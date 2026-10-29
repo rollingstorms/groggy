@@ -21,6 +21,20 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
+/// Cache validity includes the space instance, since restoration replaces a space
+/// and may recreate the same numeric mutation version. This pins identity only.
+#[derive(Debug, Clone)]
+pub(crate) struct SpaceVersion {
+    instance: Arc<()>,
+    version: u64,
+}
+impl PartialEq for SpaceVersion {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version && Arc::ptr_eq(&self.instance, &other.instance)
+    }
+}
+impl Eq for SpaceVersion {}
+
 /// Current-space incidence convention. Kept in one owner for cache assembly and
 /// verification; algorithm-specific/frozen adjacency policy remains separate.
 fn incidence_neighbors(
@@ -130,6 +144,7 @@ pub struct GraphSpace {
     */
     /// Version counter - increments on structural changes
     version: u64,
+    cache_identity: Arc<()>,
 
     /*
     === CACHE - RwLock for read-heavy, occasional write ===
@@ -164,6 +179,7 @@ impl GraphSpace {
             active_edges: HashSet::new(),
             pool,
             version: 1, // Start at 1 so empty cache (version 0) is immediately stale
+            cache_identity: Arc::new(()),
             cache: RwLock::new(CacheState::new()),
             current_read: RefCell::new(None),
             node_attribute_indices: HashMap::new(),
@@ -931,6 +947,14 @@ impl GraphSpace {
             }
         }
         Ok(snapshot)
+    }
+
+    /// Instance-sensitive validity for connected reader caches; no graph payload is retained.
+    pub(crate) fn cache_version(&self) -> SpaceVersion {
+        SpaceVersion {
+            instance: self.cache_identity.clone(),
+            version: self.version,
+        }
     }
 
     /// Get current version (for debugging/monitoring)

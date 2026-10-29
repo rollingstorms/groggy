@@ -396,11 +396,9 @@ impl PySubgraph {
         Ok(components_array)
     }
 
-    /// Check if this subgraph is connected
+    /// Empty selections are not connected; nonempty selections use weak connectivity.
     fn is_connected(&self) -> PyResult<bool> {
-        // Use connected_components to check - if only 1 component, it's connected
-        let components = self.connected_components()?;
-        Ok(components.len() <= 1)
+        self.inner.is_connected().map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
     /// Check if there is a path between two nodes within this subgraph

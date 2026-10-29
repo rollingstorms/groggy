@@ -192,7 +192,7 @@ impl GraphView {
             .copied()
             .ok_or_else(|| Self::invalid("Captured edge has no endpoints"))
     }
-    fn outgoing_occurrences(
+    pub(crate) fn outgoing_occurrences(
         &self,
         id: NodeId,
     ) -> GraphResult<impl Iterator<Item = (NodeId, EdgeId)> + '_> {

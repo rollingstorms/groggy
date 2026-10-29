@@ -370,3 +370,7 @@ harness = false
 [[bench]]
 name = "captured_view_algebra"
 harness = false
+
+[[bench]]
+name = "captured_view_traversal"
+harness = false

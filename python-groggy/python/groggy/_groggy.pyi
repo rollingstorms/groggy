@@ -10919,6 +10919,20 @@ class GraphView:
         """
         ...
 
+    def bfs(self, start: int, max_depth: Optional[int] = None) -> GraphView:
+        """Captured BFS discovery tree; selected outgoing edges only."""
+        ...
+
+    def dfs(self, start: int, max_depth: Optional[int] = None) -> GraphView:
+        """Captured iterative DFS tree with discovery-depth bound."""
+        ...
+
+    def has_path(self, source: int, target: int) -> bool: ...
+    def shortest_path_subgraph(self, source: int, target: int) -> Optional[GraphView]: ...
+    def is_connected(self, mode: str = "undirected") -> bool:
+        """Nonempty connectivity, with explicit weak/strong modes on directed inputs."""
+        ...
+
     def bfs_distances(self, *args, **kwargs) -> List[Tuple[int, int]]:
         """
         Frozen hop distances as (node ID, distance) rows; writes no properties.

@@ -399,6 +399,47 @@ impl PyGraphView {
             .map(|views| views.into_iter().map(|inner| Self { inner }).collect())
             .map_err(graph_error_to_py_err)
     }
+    /// Exact frozen BFS discovery-tree edges, bounded by hop depth.
+    #[pyo3(signature=(start, max_depth=None))]
+    fn bfs(&self, py: Python<'_>, start: NodeId, max_depth: Option<&PyAny>) -> PyResult<Self> {
+        let depth = max_depth
+            .map(|v| crate::ffi::query::query::nonnegative_count(v, "max_depth"))
+            .transpose()?;
+        py.allow_threads(|| self.inner.bfs(start, depth))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    /// Exact frozen ascending-neighbor DFS discovery tree, bounded by discovery depth.
+    #[pyo3(signature=(start, max_depth=None))]
+    fn dfs(&self, py: Python<'_>, start: NodeId, max_depth: Option<&PyAny>) -> PyResult<Self> {
+        let depth = max_depth
+            .map(|v| crate::ffi::query::query::nonnegative_count(v, "max_depth"))
+            .transpose()?;
+        py.allow_threads(|| self.inner.dfs(start, depth))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    fn has_path(&self, py: Python<'_>, source: NodeId, target: NodeId) -> PyResult<bool> {
+        py.allow_threads(|| self.inner.has_path(source, target))
+            .map_err(graph_error_to_py_err)
+    }
+    fn shortest_path_subgraph(
+        &self,
+        py: Python<'_>,
+        source: NodeId,
+        target: NodeId,
+    ) -> PyResult<Option<Self>> {
+        py.allow_threads(|| self.inner.shortest_path_subgraph(source, target))
+            .map(|view| view.map(|inner| Self { inner }))
+            .map_err(graph_error_to_py_err)
+    }
+    #[pyo3(signature=(mode="undirected"))]
+    fn is_connected(&self, py: Python<'_>, mode: &str) -> PyResult<bool> {
+        let mode = groggy::algorithms::community::ComponentMode::parse(mode)
+            .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+        py.allow_threads(|| self.inner.is_connected(mode))
+            .map_err(graph_error_to_py_err)
+    }
     /// Frozen hop distances as (node ID, distance) rows; writes no properties.
     fn bfs_distances(&self, py: Python, start: NodeId) -> PyResult<Vec<(NodeId, i64)>> {
         py.allow_threads(|| self.inner.bfs_distances(start))

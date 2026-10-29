@@ -1094,3 +1094,33 @@ Next functional component: scope-correct captured/connected traversal trees and
 hop paths. Connected BFS/DFS/shortest-path currently traverse the full owner before
 filtering, which can leak routes through excluded intermediates. This belongs to
 the existing selected ownership/algorithm contracts, not a new audit workstream.
+
+## Scoped traversal trees, paths and restoration cache identity — 2026-10-29
+
+Completed the next 26.1/AR7.5 selected-read component. GraphView provides BFS/DFS
+discovery trees, reachability, shortest-hop subgraphs and empty/weak/strong
+connectivity. One traversal kernel consumes captured adjacency or selected live
+topology. Connected adapters no longer traverse excluded intermediates/instances
+and post-filter afterward; induced children preserve parent edges, and component
+fallback/cache uses exact selected CSR. Their connected ownership remains explicit.
+
+Measured and fixed a compatibility regression before commit: connected BFS on a
+100k chain changed from a provisional 37.500 ms repeated capture path to 3.375 µs
+with topology-only reads and instance/version-cached selection validation. First
+validation/preparation still costs 31.966 ms; whole-owner reference is 0.875 µs
+and cannot implement selected scope. No universal performance claim. Restoration
+can repeat numeric space versions, so scope/CSR/component cache keys now include
+space identity; an equal-version topology-switch regression proves invalidation.
+Evidence: `captured-view-traversal-2026-10-29.md` and its paired raw release receipt.
+
+Gates: **1,460 native / 54 ignored**, strict all-target core Clippy,
+**2,430 root Python / 1 skipped**, **234 executable documentation examples**,
+rebuilt/atomically staged full-ABI extension, scoped formatting/syntax/diff checks.
+Six new native cases include all 512 three-node directed graphs; 25 Python cases
+exercise captured/connected APIs, cache restoration and scope. Existing owner
+benchmark/review changes remain excluded. Three unrelated FFI warnings remain.
+
+No new rows or broad parent closure: **211 checked / 57 unchecked**. Next read
+parity component is native/captured structural summaries and the existing Python
+clustering/transitivity placeholders; full connected accessors/default ownership
+and compound topology/custom effects retain their original scope.

@@ -17,6 +17,7 @@ pub mod subgraph;
 pub mod visualization;
 pub mod view;
 mod view_algebra;
+mod view_traversal;
 
 pub use component::*;
 pub use composer::*;
