@@ -1,0 +1,29 @@
+{
+  "fixture": "release extension; directed chain with exact f64 node property; five independent publishing selected copies; source setup excluded and capture reported separately; copy includes destination installation and one accepted initial state; no comparison with the former empty placeholder or RSS/GIL claim",
+  "cases": [
+    {
+      "nodes": 1000,
+      "edges": 999,
+      "source_capture_nanoseconds": 642208,
+      "copy_nanoseconds": [
+        3219625,
+        2918667,
+        3301500,
+        2986625,
+        2892167
+      ]
+    },
+    {
+      "nodes": 100000,
+      "edges": 99999,
+      "source_capture_nanoseconds": 135023083,
+      "copy_nanoseconds": [
+        641798375,
+        612297375,
+        581135375,
+        595558500,
+        593456042
+      ]
+    }
+  ]
+}

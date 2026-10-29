@@ -530,16 +530,11 @@ impl PySubgraph {
 
     // === Graph Conversion Methods ===
 
-    /// Convert to a new independent graph
-    fn to_graph(&self, py: Python) -> PyResult<PyObject> {
-        // Create new PyGraph with only this subgraph's nodes and edges
-        let graph_type = py.get_type::<PyGraph>();
-        let new_graph = graph_type.call0()?;
-
-        // Add nodes and edges from this subgraph to the new graph
-        // This would require copying data from inner subgraph
-
-        Ok(new_graph.to_object(py))
+    /// Materialize the validated selected state into an independent publishing graph.
+    fn to_graph(&self) -> PyResult<PyGraph> {
+        let graph = self.inner.pin_view().and_then(|view| view.to_graph())
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(PyGraph { inner: graph.into_shared(), cached_view: std::cell::RefCell::new(None) })
     }
 
     /// Convert to NetworkX graph (if available)

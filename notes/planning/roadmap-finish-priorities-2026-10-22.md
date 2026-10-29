@@ -1933,3 +1933,20 @@ Subgraph.to_graph still constructs an empty graph placeholder, and its viz gette
 still constructs a full-owner GraphDataSource. They require selected/captured
 conversion rather than silent scope widening. These are existing facade gaps,
 not new checklist rows; no claim that all remaining facade methods are audited.
+
+
+### Selected graph materialization — 2026-10-29
+
+Completed existing 26.1/AR4/AR7.5 conversion: connected and captured to_graph now
+preserve selected IDs/direction/typed properties and referenced frozen groups in
+an independent publishing graph. Out-of-scope local references reject; full source
+history/configuration recovery remains explicit owned capture. Six pre-fix Python
+cases reproduced the old empty/missing converter. Native group-source archive
+recovery, stale selection, empty copy and independent publication are verified.
+Receipt: `view-materialization-2026-10-29.md`. Absolute release copy medians:
+**2.987 ms / 595.559 ms at 1k/100k**, including initial import publication, source
+capture separate; no speedup against the incorrect placeholder or RSS claim.
+Gates: **1,506 native / 54 ignored**, strict all-target Clippy, **2,565 root Python /
+1 skipped**, **250 docs**, rebuilt/staged extension and scoped checks. Three old
+unrelated FFI warnings remain. **211 checked / 57 open**, no new rows. Visualization
+and frozen defaults/checked effectful binding remain the same parent scope.

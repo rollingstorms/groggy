@@ -584,6 +584,12 @@ impl PyGraphView {
         Ok(crate::ffi::storage::table::PyGraphTable::from_table(table))
     }
     /// Cheap ownership copy; the frozen state and selected membership remain shared.
+    /// Independent publishing graph containing exactly this captured selection.
+    fn to_graph(&self) -> PyResult<crate::ffi::api::graph::PyGraph> {
+        self.inner.to_graph()
+            .map(|graph| crate::ffi::api::graph::PyGraph { inner: graph.into_shared(), cached_view: std::cell::RefCell::new(None) })
+            .map_err(graph_error_to_py_err)
+    }
     fn copy(&self) -> Self {
         self.clone()
     }
