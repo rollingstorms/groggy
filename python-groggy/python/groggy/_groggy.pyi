@@ -4700,9 +4700,9 @@ class Graph:
     def add_nodes(self, *args, **kwargs) -> Any:
         ...
 
-    def adjacency_list(self, *args, **kwargs) -> Any:
+    def adjacency_list(self) -> Dict[int, List[int]]:
         """
-        Get adjacency list (not yet implemented).
+        Export selected outgoing adjacency, retaining isolates and parallel edge occurrences.
         """
         ...
 
@@ -9338,7 +9338,7 @@ class Subgraph:
         """
         ...
 
-    def adjacency_list(self, *args, **kwargs) -> Any:
+    def adjacency_list(self) -> Dict[int, List[int]]:
         """
         Get adjacency list representation
         Returns: Dict mapping node_id -> list of connected node_ids
@@ -10896,6 +10896,10 @@ class GraphView:
 
     def to_nodes(self) -> GraphViewEntities: ...
     def to_edges(self) -> GraphViewEntities: ...
+
+    def adjacency_list(self) -> Dict[int, List[int]]:
+        """Selected outgoing rows; undirected reverse occurrences and isolates retained."""
+        ...
 
     def query_nodes(self, filter: Union[NodeFilter, str], *, order_by: Optional[str] = None, descending: bool = False, offset: Optional[int] = None, limit: Optional[int] = None) -> List[int]: ...
     def query_edges(self, filter: Union[EdgeFilter, str], *, order_by: Optional[str] = None, descending: bool = False, offset: Optional[int] = None, limit: Optional[int] = None) -> List[int]: ...

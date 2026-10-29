@@ -1298,34 +1298,10 @@ impl PySubgraph {
         self.adjacency_matrix(sparse, weight_attr)
     }
 
-    /// Get adjacency list representation
-    /// Returns: Dict mapping node_id -> list of connected node_ids
-    fn adjacency_list(&self, py: Python) -> PyResult<PyObject> {
-        use pyo3::types::PyDict;
-
-        let result_dict = PyDict::new(py);
-        let graph_ref = self.inner.graph();
-        let graph_borrow = graph_ref.borrow();
-
-        // For each node in subgraph, find connected nodes
-        for &node_id in self.inner.node_set() {
-            let mut neighbors = Vec::new();
-
-            // Check all edges in subgraph to find neighbors
-            for &edge_id in self.inner.edge_set() {
-                if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
-                    if source == node_id && self.inner.contains_node(target) {
-                        neighbors.push(target);
-                    } else if target == node_id && self.inner.contains_node(source) {
-                        neighbors.push(source);
-                    }
-                }
-            }
-
-            result_dict.set_item(node_id, neighbors)?;
-        }
-
-        Ok(result_dict.into())
+    /// Selected outgoing adjacency from a detached topology-only read.
+    fn adjacency_list(&self, py: Python<'_>) -> PyResult<std::collections::BTreeMap<NodeId, Vec<NodeId>>> {
+        let input = self.inner.adjacency_read().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(py.allow_threads(|| input.adjacency_list()))
     }
 
     /// Group subgraph by attribute value

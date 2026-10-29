@@ -199,6 +199,10 @@ impl PyGraphView {
     fn edge_endpoints(&self, id: EdgeId) -> PyResult<(NodeId, NodeId)> {
         self.inner.edge_endpoints(id).map_err(graph_error_to_py_err)
     }
+    /// Frozen selected outgoing rows, including isolates and parallel occurrences.
+    fn adjacency_list(&self, py: Python<'_>) -> PyResult<std::collections::BTreeMap<NodeId, Vec<NodeId>>> {
+        py.allow_threads(|| self.inner.adjacency_list()).map_err(graph_error_to_py_err)
+    }
     fn neighbors(&self, id: NodeId) -> PyResult<Vec<NodeId>> {
         self.inner.neighbors(id).map_err(graph_error_to_py_err)
     }

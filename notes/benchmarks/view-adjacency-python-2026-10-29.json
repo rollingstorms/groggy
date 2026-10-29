@@ -1,0 +1,91 @@
+{
+  "baseline_commit": "8be77eaa",
+  "method": "quiet separate release-extension before/after runs, five warmed bound-method calls per size; not alternating build pairs; original O(V*E) scan measured only through 5000 nodes; setup/warmup/checks excluded; Python dictionary/list conversion included; old row ordering validated as multisets; no extrapolated old 100k time or universal speedup/RSS claim",
+  "summary": [
+    {
+      "nodes": 1000,
+      "before_median_ms": 14.906167,
+      "after_median_ms": 0.12
+    },
+    {
+      "nodes": 5000,
+      "before_median_ms": 382.160917,
+      "after_median_ms": 0.778042
+    },
+    {
+      "nodes": 100000,
+      "before_median_ms": null,
+      "after_median_ms": 29.443
+    }
+  ],
+  "before": {
+    "fixture": "release-extension connected undirected chain; five warmed bound-method exports; dictionary/list construction included; setup, initial warmup and analytic validation excluded; old unordered rows validated as multisets",
+    "cases": [
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "nanoseconds": [
+          14788500,
+          15522084,
+          15838666,
+          14906167,
+          14434584
+        ],
+        "median_nanoseconds": 14906167
+      },
+      {
+        "nodes": 5000,
+        "edges": 4999,
+        "nanoseconds": [
+          382160917,
+          388274542,
+          379897583,
+          380243125,
+          382483625
+        ],
+        "median_nanoseconds": 382160917
+      }
+    ]
+  },
+  "after": {
+    "fixture": "release-extension connected undirected chain; five warmed bound-method exports; dictionary/list construction included; setup, initial warmup and analytic validation excluded; old unordered rows validated as multisets",
+    "cases": [
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "nanoseconds": [
+          101375,
+          125250,
+          125459,
+          120000,
+          119167
+        ],
+        "median_nanoseconds": 120000
+      },
+      {
+        "nodes": 5000,
+        "edges": 4999,
+        "nanoseconds": [
+          613750,
+          778042,
+          812459,
+          853542,
+          700167
+        ],
+        "median_nanoseconds": 778042
+      },
+      {
+        "nodes": 100000,
+        "edges": 99999,
+        "nanoseconds": [
+          24839833,
+          29728083,
+          29443000,
+          27663209,
+          53567459
+        ],
+        "median_nanoseconds": 29443000
+      }
+    ]
+  }
+}

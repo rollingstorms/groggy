@@ -402,3 +402,7 @@ harness = false
 [[bench]]
 name = "view_node_sampling"
 harness = false
+
+[[bench]]
+name = "view_adjacency_export"
+harness = false

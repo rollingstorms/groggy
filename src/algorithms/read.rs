@@ -64,6 +64,9 @@ impl AlgorithmRead {
             csr: Arc::new(csr),
         })
     }
+    pub(crate) fn into_adjacency_read(self) -> crate::subgraphs::AdjacencyRead {
+        crate::subgraphs::AdjacencyRead::new(self.nodes, self.csr)
+    }
     /// Captured selection and properties used by this prepared input.
     pub fn view(&self) -> &GraphView {
         &self.view

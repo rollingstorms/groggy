@@ -1447,3 +1447,26 @@ Gates: **2,545 root Python / 1 skipped**, **247 docs**, rebuilt/staged extension
 syntax/diff checks. Native core unchanged from **1,498 / 54 ignored** full suite
 and strict all-target Clippy. Three existing unrelated FFI warnings remain;
 owner benchmark/review work untouched. **211 checked / 57 open**, no rows added.
+
+
+### Selected adjacency export — 2026-10-29
+
+Completed the existing 26.1/AR2/AR4/AR7.5 adjacency facade. Graph's placeholder and
+captured missing method now export full selected rows. Connected export replaces
+per-node full-edge scans, wrong directed reverse edges and swallowed read errors
+with validated CSR input. Detached AdjacencyRead stores shared IDs/CSR only, permits
+owner-free workers and supports GIL release. Stable sorted neighbor IDs preserve
+parallel/loop occurrences and isolated rows; excluded edges stay excluded.
+
+Receipt: `view-adjacency-export-2026-10-29.md`. Actual warmed Python before/after:
+**14.906→0.120 ms at 1k**, **382.161→0.778 ms at 5k**; new 100k export **29.443 ms**
+including dictionary/list conversion, with no extrapolated old 100k runtime. Native
+100k cold/warm prep is **24.495 ms / 2.208 µs**, detached map export **2.152 ms**;
+captured CSR preparation **17.522 ms**, initial owner capture separate. Nonpaired
+local receipts, no production/RSS/universal latency claim.
+
+Gates: **1,501 native / 54 ignored**, strict all-target core Clippy,
+**2,554 root Python / 1 skipped**, **248 docs**, rebuilt/staged release extension,
+scoped format/syntax/diff checks. Three unrelated old FFI warnings remain and owner
+work is untouched. Live defaults/effectful migration stays open; **211 checked /
+57 open**, no new rows.

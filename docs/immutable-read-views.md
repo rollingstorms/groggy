@@ -443,3 +443,5 @@ Specialized wrapper consolidation and capture are described in
 The legacy connected full-view cache follows [active membership revisions](api/current-full-view-cache.md); it remains distinct from immutable capture.
 
 See [node sampling](api/view-node-sampling.md) for seeded connected/captured selections.
+
+See [selected adjacency export](api/view-adjacency-export.md) for outgoing edge-instance rows and detached topology workers.

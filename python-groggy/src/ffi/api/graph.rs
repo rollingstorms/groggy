@@ -3009,12 +3009,11 @@ impl PyGraph {
         )
     }
 
-    /// Get adjacency list (not yet implemented).
+    /// Current outgoing adjacency, retaining isolates and selected edge occurrences.
     pub fn adjacency_list(slf: PyRef<Self>, py: Python) -> PyResult<PyObject> {
-        Self::with_full_view(slf, py, |_subgraph, _py| {
-            Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "adjacency_list not yet implemented",
-            ))
+        Self::with_full_view(slf, py, |subgraph, py| {
+            let input = subgraph.inner.adjacency_read().map_err(graph_error_to_py_err)?;
+            Ok(py.allow_threads(|| input.adjacency_list()).into_py(py))
         })
     }
 

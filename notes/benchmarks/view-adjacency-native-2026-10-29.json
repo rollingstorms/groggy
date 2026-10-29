@@ -1,0 +1,59 @@
+{
+  "cases": [
+    {
+      "captured_preparation_seconds": [
+        0.000152458,
+        0.000139167,
+        0.00013275,
+        0.000132375,
+        0.000130125
+      ],
+      "cold_connected_preparation_seconds": 0.00038675,
+      "detached_export_seconds": [
+        6.0042e-05,
+        5.0292e-05,
+        4.7042e-05,
+        4.9e-05,
+        4.6708e-05
+      ],
+      "edges": 999,
+      "immutable_capture_seconds": 0.001363125,
+      "nodes": 1000,
+      "warm_connected_preparation_seconds": [
+        3.75e-07,
+        2.08e-07,
+        1.66e-07,
+        1.66e-07,
+        1.67e-07
+      ]
+    },
+    {
+      "captured_preparation_seconds": [
+        0.01802525,
+        0.017521791,
+        0.017551917,
+        0.013370584,
+        0.008962083
+      ],
+      "cold_connected_preparation_seconds": 0.024494958,
+      "detached_export_seconds": [
+        0.002473875,
+        0.002389292,
+        0.002152125,
+        0.001918959,
+        0.00195925
+      ],
+      "edges": 99999,
+      "immutable_capture_seconds": 0.099792959,
+      "nodes": 100000,
+      "warm_connected_preparation_seconds": [
+        1.5e-06,
+        2.208e-06,
+        2.209e-06,
+        2.291e-06,
+        1.958e-06
+      ]
+    }
+  ],
+  "fixture": "release native directed chain; five samples; owner setup excluded; capture and CSR preparation separate from row export; exact analytic row checks; no Python or RSS claim"
+}
