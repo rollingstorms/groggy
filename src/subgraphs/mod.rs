@@ -19,6 +19,8 @@ pub mod view;
 mod view_algebra;
 mod view_traversal;
 mod view_metrics;
+mod view_entities;
+pub use view_entities::{GraphViewEntity, GraphViewEntities, GraphViewEntityIterator};
 
 pub use component::*;
 pub use composer::*;

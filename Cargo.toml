@@ -378,3 +378,7 @@ harness = false
 [[bench]]
 name = "structural_summaries"
 harness = false
+
+[[bench]]
+name = "captured_view_entities"
+harness = false

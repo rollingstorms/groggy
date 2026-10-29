@@ -442,6 +442,9 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<ffi::api::durable::PyDurableGraph>()?;
     m.add_class::<PySubgraph>()?;
     m.add_class::<ffi::subgraphs::view::PyGraphView>()?;
+    m.add_class::<ffi::subgraphs::view_entities::PyGraphViewEntity>()?;
+    m.add_class::<ffi::subgraphs::view_entities::PyGraphViewEntities>()?;
+    m.add_class::<ffi::subgraphs::view_entities::PyGraphViewEntityIterator>()?;
     m.add_class::<ffi::query::index::PyGraphQueryIndex>()?;
     m.add_class::<ffi::query::effective::PyEffectiveTimeIndex>()?;
     m.add_class::<ffi::query::groups::PyGroupMembershipIndex>()?;

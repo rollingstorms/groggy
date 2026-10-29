@@ -9,3 +9,5 @@ pub mod neighborhood;
 pub mod subgraph;
 
 pub mod view;
+
+pub mod view_entities;

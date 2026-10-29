@@ -112,6 +112,18 @@ impl PyGraphView {
         self.inner.write_state_id()
     }
     #[getter]
+    fn nodes(&self) -> super::view_entities::PyGraphViewEntities {
+        super::view_entities::PyGraphViewEntities {
+            inner: self.inner.node_accessor(),
+        }
+    }
+    #[getter]
+    fn edges(&self) -> super::view_entities::PyGraphViewEntities {
+        super::view_entities::PyGraphViewEntities {
+            inner: self.inner.edge_accessor(),
+        }
+    }
+    #[getter]
     fn node_ids(&self, py: Python) -> Vec<NodeId> {
         py.allow_threads(|| self.inner.node_ids())
     }

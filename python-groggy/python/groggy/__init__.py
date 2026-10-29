@@ -66,6 +66,8 @@ if not _DISPLAY_AVAILABLE:
 
 __version__ = "0.5.1"
 GraphView = _groggy.GraphView
+GraphViewEntity = _groggy.GraphViewEntity
+GraphViewEntities = _groggy.GraphViewEntities
 GraphQueryIndex = _groggy.GraphQueryIndex
 EffectiveTimeIndex = _groggy.EffectiveTimeIndex
 GroupMembershipIndex = _groggy.GroupMembershipIndex
@@ -184,6 +186,8 @@ __all__ = [
     "AlgorithmBuilder",
     "VarHandle",
     "GraphView",
+    "GraphViewEntity",
+    "GraphViewEntities",
     "GraphQueryIndex",
     "EffectiveTimeIndex",
     "GroupMembershipIndex",

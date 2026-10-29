@@ -1156,3 +1156,28 @@ traversal and structural summaries now cover the corresponding read prerequisite
 Connected column/accessor ownership and full read/write/default return migration
 still require work in existing 26.1/AR4/AR7.5/21.2; topology/custom compound effects
 remain in 09.4b.2.
+
+## Explicit captured entity/column access — 2026-10-29
+
+Completed the 26.1/AR7.5/21.2 explicit captured accessor component: view.nodes and
+view.edges provide read-only scoped entities, stable ID lookup, explicit sorted
+positions, exact selection/filter/slice/mask operations and aligned owned typed
+columns with presence bits. Entities/iterators retain only the canonical view;
+meta-node source revision lookup, scope-correct topology, source/worker lifetime
+and explicit writeback are covered. ID order materializes lazily; scalar lookup
+does not sort or allocate all IDs. Legacy connected defaults remain unchanged.
+
+Matched four-process release measurements identified and improved large-column
+projection using the existing ordered Rayon bulk path: 100k owned columns
+25.006 → 5.430 ms, presence 19.638 → 6.461 ms. Native scalar receipts stay independent
+of ID ordering; no 100ns Python FFI or general memory guarantee. Evidence and
+fixed remainder: `captured-view-entities-2026-10-29.md`.
+
+Gates: **1,472 native / 54 ignored**, strict all-target Clippy,
+**2,478 root Python / 1 skipped**, **241 executable documentation examples**,
+rebuilt/atomically staged full-ABI extension, scoped formatting, syntax and diff
+checks. Six native cases include the parallel ordering boundary; 18 public Python
+cases cover null/absence, meta/time/read-only/scope and owner lifetime. Three
+unrelated FFI warnings remain. No new rows or parent closure: **211 / 57**.
+Remaining window focus: native legacy column helpers still skip absent values;
+repair alignment through the existing attribute-first bulk reader.

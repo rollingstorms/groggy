@@ -428,3 +428,8 @@ Captured `clustering_coefficients`, local/mean `clustering_coefficient`,
 `transitivity` and `density` now use shared native structural kernels. See
 [structural summaries](api/structural-summaries.md) for simple undirected versus
 edge-instance semantics, directed-domain rejection and topology-only native reuse.
+
+Read-only `view.nodes`/`view.edges` now provide ID-based frozen entity handles,
+explicit sorted positions, aligned owned property columns, presence/masks and
+scoped selections. See [captured entity access](api/captured-view-entities.md) for
+indexing, missing/null, lifecycle and explicit writeback examples.

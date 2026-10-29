@@ -1,0 +1,409 @@
+{
+  "method": "four sequential quiet release processes, alternating serial/parallel, five samples each; scalar before sorted-ID materialization",
+  "runs": [
+    {
+      "variant": "serial",
+      "result": {
+        "cases": [
+          {
+            "direct_scalar_seconds": [
+              6.678339999999999e-08,
+              6.32458e-08,
+              6.51917e-08,
+              6.17542e-08,
+              6.300830000000001e-08
+            ],
+            "first_sorted_ids_seconds": 1.7125e-05,
+            "fresh_accessor_scalar_seconds": [
+              1.118708e-07,
+              1.109416e-07,
+              1.114458e-07,
+              1.109875e-07,
+              1.120958e-07
+            ],
+            "mask_selection_seconds": [
+              4.5375e-05,
+              4.55e-05,
+              4.3083e-05,
+              4.2875e-05,
+              4.2791e-05
+            ],
+            "nodes": 1000,
+            "owned_column_seconds": [
+              4.825e-05,
+              4.8917e-05,
+              4.9167e-05,
+              4.8375e-05,
+              4.8334e-05
+            ],
+            "presence_seconds": [
+              3.475e-05,
+              3.4542e-05,
+              3.375e-05,
+              3.3833e-05,
+              3.6583e-05
+            ],
+            "reused_accessor_scalar_seconds": [
+              7.421249999999999e-08,
+              7.48667e-08,
+              7.407499999999999e-08,
+              7.6025e-08,
+              7.63834e-08
+            ]
+          },
+          {
+            "direct_scalar_seconds": [
+              6.43083e-08,
+              6.36625e-08,
+              6.68792e-08,
+              6.768749999999999e-08,
+              6.720829999999999e-08
+            ],
+            "first_sorted_ids_seconds": 0.001304417,
+            "fresh_accessor_scalar_seconds": [
+              1.12125e-07,
+              1.028625e-07,
+              1.0499999999999999e-07,
+              1.0551250000000001e-07,
+              1.0722909999999999e-07
+            ],
+            "mask_selection_seconds": [
+              0.005610333,
+              0.004994125,
+              0.005518833,
+              0.005251083,
+              0.00504725
+            ],
+            "nodes": 100000,
+            "owned_column_seconds": [
+              0.021339458,
+              0.022293458,
+              0.020854791,
+              0.019529333,
+              0.021584125
+            ],
+            "presence_seconds": [
+              0.015956709,
+              0.016859208,
+              0.01595175,
+              0.01639275,
+              0.017785958
+            ],
+            "reused_accessor_scalar_seconds": [
+              7.33375e-08,
+              7.64459e-08,
+              7.564170000000001e-08,
+              7.44917e-08,
+              7.85875e-08
+            ]
+          }
+        ],
+        "fixture": "accepted isolates; one typed integer/null/absent column; scalar reads run before any ID-order materialization; setup excluded; five samples; 10000 scalar calls/sample",
+        "profile": "release"
+      }
+    },
+    {
+      "variant": "parallel",
+      "result": {
+        "cases": [
+          {
+            "direct_scalar_seconds": [
+              7.17583e-08,
+              6.60708e-08,
+              6.20583e-08,
+              6.33875e-08,
+              6.67666e-08
+            ],
+            "first_sorted_ids_seconds": 1.7917e-05,
+            "fresh_accessor_scalar_seconds": [
+              1.1591660000000001e-07,
+              1.126375e-07,
+              1.118417e-07,
+              1.11775e-07,
+              1.165666e-07
+            ],
+            "mask_selection_seconds": [
+              5.3958e-05,
+              4.7875e-05,
+              4.4125e-05,
+              4.8167e-05,
+              4.5791e-05
+            ],
+            "nodes": 1000,
+            "owned_column_seconds": [
+              0.000127542,
+              5.8375e-05,
+              5.2584e-05,
+              5.1875e-05,
+              5.25e-05
+            ],
+            "presence_seconds": [
+              3.6417e-05,
+              3.4791e-05,
+              4.6209e-05,
+              3.5834e-05,
+              3.5833e-05
+            ],
+            "reused_accessor_scalar_seconds": [
+              7.44458e-08,
+              7.40667e-08,
+              7.52e-08,
+              7.48833e-08,
+              7.67542e-08
+            ]
+          },
+          {
+            "direct_scalar_seconds": [
+              7.19167e-08,
+              7.069999999999999e-08,
+              7.015e-08,
+              7.09083e-08,
+              7.065e-08
+            ],
+            "first_sorted_ids_seconds": 0.001410458,
+            "fresh_accessor_scalar_seconds": [
+              1.1195420000000001e-07,
+              1.1206250000000001e-07,
+              1.109458e-07,
+              1.1069999999999999e-07,
+              1.126042e-07
+            ],
+            "mask_selection_seconds": [
+              0.006842917,
+              0.007180916,
+              0.005996458,
+              0.006707208,
+              0.00653825
+            ],
+            "nodes": 100000,
+            "owned_column_seconds": [
+              0.005609291,
+              0.004654834,
+              0.006522792,
+              0.005250167,
+              0.004447666
+            ],
+            "presence_seconds": [
+              0.00467225,
+              0.008069583,
+              0.007502917,
+              0.004972875,
+              0.004616292
+            ],
+            "reused_accessor_scalar_seconds": [
+              7.42e-08,
+              7.86583e-08,
+              8.03083e-08,
+              7.84208e-08,
+              8.0275e-08
+            ]
+          }
+        ],
+        "fixture": "accepted isolates; one typed integer/null/absent column; scalar reads run before any ID-order materialization; setup excluded; five samples; 10000 scalar calls/sample",
+        "profile": "release"
+      }
+    },
+    {
+      "variant": "serial",
+      "result": {
+        "cases": [
+          {
+            "direct_scalar_seconds": [
+              6.84291e-08,
+              6.890419999999999e-08,
+              6.74833e-08,
+              6.86625e-08,
+              6.57541e-08
+            ],
+            "first_sorted_ids_seconds": 2.125e-05,
+            "fresh_accessor_scalar_seconds": [
+              1.0889579999999999e-07,
+              1.1245829999999999e-07,
+              1.0952909999999999e-07,
+              1.105125e-07,
+              1.106625e-07
+            ],
+            "mask_selection_seconds": [
+              5.2417e-05,
+              4.8666e-05,
+              4.5875e-05,
+              4.5292e-05,
+              4.5292e-05
+            ],
+            "nodes": 1000,
+            "owned_column_seconds": [
+              0.000122625,
+              5.1666e-05,
+              5.1209e-05,
+              5.0791e-05,
+              5.1541e-05
+            ],
+            "presence_seconds": [
+              3.6958e-05,
+              3.5833e-05,
+              3.5375e-05,
+              3.5333e-05,
+              3.5667e-05
+            ],
+            "reused_accessor_scalar_seconds": [
+              7.925e-08,
+              7.70375e-08,
+              7.89167e-08,
+              7.864579999999999e-08,
+              7.634999999999999e-08
+            ]
+          },
+          {
+            "direct_scalar_seconds": [
+              7.089999999999999e-08,
+              6.93792e-08,
+              6.90458e-08,
+              6.89791e-08,
+              7.262090000000001e-08
+            ],
+            "first_sorted_ids_seconds": 0.00134425,
+            "fresh_accessor_scalar_seconds": [
+              1.114084e-07,
+              1.131792e-07,
+              1.098208e-07,
+              1.1640419999999999e-07,
+              1.11075e-07
+            ],
+            "mask_selection_seconds": [
+              0.006350834,
+              0.006257833,
+              0.005869666,
+              0.006064291,
+              0.006588708
+            ],
+            "nodes": 100000,
+            "owned_column_seconds": [
+              0.027971083,
+              0.028497125,
+              0.027793667,
+              0.029977875,
+              0.027718583
+            ],
+            "presence_seconds": [
+              0.023040875,
+              0.022864791,
+              0.021489958,
+              0.022834875,
+              0.022004834
+            ],
+            "reused_accessor_scalar_seconds": [
+              7.80625e-08,
+              7.995e-08,
+              7.82708e-08,
+              8.16042e-08,
+              7.79e-08
+            ]
+          }
+        ],
+        "fixture": "accepted isolates; one typed integer/null/absent column; scalar reads run before any ID-order materialization; setup excluded; five samples; 10000 scalar calls/sample",
+        "profile": "release"
+      }
+    },
+    {
+      "variant": "parallel",
+      "result": {
+        "cases": [
+          {
+            "direct_scalar_seconds": [
+              6.62959e-08,
+              6.80083e-08,
+              6.49458e-08,
+              6.465e-08,
+              6.497910000000001e-08
+            ],
+            "first_sorted_ids_seconds": 1.3625e-05,
+            "fresh_accessor_scalar_seconds": [
+              1.148791e-07,
+              1.168958e-07,
+              1.1488749999999999e-07,
+              1.1485829999999998e-07,
+              1.1448330000000001e-07
+            ],
+            "mask_selection_seconds": [
+              5.1083e-05,
+              4.5708e-05,
+              4.5084e-05,
+              4.6333e-05,
+              4.5e-05
+            ],
+            "nodes": 1000,
+            "owned_column_seconds": [
+              0.000104083,
+              5.6417e-05,
+              5.2792e-05,
+              5.1834e-05,
+              5.1708e-05
+            ],
+            "presence_seconds": [
+              4.225e-05,
+              4.15e-05,
+              3.5875e-05,
+              3.5667e-05,
+              3.5625e-05
+            ],
+            "reused_accessor_scalar_seconds": [
+              7.757499999999999e-08,
+              7.74917e-08,
+              7.73459e-08,
+              7.75125e-08,
+              7.794170000000001e-08
+            ]
+          },
+          {
+            "direct_scalar_seconds": [
+              7.20458e-08,
+              7.13375e-08,
+              6.88625e-08,
+              7.215000000000001e-08,
+              7.356659999999999e-08
+            ],
+            "first_sorted_ids_seconds": 0.001644625,
+            "fresh_accessor_scalar_seconds": [
+              1.347875e-07,
+              1.16325e-07,
+              1.121417e-07,
+              1.200208e-07,
+              1.182541e-07
+            ],
+            "mask_selection_seconds": [
+              0.006881125,
+              0.007144125,
+              0.00685575,
+              0.008178666,
+              0.007968792
+            ],
+            "nodes": 100000,
+            "owned_column_seconds": [
+              0.010391375,
+              0.0037115,
+              0.014590666,
+              0.024189916,
+              0.003916459
+            ],
+            "presence_seconds": [
+              0.005419417,
+              0.025515875,
+              0.025278333,
+              0.017689458,
+              0.00490725
+            ],
+            "reused_accessor_scalar_seconds": [
+              1.0772500000000001e-07,
+              8.170410000000001e-08,
+              8.20708e-08,
+              8.36333e-08,
+              8.27708e-08
+            ]
+          }
+        ],
+        "fixture": "accepted isolates; one typed integer/null/absent column; scalar reads run before any ID-order materialization; setup excluded; five samples; 10000 scalar calls/sample",
+        "profile": "release"
+      }
+    }
+  ]
+}
