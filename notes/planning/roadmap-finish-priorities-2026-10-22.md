@@ -37,7 +37,7 @@ bulk reader. Window receipts: `captured-view-algebra-2026-10-29.md`,
 The remaining ownership work is the actual default/legacy filter return migration,
 connected mutable entity/accessor and effectful algorithm/composition facades,
 and specialized view/viz adapters; the new read prerequisites do not complete
-those boundaries. Next advance that migration and compound topology acceptance;
+those boundaries. The closing review confirmed the next concrete legacy repair: CSR-backed connected neighbors can still read retained endpoints after a selected node is removed; guard CSR reuse/build with the canonical scope validator and review the separate degree adapter (reproduction in the priority-window log). Next advance that migration and compound topology acceptance;
 do not expand adjacent audits merely to create more checklist slices. The listed secondary-index families now complete 18.2:
 property/label/type/topology, effective events/activation, exact property intervals
 and retained group membership/reverse references. See

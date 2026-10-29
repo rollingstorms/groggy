@@ -1209,3 +1209,22 @@ prerequisites from actual connected/default/filter ownership, mutable/effectful
 facades, specialized adapters and topology/custom compound acceptance. Cold/
 invalidated full captured value materialization and retained recovery memory
 remain the existing 10.4/32.2 performance boundary.
+
+### Closing review: confirmed next legacy CSR liveness boundary
+
+A throwaway Python reproduction after the final gates confirms an existing
+26.1/AR7.5 inconsistency still needs the next slice. Create nodes 0/1 with edge
+0→1, retain connected induced_subgraph([0,1]), warm selected.neighbors(0), then
+remove node 1. The connected neighbors call still returns [1.0], and neighbors(1)
+returns [0.0], while selected.pin_view() correctly rejects the stale selection.
+The new captured entities and scoped traversal paths do not use this stale live
+read contract and retain their documented behavior.
+
+Cause to address: Subgraph::get_or_build_csr_internal checks versioned cache state
+but its miss path reads retained pool endpoints without the canonical selected
+liveness guard. Reuse validate_query_scope before CSR reuse/build, then check the
+legacy degree adapter's separate path and verify removal/restore/cache cases.
+The instance-sensitive validation/cache stamp needed for an inexpensive guarded
+path is already implemented this window. This is a concrete reproduction under
+the existing ownership item, not a new checkbox or completed repair. No code was
+changed after the final verified alignment commit to conceal this remaining gap.
