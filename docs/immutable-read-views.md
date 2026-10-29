@@ -433,3 +433,6 @@ Read-only `view.nodes`/`view.edges` now provide ID-based frozen entity handles,
 explicit sorted positions, aligned owned property columns, presence/masks and
 scoped selections. See [captured entity access](api/captured-view-entities.md) for
 indexing, missing/null, lifecycle and explicit writeback examples.
+
+Connected compatibility neighbor/degree liveness and aligned row semantics are
+described in [connected degree reads](api/connected-degree-reads.md).

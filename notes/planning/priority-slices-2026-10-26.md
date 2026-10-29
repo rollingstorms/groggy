@@ -1228,3 +1228,43 @@ The instance-sensitive validation/cache stamp needed for an inexpensive guarded
 path is already implemented this window. This is a concrete reproduction under
 the existing ownership item, not a new checkbox or completed repair. No code was
 changed after the final verified alignment commit to conceal this remaining gap.
+
+### Connected CSR liveness and degree blocker — 2026-10-29
+
+Completed the closing reproduction above. Selected CSR readers now validate
+canonical active membership and endpoint closure before both cache reuse and
+rebuild. Warm/cold node/edge removal and rewiring reject, equal-version restored
+spaces invalidate correctly, and frozen reads remain readable independently.
+Native total degree now includes incoming directed instances, matching the
+established incident-edge rule (loops once). Python's three separate degree edge
+scans are replaced by thin translation to one immutable topology-only Rust input;
+row computation releases the GIL. Explicit requests preserve ordering/repetition,
+implicit rows sort by ID, invalid IDs reject whole requests, and undirected
+in/out degrees use incident counts. Full-owner edge counting still requires a
+valid original selection and does not admit owner-only result IDs.
+
+Receipt: `connected-degree-reads-2026-10-29.md`; API guide and native/Python
+regressions cover scope, direction, loops, parallels, empty/invalid requests,
+prepared worker lifetime and absence of publication. The existing full-owner
+native property-attachment contract is unchanged. No whole value/state capture
+or new retention policy was introduced.
+
+Release `connected_degree_reads` receipt in `notes/benchmarks/`: 100k-chain cold
+preparation 21.532 ms; median warm preparation 0.500 microseconds; median counting
+all 100k rows 2.699 ms; averaged warmed native neighbor/incident degree calls
+0.074/0.041 microseconds. Five bulk/preparation samples and 10k scalar repetitions
+are checksum-verified. Absolute fixture timings only, not before/after speedup,
+Python FFI-budget certification or broader scale guarantees. Cold/full-owner
+preparation and legacy default ownership retain their documented boundaries.
+
+Final gates: **1,479 native / 54 ignored**, strict all-target core Clippy,
+**2,497 root Python / 1 skipped**, **242 executed documentation examples**,
+full-ABI release extension rebuilt/atomically staged. Restoration assertions were
+extended and rerun after the full native suite; strict Clippy includes the new
+benchmark. Scoped formatting/syntax/diff checks pass. Three existing unrelated
+pipeline FFI warnings remain; owner benchmark/review edits remain excluded.
+
+This completes the demonstrated compatibility blocker, not the broad ownership
+migration. No new checklist rows or premature parent closures: **211 checked /
+57 unchecked**. Actual default/filter immutable ownership and compound topology
+acceptance remain the next existing priority scopes.

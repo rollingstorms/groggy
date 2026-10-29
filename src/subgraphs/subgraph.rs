@@ -467,7 +467,11 @@ impl Subgraph {
     ///
     /// # Returns
     /// Arc to cached or newly built CSR
-    fn get_or_build_csr_internal(&self, add_reverse: bool) -> GraphResult<Arc<Csr>> {
+    pub(super) fn get_or_build_csr_internal(&self, add_reverse: bool) -> GraphResult<Arc<Csr>> {
+        // Retained pool endpoints are historical storage, not proof of current
+        // liveness. Validate even on cache hits; the stamp makes unchanged reads
+        // cheap and distinguishes restored spaces with equal numeric versions.
+        self.validate_query_scope(&self.graph.borrow())?;
         // Check cache first
         if let Some(cached) = self.csr_cache_get(add_reverse) {
             return Ok(cached);
@@ -532,7 +536,7 @@ impl Subgraph {
 /// Core Graph operations implemented for Subgraph through delegation
 /// This makes Subgraph truly behave like a Graph
 impl Subgraph {
-    fn validate_query_scope(&self, graph: &Graph) -> GraphResult<()> {
+    pub(super) fn validate_query_scope(&self, graph: &Graph) -> GraphResult<()> {
         let version = graph.space().cache_version();
         if self.validated_scope.borrow().as_ref() == Some(&version) {
             return Ok(());
@@ -1304,14 +1308,9 @@ impl SubgraphOperations for Subgraph {
     }
 
     fn degree(&self, node_id: NodeId) -> GraphResult<usize> {
-        // Match neighbors() behavior: include reverse edges for undirected graphs.
-        let add_reverse = {
-            let graph = self.graph.borrow();
-            graph.is_undirected()
-        };
-
-        // Get or build CSR (cached across calls)
-        let csr = self.get_or_build_csr_internal(add_reverse)?;
+        // Degree counts incident edge instances, including incoming directed
+        // edges; reverse CSR inserts self-loops only once.
+        let csr = self.get_or_build_csr_internal(true)?;
 
         // Get ordered nodes for indexing
         let ordered_nodes = self.ordered_nodes();

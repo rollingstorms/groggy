@@ -7,6 +7,9 @@
 //! - Filtered subgraphs
 //! - Component subgraphs
 
+mod degrees;
+pub use degrees::{DegreeMode, SubgraphDegreeRead};
+
 pub mod component;
 pub mod composer;
 pub(crate) mod composition;

@@ -1,0 +1,48 @@
+{
+  "cases": [
+    {
+      "bulk_count_seconds": [
+        7.2209e-05,
+        4.3417e-05,
+        5.2291e-05,
+        4.9042e-05,
+        4.25e-05
+      ],
+      "cold_prepare_seconds": 0.000622959,
+      "edges": 999,
+      "nodes": 1000,
+      "warm_native_degree_seconds_per_call": 8.53125e-08,
+      "warm_neighbor_seconds_per_call": 1.990417e-07,
+      "warm_prepare_seconds": [
+        1.041e-06,
+        2.5e-07,
+        2.09e-07,
+        2.08e-07,
+        2.08e-07
+      ]
+    },
+    {
+      "bulk_count_seconds": [
+        0.002812125,
+        0.002664,
+        0.002779458,
+        0.00269875,
+        0.002663666
+      ],
+      "cold_prepare_seconds": 0.021531667,
+      "edges": 99999,
+      "nodes": 100000,
+      "warm_native_degree_seconds_per_call": 4.0979200000000003e-08,
+      "warm_neighbor_seconds_per_call": 7.371670000000001e-08,
+      "warm_prepare_seconds": [
+        5.83e-07,
+        8.4e-08,
+        1.25e-07,
+        1e-06,
+        5e-07
+      ]
+    }
+  ],
+  "fixture": "undirected chain, no properties; topology-only, checksum-verified; absolute timings, no baseline speedup claim",
+  "profile": "release"
+}

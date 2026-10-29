@@ -386,3 +386,7 @@ harness = false
 [[bench]]
 name = "connected_column_alignment"
 harness = false
+
+[[bench]]
+name = "connected_degree_reads"
+harness = false

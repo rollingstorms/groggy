@@ -191,6 +191,7 @@ fn restoration_with_equal_numeric_space_versions_invalidates_connected_reader_ca
         "live".into(),
     );
     assert_eq!(selection.neighbors(0).unwrap(), vec![1]);
+    assert_eq!(selection.degree(1).unwrap(), 1);
     assert_eq!(
         selection.connected_components().unwrap()[0].node_set(),
         &HashSet::from([0, 1])
@@ -202,10 +203,64 @@ fn restoration_with_equal_numeric_space_versions_invalidates_connected_reader_ca
         .unwrap();
     assert_eq!(owner.borrow().space().get_version(), first_version);
     assert_eq!(selection.neighbors(0).unwrap(), vec![2]);
+    assert_eq!(selection.degree(1).unwrap(), 0);
+    assert_eq!(selection.degree(2).unwrap(), 1);
     assert_eq!(
         selection.connected_components().unwrap()[0].node_set(),
         &HashSet::from([0, 2])
     );
     assert!(selection.has_path(0, 2).unwrap());
     assert!(!selection.has_path(0, 1).unwrap());
+}
+
+#[test]
+fn connected_csr_rejects_removed_entities_and_rewired_outside_endpoints() {
+    for warm in [false, true] {
+        for remove_node in [false, true] {
+            let mut graph = Graph::new();
+            graph.add_nodes(3).unwrap();
+            graph.add_edge(0, 1).unwrap();
+            let frozen = graph.read_view().unwrap();
+            let owner = Rc::new(RefCell::new(graph));
+            let selected = Subgraph::new(
+                owner.clone(),
+                HashSet::from([0, 1]),
+                HashSet::from([0]),
+                "selection".into(),
+            );
+            if warm {
+                assert_eq!(selected.neighbors(0).unwrap(), vec![1]);
+                assert_eq!(selected.degree(1).unwrap(), 1);
+            }
+            if remove_node {
+                owner.borrow_mut().remove_node(1).unwrap();
+            } else {
+                owner.borrow_mut().remove_edge(0).unwrap();
+            }
+            let state = owner.borrow().current_state_id();
+            for node in [0, 1] {
+                assert!(selected.neighbors(node).is_err());
+                assert!(selected.degree(node).is_err());
+            }
+            assert_eq!(owner.borrow().current_state_id(), state);
+            assert_eq!(frozen.neighbors(0).unwrap(), vec![1]);
+            assert_eq!(frozen.degree(1).unwrap(), 1);
+        }
+    }
+    let mut graph = Graph::new();
+    graph.add_nodes(3).unwrap();
+    graph.add_edge(0, 1).unwrap();
+    let owner = Rc::new(RefCell::new(graph));
+    let selected = Subgraph::new(
+        owner.clone(),
+        HashSet::from([0, 1]),
+        HashSet::from([0]),
+        "selection".into(),
+    );
+    assert_eq!(selected.neighbors(0).unwrap(), vec![1]);
+    owner.borrow_mut().set_edge_endpoints(0, 0, 2).unwrap();
+    assert!(selected.neighbors(0).is_err());
+    assert!(selected.degree(0).is_err());
+    owner.borrow_mut().set_edge_endpoints(0, 0, 1).unwrap();
+    assert_eq!(selected.neighbors(0).unwrap(), vec![1]);
 }
