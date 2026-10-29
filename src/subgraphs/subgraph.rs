@@ -891,128 +891,40 @@ impl Subgraph {
     // === STRUCTURAL METRICS ===
     // Remember: All operations are on this subgraph (active nodes/edges)
 
-    /// Calculate clustering coefficient for a node or average for all nodes
-    /// Formula: 2 * triangles / (degree * (degree - 1)) for directed graphs
-    pub fn clustering_coefficient(&self, node_id: Option<NodeId>) -> GraphResult<f64> {
-        match node_id {
-            Some(nid) => {
-                if !self.has_node(nid) {
-                    return Err(GraphError::InvalidInput(format!(
-                        "Node {} not in this subgraph",
-                        nid
-                    )));
-                }
-                self.calculate_node_clustering_coefficient(nid)
+    /// Prepare immutable topology-only summaries without capturing property/history payloads.
+    pub fn structural_read(&self) -> GraphResult<crate::algorithms::UndirectedStructure> {
+        {
+            let graph = self.graph.borrow();
+            if graph.is_directed() {
+                return Err(GraphError::InvalidInput(
+                    "Structural clustering/transitivity require an undirected graph".into(),
+                ));
             }
-            None => {
-                // Average clustering coefficient for all nodes in subgraph
-                let mut total = 0.0;
-                let mut count = 0;
-
-                for &node_id in self.nodes.iter() {
-                    let coefficient = self.calculate_node_clustering_coefficient(node_id)?;
-                    total += coefficient;
-                    count += 1;
-                }
-
-                if count == 0 {
-                    Ok(0.0)
-                } else {
-                    Ok(total / count as f64)
-                }
-            }
+            self.validate_query_scope(&graph)?;
         }
+        Ok(crate::algorithms::UndirectedStructure::new(
+            self.ordered_nodes(),
+            self.get_or_build_csr_internal(true)?,
+        ))
     }
 
-    /// Helper method to calculate clustering coefficient for a single node
-    fn calculate_node_clustering_coefficient(&self, node_id: NodeId) -> GraphResult<f64> {
-        let graph = self.graph.borrow();
-
-        // Get neighbors of this node that are also in the subgraph
-        let neighbors = graph.neighbors_filtered(node_id, &self.nodes)?;
-        let degree = neighbors.len();
-
-        if degree < 2 {
-            return Ok(0.0); // Clustering coefficient is 0 for nodes with degree < 2
-        }
-
-        // Count triangles: edges between neighbors
-        let mut triangles = 0;
-        for i in 0..neighbors.len() {
-            for j in (i + 1)..neighbors.len() {
-                if graph.has_edge_between_filtered(neighbors[i], neighbors[j], &self.edges)? {
-                    triangles += 1;
-                }
-            }
-        }
-
-        // Calculate clustering coefficient
-        let possible_edges = degree * (degree - 1) / 2; // For undirected graphs
-        Ok(triangles as f64 / possible_edges as f64)
+    /// Simple loop-free undirected local clustering or mean including isolates.
+    pub fn clustering_coefficient(&self, node: Option<NodeId>) -> GraphResult<f64> {
+        self.structural_read()?.clustering_coefficient(node)
     }
 
-    /// Calculate global clustering coefficient (transitivity)
-    /// Formula: 3 * triangles / triads
+    /// Simple loop-free undirected global clustering.
     pub fn transitivity(&self) -> GraphResult<f64> {
-        let mut total_triangles = 0;
-        let mut total_triads = 0;
-
-        let graph = self.graph.borrow();
-
-        // Count each triangle only once by using node ordering
-        let mut nodes_vec: Vec<_> = self.nodes.iter().copied().collect();
-        nodes_vec.sort();
-
-        for (i, &node_a) in nodes_vec.iter().enumerate() {
-            let neighbors_a = graph.neighbors_filtered(node_a, &self.nodes)?;
-
-            for (j, &node_b) in nodes_vec.iter().enumerate().skip(i + 1) {
-                if !neighbors_a.contains(&node_b) {
-                    continue; // No edge between a and b
-                }
-
-                for &node_c in nodes_vec.iter().skip(j + 1) {
-                    if neighbors_a.contains(&node_c) {
-                        let neighbors_b = graph.neighbors_filtered(node_b, &self.nodes)?;
-                        if neighbors_b.contains(&node_c) {
-                            // Triangle found: a-b-c
-                            total_triangles += 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Count triads (connected triples)
-        for &node_id in self.nodes.iter() {
-            let neighbors = graph.neighbors_filtered(node_id, &self.nodes)?;
-            let degree = neighbors.len();
-
-            if degree >= 2 {
-                total_triads += degree * (degree - 1) / 2;
-            }
-        }
-
-        if total_triads == 0 {
-            Ok(0.0)
-        } else {
-            Ok(3.0 * total_triangles as f64 / total_triads as f64)
-        }
+        self.structural_read()?.transitivity()
     }
 
-    /// Calculate subgraph density
-    /// Formula: 2 * edges / (nodes * (nodes - 1)) for undirected graphs
+    /// Edge-instance density with the directed/undirected denominator; may exceed one.
     pub fn density(&self) -> f64 {
-        let node_count = self.nodes.len();
-
-        if node_count < 2 {
-            return 0.0;
-        }
-
-        let edge_count = self.edges.len();
-        let max_possible_edges = node_count * (node_count - 1) / 2; // Undirected graph
-
-        edge_count as f64 / max_possible_edges as f64
+        crate::algorithms::structural::density(
+            self.nodes.len(),
+            self.edges.len(),
+            self.graph.borrow().is_directed(),
+        )
     }
 
     // === SUBGRAPH SET OPERATIONS ===

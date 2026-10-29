@@ -18,6 +18,7 @@ pub mod visualization;
 pub mod view;
 mod view_algebra;
 mod view_traversal;
+mod view_metrics;
 
 pub use component::*;
 pub use composer::*;

@@ -258,44 +258,10 @@ impl Step for TriangleCountStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut topology = undirected_topology(ctx, scope)?;
-        // Orient the simple projection by node ID: every triangle is visited once.
-        for (node, neighbors) in topology.neighbors.iter_mut().enumerate() {
-            neighbors.dedup();
-            neighbors.retain(|&neighbor| neighbor > node);
-        }
-        let mut counts = vec![0i64; topology.nodes.len()];
-        for (u, neighbors) in topology.neighbors.iter().enumerate() {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("triangle_count cancelled"));
-            }
-            for (position, &v) in neighbors.iter().enumerate() {
-                let mut left = position + 1;
-                let mut right = 0;
-                let other = &topology.neighbors[v];
-                while left < neighbors.len() && right < other.len() {
-                    if ctx.is_cancelled() {
-                        return Err(anyhow!("triangle_count cancelled"));
-                    }
-                    match neighbors[left].cmp(&other[right]) {
-                        std::cmp::Ordering::Less => left += 1,
-                        std::cmp::Ordering::Greater => right += 1,
-                        std::cmp::Ordering::Equal => {
-                            for node in [u, v, neighbors[left]] {
-                                counts[node] = counts[node]
-                                    .checked_add(1)
-                                    .ok_or_else(|| anyhow!("Triangle count exceeds i64"))?;
-                            }
-                            left += 1;
-                            right += 1;
-                        }
-                    }
-                }
-            }
-        }
-        if ctx.is_cancelled() {
-            return Err(anyhow!("triangle_count cancelled"));
-        }
+        let topology = undirected_topology(ctx, scope)?;
+        let counts = crate::algorithms::structural::triangle_counts(topology.neighbors, || {
+            ctx.is_cancelled()
+        })?;
         let result = topology
             .nodes
             .into_iter()

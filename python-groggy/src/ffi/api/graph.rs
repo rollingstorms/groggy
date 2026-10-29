@@ -2618,26 +2618,20 @@ impl PyGraph {
         })
     }
 
-    /// Calculate clustering coefficient (not yet implemented in core).
-    #[pyo3(signature = (_node_id = None))]
-    pub fn clustering_coefficient(
-        slf: PyRef<Self>,
-        py: Python,
-        _node_id: Option<NodeId>,
-    ) -> PyResult<f64> {
-        Self::with_full_view(slf, py, |_subgraph, _py| {
-            Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Clustering coefficient not yet implemented - coming in future version",
-            ))
+    /// Local or average simple undirected clustering through native prepared topology.
+    #[pyo3(signature = (node_id = None))]
+    pub fn clustering_coefficient(slf: PyRef<Self>, py: Python, node_id: Option<&PyAny>) -> PyResult<f64> {
+        let node = node_id.map(|v| crate::ffi::query::query::nonnegative_count(v, "node_id")).transpose()?;
+        Self::with_full_view(slf, py, |subgraph, py| {
+            let input = subgraph.inner.structural_read().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            py.allow_threads(|| input.clustering_coefficient(node)).map_err(crate::ffi::utils::graph_error_to_py_err)
         })
     }
-
-    /// Calculate transitivity (not yet implemented in core).
+    /// Simple undirected transitivity through native prepared topology.
     pub fn transitivity(slf: PyRef<Self>, py: Python) -> PyResult<f64> {
-        Self::with_full_view(slf, py, |_subgraph, _py| {
-            Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Transitivity not yet implemented - coming in future version",
-            ))
+        Self::with_full_view(slf, py, |subgraph, py| {
+            let input = subgraph.inner.structural_read().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            py.allow_threads(|| input.transitivity()).map_err(crate::ffi::utils::graph_error_to_py_err)
         })
     }
 

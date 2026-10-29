@@ -1124,3 +1124,35 @@ No new rows or broad parent closure: **211 checked / 57 unchecked**. Next read
 parity component is native/captured structural summaries and the existing Python
 clustering/transitivity placeholders; full connected accessors/default ownership
 and compound topology/custom effects retain their original scope.
+
+## Topology-only structural summaries and former Python placeholders — 2026-10-29
+
+Completed the next 26.1/AR7.5/28.15 read parity component. Graph, connected
+Subgraph and GraphView now expose actual native simple-undirected local/mean
+clustering and transitivity; GraphView also returns bulk owned coefficient rows.
+Selected topology excludes owner-only triangle edges, loops and parallel mass.
+Directed clustering definitions reject explicitly, as existing triangle/k-core
+steps do. Native inherent/trait/captured/Python density shares one direction-aware
+edge-instance definition and avoids usize denominator multiplication overflow.
+
+UndirectedStructure shares immutable CSR and sorted IDs for repeated native
+computations, retaining no properties/history/writable owner/GraphView. Python
+connected adapters prepare only topology then release the GIL. Builder triangles
+and summaries use one checked cancellation-aware kernel. No fake partial graph or
+full owner clone. Evidence, domains and raw release baseline:
+`structural-summaries-2026-10-29.md`; all 64 four-node simple graphs match independent
+closed-triple counts. Cold setup, chain/star/clique computations and cached
+preparation are measured separately without a before/after speedup claim.
+
+Gates: **1,466 native / 54 ignored**, strict all-target core Clippy,
+**2,460 root Python / 1 skipped**, **237 executable documentation examples**,
+rebuilt/atomically staged full-ABI extension, scoped Rust formatting and syntax/
+diff checks. Four native integration/two unit cases and 30 Python cases added;
+no existing regression weakened. Three unrelated FFI warnings remain.
+
+Inventory remains **211 checked / 57 unchecked**; no new checkbox rows or broad
+parent closure. Captured algebra/grouping, thirteen classic algorithms, scoped
+traversal and structural summaries now cover the corresponding read prerequisites.
+Connected column/accessor ownership and full read/write/default return migration
+still require work in existing 26.1/AR4/AR7.5/21.2; topology/custom compound effects
+remain in 09.4b.2.

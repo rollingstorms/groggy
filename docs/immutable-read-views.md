@@ -423,3 +423,8 @@ endpoint closure and connected compatibility behavior.
 `is_connected` defines empty/weak/strong cases explicitly. See
 [captured traversal](api/captured-view-traversal.md) for tree-versus-neighborhood
 semantics and connected compatibility repairs.
+
+Captured `clustering_coefficients`, local/mean `clustering_coefficient`,
+`transitivity` and `density` now use shared native structural kernels. See
+[structural summaries](api/structural-summaries.md) for simple undirected versus
+edge-instance semantics, directed-domain rejection and topology-only native reuse.

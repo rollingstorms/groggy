@@ -125,6 +125,15 @@ impl AlgorithmRead {
         Ok(self.nodes.iter().copied().zip(labels).collect())
     }
 
+    /// Share only checked undirected topology/IDs for structural computations.
+    pub fn structural_read(&self) -> GraphResult<super::UndirectedStructure> {
+        self.require_undirected("structural summaries")?;
+        Ok(super::UndirectedStructure::new(
+            self.nodes.clone(),
+            self.csr.clone(),
+        ))
+    }
+
     /// Captured Louvain labels. Context supplies diagnostics/cancellation only; no writes occur.
     pub fn louvain(
         &self,

@@ -399,6 +399,26 @@ impl PyGraphView {
             .map(|views| views.into_iter().map(|inner| Self { inner }).collect())
             .map_err(graph_error_to_py_err)
     }
+    /// Local or average simple undirected clustering on captured topology.
+    #[pyo3(signature=(node_id=None))]
+    fn clustering_coefficient(&self, py: Python<'_>, node_id: Option<&PyAny>) -> PyResult<f64> {
+        let node = node_id
+            .map(|v| crate::ffi::query::query::nonnegative_count(v, "node_id"))
+            .transpose()?;
+        py.allow_threads(|| self.inner.clustering_coefficient(node))
+            .map_err(graph_error_to_py_err)
+    }
+    fn clustering_coefficients(&self, py: Python<'_>) -> PyResult<Vec<(NodeId, f64)>> {
+        py.allow_threads(|| self.inner.clustering_coefficients())
+            .map_err(graph_error_to_py_err)
+    }
+    fn transitivity(&self, py: Python<'_>) -> PyResult<f64> {
+        py.allow_threads(|| self.inner.transitivity())
+            .map_err(graph_error_to_py_err)
+    }
+    fn density(&self) -> f64 {
+        self.inner.density()
+    }
     /// Exact frozen BFS discovery-tree edges, bounded by hop depth.
     #[pyo3(signature=(start, max_depth=None))]
     fn bfs(&self, py: Python<'_>, start: NodeId, max_depth: Option<&PyAny>) -> PyResult<Self> {

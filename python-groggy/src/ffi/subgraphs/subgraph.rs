@@ -362,25 +362,8 @@ impl PySubgraph {
 
     // === Analysis Methods - delegate to SubgraphOperations ===
 
-    /// Calculate density of this subgraph
-    fn density(&self) -> f64 {
-        // Use same calculation as original but with trait data
-        let num_nodes = self.inner.node_count();
-        let num_edges = self.inner.edge_count();
-
-        if num_nodes <= 1 {
-            return 0.0;
-        }
-
-        // For undirected graph: max edges = n(n-1)/2
-        let max_possible_edges = (num_nodes * (num_nodes - 1)) / 2;
-
-        if max_possible_edges > 0 {
-            num_edges as f64 / max_possible_edges as f64
-        } else {
-            0.0
-        }
-    }
+    /// Edge-instance density using the native directed/undirected definition.
+    fn density(&self) -> f64 { self.inner.density() }
 
     /// Get connected components within this subgraph (lazy array)
     fn connected_components(&self) -> PyResult<PyComponentsArray> {
@@ -1218,22 +1201,16 @@ impl PySubgraph {
 
     // === MISSING GRAPH METRICS ===
 
-    /// Calculate clustering coefficient for a node or entire subgraph
-    fn clustering_coefficient(&self, _py: Python, _node_id: Option<NodeId>) -> PyResult<f64> {
-        // Note: Clustering coefficient not yet implemented in core
-        // This is a placeholder for future implementation
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "Clustering coefficient not yet implemented in core - coming in future version",
-        ))
+    /// Local or average simple undirected clustering; prepared topology crosses the GIL boundary.
+    #[pyo3(signature=(node_id=None))]
+    fn clustering_coefficient(&self, py: Python<'_>, node_id: Option<&PyAny>) -> PyResult<f64> {
+        let node = node_id.map(|v| crate::ffi::query::query::nonnegative_count(v, "node_id")).transpose()?;
+        let input = self.inner.structural_read().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        py.allow_threads(|| input.clustering_coefficient(node)).map_err(crate::ffi::utils::graph_error_to_py_err)
     }
-
-    /// Calculate transitivity of the subgraph
-    fn transitivity(&self, _py: Python) -> PyResult<f64> {
-        // Note: Transitivity not yet implemented in core
-        // This is a placeholder for future implementation
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "Transitivity not yet implemented in core - coming in future version",
-        ))
+    fn transitivity(&self, py: Python<'_>) -> PyResult<f64> {
+        let input = self.inner.structural_read().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        py.allow_threads(|| input.transitivity()).map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
     // === ENTITY TYPE METHOD ===

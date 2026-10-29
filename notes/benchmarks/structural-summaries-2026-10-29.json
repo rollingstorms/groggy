@@ -1,0 +1,150 @@
+{
+  "cases": [
+    {
+      "all_clustering_seconds": [
+        4.8291e-05,
+        3.7625e-05,
+        3.7417e-05,
+        3.7375e-05,
+        3.7375e-05
+      ],
+      "capture_seconds": 0.000594125,
+      "captured_prepare_seconds": 7.1959e-05,
+      "connected_cached_prepare_seconds": [
+        1.25e-07,
+        8.3e-08,
+        4.2e-08,
+        4.1e-08,
+        4.2e-08
+      ],
+      "connected_prepare_seconds": 0.000166583,
+      "edges": 999,
+      "fixture": "chain",
+      "local_clustering_seconds": [
+        3.33e-07,
+        1.67e-07,
+        1.25e-07,
+        8.3e-08,
+        1.25e-07
+      ],
+      "nodes": 1000,
+      "transitivity_seconds": [
+        3.8667e-05,
+        3.825e-05,
+        3.8333e-05,
+        3.8167e-05,
+        3.8292e-05
+      ]
+    },
+    {
+      "all_clustering_seconds": [
+        0.004924541,
+        0.004315792,
+        0.004309709,
+        0.004120125,
+        0.003893667
+      ],
+      "capture_seconds": 0.120541542,
+      "captured_prepare_seconds": 0.015059708,
+      "connected_cached_prepare_seconds": [
+        1.417e-06,
+        9.59e-07,
+        1.167e-06,
+        9.58e-07,
+        1.084e-06
+      ],
+      "connected_prepare_seconds": 0.025780458,
+      "edges": 99999,
+      "fixture": "chain",
+      "local_clustering_seconds": [
+        4.416e-06,
+        4.542e-06,
+        5.125e-06,
+        2.292e-06,
+        3.542e-06
+      ],
+      "nodes": 100000,
+      "transitivity_seconds": [
+        0.004259625,
+        0.004524625,
+        0.00417925,
+        0.004138625,
+        0.003952667
+      ]
+    },
+    {
+      "all_clustering_seconds": [
+        0.004417917,
+        0.003673208,
+        0.003773208,
+        0.003727875,
+        0.003850125
+      ],
+      "capture_seconds": 0.093451625,
+      "captured_prepare_seconds": 0.013358667,
+      "connected_cached_prepare_seconds": [
+        3.417e-06,
+        9.59e-07,
+        2.91e-07,
+        1.167e-06,
+        2.042e-06
+      ],
+      "connected_prepare_seconds": 0.02203725,
+      "edges": 99999,
+      "fixture": "star",
+      "local_clustering_seconds": [
+        0.004840833,
+        0.00497125,
+        0.004821042,
+        0.004815459,
+        0.005116334
+      ],
+      "nodes": 100000,
+      "transitivity_seconds": [
+        0.003871292,
+        0.004066417,
+        0.003691792,
+        0.004078208,
+        0.003875417
+      ]
+    },
+    {
+      "all_clustering_seconds": [
+        0.010246125,
+        0.010021,
+        0.010204291,
+        0.01031825,
+        0.010000959
+      ],
+      "capture_seconds": 0.011793,
+      "captured_prepare_seconds": 0.00281275,
+      "connected_cached_prepare_seconds": [
+        1.042e-06,
+        1.5e-06,
+        1.417e-06,
+        1.791e-06,
+        1.167e-06
+      ],
+      "connected_prepare_seconds": 0.003983541,
+      "edges": 44850,
+      "fixture": "clique",
+      "local_clustering_seconds": [
+        0.000771667,
+        0.000718458,
+        0.000765333,
+        0.000687459,
+        0.000709792
+      ],
+      "nodes": 300,
+      "transitivity_seconds": [
+        0.010748167,
+        0.01005775,
+        0.010613417,
+        0.010287666,
+        0.010361667
+      ]
+    }
+  ],
+  "fixture": "undirected unweighted simple topology, no properties; setup and five reusable computations measured separately; all rows/objectives checked",
+  "profile": "release"
+}

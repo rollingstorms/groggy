@@ -26,6 +26,8 @@ mod property_batch;
 pub mod read;
 pub mod registry;
 pub mod steps;
+pub(crate) mod structural;
+pub use structural::UndirectedStructure;
 pub mod temporal;
 
 pub use pipeline::{AlgorithmSpec, Pipeline, PipelineBuilder, PipelineSpec};

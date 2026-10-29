@@ -4783,7 +4783,7 @@ class Graph:
         """
         ...
 
-    def clustering_coefficient(self, *args, **kwargs) -> Any:
+    def clustering_coefficient(self, node_id: Optional[int] = None) -> float:
         """
         Calculate clustering coefficient (not yet implemented in core).
         """
@@ -5343,7 +5343,7 @@ class Graph:
         """
         ...
 
-    def transitivity(self, *args, **kwargs) -> Any:
+    def transitivity(self) -> float:
         """
         Calculate transitivity (not yet implemented in core).
         """
@@ -9384,7 +9384,7 @@ class Subgraph:
         """
         ...
 
-    def clustering_coefficient(self, *args, **kwargs) -> Any:
+    def clustering_coefficient(self, node_id: Optional[int] = None) -> float:
         """
         Calculate clustering coefficient for a node or entire subgraph
         """
@@ -9781,7 +9781,7 @@ class Subgraph:
         """
         ...
 
-    def transitivity(self, *args, **kwargs) -> Any:
+    def transitivity(self) -> float:
         """
         Calculate transitivity of the subgraph
         """
@@ -10977,6 +10977,11 @@ class GraphView:
     def calculate_similarity(self, other: GraphView, metric: str = "jaccard") -> float: ...
     def group_by_nodes(self, attr_name: str) -> List[GraphView]: ...
     def group_by_edges(self, attr_name: str) -> List[GraphView]: ...
+
+    def density(self) -> float: ...
+    def clustering_coefficient(self, node_id: Optional[int] = None) -> float: ...
+    def clustering_coefficients(self) -> List[Tuple[int, float]]: ...
+    def transitivity(self) -> float: ...
 
     def connected_components(self, *args, **kwargs) -> List[GraphView]:
         """
