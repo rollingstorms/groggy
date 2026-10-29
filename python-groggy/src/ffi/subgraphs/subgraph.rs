@@ -238,18 +238,10 @@ impl PySubgraph {
     /// Get viz accessor for visualization operations
     #[getter]
     pub(crate) fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use groggy::viz::streaming::GraphDataSource;
-
-        // Create GraphDataSource directly from the subgraph's underlying graph
-        // The subgraph already filters to the right nodes/edges
-        let graph_ref = self.inner.graph();
-        let graph_data_source = GraphDataSource::new(&graph_ref.borrow());
-
-        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
-            graph_data_source,
-            "Subgraph".to_string(),
-        );
-
+        let view = self.inner.pin_view().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let source = py.allow_threads(|| groggy::viz::streaming::GraphDataSource::from_view(&view))
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(source, "Subgraph".into());
         Py::new(py, viz_accessor)
     }
 

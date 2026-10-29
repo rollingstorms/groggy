@@ -96,6 +96,36 @@ impl GraphDataSource {
         Ok(Self::capture(nodes, edges, is_directed, attribute_types))
     }
 
+    /// Capture exactly selected frozen rows and edge instances. No writable graph
+    /// or unrelated parent rows are retained; typed values use from_entities policy.
+    pub fn from_view(view: &crate::GraphView) -> GraphResult<Self> {
+        let mut snapshot = view.to_snapshot();
+        let nodes = snapshot
+            .active_nodes
+            .into_iter()
+            .map(|id| GraphNode {
+                id: id.to_string(),
+                label: None,
+                position: None,
+                attributes: snapshot.node_attributes.remove(&id).unwrap_or_default(),
+            })
+            .collect();
+        let mut edges: Vec<_> = snapshot.edges.into_iter().collect();
+        edges.sort_unstable_by_key(|&(id, _)| id);
+        let edges = edges
+            .into_iter()
+            .map(|(id, (source, target))| GraphEdge {
+                id: id.to_string(),
+                source: source.to_string(),
+                target: target.to_string(),
+                label: None,
+                weight: None,
+                attributes: snapshot.edge_attributes.remove(&id).unwrap_or_default(),
+            })
+            .collect();
+        Self::from_entities(nodes, edges, view.is_directed())
+    }
+
     /// Create a new adapter using the "name" attribute as the preferred label.
     pub fn new(graph: &Graph) -> Self {
         Self::new_with_label(graph, "name")

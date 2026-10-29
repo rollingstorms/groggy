@@ -1,0 +1,57 @@
+{
+  "fixture": "release extension; five frozen visualization captures; directed chain with f64 node properties; source setup/capture separate; selected payload construction and Python accessor included; no server/layout or comparison to incorrect whole-owner capture",
+  "cases": [
+    {
+      "owner_nodes": 1000,
+      "selected_nodes": 16,
+      "selected_edges": 15,
+      "owner_capture_nanoseconds": 647667,
+      "viz_capture_nanoseconds": [
+        36708,
+        15042,
+        11125,
+        10375,
+        10667
+      ]
+    },
+    {
+      "owner_nodes": 1000,
+      "selected_nodes": 1000,
+      "selected_edges": 999,
+      "owner_capture_nanoseconds": 647667,
+      "viz_capture_nanoseconds": [
+        750125,
+        667750,
+        670000,
+        661833,
+        656000
+      ]
+    },
+    {
+      "owner_nodes": 100000,
+      "selected_nodes": 16,
+      "selected_edges": 15,
+      "owner_capture_nanoseconds": 126647708,
+      "viz_capture_nanoseconds": [
+        43667,
+        12542,
+        11292,
+        10458,
+        10333
+      ]
+    },
+    {
+      "owner_nodes": 100000,
+      "selected_nodes": 100000,
+      "selected_edges": 99999,
+      "owner_capture_nanoseconds": 126647708,
+      "viz_capture_nanoseconds": [
+        154778334,
+        150907958,
+        150142291,
+        163229666,
+        149078625
+      ]
+    }
+  ]
+}

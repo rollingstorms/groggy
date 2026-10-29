@@ -590,6 +590,13 @@ impl PyGraphView {
             .map(|graph| crate::ffi::api::graph::PyGraph { inner: graph.into_shared(), cached_view: std::cell::RefCell::new(None) })
             .map_err(graph_error_to_py_err)
     }
+    /// Immutable visualization capture of exactly this selected state.
+    #[getter]
+    fn viz(&self, py: Python<'_>) -> PyResult<crate::ffi::viz_accessor::VizAccessor> {
+        py.allow_threads(|| groggy::viz::streaming::GraphDataSource::from_view(&self.inner))
+            .map(|source| crate::ffi::viz_accessor::VizAccessor::with_data_source(source, "GraphView".into()))
+            .map_err(graph_error_to_py_err)
+    }
     fn copy(&self) -> Self {
         self.clone()
     }

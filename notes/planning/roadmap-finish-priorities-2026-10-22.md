@@ -1950,3 +1950,19 @@ Gates: **1,506 native / 54 ignored**, strict all-target Clippy, **2,565 root Pyt
 1 skipped**, **250 docs**, rebuilt/staged extension and scoped checks. Three old
 unrelated FFI warnings remain. **211 checked / 57 open**, no new rows. Visualization
 and frozen defaults/checked effectful binding remain the same parent scope.
+
+
+### Selected immutable visualization — 2026-10-29
+
+Completed existing 26.1/AR4/AR7.5 visualization adapter scope. Two pre-fix real
+server cases reproduced full-parent leakage/missing captured .viz. Both now use
+GraphDataSource.from_view and the existing checked entity policy; selected IDs,
+parallel/loop instances, direction, typed properties/positions/weights and snapshot
+lifetime remain intact. Captured preparation releases the GIL. Real isolated HTTP/
+websocket snapshot tests and native worker/source-identity cases pass. Receipt:
+`view-visualization-2026-10-29.md`. Sixteen-node source medians **11.125/11.292 µs**
+from 1k/100k parents after capture; full-source medians **0.668/150.908 ms**, no
+server/RSS/universal speed claim. Gates: **1,508 native / 54 ignored**, strict
+Clippy, **2,567 root Python / 1 skipped**, **251 docs**, rebuilt/staged release
+extension and scoped checks. **211 checked / 57 open**; main remaining boundary is
+frozen default read binding and explicit checked execution/writeback.
