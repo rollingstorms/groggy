@@ -1383,3 +1383,28 @@ Gates: **1,492 native / 54 ignored**, strict all-target core Clippy,
 atomically staged extension and scoped formatting/syntax/diff checks. Three old
 unrelated FFI warnings remain; owner edits stay excluded. No new checklist rows
 or broad ownership/default/compound closure: **211 checked / 57 unchecked**.
+
+
+### Current connected full-view cache repair — 2026-10-29
+
+Completed another existing 26.1/AR4/AR7.5 component. Seven reproduced failures
+showed that aggregate entity counts reused stale full-view membership after
+same-size replacements/trades and state restoration. GraphSpace now supplies an
+instance-sensitive membership revision across all eight scalar/bulk mutation
+paths. Property and endpoint-only writes preserve cached membership; separate
+read caches still refresh values/topology. Restoration distinguishes equal
+numeric versions. The Python bridge no longer allocates whole ID vectors for a
+warm cache check. Explicit immutable capture and legacy return types are unchanged.
+
+Receipt: `current-full-view-cache-2026-10-29.md`. Quiet release-extension warm-hit
+medians were **2,445→40 ns at 1k** and **431,955→41 ns at 100k**. These are bound
+Python method calls in nonalternating local runs; initial view construction and
+immutable capture are excluded, so no universal FFI budget claim.
+
+Gates: **1,494 native / 54 ignored**, strict all-target core Clippy,
+**2,519 root Python / 1 skipped**, **245 executed documentation examples**, rebuilt/
+atomically staged release extension and scoped formatting/syntax/diff checks.
+Three unrelated existing FFI warnings remain; owner edits excluded.
+No rows added or broad parents closed: **211 checked / 57 open**. Next remains
+immutable default/effectful facade migration and compound topology acceptance;
+full refreshed-output copying also remains linear.

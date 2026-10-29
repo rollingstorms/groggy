@@ -1,0 +1,78 @@
+{
+  "baseline_commit": "5fb84d75",
+  "method": "before/after quiet local release-extension runs; same Python source and bound method; 7 samples of 128 cached calls per size; not alternating process pairs; construction and immutable capture excluded",
+  "summary": [
+    {
+      "nodes": 1000,
+      "baseline_median_nanoseconds_per_call": 2444.6640625,
+      "revision_median_nanoseconds_per_call": 39.7109375
+    },
+    {
+      "nodes": 100000,
+      "baseline_median_nanoseconds_per_call": 431954.7578125,
+      "revision_median_nanoseconds_per_call": 40.6875
+    }
+  ],
+  "baseline": {
+    "fixture": "unchanged connected full view on a chain, no immutable capture; release extension; 7 samples of 128 Python calls; source construction excluded",
+    "cases": [
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "nanoseconds_per_call": [
+          2641.2734375,
+          2416.015625,
+          2441.078125,
+          2470.375,
+          2444.6640625,
+          2453.125,
+          2404.625
+        ]
+      },
+      {
+        "nodes": 100000,
+        "edges": 99999,
+        "nanoseconds_per_call": [
+          437420.5703125,
+          431177.40625,
+          433712.2421875,
+          440664.0625,
+          431954.7578125,
+          421047.5234375,
+          425410.15625
+        ]
+      }
+    ]
+  },
+  "revision": {
+    "fixture": "unchanged connected full view on a chain, no immutable capture; release extension; 7 samples of 128 Python calls; source construction excluded",
+    "cases": [
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "nanoseconds_per_call": [
+          43.9453125,
+          40.3671875,
+          39.390625,
+          39.3828125,
+          39.390625,
+          40.0390625,
+          39.7109375
+        ]
+      },
+      {
+        "nodes": 100000,
+        "edges": 99999,
+        "nanoseconds_per_call": [
+          10729.1640625,
+          56.640625,
+          40.6953125,
+          40.6875,
+          40.3671875,
+          40.359375,
+          40.3671875
+        ]
+      }
+    ]
+  }
+}

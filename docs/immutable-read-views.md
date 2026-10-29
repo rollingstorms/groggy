@@ -439,3 +439,5 @@ described in [connected degree reads](api/connected-degree-reads.md).
 
 Specialized wrapper consolidation and capture are described in
 [specialized selections](api/specialized-selections.md).
+
+The legacy connected full-view cache follows [active membership revisions](api/current-full-view-cache.md); it remains distinct from immutable capture.

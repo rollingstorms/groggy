@@ -35,6 +35,14 @@ impl PartialEq for SpaceVersion {
 }
 impl Eq for SpaceVersion {}
 
+/// Opaque in-process revision of active node/edge membership. Clone and compare
+/// it for full-selection caches; it retains identity only, not graph payloads.
+/// Property writes and endpoint-only changes do not alter membership. A restored
+/// space has a different instance identity even if its numeric versions match.
+/// This is not a durable state ID, timestamp or checked-write capability.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MembershipRevision(SpaceVersion);
+
 /// Current-space incidence convention. Kept in one owner for cache assembly and
 /// verification; algorithm-specific/frozen adjacency policy remains separate.
 fn incidence_neighbors(
@@ -144,6 +152,7 @@ pub struct GraphSpace {
     */
     /// Version counter - increments on structural changes
     version: u64,
+    membership_version: u64,
     cache_identity: Arc<()>,
 
     /*
@@ -179,6 +188,7 @@ impl GraphSpace {
             active_edges: HashSet::new(),
             pool,
             version: 1, // Start at 1 so empty cache (version 0) is immediately stale
+            membership_version: 1,
             cache_identity: Arc::new(()),
             cache: RwLock::new(CacheState::new()),
             current_read: RefCell::new(None),
@@ -198,6 +208,7 @@ impl GraphSpace {
         self.invalidate_current_read();
         if self.active_nodes.insert(node_id) {
             self.version += 1;
+            self.membership_version += 1;
         }
     }
 
@@ -208,6 +219,7 @@ impl GraphSpace {
         self.active_nodes.extend(nodes);
         if self.active_nodes.len() != before {
             self.version += 1;
+            self.membership_version += 1;
         }
     }
 
@@ -220,6 +232,7 @@ impl GraphSpace {
         }
         if self.active_nodes.len() != before {
             self.version += 1;
+            self.membership_version += 1;
         }
         // Remove nodes from all attribute indices
         for (_, nodes_map) in self.node_attribute_indices.iter_mut() {
@@ -234,6 +247,7 @@ impl GraphSpace {
         self.invalidate_current_read();
         if self.active_nodes.remove(&node_id) {
             self.version += 1;
+            self.membership_version += 1;
         }
         // Remove node from all attribute indices
         for (_, nodes) in self.node_attribute_indices.iter_mut() {
@@ -244,14 +258,18 @@ impl GraphSpace {
     /// Add an edge to the active set (&mut self - increments version for topology cache invalidation)
     pub fn activate_edge(&mut self, edge_id: EdgeId, _source: NodeId, _target: NodeId) {
         self.invalidate_current_read();
-        self.active_edges.insert(edge_id);
+        if self.active_edges.insert(edge_id) {
+            self.membership_version += 1;
+        }
         self.version += 1; // invalidate topology cache
     }
 
     /// Remove an edge from the active set (&mut self)
     pub fn deactivate_edge(&mut self, edge_id: EdgeId) {
         self.invalidate_current_read();
-        self.active_edges.remove(&edge_id);
+        if self.active_edges.remove(&edge_id) {
+            self.membership_version += 1;
+        }
         // Remove edge from all attribute indices
         for (_, edges) in self.edge_attribute_indices.iter_mut() {
             edges.remove(&edge_id);
@@ -262,7 +280,11 @@ impl GraphSpace {
     /// Bulk activate edges (&mut self)
     pub fn activate_edges<I: IntoIterator<Item = EdgeId>>(&mut self, edges: I) {
         self.invalidate_current_read();
+        let before = self.active_edges.len();
         self.active_edges.extend(edges);
+        if self.active_edges.len() != before {
+            self.membership_version += 1;
+        }
         self.version += 1;
     }
 
@@ -272,8 +294,12 @@ impl GraphSpace {
         if edges.is_empty() {
             return;
         }
+        let before = self.active_edges.len();
         for edge in edges {
             self.active_edges.remove(edge);
+        }
+        if self.active_edges.len() != before {
+            self.membership_version += 1;
         }
         // Remove edges from all attribute indices
         for (_, edges_map) in self.edge_attribute_indices.iter_mut() {
@@ -959,6 +985,15 @@ impl GraphSpace {
             }
         }
         Ok(snapshot)
+    }
+
+    /// Read active-membership cache validity in O(1), independently of values
+    /// and ordered endpoints. Comparing stamps also distinguishes restored spaces.
+    pub fn membership_revision(&self) -> MembershipRevision {
+        MembershipRevision(SpaceVersion {
+            instance: self.cache_identity.clone(),
+            version: self.membership_version,
+        })
     }
 
     /// Instance-sensitive validity for connected reader caches; no graph payload is retained.

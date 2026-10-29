@@ -214,7 +214,7 @@ impl PyAggregationResult {
 pub struct PyGraph {
     pub inner: Rc<RefCell<RustGraph>>,
     // Cache for the full graph view to avoid expensive recreation
-    pub cached_view: RefCell<Option<(u64, Py<PySubgraph>)>>, // (version, cached_subgraph)
+    pub cached_view: RefCell<Option<(groggy::state::space::MembershipRevision, Py<PySubgraph>)>>,
 }
 
 impl Clone for PyGraph {
@@ -2527,12 +2527,9 @@ impl PyGraph {
     /// Return a full-view Subgraph (whole graph as a subgraph).
     /// Downstream code can always resolve parent graph from this object.
     pub fn view(self_: PyRef<Self>, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
-        // Check cache first - avoid expensive view creation if version hasn't changed
-        let current_version = {
-            let borrowed = self_.inner.borrow();
-            // Use node count + edge count as a simple version indicator
-            (borrowed.node_ids().len() + borrowed.edge_ids().len()) as u64
-        };
+        // Membership stamps avoid both cardinality collisions and O(n) ID-vector
+        // allocation on a warm hit. Endpoint/value readers have their own caches.
+        let current_version = self_.inner.borrow().space().membership_revision();
 
         // Check if we have a cached view for this version
         {
