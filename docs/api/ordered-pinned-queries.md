@@ -134,3 +134,16 @@ follows the existing shared GraphView capture.
 Arbitrary multi-edge pattern matching, specialized group/temporal interval indexes,
 ordinary connected Subgraph migration and wider query/expression consolidation
 remain in the original checklist. This slice does not certify those features.
+
+## ID pages from existing postings
+
+With no `order_by`, simple property-presence and exact-equality queries page
+directly from their existing immutable sorted ID postings. Both ascending and
+descending requests copy only the returned page. Exact lookup shares the same
+binary-search bounds as the ordinary indexed predicate path. No new index is
+built and no automatic update/recovery is introduced.
+
+Missing requested indexes still reject unless `allow_scan=True`. Boolean/range/
+topology predicates retain the ordinary executor. Property ordering still validates
+all matching scalar values, including empty or out-of-range pages, before selecting
+a page. The fast path changes allocation work, not query or validation semantics.

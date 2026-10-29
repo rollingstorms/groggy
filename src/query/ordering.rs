@@ -113,7 +113,7 @@ fn key(value: Option<&AttrValue>) -> GraphResult<Key<'_>> {
 pub(crate) fn page(
     view: &GraphView,
     node: bool,
-    mut ids: Vec<usize>,
+    ids: Vec<usize>,
     options: &QueryOptions,
 ) -> GraphResult<Vec<usize>> {
     if let Some(name) = &options.order_by {
@@ -167,12 +167,23 @@ pub(crate) fn page(
         let selected = &mut rows[start..end];
         selected.sort_unstable_by(compare);
         return Ok(selected.iter().map(|(id, _)| *id).collect());
-    } else if options.descending {
-        ids.reverse();
     }
-    Ok(ids
-        .into_iter()
-        .skip(options.offset)
-        .take(options.limit.unwrap_or(usize::MAX))
-        .collect())
+    Ok(id_page(&ids, options))
+}
+
+/// Page an ascending ID posting without copying/reversing the complete posting.
+pub(crate) fn id_page(ids: &[usize], options: &QueryOptions) -> Vec<usize> {
+    let start = options.offset.min(ids.len());
+    let end = start
+        .saturating_add(options.limit.unwrap_or(usize::MAX))
+        .min(ids.len());
+    if options.descending {
+        ids[ids.len() - end..ids.len() - start]
+            .iter()
+            .rev()
+            .copied()
+            .collect()
+    } else {
+        ids[start..end].to_vec()
+    }
 }

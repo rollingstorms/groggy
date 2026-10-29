@@ -20,8 +20,13 @@ query migration (21.2). Repeated current read captures now share weakly cached
 frozen payloads with fresh provenance and mutation invalidation; see
 `current-read-sharing-2026-10-28.md`. Sparse frozen adjacency now avoids empty per-node entries, with measured
 capture/memory/probe trade-offs in `pinned-read-adjacency-2026-10-28.md`.
-First/invalidated full value materialization and legacy connected ownership remain
-open. The listed secondary-index families now complete 18.2:
+ID-ordered indexed presence/exact pages now borrow existing postings rather than
+materializing all matches (`query-page-postings-2026-10-28.md`). The 1k/100k/1m
+complete core workflow and archive framing receipts make reconstruction/recovery
+memory costs explicit. First/invalidated full value materialization and legacy
+connected ownership remain open. With these measured read prerequisites in place,
+next advance connected immutable ownership and compound topology acceptance; do
+not expand adjacent audits merely to create more checklist slices. The listed secondary-index families now complete 18.2:
 property/label/type/topology, effective events/activation, exact property intervals
 and retained group membership/reverse references. See
 `secondary-indexes-exit-review-2026-10-28.md`. Native default and

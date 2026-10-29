@@ -1020,3 +1020,27 @@ Gates: **1,442 native / 56 ignored**, strict all-target Clippy, **2,314 root Pyt
 parent closure: **211 checked / 57 unchecked**. A measured next retrieval component
 is paging directly from existing presence/equality postings instead of cloning
 all matching IDs for a small ID-ordered page.
+
+
+## Bounded pages from existing index postings — 2026-10-28
+
+Completed the measured 21.2/32.2 allocation component: simple ID-ordered presence/
+exact-equality queries borrow existing sorted postings and allocate only the
+returned page. Equality bounds and ascending/descending overflow-safe ID paging
+are shared with the ordinary index/scan paths. Missing indexes still reject unless
+scanning is explicit; property ordering still validates every matching scalar even
+for empty pages. No new query type/index/recovery/retention work.
+
+`query-page-postings-2026-10-28.md`: two native scan-parity/validation cases and one
+Python scope/lifetime/count case, plus two alternating release processes per
+variant at 1k/100k/1m. Million-node forward exact pages measure **79.173 → 2.508 µs**;
+presence pages **7,606.391 → 0.073 µs** by avoiding full-match materialization.
+These are repeated native measurements excluding capture/index build/Python.
+
+Gates: **1,444 native / 56 ignored**, strict all-target core Clippy, **2,315 root
+Python / 1 skipped**, **227 docs**, rebuilt/staged full-ABI release extension.
+Fixed inventory remains **211 checked / 57 unchecked**, no new rows. This hour
+completes five committed slices (capture reuse, sparse frozen adjacency, million
+workflow baseline, archive framing lifetime, direct posting pages). Functional
+next priorities remain connected immutable ownership and compound topology;
+large retained reconstruction/recovery memory remains explicitly open.

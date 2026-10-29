@@ -1,0 +1,758 @@
+{
+  "baseline_commit": "ec24e465",
+  "method": "identical benchmark source, separate release executables; two before/after processes in reversed order; setup excluded; five query samples per case per process; native API only, not an FFI budget",
+  "runs": [
+    {
+      "cases": [
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            9.625e-06,
+            7.16675e-06,
+            6.771e-06,
+            6.79175e-06,
+            6.78125e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.34791e-06,
+            1.31708e-06,
+            1.36708e-06,
+            1.34833e-06,
+            1.38292e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            6.9375e-06,
+            6.78125e-06,
+            6.84375e-06,
+            6.8335e-06,
+            6.8125e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.36875e-06,
+            1.37167e-06,
+            1.36542e-06,
+            1.3741599999999999e-06,
+            1.3587500000000001e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.000798625,
+            0.0007211355,
+            0.00067338525,
+            0.000672302,
+            0.00069647925
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            9.36042e-06,
+            9.201250000000001e-06,
+            9.20792e-06,
+            9.17709e-06,
+            9.14875e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.00072448975,
+            0.000707854,
+            0.00072001025,
+            0.0007615,
+            0.00072795825
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            9.34542e-06,
+            9.57375e-06,
+            9.7825e-06,
+            9.96666e-06,
+            1.049167e-05
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.008136948,
+            0.00725144775,
+            0.007349375,
+            0.0073202395,
+            0.0071444585
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            7.639417e-05,
+            7.649042e-05,
+            7.91775e-05,
+            7.916833e-05,
+            7.747791e-05
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.00732214575,
+            0.007579375,
+            0.00729625,
+            0.007282427,
+            0.00764039575
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            8.03825e-05,
+            8.472583e-05,
+            8.289708e-05,
+            7.679916999999999e-05,
+            7.597167e-05
+          ]
+        }
+      ],
+      "fixture": "one repeating i64 bucket plus built-in entity_type; immutable index explicit; setup excluded; one-row offset with ten-row page",
+      "profile": "release",
+      "variant": "before",
+      "repeat": 0
+    },
+    {
+      "cases": [
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            5.3125e-07,
+            1.1475e-07,
+            8.35e-08,
+            7.3e-08,
+            8.325e-08
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.25917e-06,
+            1.27417e-06,
+            1.325e-06,
+            1.33e-06,
+            1.30792e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            1.5625e-07,
+            9.375e-08,
+            8.325e-08,
+            8.325e-08,
+            8.325e-08
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.325e-06,
+            1.33959e-06,
+            1.2333400000000002e-06,
+            1.23167e-06,
+            1.19542e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            3.23e-07,
+            7.3e-08,
+            8.325e-08,
+            7.275e-08,
+            7.3e-08
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.26916e-06,
+            2.4741599999999997e-06,
+            2.09875e-06,
+            1.97542e-06,
+            1.98875e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            2.6025e-07,
+            7.275e-08,
+            6.25e-08,
+            7.275e-08,
+            7.3e-08
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.05875e-06,
+            1.96292e-06,
+            1.9625e-06,
+            1.985e-06,
+            1.97042e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            1.0105e-06,
+            6.25e-08,
+            6.25e-08,
+            7.3e-08,
+            7.3e-08
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.58083e-06,
+            2.40458e-06,
+            2.3425e-06,
+            2.43584e-06,
+            2.34167e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            1.2395e-06,
+            6.25e-08,
+            7.275e-08,
+            6.25e-08,
+            7.275e-08
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.54042e-06,
+            2.37417e-06,
+            2.4550000000000002e-06,
+            2.58875e-06,
+            2.55125e-06
+          ]
+        }
+      ],
+      "fixture": "one repeating i64 bucket plus built-in entity_type; immutable index explicit; setup excluded; one-row offset with ten-row page",
+      "profile": "release",
+      "variant": "after",
+      "repeat": 0
+    },
+    {
+      "cases": [
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            2.395e-07,
+            7.275e-08,
+            9.375e-08,
+            7.275e-08,
+            8.325e-08
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.30292e-06,
+            1.25167e-06,
+            1.27583e-06,
+            1.2591600000000001e-06,
+            1.26458e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            4.1675e-07,
+            9.375e-08,
+            7.3e-08,
+            7.275e-08,
+            7.3e-08
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.24833e-06,
+            1.23625e-06,
+            1.24e-06,
+            1.24e-06,
+            1.24333e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            9.5825e-07,
+            6.25e-08,
+            6.25e-08,
+            6.25e-08,
+            7.275e-08
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.16e-06,
+            2.01125e-06,
+            2.02167e-06,
+            2.06708e-06,
+            2.06291e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            1.46e-07,
+            7.3e-08,
+            7.3e-08,
+            7.3e-08,
+            7.3e-08
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.05875e-06,
+            2.00333e-06,
+            2.00333e-06,
+            2.05708e-06,
+            2.22333e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            4.7605e-06,
+            8.325e-08,
+            7.3e-08,
+            6.25e-08,
+            7.3e-08
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.74875e-06,
+            2.55459e-06,
+            2.5145899999999998e-06,
+            2.5375000000000003e-06,
+            2.5008300000000002e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            3.948e-06,
+            7.275e-08,
+            7.3e-08,
+            6.25e-08,
+            8.325e-08
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            2.7958300000000004e-06,
+            2.50583e-06,
+            2.5012500000000004e-06,
+            2.51833e-06,
+            2.41875e-06
+          ]
+        }
+      ],
+      "fixture": "one repeating i64 bucket plus built-in entity_type; immutable index explicit; setup excluded; one-row offset with ten-row page",
+      "profile": "release",
+      "variant": "after",
+      "repeat": 1
+    },
+    {
+      "cases": [
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            1.096875e-05,
+            9.479e-06,
+            7.427e-06,
+            7e-06,
+            6.94775e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.51958e-06,
+            1.4079199999999998e-06,
+            1.4012500000000001e-06,
+            1.41209e-06,
+            1.4325e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            7.75e-06,
+            7.08325e-06,
+            7.25e-06,
+            7.94775e-06,
+            7.09375e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.43583e-06,
+            2.65375e-06,
+            1.41958e-06,
+            1.46167e-06,
+            1.46291e-06
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.000889927,
+            0.0007276145,
+            0.000836052,
+            0.000753927,
+            0.0007562085
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            9.80875e-06,
+            9.95458e-06,
+            1.698e-05,
+            9.6575e-06,
+            9.94083e-06
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.00079896875,
+            0.00084475,
+            0.00074971875,
+            0.00076686475,
+            0.0012106875
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 100000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            1.009458e-05,
+            9.75834e-06,
+            9.74291e-06,
+            9.996670000000002e-06,
+            1.0141659999999999e-05
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.008307698,
+            0.0082141145,
+            0.00756935425,
+            0.00764342725,
+            0.007646354
+          ]
+        },
+        {
+          "descending": false,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            8.367875e-05,
+            8.321791000000001e-05,
+            8.343833e-05,
+            8.191333000000001e-05,
+            7.709666e-05
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 4,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "has_attribute",
+          "seconds_per_query": [
+            0.00743014575,
+            0.0076682395,
+            0.00787389575,
+            0.00835559375,
+            0.007949448
+          ]
+        },
+        {
+          "descending": true,
+          "iterations": 100,
+          "limit": 10,
+          "nodes": 1000000,
+          "offset": 1,
+          "predicate": "equals",
+          "seconds_per_query": [
+            8.875292e-05,
+            8.338084000000001e-05,
+            8.265625e-05,
+            8.254042e-05,
+            8.807209e-05
+          ]
+        }
+      ],
+      "fixture": "one repeating i64 bucket plus built-in entity_type; immutable index explicit; setup excluded; one-row offset with ten-row page",
+      "profile": "release",
+      "variant": "before",
+      "repeat": 1
+    }
+  ]
+}

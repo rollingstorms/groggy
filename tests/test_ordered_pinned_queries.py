@@ -130,3 +130,23 @@ def test_bounded_queries_keep_effective_clocks_across_owner_mutation_drop_and_th
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert list(pool.map(lambda _: index.query_nodes(all_nodes(), order_by="score"), range(10))) == [expected] * 10
     assert index.view.within_hops([0], 1).node_ids == [0, 1]
+
+
+def test_direct_id_pages_match_captured_scans_and_keep_index_validation():
+    graph = fixture()
+    view = graph.query().select_edges([0, 1, 3])
+    index = view.build_index(node_properties=["score"], edge_properties=["weight"])
+    for descending in [False, True]:
+        for offset in [0, 1, 10, 2**64 - 1]:
+            for limit in [None, 0, 1, 3, 2**64 - 1]:
+                args = dict(descending=descending, offset=offset, limit=limit)
+                for predicate in ["score == null", "score == 9007199254740993"]:
+                    assert index.query_nodes(predicate, **args) == view.query_nodes(predicate, **args)
+                for predicate in ["weight == null", "weight == 1"]:
+                    assert index.query_edges(predicate, **args) == view.query_edges(predicate, **args)
+    graph.remove_node(0)
+    assert index.query_nodes("score == 9007199254740993", limit=1) == [0]
+    missing = view.build_index()
+    with pytest.raises(ValueError, match="index"):
+        missing.query_nodes("score == null", limit=0)
+    assert missing.query_nodes("score == null", limit=0, allow_scan=True) == []

@@ -337,3 +337,102 @@ fn bounded_reads_validate_all_seeds_and_preserve_time_source_and_owner_independe
         vec![0, 1, 2]
     );
 }
+
+#[test]
+fn direct_posting_pages_match_scans_for_typed_values_scopes_and_extreme_bounds() {
+    let values = vec![
+        V::Int(1),
+        V::SmallInt(1),
+        V::Float(1.0),
+        V::Float64(1.0),
+        V::Null,
+        V::Text("one".into()),
+        V::CompactText(CompactString::new("one")),
+        V::Int(1),
+        V::Null,
+        V::Float64(f64::NAN),
+        V::Bytes(vec![1, 2]),
+    ];
+    let full = query(values.clone());
+    let selected = full
+        .view()
+        .select_edges(&[0, 2, 4, 7])
+        .unwrap()
+        .build_index(&["x".into()], &["x".into()], false)
+        .unwrap();
+    for index in [&full, &selected] {
+        let mut node_filters = vec![NodeFilter::HasAttribute { name: "x".into() }];
+        let mut edge_filters = vec![EdgeFilter::HasAttribute { name: "x".into() }];
+        for value in values.iter().chain([V::Int(-9)].iter()) {
+            node_filters.push(NodeFilter::AttributeEquals {
+                name: "x".into(),
+                value: value.clone(),
+            });
+            node_filters.push(NodeFilter::AttributeFilter {
+                name: "x".into(),
+                filter: AttributeFilter::Equals(value.clone()),
+            });
+            edge_filters.push(EdgeFilter::AttributeEquals {
+                name: "x".into(),
+                value: value.clone(),
+            });
+            edge_filters.push(EdgeFilter::AttributeFilter {
+                name: "x".into(),
+                filter: AttributeFilter::Equals(value.clone()),
+            });
+        }
+        for descending in [false, true] {
+            for offset in [0, 1, 4, usize::MAX] {
+                for limit in [None, Some(0), Some(1), Some(3), Some(usize::MAX)] {
+                    let options = QueryOptions {
+                        descending,
+                        offset,
+                        limit,
+                        ..Default::default()
+                    };
+                    for filter in &node_filters {
+                        assert_eq!(
+                            index.query_nodes(filter, &options, false).unwrap(),
+                            index.view().query_nodes(filter, &options).unwrap()
+                        );
+                    }
+                    for filter in &edge_filters {
+                        assert_eq!(
+                            index.query_edges(filter, &options, false).unwrap(),
+                            index.view().query_edges(filter, &options).unwrap()
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn direct_pages_preserve_missing_index_and_full_scalar_order_validation() {
+    let index = query(vec![V::Bytes(vec![1, 2]), V::Null]);
+    let node = NodeFilter::HasAttribute { name: "x".into() };
+    let edge = EdgeFilter::HasAttribute { name: "x".into() };
+    let absent = index.view().build_index(&[], &[], false).unwrap();
+    let options = QueryOptions {
+        offset: usize::MAX,
+        limit: Some(0),
+        ..Default::default()
+    };
+    assert!(absent.query_nodes(&node, &options, false).is_err());
+    assert!(absent.query_edges(&edge, &options, false).is_err());
+    assert!(absent
+        .query_nodes(&node, &options, true)
+        .unwrap()
+        .is_empty());
+    assert!(absent
+        .query_edges(&edge, &options, true)
+        .unwrap()
+        .is_empty());
+    let ordered = QueryOptions {
+        order_by: Some("x".into()),
+        ..options
+    };
+    assert!(index.query_nodes(&node, &ordered, false).is_err());
+    assert!(index.query_edges(&edge, &ordered, false).is_err());
+}

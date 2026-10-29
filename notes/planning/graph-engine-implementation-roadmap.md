@@ -1778,3 +1778,15 @@ payload lifetime, with no additional history pin. See
 `current-read-sharing-2026-10-28.md` and `docs/api/current-read-sharing.md`.
 This advances 21.2/AR7.5/32.2; legacy connected Subgraph migration and first-capture
 materialization remain open. Fixed checklist remains 211 checked / 57 unchecked.
+
+
+## Measured read/recovery follow-through — 2026-10-28
+
+Current read payload reuse is followed by sparse canonical adjacency, a complete
+1k/100k/1m-node/edge core workflow, single-buffer retained archive preparation and
+direct presence/equality posting pages. Each component has a separate committed
+receipt under priority-slices-2026-10-26.md, with full native/Python/docs gates and
+explicit performance limitations (star row-probe regression and no million-scale
+RSS improvement claim). Fixed checklist remains 211 checked / 57 unchecked.
+Functional connected ownership and compound topology acceptance stay the next
+priorities; large retained reconstruction/recovery memory remains 10.4/32.2.

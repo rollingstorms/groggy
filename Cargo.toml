@@ -358,3 +358,7 @@ harness = false
 [[bench]]
 name = "core_workflow_scale"
 harness = false
+
+[[bench]]
+name = "query_page_postings"
+harness = false

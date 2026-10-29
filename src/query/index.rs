@@ -93,6 +93,24 @@ impl ColumnIndex {
             ranges: ranges.map(|rows| rows.into_iter().map(|(id, _)| id).collect()),
         }
     }
+    fn equality_range(
+        &self,
+        view: &GraphView,
+        node: bool,
+        name: &AttrName,
+        target: &AttrValue,
+    ) -> std::ops::Range<usize> {
+        let compare =
+            |id: &usize| value(view, node, *id, name).map_or(Ordering::Equal, |v| v.cmp(target));
+        let lower = self
+            .equality
+            .partition_point(|id| compare(id) == Ordering::Less);
+        let upper = self
+            .equality
+            .partition_point(|id| compare(id) != Ordering::Greater);
+        lower..upper
+    }
+
     fn query(
         &self,
         view: &GraphView,
@@ -118,17 +136,20 @@ impl ColumnIndex {
         } else {
             return Vec::new();
         };
-        let compare = |id: &usize| {
-            value(view, node, *id, name).map_or(Ordering::Equal, |v| {
-                if equal {
-                    v.cmp(target)
-                } else {
-                    range_cmp(v, target).unwrap_or(Ordering::Equal)
-                }
-            })
+        let (lower, upper) = if equal {
+            let range = self.equality_range(view, node, name, target);
+            (range.start, range.end)
+        } else {
+            let compare = |id: &usize| {
+                value(view, node, *id, name)
+                    .and_then(|v| range_cmp(v, target))
+                    .unwrap_or(Ordering::Equal)
+            };
+            (
+                rows.partition_point(|id| compare(id) == Ordering::Less),
+                rows.partition_point(|id| compare(id) != Ordering::Greater),
+            )
         };
-        let lower = rows.partition_point(|id| compare(id) == Ordering::Less);
-        let upper = rows.partition_point(|id| compare(id) != Ordering::Greater);
         let mut result = if equal {
             if negate {
                 rows[..lower]
@@ -365,6 +386,20 @@ impl GraphQueryIndex {
         allow_scan: bool,
     ) -> GraphResult<Vec<usize>> {
         self.check_order(true, options, allow_scan)?;
+        if options.order_by.is_none() {
+            let direct = match filter {
+                NodeFilter::HasAttribute { name } => self.direct_property_rows(true, name, None),
+                NodeFilter::AttributeEquals { name, value }
+                | NodeFilter::AttributeFilter {
+                    name,
+                    filter: AttributeFilter::Equals(value),
+                } => self.direct_property_rows(true, name, Some(value)),
+                _ => None,
+            };
+            if let Some(rows) = direct {
+                return Ok(super::ordering::id_page(rows, options));
+            }
+        }
         super::ordering::page(
             &self.view,
             true,
@@ -380,6 +415,20 @@ impl GraphQueryIndex {
         allow_scan: bool,
     ) -> GraphResult<Vec<usize>> {
         self.check_order(false, options, allow_scan)?;
+        if options.order_by.is_none() {
+            let direct = match filter {
+                EdgeFilter::HasAttribute { name } => self.direct_property_rows(false, name, None),
+                EdgeFilter::AttributeEquals { name, value }
+                | EdgeFilter::AttributeFilter {
+                    name,
+                    filter: AttributeFilter::Equals(value),
+                } => self.direct_property_rows(false, name, Some(value)),
+                _ => None,
+            };
+            if let Some(rows) = direct {
+                return Ok(super::ordering::id_page(rows, options));
+            }
+        }
         super::ordering::page(
             &self.view,
             false,
@@ -387,6 +436,26 @@ impl GraphQueryIndex {
             options,
         )
     }
+    /// Present postings and equal-key runs are already in ascending ID order.
+    /// Missing indexes return to the ordinary checked scan/error path.
+    fn direct_property_rows(
+        &self,
+        node: bool,
+        name: &AttrName,
+        target: Option<&AttrValue>,
+    ) -> Option<&[usize]> {
+        let columns = if node {
+            &self.data.nodes
+        } else {
+            &self.data.edges
+        };
+        let column = columns.get(name)?;
+        Some(match target {
+            Some(value) => &column.equality[column.equality_range(&self.view, node, name, value)],
+            None => &column.present,
+        })
+    }
+
     fn check_order(
         &self,
         node: bool,
