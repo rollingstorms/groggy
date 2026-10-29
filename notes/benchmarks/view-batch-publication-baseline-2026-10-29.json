@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "edges": 999,
+      "final_state": 6,
+      "nodes": 1000,
+      "publication_seconds": [
+        0.002743375,
+        0.002436416,
+        0.002303292,
+        0.002090291,
+        0.00202175
+      ],
+      "selected_edges": 1,
+      "selected_nodes": 2,
+      "vector_dimensions": 16
+    },
+    {
+      "edges": 99999,
+      "final_state": 6,
+      "nodes": 100000,
+      "publication_seconds": [
+        0.344549125,
+        0.344465458,
+        0.337124875,
+        0.312756375,
+        0.299865708
+      ],
+      "selected_edges": 1,
+      "selected_nodes": 2,
+      "vector_dimensions": 16
+    }
+  ],
+  "fixture": "chain, f64 scalar and 16-element f64 vector per node; two-node immutable scope; five sequential score writes with original capture retained; includes publication and refreshed payload construction",
+  "profile": "release"
+}

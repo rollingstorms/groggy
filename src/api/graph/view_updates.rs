@@ -92,7 +92,7 @@ impl Graph {
         let mut snapshot = self
             .space
             .capture_read_snapshot(&self.pool.borrow(), self.current_commit)?;
-        if !same_values(&snapshot, view.read_state().snapshot()) {
+        if !same_values(&snapshot, view.read_state().snapshot())? {
             return Err(invalid(
                 "Working graph no longer matches the view's captured state",
             ));
@@ -121,12 +121,14 @@ impl Graph {
         snapshot.state_id = self.history.next_state_id();
         // Construct and validate ALL returned data before publication. No fallible
         // capture or selected-membership validation runs after the graph changes.
-        let state = PinnedReadState::from_snapshot(snapshot)?.with_origin(
-            Arc::clone(self.history.identity()),
-            self.current_branch.clone(),
-            self.history.next_state_id(),
-            true,
-        );
+        let state = PinnedReadState::from_snapshot(snapshot)?
+            .with_groups(self.pool.borrow().retained_groups())
+            .with_origin(
+                Arc::clone(self.history.identity()),
+                self.current_branch.clone(),
+                self.history.next_state_id(),
+                true,
+            );
         let refreshed = GraphView::from_membership(state, nodes, edges)?;
         Ok(PreparedViewPublication {
             publication: prepared,
@@ -140,13 +142,43 @@ fn invalid(message: &str) -> GraphError {
     GraphError::InvalidInput(message.into())
 }
 
-fn same_values(a: &GraphSnapshot, b: &GraphSnapshot) -> bool {
-    a.state_id == b.state_id
+fn same_values(a: &GraphSnapshot, b: &GraphSnapshot) -> GraphResult<bool> {
+    Ok(a.state_id == b.state_id
         && a.graph_type == b.graph_type
         && a.active_nodes == b.active_nodes
         && a.edges == b.edges
-        && a.node_attributes == b.node_attributes
-        && a.edge_attributes == b.edge_attributes
+        && same_property_rows(&a.node_attributes, &b.node_attributes)?
+        && same_property_rows(&a.edge_attributes, &b.edge_attributes)?)
+}
+
+fn same_property_rows(
+    a: &HashMap<usize, HashMap<AttrName, AttrValue>>,
+    b: &HashMap<usize, HashMap<AttrName, AttrValue>>,
+) -> GraphResult<bool> {
+    // Missing rows and empty rows both mean no properties. Exact retained payload
+    // equality still distinguishes floating widths, signed zero and NaN bits.
+    if a.values().filter(|row| !row.is_empty()).count()
+        != b.values().filter(|row| !row.is_empty()).count()
+    {
+        return Ok(false);
+    }
+    for (id, row) in a.iter().filter(|(_, row)| !row.is_empty()) {
+        let Some(other) = b.get(id) else {
+            return Ok(false);
+        };
+        if row.len() != other.len() {
+            return Ok(false);
+        }
+        for (name, value) in row {
+            let Some(other) = other.get(name) else {
+                return Ok(false);
+            };
+            if !crate::state::change::same_value(value, other)? {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
 }
 
 fn validate_scope(
@@ -156,41 +188,63 @@ fn validate_scope(
     first_node: NodeId,
     first_edge: EdgeId,
 ) -> GraphResult<()> {
-    let node_ok = |id: NodeId| {
-        view.contains_node(id) || (first_node..first_node + batch.add_nodes).contains(&id)
-    };
+    // Keep this match exhaustive: a new batch operation must be considered here.
+    // Identity bindings are normalized into the property columns by preparation;
+    // clock fields describe acceptance, not additional selected write targets.
+    let PreparedBatch {
+        add_nodes,
+        add_edges,
+        edge_endpoint_changes,
+        node_attrs,
+        edge_attrs,
+        unset_node_attrs,
+        unset_edge_attrs,
+        remove_edges,
+        remove_nodes,
+        identity_bindings: _,
+        effective_at: _,
+        change_times: _,
+    } = batch;
+
+    let node_ok =
+        |id: NodeId| view.contains_node(id) || (first_node..first_node + *add_nodes).contains(&id);
     let edge_ok = |id: EdgeId| {
-        view.contains_edge(id) || (first_edge..first_edge + batch.add_edges.len()).contains(&id)
+        view.contains_edge(id) || (first_edge..first_edge + add_edges.len()).contains(&id)
     };
     let mut errors = Vec::new();
-    let node_targets = batch
-        .node_attrs
+    let node_targets = node_attrs
         .values()
         .flat_map(|rows| rows.iter().map(|(id, _)| *id))
-        .chain(batch.remove_nodes.iter().copied());
+        .chain(unset_node_attrs.values().flatten().copied())
+        .chain(remove_nodes.iter().copied());
     for id in node_targets {
         if !node_ok(id) {
             errors.push(format!("node {id} is outside the view"));
         }
     }
-    let edge_targets = batch
-        .edge_attrs
+    let edge_targets = edge_attrs
         .values()
         .flat_map(|rows| rows.iter().map(|(id, _)| *id))
-        .chain(batch.remove_edges.iter().copied());
+        .chain(unset_edge_attrs.values().flatten().copied())
+        .chain(edge_endpoint_changes.iter().map(|change| change.edge_id))
+        .chain(remove_edges.iter().copied());
     for id in edge_targets {
         if !edge_ok(id) {
             errors.push(format!("edge {id} is outside the view"));
         }
     }
-    for &(source, target) in &batch.add_edges {
+    for (source, target) in add_edges.iter().copied().chain(
+        edge_endpoint_changes
+            .iter()
+            .map(|change| change.new_endpoints),
+    ) {
         for id in [source, target] {
             if !node_ok(id) {
                 errors.push(format!("edge endpoint {id} is outside the view"));
             }
         }
     }
-    let removed: HashSet<_> = batch.remove_nodes.iter().copied().collect();
+    let removed: HashSet<_> = remove_nodes.iter().copied().collect();
     for (&edge, &(source, target)) in &snapshot.edges {
         if (removed.contains(&source) || removed.contains(&target)) && !view.contains_edge(edge) {
             errors.push(format!(
@@ -219,8 +273,26 @@ fn project(
     first_node: NodeId,
     first_edge: EdgeId,
 ) -> (HashSet<NodeId>, HashSet<EdgeId>) {
-    let added_nodes = first_node..first_node + batch.add_nodes;
-    let added_edges = first_edge..first_edge + batch.add_edges.len();
+    // Keep this match exhaustive: a new batch operation must be considered here.
+    // Identity bindings are normalized into the property columns by preparation;
+    // clock fields describe acceptance, not additional selected write targets.
+    let PreparedBatch {
+        add_nodes,
+        add_edges,
+        edge_endpoint_changes,
+        node_attrs,
+        edge_attrs,
+        unset_node_attrs,
+        unset_edge_attrs,
+        remove_edges,
+        remove_nodes,
+        identity_bindings: _,
+        effective_at: _,
+        change_times: _,
+    } = batch;
+
+    let added_nodes = first_node..first_node + *add_nodes;
+    let added_edges = first_edge..first_edge + add_edges.len();
     let mut nodes = view.nodes().clone();
     let mut edges = view.edges().clone();
     nodes.extend(added_nodes.clone());
@@ -232,10 +304,13 @@ fn project(
             HashMap::from([("entity_type".into(), AttrValue::Text("base".into()))]),
         );
     }
-    for (offset, &endpoints) in batch.add_edges.iter().enumerate() {
+    for (offset, &endpoints) in add_edges.iter().enumerate() {
         snapshot.edges.insert(first_edge + offset, endpoints);
     }
-    for (name, rows) in &batch.node_attrs {
+    for change in edge_endpoint_changes {
+        snapshot.edges.insert(change.edge_id, change.new_endpoints);
+    }
+    for (name, rows) in node_attrs {
         for (id, value) in rows {
             snapshot
                 .node_attributes
@@ -244,7 +319,7 @@ fn project(
                 .insert(name.clone(), value.clone());
         }
     }
-    for (name, rows) in &batch.edge_attrs {
+    for (name, rows) in edge_attrs {
         for (id, value) in rows {
             snapshot
                 .edge_attributes
@@ -253,8 +328,21 @@ fn project(
                 .insert(name.clone(), value.clone());
         }
     }
-    let removed_nodes: HashSet<_> = batch.remove_nodes.iter().copied().collect();
-    let removed_edges: HashSet<_> = batch.remove_edges.iter().copied().collect();
+    for (columns, unsets) in [
+        (&mut snapshot.node_attributes, unset_node_attrs),
+        (&mut snapshot.edge_attributes, unset_edge_attrs),
+    ] {
+        for (name, ids) in unsets {
+            for id in ids {
+                if let Some(row) = columns.get_mut(id) {
+                    row.remove(name);
+                }
+            }
+        }
+        columns.retain(|_, row| !row.is_empty());
+    }
+    let removed_nodes: HashSet<_> = remove_nodes.iter().copied().collect();
+    let removed_edges: HashSet<_> = remove_edges.iter().copied().collect();
     snapshot
         .active_nodes
         .retain(|id| !removed_nodes.contains(id));
@@ -272,4 +360,37 @@ fn project(
     nodes.retain(|id| !removed_nodes.contains(id));
     edges.retain(|id| snapshot.edges.contains_key(id));
     (nodes, edges)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn source_comparison_uses_exact_payloads_and_normalizes_empty_rows() {
+        let mut a = GraphSnapshot::empty(1);
+        a.active_nodes.push(0);
+        a.edges.insert(0, (0, 0));
+        let mut b = a.clone();
+        a.edge_attributes.insert(0, HashMap::new());
+        assert!(same_values(&a, &b).unwrap());
+        for (left, right) in [
+            (AttrValue::Float(1.), AttrValue::Float64(1.)),
+            (AttrValue::Float64(0.), AttrValue::Float64(-0.)),
+            (
+                AttrValue::Float64(f64::from_bits(0x7ff8000000000001)),
+                AttrValue::Float64(f64::from_bits(0x7ff8000000000002)),
+            ),
+            (
+                AttrValue::Float64Vec(vec![0.]),
+                AttrValue::Float64Vec(vec![-0.]),
+            ),
+        ] {
+            a.node_attributes
+                .insert(0, HashMap::from([("value".into(), left)]));
+            b.node_attributes
+                .insert(0, HashMap::from([("value".into(), right)]));
+            assert!(!same_values(&a, &b).unwrap());
+            assert!(same_values(&a, &a).unwrap());
+        }
+    }
 }

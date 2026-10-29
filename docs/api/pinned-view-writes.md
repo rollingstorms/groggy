@@ -133,3 +133,48 @@ owners require the GIL; frozen read kernels retain their existing GIL release.
 Legacy connected Subgraph/table reads, table source-pin propagation and arbitrary
 effective-time reconstruction remain separate roadmap work. This API operates on
 accepted-state pins. See [verification and bounded release costs](../../notes/planning/pinned-view-writes-2026-10-25.md).
+
+## Complete batch operations
+
+Scope checks include property unsets and existing-edge endpoint revisions. Both
+an edge being revised and its new existing endpoints must belong to the selection;
+new endpoints may use that batch's added-node handles. External ID assignments
+use the same scoped target checks after canonical preparation.
+
+The returned view applies endpoint revisions before cascading removals, and
+unsets produce absence rather than an old value or explicit null. Its retained
+group catalog remains available for meta-node source reads. All output is still
+prepared before publication, and the returned view can authorize the next batch.
+
+```python
+revised_graph = Graph(directed=True)
+initial = GraphBatch(effective_at=0)
+left = initial.add_node(score=1)
+right = initial.add_node()
+isolate = initial.add_node()
+initial.add_edge(left, right, weight=7)
+revised_graph.apply_batch(initial, 0, "initial", "example")
+original = revised_graph.read_view()
+change = GraphBatch(effective_at=10)
+change.set_edge_endpoints(0, 0, 2)
+change.unset_node_attr(0, "score")
+change.unset_edge_attr(0, "weight")
+change.remove_node(1)
+refreshed = revised_graph.apply_view_batch(original, change, "revise", "example")["view"]
+assert refreshed.node_ids == [0, 2]
+assert refreshed.edge_ids == [0]
+assert refreshed.edge_endpoints(0) == (0, 2)
+assert not refreshed.has_node_attribute(0, "score")
+assert not refreshed.has_edge_attribute(0, "weight")
+assert original.edge_endpoints(0) == (0, 1)
+followup = GraphBatch()
+followup.set_node_attr(0, "score", None)
+assert revised_graph.apply_view_batch(refreshed, followup, "next", "example")["view"].has_node_attribute(0, "score")
+```
+
+Source payload checks use the canonical exact retained-value comparison, including
+floating widths, signed zero and NaN payloads. Empty versus omitted property rows
+both represent absence. New canonical batch fields must be handled explicitly in
+the scope and projection matches; adding a field causes a compile error there.
+This checked single-batch path does not imply atomic execution of arbitrary
+multi-stage topology algorithms.

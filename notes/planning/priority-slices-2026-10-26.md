@@ -1318,3 +1318,37 @@ This completes specialized membership/traversal consolidation and removes the
 reproduced selected-route defect. Actual immutable default/filter returns,
 effectful facades, the remaining viz adapter boundary and general compound
 topology acceptance retain their existing priority scopes.
+
+### Complete canonical operations through checked view writes — 2026-10-29
+
+Completed the existing scoped-write component of 26.1/AR4. Six pre-fix Python
+regressions reproduced escaped node/edge unsets, excluded-edge/new-endpoint
+rewrites, stale unset values in refreshed views and lost surviving rewired edges.
+Scope checks now include all prepared mutation targets, and projection follows
+actual addition/revision/assignment/unset/removal order. Refreshed views retain
+the immutable group catalog for meta-source access. Exact source comparisons use
+canonical retained payload equality and normalize empty/absent property rows.
+Exhaustive PreparedBatch matches now make future added fields a compile-time
+review requirement at both scope and projection consumers. Identity targets remain
+represented by their normalized property columns; clock fields add no targets.
+
+Receipt: `view-batch-completeness-2026-10-29.md`. Native/Python evidence covers
+whole-request rejection without allocation/publication, refreshed absence,
+rewiring before node cascade, additions and identities, reverse/loop endpoints,
+explicit effective states, next-write authorization, old immutable inputs,
+retained meta-source workers, and durable byte-preserving rejection/recovery.
+Unchanged NaN sources were already supported and remain regression-covered.
+
+Release view_batch_publication baseline: a chain with one f64 scalar plus a
+16-element f64 vector per node, two-node/one-edge write scope and original capture
+retained through five sequential scalar writes. Quiet standalone medians: 2.303 ms
+at 1k and 337.125 ms at 100k, including full refreshed payload construction.
+Raw receipt: `notes/benchmarks/view-batch-publication-baseline-2026-10-29.json`.
+This exposes the existing full-state output cost; there is no O(1) view-write claim.
+
+Gates: **1,487 native / 54 ignored**, strict all-target core Clippy,
+**2,511 root Python / 1 skipped**, **244 executed documentation examples**,
+full-ABI release extension rebuilt/atomically staged, scoped formatting/syntax/
+diff checks. Three unrelated existing FFI warnings remain; owner edits excluded.
+Inventory remains **211 checked / 57 open**: immutable defaults and general
+multi-stage topology execution are still their existing broader boundaries.

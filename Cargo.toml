@@ -394,3 +394,7 @@ harness = false
 [[bench]]
 name = "specialized_selection_scope"
 harness = false
+
+[[bench]]
+name = "view_batch_publication"
+harness = false
