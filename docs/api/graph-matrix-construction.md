@@ -31,8 +31,10 @@ matrix = graph.view().adjacency_matrix(sparse=True, weight_attr="weight")
 ```
 
 A view export respects its selected edge IDs, rather than adding all parent
-edges between its nodes. Active membership is checked against the parent at
-compute time. Mutating the graph later does not change the returned matrix.
+edges between its nodes. Active membership and endpoint closure are checked against the parent at
+compute time. Stale connected selections reject instead of silently shrinking; see
+[connected matrix scope](connected-matrix-scope.md). Mutating the graph later does
+not change the returned matrix.
 
 For generic rectangular `from_row_major_data(..., nodes=...)`, IDs describe
 rows and must match the row count; non-square columns retain `col_N` names.

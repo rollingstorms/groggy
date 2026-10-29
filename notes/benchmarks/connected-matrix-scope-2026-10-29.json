@@ -1,0 +1,74 @@
+{
+  "baseline_commit": "7e616925",
+  "method": "quiet separate release-extension before/after runs, five warmed sparse exports per size; source setup/warmup/scalar checks excluded; sparse construction and wrapper included; not alternating build pairs; no universal speedup, RSS or cold-scope bound",
+  "summary": [
+    {
+      "nodes": 1000,
+      "before_median_ms": 0.358125,
+      "after_median_ms": 0.346791
+    },
+    {
+      "nodes": 100000,
+      "before_median_ms": 46.011833,
+      "after_median_ms": 40.699458
+    }
+  ],
+  "before": {
+    "fixture": "release extension; directed chain; five warmed connected sparse matrix exports; source setup/warmup/scalar validation excluded; sparse construction and Python wrapper included; no dense intermediate",
+    "cases": [
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "nanoseconds": [
+          358125,
+          375292,
+          360167,
+          357958,
+          350458
+        ],
+        "median_nanoseconds": 358125
+      },
+      {
+        "nodes": 100000,
+        "edges": 99999,
+        "nanoseconds": [
+          42038167,
+          46011833,
+          43425208,
+          47779709,
+          47490291
+        ],
+        "median_nanoseconds": 46011833
+      }
+    ]
+  },
+  "after": {
+    "fixture": "release extension; directed chain; five warmed connected sparse matrix exports; source setup/warmup/scalar validation excluded; sparse construction and Python wrapper included; no dense intermediate",
+    "cases": [
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "nanoseconds": [
+          318333,
+          346500,
+          346791,
+          354833,
+          347750
+        ],
+        "median_nanoseconds": 346791
+      },
+      {
+        "nodes": 100000,
+        "edges": 99999,
+        "nanoseconds": [
+          40577125,
+          42173500,
+          40699458,
+          39802333,
+          43759667
+        ],
+        "median_nanoseconds": 40699458
+      }
+    ]
+  }
+}

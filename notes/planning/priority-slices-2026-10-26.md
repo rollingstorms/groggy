@@ -1470,3 +1470,33 @@ Gates: **1,501 native / 54 ignored**, strict all-target core Clippy,
 scoped format/syntax/diff checks. Three unrelated old FFI warnings remain and owner
 work is untouched. Live defaults/effectful migration stays open; **211 checked /
 57 open**, no new rows.
+
+
+### Connected matrix scope consistency — 2026-10-29
+
+Completed another existing 26.1/AR2/AR4 reader component. Four pre-fix cases showed
+dense/sparse connected exports silently losing inactive selected rows or edges.
+Canonical scope validation now rejects stale selections and shared ascending ID
+slices replace two filtered temporary vectors. Aliases inherit the guard; valid
+inside rewiring remains live, while captured/previous owned matrices remain frozen.
+
+Receipt: `connected-matrix-scope-2026-10-29.md`. Quiet warmed sparse export before/
+after medians: **0.358→0.347 ms at 1k**, **46.012→40.699 ms at 100k**; separate local
+builds, no universal memory/latency claim. Gates: **1,503 native / 54 ignored**,
+strict all-target core Clippy, **2,559 root Python / 1 skipped**, **249 docs**,
+rebuilt/staged release extension, scoped formatting/syntax/diff checks. Three
+existing unrelated FFI warnings remain; owner changes remain untouched.
+**211 checked / 57 open**, no new rows or broad parent closure.
+
+### Current block and fixed next boundary
+
+This block committed integer sampling, whole-selection column/index adapters,
+adjacency export and matrix scope consistency. These finish actual operations
+within 26.1/AR2/AR4/AR7.5; the numerical solver work is unchanged. Remaining work
+includes binding effectful apply/sampler/collapse facades to captured reads and
+explicit checked owner writes, then migrating default returns. Legacy Python
+selection conversion and visualization adapters also retain their original scope:
+Subgraph.to_graph still constructs an empty graph placeholder, and its viz getter
+still constructs a full-owner GraphDataSource. They require selected/captured
+conversion rather than silent scope widening. These are existing facade gaps,
+not new checklist rows; no claim that all remaining facade methods are audited.

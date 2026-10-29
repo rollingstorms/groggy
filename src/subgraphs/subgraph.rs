@@ -406,7 +406,8 @@ impl Subgraph {
         Arc::clone(cache)
     }
 
-    /// Compute an owned numerical snapshot of this view's selected active edges.
+    /// Compute an owned numerical snapshot of this view's selected edges.
+    /// Stale membership or endpoints outside the selection reject instead of shrinking output.
     /// The view itself continues to read its live parent graph.
     pub fn adjacency_matrix(
         &self,
@@ -414,18 +415,9 @@ impl Subgraph {
         weight_attr: Option<&str>,
     ) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
         let graph = self.graph.borrow();
-        let nodes: Vec<_> = self
-            .ordered_nodes()
-            .iter()
-            .copied()
-            .filter(|&id| graph.space().contains_node(id))
-            .collect();
-        let edges: Vec<_> = self
-            .ordered_edges()
-            .iter()
-            .copied()
-            .filter(|&id| graph.space().contains_edge(id))
-            .collect();
+        self.validate_query_scope(&graph)?;
+        let nodes = self.ordered_nodes();
+        let edges = self.ordered_edges();
         graph.adjacency_from_entities(&nodes, &edges, sparse, weight_attr)
     }
 
