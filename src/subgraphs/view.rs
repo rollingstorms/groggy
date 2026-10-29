@@ -379,6 +379,105 @@ impl GraphView {
         .map_err(|error| GraphError::InvalidInput(error.to_string()))?;
         self.algorithm_input()?.pagerank(&algorithm, None)
     }
+    /// Owned Louvain community rows over captured unweighted undirected edge instances.
+    pub fn louvain(
+        &self,
+        max_iter: usize,
+        max_phases: usize,
+        resolution: f64,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        let algorithm = crate::algorithms::community::Louvain::new(
+            max_iter,
+            max_phases,
+            resolution,
+            "community".into(),
+        )
+        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        self.algorithm_input()?
+            .louvain(&algorithm, &mut crate::algorithms::Context::new())
+    }
+
+    /// Owned bounded Leiden communities; uses local seeded refinement and captured topology.
+    pub fn leiden(
+        &self,
+        max_iter: usize,
+        max_phases: usize,
+        resolution: f64,
+        seed: Option<u64>,
+        theta: f64,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        let algorithm = crate::algorithms::community::Leiden::new(
+            max_iter,
+            max_phases,
+            resolution,
+            seed,
+            "community".into(),
+        )
+        .and_then(|a| a.with_theta(theta))
+        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        self.algorithm_input()?
+            .leiden(&algorithm, &mut crate::algorithms::Context::new())
+    }
+
+    /// Owned bounded two-level Infomap communities with captured direction and flow.
+    pub fn infomap(
+        &self,
+        teleportation: f64,
+        num_trials: usize,
+        max_iter: usize,
+        flow_max_iter: usize,
+        seed: Option<u64>,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        let algorithm = crate::algorithms::community::Infomap::new(
+            teleportation,
+            num_trials,
+            max_iter,
+            seed,
+            "community".into(),
+        )
+        .and_then(|a| a.with_flow_budget(flow_max_iter))
+        .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        self.algorithm_input()?
+            .infomap(&algorithm, &mut crate::algorithms::Context::new())
+    }
+
+    /// Owned Girvan–Newman communities; frozen positive lengths, unweighted modularity.
+    pub fn girvan_newman(
+        &self,
+        num_levels: Option<usize>,
+        modularity_threshold: Option<f64>,
+        weight_attr: Option<AttrName>,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        let algorithm = crate::algorithms::community::GirvanNewman::new(
+            num_levels,
+            modularity_threshold,
+            weight_attr,
+            "community".into(),
+        );
+        self.algorithm_input()?
+            .girvan_newman(&algorithm, &mut crate::algorithms::Context::new())
+    }
+
+    /// Owned seed-valued label propagation rows; reads the captured attribute values.
+    pub fn label_propagation(
+        &self,
+        max_iter: usize,
+        tolerance: f64,
+        seed_attr: Option<AttrName>,
+        seed: Option<u64>,
+    ) -> GraphResult<Vec<(NodeId, AttrValue)>> {
+        let algorithm = crate::algorithms::community::LabelPropagation::new(
+            max_iter,
+            tolerance,
+            "community".into(),
+            seed_attr,
+        )
+        .map_err(|e| GraphError::InvalidInput(e.to_string()))?
+        .with_seed(seed);
+        self.algorithm_input()?
+            .label_propagation(&algorithm, &mut crate::algorithms::Context::new())
+    }
+
     /// Captured component views, ordered by smallest node ID, without writes.
     pub fn connected_components(
         &self,

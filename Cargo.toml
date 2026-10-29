@@ -362,3 +362,7 @@ harness = false
 [[bench]]
 name = "query_page_postings"
 harness = false
+
+[[bench]]
+name = "captured_communities"
+harness = false

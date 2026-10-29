@@ -41,98 +41,60 @@ impl GirvanNewman {
         }
     }
 
-    fn metadata_template() -> AlgorithmMetadata {
-        AlgorithmMetadata {
-            id: "community.girvan_newman".to_string(),
-            name: "Girvan-Newman".to_string(),
-            description: "Undirected community detection via edge-instance betweenness removal and original-graph modularity. Intended for small graphs.".to_string(),
-            version: "0.1.0".to_string(),
-            cost_hint: CostHint::Cubic,
-            supports_cancellation: true,
-            parameters: vec![
-                ParameterMetadata {
-                    name: "num_levels".to_string(),
-                    description: "Maximum individual edge removals; zero returns initial components. Default: all non-loop edges, subject to modularity stopping.".to_string(),
-                    value_type: ParameterType::Int,
-                    required: false,
-                    default_value: None,
-                },
-                ParameterMetadata {
-                    name: "modularity_threshold".to_string(),
-                    description: "Stop when original-graph modularity falls below the best by more than this nonnegative threshold (default 0.0001).".to_string(),
-                    value_type: ParameterType::Float,
-                    required: false,
-                    default_value: None,
-                },
-                ParameterMetadata {
-                    name: "weight_attr".to_string(),
-                    description: "Optional strictly positive finite edge lengths (missing one); modularity remains unweighted.".to_string(),
-                    value_type: ParameterType::Text,
-                    required: false,
-                    default_value: None,
-                },
-                ParameterMetadata {
-                    name: "output_attr".to_string(),
-                    description: "Node attribute to store community assignments.".to_string(),
-                    value_type: ParameterType::Text,
-                    required: false,
-                    default_value: None,
-                },
-            ],
-        }
-    }
-
-    fn compute(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, usize>> {
-        let t0 = Instant::now();
-        if ctx.is_cancelled() {
-            return Err(anyhow!("Girvan-Newman cancelled"));
-        }
+    fn checked_threshold(&self) -> Result<f64> {
         let threshold = self.modularity_threshold.unwrap_or(0.0001);
         if !threshold.is_finite() || threshold < 0.0 {
             return Err(anyhow!(
                 "modularity_threshold must be finite and nonnegative"
             ));
         }
-        if subgraph.graph().borrow().is_directed() {
-            return Err(anyhow!(
-                "Girvan-Newman currently requires an undirected graph"
-            ));
+        Ok(threshold)
+    }
+
+    pub(crate) fn compute_read(
+        &self,
+        input: &crate::algorithms::AlgorithmRead,
+        ctx: &mut Context,
+    ) -> Result<Vec<(NodeId, usize)>> {
+        let t0 = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Girvan-Newman cancelled"));
         }
-        let checked = checked_dijkstra_weights(ctx, subgraph, self.weight_attr.as_ref())?;
-        if self.weight_attr.is_some() && checked.values().any(|&weight| weight <= 0.0) {
-            return Err(anyhow!(
-                "Girvan-Newman requires strictly positive edge weights"
-            ));
-        }
-        let nodes = subgraph.ordered_nodes();
-        let index: HashMap<_, _> = nodes
-            .iter()
-            .enumerate()
-            .map(|(i, &node)| (node, i))
-            .collect();
+        let threshold = self.checked_threshold()?;
+        input.require_undirected("Girvan-Newman")?;
         let mut edges = Vec::new();
         let mut original_edges = Vec::new();
-        {
-            let graph = subgraph.graph();
-            let graph = graph.borrow();
-            for &id in subgraph.ordered_edges().iter() {
-                let (u, v) = graph.edge_endpoints(id)?;
-                let value = self
-                    .weight_attr
-                    .as_ref()
-                    .map(|attr| ctx.edge_attribute(subgraph, id, attr))
-                    .transpose()?
-                    .flatten();
-                let length = crate::query::weights::dijkstra_weight(value.as_ref(), id)?;
-                edges.push(Edge {
-                    id,
-                    u: index[&u],
-                    v: index[&v],
-                    length,
-                });
-                original_edges.push((u, v));
+        for row in input.edge_rows(ctx) {
+            let (id, u, v) = row?;
+            let value = self
+                .weight_attr
+                .as_ref()
+                .map(|attr| input.view().edge_attr(id, attr))
+                .transpose()?
+                .flatten();
+            let length = crate::query::weights::dijkstra_weight(value.as_ref(), id)?;
+            if self.weight_attr.is_some() && length <= 0.0 {
+                return Err(anyhow!(
+                    "Girvan-Newman requires strictly positive edge weights"
+                ));
             }
+            edges.push(Edge { id, u, v, length });
+            original_edges.push((input.node_ids()[u], input.node_ids()[v]));
         }
+        let labels =
+            self.compute_partition(ctx, input.node_ids(), edges, original_edges, threshold, t0)?;
+        Ok(input.node_ids().iter().copied().zip(labels).collect())
+    }
+
+    fn compute_partition(
+        &self,
+        ctx: &mut Context,
+        nodes: &[NodeId],
+        edges: Vec<Edge>,
+        original_edges: Vec<(NodeId, NodeId)>,
+        threshold: f64,
+        t0: Instant,
+    ) -> Result<Vec<usize>> {
         let topology = Topology::new(nodes.len(), edges);
         let mut active: Vec<_> = topology.edges.iter().map(|e| e.u != e.v).collect();
         let initial_edge_count = active.iter().filter(|&&v| v).count();
@@ -195,11 +157,101 @@ impl GirvanNewman {
         ctx.record_stat("girvan_newman.count.iterations", removals as f64);
         ctx.record_stat("girvan_newman.best_modularity", best_modularity);
         ctx.record_call("girvan_newman.compute", t0.elapsed());
-        Ok(nodes
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Girvan-Newman cancelled"));
+        }
+        Ok(best)
+    }
+
+    fn metadata_template() -> AlgorithmMetadata {
+        AlgorithmMetadata {
+            id: "community.girvan_newman".to_string(),
+            name: "Girvan-Newman".to_string(),
+            description: "Undirected community detection via edge-instance betweenness removal and original-graph modularity. Intended for small graphs.".to_string(),
+            version: "0.1.0".to_string(),
+            cost_hint: CostHint::Cubic,
+            supports_cancellation: true,
+            parameters: vec![
+                ParameterMetadata {
+                    name: "num_levels".to_string(),
+                    description: "Maximum individual edge removals; zero returns initial components. Default: all non-loop edges, subject to modularity stopping.".to_string(),
+                    value_type: ParameterType::Int,
+                    required: false,
+                    default_value: None,
+                },
+                ParameterMetadata {
+                    name: "modularity_threshold".to_string(),
+                    description: "Stop when original-graph modularity falls below the best by more than this nonnegative threshold (default 0.0001).".to_string(),
+                    value_type: ParameterType::Float,
+                    required: false,
+                    default_value: None,
+                },
+                ParameterMetadata {
+                    name: "weight_attr".to_string(),
+                    description: "Optional strictly positive finite edge lengths (missing one); modularity remains unweighted.".to_string(),
+                    value_type: ParameterType::Text,
+                    required: false,
+                    default_value: None,
+                },
+                ParameterMetadata {
+                    name: "output_attr".to_string(),
+                    description: "Node attribute to store community assignments.".to_string(),
+                    value_type: ParameterType::Text,
+                    required: false,
+                    default_value: None,
+                },
+            ],
+        }
+    }
+
+    fn compute(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, usize>> {
+        let t0 = Instant::now();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Girvan-Newman cancelled"));
+        }
+        let threshold = self.checked_threshold()?;
+        if subgraph.graph().borrow().is_directed() {
+            return Err(anyhow!(
+                "Girvan-Newman currently requires an undirected graph"
+            ));
+        }
+        let checked = checked_dijkstra_weights(ctx, subgraph, self.weight_attr.as_ref())?;
+        if self.weight_attr.is_some() && checked.values().any(|&weight| weight <= 0.0) {
+            return Err(anyhow!(
+                "Girvan-Newman requires strictly positive edge weights"
+            ));
+        }
+        let nodes = subgraph.ordered_nodes();
+        let index: HashMap<_, _> = nodes
             .iter()
-            .zip(best)
-            .map(|(&node, community)| (node, community))
-            .collect())
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+        let mut edges = Vec::new();
+        let mut original_edges = Vec::new();
+        {
+            let graph = subgraph.graph();
+            let graph = graph.borrow();
+            for &id in subgraph.ordered_edges().iter() {
+                let (u, v) = graph.edge_endpoints(id)?;
+                let value = self
+                    .weight_attr
+                    .as_ref()
+                    .map(|attr| ctx.edge_attribute(subgraph, id, attr))
+                    .transpose()?
+                    .flatten();
+                let length = crate::query::weights::dijkstra_weight(value.as_ref(), id)?;
+                edges.push(Edge {
+                    id,
+                    u: index[&u],
+                    v: index[&v],
+                    length,
+                });
+                original_edges.push((u, v));
+            }
+        }
+        let labels = self.compute_partition(ctx, &nodes, edges, original_edges, threshold, t0)?;
+        Ok(nodes.iter().copied().zip(labels).collect())
     }
 }
 

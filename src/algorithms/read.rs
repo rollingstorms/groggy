@@ -2,7 +2,7 @@
 use crate::{
     state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions},
     subgraphs::GraphView,
-    GraphError, GraphResult, NodeId,
+    EdgeId, GraphError, GraphResult, NodeId,
 };
 use rustc_hash::FxHashMap;
 use std::sync::{
@@ -76,6 +76,142 @@ impl AlgorithmRead {
     pub fn csr(&self) -> &Csr {
         &self.csr
     }
+    pub(crate) fn require_undirected(&self, algorithm: &str) -> GraphResult<()> {
+        if self.view.is_directed() {
+            return Err(GraphError::InvalidInput(format!(
+                "{algorithm} currently requires an undirected graph"
+            )));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn edge_rows<'a>(
+        &'a self,
+        ctx: &'a super::Context,
+    ) -> impl Iterator<Item = GraphResult<(EdgeId, usize, usize)>> + 'a {
+        self.view.edge_ids().into_iter().map(|id| {
+            if ctx.is_cancelled() {
+                return Err(GraphError::InvalidInput(
+                    "community detection cancelled".into(),
+                ));
+            }
+            let (source, target) = self.view.edge_endpoints(id)?;
+            let row = |node| {
+                self.index.get(&node).copied().ok_or_else(|| {
+                    GraphError::InvalidInput(
+                        "Community endpoint is outside the captured selection".into(),
+                    )
+                })
+            };
+            Ok((id, row(source)?, row(target)?))
+        })
+    }
+
+    fn community_rows(
+        &self,
+        labels: Vec<usize>,
+        ctx: &super::Context,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        if ctx.is_cancelled() {
+            return Err(GraphError::InvalidInput(
+                "community detection cancelled".into(),
+            ));
+        }
+        if labels.len() != self.nodes.len() {
+            return Err(GraphError::InvalidInput(
+                "Community result has incorrect captured row count".into(),
+            ));
+        }
+        Ok(self.nodes.iter().copied().zip(labels).collect())
+    }
+
+    /// Captured Louvain labels. Context supplies diagnostics/cancellation only; no writes occur.
+    pub fn louvain(
+        &self,
+        algorithm: &super::community::Louvain,
+        ctx: &mut super::Context,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        if ctx.is_cancelled() {
+            return Err(GraphError::InvalidInput(
+                "community detection cancelled".into(),
+            ));
+        }
+        self.require_undirected("louvain")?;
+        let edges = self
+            .edge_rows(ctx)
+            .map(|row| row.map(|(_, u, v)| (u, v, 1)))
+            .collect::<GraphResult<_>>()?;
+        let labels = algorithm
+            .compute_partition(ctx, self.nodes.len(), edges)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        self.community_rows(labels, ctx)
+    }
+
+    /// Captured bounded Leiden labels with the existing refinement/seed policy.
+    pub fn leiden(
+        &self,
+        algorithm: &super::community::Leiden,
+        ctx: &mut super::Context,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        if ctx.is_cancelled() {
+            return Err(GraphError::InvalidInput(
+                "community detection cancelled".into(),
+            ));
+        }
+        self.require_undirected("leiden")?;
+        let edges = self
+            .edge_rows(ctx)
+            .map(|row| row.map(|(_, u, v)| (u, v, 1)))
+            .collect::<GraphResult<_>>()?;
+        let labels = algorithm
+            .compute_partition(ctx, self.nodes.len(), edges)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        self.community_rows(labels, ctx)
+    }
+
+    /// Captured bounded two-level Infomap labels, preserving captured orientation.
+    pub fn infomap(
+        &self,
+        algorithm: &super::community::Infomap,
+        ctx: &mut super::Context,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        if ctx.is_cancelled() {
+            return Err(GraphError::InvalidInput(
+                "community detection cancelled".into(),
+            ));
+        }
+        let edges = self
+            .edge_rows(ctx)
+            .map(|row| row.map(|(_, u, v)| (u, v)))
+            .collect::<GraphResult<_>>()?;
+        let labels = algorithm
+            .compute_partition(ctx, self.nodes.len(), edges, self.view.is_directed())
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        self.community_rows(labels, ctx)
+    }
+
+    /// Captured Girvan–Newman labels using selected edge instances and frozen lengths.
+    pub fn girvan_newman(
+        &self,
+        algorithm: &super::community::GirvanNewman,
+        ctx: &mut super::Context,
+    ) -> GraphResult<Vec<(NodeId, usize)>> {
+        algorithm
+            .compute_read(self, ctx)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
+    }
+
+    /// Captured label propagation preserves arbitrary seed attribute values.
+    pub fn label_propagation(
+        &self,
+        algorithm: &super::community::LabelPropagation,
+        ctx: &mut super::Context,
+    ) -> GraphResult<Vec<(NodeId, crate::AttrValue)>> {
+        algorithm
+            .compute_read(self, ctx)
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))
+    }
+
     /// Captured Brandes node betweenness, preserving parallel shortest instances.
     pub fn betweenness(
         &self,

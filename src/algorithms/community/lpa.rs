@@ -135,6 +135,28 @@ impl LabelPropagation {
         self
     }
 
+    pub(crate) fn compute_read(
+        &self,
+        input: &crate::algorithms::AlgorithmRead,
+        ctx: &mut Context,
+    ) -> Result<Vec<(NodeId, AttrValue)>> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("label propagation cancelled"));
+        }
+        ctx.record_stat("lpa.count.input_nodes", input.node_ids().len() as f64);
+        ctx.record_stat("lpa.count.input_edges", input.view().edge_count() as f64);
+        ctx.record_stat("lpa.count.csr_nodes", input.csr().node_count() as f64);
+        ctx.record_stat("lpa.count.csr_edges", input.csr().neighbors.len() as f64);
+        let state = self.initialise_labels_from(ctx, input.node_ids(), |id, name| {
+            input.view().node_attr(id, name)
+        })?;
+        let state = self.run_iterations(ctx, input.csr(), state)?;
+        if ctx.is_cancelled() {
+            return Err(anyhow!("label propagation cancelled"));
+        }
+        Ok(state.into_pairs())
+    }
+
     fn metadata_template() -> AlgorithmMetadata {
         AlgorithmMetadata {
             id: "community.lpa".to_string(),
@@ -192,15 +214,31 @@ impl LabelPropagation {
         nodes: &[NodeId],
         subgraph: &Subgraph,
     ) -> Result<LabelState> {
+        self.initialise_labels_from(ctx, nodes, |node, name| {
+            ctx.node_attribute(subgraph, node, name)
+        })
+    }
+
+    fn initialise_labels_from<F>(
+        &self,
+        ctx: &Context,
+        nodes: &[NodeId],
+        mut read: F,
+    ) -> Result<LabelState>
+    where
+        F: FnMut(NodeId, &AttrName) -> crate::GraphResult<Option<AttrValue>>,
+    {
         let mut labels = Vec::with_capacity(nodes.len());
         if nodes.is_empty() {
             return Ok(LabelState::new(nodes.to_vec(), labels));
         }
 
         for &node in nodes.iter() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("label propagation cancelled"));
+            }
             let label = if let Some(seed_attr) = &self.seed_attr {
-                ctx.node_attribute(subgraph, node, seed_attr)?
-                    .unwrap_or(AttrValue::Int(node as i64))
+                read(node, seed_attr)?.unwrap_or(AttrValue::Int(node as i64))
             } else {
                 AttrValue::Int(node as i64)
             };
@@ -235,8 +273,6 @@ impl LabelPropagation {
     fn run_iterations(
         &self,
         ctx: &mut Context,
-        _subgraph: &Subgraph,
-        _indexer: &NodeIndexer,
         csr: &Csr,
         mut state: LabelState,
     ) -> Result<LabelState> {
@@ -422,7 +458,7 @@ impl Algorithm for LabelPropagation {
 
         // === PHASE 6: Run Iterations ===
         let compute_start = Instant::now();
-        let state = self.run_iterations(ctx, &subgraph, &indexer, &csr, state)?;
+        let state = self.run_iterations(ctx, &csr, state)?;
         ctx.record_call("lpa.compute", compute_start.elapsed());
 
         if ctx.is_cancelled() {

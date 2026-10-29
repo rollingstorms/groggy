@@ -61,6 +61,79 @@ impl Leiden {
         Ok(self)
     }
 
+    pub(crate) fn compute_partition(
+        &self,
+        ctx: &mut Context,
+        node_count: usize,
+        edges: Vec<(usize, usize, u64)>,
+    ) -> Result<Vec<usize>> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Leiden cancelled"));
+        }
+        let mut level = Level::new(node_count, edges)?;
+        let mut membership: Vec<_> = (0..node_count).collect();
+        let mut inherited = level.singleton_labels();
+        let mut final_labels = inherited.clone();
+        let mut rng = fastrand::Rng::with_seed(self.seed.unwrap_or(0));
+        let mut levels = 0;
+        for phase in 0..self.max_phases {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Leiden cancelled"));
+            }
+            ctx.record_stat(format!("leiden.phase_{phase}.nodes"), level.n as f64);
+            let before = level.modularity(&inherited, self.resolution)?;
+            let parent = fast_moves(
+                &level,
+                &inherited,
+                self.resolution,
+                self.max_iter,
+                &mut rng,
+                ctx,
+            )?;
+            let after = level.modularity(&parent.labels, self.resolution)?;
+            let tolerance = 64. * f64::EPSILON * (1. + before.abs().max(after.abs()));
+            if after < before - tolerance {
+                return Err(anyhow!("Leiden phase decreased modularity"));
+            }
+            final_labels = membership.iter().map(|&u| parent.labels[u]).collect();
+            levels += 1;
+            ctx.record_stat(format!("leiden.phase_{phase}.modularity"), after);
+            ctx.record_stat(
+                format!("leiden.phase_{phase}.communities"),
+                parent.communities as f64,
+            );
+            ctx.record_stat(
+                format!("leiden.phase_{phase}.visits"),
+                parent.iterations as f64,
+            );
+            if parent.communities == level.n {
+                break;
+            }
+            let refined = refine(&level, &parent, self.resolution, self.theta, &mut rng, ctx)?;
+            let next_inherited = inherited_partition(&parent, &refined)?;
+            let coarse = level.aggregate(&refined)?;
+            let projected = coarse.modularity(&next_inherited, self.resolution)?;
+            if (projected - after).abs() > tolerance {
+                return Err(anyhow!("Leiden aggregation changed modularity"));
+            }
+            ctx.record_stat(
+                format!("leiden.phase_{phase}.refined_groups"),
+                refined.communities as f64,
+            );
+            for u in &mut membership {
+                *u = refined.labels[*u];
+            }
+            inherited = next_inherited;
+            level = coarse;
+        }
+        ctx.record_stat("leiden.total_phases", levels as f64);
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Leiden cancelled"));
+        }
+
+        Ok(final_labels)
+    }
+
     fn metadata_template() -> AlgorithmMetadata {
         AlgorithmMetadata {
             id: "community.leiden".to_string(),
@@ -159,66 +232,7 @@ impl Algorithm for Leiden {
                 edges.push((index[&u], index[&v], 1));
             }
         }
-        let mut level = Level::new(nodes.len(), edges)?;
-        let mut membership: Vec<_> = (0..nodes.len()).collect();
-        let mut inherited = level.singleton_labels();
-        let mut final_labels = inherited.clone();
-        let mut rng = fastrand::Rng::with_seed(self.seed.unwrap_or(0));
-        let mut levels = 0;
-        for phase in 0..self.max_phases {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("Leiden cancelled"));
-            }
-            ctx.record_stat(format!("leiden.phase_{phase}.nodes"), level.n as f64);
-            let before = level.modularity(&inherited, self.resolution)?;
-            let parent = fast_moves(
-                &level,
-                &inherited,
-                self.resolution,
-                self.max_iter,
-                &mut rng,
-                ctx,
-            )?;
-            let after = level.modularity(&parent.labels, self.resolution)?;
-            let tolerance = 64. * f64::EPSILON * (1. + before.abs().max(after.abs()));
-            if after < before - tolerance {
-                return Err(anyhow!("Leiden phase decreased modularity"));
-            }
-            final_labels = membership.iter().map(|&u| parent.labels[u]).collect();
-            levels += 1;
-            ctx.record_stat(format!("leiden.phase_{phase}.modularity"), after);
-            ctx.record_stat(
-                format!("leiden.phase_{phase}.communities"),
-                parent.communities as f64,
-            );
-            ctx.record_stat(
-                format!("leiden.phase_{phase}.visits"),
-                parent.iterations as f64,
-            );
-            if parent.communities == level.n {
-                break;
-            }
-            let refined = refine(&level, &parent, self.resolution, self.theta, &mut rng, ctx)?;
-            let next_inherited = inherited_partition(&parent, &refined)?;
-            let coarse = level.aggregate(&refined)?;
-            let projected = coarse.modularity(&next_inherited, self.resolution)?;
-            if (projected - after).abs() > tolerance {
-                return Err(anyhow!("Leiden aggregation changed modularity"));
-            }
-            ctx.record_stat(
-                format!("leiden.phase_{phase}.refined_groups"),
-                refined.communities as f64,
-            );
-            for u in &mut membership {
-                *u = refined.labels[*u];
-            }
-            inherited = next_inherited;
-            level = coarse;
-        }
-        ctx.record_stat("leiden.total_phases", levels as f64);
-        if ctx.is_cancelled() {
-            return Err(anyhow!("Leiden cancelled"));
-        }
+        let final_labels = self.compute_partition(ctx, nodes.len(), edges)?;
 
         if ctx.persist_results() {
             let attr_values: Vec<_> = nodes

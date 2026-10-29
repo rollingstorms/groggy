@@ -263,6 +263,101 @@ impl PyGraphView {
         .map(|inner| PyPageRankResult { inner })
         .map_err(graph_error_to_py_err)
     }
+    /// Owned community rows from captured topology; never attaches properties.
+    #[pyo3(signature=(*, max_iter=None, max_phases=None, resolution=1.0))]
+    fn louvain(
+        &self,
+        py: Python<'_>,
+        max_iter: Option<&PyAny>,
+        max_phases: Option<&PyAny>,
+        resolution: f64,
+    ) -> PyResult<Vec<(NodeId, usize)>> {
+        let iterations = community_count(max_iter, "max_iter", 20)?;
+        let phases = community_count(max_phases, "max_phases", 10)?;
+        py.allow_threads(|| self.inner.louvain(iterations, phases, resolution))
+            .map_err(graph_error_to_py_err)
+    }
+    /// Bounded Leiden using captured topology and an optional reproducible seed.
+    #[pyo3(signature=(*, max_iter=None, max_phases=None, resolution=1.0, seed=None, theta=0.01))]
+    fn leiden(
+        &self,
+        py: Python<'_>,
+        max_iter: Option<&PyAny>,
+        max_phases: Option<&PyAny>,
+        resolution: f64,
+        seed: Option<&PyAny>,
+        theta: f64,
+    ) -> PyResult<Vec<(NodeId, usize)>> {
+        let iterations = community_count(max_iter, "max_iter", 20)?;
+        let phases = community_count(max_phases, "max_phases", 10)?;
+        let seed = community_seed(seed)?;
+        py.allow_threads(|| {
+            self.inner
+                .leiden(iterations, phases, resolution, seed, theta)
+        })
+        .map_err(graph_error_to_py_err)
+    }
+    /// Bounded two-level Infomap; direction and edge instances are captured.
+    #[pyo3(signature=(*, teleportation=0.15, num_trials=None, max_iter=None, flow_max_iter=None, seed=None))]
+    fn infomap(
+        &self,
+        py: Python<'_>,
+        teleportation: f64,
+        num_trials: Option<&PyAny>,
+        max_iter: Option<&PyAny>,
+        flow_max_iter: Option<&PyAny>,
+        seed: Option<&PyAny>,
+    ) -> PyResult<Vec<(NodeId, usize)>> {
+        let trials = community_count(num_trials, "num_trials", 10)?;
+        let iterations = community_count(max_iter, "max_iter", 100)?;
+        let flow = community_count(flow_max_iter, "flow_max_iter", 10_000)?;
+        let seed = community_seed(seed)?;
+        py.allow_threads(|| {
+            self.inner
+                .infomap(teleportation, trials, iterations, flow, seed)
+        })
+        .map_err(graph_error_to_py_err)
+    }
+    /// Small-graph Girvan–Newman with frozen strictly positive edge lengths.
+    #[pyo3(signature=(*, num_levels=None, modularity_threshold=None, weight_attr=None))]
+    fn girvan_newman(
+        &self,
+        py: Python<'_>,
+        num_levels: Option<&PyAny>,
+        modularity_threshold: Option<f64>,
+        weight_attr: Option<String>,
+    ) -> PyResult<Vec<(NodeId, usize)>> {
+        let levels = num_levels
+            .map(|v| crate::ffi::query::query::nonnegative_count(v, "num_levels"))
+            .transpose()?;
+        py.allow_threads(|| {
+            self.inner
+                .girvan_newman(levels, modularity_threshold, weight_attr)
+        })
+        .map_err(graph_error_to_py_err)
+    }
+    /// Owned label values, including nonnumeric labels, from captured seed attributes.
+    #[pyo3(signature=(*, max_iter=None, tolerance=0.0, seed_attr=None, seed=None))]
+    fn label_propagation(
+        &self,
+        py: Python<'_>,
+        max_iter: Option<&PyAny>,
+        tolerance: f64,
+        seed_attr: Option<String>,
+        seed: Option<&PyAny>,
+    ) -> PyResult<Vec<(NodeId, PyObject)>> {
+        let iterations = community_count(max_iter, "max_iter", 20)?;
+        let seed = community_seed(seed)?;
+        let rows = py
+            .allow_threads(|| {
+                self.inner
+                    .label_propagation(iterations, tolerance, seed_attr, seed)
+            })
+            .map_err(graph_error_to_py_err)?;
+        rows.into_iter()
+            .map(|(id, value)| Ok((id, attr_value_to_python_value(py, &value)?)))
+            .collect()
+    }
     /// Immutable components sharing captured state; ignores orientation by default.
     #[pyo3(signature = (mode="undirected"))]
     fn connected_components(&self, py: Python, mode: &str) -> PyResult<Vec<Self>> {
@@ -365,6 +460,26 @@ impl PyGraphView {
     fn copy(&self) -> Self {
         self.clone()
     }
+}
+
+fn community_count(value: Option<&PyAny>, name: &str, default: usize) -> PyResult<usize> {
+    value
+        .map(|v| crate::ffi::query::query::nonnegative_count(v, name))
+        .transpose()
+        .map(|v| v.unwrap_or(default))
+}
+
+fn community_seed(value: Option<&PyAny>) -> PyResult<Option<u64>> {
+    value
+        .map(|v| {
+            if v.is_instance_of::<pyo3::types::PyBool>() {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "seed must be an unsigned integer",
+                ));
+            }
+            v.extract::<u64>()
+        })
+        .transpose()
 }
 
 // Only immutable input and owned Send numerical data cross the GIL boundary.

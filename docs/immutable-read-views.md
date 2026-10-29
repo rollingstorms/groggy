@@ -404,3 +404,11 @@ cancel)`; weighted reads prepare a private minimum-instance CSR. Python releases
 the GIL. These reads publish no attributes, deltas, checkpoints or live caches.
 The legacy nonpersistent wrapper now exposes its computed rows through
 `centrality.betweenness.scores`, matching the other centrality algorithms.
+
+## Captured community algorithms
+
+`GraphView.louvain`, `leiden`, `infomap`, `girvan_newman` and
+`label_propagation` now consume the same captured inputs as the other classic
+algorithms. They return owned rows without publishing properties. See
+[captured communities](api/captured-community.md) for controls, frozen seed/weight
+semantics, cancellation, preparation costs and the remaining connected migration.

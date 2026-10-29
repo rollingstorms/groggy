@@ -62,3 +62,9 @@ with unique and repeated initial labels against direct adjacency/value
 propagation, plus failure, seed, sparse-ID and nonpersistent-output cases.
 `tests/test_lpa_validation.py` checks the rebuilt Python surface.
 NetworkX/Neo4j comparison and larger-scale verification remain open.
+
+## Immutable input
+
+The same kernel is available through `GraphView`; it reads captured topology and
+properties and returns owned rows without publication. See
+[captured community methods](captured-community.md).

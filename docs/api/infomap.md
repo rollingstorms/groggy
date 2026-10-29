@@ -55,3 +55,9 @@ Still open: hierarchical/nested map-equation codebooks, coarse/fine optimization
 Private `map_equation.rs` tests compare objective values and every single-node move against independently computed dense-transition/codebook entropy across all 81 small partitions, directed/undirected modes and teleportation 0/0.15/1. Analytic checks cover dangling rows, loop/parallel incidence, periodic paths, reducible zero-jump mixtures, forced nonconvergence and known one/two/singleton-codebook lengths.
 
 `tests/infomap_validation.rs` and `tests/test_infomap_validation.py` exercise actual flow modules, teleportation dependence, trial execution, direction, local RNG behavior, invalid controls, stale IDs, cancellation, failed-flow preservation and empty/edgeless/gapped-ID selections. Bounded debug measurements and raw repetitions are recorded in `notes/benchmarks/infomap-2026-10-21.md`. No external graph package was installed or executed.
+
+## Immutable input
+
+The same kernel is available through `GraphView`; it reads captured topology and
+properties and returns owned rows without publication. See
+[captured community methods](captured-community.md).

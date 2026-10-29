@@ -1044,3 +1044,29 @@ completes five committed slices (capture reuse, sparse frozen adjacency, million
 workflow baseline, archive framing lifetime, direct posting pages). Functional
 next priorities remain connected immutable ownership and compound topology;
 large retained reconstruction/recovery memory remains explicitly open.
+
+## Captured community kernels — 2026-10-29
+
+Completed the functional 26.1/AR7.5 dependency: Louvain, Leiden, Infomap,
+Girvan–Newman and label propagation now consume canonical captured input through
+native AlgorithmRead/GraphView and GIL-releasing Python GraphView methods. Shared
+kernels preserve legacy connected preparation, staged labels/weights and checked
+writeback; read computations return owned rows and never publish. This completes
+the immutable input surface for all thirteen classic registry algorithms.
+
+Evidence/remaining boundaries: `captured-communities-2026-10-29.md`; executable
+controls and examples: `docs/api/captured-community.md`. Five native parity/
+lifecycle/domain cases and 79 Python cases pass, including worker transfer and
+effective-time corrections across durable close/reopen. Ten release cases compare
+connected, convenience and reusable captured preparation without claiming an
+all-size speedup. No whole Graph, history or writable owner is cloned.
+
+Gates: **1,449 native / 56 ignored**, strict all-target core Clippy,
+**2,394 root Python / 1 skipped**, **229 executable doc examples**, rebuilt and
+atomically staged full-ABI release extension. Python stubs and scoped formatting
+are updated. Three existing unrelated FFI warnings remain.
+
+No new checklist rows or broad parent closure: **211 checked / 57 unchecked**.
+Connected default ownership/accessors (26.1/AR4), legacy filter result migration
+(21.2) and compound topology/custom effects (09.4b.2) remain priority work.
+Hierarchical Infomap and broad algorithm certification retain their existing scope.

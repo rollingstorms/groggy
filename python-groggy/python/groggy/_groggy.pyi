@@ -10931,6 +10931,26 @@ class GraphView:
         """
         ...
 
+    def louvain(self, *, max_iter: Optional[int] = None, max_phases: Optional[int] = None, resolution: float = 1.0) -> List[Tuple[int, int]]:
+        """Owned captured community rows; count defaults are 20 iterations, 10 phases."""
+        ...
+
+    def leiden(self, *, max_iter: Optional[int] = None, max_phases: Optional[int] = None, resolution: float = 1.0, seed: Optional[int] = None, theta: float = 0.01) -> List[Tuple[int, int]]:
+        """Owned bounded Leiden rows from captured topology; never publishes."""
+        ...
+
+    def infomap(self, *, teleportation: float = 0.15, num_trials: Optional[int] = None, max_iter: Optional[int] = None, flow_max_iter: Optional[int] = None, seed: Optional[int] = None) -> List[Tuple[int, int]]:
+        """Owned bounded two-level rows; defaults: 10 trials, 100 sweeps, 10000 flow iterations."""
+        ...
+
+    def girvan_newman(self, *, num_levels: Optional[int] = None, modularity_threshold: Optional[float] = None, weight_attr: Optional[str] = None) -> List[Tuple[int, int]]:
+        """Owned small-graph communities using captured positive edge lengths."""
+        ...
+
+    def label_propagation(self, *, max_iter: Optional[int] = None, tolerance: float = 0.0, seed_attr: Optional[str] = None, seed: Optional[int] = None) -> List[Tuple[int, Any]]:
+        """Owned arbitrary-valued labels from captured seed values; default 20 iterations."""
+        ...
+
     def connected_components(self, *args, **kwargs) -> List[GraphView]:
         """
         Immutable components sharing captured state; ignores orientation by default.

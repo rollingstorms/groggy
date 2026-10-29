@@ -124,10 +124,29 @@ impl Algorithm for Louvain {
                 edges.push((index[&u], index[&v], 1));
             }
         }
-        ctx.record_stat("louvain.count.input_nodes", nodes.len() as f64);
+        let labels = self.compute_partition(ctx, nodes.len(), edges)?;
+        let partition = nodes.iter().copied().zip(labels).collect();
+        if ctx.is_cancelled() {
+            return Err(anyhow!("louvain cancelled"));
+        }
+        self.persist_partition(ctx, subgraph, partition, start_time)
+    }
+}
+
+impl Louvain {
+    pub(crate) fn compute_partition(
+        &self,
+        ctx: &mut Context,
+        node_count: usize,
+        edges: Vec<(usize, usize, u64)>,
+    ) -> Result<Vec<usize>> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("louvain cancelled"));
+        }
+        ctx.record_stat("louvain.count.input_nodes", node_count as f64);
         ctx.record_stat("louvain.count.input_edges", edges.len() as f64);
-        let mut level = Level::new(nodes.len(), edges)?;
-        let mut original_to_level: Vec<_> = (0..nodes.len()).collect();
+        let mut level = Level::new(node_count, edges)?;
+        let mut original_to_level: Vec<_> = (0..node_count).collect();
         let mut total_iterations = 0;
         let mut total_moves = 0;
         let mut phases = 0;
@@ -173,15 +192,12 @@ impl Algorithm for Louvain {
         ctx.record_stat("louvain.total_iterations", total_iterations as f64);
         ctx.record_stat("louvain.total_moves", total_moves as f64);
         ctx.record_stat("louvain.total_phases", phases as f64);
-        let partition = nodes.iter().copied().zip(original_to_level).collect();
         if ctx.is_cancelled() {
             return Err(anyhow!("louvain cancelled"));
         }
-        self.persist_partition(ctx, subgraph, partition, start_time)
+        Ok(original_to_level)
     }
-}
 
-impl Louvain {
     fn persist_partition(
         &self,
         ctx: &mut Context,

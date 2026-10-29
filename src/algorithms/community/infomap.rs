@@ -61,6 +61,33 @@ impl Infomap {
         Ok(self)
     }
 
+    pub(crate) fn compute_partition(
+        &self,
+        ctx: &mut Context,
+        node_count: usize,
+        edges: Vec<(usize, usize)>,
+        directed: bool,
+    ) -> Result<Vec<usize>> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Infomap cancelled"));
+        }
+        let walk = Walk::new(node_count, edges, directed)?;
+        let flow = walk.solve(self.teleportation, self.flow_max_iter, ctx)?;
+        ctx.record_stat("infomap.flow.iterations", flow.iterations as f64);
+        ctx.record_stat("infomap.flow.residual", flow.residual);
+        let mut rng = fastrand::Rng::with_seed(self.seed.unwrap_or(0));
+        let partition = flow.optimize(self.num_trials, self.max_iter, &mut rng, ctx)?;
+        ctx.record_stat(
+            "infomap.count.communities",
+            partition.iter().copied().max().map_or(0, |n| n + 1) as f64,
+        );
+        if ctx.is_cancelled() {
+            return Err(anyhow!("Infomap cancelled"));
+        }
+
+        Ok(partition)
+    }
+
     fn metadata_template() -> AlgorithmMetadata {
         AlgorithmMetadata {
             id: "community.infomap".to_string(),
@@ -151,19 +178,7 @@ impl Algorithm for Infomap {
                 edges.push((index[&u], index[&v]));
             }
         }
-        let walk = Walk::new(nodes.len(), edges, directed)?;
-        let flow = walk.solve(self.teleportation, self.flow_max_iter, ctx)?;
-        ctx.record_stat("infomap.flow.iterations", flow.iterations as f64);
-        ctx.record_stat("infomap.flow.residual", flow.residual);
-        let mut rng = fastrand::Rng::with_seed(self.seed.unwrap_or(0));
-        let partition = flow.optimize(self.num_trials, self.max_iter, &mut rng, ctx)?;
-        ctx.record_stat(
-            "infomap.count.communities",
-            partition.iter().copied().max().map_or(0, |n| n + 1) as f64,
-        );
-        if ctx.is_cancelled() {
-            return Err(anyhow!("Infomap cancelled"));
-        }
+        let partition = self.compute_partition(ctx, nodes.len(), edges, directed)?;
 
         // Phase 8: Write results
         if ctx.persist_results() {
