@@ -436,3 +436,6 @@ indexing, missing/null, lifecycle and explicit writeback examples.
 
 Connected compatibility neighbor/degree liveness and aligned row semantics are
 described in [connected degree reads](api/connected-degree-reads.md).
+
+Specialized wrapper consolidation and capture are described in
+[specialized selections](api/specialized-selections.md).

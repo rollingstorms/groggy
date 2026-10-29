@@ -4,7 +4,7 @@
 
 use crate::ffi::subgraphs::subgraph::PySubgraph;
 use groggy::subgraphs::{NeighborhoodResult, NeighborhoodStats, NeighborhoodSubgraph};
-use groggy::traits::{GraphEntity, NeighborhoodOperations, SubgraphOperations};
+use groggy::traits::{NeighborhoodOperations, SubgraphOperations};
 use groggy::NodeId;
 use pyo3::prelude::*;
 
@@ -18,20 +18,20 @@ pub struct PyNeighborhoodSubgraph {
 impl PyNeighborhoodSubgraph {
     /// Get the subgraph object (public method for Rust code)
     pub fn subgraph(&self, _py: Python) -> PyResult<PySubgraph> {
-        // Create PySubgraph using the same pattern as connected components
-        // Create core Subgraph first, then wrap in PySubgraph
-        let core_subgraph = groggy::subgraphs::Subgraph::new(
-            self.inner.graph_ref().clone(),
-            self.inner.node_set().clone(),
-            self.inner.edge_set().clone(),
-            format!("neighborhood_hops_{}", self.inner.hops()),
-        );
-        PySubgraph::from_core_subgraph(core_subgraph)
+        PySubgraph::from_core_subgraph(self.inner.as_subgraph().clone())
     }
 }
 
 #[pymethods]
 impl PyNeighborhoodSubgraph {
+    /// Capture selected values/topology independently of later owner changes.
+    fn pin_view(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        self.inner
+            .pin_view()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     // === NeighborhoodOperations - Specialized methods ===
 
     #[getter]
@@ -117,12 +117,7 @@ impl PyNeighborhoodArray {
         // Convert NeighborhoodSubgraph to PySubgraph
         let mut subgraphs = Vec::with_capacity(result.neighborhoods.len());
         for neighborhood in result.neighborhoods.iter() {
-            let core_subgraph = groggy::subgraphs::Subgraph::new(
-                neighborhood.graph_ref(),
-                neighborhood.node_set().clone(),
-                neighborhood.edge_set().clone(),
-                format!("neighborhood_hops_{}", neighborhood.hops()),
-            );
+            let core_subgraph = neighborhood.as_subgraph().clone();
             subgraphs.push(crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(core_subgraph)?);
         }
 

@@ -37,7 +37,7 @@ bulk reader. Window receipts: `captured-view-algebra-2026-10-29.md`,
 The remaining ownership work is the actual default/legacy filter return migration,
 connected mutable entity/accessor and effectful algorithm/composition facades,
 and specialized view/viz adapters; the new read prerequisites do not complete
-those boundaries. The closing-review CSR liveness defect is now repaired: connected neighbor/degree reads validate scope before cached topology, and Python degree adapters delegate to one topology-only Rust input with ordered whole-request errors and GIL-free row computation (`connected-degree-reads-2026-10-29.md`). Actual immutable default/filter returns and compound topology acceptance remain the next priorities;
+those boundaries. The closing-review CSR liveness defect is now repaired: connected neighbor/degree reads validate scope before cached topology, and Python degree adapters delegate to one topology-only Rust input with ordered whole-request errors and GIL-free row computation (`connected-degree-reads-2026-10-29.md`). Filtered/component/neighborhood selections now share canonical membership, caches, scoped traversal and explicit frozen capture (`specialized-selection-scope-2026-10-29.md`), retiring their owner-traverse/filter implementations. Actual immutable default/filter returns and compound topology acceptance remain the next priorities;
 do not expand adjacent audits merely to create more checklist slices. The listed secondary-index families now complete 18.2:
 property/label/type/topology, effective events/activation, exact property intervals
 and retained group membership/reverse references. See

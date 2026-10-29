@@ -15,11 +15,8 @@ use std::rc::Rc;
 
 /// A filtered subgraph using our existing efficient subgraph storage
 ///
-/// FilteredSubgraph uses the same storage pattern as the base Subgraph:
-/// - HashSet<NodeId> for efficient node lookups
-/// - HashSet<EdgeId> for efficient edge lookups  
-/// - Rc<RefCell<Graph>> for shared graph access
-/// - Additional filter criteria for reapplication and combination
+/// FilteredSubgraph owns one canonical `Subgraph` selection and its caches,
+/// with specialized metadata kept separately. Clones share node/edge membership.
 ///
 /// # Design Principles
 /// - **Same Efficient Storage**: Identical foundation as base Subgraph
@@ -28,12 +25,8 @@ use std::rc::Rc;
 /// - **Trait Composability**: Implements both SubgraphOperations and FilterOperations
 #[derive(Debug, Clone)]
 pub struct FilteredSubgraph {
-    /// Reference to our shared graph storage infrastructure
-    graph: Rc<RefCell<Graph>>,
-    /// Efficient node set - same as base Subgraph
-    nodes: HashSet<NodeId>,
-    /// Efficient edge set - same as base Subgraph  
-    edges: HashSet<EdgeId>,
+    /// Canonical owner, selected membership, scope validation and topology caches.
+    selection: crate::subgraphs::Subgraph,
 
     // Filter-specific metadata (not stored in GraphPool - just behavior data)
     /// Filter criteria used to create this subgraph
@@ -45,6 +38,25 @@ pub struct FilteredSubgraph {
 }
 
 impl FilteredSubgraph {
+    /// Borrow the canonical connected selection without copying its membership.
+    pub fn as_subgraph(&self) -> &crate::subgraphs::Subgraph {
+        &self.selection
+    }
+
+    /// Freeze current selected values/topology; specialized metadata stays on this wrapper.
+    pub fn pin_view(&self) -> GraphResult<crate::subgraphs::GraphView> {
+        self.selection.pin_view()
+    }
+
+    fn wrap_selection(&self, result: crate::subgraphs::Subgraph) -> Self {
+        Self {
+            selection: result,
+            filter_criteria: self.filter_criteria.clone(),
+            original_node_count: self.original_node_count,
+            original_edge_count: self.original_edge_count,
+        }
+    }
+
     /// Create a new FilteredSubgraph from filter results
     ///
     /// # Arguments
@@ -66,9 +78,7 @@ impl FilteredSubgraph {
         original_edge_count: usize,
     ) -> Self {
         Self {
-            graph,
-            nodes,
-            edges,
+            selection: crate::subgraphs::Subgraph::new(graph, nodes, edges, "filtered".into()),
             filter_criteria: criteria,
             original_node_count,
             original_edge_count,
@@ -147,7 +157,7 @@ impl GraphEntity for FilteredSubgraph {
     }
 
     fn graph_ref(&self) -> Rc<RefCell<Graph>> {
-        self.graph.clone()
+        self.selection.graph()
     }
 
     fn related_entities(&self) -> GraphResult<Vec<Box<dyn GraphEntity>>> {
@@ -155,10 +165,11 @@ impl GraphEntity for FilteredSubgraph {
         use crate::entities::EntityNode;
 
         let entities: Vec<Box<dyn GraphEntity>> = self
-            .nodes
+            .selection
+            .nodes()
             .iter()
             .map(|&node_id| {
-                Box::new(EntityNode::new(node_id, self.graph.clone())) as Box<dyn GraphEntity>
+                Box::new(EntityNode::new(node_id, self.selection.graph())) as Box<dyn GraphEntity>
             })
             .collect();
         Ok(entities)
@@ -168,8 +179,8 @@ impl GraphEntity for FilteredSubgraph {
         let stats = self.filter_stats();
         format!(
             "FilteredSubgraph: {} nodes, {} edges (retained {:.1}% nodes, {:.1}% edges, complexity {})",
-            self.nodes.len(),
-            self.edges.len(),
+            self.selection.nodes().len(),
+            self.selection.edges().len(),
             stats.node_retention_rate * 100.0,
             stats.edge_retention_rate * 100.0,
             stats.criteria_complexity
@@ -178,283 +189,65 @@ impl GraphEntity for FilteredSubgraph {
 }
 
 impl SubgraphOperations for FilteredSubgraph {
-    // Use existing efficient storage - same as base Subgraph
     fn node_set(&self) -> &HashSet<NodeId> {
-        &self.nodes
+        self.selection.nodes()
     }
-
     fn edge_set(&self) -> &HashSet<EdgeId> {
-        &self.edges
+        self.selection.edges()
     }
-
-    // Delegate all core algorithms to existing efficient implementations
+    fn neighbors(&self, node: NodeId) -> GraphResult<Vec<NodeId>> {
+        self.selection.neighbors(node)
+    }
+    fn degree(&self, node: NodeId) -> GraphResult<usize> {
+        self.selection.degree(node)
+    }
     fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
-        // Use existing connected components algorithm with filtered data
-        use crate::query::traversal::TraversalEngine;
-        let graph = self.graph.borrow_mut();
-        let options = crate::query::traversal::TraversalOptions::default();
-
-        let mut traversal_engine = TraversalEngine::new();
-        let result =
-            traversal_engine.connected_components(&graph.pool(), graph.space(), options)?;
-
-        let mut components = Vec::new();
-        for component in result.components {
-            let component_nodes: HashSet<NodeId> = component.nodes.into_iter().collect();
-            let component_edges: HashSet<EdgeId> = component.edges.into_iter().collect();
-
-            // Filter to only edges that are also in our filtered subgraph
-            let filtered_component_edges: HashSet<EdgeId> =
-                component_edges.intersection(&self.edges).cloned().collect();
-
-            let component_subgraph = FilteredSubgraph::new(
-                self.graph.clone(),
-                component_nodes,
-                filtered_component_edges,
-                self.filter_criteria.clone(),
-                self.original_node_count,
-                self.original_edge_count,
-            );
-
-            components.push(Box::new(component_subgraph) as Box<dyn SubgraphOperations>);
-        }
-
-        Ok(components)
+        Ok(self
+            .selection
+            .component_selections()?
+            .into_iter()
+            .map(|result| Box::new(self.wrap_selection(result)) as Box<dyn SubgraphOperations>)
+            .collect())
     }
-
     fn bfs(
         &self,
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Box<dyn SubgraphOperations>> {
-        if !self.nodes.contains(&start) {
-            return Err(crate::errors::GraphError::NodeNotFound {
-                node_id: start,
-                operation: "filtered_bfs".to_string(),
-                suggestion: "Ensure start node exists in filtered subgraph".to_string(),
-            });
-        }
-
-        use crate::query::traversal::TraversalEngine;
-        let graph = self.graph.borrow_mut();
-        let mut options = crate::query::traversal::TraversalOptions::default();
-        if let Some(depth) = max_depth {
-            options.max_depth = Some(depth);
-        }
-
-        let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.bfs(&graph.pool(), graph.space(), start, options)?;
-
-        // Filter result to nodes/edges that exist in this filtered subgraph
-        let filtered_nodes: HashSet<NodeId> = result
-            .nodes
-            .into_iter()
-            .filter(|node| self.nodes.contains(node))
-            .collect();
-        let filtered_edges: HashSet<EdgeId> = result
-            .edges
-            .into_iter()
-            .filter(|edge| self.edges.contains(edge))
-            .collect();
-
-        let bfs_subgraph = FilteredSubgraph::new(
-            self.graph.clone(),
-            filtered_nodes,
-            filtered_edges,
-            self.filter_criteria.clone(),
-            self.original_node_count,
-            self.original_edge_count,
-        );
-
-        Ok(Box::new(bfs_subgraph))
+        Ok(Box::new(self.wrap_selection(
+            self.selection.bfs_selection(start, max_depth)?,
+        )))
     }
-
     fn dfs(
         &self,
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Box<dyn SubgraphOperations>> {
-        if !self.nodes.contains(&start) {
-            return Err(crate::errors::GraphError::NodeNotFound {
-                node_id: start,
-                operation: "filtered_dfs".to_string(),
-                suggestion: "Ensure start node exists in filtered subgraph".to_string(),
-            });
-        }
-
-        use crate::query::traversal::TraversalEngine;
-        let graph = self.graph.borrow_mut();
-        let mut options = crate::query::traversal::TraversalOptions::default();
-        if let Some(depth) = max_depth {
-            options.max_depth = Some(depth);
-        }
-
-        let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.dfs(&graph.pool(), graph.space(), start, options)?;
-
-        // Filter result to nodes/edges that exist in this filtered subgraph
-        let filtered_nodes: HashSet<NodeId> = result
-            .nodes
-            .into_iter()
-            .filter(|node| self.nodes.contains(node))
-            .collect();
-        let filtered_edges: HashSet<EdgeId> = result
-            .edges
-            .into_iter()
-            .filter(|edge| self.edges.contains(edge))
-            .collect();
-
-        let dfs_subgraph = FilteredSubgraph::new(
-            self.graph.clone(),
-            filtered_nodes,
-            filtered_edges,
-            self.filter_criteria.clone(),
-            self.original_node_count,
-            self.original_edge_count,
-        );
-
-        Ok(Box::new(dfs_subgraph))
+        Ok(Box::new(self.wrap_selection(
+            self.selection.dfs_selection(start, max_depth)?,
+        )))
     }
-
     fn shortest_path_subgraph(
         &self,
         source: NodeId,
         target: NodeId,
     ) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
-        if !self.nodes.contains(&source) || !self.nodes.contains(&target) {
-            return Ok(None);
-        }
-
-        use crate::query::traversal::{PathFindingOptions, TraversalEngine};
-        let graph = self.graph.borrow_mut();
-        let options = PathFindingOptions::default();
-
-        let mut traversal_engine = TraversalEngine::new();
-        let x = if let Some(path_result) =
-            traversal_engine.shortest_path(&graph.pool(), graph.space(), source, target, options)?
-        {
-            // Filter path to nodes/edges that exist in this filtered subgraph
-            let filtered_nodes: HashSet<NodeId> = path_result
-                .nodes
-                .into_iter()
-                .filter(|node| self.nodes.contains(node))
-                .collect();
-            let filtered_edges: HashSet<EdgeId> = path_result
-                .edges
-                .into_iter()
-                .filter(|edge| self.edges.contains(edge))
-                .collect();
-
-            if !filtered_nodes.is_empty() {
-                let path_subgraph = FilteredSubgraph::new(
-                    self.graph.clone(),
-                    filtered_nodes,
-                    filtered_edges,
-                    self.filter_criteria.clone(),
-                    self.original_node_count,
-                    self.original_edge_count,
-                );
-                Ok(Some(Box::new(path_subgraph) as Box<dyn SubgraphOperations>))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        };
-        x
+        Ok(self
+            .selection
+            .path_selection(source, target)?
+            .map(|result| Box::new(self.wrap_selection(result)) as Box<dyn SubgraphOperations>))
     }
-
     fn induced_subgraph(&self, nodes: &[NodeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
-        // Filter to nodes that exist in this filtered subgraph
-        let filtered_nodes: HashSet<NodeId> = nodes
-            .iter()
-            .filter(|&&node| self.nodes.contains(&node))
-            .cloned()
-            .collect();
-
-        if filtered_nodes.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "No nodes from the requested set exist in this filtered subgraph".to_string(),
-            ));
-        }
-
-        // Find induced edges using existing graph algorithms
-        let graph = self.graph.borrow();
-        let mut induced_edges = HashSet::new();
-
-        for &node1 in &filtered_nodes {
-            for &node2 in &filtered_nodes {
-                if node1 < node2 {
-                    // Avoid duplicate checking
-                    if let Ok(edges) = graph.incident_edges(node1) {
-                        for edge_id in edges {
-                            if let Ok((src, tgt)) = graph.edge_endpoints(edge_id) {
-                                if (src == node1 && tgt == node2) || (src == node2 && tgt == node1)
-                                {
-                                    if self.edges.contains(&edge_id) {
-                                        induced_edges.insert(edge_id);
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let induced_subgraph = FilteredSubgraph::new(
-            self.graph.clone(),
-            filtered_nodes,
-            induced_edges,
-            self.filter_criteria.clone(),
-            self.original_node_count,
-            self.original_edge_count,
-        );
-
-        Ok(Box::new(induced_subgraph))
+        Ok(Box::new(
+            self.wrap_selection(self.selection.induced_selection(nodes)?),
+        ))
     }
-
     fn subgraph_from_edges(&self, edges: &[EdgeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
-        // Filter to edges that exist in this filtered subgraph
-        let filtered_edges: HashSet<EdgeId> = edges
-            .iter()
-            .filter(|&&edge| self.edges.contains(&edge))
-            .cloned()
-            .collect();
-
-        if filtered_edges.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "No edges from the requested set exist in this filtered subgraph".to_string(),
-            ));
-        }
-
-        // Find nodes connected to these edges
-        let graph = self.graph.borrow();
-        let mut edge_nodes = HashSet::new();
-
-        for &edge_id in &filtered_edges {
-            if let Ok((src, tgt)) = graph.edge_endpoints(edge_id) {
-                if self.nodes.contains(&src) && self.nodes.contains(&tgt) {
-                    edge_nodes.insert(src);
-                    edge_nodes.insert(tgt);
-                }
-            }
-        }
-
-        let edge_subgraph = FilteredSubgraph::new(
-            self.graph.clone(),
-            edge_nodes,
-            filtered_edges,
-            self.filter_criteria.clone(),
-            self.original_node_count,
-            self.original_edge_count,
-        );
-
-        Ok(Box::new(edge_subgraph))
+        Ok(Box::new(
+            self.wrap_selection(self.selection.edge_selection(edges)?),
+        ))
     }
 
-    /// Create a VizModule for this filtered subgraph
     fn viz(&self) -> crate::viz::VizModule {
         use crate::subgraphs::visualization::SubgraphDataSource;
         use std::sync::Arc;
@@ -475,17 +268,25 @@ impl FilterOperations for FilteredSubgraph {
 
     fn reapply_filter(&self) -> GraphResult<Box<dyn FilterOperations>> {
         let new_subgraph =
-            FilteredSubgraph::from_criteria(self.graph.clone(), self.filter_criteria.clone())?;
+            FilteredSubgraph::from_criteria(self.selection.graph(), self.filter_criteria.clone())?;
 
         Ok(Box::new(new_subgraph))
     }
 
     fn and_filter(&self, other: &dyn FilterOperations) -> GraphResult<Box<dyn FilterOperations>> {
         // Create intersection of node and edge sets
-        let intersected_nodes: HashSet<NodeId> =
-            self.nodes.intersection(other.node_set()).cloned().collect();
-        let intersected_edges: HashSet<EdgeId> =
-            self.edges.intersection(other.edge_set()).cloned().collect();
+        let intersected_nodes: HashSet<NodeId> = self
+            .selection
+            .nodes()
+            .intersection(other.node_set())
+            .cloned()
+            .collect();
+        let intersected_edges: HashSet<EdgeId> = self
+            .selection
+            .edges()
+            .intersection(other.edge_set())
+            .cloned()
+            .collect();
 
         // Combine criteria with AND
         let combined_criteria = FilterCriteria::And(vec![
@@ -494,7 +295,7 @@ impl FilterOperations for FilteredSubgraph {
         ]);
 
         let and_subgraph = FilteredSubgraph::new(
-            self.graph.clone(),
+            self.selection.graph(),
             intersected_nodes,
             intersected_edges,
             combined_criteria,
@@ -507,9 +308,9 @@ impl FilterOperations for FilteredSubgraph {
 
     fn or_filter(&self, other: &dyn FilterOperations) -> GraphResult<Box<dyn FilterOperations>> {
         // Create union of node and edge sets
-        let mut unioned_nodes = self.nodes.clone();
+        let mut unioned_nodes = self.selection.nodes().clone();
         unioned_nodes.extend(other.node_set());
-        let mut unioned_edges = self.edges.clone();
+        let mut unioned_edges = self.selection.edges().clone();
         unioned_edges.extend(other.edge_set());
 
         // Combine criteria with OR
@@ -519,7 +320,7 @@ impl FilterOperations for FilteredSubgraph {
         ]);
 
         let or_subgraph = FilteredSubgraph::new(
-            self.graph.clone(),
+            self.selection.graph(),
             unioned_nodes,
             unioned_edges,
             combined_criteria,
@@ -532,14 +333,24 @@ impl FilterOperations for FilteredSubgraph {
 
     fn not_filter(&self) -> GraphResult<Box<dyn FilterOperations>> {
         // Create complement against full graph
-        let graph_borrow = self.graph.borrow();
+        let owner = self.selection.graph();
+        let graph_borrow = owner.borrow();
         let all_nodes: HashSet<NodeId> = graph_borrow.node_ids().into_iter().collect();
-        let all_edges: HashSet<EdgeId> = graph_borrow.edge_ids().into_iter().collect();
-
-        let complement_nodes: HashSet<NodeId> =
-            all_nodes.difference(&self.nodes).cloned().collect();
-        let complement_edges: HashSet<EdgeId> =
-            all_edges.difference(&self.edges).cloned().collect();
+        self.selection.validate_query_scope(&graph_borrow)?;
+        let complement_nodes: HashSet<NodeId> = all_nodes
+            .difference(self.selection.nodes())
+            .copied()
+            .collect();
+        let mut complement_edges = HashSet::new();
+        for edge in graph_borrow.edge_ids() {
+            if self.selection.edges().contains(&edge) {
+                continue;
+            }
+            let (source, target) = graph_borrow.edge_endpoints(edge)?;
+            if complement_nodes.contains(&source) && complement_nodes.contains(&target) {
+                complement_edges.insert(edge);
+            }
+        }
 
         // Negate criteria
         let negated_criteria = FilterCriteria::Not(Box::new(self.filter_criteria.clone()));
@@ -547,7 +358,7 @@ impl FilterOperations for FilteredSubgraph {
         drop(graph_borrow);
 
         let not_subgraph = FilteredSubgraph::new(
-            self.graph.clone(),
+            self.selection.graph(),
             complement_nodes,
             complement_edges,
             negated_criteria,
@@ -567,7 +378,8 @@ impl FilterOperations for FilteredSubgraph {
             FilterCriteria::And(vec![self.filter_criteria.clone(), additional_criteria]);
 
         // Reapply combined criteria to current graph
-        let new_subgraph = FilteredSubgraph::from_criteria(self.graph.clone(), combined_criteria)?;
+        let new_subgraph =
+            FilteredSubgraph::from_criteria(self.selection.graph(), combined_criteria)?;
 
         Ok(Box::new(new_subgraph))
     }

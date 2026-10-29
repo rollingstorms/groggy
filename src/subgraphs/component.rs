@@ -14,11 +14,8 @@ use std::rc::Rc;
 
 /// A connected component using our existing efficient subgraph storage
 ///
-/// ComponentSubgraph uses the same storage pattern as the base Subgraph:
-/// - HashSet<NodeId> for efficient node lookups
-/// - HashSet<EdgeId> for efficient edge lookups  
-/// - Rc<RefCell<Graph>> for shared graph access
-/// - Additional component metadata for specialized operations
+/// ComponentSubgraph owns one canonical `Subgraph` selection and its caches,
+/// with specialized metadata kept separately. Clones share node/edge membership.
 ///
 /// # Design Principles
 /// - **Same Efficient Storage**: Identical foundation as base Subgraph
@@ -27,12 +24,8 @@ use std::rc::Rc;
 /// - **Trait Composability**: Implements both SubgraphOperations and ComponentOperations
 #[derive(Debug, Clone)]
 pub struct ComponentSubgraph {
-    /// Reference to our shared graph storage infrastructure
-    graph: Rc<RefCell<Graph>>,
-    /// Efficient node set - same as base Subgraph
-    nodes: HashSet<NodeId>,
-    /// Efficient edge set - same as base Subgraph  
-    edges: HashSet<EdgeId>,
+    /// Canonical owner, selected membership, scope validation and topology caches.
+    selection: crate::subgraphs::Subgraph,
 
     // Component-specific metadata (not stored in GraphPool - just behavior data)
     /// Unique component identifier within the parent graph's component structure
@@ -44,6 +37,25 @@ pub struct ComponentSubgraph {
 }
 
 impl ComponentSubgraph {
+    /// Borrow the canonical connected selection without copying its membership.
+    pub fn as_subgraph(&self) -> &crate::subgraphs::Subgraph {
+        &self.selection
+    }
+
+    /// Freeze current selected values/topology; specialized metadata stays on this wrapper.
+    pub fn pin_view(&self) -> GraphResult<crate::subgraphs::GraphView> {
+        self.selection.pin_view()
+    }
+
+    fn wrap_selection(&self, result: crate::subgraphs::Subgraph) -> Self {
+        Self {
+            is_largest: self.is_largest && result.nodes() == self.selection.nodes(),
+            selection: result,
+            component_id: self.component_id,
+            total_components: self.total_components,
+        }
+    }
+
     /// Create a new ComponentSubgraph from existing component analysis
     ///
     /// # Arguments
@@ -65,9 +77,7 @@ impl ComponentSubgraph {
         total_components: usize,
     ) -> Self {
         Self {
-            graph,
-            nodes,
-            edges,
+            selection: crate::subgraphs::Subgraph::new(graph, nodes, edges, "component".into()),
             component_id,
             is_largest,
             total_components,
@@ -124,7 +134,7 @@ impl GraphEntity for ComponentSubgraph {
     }
 
     fn graph_ref(&self) -> Rc<RefCell<Graph>> {
-        self.graph.clone()
+        self.selection.graph()
     }
 
     fn related_entities(&self) -> GraphResult<Vec<Box<dyn GraphEntity>>> {
@@ -132,10 +142,11 @@ impl GraphEntity for ComponentSubgraph {
         use crate::entities::EntityNode;
 
         let entities: Vec<Box<dyn GraphEntity>> = self
-            .nodes
+            .selection
+            .nodes()
             .iter()
             .map(|&node_id| {
-                Box::new(EntityNode::new(node_id, self.graph.clone())) as Box<dyn GraphEntity>
+                Box::new(EntityNode::new(node_id, self.selection.graph())) as Box<dyn GraphEntity>
             })
             .collect();
         Ok(entities)
@@ -151,273 +162,73 @@ impl GraphEntity for ComponentSubgraph {
             "Component {}/{}: {} nodes, {} edges ({})",
             self.component_id,
             self.total_components,
-            self.nodes.len(),
-            self.edges.len(),
+            self.selection.nodes().len(),
+            self.selection.edges().len(),
             status
         )
     }
 }
 
 impl SubgraphOperations for ComponentSubgraph {
-    // Use existing efficient storage - same as base Subgraph
     fn node_set(&self) -> &HashSet<NodeId> {
-        &self.nodes
+        self.selection.nodes()
     }
-
     fn edge_set(&self) -> &HashSet<EdgeId> {
-        &self.edges
+        self.selection.edges()
     }
-
-    // Delegate all core algorithms to existing efficient implementations
+    fn neighbors(&self, node: NodeId) -> GraphResult<Vec<NodeId>> {
+        self.selection.neighbors(node)
+    }
+    fn degree(&self, node: NodeId) -> GraphResult<usize> {
+        self.selection.degree(node)
+    }
     fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
-        // Components of a component are typically just itself, unless further subdivision
-        // For now, return self as the only component
-        Ok(vec![Box::new(self.clone()) as Box<dyn SubgraphOperations>])
+        Ok(self
+            .selection
+            .component_selections()?
+            .into_iter()
+            .map(|result| Box::new(self.wrap_selection(result)) as Box<dyn SubgraphOperations>)
+            .collect())
     }
-
     fn bfs(
         &self,
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Box<dyn SubgraphOperations>> {
-        // Use existing BFS implementation from base Subgraph pattern
-        if !self.nodes.contains(&start) {
-            return Err(crate::errors::GraphError::NodeNotFound {
-                node_id: start,
-                operation: "component_bfs".to_string(),
-                suggestion: "Ensure start node is within this component".to_string(),
-            });
-        }
-
-        use crate::query::traversal::TraversalEngine;
-        let graph = self.graph.borrow_mut();
-        let mut options = crate::query::traversal::TraversalOptions::default();
-        if let Some(depth) = max_depth {
-            options.max_depth = Some(depth);
-        }
-
-        let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.bfs(&graph.pool(), graph.space(), start, options)?;
-
-        // Filter result to nodes that exist in this component
-        let filtered_nodes: HashSet<NodeId> = result
-            .nodes
-            .into_iter()
-            .filter(|node| self.nodes.contains(node))
-            .collect();
-        let filtered_edges: HashSet<EdgeId> = result
-            .edges
-            .into_iter()
-            .filter(|edge| self.edges.contains(edge))
-            .collect();
-
-        // Create new ComponentSubgraph for the BFS result
-        let bfs_component = ComponentSubgraph::new(
-            self.graph.clone(),
-            filtered_nodes,
-            filtered_edges,
-            self.component_id, // Keep same component ID
-            false,             // BFS result is not the largest
-            self.total_components,
-        );
-
-        Ok(Box::new(bfs_component))
+        Ok(Box::new(self.wrap_selection(
+            self.selection.bfs_selection(start, max_depth)?,
+        )))
     }
-
     fn dfs(
         &self,
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Box<dyn SubgraphOperations>> {
-        // Use existing DFS implementation pattern
-        if !self.nodes.contains(&start) {
-            return Err(crate::errors::GraphError::NodeNotFound {
-                node_id: start,
-                operation: "component_dfs".to_string(),
-                suggestion: "Ensure start node is within this component".to_string(),
-            });
-        }
-
-        use crate::query::traversal::TraversalEngine;
-        let graph = self.graph.borrow_mut();
-        let mut options = crate::query::traversal::TraversalOptions::default();
-        if let Some(depth) = max_depth {
-            options.max_depth = Some(depth);
-        }
-
-        let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.dfs(&graph.pool(), graph.space(), start, options)?;
-
-        // Filter result to nodes that exist in this component
-        let filtered_nodes: HashSet<NodeId> = result
-            .nodes
-            .into_iter()
-            .filter(|node| self.nodes.contains(node))
-            .collect();
-        let filtered_edges: HashSet<EdgeId> = result
-            .edges
-            .into_iter()
-            .filter(|edge| self.edges.contains(edge))
-            .collect();
-
-        // Create new ComponentSubgraph for the DFS result
-        let dfs_component = ComponentSubgraph::new(
-            self.graph.clone(),
-            filtered_nodes,
-            filtered_edges,
-            self.component_id, // Keep same component ID
-            false,             // DFS result is not the largest
-            self.total_components,
-        );
-
-        Ok(Box::new(dfs_component))
+        Ok(Box::new(self.wrap_selection(
+            self.selection.dfs_selection(start, max_depth)?,
+        )))
     }
-
     fn shortest_path_subgraph(
         &self,
         source: NodeId,
         target: NodeId,
     ) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
-        if !self.nodes.contains(&source) || !self.nodes.contains(&target) {
-            return Ok(None);
-        }
-
-        use crate::query::traversal::{PathFindingOptions, TraversalEngine};
-        let graph = self.graph.borrow_mut();
-        let options = PathFindingOptions::default();
-
-        let mut traversal_engine = TraversalEngine::new();
-        let x = if let Some(path_result) =
-            traversal_engine.shortest_path(&graph.pool(), graph.space(), source, target, options)?
-        {
-            // Filter path to nodes/edges that exist in this component
-            let filtered_nodes: HashSet<NodeId> = path_result
-                .nodes
-                .into_iter()
-                .filter(|node| self.nodes.contains(node))
-                .collect();
-            let filtered_edges: HashSet<EdgeId> = path_result
-                .edges
-                .into_iter()
-                .filter(|edge| self.edges.contains(edge))
-                .collect();
-
-            if !filtered_nodes.is_empty() {
-                let path_component = ComponentSubgraph::new(
-                    self.graph.clone(),
-                    filtered_nodes,
-                    filtered_edges,
-                    self.component_id, // Keep same component ID
-                    false,             // Path is not the largest
-                    self.total_components,
-                );
-                Ok(Some(Box::new(path_component) as Box<dyn SubgraphOperations>))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        };
-        x
+        Ok(self
+            .selection
+            .path_selection(source, target)?
+            .map(|result| Box::new(self.wrap_selection(result)) as Box<dyn SubgraphOperations>))
     }
-
     fn induced_subgraph(&self, nodes: &[NodeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
-        // Filter to nodes that exist in this component
-        let component_nodes: HashSet<NodeId> = nodes
-            .iter()
-            .filter(|&&node| self.nodes.contains(&node))
-            .cloned()
-            .collect();
-
-        if component_nodes.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "No nodes from the requested set exist in this component".to_string(),
-            ));
-        }
-
-        // Find induced edges using existing graph algorithms
-        let graph = self.graph.borrow();
-        let mut induced_edges = HashSet::new();
-
-        for &node1 in &component_nodes {
-            for &node2 in &component_nodes {
-                if node1 < node2 {
-                    // Avoid duplicate checking
-                    if let Ok(has_edge) = graph.has_edge_between(node1, node2) {
-                        if has_edge {
-                            // Find the actual edge ID
-                            if let Ok(edges) = graph.incident_edges(node1) {
-                                for edge_id in edges {
-                                    if let Ok((src, tgt)) = graph.edge_endpoints(edge_id) {
-                                        if (src == node1 && tgt == node2)
-                                            || (src == node2 && tgt == node1)
-                                        {
-                                            if self.edges.contains(&edge_id) {
-                                                induced_edges.insert(edge_id);
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let induced_component = ComponentSubgraph::new(
-            self.graph.clone(),
-            component_nodes,
-            induced_edges,
-            self.component_id, // Keep same component ID
-            false,             // Induced subgraph is not the largest
-            self.total_components,
-        );
-
-        Ok(Box::new(induced_component))
+        Ok(Box::new(
+            self.wrap_selection(self.selection.induced_selection(nodes)?),
+        ))
     }
-
     fn subgraph_from_edges(&self, edges: &[EdgeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
-        // Filter to edges that exist in this component
-        let component_edges: HashSet<EdgeId> = edges
-            .iter()
-            .filter(|&&edge| self.edges.contains(&edge))
-            .cloned()
-            .collect();
-
-        if component_edges.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "No edges from the requested set exist in this component".to_string(),
-            ));
-        }
-
-        // Find nodes connected to these edges
-        let graph = self.graph.borrow();
-        let mut edge_nodes = HashSet::new();
-
-        for &edge_id in &component_edges {
-            if let Ok((src, tgt)) = graph.edge_endpoints(edge_id) {
-                if self.nodes.contains(&src) && self.nodes.contains(&tgt) {
-                    edge_nodes.insert(src);
-                    edge_nodes.insert(tgt);
-                }
-            }
-        }
-
-        let edge_component = ComponentSubgraph::new(
-            self.graph.clone(),
-            edge_nodes,
-            component_edges,
-            self.component_id, // Keep same component ID
-            false,             // Edge subgraph is not the largest
-            self.total_components,
-        );
-
-        Ok(Box::new(edge_component))
+        Ok(Box::new(
+            self.wrap_selection(self.selection.edge_selection(edges)?),
+        ))
     }
 
-    /// Create a VizModule for this component subgraph
     fn viz(&self) -> crate::viz::VizModule {
         use crate::subgraphs::visualization::SubgraphDataSource;
         use std::sync::Arc;
@@ -445,21 +256,22 @@ impl ComponentOperations for ComponentSubgraph {
         other: &dyn ComponentOperations,
     ) -> GraphResult<Box<dyn ComponentOperations>> {
         // Union of node and edge sets
-        let mut merged_nodes = self.nodes.clone();
+        let mut merged_nodes = self.selection.nodes().clone();
         let other_nodes = other.node_set();
         merged_nodes.extend(other_nodes);
 
-        let mut merged_edges = self.edges.clone();
+        let mut merged_edges = self.selection.edges().clone();
         let other_edges = other.edge_set();
         merged_edges.extend(other_edges);
 
         // Create new component with merged data
         let new_component_id = std::cmp::max(self.component_id, other.component_id());
         let merged_size = merged_nodes.len();
-        let is_largest = merged_size >= std::cmp::max(self.nodes.len(), other_nodes.len());
+        let is_largest =
+            merged_size >= std::cmp::max(self.selection.nodes().len(), other_nodes.len());
 
         let merged_component = ComponentSubgraph::new(
-            self.graph.clone(),
+            self.selection.graph(),
             merged_nodes,
             merged_edges,
             new_component_id,
@@ -472,14 +284,15 @@ impl ComponentOperations for ComponentSubgraph {
 
     fn boundary_nodes(&self) -> GraphResult<Vec<NodeId>> {
         let mut boundary_nodes = Vec::new();
-        let graph = self.graph.borrow();
+        let owner = self.selection.graph();
+        let graph = owner.borrow();
 
-        for &node_id in &self.nodes {
+        for &node_id in self.selection.nodes() {
             // Check if this node has any neighbors outside the component
             let neighbors = graph.neighbors(node_id)?;
             let has_external_neighbor = neighbors
                 .iter()
-                .any(|&neighbor| !self.nodes.contains(&neighbor));
+                .any(|&neighbor| !self.selection.nodes().contains(&neighbor));
 
             if has_external_neighbor {
                 boundary_nodes.push(node_id);

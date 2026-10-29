@@ -23,6 +23,14 @@ impl PyComponentSubgraph {
 
 #[pymethods]
 impl PyComponentSubgraph {
+    /// Capture selected values/topology independently of later owner changes.
+    fn pin_view(&self) -> PyResult<crate::ffi::subgraphs::view::PyGraphView> {
+        self.inner
+            .pin_view()
+            .map(|inner| crate::ffi::subgraphs::view::PyGraphView { inner })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     // === ComponentOperations - Specialized methods (these are unique) ===
 
     #[getter]

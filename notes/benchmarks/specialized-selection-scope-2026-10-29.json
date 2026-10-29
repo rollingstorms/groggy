@@ -1,0 +1,224 @@
+{
+  "cases": [
+    {
+      "edges": 999,
+      "filter_clone_seconds_per_call": 9.8458e-08,
+      "nodes": 1000,
+      "object_sizes_bytes": {
+        "base": 160,
+        "component": 184,
+        "filtered": 304,
+        "neighborhood": 200
+      },
+      "timings": [
+        {
+          "four_node_induction_seconds": [
+            5.3209e-05,
+            2.5542e-05,
+            2.5167e-05,
+            2.525e-05,
+            2.5167e-05
+          ],
+          "kind": "subgraph",
+          "three_edge_selection_seconds": [
+            1.291e-06,
+            8.34e-07,
+            7.09e-07,
+            7.5e-07,
+            7.5e-07
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.371125e-06,
+            1.2333330000000002e-06,
+            2.9390829999999997e-06,
+            1.13725e-06,
+            1.134e-06
+          ]
+        },
+        {
+          "four_node_induction_seconds": [
+            3.3333e-05,
+            2.5667e-05,
+            2.4792e-05,
+            5.1834e-05,
+            2.8417e-05
+          ],
+          "kind": "filtered_subgraph",
+          "three_edge_selection_seconds": [
+            1.458e-06,
+            8.34e-07,
+            8.34e-07,
+            2.125e-06,
+            9.17e-07
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.288792e-06,
+            1.447916e-06,
+            1.908709e-06,
+            1.313458e-06,
+            1.35075e-06
+          ]
+        },
+        {
+          "four_node_induction_seconds": [
+            6.2958e-05,
+            2.7834e-05,
+            2.7667e-05,
+            2.675e-05,
+            2.6667e-05
+          ],
+          "kind": "component",
+          "three_edge_selection_seconds": [
+            2.042e-06,
+            8.34e-07,
+            7.92e-07,
+            8.33e-07,
+            9.16e-07
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.3338340000000001e-06,
+            1.2226669999999999e-06,
+            1.33525e-06,
+            1.454292e-06,
+            1.5481250000000001e-06
+          ]
+        },
+        {
+          "four_node_induction_seconds": [
+            3.2917e-05,
+            2.5333e-05,
+            2.5e-05,
+            2.7125e-05,
+            2.7e-05
+          ],
+          "kind": "neighborhood",
+          "three_edge_selection_seconds": [
+            1.584e-06,
+            8.33e-07,
+            7.91e-07,
+            8.34e-07,
+            8.33e-07
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.3975000000000002e-06,
+            1.485875e-06,
+            1.361292e-06,
+            1.731292e-06,
+            1.388583e-06
+          ]
+        }
+      ]
+    },
+    {
+      "edges": 99999,
+      "filter_clone_seconds_per_call": 7.0959e-08,
+      "nodes": 100000,
+      "object_sizes_bytes": {
+        "base": 160,
+        "component": 184,
+        "filtered": 304,
+        "neighborhood": 200
+      },
+      "timings": [
+        {
+          "four_node_induction_seconds": [
+            0.007225042,
+            0.007416166,
+            0.007332834,
+            0.006816,
+            0.007758625
+          ],
+          "kind": "subgraph",
+          "three_edge_selection_seconds": [
+            2.625e-06,
+            3.542e-06,
+            3.541e-06,
+            2.75e-06,
+            3.875e-06
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.170375e-06,
+            1.465792e-06,
+            1.483833e-06,
+            1.1648330000000001e-06,
+            1.464834e-06
+          ]
+        },
+        {
+          "four_node_induction_seconds": [
+            0.006777625,
+            0.006800208,
+            0.007291,
+            0.006888334,
+            0.007810041
+          ],
+          "kind": "filtered_subgraph",
+          "three_edge_selection_seconds": [
+            3.208e-06,
+            3.791e-06,
+            4.042e-06,
+            3.416e-06,
+            3.167e-06
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.288875e-06,
+            1.2714169999999998e-06,
+            1.271459e-06,
+            1.752709e-06,
+            1.3337500000000001e-06
+          ]
+        },
+        {
+          "four_node_induction_seconds": [
+            0.005803083,
+            0.005760041,
+            0.007211584,
+            0.006494375,
+            0.006596375
+          ],
+          "kind": "component",
+          "three_edge_selection_seconds": [
+            2.291e-06,
+            3.125e-06,
+            4.75e-06,
+            1.584e-06,
+            3.042e-06
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.300083e-06,
+            1.578334e-06,
+            1.205625e-06,
+            1.197875e-06,
+            1.1899169999999999e-06
+          ]
+        },
+        {
+          "four_node_induction_seconds": [
+            0.007700209,
+            0.007154667,
+            0.005849458,
+            0.00669775,
+            0.006658791
+          ],
+          "kind": "neighborhood",
+          "three_edge_selection_seconds": [
+            3.25e-06,
+            4.167e-06,
+            1.75e-06,
+            2.417e-06,
+            2.958e-06
+          ],
+          "warm_three_hop_bfs_seconds": [
+            1.29225e-06,
+            1.2124169999999999e-06,
+            1.3801659999999998e-06,
+            1.2922079999999999e-06,
+            1.371458e-06
+          ]
+        }
+      ]
+    }
+  ],
+  "fixture": "undirected chain; no properties; absolute warmed topology-only timings with output and membership-sharing checks; no before/after speedup claim",
+  "profile": "release"
+}

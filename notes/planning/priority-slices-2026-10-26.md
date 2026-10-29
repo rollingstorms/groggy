@@ -1268,3 +1268,53 @@ This completes the demonstrated compatibility blocker, not the broad ownership
 migration. No new checklist rows or premature parent closures: **211 checked /
 57 unchecked**. Actual default/filter immutable ownership and compound topology
 acceptance remain the next existing priority scopes.
+
+### Specialized selection ownership and topology — 2026-10-29
+
+Completed the next existing 26.1/AR2/AR7.5 component. A pre-fix native regression
+proved that filtered BFS traversed owner-only routes and returned nodes outside
+its reachable selected topology. Filtered/component/neighborhood wrappers now own
+one canonical Subgraph selection plus their specialized metadata. Their separate
+membership/owner fields and duplicated traversal implementations are retired;
+neighbor/degree, actual components, BFS/DFS, shortest hop paths and node/edge
+selection use the same selected-scope validation and topology kernels.
+
+Typed native result helpers move canonical membership directly into metadata
+wrappers without copying output hash sets through trait objects. Canonical
+connected induction/edge selection also stop capturing full owner property values:
+induction scans selected edge instances once, and explicit edge selection resolves
+only the selected requested instances. Parallel edges, loops and empty outputs
+retain the base selection contract. Filter complement prunes dangling crossing
+edges. Specialized clones share membership; Python neighborhood conversion shares
+the canonical native selection and preserves its existing type label. All three
+native wrappers expose explicit capture; component/neighborhood extension adapters
+and stubs expose that same frozen path. No new graph/history representation.
+
+Receipt: `specialized-selection-scope-2026-10-29.md`; native regressions cover all
+three variants, both directedness modes, selected-route isolation, disconnected
+components, complete parallel/loop induction, invalid/empty behavior, metadata,
+shared clones, warm stale-scope rejection and frozen worker lifetime. The public
+Python neighborhood bridge and extension registration are covered too. The prior
+canonical traversal/degree/restoration suites remain passing.
+
+Release raw receipt in `notes/benchmarks/specialized-selection-scope-2026-10-29.json`:
+100k-chain median warm three-hop BFS 1.206–1.465 microseconds across base and all
+three variants; four-node induction 6.494–7.333 ms (one selected-edge scan); selecting
+three edges 2.958–3.541 microseconds. Small-criteria shared filter cloning averages
+0.071 microseconds at 100k nodes. Current object struct sizes are 160/304/184/200
+bytes for base/filtered/component/neighborhood, excluding heap allocations. Five
+samples and output/membership checks; absolute warmed topology-only evidence,
+not a universal speedup, heap-total or Python FFI-budget claim. First validation
+and explicit immutable full-value capture keep their documented costs.
+
+Final gates: **1,483 native / 54 ignored**, strict all-target core Clippy,
+**2,500 root Python / 1 skipped**, **243 executable documentation examples**,
+full-ABI release extension rebuilt/atomically staged. Scoped formatting, Python
+syntax and diff checks pass. Three pre-existing unrelated pipeline FFI warnings
+remain; owner benchmark/review changes are preserved outside the commit.
+
+No new checklist rows or broad parent closure: **211 checked / 57 unchecked**.
+This completes specialized membership/traversal consolidation and removes the
+reproduced selected-route defect. Actual immutable default/filter returns,
+effectful facades, the remaining viz adapter boundary and general compound
+topology acceptance retain their existing priority scopes.

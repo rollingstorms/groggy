@@ -1078,118 +1078,19 @@ impl SubgraphOperations for Subgraph {
     }
 
     fn induced_subgraph(&self, nodes: &[NodeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
-        // Preserve the legacy request intersection, but never expand the parent's edge scope.
-        let nodes: Vec<_> = nodes
-            .iter()
-            .copied()
-            .filter(|node| self.nodes.contains(node))
-            .collect();
-        let view = self.pin_view()?.select_nodes(&nodes)?;
-        Ok(Box::new(self.connected_named_result(
-            view,
-            format!("{}_induced", self.subgraph_type),
-        )))
+        Ok(Box::new(self.induced_selection(nodes)?))
     }
 
     fn subgraph_from_edges(&self, edges: &[EdgeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
-        let edges: Vec<_> = edges
-            .iter()
-            .copied()
-            .filter(|edge| self.edges.contains(edge))
-            .collect();
-        let view = self.pin_view()?.select_edges(&edges)?;
-        Ok(Box::new(self.connected_named_result(
-            view,
-            format!("{}_from_edges", self.subgraph_type),
-        )))
+        Ok(Box::new(self.edge_selection(edges)?))
     }
 
     fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
-        if let Some(cached) = self.component_cache_get(ComponentCacheMode::Undirected) {
-            let mut component_subgraphs = Vec::with_capacity(cached.components.len());
-            for (i, component) in cached.components.iter().enumerate() {
-                // Convert Vec to HashSet on demand - cheaper than storing HashSet
-                let nodes_set: HashSet<NodeId> = component.nodes.iter().copied().collect();
-                let edges_set: HashSet<EdgeId> = component.edges.iter().copied().collect();
-                let component_subgraph = Subgraph::new(
-                    self.graph.clone(),
-                    nodes_set,
-                    edges_set,
-                    format!("{}_component_{}", self.subgraph_type, i),
-                );
-                component_subgraphs
-                    .push(Box::new(component_subgraph) as Box<dyn SubgraphOperations>);
-            }
-            return Ok(component_subgraphs);
-        }
-
-        {
-            let graph = self.graph.borrow();
-            self.validate_query_scope(&graph)?;
-        }
-        let nodes = self.ordered_nodes();
-        if nodes.len() >= u32::MAX as usize {
-            return Err(GraphError::InvalidInput(
-                "Components require fewer than u32::MAX nodes".into(),
-            ));
-        }
-        let csr = self.get_or_build_csr_internal(true)?;
-        let mut labels = vec![0; nodes.len()];
-        let count = crate::algorithms::community::components::bfs_components(
-            &csr,
-            &mut labels,
-            &mut crate::algorithms::Context::new(),
-            None,
-        )
-        .map_err(|error| GraphError::InvalidInput(error.to_string()))? as usize;
-        let mut grouped_nodes = vec![Vec::new(); count];
-        let mut grouped_edges = vec![Vec::new(); count];
-        let positions: HashMap<_, _> = nodes
-            .iter()
-            .enumerate()
-            .map(|(index, &node)| (node, index))
-            .collect();
-        for (index, &node) in nodes.iter().enumerate() {
-            grouped_nodes[labels[index] as usize].push(node);
-        }
-        {
-            let graph = self.graph.borrow();
-            for &edge in self.ordered_edges().iter() {
-                let (source, target) = graph.edge_endpoints(edge)?;
-                let group = labels[positions[&source]] as usize;
-                if group == labels[positions[&target]] as usize {
-                    grouped_edges[group].push(edge);
-                }
-            }
-        }
-        let mut component_subgraphs = Vec::with_capacity(count);
-        let mut cache_components = Vec::with_capacity(count);
-        let assignments = nodes
-            .iter()
-            .zip(&labels)
-            .map(|(&node, &label)| (node, i64::from(label)))
-            .collect();
-        for (index, (nodes, edges)) in grouped_nodes.into_iter().zip(grouped_edges).enumerate() {
-            component_subgraphs.push(Box::new(Self::new(
-                self.graph.clone(),
-                nodes.iter().copied().collect(),
-                edges.iter().copied().collect(),
-                format!("{}_component_{index}", self.subgraph_type),
-            )) as Box<dyn SubgraphOperations>);
-            cache_components.push(ComponentCacheComponent {
-                nodes: Arc::new(nodes),
-                edges: Arc::new(edges),
-            });
-        }
-        if !cache_components.is_empty() {
-            self.component_cache_store(
-                ComponentCacheMode::Undirected,
-                Arc::new(assignments),
-                Arc::new(cache_components),
-            );
-        }
-
-        Ok(component_subgraphs)
+        Ok(self
+            .component_selections()?
+            .into_iter()
+            .map(|selection| Box::new(selection) as Box<dyn SubgraphOperations>)
+            .collect())
     }
 
     fn bfs(
@@ -1197,59 +1098,23 @@ impl SubgraphOperations for Subgraph {
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Box<dyn SubgraphOperations>> {
-        let graph = self.graph.borrow();
-        self.validate_query_scope(&graph)?;
-        let (nodes, edges) = crate::query::scoped_traversal::bfs(
-            &crate::query::scoped_traversal::Live::new(&graph, &self.nodes, &self.edges),
-            start,
-            max_depth,
-        )?;
-        Ok(Box::new(Self::new(
-            self.graph.clone(),
-            nodes,
-            edges,
-            format!("{}_bfs_from_{start}", self.subgraph_type),
-        )))
+        Ok(Box::new(self.bfs_selection(start, max_depth)?))
     }
     fn dfs(
         &self,
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Box<dyn SubgraphOperations>> {
-        let graph = self.graph.borrow();
-        self.validate_query_scope(&graph)?;
-        let (nodes, edges) = crate::query::scoped_traversal::dfs(
-            &crate::query::scoped_traversal::Live::new(&graph, &self.nodes, &self.edges),
-            start,
-            max_depth,
-        )?;
-        Ok(Box::new(Self::new(
-            self.graph.clone(),
-            nodes,
-            edges,
-            format!("{}_dfs_from_{start}", self.subgraph_type),
-        )))
+        Ok(Box::new(self.dfs_selection(start, max_depth)?))
     }
     fn shortest_path_subgraph(
         &self,
         source: NodeId,
         target: NodeId,
     ) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
-        let graph = self.graph.borrow();
-        self.validate_query_scope(&graph)?;
-        Ok(crate::query::scoped_traversal::shortest_path(
-            &crate::query::scoped_traversal::Live::new(&graph, &self.nodes, &self.edges),
-            source,
-            target,
-        )?
-        .map(|(nodes, edges)| {
-            Box::new(Self::new(
-                self.graph.clone(),
-                nodes,
-                edges,
-                format!("{}_path_{source}_{target}", self.subgraph_type),
-            )) as Box<dyn SubgraphOperations>
-        }))
+        Ok(self
+            .path_selection(source, target)?
+            .map(|selection| Box::new(selection) as Box<dyn SubgraphOperations>))
     }
 
     /// Create a VizModule for this subgraph to enable visualization
@@ -1327,6 +1192,198 @@ impl SubgraphOperations for Subgraph {
 
         // Get degree from CSR (just neighbor count)
         Ok(csr.neighbors(node_idx).len())
+    }
+}
+
+// Typed results keep metadata adapters from cloning membership through trait objects.
+impl Subgraph {
+    pub(super) fn induced_selection(&self, nodes: &[NodeId]) -> GraphResult<Subgraph> {
+        let graph = self.graph.borrow();
+        self.validate_query_scope(&graph)?;
+        // Connected results need membership, not a frozen copy of owner values.
+        let nodes: HashSet<_> = nodes
+            .iter()
+            .copied()
+            .filter(|node| self.nodes.contains(node))
+            .collect();
+        let mut edges = HashSet::new();
+        for &edge in self.edges.iter() {
+            let (source, target) = graph.edge_endpoints(edge)?;
+            if nodes.contains(&source) && nodes.contains(&target) {
+                edges.insert(edge);
+            }
+        }
+        Ok(Self::new(
+            self.graph.clone(),
+            nodes,
+            edges,
+            format!("{}_induced", self.subgraph_type),
+        ))
+    }
+    pub(super) fn edge_selection(&self, edges: &[EdgeId]) -> GraphResult<Subgraph> {
+        let graph = self.graph.borrow();
+        self.validate_query_scope(&graph)?;
+        let edges: HashSet<_> = edges
+            .iter()
+            .copied()
+            .filter(|edge| self.edges.contains(edge))
+            .collect();
+        let mut nodes = HashSet::new();
+        for &edge in &edges {
+            let (source, target) = graph.edge_endpoints(edge)?;
+            nodes.extend([source, target]);
+        }
+        Ok(Self::new(
+            self.graph.clone(),
+            nodes,
+            edges,
+            format!("{}_from_edges", self.subgraph_type),
+        ))
+    }
+    pub(super) fn component_selections(&self) -> GraphResult<Vec<Subgraph>> {
+        if let Some(cached) = self.component_cache_get(ComponentCacheMode::Undirected) {
+            let mut component_subgraphs = Vec::with_capacity(cached.components.len());
+            for (i, component) in cached.components.iter().enumerate() {
+                // Convert Vec to HashSet on demand - cheaper than storing HashSet
+                let nodes_set: HashSet<NodeId> = component.nodes.iter().copied().collect();
+                let edges_set: HashSet<EdgeId> = component.edges.iter().copied().collect();
+                let component_subgraph = Subgraph::new(
+                    self.graph.clone(),
+                    nodes_set,
+                    edges_set,
+                    format!("{}_component_{}", self.subgraph_type, i),
+                );
+                component_subgraphs.push(component_subgraph);
+            }
+            return Ok(component_subgraphs);
+        }
+
+        {
+            let graph = self.graph.borrow();
+            self.validate_query_scope(&graph)?;
+        }
+        let nodes = self.ordered_nodes();
+        if nodes.len() >= u32::MAX as usize {
+            return Err(GraphError::InvalidInput(
+                "Components require fewer than u32::MAX nodes".into(),
+            ));
+        }
+        let csr = self.get_or_build_csr_internal(true)?;
+        let mut labels = vec![0; nodes.len()];
+        let count = crate::algorithms::community::components::bfs_components(
+            &csr,
+            &mut labels,
+            &mut crate::algorithms::Context::new(),
+            None,
+        )
+        .map_err(|error| GraphError::InvalidInput(error.to_string()))? as usize;
+        let mut grouped_nodes = vec![Vec::new(); count];
+        let mut grouped_edges = vec![Vec::new(); count];
+        let positions: HashMap<_, _> = nodes
+            .iter()
+            .enumerate()
+            .map(|(index, &node)| (node, index))
+            .collect();
+        for (index, &node) in nodes.iter().enumerate() {
+            grouped_nodes[labels[index] as usize].push(node);
+        }
+        {
+            let graph = self.graph.borrow();
+            for &edge in self.ordered_edges().iter() {
+                let (source, target) = graph.edge_endpoints(edge)?;
+                let group = labels[positions[&source]] as usize;
+                if group == labels[positions[&target]] as usize {
+                    grouped_edges[group].push(edge);
+                }
+            }
+        }
+        let mut component_subgraphs = Vec::with_capacity(count);
+        let mut cache_components = Vec::with_capacity(count);
+        let assignments = nodes
+            .iter()
+            .zip(&labels)
+            .map(|(&node, &label)| (node, i64::from(label)))
+            .collect();
+        for (index, (nodes, edges)) in grouped_nodes.into_iter().zip(grouped_edges).enumerate() {
+            component_subgraphs.push(Self::new(
+                self.graph.clone(),
+                nodes.iter().copied().collect(),
+                edges.iter().copied().collect(),
+                format!("{}_component_{index}", self.subgraph_type),
+            ));
+            cache_components.push(ComponentCacheComponent {
+                nodes: Arc::new(nodes),
+                edges: Arc::new(edges),
+            });
+        }
+        if !cache_components.is_empty() {
+            self.component_cache_store(
+                ComponentCacheMode::Undirected,
+                Arc::new(assignments),
+                Arc::new(cache_components),
+            );
+        }
+
+        Ok(component_subgraphs)
+    }
+    pub(super) fn bfs_selection(
+        &self,
+        start: NodeId,
+        max_depth: Option<usize>,
+    ) -> GraphResult<Subgraph> {
+        let graph = self.graph.borrow();
+        self.validate_query_scope(&graph)?;
+        let (nodes, edges) = crate::query::scoped_traversal::bfs(
+            &crate::query::scoped_traversal::Live::new(&graph, &self.nodes, &self.edges),
+            start,
+            max_depth,
+        )?;
+        Ok(Self::new(
+            self.graph.clone(),
+            nodes,
+            edges,
+            format!("{}_bfs_from_{start}", self.subgraph_type),
+        ))
+    }
+    pub(super) fn dfs_selection(
+        &self,
+        start: NodeId,
+        max_depth: Option<usize>,
+    ) -> GraphResult<Subgraph> {
+        let graph = self.graph.borrow();
+        self.validate_query_scope(&graph)?;
+        let (nodes, edges) = crate::query::scoped_traversal::dfs(
+            &crate::query::scoped_traversal::Live::new(&graph, &self.nodes, &self.edges),
+            start,
+            max_depth,
+        )?;
+        Ok(Self::new(
+            self.graph.clone(),
+            nodes,
+            edges,
+            format!("{}_dfs_from_{start}", self.subgraph_type),
+        ))
+    }
+    pub(super) fn path_selection(
+        &self,
+        source: NodeId,
+        target: NodeId,
+    ) -> GraphResult<Option<Subgraph>> {
+        let graph = self.graph.borrow();
+        self.validate_query_scope(&graph)?;
+        Ok(crate::query::scoped_traversal::shortest_path(
+            &crate::query::scoped_traversal::Live::new(&graph, &self.nodes, &self.edges),
+            source,
+            target,
+        )?
+        .map(|(nodes, edges)| {
+            Self::new(
+                self.graph.clone(),
+                nodes,
+                edges,
+                format!("{}_path_{source}_{target}", self.subgraph_type),
+            )
+        }))
     }
 }
 

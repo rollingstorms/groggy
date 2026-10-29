@@ -390,3 +390,7 @@ harness = false
 [[bench]]
 name = "connected_degree_reads"
 harness = false
+
+[[bench]]
+name = "specialized_selection_scope"
+harness = false

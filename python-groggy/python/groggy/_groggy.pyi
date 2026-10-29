@@ -2909,6 +2909,10 @@ class ComponentSubgraph:
     """
     Python wrapper for ComponentSubgraph - Pure delegation to existing traits
     """
+    def pin_view(self) -> GraphView:
+        """Freeze the current selected state independently of later owner changes."""
+        ...
+
     @property
     def component_id(self) -> Any:
         ...
@@ -7565,6 +7569,10 @@ class NeighborhoodSubgraph:
     """
     Python wrapper for NeighborhoodSubgraph
     """
+    def pin_view(self) -> GraphView:
+        """Freeze the current selected state independently of later owner changes."""
+        ...
+
     @property
     def central_nodes(self) -> Any:
         ...
