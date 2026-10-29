@@ -1041,40 +1041,40 @@ impl Subgraph {
 
     // === SUBGRAPH SET OPERATIONS ===
 
-    /// Merge with another subgraph (union operation)
-    /// Returns new subgraph containing all nodes and edges from both subgraphs
+    fn common_views(&self, other: &Subgraph) -> GraphResult<(super::GraphView, super::GraphView)> {
+        if !Rc::ptr_eq(&self.graph, &other.graph) {
+            return Err(GraphError::InvalidInput(
+                "Subgraph algebra requires the same graph owner".into(),
+            ));
+        }
+        let left = self.pin_view()?;
+        let right = super::GraphView::from_membership(
+            left.read_state().clone(),
+            other.nodes.as_ref().clone(),
+            other.edges.as_ref().clone(),
+        )?;
+        Ok((left, right))
+    }
+
+    fn connected_named_result(&self, view: super::GraphView, name: String) -> Self {
+        let (nodes, edges) = view.into_membership();
+        Self::new(self.graph.clone(), nodes, edges, name)
+    }
+
+    /// Exact membership union; reject unrelated graph owners.
     pub fn merge_with(&self, other: &Subgraph) -> GraphResult<Subgraph> {
-        // Union of nodes and edges
-        let mut merged_nodes: HashSet<NodeId> = self.nodes.iter().copied().collect();
-        merged_nodes.extend(other.nodes.iter().copied());
-
-        let mut merged_edges: HashSet<EdgeId> = self.edges.iter().copied().collect();
-        merged_edges.extend(other.edges.iter().copied());
-
-        // Create merged subgraph with union of nodes and edges
-        Ok(Subgraph::new(
-            self.graph.clone(),
-            merged_nodes,
-            merged_edges,
+        let (left, right) = self.common_views(other)?;
+        Ok(self.connected_named_result(
+            left.merge_with(&right)?,
             format!("merge_{}_{}", self.subgraph_type, other.subgraph_type),
         ))
     }
 
-    /// Intersect with another subgraph
-    /// Returns new subgraph containing only nodes and edges present in both subgraphs
+    /// Exact membership intersection; reject unrelated graph owners.
     pub fn intersect_with(&self, other: &Subgraph) -> GraphResult<Subgraph> {
-        // Intersection of nodes
-        let intersected_nodes: HashSet<NodeId> =
-            self.nodes.intersection(&other.nodes).copied().collect();
-
-        // Intersection of edges
-        let intersected_edges: HashSet<EdgeId> =
-            self.edges.intersection(&other.edges).copied().collect();
-
-        Ok(Subgraph::new(
-            self.graph.clone(),
-            intersected_nodes,
-            intersected_edges,
+        let (left, right) = self.common_views(other)?;
+        Ok(self.connected_named_result(
+            left.intersect_with(&right)?,
             format!(
                 "intersection_{}_{}",
                 self.subgraph_type, other.subgraph_type
@@ -1082,211 +1082,67 @@ impl Subgraph {
         ))
     }
 
-    /// Subtract another subgraph from this one (difference operation)
-    /// Returns new subgraph with other's nodes and edges removed
+    /// Remove nodes/edges and prune edges incident to removed nodes.
     pub fn subtract_from(&self, other: &Subgraph) -> GraphResult<Subgraph> {
-        // Remove other's nodes from this subgraph
-        let remaining_nodes: HashSet<NodeId> =
-            self.nodes.difference(&other.nodes).copied().collect();
-
-        // Remove other's edges from this subgraph
-        let remaining_edges: HashSet<EdgeId> =
-            self.edges.difference(&other.edges).copied().collect();
-
-        Ok(Subgraph::new(
-            self.graph.clone(),
-            remaining_nodes,
-            remaining_edges,
+        let (left, right) = self.common_views(other)?;
+        Ok(self.connected_named_result(
+            left.subtract_from(&right)?,
             format!("difference_{}_{}", self.subgraph_type, other.subgraph_type),
         ))
     }
 
-    /// Calculate similarity with another subgraph using specified metric
+    /// Compare node membership only, within the same graph owner.
     pub fn calculate_similarity(
         &self,
         other: &Subgraph,
         metric: SimilarityMetric,
     ) -> GraphResult<f64> {
-        match metric {
-            SimilarityMetric::Jaccard => {
-                // |A ∩ B| / |A ∪ B| for nodes
-                let intersection_size = self.nodes.intersection(&other.nodes).count();
-                let union_size = self.nodes.union(&other.nodes).count();
-
-                if union_size == 0 {
-                    Ok(0.0)
-                } else {
-                    Ok(intersection_size as f64 / union_size as f64)
-                }
-            }
-            SimilarityMetric::Dice => {
-                // 2 * |A ∩ B| / (|A| + |B|) for nodes
-                let intersection_size = self.nodes.intersection(&other.nodes).count();
-                let total_size = self.nodes.len() + other.nodes.len();
-
-                if total_size == 0 {
-                    Ok(0.0)
-                } else {
-                    Ok(2.0 * intersection_size as f64 / total_size as f64)
-                }
-            }
-            SimilarityMetric::Overlap => {
-                // |A ∩ B| / min(|A|, |B|) for nodes
-                let intersection_size = self.nodes.intersection(&other.nodes).count();
-                let min_size = self.nodes.len().min(other.nodes.len());
-
-                if min_size == 0 {
-                    Ok(0.0)
-                } else {
-                    Ok(intersection_size as f64 / min_size as f64)
-                }
-            }
-            SimilarityMetric::Cosine => {
-                // Simplified cosine similarity based on node presence (binary vectors)
-                let intersection_size = self.nodes.intersection(&other.nodes).count();
-                let magnitude_product =
-                    (self.nodes.len() as f64).sqrt() * (other.nodes.len() as f64).sqrt();
-
-                if magnitude_product == 0.0 {
-                    Ok(0.0)
-                } else {
-                    Ok(intersection_size as f64 / magnitude_product)
-                }
-            }
+        if !Rc::ptr_eq(&self.graph, &other.graph) {
+            return Err(GraphError::InvalidInput(
+                "Subgraph similarity requires the same graph owner".into(),
+            ));
         }
+        Ok(super::view_algebra::membership_similarity(
+            self.nodes(),
+            other.nodes(),
+            metric,
+        ))
     }
 
-    /// Find overlapping regions with multiple other subgraphs
-    /// Returns vector of intersection subgraphs with each input subgraph
+    /// Nonempty intersections in caller order.
     pub fn find_overlaps(&self, others: Vec<&Subgraph>) -> GraphResult<Vec<Subgraph>> {
-        let mut overlaps = Vec::new();
-
-        for other in others {
-            let overlap = self.intersect_with(other)?;
-            if !overlap.nodes.is_empty() || !overlap.edges.is_empty() {
-                overlaps.push(overlap);
-            }
-        }
-
-        Ok(overlaps)
+        others
+            .into_iter()
+            .map(|other| self.intersect_with(other))
+            .filter_map(|result| match result {
+                Ok(view) if view.node_count() == 0 => None,
+                other => Some(other),
+            })
+            .collect()
     }
 
-    /// Group nodes by attribute value, returning a vector of subgraphs
-    /// Each subgraph contains nodes with the same attribute value and their induced edges
-    ///
-    /// # Arguments
-    /// * `attr_name` - The node attribute to group by
-    ///
-    /// # Returns
-    /// Vector of subgraphs, one for each unique attribute value
-    ///
-    /// # Example
-    /// ```ignore
-    /// let dept_groups = subgraph.group_by_nodes("department")?;
-    /// // Returns subgraphs for each department
-    /// ```ignore
-    pub fn group_by_nodes(&self, attr_name: &AttrName) -> GraphResult<Vec<Subgraph>> {
-        use std::collections::HashMap;
-
-        let graph = self.graph.borrow();
-        let mut groups: HashMap<AttrValue, HashSet<NodeId>> = HashMap::new();
-
-        // Group nodes by attribute value
-        for &node_id in self.nodes.iter() {
-            if let Some(attr_value) = graph.get_node_attr(node_id, attr_name)? {
-                groups.entry(attr_value).or_default().insert(node_id);
-            }
-            // Skip nodes without the attribute
-        }
-
-        // Create subgraphs for each group - sort by attribute value for deterministic order
-        let mut result_subgraphs = Vec::new();
-        let mut sorted_groups: Vec<_> = groups.into_iter().collect();
-        sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-        for (attr_value, node_group) in sorted_groups {
-            if !node_group.is_empty() {
-                // Find induced edges for this group of nodes
-                let mut induced_edges = HashSet::new();
-                for &edge_id in self.edges.iter() {
-                    if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                        if node_group.contains(&source) && node_group.contains(&target) {
-                            induced_edges.insert(edge_id);
-                        }
-                    }
-                }
-
-                // Create subgraph with descriptive name
-                let subgraph_name = format!("{}_group_{:?}", attr_name, attr_value);
-                let subgraph =
-                    Subgraph::new(self.graph.clone(), node_group, induced_edges, subgraph_name);
-                result_subgraphs.push(subgraph);
-            }
-        }
-
-        Ok(result_subgraphs)
+    /// Group present node values with the canonical immutable grouping kernel.
+    pub fn group_by_nodes(&self, attr: &AttrName) -> GraphResult<Vec<Subgraph>> {
+        Ok(self
+            .pin_view()?
+            .grouped_nodes(attr)?
+            .into_iter()
+            .map(|(value, view)| {
+                self.connected_named_result(view, format!("{attr}_group_{value:?}"))
+            })
+            .collect())
     }
 
-    /// Group edges by attribute value, returning a vector of subgraphs
-    /// Each subgraph contains edges with the same attribute value and their connected nodes
-    ///
-    /// # Arguments
-    /// * `attr_name` - The edge attribute to group by
-    ///
-    /// # Returns
-    /// Vector of subgraphs, one for each unique attribute value
-    ///
-    /// # Example
-    /// ```ignore
-    /// let type_groups = subgraph.group_by_edges("interaction_type")?;
-    /// // Returns subgraphs for each interaction type
-    /// ```ignore
-    pub fn group_by_edges(&self, attr_name: &AttrName) -> GraphResult<Vec<Subgraph>> {
-        use std::collections::HashMap;
-
-        let graph = self.graph.borrow();
-        let mut groups: HashMap<AttrValue, HashSet<EdgeId>> = HashMap::new();
-
-        // Group edges by attribute value
-        for &edge_id in self.edges.iter() {
-            if let Some(attr_value) = graph.get_edge_attr(edge_id, attr_name)? {
-                groups.entry(attr_value).or_default().insert(edge_id);
-            }
-            // Skip edges without the attribute
-        }
-
-        // Create subgraphs for each group - sort by attribute value for deterministic order
-        let mut result_subgraphs = Vec::new();
-        let mut sorted_groups: Vec<_> = groups.into_iter().collect();
-        sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-        for (attr_value, edge_group) in sorted_groups {
-            if !edge_group.is_empty() {
-                // Find connected nodes for this group of edges
-                let mut connected_nodes = HashSet::new();
-                for &edge_id in &edge_group {
-                    if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                        connected_nodes.insert(source);
-                        connected_nodes.insert(target);
-                    }
-                }
-
-                // Only include nodes that are in the original subgraph
-                connected_nodes.retain(|node_id| self.nodes.contains(node_id));
-
-                // Create subgraph with descriptive name
-                let subgraph_name = format!("{}_edge_group_{:?}", attr_name, attr_value);
-                let subgraph = Subgraph::new(
-                    self.graph.clone(),
-                    connected_nodes,
-                    edge_group,
-                    subgraph_name,
-                );
-                result_subgraphs.push(subgraph);
-            }
-        }
-
-        Ok(result_subgraphs)
+    /// Group present edge values, preserving exact selected instances.
+    pub fn group_by_edges(&self, attr: &AttrName) -> GraphResult<Vec<Subgraph>> {
+        Ok(self
+            .pin_view()?
+            .grouped_edges(attr)?
+            .into_iter()
+            .map(|(value, view)| {
+                self.connected_named_result(view, format!("{attr}_edge_group_{value:?}"))
+            })
+            .collect())
     }
 }
 

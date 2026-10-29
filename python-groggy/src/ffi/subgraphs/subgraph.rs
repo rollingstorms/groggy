@@ -1369,23 +1369,17 @@ impl PySubgraph {
         }
     }
 
-    /// Set operations - merge, intersect, subtract (placeholders)
-    fn merge_with(&self, _py: Python, _other: &PySubgraph) -> PyResult<PySubgraph> {
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "Subgraph set operations not yet implemented - requires subgraph algebra in core",
-        ))
+    /// Exact membership algebra over a common live owner.
+    fn merge_with(&self, _py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
+        self.inner.merge_with(&other.inner).map(|inner| PySubgraph { inner }).map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
-    fn intersect_with(&self, _py: Python, _other: &PySubgraph) -> PyResult<PySubgraph> {
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "Subgraph set operations not yet implemented - requires subgraph algebra in core",
-        ))
+    fn intersect_with(&self, _py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
+        self.inner.intersect_with(&other.inner).map(|inner| PySubgraph { inner }).map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
-    fn subtract_from(&self, _py: Python, _other: &PySubgraph) -> PyResult<PySubgraph> {
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "Subgraph set operations not yet implemented - requires subgraph algebra in core",
-        ))
+    fn subtract_from(&self, _py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
+        self.inner.subtract_from(&other.inner).map(|inner| PySubgraph { inner }).map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
     /// Enhanced collapse supporting three syntax forms for flexible aggregation

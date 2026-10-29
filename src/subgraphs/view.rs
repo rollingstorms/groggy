@@ -55,6 +55,22 @@ impl GraphView {
             membership: Membership::Selected(Arc::new(Selection { nodes, edges })),
         })
     }
+    /// Consume selected membership when adapting to the legacy connected representation.
+    pub(crate) fn into_membership(self) -> (HashSet<NodeId>, HashSet<EdgeId>) {
+        match self.membership {
+            Membership::Full => (
+                self.state.existence().nodes().clone(),
+                self.state.existence().edges().clone(),
+            ),
+            Membership::Selected(selection) => {
+                let selection = Arc::try_unwrap(selection).unwrap_or_else(|shared| Selection {
+                    nodes: shared.nodes.clone(),
+                    edges: shared.edges.clone(),
+                });
+                (selection.nodes, selection.edges)
+            }
+        }
+    }
     /// Read a meta-node's immutable source group, independent of current liveness.
     pub fn meta_subgraph(&self, node: NodeId) -> GraphResult<Self> {
         match self.node_attr(node, &"contains_subgraph".into())? {

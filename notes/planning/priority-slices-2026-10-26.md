@@ -1070,3 +1070,27 @@ No new checklist rows or broad parent closure: **211 checked / 57 unchecked**.
 Connected default ownership/accessors (26.1/AR4), legacy filter result migration
 (21.2) and compound topology/custom effects (09.4b.2) remain priority work.
 Hierarchical Infomap and broad algorithm certification retain their existing scope.
+
+## Captured membership algebra and grouping — 2026-10-29
+
+Completed the next 26.1/AR7.5 read dependency: exact GraphView membership algebra,
+node-set similarity, native overlap intersections and typed node/edge grouping.
+Connected adapters reuse the same kernel and preserve their connected return type
+and descriptive metadata. Fixed native dangling-edge subtraction and cross-owner
+ID mixing, and exposed Python's three former set-operation placeholders.
+`captured-view-algebra-2026-10-29.md` records semantics, tests, release preparation
+costs and the fixed remaining ownership boundary.
+
+Gates: **1,454 native / 54 ignored**, strict all-target core Clippy,
+**2,405 root Python / 1 skipped**, **231 executable documentation examples**,
+rebuilt and atomically staged full-ABI extension. The two fewer ignored examples
+are old group-by documentation snippets replaced by the executable captured guide;
+no running regression was removed. Six release fixtures report capture separately
+from grouping/algebra; no universal speedup or memory claim. Three unrelated FFI
+warnings remain. Stubs, scoped formatting, Python syntax and diff checks pass.
+
+Inventory remains **211 checked / 57 unchecked**; no new rows or parent closure.
+Next functional component: scope-correct captured/connected traversal trees and
+hop paths. Connected BFS/DFS/shortest-path currently traverse the full owner before
+filtering, which can leak routes through excluded intermediates. This belongs to
+the existing selected ownership/algorithm contracts, not a new audit workstream.

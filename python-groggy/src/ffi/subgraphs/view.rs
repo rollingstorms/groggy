@@ -217,6 +217,38 @@ impl PyGraphView {
             .map(|inner| Self { inner })
             .map_err(graph_error_to_py_err)
     }
+    /// Exact selection union; both views must derive from the same capture.
+    fn merge_with(&self, py: Python<'_>, other: &Self) -> PyResult<Self> {
+        py.allow_threads(|| self.inner.merge_with(&other.inner))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    fn intersect_with(&self, py: Python<'_>, other: &Self) -> PyResult<Self> {
+        py.allow_threads(|| self.inner.intersect_with(&other.inner))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    fn subtract_from(&self, py: Python<'_>, other: &Self) -> PyResult<Self> {
+        py.allow_threads(|| self.inner.subtract_from(&other.inner))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
+    #[pyo3(signature=(other, metric="jaccard"))]
+    fn calculate_similarity(&self, py: Python<'_>, other: &Self, metric: &str) -> PyResult<f64> {
+        let metric = metric.parse().map_err(graph_error_to_py_err)?;
+        py.allow_threads(|| self.inner.calculate_similarity(&other.inner, metric))
+            .map_err(graph_error_to_py_err)
+    }
+    fn group_by_nodes(&self, py: Python<'_>, attr_name: String) -> PyResult<Vec<Self>> {
+        py.allow_threads(|| self.inner.group_by_nodes(&attr_name))
+            .map(|views| views.into_iter().map(|inner| Self { inner }).collect())
+            .map_err(graph_error_to_py_err)
+    }
+    fn group_by_edges(&self, py: Python<'_>, attr_name: String) -> PyResult<Vec<Self>> {
+        py.allow_threads(|| self.inner.group_by_edges(&attr_name))
+            .map(|views| views.into_iter().map(|inner| Self { inner }).collect())
+            .map_err(graph_error_to_py_err)
+    }
     /// Captured Brandes node betweenness as owned f64 rows.
     #[pyo3(signature = (normalized=true, weight_attr=None))]
     fn betweenness(

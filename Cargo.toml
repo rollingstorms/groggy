@@ -366,3 +366,7 @@ harness = false
 [[bench]]
 name = "captured_communities"
 harness = false
+
+[[bench]]
+name = "captured_view_algebra"
+harness = false

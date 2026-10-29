@@ -9595,7 +9595,7 @@ class Subgraph:
         """
         ...
 
-    def intersect_with(self, *args, **kwargs) -> Any:
+    def intersect_with(self, other: Subgraph) -> Subgraph:
         ...
 
     def is_connected(self, *args, **kwargs) -> Any:
@@ -9610,7 +9610,7 @@ class Subgraph:
         """
         ...
 
-    def merge_with(self, *args, **kwargs) -> Any:
+    def merge_with(self, other: Subgraph) -> Subgraph:
         """
         Set operations - merge, intersect, subtract (placeholders)
         """
@@ -9711,7 +9711,7 @@ class Subgraph:
         """
         ...
 
-    def subtract_from(self, *args, **kwargs) -> Any:
+    def subtract_from(self, other: Subgraph) -> Subgraph:
         ...
 
     def summary(self, *args, **kwargs) -> Any:
@@ -10950,6 +10950,19 @@ class GraphView:
     def label_propagation(self, *, max_iter: Optional[int] = None, tolerance: float = 0.0, seed_attr: Optional[str] = None, seed: Optional[int] = None) -> List[Tuple[int, Any]]:
         """Owned arbitrary-valued labels from captured seed values; default 20 iterations."""
         ...
+
+    def merge_with(self, other: GraphView) -> GraphView:
+        """Exact membership union within one capture; does not induce extra edges."""
+        ...
+
+    def intersect_with(self, other: GraphView) -> GraphView: ...
+    def subtract_from(self, other: GraphView) -> GraphView:
+        """Remove the other's nodes/edges, pruning edges incident to removed nodes."""
+        ...
+
+    def calculate_similarity(self, other: GraphView, metric: str = "jaccard") -> float: ...
+    def group_by_nodes(self, attr_name: str) -> List[GraphView]: ...
+    def group_by_edges(self, attr_name: str) -> List[GraphView]: ...
 
     def connected_components(self, *args, **kwargs) -> List[GraphView]:
         """

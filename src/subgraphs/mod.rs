@@ -16,6 +16,7 @@ pub mod neighborhood;
 pub mod subgraph;
 pub mod visualization;
 pub mod view;
+mod view_algebra;
 
 pub use component::*;
 pub use composer::*;

@@ -412,3 +412,8 @@ The legacy nonpersistent wrapper now exposes its computed rows through
 algorithms. They return owned rows without publishing properties. See
 [captured communities](api/captured-community.md) for controls, frozen seed/weight
 semantics, cancellation, preparation costs and the remaining connected migration.
+
+Captured selections also support exact membership union/intersection/difference,
+node-membership similarity and typed node/edge grouping. See
+[captured view algebra](api/captured-view-algebra.md) for common-capture rules,
+endpoint closure and connected compatibility behavior.
