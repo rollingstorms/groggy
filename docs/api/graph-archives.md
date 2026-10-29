@@ -132,3 +132,17 @@ preserved; exact payload comparison distinguishes signed zero, NaN payload bits
 and other hash collisions. Archives without this feature retain their earlier
 required document version. Previously discarded payload bits cannot be recovered
 from old data that no longer contains them.
+
+## Preparation memory and validation
+
+Archives are explicit full retained exports. Preparation validates selected state
+against history, freezes the retained document and encodes a single framed byte
+buffer. The detached document is released before the encoded bytes undergo the
+existing full decode/restore validation. File publication starts only after that
+validation succeeds; length/checksum, format versions, raw referents and retained
+state checks remain in force. Prepared bytes remain independently owned.
+
+This avoids a second full payload buffer and overlapping document lifetime during
+round-trip validation. It is still a buffered operation with complete retained
+reconstruction, so large graphs can require substantial memory and time. Journal
+checkpoint fragments and scheduling have their separate documented contracts.

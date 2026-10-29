@@ -26,7 +26,7 @@ Raw evidence: `notes/benchmarks/core-workflow-scale-2026-10-28.json`.
 
 | Nodes / edges | Bulk accept | Cold capture | Index build | Indexed 10-row page | 3-hop neighborhood | Effective read | Archive save / recovery | Peak RSS |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1,000 / 1,000 | 4.278 ms | 0.792 ms | 0.191 ms | 1.513 µs | 2.323 µs | 2.171 ms | 26.194 / 5.865 ms | 20.766 MiB |
+| 1,000 / 1,000 | 4.278 ms | 0.792 ms | 0.187 ms | 1.513 µs | 2.323 µs | 2.171 ms | 26.190 / 5.865 ms | 20.766 MiB |
 | 100,000 / 100,000 | 0.600 s | 0.143 s | 0.051 s | 10.117 µs | 2.092 µs | 0.291 s | 1.336 / 0.831 s | 1,203.469 MiB |
 | 1,000,000 / 1,000,000 | 8.257 s | 2.240 s | 0.751 s | 75.618 µs | 1.951 µs | 5.908 s | 26.669 / 14.599 s | 4,076.422 MiB |
 

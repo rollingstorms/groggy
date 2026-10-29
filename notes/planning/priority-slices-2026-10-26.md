@@ -1001,3 +1001,22 @@ low-degree fixtures do not establish production budgets.
 validation allocation lifetime; preserve full recovery and corruption validation.
 The new release benchmark passes all three sizes and strict all-target Clippy;
 the unchanged core retains the preceding full native/Python/docs gates.
+
+
+## Archive preparation allocation lifetime — 2026-10-28
+
+Completed the measured 10.4/32.2 encoding component: one framed byte vector,
+detached document released before complete round-trip validation, and prepared
+buffer growth slack released. Format/header/checksum, full corruption validation
+and synced no-clobber publication remain unchanged.
+`single-buffer-archives-2026-10-28.md` records matched complete workflow receipts:
+100k save 1.525 → 1.365 s with process peak 1,181.969 → 871.469 MiB; million save
+24.731 → 20.674 s, but whole-process peak 4,062.031 → 4,282.734 MiB in one pair.
+No million-scale peak-memory improvement is claimed; reconstruct/recover memory
+needs stage-specific measurement and stays open.
+
+Gates: **1,442 native / 56 ignored**, strict all-target Clippy, **2,314 root Python
+/ 1 skipped**, **227 docs**, rebuilt/staged full-ABI extension. No new rows or
+parent closure: **211 checked / 57 unchecked**. A measured next retrieval component
+is paging directly from existing presence/equality postings instead of cloning
+all matching IDs for a small ID-ordered page.

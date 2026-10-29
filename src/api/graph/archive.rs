@@ -258,14 +258,21 @@ impl Graph {
         let document = self.archive_document()?;
         // Validate all retained backing data before any destination is created.
         // Explicit archives are a full-copy operation, never part of ordinary writes.
-        let mut payload = Vec::new();
-        ciborium::ser::into_writer(&document, &mut payload).map_err(invalid)?;
-        let mut bytes = Vec::with_capacity(HEADER + payload.len());
-        bytes.extend_from_slice(MAGIC);
-        bytes.extend_from_slice(&(payload.len() as u64).to_le_bytes());
-        bytes.extend_from_slice(&(!(payload.len() as u64)).to_le_bytes());
-        bytes.extend_from_slice(&xxhash_rust::xxh3::xxh3_64(&payload).to_le_bytes());
-        bytes.extend_from_slice(&payload);
+        // Serialize after the reserved header so framing never duplicates the
+        // complete payload. Release the detached document before full decode/
+        // restore validation; it is no longer needed once its bytes are frozen.
+        let mut bytes = vec![0; HEADER];
+        ciborium::ser::into_writer(&document, &mut bytes).map_err(invalid)?;
+        drop(document);
+        // Prepared archives may outlive the graph; do not retain the encoder's
+        // geometric growth slack in their owned byte buffer.
+        bytes.shrink_to_fit();
+        let length = (bytes.len() - HEADER) as u64;
+        let checksum = xxhash_rust::xxh3::xxh3_64(&bytes[HEADER..]);
+        bytes[..8].copy_from_slice(MAGIC);
+        bytes[8..16].copy_from_slice(&length.to_le_bytes());
+        bytes[16..24].copy_from_slice(&(!length).to_le_bytes());
+        bytes[24..32].copy_from_slice(&checksum.to_le_bytes());
         // Ensures a malformed native raw escape cannot create an unreadable archive.
         Self::from_archive_bytes(&bytes)?;
         Ok(bytes)
