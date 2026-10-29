@@ -123,6 +123,15 @@ impl PyGraphView {
             inner: self.inner.edge_accessor(),
         }
     }
+    /// Frozen node column aligned with node_ids; absent cells project to Null.
+    fn __getitem__(&self, py: Python<'_>, name: &str) -> crate::ffi::storage::array::PyBaseArray {
+        crate::ffi::storage::array::PyBaseArray {
+            inner: py.allow_threads(|| self.inner.node_accessor().column(&name.to_owned())),
+        }
+    }
+    /// Read-only captured entity adapters, sharing this selection and source pin.
+    fn to_nodes(&self) -> super::view_entities::PyGraphViewEntities { self.nodes() }
+    fn to_edges(&self) -> super::view_entities::PyGraphViewEntities { self.edges() }
     #[getter]
     fn node_ids(&self, py: Python) -> Vec<NodeId> {
         py.allow_threads(|| self.inner.node_ids())

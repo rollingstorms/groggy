@@ -1,0 +1,78 @@
+{
+  "baseline_commit": "687e4007",
+  "method": "quiet before/after release-extension runs, seven samples per size; not alternating build pairs; homogeneous values keep pre-fix HashSet ordering irrelevant to validation; BaseArray construction included; setup/warmup/to_list excluded; no universal speedup or memory claim",
+  "summary": [
+    {
+      "nodes": 1000,
+      "before_median_ms": 0.10325,
+      "after_median_ms": 0.11275
+    },
+    {
+      "nodes": 100000,
+      "before_median_ms": 32.797667,
+      "after_median_ms": 23.701542
+    }
+  ],
+  "before": {
+    "fixture": "release extension; homogeneous exact f64 score column; connected selection; seven Python bound method calls; setup, initial warmup and to_list validation excluded; output BaseArray construction included",
+    "cases": [
+      {
+        "nodes": 1000,
+        "nanoseconds": [
+          105833,
+          103250,
+          110625,
+          102208,
+          108750,
+          99375,
+          99167
+        ],
+        "median_nanoseconds": 103250
+      },
+      {
+        "nodes": 100000,
+        "nanoseconds": [
+          32672250,
+          32643583,
+          34400167,
+          34060000,
+          32085500,
+          32797667,
+          33212375
+        ],
+        "median_nanoseconds": 32797667
+      }
+    ]
+  },
+  "after": {
+    "fixture": "release extension; homogeneous exact f64 score column; connected selection; seven Python bound method calls; setup, initial warmup and to_list validation excluded; output BaseArray construction included",
+    "cases": [
+      {
+        "nodes": 1000,
+        "nanoseconds": [
+          112375,
+          114333,
+          112208,
+          111667,
+          115500,
+          112750,
+          114209
+        ],
+        "median_nanoseconds": 112750
+      },
+      {
+        "nodes": 100000,
+        "nanoseconds": [
+          22719208,
+          24032292,
+          22307042,
+          23701542,
+          23488792,
+          23838959,
+          24177292
+        ],
+        "median_nanoseconds": 23701542
+      }
+    ]
+  }
+}

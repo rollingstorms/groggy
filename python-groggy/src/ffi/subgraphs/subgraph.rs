@@ -210,7 +210,7 @@ impl PySubgraph {
     /// Get nodes as a property that supports indexing and attribute access
     #[getter]
     fn nodes(&self, py: Python) -> PyResult<Py<PyNodesAccessor>> {
-        let node_collection = self.inner.node_set().iter().copied().collect();
+        let node_collection = self.inner.node_ids();
 
         Py::new(
             py,
@@ -224,7 +224,7 @@ impl PySubgraph {
     /// Get edges as a property that supports indexing and attribute access
     #[getter]
     fn edges(&self, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
-        let edge_collection = self.inner.edge_set().iter().copied().collect();
+        let edge_collection = self.inner.edge_ids();
 
         Py::new(
             py,
@@ -279,7 +279,7 @@ impl PySubgraph {
     /// Get node IDs as PyIntArray
     #[getter]
     fn node_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
-        let node_ids: Vec<usize> = self.inner.node_set().iter().copied().collect();
+        let node_ids = self.inner.node_ids();
         let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids)?;
         Py::new(py, py_int_array)
     }
@@ -287,7 +287,7 @@ impl PySubgraph {
     /// Get edge IDs as PyIntArray
     #[getter]
     fn edge_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
-        let edge_ids: Vec<usize> = self.inner.edge_set().iter().copied().collect();
+        let edge_ids = self.inner.edge_ids();
         let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids)?;
         Py::new(py, py_int_array)
     }
@@ -636,38 +636,12 @@ impl PySubgraph {
             })
     }
 
-    /// Support attribute access via indexing: subgraph['attr_name'] -> BaseArray
-    fn __getitem__(&self, key: &PyAny, py: Python) -> PyResult<PyObject> {
-        // Only support string keys (attribute names) for now
-        if let Ok(attr_name) = key.extract::<String>() {
-            // Return BaseArray of attribute values for all nodes in the subgraph
-            let graph_ref = self.inner.graph();
-            let mut attr_values = Vec::new();
-
-            for &node_id in self.inner.node_set() {
-                let graph = graph_ref.borrow();
-                match graph.get_node_attr(node_id, &attr_name) {
-                    Ok(Some(attr_value)) => {
-                        attr_values.push(attr_value);
-                    }
-                    Ok(None) | Err(_) => {
-                        // Use null for missing attributes
-                        attr_values.push(AttrValue::Null);
-                    }
-                }
-            }
-
-            let py_base_array = PyBaseArray {
-                inner: BaseArray::new(attr_values),
-            };
-            return Ok(Py::new(py, py_base_array)?.to_object(py));
-        }
-
-        // For now, only support string attribute access
-        Err(PyTypeError::new_err(
-            "Subgraph indexing only supports string attribute names. \
-             Example: subgraph['community']",
-        ))
+    /// Attribute values aligned with ascending selected node IDs. Missing values
+    /// project to Null; invalid live IDs and corrupt columns remain errors.
+    fn __getitem__(&self, key: &str) -> PyResult<PyBaseArray> {
+        let values = self.inner.get_node_attribute_column(&key.to_owned())
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(PyBaseArray { inner: BaseArray::new(values) })
     }
 
     /// Compute neighborhoods from this subgraph and return them as a SubgraphArray
@@ -1270,7 +1244,7 @@ impl PySubgraph {
     /// Get nodes from this subgraph as a NodesAccessor
     /// Enables chaining like: subgraph.to_nodes().table().stats()
     pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
-        let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
+        let node_ids = self.inner.node_ids();
 
         // Create a NodesAccessor using the same pattern as the getter method
         Ok(crate::ffi::storage::accessors::PyNodesAccessor {
@@ -1282,7 +1256,7 @@ impl PySubgraph {
     /// Get edges from this subgraph as an EdgesAccessor  
     /// Enables chaining like: subgraph.to_edges().to_nodes().connected_components()
     pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
-        let edge_ids: Vec<groggy::types::EdgeId> = self.inner.edge_set().iter().copied().collect();
+        let edge_ids = self.inner.edge_ids();
 
         // Create an EdgesAccessor using the struct syntax
         Ok(crate::ffi::storage::accessors::PyEdgesAccessor {

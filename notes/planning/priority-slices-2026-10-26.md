@@ -1429,3 +1429,21 @@ latency/RSS claim. Gates: **1,498 native / 54 ignored**, strict all-target Clipp
 scoped format/syntax/diff checks. Three existing FFI warnings remain. Pending next-
 slice column-indexing tests and owner benchmark work excluded from this slice gate.
 No rows added or broad parents closed: **211 checked / 57 open**.
+
+
+### Whole-selection Python column facade — 2026-10-29
+
+Completed another existing 26.1/AR4/AR7.5 component. Subgraph["property"] now uses
+the checked native bulk reader rather than a per-row FFI scalar loop that hid
+errors as nulls. Selected node/edge properties and adapters share ascending IDs;
+GraphView indexing and to_nodes/to_edges reuse frozen readonly accessors. Three
+pre-fix cases reproduced the old boundary; eight final cases cover row/absence/
+error/type/lifetime behavior. Broader live defaults/effectful facades remain open.
+
+Receipt: `view-column-indexing-2026-10-29.md`. Release before/after medians are
+**0.103→0.113 ms at 1k**, **32.798→23.702 ms at 100k** for complete f64 columns;
+separate nonalternating local builds, no universal performance/RSS claim.
+Gates: **2,545 root Python / 1 skipped**, **247 docs**, rebuilt/staged extension,
+syntax/diff checks. Native core unchanged from **1,498 / 54 ignored** full suite
+and strict all-target Clippy. Three existing unrelated FFI warnings remain;
+owner benchmark/review work untouched. **211 checked / 57 open**, no rows added.
