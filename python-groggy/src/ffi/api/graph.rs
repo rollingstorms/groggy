@@ -2649,8 +2649,13 @@ impl PyGraph {
     }
 
     /// Sample k random nodes from the graph.
-    pub fn sample(slf: PyRef<Self>, py: Python, k: usize) -> PyResult<PySubgraph> {
-        Self::with_full_view(slf, py, |subgraph, _py| subgraph.sample_k(k))
+    #[pyo3(signature=(k, *, seed=None))]
+    pub fn sample(slf: PyRef<Self>, py: Python, k: &PyAny, seed: Option<&PyAny>) -> PyResult<PySubgraph> {
+        let seed = crate::ffi::utils::optional_seed(seed)?;
+        let k = crate::ffi::utils::sample_count(k)?;
+        Self::with_full_view(slf, py, |subgraph, _py| {
+            PySubgraph::from_core_subgraph(subgraph.inner.sample(k, seed).map_err(graph_error_to_py_err)?)
+        })
     }
 
     /// Create induced subgraph from list of nodes.

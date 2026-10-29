@@ -5199,7 +5199,7 @@ class Graph:
         """
         ...
 
-    def sample(self, *args, **kwargs) -> Any:
+    def sample(self, k: int, *, seed: Optional[int] = None) -> Subgraph:
         """
         Sample k random nodes from the graph.
         """
@@ -9686,7 +9686,7 @@ class Subgraph:
         """
         ...
 
-    def sample(self, *args, **kwargs) -> Any:
+    def sample(self, sampler_or_k: Any, *, seed: Optional[int] = None) -> Union[Subgraph, SubgraphArray]:
         """
         Sample using either a sampler pipeline or a simple k value.
         """
@@ -10885,6 +10885,10 @@ class GraphView:
     def nodes(self) -> GraphViewEntities: ...
     @property
     def edges(self) -> GraphViewEntities: ...
+
+    def sample(self, k: int, *, seed: Optional[int] = None) -> GraphView:
+        """Uniformly sample up to k nodes and induce selected edges; share frozen state."""
+        ...
 
     def query_nodes(self, filter: Union[NodeFilter, str], *, order_by: Optional[str] = None, descending: bool = False, offset: Optional[int] = None, limit: Optional[int] = None) -> List[int]: ...
     def query_edges(self, filter: Union[EdgeFilter, str], *, order_by: Optional[str] = None, descending: bool = False, offset: Optional[int] = None, limit: Optional[int] = None) -> List[int]: ...

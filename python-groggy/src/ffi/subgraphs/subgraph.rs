@@ -722,18 +722,24 @@ impl PySubgraph {
     }
 
     /// Sample using either a sampler pipeline or a simple k value.
-    #[pyo3(signature = (sampler_or_k))]
-    pub fn sample(&self, py: Python, sampler_or_k: &PyAny) -> PyResult<PyObject> {
-        if let Ok(k) = sampler_or_k.extract::<usize>() {
-            return Ok(self.sample_k(k)?.into_py(py));
+    #[pyo3(signature = (sampler_or_k, *, seed=None))]
+    pub fn sample(&self, py: Python, sampler_or_k: &PyAny, seed: Option<&PyAny>) -> PyResult<PyObject> {
+        let seed = crate::ffi::utils::optional_seed(seed)?;
+        if let Ok(k) = crate::ffi::utils::sample_count(sampler_or_k) {
+            return Ok(PySubgraph::from_core_subgraph(
+                self.inner.sample(k, seed).map_err(crate::ffi::utils::graph_error_to_py_err)?
+            )?.into_py(py));
         }
 
+        if seed.is_some() {
+            return Err(PyTypeError::new_err("seed is only supported for integer sampling; set sampler seeds in its specification"));
+        }
         if sampler_or_k.hasattr("to_spec")? {
             let spec_any = sampler_or_k.call_method0("to_spec")?;
             let handle = py_build_sample_pipeline(py, spec_any)?;
-            let result = py_run_sample_pipeline(py, &handle, self)?;
+            let result = py_run_sample_pipeline(py, &handle, self);
             py_drop_sample_pipeline(&handle);
-            return Ok(result.into_py(py));
+            return Ok(result?.into_py(py));
         }
 
         Err(PyTypeError::new_err(
@@ -742,14 +748,9 @@ impl PySubgraph {
     }
 
     pub(crate) fn sample_k(&self, k: usize) -> PyResult<PySubgraph> {
-        let node_ids: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
-
-        if k >= node_ids.len() {
-            return PySubgraph::from_core_subgraph(self.inner.clone());
-        }
-
-        let _sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
-        PySubgraph::from_core_subgraph(self.inner.clone())
+        PySubgraph::from_core_subgraph(
+            self.inner.sample(k, None).map_err(crate::ffi::utils::graph_error_to_py_err)?
+        )
     }
 
     // === String representations ===

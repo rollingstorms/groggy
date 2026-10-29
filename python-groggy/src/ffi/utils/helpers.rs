@@ -299,3 +299,26 @@ pub fn graph_error_to_py_err(error: GraphError) -> PyErr {
         _ => PyErr::new::<PyRuntimeError, _>(format!("Graph error: {}", error)),
     }
 }
+
+/// Translate an optional unsigned seed, rejecting booleans.
+pub(crate) fn optional_seed(value: Option<&PyAny>) -> PyResult<Option<u64>> {
+    value
+        .map(|v| {
+            if v.is_instance_of::<pyo3::types::PyBool>() {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "seed must be an unsigned integer",
+                ));
+            }
+            v.extract::<u64>()
+        })
+        .transpose()
+}
+
+
+/// Translate a node-sampling count without accepting Python booleans.
+pub(crate) fn sample_count(value: &PyAny) -> PyResult<usize> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err("sample count must be a nonnegative integer"));
+    }
+    value.extract::<usize>()
+}

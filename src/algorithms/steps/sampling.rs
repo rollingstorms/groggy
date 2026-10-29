@@ -93,24 +93,9 @@ fn sample_mask(
     count: usize,
     seed: Option<u64>,
 ) -> Result<HashMap<usize, AlgorithmParamValue>> {
-    check_cancelled(ctx)?;
-    let count = count.min(ids.len());
-    let mut rng = seed.map(fastrand::Rng::with_seed).unwrap_or_default();
-    let mut reservoir = Vec::new();
-    reservoir.try_reserve_exact(count)?;
-    if count != 0 {
-        for (index, &id) in ids.iter().enumerate() {
-            check_cancelled(ctx)?;
-            if index < count {
-                reservoir.push(id);
-            } else {
-                let replacement = rng.usize(0..=index);
-                if replacement < count {
-                    reservoir[replacement] = id;
-                }
-            }
-        }
-    }
+    let reservoir = crate::subgraphs::sampling::sample_ids(ids, count, seed, || {
+        check_cancelled(ctx).map_err(|error| crate::GraphError::InvalidInput(error.to_string()))
+    })?;
     let mut result = HashMap::new();
     result.try_reserve(reservoir.len())?;
     for id in reservoir {

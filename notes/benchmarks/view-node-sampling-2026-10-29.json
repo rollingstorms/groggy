@@ -1,0 +1,895 @@
+{
+  "method": "three alternating local standalone release process pairs; 15 samples per case/variant; before is the correct reservoir implementation before only the zero-size shortcuts, not the former incorrect full-input clone; setup, initial validation and immutable capture excluded from sampling timings; no Python, production RSS or universal latency claim",
+  "summary": [
+    {
+      "nodes": 1000,
+      "requested": "0",
+      "sampled_nodes": 0,
+      "sampled_edges": 0,
+      "before_warm_connected_seconds_median": 1.4209e-05,
+      "before_captured_seconds_median": 6.708e-06,
+      "after_warm_connected_seconds_median": 2.08e-07,
+      "after_captured_seconds_median": 4.2e-08
+    },
+    {
+      "nodes": 1000,
+      "requested": "16",
+      "sampled_nodes": 16,
+      "sampled_edges": 1,
+      "before_warm_connected_seconds_median": 2.9e-05,
+      "before_captured_seconds_median": 1.2208e-05,
+      "after_warm_connected_seconds_median": 3.1125e-05,
+      "after_captured_seconds_median": 1.325e-05
+    },
+    {
+      "nodes": 1000,
+      "requested": "18446744073709551615",
+      "sampled_nodes": 1000,
+      "sampled_edges": 999,
+      "before_warm_connected_seconds_median": 4.2e-08,
+      "before_captured_seconds_median": 4.2e-08,
+      "after_warm_connected_seconds_median": 4.2e-08,
+      "after_captured_seconds_median": 4.1e-08
+    },
+    {
+      "nodes": 100000,
+      "requested": "0",
+      "sampled_nodes": 0,
+      "sampled_edges": 0,
+      "before_warm_connected_seconds_median": 0.002351542,
+      "before_captured_seconds_median": 0.001308125,
+      "after_warm_connected_seconds_median": 2.08e-07,
+      "after_captured_seconds_median": 8.3e-08
+    },
+    {
+      "nodes": 100000,
+      "requested": "16",
+      "sampled_nodes": 16,
+      "sampled_edges": 0,
+      "before_warm_connected_seconds_median": 0.004631125,
+      "before_captured_seconds_median": 0.001404375,
+      "after_warm_connected_seconds_median": 0.004609458,
+      "after_captured_seconds_median": 0.001427666
+    },
+    {
+      "nodes": 100000,
+      "requested": "18446744073709551615",
+      "sampled_nodes": 100000,
+      "sampled_edges": 99999,
+      "before_warm_connected_seconds_median": 7.91e-07,
+      "before_captured_seconds_median": 4.1e-08,
+      "after_warm_connected_seconds_median": 1e-06,
+      "after_captured_seconds_median": 4.2e-08
+    }
+  ],
+  "runs": [
+    {
+      "before": {
+        "cases": [
+          {
+            "captured_seconds": [
+              8.584e-06,
+              6.958e-06,
+              6.625e-06,
+              6.625e-06,
+              6.583e-06
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.0006635,
+            "nodes": 1000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              1.6292e-05,
+              1.4209e-05,
+              1.4083e-05,
+              1.4e-05,
+              1.4e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              1.2208e-05,
+              1.175e-05,
+              1.2042e-05,
+              1.2167e-05,
+              1.5375e-05
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.0006635,
+            "nodes": 1000,
+            "requested": "16",
+            "sampled_edges": 1,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              2.9667e-05,
+              2.875e-05,
+              2.8458e-05,
+              2.85e-05,
+              2.8458e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.0,
+              0.0,
+              4.2e-08,
+              4.2e-08,
+              4.2e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.0006635,
+            "nodes": 1000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 999,
+            "sampled_nodes": 1000,
+            "warm_connected_seconds": [
+              1.25e-07,
+              4.1e-08,
+              4.1e-08,
+              8.4e-08,
+              4.1e-08
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001328291,
+              0.001232458,
+              0.001223667,
+              0.001349625,
+              0.001320792
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.104976791,
+            "nodes": 100000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              0.002166375,
+              0.002859666,
+              0.003359583,
+              0.001769917,
+              0.002132083
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001357833,
+              0.001489208,
+              0.00138475,
+              0.001361375,
+              0.001445708
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.104976791,
+            "nodes": 100000,
+            "requested": "16",
+            "sampled_edges": 0,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              0.005660041,
+              0.007284375,
+              0.004929625,
+              0.003077958,
+              0.002957459
+            ]
+          },
+          {
+            "captured_seconds": [
+              4.2e-08,
+              4.2e-08,
+              4.1e-08,
+              0.0,
+              4.1e-08
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.104976791,
+            "nodes": 100000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 99999,
+            "sampled_nodes": 100000,
+            "warm_connected_seconds": [
+              1.459e-06,
+              4.59e-07,
+              7.92e-07,
+              8.33e-07,
+              3.75e-07
+            ]
+          }
+        ],
+        "fixture": "release native chain; 5 samples; fixed local seed; owner setup and first connected validation excluded; immutable capture reported separately; timings checked against analytic chain edges; no before/after speedup claim"
+      },
+      "after": {
+        "cases": [
+          {
+            "captured_seconds": [
+              4.1e-08,
+              8.4e-08,
+              4.1e-08,
+              4.2e-08,
+              8.3e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000737583,
+            "nodes": 1000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              1.583e-06,
+              3.33e-07,
+              2.92e-07,
+              1.66e-07,
+              1.67e-07
+            ]
+          },
+          {
+            "captured_seconds": [
+              1.4375e-05,
+              1.2917e-05,
+              1.35e-05,
+              1.1917e-05,
+              1.2166e-05
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000737583,
+            "nodes": 1000,
+            "requested": "16",
+            "sampled_edges": 1,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              4.4209e-05,
+              3.1666e-05,
+              3.0917e-05,
+              2.7917e-05,
+              3.1541e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              4.2e-08,
+              0.0,
+              4.2e-08,
+              4.1e-08,
+              4.2e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000737583,
+            "nodes": 1000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 999,
+            "sampled_nodes": 1000,
+            "warm_connected_seconds": [
+              8.4e-08,
+              4.2e-08,
+              4.1e-08,
+              4.2e-08,
+              4.2e-08
+            ]
+          },
+          {
+            "captured_seconds": [
+              8.3e-08,
+              8.3e-08,
+              8.3e-08,
+              1.1708e-05,
+              2.08e-07
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.106981125,
+            "nodes": 100000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              3.33e-07,
+              2.92e-07,
+              2.08e-07,
+              1.67e-07,
+              2.08e-07
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001485834,
+              0.001407709,
+              0.001427666,
+              0.00153675,
+              0.001356584
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.106981125,
+            "nodes": 100000,
+            "requested": "16",
+            "sampled_edges": 0,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              0.00460225,
+              0.004648041,
+              0.005253042,
+              0.003173917,
+              0.003798209
+            ]
+          },
+          {
+            "captured_seconds": [
+              2.5e-07,
+              2.5e-07,
+              4.2e-08,
+              0.0,
+              4.2e-08
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.106981125,
+            "nodes": 100000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 99999,
+            "sampled_nodes": 100000,
+            "warm_connected_seconds": [
+              2.833e-06,
+              1.083e-06,
+              1.917e-06,
+              5e-07,
+              4.2e-08
+            ]
+          }
+        ],
+        "fixture": "release native chain; 5 samples; fixed local seed; owner setup and first connected validation excluded; immutable capture reported separately; timings checked against analytic chain edges; no before/after speedup claim"
+      }
+    },
+    {
+      "before": {
+        "cases": [
+          {
+            "captured_seconds": [
+              7.625e-06,
+              7.25e-06,
+              7.125e-06,
+              7.166e-06,
+              7.125e-06
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.00062825,
+            "nodes": 1000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              1.525e-05,
+              1.6791e-05,
+              1.5083e-05,
+              1.5083e-05,
+              1.4917e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              1.4166e-05,
+              1.35e-05,
+              1.7667e-05,
+              1.3458e-05,
+              1.3375e-05
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.00062825,
+            "nodes": 1000,
+            "requested": "16",
+            "sampled_edges": 1,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              3.1958e-05,
+              3.0625e-05,
+              3.0083e-05,
+              3.075e-05,
+              3.1458e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.0,
+              4.2e-08,
+              0.0,
+              4.2e-08,
+              4.1e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.00062825,
+            "nodes": 1000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 999,
+            "sampled_nodes": 1000,
+            "warm_connected_seconds": [
+              2.09e-07,
+              8.3e-08,
+              8.3e-08,
+              4.2e-08,
+              4.2e-08
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001379833,
+              0.001232291,
+              0.001311416,
+              0.001204208,
+              0.001234542
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.110006875,
+            "nodes": 100000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              0.002266375,
+              0.002351542,
+              0.0026055,
+              0.002048625,
+              0.001808916
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001371041,
+              0.001501667,
+              0.001386875,
+              0.001659833,
+              0.001456667
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.110006875,
+            "nodes": 100000,
+            "requested": "16",
+            "sampled_edges": 0,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              0.003358334,
+              0.003597584,
+              0.00509925,
+              0.004631125,
+              0.004718292
+            ]
+          },
+          {
+            "captured_seconds": [
+              5e-07,
+              4.1e-08,
+              1.66e-07,
+              0.0,
+              4.2e-08
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.110006875,
+            "nodes": 100000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 99999,
+            "sampled_nodes": 100000,
+            "warm_connected_seconds": [
+              3.291e-06,
+              4.1e-08,
+              2.292e-06,
+              1.708e-06,
+              7.91e-07
+            ]
+          }
+        ],
+        "fixture": "release native chain; 5 samples; fixed local seed; owner setup and first connected validation excluded; immutable capture reported separately; timings checked against analytic chain edges; no before/after speedup claim"
+      },
+      "after": {
+        "cases": [
+          {
+            "captured_seconds": [
+              4.1e-08,
+              8.3e-08,
+              4.2e-08,
+              4.2e-08,
+              4.1e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000618625,
+            "nodes": 1000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              3.75e-07,
+              2.5e-07,
+              2.08e-07,
+              1.67e-07,
+              1.67e-07
+            ]
+          },
+          {
+            "captured_seconds": [
+              1.2708e-05,
+              1.1875e-05,
+              1.325e-05,
+              1.2208e-05,
+              1.2833e-05
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000618625,
+            "nodes": 1000,
+            "requested": "16",
+            "sampled_edges": 1,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              3.825e-05,
+              2.7625e-05,
+              3.0083e-05,
+              2.7625e-05,
+              2.9542e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              4.1e-08,
+              4.2e-08,
+              4.1e-08,
+              4.1e-08,
+              4.2e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000618625,
+            "nodes": 1000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 999,
+            "sampled_nodes": 1000,
+            "warm_connected_seconds": [
+              1.25e-07,
+              4.1e-08,
+              8.4e-08,
+              4.1e-08,
+              4.1e-08
+            ]
+          },
+          {
+            "captured_seconds": [
+              8.3e-08,
+              4.2e-08,
+              8.4e-08,
+              4.2e-08,
+              4.1e-08
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.10647375,
+            "nodes": 100000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              4.16e-07,
+              2.5e-07,
+              1.67e-07,
+              1.67e-07,
+              1.67e-07
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.00136675,
+              0.001436333,
+              0.001461917,
+              0.001494,
+              0.001386709
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.10647375,
+            "nodes": 100000,
+            "requested": "16",
+            "sampled_edges": 0,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              0.004609458,
+              0.003930875,
+              0.005413,
+              0.005746584,
+              0.003807791
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.0,
+              0.0,
+              4.1e-08,
+              4.1e-08,
+              4.2e-08
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.10647375,
+            "nodes": 100000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 99999,
+            "sampled_nodes": 100000,
+            "warm_connected_seconds": [
+              1.042e-06,
+              1.333e-06,
+              2.09e-07,
+              8.75e-07,
+              1e-06
+            ]
+          }
+        ],
+        "fixture": "release native chain; 5 samples; fixed local seed; owner setup and first connected validation excluded; immutable capture reported separately; timings checked against analytic chain edges; no before/after speedup claim"
+      }
+    },
+    {
+      "before": {
+        "cases": [
+          {
+            "captured_seconds": [
+              6.708e-06,
+              6.375e-06,
+              6.375e-06,
+              6.417e-06,
+              6.375e-06
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000630583,
+            "nodes": 1000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              1.425e-05,
+              1.3791e-05,
+              1.3709e-05,
+              1.3667e-05,
+              1.3666e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              1.2417e-05,
+              1.2042e-05,
+              1.1917e-05,
+              1.1875e-05,
+              1.1875e-05
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000630583,
+            "nodes": 1000,
+            "requested": "16",
+            "sampled_edges": 1,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              2.9e-05,
+              2.7958e-05,
+              2.9417e-05,
+              2.7542e-05,
+              2.75e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              4.2e-08,
+              4.1e-08,
+              4.2e-08,
+              4.2e-08,
+              0.0
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000630583,
+            "nodes": 1000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 999,
+            "sampled_nodes": 1000,
+            "warm_connected_seconds": [
+              1.25e-07,
+              4.2e-08,
+              4.2e-08,
+              4.1e-08,
+              4.2e-08
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001220416,
+              0.001308125,
+              0.001219125,
+              0.001323708,
+              0.001382416
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.102805041,
+            "nodes": 100000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              0.001860917,
+              0.002369125,
+              0.002907042,
+              0.003359292,
+              0.002445417
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001390583,
+              0.0015055,
+              0.001493083,
+              0.001404375,
+              0.001358792
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.102805041,
+            "nodes": 100000,
+            "requested": "16",
+            "sampled_edges": 0,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              0.00344325,
+              0.005304125,
+              0.005835167,
+              0.004003458,
+              0.00342225
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.0,
+              0.0,
+              0.0,
+              3.34e-07,
+              4.2e-08
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.102805041,
+            "nodes": 100000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 99999,
+            "sampled_nodes": 100000,
+            "warm_connected_seconds": [
+              4.1e-08,
+              3.34e-07,
+              8.3e-08,
+              2e-06,
+              6.25e-07
+            ]
+          }
+        ],
+        "fixture": "release native chain; 5 samples; fixed local seed; owner setup and first connected validation excluded; immutable capture reported separately; timings checked against analytic chain edges; no before/after speedup claim"
+      },
+      "after": {
+        "cases": [
+          {
+            "captured_seconds": [
+              8.3e-08,
+              4.1e-08,
+              4.1e-08,
+              8.3e-08,
+              4.2e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000747084,
+            "nodes": 1000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              4.58e-07,
+              2.5e-07,
+              2.08e-07,
+              2.08e-07,
+              2.08e-07
+            ]
+          },
+          {
+            "captured_seconds": [
+              1.45e-05,
+              1.4833e-05,
+              1.4459e-05,
+              1.3416e-05,
+              1.4334e-05
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000747084,
+            "nodes": 1000,
+            "requested": "16",
+            "sampled_edges": 1,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              4.2625e-05,
+              3.3167e-05,
+              3.1125e-05,
+              3.1416e-05,
+              3.0375e-05
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.0,
+              4.2e-08,
+              4.1e-08,
+              0.0,
+              4.2e-08
+            ],
+            "edges": 999,
+            "immutable_capture_seconds": 0.000747084,
+            "nodes": 1000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 999,
+            "sampled_nodes": 1000,
+            "warm_connected_seconds": [
+              1.25e-07,
+              8.3e-08,
+              4.2e-08,
+              4.2e-08,
+              8.4e-08
+            ]
+          },
+          {
+            "captured_seconds": [
+              8.3e-08,
+              4.2e-08,
+              4.2e-08,
+              4.2e-08,
+              4.2e-08
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.103862208,
+            "nodes": 100000,
+            "requested": "0",
+            "sampled_edges": 0,
+            "sampled_nodes": 0,
+            "warm_connected_seconds": [
+              5e-07,
+              2.5e-07,
+              2.5e-07,
+              1.67e-07,
+              1.67e-07
+            ]
+          },
+          {
+            "captured_seconds": [
+              0.001420458,
+              0.00142175,
+              0.00146325,
+              0.001583708,
+              0.0013915
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.103862208,
+            "nodes": 100000,
+            "requested": "16",
+            "sampled_edges": 0,
+            "sampled_nodes": 16,
+            "warm_connected_seconds": [
+              0.004680958,
+              0.005023917,
+              0.004401083,
+              0.004660625,
+              0.004049458
+            ]
+          },
+          {
+            "captured_seconds": [
+              4.1e-08,
+              4.2e-08,
+              4.2e-08,
+              4.1e-08,
+              2.92e-07
+            ],
+            "edges": 99999,
+            "immutable_capture_seconds": 0.103862208,
+            "nodes": 100000,
+            "requested": "18446744073709551615",
+            "sampled_edges": 99999,
+            "sampled_nodes": 100000,
+            "warm_connected_seconds": [
+              1.958e-06,
+              1e-06,
+              4.2e-08,
+              3.33e-07,
+              3.33e-07
+            ]
+          }
+        ],
+        "fixture": "release native chain; 5 samples; fixed local seed; owner setup and first connected validation excluded; immutable capture reported separately; timings checked against analytic chain edges; no before/after speedup claim"
+      }
+    }
+  ]
+}

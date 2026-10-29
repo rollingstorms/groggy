@@ -398,3 +398,7 @@ harness = false
 [[bench]]
 name = "view_batch_publication"
 harness = false
+
+[[bench]]
+name = "view_node_sampling"
+harness = false

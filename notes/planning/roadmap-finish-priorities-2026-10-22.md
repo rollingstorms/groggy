@@ -1841,3 +1841,24 @@ Three unrelated existing FFI warnings remain; owner edits excluded.
 No rows added or broad parents closed: **211 checked / 57 open**. Next remains
 immutable default/effectful facade migration and compound topology acceptance;
 full refreshed-output copying also remains linear.
+
+
+### Complete integer view sampling — 2026-10-29
+
+Completed an existing 26.1/AR4/AR7.5 operation: graph and connected integer sampling
+formerly discarded the sampled IDs and returned the entire input. Native connected
+and captured methods now share the checked reservoir kernel with pipeline masks,
+induce only selected instances, cap counts and preserve frozen source/time/group/
+write pins. Collection failures propagate; sampler handles release on failed runs.
+Measured zero-size shortcuts remove sorting/induction after live scope validation.
+Read defaults and full immutable sampler/effectful pipeline migration remain open.
+
+Receipt: `view-node-sampling-2026-10-29.md`. At 100k, paired local native zero-size
+medians are **2.352 ms→0.208 µs connected**, **1.308 ms→0.083 µs captured**; the
+baseline is the correct implementation before only the zero shortcut. Sixteen-node
+samples measure **4.609 ms / 1.428 ms** with setup/capture excluded. No universal
+latency/RSS claim. Gates: **1,498 native / 54 ignored**, strict all-target Clippy,
+**2,537 root Python / 1 skipped**, **246 docs**, rebuilt/staged release extension,
+scoped format/syntax/diff checks. Three existing FFI warnings remain. Pending next-
+slice column-indexing tests and owner benchmark work excluded from this slice gate.
+No rows added or broad parents closed: **211 checked / 57 open**.

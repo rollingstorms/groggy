@@ -7,6 +7,7 @@
 //! - Filtered subgraphs
 //! - Component subgraphs
 
+pub(crate) mod sampling;
 mod degrees;
 pub use degrees::{DegreeMode, SubgraphDegreeRead};
 

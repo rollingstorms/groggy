@@ -205,6 +205,15 @@ impl PyGraphView {
     fn in_degree(&self, id: NodeId) -> PyResult<usize> {
         self.inner.in_degree(id).map_err(graph_error_to_py_err)
     }
+    /// Uniform induced node sample sharing this immutable capture.
+    #[pyo3(signature=(k, *, seed=None))]
+    fn sample(&self, py: Python<'_>, k: &PyAny, seed: Option<&PyAny>) -> PyResult<Self> {
+        let seed = crate::ffi::utils::optional_seed(seed)?;
+        let k = crate::ffi::utils::sample_count(k)?;
+        py.allow_threads(|| self.inner.sample(k, seed))
+            .map(|inner| Self { inner })
+            .map_err(graph_error_to_py_err)
+    }
     fn select_nodes(&self, py: Python, ids: Vec<NodeId>) -> PyResult<Self> {
         py.allow_threads(|| self.inner.select_nodes(&ids))
             .map(|inner| Self { inner })
@@ -334,7 +343,7 @@ impl PyGraphView {
     ) -> PyResult<Vec<(NodeId, usize)>> {
         let iterations = community_count(max_iter, "max_iter", 20)?;
         let phases = community_count(max_phases, "max_phases", 10)?;
-        let seed = community_seed(seed)?;
+        let seed = crate::ffi::utils::optional_seed(seed)?;
         py.allow_threads(|| {
             self.inner
                 .leiden(iterations, phases, resolution, seed, theta)
@@ -355,7 +364,7 @@ impl PyGraphView {
         let trials = community_count(num_trials, "num_trials", 10)?;
         let iterations = community_count(max_iter, "max_iter", 100)?;
         let flow = community_count(flow_max_iter, "flow_max_iter", 10_000)?;
-        let seed = community_seed(seed)?;
+        let seed = crate::ffi::utils::optional_seed(seed)?;
         py.allow_threads(|| {
             self.inner
                 .infomap(teleportation, trials, iterations, flow, seed)
@@ -391,7 +400,7 @@ impl PyGraphView {
         seed: Option<&PyAny>,
     ) -> PyResult<Vec<(NodeId, PyObject)>> {
         let iterations = community_count(max_iter, "max_iter", 20)?;
-        let seed = community_seed(seed)?;
+        let seed = crate::ffi::utils::optional_seed(seed)?;
         let rows = py
             .allow_threads(|| {
                 self.inner
@@ -572,19 +581,6 @@ fn community_count(value: Option<&PyAny>, name: &str, default: usize) -> PyResul
         .map(|v| crate::ffi::query::query::nonnegative_count(v, name))
         .transpose()
         .map(|v| v.unwrap_or(default))
-}
-
-fn community_seed(value: Option<&PyAny>) -> PyResult<Option<u64>> {
-    value
-        .map(|v| {
-            if v.is_instance_of::<pyo3::types::PyBool>() {
-                return Err(pyo3::exceptions::PyTypeError::new_err(
-                    "seed must be an unsigned integer",
-                ));
-            }
-            v.extract::<u64>()
-        })
-        .transpose()
 }
 
 // Only immutable input and owned Send numerical data cross the GIL boundary.

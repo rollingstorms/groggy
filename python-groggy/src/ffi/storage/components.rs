@@ -234,12 +234,8 @@ impl PyComponentsArray {
         let mut sampled = Vec::new();
 
         for i in 0..self.components_data.len() {
-            if let Ok(component) = self.__getitem__(i as isize) {
-                match component.sample_k(k) {
-                    Ok(sampled_component) => sampled.push(sampled_component),
-                    Err(_) => continue, // Skip failed components
-                }
-            }
+            let component = self.__getitem__(i as isize)?;
+            sampled.push(component.sample_k(k)?);
         }
 
         Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
@@ -522,10 +518,7 @@ impl PyComponentsIterator {
         let mut sampled = Vec::new();
 
         for component in components {
-            match component.sample_k(k) {
-                Ok(sampled_component) => sampled.push(sampled_component),
-                Err(_) => continue, // Skip failed components
-            }
+            sampled.push(component.sample_k(k)?);
         }
 
         Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
