@@ -376,14 +376,14 @@ impl Subgraph {
         self.edges.contains(&edge_id)
     }
 
-    /// Get all node IDs as a Vec (for compatibility with existing APIs)
+    /// Get ascending node IDs, aligned with native complete-column readers.
     pub fn node_ids(&self) -> Vec<NodeId> {
-        self.nodes.iter().copied().collect()
+        self.ordered_nodes().to_vec()
     }
 
-    /// Get all edge IDs as a Vec (for compatibility with existing APIs)
+    /// Get ascending edge IDs, aligned with native complete-column readers.
     pub fn edge_ids(&self) -> Vec<EdgeId> {
-        self.edges.iter().copied().collect()
+        self.ordered_edges().to_vec()
     }
 
     /// Deterministic ordered node list (ascending).
@@ -720,67 +720,48 @@ impl Subgraph {
     }
 }
 
-/// Column access operations for bulk attribute extraction
+/// Aligned native columns; these compatibility reads still use the current owner.
 impl Subgraph {
-    /// Get all values for a node attribute within this subgraph
-    /// This is the key column access operation: subgraph[attr_name] -> Vec<AttrValue>
+    /// Values aligned with ascending node_ids(); absent properties project to Null.
+    /// Every selected node must remain active. Values are copied through one bulk column read.
     pub fn get_node_attribute_column(&self, attr_name: &AttrName) -> GraphResult<Vec<AttrValue>> {
-        let mut values = Vec::new();
-        let graph_borrow = self.graph.borrow();
-
-        for &node_id in self.nodes.iter() {
-            if let Some(attr_value) = graph_borrow.get_node_attr(node_id, attr_name)? {
-                values.push(attr_value);
-            } else {
-                // Handle missing attributes - could use None or skip
-                // For now, we'll skip missing attributes
-            }
-        }
-
-        Ok(values)
+        self.get_node_attributes_for_nodes(&self.ordered_nodes(), attr_name)
     }
 
-    /// Get all values for an edge attribute within this subgraph
+    /// Values aligned with ascending edge_ids(); absent properties project to Null.
     pub fn get_edge_attribute_column(&self, attr_name: &AttrName) -> GraphResult<Vec<AttrValue>> {
-        let mut values = Vec::new();
-        let graph_borrow = self.graph.borrow();
-
-        for &edge_id in self.edges.iter() {
-            if let Some(attr_value) = graph_borrow.get_edge_attr(edge_id, attr_name)? {
-                values.push(attr_value);
-            } else {
-                // Handle missing attributes - skip for now
+        let graph = self.graph.borrow();
+        let ids = self.ordered_edges();
+        for &id in ids.iter() {
+            if !graph.has_edge(id) {
+                return Err(GraphError::edge_not_found(id, "subgraph column access"));
             }
         }
-
-        Ok(values)
+        Ok(graph
+            .get_edges_attrs(attr_name, &ids)?
+            .into_iter()
+            .map(|value| value.unwrap_or(AttrValue::Null))
+            .collect())
     }
 
-    /// Get node attribute values for specific nodes within this subgraph
-    /// This enables: g.nodes[[1,2,3]][attr_name] -> [val1, val2, val3]
+    /// Values aligned with the caller's exact ID sequence, including repeats and missing cells.
+    /// Out-of-scope/inactive requested IDs reject before any values are copied.
     pub fn get_node_attributes_for_nodes(
         &self,
         node_ids: &[NodeId],
         attr_name: &AttrName,
     ) -> GraphResult<Vec<AttrValue>> {
-        let mut values = Vec::new();
-        let graph_borrow = self.graph.borrow();
-
-        for &node_id in node_ids {
-            // Ensure the node is in this subgraph
-            if !self.has_node(node_id) {
-                return Err(GraphError::node_not_found(
-                    node_id,
-                    "subgraph attribute access",
-                ));
-            }
-
-            if let Some(attr_value) = graph_borrow.get_node_attr(node_id, attr_name)? {
-                values.push(attr_value);
+        let graph = self.graph.borrow();
+        for &id in node_ids {
+            if !self.nodes.contains(&id) || !graph.has_node(id) {
+                return Err(GraphError::node_not_found(id, "subgraph attribute access"));
             }
         }
-
-        Ok(values)
+        Ok(graph
+            .get_nodes_attrs(attr_name, node_ids)?
+            .into_iter()
+            .map(|value| value.unwrap_or(AttrValue::Null))
+            .collect())
     }
 }
 

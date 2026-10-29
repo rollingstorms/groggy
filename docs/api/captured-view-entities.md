@@ -115,3 +115,7 @@ it when its snapshot is no longer needed. Owned arrays may copy large property
 values. This completes the explicit captured accessor path, not the full connected
 default/mutation-facade migration. See the existing checked pinned-view write API
 for publication, stale-source and scope validation.
+
+Native connected Subgraph column helpers now retain aligned missing rows and use
+the existing bulk storage reader. See [native column alignment](connected-column-alignment.md)
+for their live ownership and explicit-sequence rules.

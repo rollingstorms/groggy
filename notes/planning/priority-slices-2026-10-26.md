@@ -1181,3 +1181,31 @@ cases cover null/absence, meta/time/read-only/scope and owner lifetime. Three
 unrelated FFI warnings remain. No new rows or parent closure: **211 / 57**.
 Remaining window focus: native legacy column helpers still skip absent values;
 repair alignment through the existing attribute-first bulk reader.
+
+## Native compatibility column alignment — 2026-10-29
+
+Completed the final window slice in existing 26.1/AR7.5. Native Subgraph complete
+columns align to ascending node_ids/edge_ids; missing cells no longer disappear.
+Explicit requested node sequences retain order and repetitions. Whole-request
+scope/liveness checks preserve rejection, then the existing attribute-first bulk
+reader resolves the storage column once. No new graph capture/publication path;
+live ownership and Python connected accessor defaults retain their boundaries.
+Evidence: `connected-column-alignment-2026-10-29.md`; four native cases and a 1k/
+100k release comparison with equivalent aligned scalar reads. This fixes row
+identity, without claiming a general throughput improvement.
+
+Final gates: **1,476 native / 54 ignored**, strict all-target core Clippy,
+**2,478 root Python / 1 skipped**, **241 executable documentation examples**,
+rebuilt/atomically staged full-ABI extension, scoped formatting/syntax/diff checks.
+The native-only guide links the compilable integration examples. Three unrelated
+FFI warnings remain. Owner benchmark/review edits are preserved outside commits.
+
+This window completes five committed functional slices: captured algebra/grouping,
+scoped traversal/cache restoration, structural summaries, captured entity/column
+access, and native compatibility column alignment. No new checkbox rows or broad
+parent closures: **211 checked / 57 unchecked**. The execution checkpoint in
+`roadmap-finish-priorities-2026-10-22.md` now distinguishes those completed read
+prerequisites from actual connected/default/filter ownership, mutable/effectful
+facades, specialized adapters and topology/custom compound acceptance. Cold/
+invalidated full captured value materialization and retained recovery memory
+remain the existing 10.4/32.2 performance boundary.

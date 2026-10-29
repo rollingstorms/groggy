@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "bulk_column_seconds": [
+        9.5417e-05,
+        9.3541e-05,
+        0.000133416,
+        9.4084e-05,
+        9.0417e-05
+      ],
+      "equivalent_scalar_column_seconds": [
+        0.000113333,
+        0.000104875,
+        0.000102958,
+        0.000102,
+        0.000108709
+      ],
+      "nodes": 1000
+    },
+    {
+      "bulk_column_seconds": [
+        0.018531042,
+        0.019796375,
+        0.020210917,
+        0.0175095,
+        0.019105584
+      ],
+      "equivalent_scalar_column_seconds": [
+        0.023186,
+        0.018806291,
+        0.019952875,
+        0.020052875,
+        0.020246125
+      ],
+      "nodes": 100000
+    }
+  ],
+  "fixture": "manual isolates; integer/null/absent column; precomputed sorted IDs; five alternating samples; both complete row vectors compared; no Python or capture",
+  "profile": "release"
+}

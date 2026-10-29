@@ -382,3 +382,7 @@ harness = false
 [[bench]]
 name = "captured_view_entities"
 harness = false
+
+[[bench]]
+name = "connected_column_alignment"
+harness = false

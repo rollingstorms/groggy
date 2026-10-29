@@ -14,7 +14,7 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Current remainder (2026-10-28): compound topology execution and typed effects
+Current remainder (2026-10-29): compound topology execution and typed effects
 (09.4b.2), ordinary connected Subgraph ownership (26.1/AR4/AR7.5) and legacy pinned
 query migration (21.2). Repeated current read captures now share weakly cached
 frozen payloads with fresh provenance and mutation invalidation; see
@@ -25,8 +25,20 @@ materializing all matches (`query-page-postings-2026-10-28.md`). The 1k/100k/1m
 complete core workflow and archive framing receipts make reconstruction/recovery
 memory costs explicit. First/invalidated full value materialization and legacy
 connected ownership remain open. With these measured read prerequisites in place,
-all thirteen classic algorithms now support captured input, including the five community kernels (`captured-communities-2026-10-29.md`). Next advance connected immutable ownership and compound topology acceptance; do
-not expand adjacent audits merely to create more checklist slices. The listed secondary-index families now complete 18.2:
+all thirteen classic algorithms now support captured input, including the five
+community kernels (`captured-communities-2026-10-29.md`). Captured read parity now
+also covers exact algebra/grouping, scoped traversal trees/hop paths, structural
+summaries and readonly entities/aligned columns. Connected compatibility repairs
+preserve selected traversal/induction/component scope, invalidate caches across
+equal-version restoration, and align native columns through the attribute-first
+bulk reader. Window receipts: `captured-view-algebra-2026-10-29.md`,
+`captured-view-traversal-2026-10-29.md`, `structural-summaries-2026-10-29.md`,
+`captured-view-entities-2026-10-29.md`, `connected-column-alignment-2026-10-29.md`.
+The remaining ownership work is the actual default/legacy filter return migration,
+connected mutable entity/accessor and effectful algorithm/composition facades,
+and specialized view/viz adapters; the new read prerequisites do not complete
+those boundaries. Next advance that migration and compound topology acceptance;
+do not expand adjacent audits merely to create more checklist slices. The listed secondary-index families now complete 18.2:
 property/label/type/topology, effective events/activation, exact property intervals
 and retained group membership/reverse references. See
 `secondary-indexes-exit-review-2026-10-28.md`. Native default and
