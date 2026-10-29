@@ -298,3 +298,54 @@ fn accepting_manual_changes_refreshes_state_identity_and_write_coordinates() {
     assert_eq!(clean.write_state_id(), Some(accepted));
     assert!(dirty.write_state_id().is_none());
 }
+
+#[test]
+fn sparse_frozen_incidence_distinguishes_isolates_sinks_and_inactive_ids() {
+    for graph_type in [GraphType::Directed, GraphType::Undirected] {
+        let mut graph = Graph::new_with_type_manual(graph_type);
+        graph.add_nodes(1_000).unwrap();
+        let pairs = [(0, 1), (0, 1), (1, 1), (3, 0), (4, 5)];
+        let edges = graph.add_edges(&pairs).unwrap();
+        let pin = graph.pin_current_state().unwrap();
+        for node in 0..1_000 {
+            let mut expected = Vec::new();
+            let mut incident = Vec::new();
+            for (&id, &(u, v)) in edges.iter().zip(pairs.iter()) {
+                if u == node {
+                    expected.push((v, id));
+                }
+                if v == node && u != v && graph_type == GraphType::Undirected {
+                    expected.push((u, id));
+                }
+                if u == node || v == node {
+                    incident.push(id);
+                }
+            }
+            expected.sort_unstable();
+            let actual: Vec<_> = pin
+                .neighbors(node)
+                .unwrap()
+                .iter()
+                .copied()
+                .zip(pin.neighbor_edges(node).unwrap().iter().copied())
+                .collect();
+            assert_eq!(actual, expected);
+            assert_eq!(pin.incident_edges(node).unwrap(), &incident);
+        }
+        for id in [1_000, usize::MAX] {
+            assert!(pin.neighbors(id).is_none());
+            assert!(pin.neighbor_edges(id).is_none());
+            assert!(pin.incident_edges(id).is_none());
+        }
+        graph.remove_node(5).unwrap();
+        let changed = graph.pin_current_state().unwrap();
+        assert!(changed.neighbors(5).is_none());
+        assert_eq!(
+            pin.neighbors(5).unwrap().len(),
+            usize::from(graph_type == GraphType::Undirected)
+        );
+        assert_eq!(pin.incident_edges(5).unwrap(), &vec![edges[4]]);
+        assert!(changed.neighbors(4).unwrap().is_empty());
+        assert!(changed.incident_edges(4).unwrap().is_empty());
+    }
+}

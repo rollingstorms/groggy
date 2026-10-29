@@ -962,3 +962,23 @@ Gates: **1,441 native / 56 ignored**, strict all-target core Clippy, **2,314 roo
 Python / 1 skipped**, **226 docs**, full-ABI release extension rebuilt/staged.
 No new checklist rows or broad parent closure: **211 checked / 57 open**.
 First-capture allocation and legacy connected ownership remain priority work.
+
+
+## Sparse canonical read adjacency — 2026-10-28
+
+Canonical frozen reads now allocate only nonempty adjacency/incidence entries.
+Active isolates/sinks return shared immutable empty rows and absent IDs remain
+absent, preserving parallel/loop/direction/order semantics. Bounded incidence
+reservations avoid dense construction growth. See
+`pinned-read-adjacency-2026-10-28.md` for native endpoint-reference coverage and
+two-process matched 100k-node isolate/sparse/chain/star release receipts. Cold
+captures improved 12–25% on these fixtures; sparse peak RSS falls, chain peak RSS
+is unchanged, and the outgoing-star three-row probe is 26.7% slower because sinks
+need an extra membership check. This trade-off is explicit, not a universal
+throughput claim.
+
+Gates: **1,442 native / 56 ignored**, strict all-target core Clippy, **2,314 root
+Python / 1 skipped**, **227 docs**, rebuilt/staged full-ABI release extension.
+No parent closure/new rows: **211 checked / 57 open**. The next measured priority
+is a whole ingest/query/neighborhood/effective-read/recovery workload at larger
+sizes; connected ownership and compound topology acceptance remain open.

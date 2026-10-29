@@ -350,3 +350,7 @@ harness = false
 [[bench]]
 name = "current_read_reuse"
 harness = false
+
+[[bench]]
+name = "pinned_read_adjacency"
+harness = false

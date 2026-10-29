@@ -63,3 +63,23 @@ secondary index. It applies to current-state capture; historical/effective-time
 reconstruction retains its existing cache policy. It also does not change the
 legacy connected Subgraph's live-parent behavior. Use an explicit immutable
 capture until the remaining connected-view migration is complete.
+
+## Sparse frozen adjacency
+
+Cold captures allocate adjacency/incidence rows for nodes that actually have
+those edges. Isolates and directed sinks share immutable empty rows; active
+membership remains authoritative, so an empty row does not mean a missing node.
+Parallel edge occurrences, stable neighbor/edge alignment and self-loop incidence
+keep their existing definitions. This applies to the shared PinnedReadState used
+by current and historical views; it does not change graph direction or topology.
+
+```python
+sparse = Graph(directed=True)
+sparse.add_nodes(3)
+sparse.add_edge(0, 1)
+view = sparse.read_view()
+assert view.neighbors(0) == [1]
+assert view.neighbors(1) == []  # Active sink, with one incoming incident edge.
+assert view.incident_edges(1) == [0]
+assert view.neighbors(2) == view.incident_edges(2) == []  # Active isolate.
+```

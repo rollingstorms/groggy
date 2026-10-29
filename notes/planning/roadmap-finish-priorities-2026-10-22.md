@@ -18,8 +18,10 @@ Current remainder (2026-10-28): compound topology execution and typed effects
 (09.4b.2), ordinary connected Subgraph ownership (26.1/AR4/AR7.5) and legacy pinned
 query migration (21.2). Repeated current read captures now share weakly cached
 frozen payloads with fresh provenance and mutation invalidation; see
-`current-read-sharing-2026-10-28.md`. First/invalidated capture materialization and
-legacy connected ownership remain open. The listed secondary-index families now complete 18.2:
+`current-read-sharing-2026-10-28.md`. Sparse frozen adjacency now avoids empty per-node entries, with measured
+capture/memory/probe trade-offs in `pinned-read-adjacency-2026-10-28.md`.
+First/invalidated full value materialization and legacy connected ownership remain
+open. The listed secondary-index families now complete 18.2:
 property/label/type/topology, effective events/activation, exact property intervals
 and retained group membership/reverse references. See
 `secondary-indexes-exit-review-2026-10-28.md`. Native default and

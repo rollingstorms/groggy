@@ -41,6 +41,12 @@ struct Adjacency {
     neighbors: Vec<NodeId>,
     edges: Vec<EdgeId>,
 }
+// Active isolates and directed sinks share immutable empty rows. Membership,
+// rather than an allocated empty map entry, distinguishes them from absent IDs.
+static EMPTY_ADJACENCY: Adjacency = Adjacency {
+    neighbors: Vec::new(),
+    edges: Vec::new(),
+};
 #[derive(Debug)]
 struct ReadData {
     snapshot: GraphSnapshot,
@@ -94,10 +100,17 @@ impl PinnedReadState {
             ));
         }
         let edges = snapshot.edges.keys().copied().collect();
-        let mut adjacency: HashMap<_, Vec<_>> =
-            nodes.iter().map(|&node| (node, Vec::new())).collect();
-        let mut incident: HashMap<_, Vec<_>> =
-            nodes.iter().map(|&node| (node, Vec::new())).collect();
+        // Bound occupied rows by incidences, avoiding dense empty entries and
+        // repeated table growth on connected captures. Saturation is intentional
+        // for the capacity bound; validation below still checks every endpoint.
+        let incident_bound = snapshot.edges.len().saturating_mul(2).min(nodes.len());
+        let adjacency_bound = if snapshot.graph_type == GraphType::Directed {
+            snapshot.edges.len().min(nodes.len())
+        } else {
+            incident_bound
+        };
+        let mut adjacency: HashMap<_, Vec<_>> = HashMap::with_capacity(adjacency_bound);
+        let mut incident: HashMap<_, Vec<_>> = HashMap::with_capacity(incident_bound);
         for (&edge, &(source, target)) in &snapshot.edges {
             if !nodes.contains(&source) || !nodes.contains(&target) {
                 return Err(GraphError::InvalidInput(
@@ -236,14 +249,26 @@ impl PinnedReadState {
     }
     /// Sorted neighbor occurrences; parallel edges repeat neighbors, self-loops occur once.
     pub fn neighbors(&self, id: NodeId) -> Option<&Vec<NodeId>> {
-        self.data.adjacency.get(&id).map(|entry| &entry.neighbors)
+        self.adjacency_row(id).map(|entry| &entry.neighbors)
     }
     /// Edge IDs aligned with neighbor occurrences, enabling edge-scoped views.
     pub fn neighbor_edges(&self, id: NodeId) -> Option<&Vec<EdgeId>> {
-        self.data.adjacency.get(&id).map(|entry| &entry.edges)
+        self.adjacency_row(id).map(|entry| &entry.edges)
     }
     /// Incident edge instances in stable ID order; loops occur once.
     pub fn incident_edges(&self, id: NodeId) -> Option<&Vec<EdgeId>> {
-        self.data.incident.get(&id)
+        self.data.incident.get(&id).or_else(|| {
+            self.existence()
+                .contains_node(id)
+                .then_some(&EMPTY_ADJACENCY.edges)
+        })
+    }
+
+    fn adjacency_row(&self, id: NodeId) -> Option<&Adjacency> {
+        self.data.adjacency.get(&id).or_else(|| {
+            self.existence()
+                .contains_node(id)
+                .then_some(&EMPTY_ADJACENCY)
+        })
     }
 }

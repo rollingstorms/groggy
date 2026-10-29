@@ -1,0 +1,406 @@
+{
+  "baseline_commit": "98004d6d",
+  "method": "separate release executables, two processes per fixture/variant in reversed order; five cold captures and five whole-node lookup passes per process; /usr/bin/time -l maximum process RSS includes fixture construction and allocator retention",
+  "runs": [
+    {
+      "capture_seconds": [
+        0.056462791,
+        0.054784583,
+        0.054523292,
+        0.050532916,
+        0.051695417
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 0,
+      "lookup_seconds_per_node": [
+        1.3925542e-07,
+        1.34785e-07,
+        1.3651792e-07,
+        1.3745458e-07,
+        1.6179708e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "isolates",
+      "variant": "before",
+      "repeat": 0,
+      "maximum_resident_bytes": 173129728
+    },
+    {
+      "capture_seconds": [
+        0.042234584,
+        0.040458875,
+        0.038367583,
+        0.039477459,
+        0.038028666
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 0,
+      "lookup_seconds_per_node": [
+        5.146541999999999e-08,
+        4.9264579999999997e-08,
+        5.816708e-08,
+        4.922791e-08,
+        5.083833e-08
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "isolates",
+      "variant": "after",
+      "repeat": 0,
+      "maximum_resident_bytes": 160661504
+    },
+    {
+      "capture_seconds": [
+        0.058099667,
+        0.052124875,
+        0.0518965,
+        0.0525855,
+        0.051784209
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 1000,
+      "lookup_seconds_per_node": [
+        1.5193042e-07,
+        1.342425e-07,
+        1.4973333000000001e-07,
+        1.5013208e-07,
+        1.3523250000000002e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "sparse",
+      "variant": "before",
+      "repeat": 0,
+      "maximum_resident_bytes": 173670400
+    },
+    {
+      "capture_seconds": [
+        0.043223584,
+        0.041173041,
+        0.039987083,
+        0.040786958,
+        0.039643625
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 1000,
+      "lookup_seconds_per_node": [
+        9.864457999999999e-08,
+        1.0327084e-07,
+        1.0340208e-07,
+        9.637292e-08,
+        1.0300875e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "sparse",
+      "variant": "after",
+      "repeat": 0,
+      "maximum_resident_bytes": 162250752
+    },
+    {
+      "capture_seconds": [
+        0.133591459,
+        0.127731833,
+        0.127290416,
+        0.121629458,
+        0.123811167
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        1.4725916e-07,
+        1.3547500000000001e-07,
+        1.4388458e-07,
+        1.3285666e-07,
+        1.4308583e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "chain",
+      "variant": "before",
+      "repeat": 0,
+      "maximum_resident_bytes": 205422592
+    },
+    {
+      "capture_seconds": [
+        0.117035375,
+        0.112411708,
+        0.107241583,
+        0.11002275,
+        0.110271834
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        1.3758958e-07,
+        1.2611e-07,
+        1.2886625000000002e-07,
+        1.2939667e-07,
+        1.2880166e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "chain",
+      "variant": "after",
+      "repeat": 0,
+      "maximum_resident_bytes": 206815232
+    },
+    {
+      "capture_seconds": [
+        0.098883959,
+        0.096791292,
+        0.092207583,
+        0.089943667,
+        0.090867708
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        1.2757583e-07,
+        1.2896125e-07,
+        1.2494708e-07,
+        1.2791166e-07,
+        1.2648333e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "star",
+      "variant": "before",
+      "repeat": 0,
+      "maximum_resident_bytes": 197214208
+    },
+    {
+      "capture_seconds": [
+        0.081658542,
+        0.078623042,
+        0.071011792,
+        0.072972792,
+        0.070897791
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        1.3897125e-07,
+        1.5004042e-07,
+        1.5195834e-07,
+        1.4668459e-07,
+        1.6049791e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "star",
+      "variant": "after",
+      "repeat": 0,
+      "maximum_resident_bytes": 190660608
+    },
+    {
+      "capture_seconds": [
+        0.038968291,
+        0.037674125,
+        0.036933334,
+        0.035539916,
+        0.036454917
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 0,
+      "lookup_seconds_per_node": [
+        4.3140840000000004e-08,
+        4.423667e-08,
+        4.556667e-08,
+        4.34725e-08,
+        4.4134170000000005e-08
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "isolates",
+      "variant": "after",
+      "repeat": 1,
+      "maximum_resident_bytes": 162463744
+    },
+    {
+      "capture_seconds": [
+        0.051459542,
+        0.048733166,
+        0.046881417,
+        0.047083417,
+        0.047738917
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 0,
+      "lookup_seconds_per_node": [
+        1.3032459e-07,
+        1.1946208e-07,
+        1.2253459e-07,
+        1.1853417e-07,
+        1.2254334e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "isolates",
+      "variant": "before",
+      "repeat": 1,
+      "maximum_resident_bytes": 172933120
+    },
+    {
+      "capture_seconds": [
+        0.037672792,
+        0.036929125,
+        0.03567825,
+        0.034817625,
+        0.034974917
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 1000,
+      "lookup_seconds_per_node": [
+        8.30725e-08,
+        8.372375e-08,
+        8.271666999999999e-08,
+        8.752417e-08,
+        9.072375e-08
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "sparse",
+      "variant": "after",
+      "repeat": 1,
+      "maximum_resident_bytes": 161710080
+    },
+    {
+      "capture_seconds": [
+        0.050343375,
+        0.046304625,
+        0.045430625,
+        0.04622775,
+        0.044950959
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 1000,
+      "lookup_seconds_per_node": [
+        1.3019791e-07,
+        1.2122041e-07,
+        1.1530250000000001e-07,
+        1.2086541e-07,
+        1.1140834e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "sparse",
+      "variant": "before",
+      "repeat": 1,
+      "maximum_resident_bytes": 173146112
+    },
+    {
+      "capture_seconds": [
+        0.101938542,
+        0.096015,
+        0.098102667,
+        0.094186709,
+        0.094288917
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        1.2328e-07,
+        1.2153666e-07,
+        1.1665874999999999e-07,
+        1.0692999999999999e-07,
+        1.1048749999999999e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "chain",
+      "variant": "after",
+      "repeat": 1,
+      "maximum_resident_bytes": 206061568
+    },
+    {
+      "capture_seconds": [
+        0.116194166,
+        0.113204083,
+        0.1078675,
+        0.10579775,
+        0.106468292
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        1.2041458e-07,
+        1.260425e-07,
+        1.2059792e-07,
+        1.2244291e-07,
+        1.2320457999999998e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "chain",
+      "variant": "before",
+      "repeat": 1,
+      "maximum_resident_bytes": 207175680
+    },
+    {
+      "capture_seconds": [
+        0.072623833,
+        0.069127,
+        0.065670125,
+        0.06690925,
+        0.065986041
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        1.2947416e-07,
+        1.4288584e-07,
+        1.4949791e-07,
+        1.4446792e-07,
+        1.0207499999999999e-07
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "star",
+      "variant": "after",
+      "repeat": 1,
+      "maximum_resident_bytes": 190644224
+    },
+    {
+      "capture_seconds": [
+        0.082554458,
+        0.080572666,
+        0.078449917,
+        0.080888,
+        0.073744292
+      ],
+      "capture_work": "cold capture; last reader released between samples; normal built-in node attributes",
+      "edges": 99999,
+      "lookup_seconds_per_node": [
+        9.697834000000001e-08,
+        9.877208e-08,
+        1.0485249999999999e-07,
+        9.356542e-08,
+        7.455375e-08
+      ],
+      "lookup_work": "neighbors, aligned edge IDs and incident IDs for each node, including isolates",
+      "nodes": 100000,
+      "profile": "release",
+      "shape": "star",
+      "variant": "before",
+      "repeat": 1,
+      "maximum_resident_bytes": 198705152
+    }
+  ]
+}
