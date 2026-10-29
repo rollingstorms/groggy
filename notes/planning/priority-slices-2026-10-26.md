@@ -982,3 +982,22 @@ Python / 1 skipped**, **227 docs**, rebuilt/staged full-ABI release extension.
 No parent closure/new rows: **211 checked / 57 open**. The next measured priority
 is a whole ingest/query/neighborhood/effective-read/recovery workload at larger
 sizes; connected ownership and compound topology acceptance remain open.
+
+
+## Million-node core workflow baseline — 2026-10-28
+
+Existing 32.1/32.2 now has a complete 1k/100k/1m directed-ring workflow receipt: one
+bulk publication, cold canonical capture, explicit property index/page, bounded
+neighborhood, later correction/effective reconstruction and retained archive
+recovery after dropping the owner. See `core-workflow-scale-2026-10-28.md`. The
+million case completes with 8.257 s bulk acceptance, 75.618 µs indexed ten-row
+page, 1.951 µs three-hop neighborhood, 5.908 s effective reconstruction and 26.669 /
+14.599 s archive save/recovery. Peak process RSS is 4,076.422 MiB and includes
+every stage/allocator retention, not logical-heap bytes. Small payload/two-version/
+low-degree fixtures do not establish production budgets.
+
+32.2 changes from open to partial, with no new rows or checkbox closure:
+**211 checked / 57 unchecked**. The measured follow-up is archive encoding/
+validation allocation lifetime; preserve full recovery and corruption validation.
+The new release benchmark passes all three sizes and strict all-target Clippy;
+the unchanged core retains the preceding full native/Python/docs gates.

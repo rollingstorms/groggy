@@ -1,0 +1,135 @@
+{
+  "profile": "release",
+  "method": "separate process per count; one end-to-end run per size; /usr/bin/time -l process peak includes setup and all stages; five batches of 100 indexed pages/neighborhoods each; no production latency budget",
+  "cases": [
+    {
+      "archive_bytes": 253301,
+      "archive_recovery_seconds": 0.005864709,
+      "archive_save_seconds": 0.026190375,
+      "capture_seconds": 0.000792125,
+      "edges": 1000,
+      "index_build_seconds": 0.000186625,
+      "indexed_page_seconds": [
+        1.56459e-06,
+        1.3279200000000002e-06,
+        1.6879199999999999e-06,
+        1.45917e-06,
+        1.5129100000000002e-06
+      ],
+      "ingest_seconds": 0.004277834,
+      "input_seconds": 1.575e-05,
+      "matching_rows": 10,
+      "neighborhood_hops": 3,
+      "neighborhood_seconds": [
+        2.14417e-06,
+        2.0475e-06,
+        2.49958e-06,
+        2.40042e-06,
+        2.3225e-06
+      ],
+      "nodes": 1000,
+      "page_rows": 10,
+      "profile": "release",
+      "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+      "scan_page_seconds": 6.9417e-05,
+      "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+      "shape": "directed ring",
+      "temporal_prepare_seconds": 4.75e-06,
+      "temporal_read_seconds": 0.002171,
+      "update_seconds": 3.3542e-05,
+      "versions": 2,
+      "maximum_resident_bytes": 21774336,
+      "process_time_seconds": {
+        "wall": 0.04,
+        "user": 0.02,
+        "system": 0.0
+      }
+    },
+    {
+      "archive_bytes": 26889515,
+      "archive_recovery_seconds": 0.830885583,
+      "archive_save_seconds": 1.336351667,
+      "capture_seconds": 0.143191417,
+      "edges": 100000,
+      "index_build_seconds": 0.051142958,
+      "indexed_page_seconds": [
+        1.127959e-05,
+        1.011709e-05,
+        9.37e-06,
+        9.29e-06,
+        1.024083e-05
+      ],
+      "ingest_seconds": 0.599613291,
+      "input_seconds": 0.00101475,
+      "matching_rows": 1000,
+      "neighborhood_hops": 3,
+      "neighborhood_seconds": [
+        2.58084e-06,
+        1.93e-06,
+        1.9225000000000002e-06,
+        2.09166e-06,
+        2.1395799999999997e-06
+      ],
+      "nodes": 100000,
+      "page_rows": 10,
+      "profile": "release",
+      "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+      "scan_page_seconds": 0.026008209,
+      "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+      "shape": "directed ring",
+      "temporal_prepare_seconds": 4.125e-06,
+      "temporal_read_seconds": 0.290767959,
+      "update_seconds": 0.000103375,
+      "versions": 2,
+      "maximum_resident_bytes": 1261928448,
+      "process_time_seconds": {
+        "wall": 3.7,
+        "user": 3.32,
+        "system": 0.33
+      }
+    },
+    {
+      "archive_bytes": 290157519,
+      "archive_recovery_seconds": 14.599149542,
+      "archive_save_seconds": 26.669038917,
+      "capture_seconds": 2.239907,
+      "edges": 1000000,
+      "index_build_seconds": 0.75099275,
+      "indexed_page_seconds": [
+        8.004084e-05,
+        7.561792e-05,
+        7.5795e-05,
+        7.449208e-05,
+        7.533416999999999e-05
+      ],
+      "ingest_seconds": 8.257251875,
+      "input_seconds": 0.009312666,
+      "matching_rows": 10000,
+      "neighborhood_hops": 3,
+      "neighborhood_seconds": [
+        2.43583e-06,
+        1.95125e-06,
+        1.9658300000000003e-06,
+        1.93125e-06,
+        1.90458e-06
+      ],
+      "nodes": 1000000,
+      "page_rows": 10,
+      "profile": "release",
+      "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+      "scan_page_seconds": 0.340208792,
+      "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+      "shape": "directed ring",
+      "temporal_prepare_seconds": 3.292e-06,
+      "temporal_read_seconds": 5.907857667,
+      "update_seconds": 0.001049834,
+      "versions": 2,
+      "maximum_resident_bytes": 4274438144,
+      "process_time_seconds": {
+        "wall": 66.28,
+        "user": 50.0,
+        "system": 10.71
+      }
+    }
+  ]
+}

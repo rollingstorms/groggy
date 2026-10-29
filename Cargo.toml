@@ -354,3 +354,7 @@ harness = false
 [[bench]]
 name = "pinned_read_adjacency"
 harness = false
+
+[[bench]]
+name = "core_workflow_scale"
+harness = false
