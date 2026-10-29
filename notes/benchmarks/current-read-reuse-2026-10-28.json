@@ -1,0 +1,35 @@
+{
+  "cases": [
+    {
+      "after_last_reader_release_seconds": 0.000349875,
+      "cold_seconds": 0.000352041,
+      "invalidated_seconds": 0.00038425,
+      "mutation_seconds": 0.000012375,
+      "nodes": 1000,
+      "shared_seconds": [
+        1.2245e-7,
+        1.255625e-7,
+        1.226334e-7,
+        1.248292e-7,
+        1.207083e-7
+      ]
+    },
+    {
+      "after_last_reader_release_seconds": 0.091040041,
+      "cold_seconds": 0.093910125,
+      "invalidated_seconds": 0.088768208,
+      "mutation_seconds": 0.000143209,
+      "nodes": 100000,
+      "shared_seconds": [
+        1.096292e-7,
+        1.0950829999999999e-7,
+        1.0909999999999999e-7,
+        1.0960830000000001e-7,
+        1.091583e-7
+      ]
+    }
+  ],
+  "fixture": "one score column, no edges; manual property mutation after accepted bulk fixture",
+  "profile": "release",
+  "shared_iterations": 10000
+}

@@ -1766,3 +1766,15 @@ selection contracts remain unchanged.
 Gates: **1,433 native / 56 ignored**, **2,309 root Python / 1 skipped**, **224 docs**,
 strict all-target core Clippy. The query-capture and selected-read slices are
 committed separately. No rows added/closed: **211 checked / 57 open**.
+
+
+## Current immutable capture sharing — 2026-10-28
+
+The measured repeated-capture bottleneck from 21.2 now has a weak selected-state
+payload cache. Independent captures preserve separate writeback identity and
+fresh branch/group metadata; clones retain their original identity. Property,
+unset, topology and physical mapping changes invalidate reuse. Readers determine
+payload lifetime, with no additional history pin. See
+`current-read-sharing-2026-10-28.md` and `docs/api/current-read-sharing.md`.
+This advances 21.2/AR7.5/32.2; legacy connected Subgraph migration and first-capture
+materialization remain open. Fixed checklist remains 211 checked / 57 unchecked.

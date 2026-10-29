@@ -16,6 +16,7 @@ use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, EdgeId, NodeId, StateId};
 use crate::{GraphError, GraphResult};
 pub(crate) use integrity::CachedTopologyCheck;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
@@ -82,6 +83,14 @@ impl CacheState {
     }
 }
 
+/// Reusable frozen payload, keyed separately from branch/write provenance.
+#[derive(Debug)]
+struct CurrentReadCache {
+    checkpoint: StateId,
+    graph_type: crate::types::GraphType,
+    data: super::read_state::WeakReadData,
+}
+
 /// Minimal active state tracker for the current graph
 ///
 /// DESIGN: GraphSpace is just the "active set" tracker. It knows which
@@ -128,6 +137,9 @@ pub struct GraphSpace {
     /// Cache state with RwLock for lock-free reads
     cache: RwLock<CacheState>,
 
+    /// Weak ownership avoids extending reader lifetimes or retaining an old checkpoint.
+    current_read: RefCell<Option<CurrentReadCache>>,
+
     /*
     === ATTRIBUTE INDEX MAPPINGS - Plain HashMaps ===
     */
@@ -153,6 +165,7 @@ impl GraphSpace {
             pool,
             version: 1, // Start at 1 so empty cache (version 0) is immediately stale
             cache: RwLock::new(CacheState::new()),
+            current_read: RefCell::new(None),
             node_attribute_indices: HashMap::new(),
             edge_attribute_indices: HashMap::new(),
             base_state,
@@ -166,6 +179,7 @@ impl GraphSpace {
 
     /// Add a node to the active set (&mut self)
     pub fn activate_node(&mut self, node_id: NodeId) {
+        self.invalidate_current_read();
         if self.active_nodes.insert(node_id) {
             self.version += 1;
         }
@@ -173,6 +187,7 @@ impl GraphSpace {
 
     /// Bulk activate nodes (&mut self - PERFORMANCE: single extend call)
     pub fn activate_nodes<I: IntoIterator<Item = NodeId>>(&mut self, nodes: I) {
+        self.invalidate_current_read();
         let before = self.active_nodes.len();
         self.active_nodes.extend(nodes);
         if self.active_nodes.len() != before {
@@ -182,6 +197,7 @@ impl GraphSpace {
 
     /// Remove multiple nodes from the active set (&mut self)
     pub fn deactivate_nodes(&mut self, nodes: &[NodeId]) {
+        self.invalidate_current_read();
         let before = self.active_nodes.len();
         for node in nodes {
             self.active_nodes.remove(node);
@@ -199,6 +215,7 @@ impl GraphSpace {
 
     /// Remove a node from the active set (&mut self)
     pub fn deactivate_node(&mut self, node_id: NodeId) {
+        self.invalidate_current_read();
         if self.active_nodes.remove(&node_id) {
             self.version += 1;
         }
@@ -210,12 +227,14 @@ impl GraphSpace {
 
     /// Add an edge to the active set (&mut self - increments version for topology cache invalidation)
     pub fn activate_edge(&mut self, edge_id: EdgeId, _source: NodeId, _target: NodeId) {
+        self.invalidate_current_read();
         self.active_edges.insert(edge_id);
         self.version += 1; // invalidate topology cache
     }
 
     /// Remove an edge from the active set (&mut self)
     pub fn deactivate_edge(&mut self, edge_id: EdgeId) {
+        self.invalidate_current_read();
         self.active_edges.remove(&edge_id);
         // Remove edge from all attribute indices
         for (_, edges) in self.edge_attribute_indices.iter_mut() {
@@ -226,12 +245,14 @@ impl GraphSpace {
 
     /// Bulk activate edges (&mut self)
     pub fn activate_edges<I: IntoIterator<Item = EdgeId>>(&mut self, edges: I) {
+        self.invalidate_current_read();
         self.active_edges.extend(edges);
         self.version += 1;
     }
 
     /// Remove multiple edges from the active set (&mut self)
     pub fn deactivate_edges(&mut self, edges: &[EdgeId]) {
+        self.invalidate_current_read();
         if edges.is_empty() {
             return;
         }
@@ -263,6 +284,7 @@ impl GraphSpace {
     ) where
         T: Into<usize> + Copy,
     {
+        self.invalidate_current_read();
         let id = entity_id.into();
         if is_node {
             self.node_attribute_indices
@@ -308,6 +330,7 @@ impl GraphSpace {
         name: &AttrName,
         is_node: bool,
     ) -> Option<usize> {
+        self.invalidate_current_read();
         let columns = if is_node {
             &mut self.node_attribute_indices
         } else {
@@ -349,6 +372,7 @@ impl GraphSpace {
 
     /// Set current attribute index for a node (&mut self)
     pub fn set_node_attr_index(&mut self, node_id: NodeId, attr_name: AttrName, new_index: usize) {
+        self.invalidate_current_read();
         self.node_attribute_indices
             .entry(attr_name)
             .or_default()
@@ -365,6 +389,7 @@ impl GraphSpace {
 
     /// Set current attribute index for an edge (&mut self)
     pub fn set_edge_attr_index(&mut self, edge_id: EdgeId, attr_name: AttrName, new_index: usize) {
+        self.invalidate_current_read();
         self.edge_attribute_indices
             .entry(attr_name)
             .or_default()
@@ -795,6 +820,7 @@ impl GraphSpace {
         is_node: bool,
         indices: HashMap<AttrName, HashMap<usize, usize>>,
     ) {
+        self.invalidate_current_read();
         if is_node {
             self.node_attribute_indices = indices;
         } else {
@@ -817,6 +843,35 @@ impl GraphSpace {
                 .filter(move |(id, _)| active.contains(id))
                 .map(move |(&id, &index)| (id, name, index))
         })
+    }
+
+    /// Raw pool access and selected mapping/topology changes must discard reuse.
+    pub(crate) fn invalidate_current_read(&mut self) {
+        self.current_read.get_mut().take();
+    }
+
+    /// Reuse current frozen data while a reader holds it. Provenance and retained
+    /// group catalogs are rebound by the graph coordinator on every capture.
+    pub(crate) fn capture_read_state(
+        &self,
+        pool: &GraphPool,
+        checkpoint: StateId,
+    ) -> GraphResult<super::PinnedReadState> {
+        if let Some(cache) = self.current_read.borrow().as_ref() {
+            if cache.checkpoint == checkpoint && cache.graph_type == pool.graph_type() {
+                if let Some(state) = cache.data.upgrade() {
+                    return Ok(state);
+                }
+            }
+        }
+        let state =
+            super::PinnedReadState::from_snapshot(self.capture_read_snapshot(pool, checkpoint)?)?;
+        *self.current_read.borrow_mut() = Some(CurrentReadCache {
+            checkpoint,
+            graph_type: pool.graph_type(),
+            data: state.downgrade_data(),
+        });
+        Ok(state)
     }
 
     /// Materialize current active values in attribute-first order for an immutable read pin.

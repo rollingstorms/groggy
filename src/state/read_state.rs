@@ -5,7 +5,7 @@ use crate::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 
 /// Active membership at a captured state; independent of later working-graph edits.
@@ -48,6 +48,20 @@ struct ReadData {
     adjacency: HashMap<NodeId, Adjacency>,
     incident: HashMap<NodeId, Vec<EdgeId>>,
 }
+/// A non-owning current-state cache; readers alone determine payload lifetime.
+#[derive(Debug)]
+pub(crate) struct WeakReadData(Weak<ReadData>);
+impl WeakReadData {
+    pub(crate) fn upgrade(&self) -> Option<PinnedReadState> {
+        self.0.upgrade().map(|data| PinnedReadState {
+            data,
+            capture: Arc::new(()),
+            origin: None,
+            read_time: None,
+            groups: Default::default(),
+        })
+    }
+}
 /// In-process checked-write provenance, shared by derived immutable selections.
 #[derive(Debug)]
 pub(crate) struct ReadOrigin {
@@ -61,11 +75,17 @@ pub(crate) struct ReadOrigin {
 #[derive(Debug, Clone)]
 pub struct PinnedReadState {
     data: Arc<ReadData>,
+    // Writeback distinguishes independent captures even when their payload is shared.
+    capture: Arc<()>,
     origin: Option<Arc<ReadOrigin>>,
     read_time: Option<Arc<super::effective_read::ReadTime>>,
     groups: Arc<HashMap<crate::types::SubgraphId, crate::storage::retained_group::RetainedGroup>>,
 }
 impl PinnedReadState {
+    pub(crate) fn downgrade_data(&self) -> WeakReadData {
+        WeakReadData(Arc::downgrade(&self.data))
+    }
+
     pub(crate) fn from_snapshot(snapshot: GraphSnapshot) -> GraphResult<Self> {
         let nodes: HashSet<_> = snapshot.active_nodes.iter().copied().collect();
         if nodes.len() != snapshot.active_nodes.len() {
@@ -107,6 +127,7 @@ impl PinnedReadState {
             })
             .collect();
         Ok(Self {
+            capture: Arc::new(()),
             origin: None,
             read_time: None,
             groups: Default::default(),
@@ -178,7 +199,7 @@ impl PinnedReadState {
             .map(|origin| origin.state)
     }
     pub(crate) fn shares_capture(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.data, &other.data)
+        Arc::ptr_eq(&self.capture, &other.capture)
     }
     /// Borrow frozen values/topology. state_id is checkpoint ancestry for a working capture,
     /// not an assertion that uncheckpointed edits have been recorded in history.

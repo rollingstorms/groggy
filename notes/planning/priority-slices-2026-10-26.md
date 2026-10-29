@@ -945,3 +945,20 @@ selection contracts remain unchanged.
 Gates: **1,433 native / 56 ignored**, **2,309 root Python / 1 skipped**, **224 docs**,
 strict all-target core Clippy. The query-capture and selected-read slices are
 committed separately. No rows added/closed: **211 checked / 57 open**.
+
+
+## Repeated immutable capture reuse — 2026-10-28
+
+Completed the measured repeated-capture component of 21.2/AR7.5/32.2. A weak
+GraphSpace cache shares frozen ReadData while readers hold it, with independent
+capture identity and fresh branch/write coordinates/group catalogs. Selected
+property/topology/mapping changes invalidate reuse, including dirty manual edits
+without a topology-generation change. Existing independent-table-export rejection
+is preserved. At 100k nodes the quiet release fixture measured **109.158 ns**
+median shared capture, versus **93.910 ms** initial cold capture; mutation/release
+then requires another materialization. See `current-read-sharing-2026-10-28.md`.
+
+Gates: **1,441 native / 56 ignored**, strict all-target core Clippy, **2,314 root
+Python / 1 skipped**, **226 docs**, full-ABI release extension rebuilt/staged.
+No new checklist rows or broad parent closure: **211 checked / 57 open**.
+First-capture allocation and legacy connected ownership remain priority work.

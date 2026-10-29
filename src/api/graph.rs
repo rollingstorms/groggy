@@ -365,6 +365,7 @@ impl Graph {
     /// }
     /// ```
     pub(crate) fn pool_mut(&mut self) -> std::cell::RefMut<'_, GraphPool> {
+        self.space.invalidate_current_read();
         self.pool.borrow_mut()
     }
 
@@ -2245,10 +2246,10 @@ impl Graph {
     /// Capture immutable current read state, including uncheckpointed property edits.
     /// No commit/delta is created; clones of the result share its frozen values.
     pub fn pin_current_state(&self) -> GraphResult<crate::state::PinnedReadState> {
-        let snapshot = self
+        let state = self
             .space
-            .capture_read_snapshot(&self.pool.borrow(), self.current_commit)?;
-        Ok(crate::state::PinnedReadState::from_snapshot(snapshot)?
+            .capture_read_state(&self.pool.borrow(), self.current_commit)?;
+        Ok(state
             .with_groups(self.pool.borrow().retained_groups())
             .with_origin(
                 Arc::clone(self.history.identity()),

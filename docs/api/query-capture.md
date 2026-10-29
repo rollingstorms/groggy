@@ -71,8 +71,10 @@ assert index.query_edges("weight > 0", order_by="weight") == \
 ```
 
 Captures, scans, explicit index builds and owned page lists allocate memory.
-Capturing an owner materializes its current read state; reuse the resulting query
-when a stable state is intended. Queries do not publish deltas or checkpoints,
+The first owner capture materializes its current read state. Repeated captures
+share that frozen payload while a reader holds it and the working state is
+unchanged; see [current read sharing](current-read-sharing.md). Each capture keeps
+separate provenance. Reuse the resulting query when a stable state is intended. Queries do not publish deltas or checkpoints,
 and durable captures do not retain writer locks. Detached scan/order work releases
 the Python GIL. Native callers use `Graph::query()` and
 `GraphView::query_nodes/query_edges` with the shared `QueryOptions`.

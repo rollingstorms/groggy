@@ -346,3 +346,7 @@ harness = false
 [[bench]]
 name = "selected_property_scope"
 harness = false
+
+[[bench]]
+name = "current_read_reuse"
+harness = false
