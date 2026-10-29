@@ -78,13 +78,12 @@ Core batch validation, proposed-state schema checks, identity reservations and
 explicit/default effective times use the existing mutation coordinator. All scope
 checks and the refreshed immutable payload/membership are constructed **before**
 publication. There is no fallible output capture after a successful mutation.
-Read values/topology are also compared with the original capture to reject
-untracked raw storage changes made after that capture.
-
-This is not a global repair of native `pool_mut`/`space_mut` escapes. Raw untracked
-edits made before capturing a pin remain outside the supported checked mutation
-contract; the broader migration remains open. Source pins are in-process and are
-not serialized write capabilities. A fresh `Graph.read_view()` retrieves current
+Source checks reuse the verified current immutable payload when it is identical
+to the input payload. After invalidation, a different payload receives the exact
+value/topology comparison before any write. Trusted internal pool access also
+invalidates the cache; corruption fixtures continue to reject. Public mutable
+pool/space escapes have been sealed (see [storage access](storage-access.md)).
+Source pins are in-process and are not serialized write capabilities. A fresh `Graph.read_view()` retrieves current
 state explicitly. `add_graph`/table materialization create independent data; a
 view clone shares immutable data. Cached adjacency belongs to the frozen payload
 and cannot become stale when its owner changes.
@@ -178,3 +177,24 @@ both represent absence. New canonical batch fields must be handled explicitly in
 the scope and projection matches; adding a field causes a compile error there.
 This checked single-batch path does not imply atomic execution of arbitrary
 multi-stage topology algorithms.
+
+
+## Current payload reuse and cost
+
+After successful graph or durable publication, the complete prebuilt result seeds
+the existing weak current-read cache. A subsequent `read_view()` shares that data
+but gets fresh capture identity, branch provenance and retained-group metadata.
+Old views remain unchanged. Ordinary mutations and physical maintenance invalidate
+the cache. The payload is released when no reader or retained source owns it;
+the cache does not retain it independently.
+
+The identity fast path removes repeated full current-value materialization and
+comparison. Output copying happens after ordinary validation and scope checks,
+so a rejected batch does not build an unused full output snapshot. Each accepted
+write still copies the full snapshot and builds its immutable topology indexes.
+It is not an O(1) view-write guarantee, even for a small selection.
+
+Paired release evidence and limits are recorded in
+[the performance receipt](../../notes/planning/view-write-payload-reuse-2026-10-29.md)
+and its matching benchmark data. These in-memory timings do not include durable fsync or certify Python
+GIL/FFI latency.

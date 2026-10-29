@@ -1352,3 +1352,34 @@ full-ABI release extension rebuilt/atomically staged, scoped formatting/syntax/
 diff checks. Three unrelated existing FFI warnings remain; owner edits excluded.
 Inventory remains **211 checked / 57 open**: immutable defaults and general
 multi-stage topology execution are still their existing broader boundaries.
+
+### Reuse accepted payloads for scoped publication — 2026-10-29
+
+Completed a measured existing 26.1/AR4/AR7.5 and 10.4/32.2 component. Source checks
+reuse current immutable data identity after the unchanged provenance/head guards;
+distinct payloads still receive exact fallback comparison. Full output copying
+moves after ordinary preparation and selected-scope validation. Graph/durable
+success then shares one helper to seed the weak current-read cache with the
+prebuilt accepted full payload. New captures retain fresh identity and current
+branch/group metadata; no extra retention pin or new snapshot format.
+
+Receipt: `view-write-payload-reuse-2026-10-29.md`. New native cases verify payload
+sharing independent of selected membership, immutable original values, ordinary
+mutation invalidation, forced same-head maintenance fallback, fresh catalogs,
+durable adoption/reopen and weak lifetime/distinct capture identity. All ten
+existing raw/corrupt pinned-write boundary cases remain passing.
+
+Same release fixture as `9b364219`, three alternating standalone process pairs,
+15 samples per size/variant: medians **1.464→0.517 ms at 1k** and **310.443→76.283 ms
+at 100k**, 2.83×/4.07× on this workload. Whole-fixture peak RSS in one extra run per
+variant is 594.281/589.359 MiB; construction is included, so no significant peak
+memory improvement or isolated allocation claim. Raw paired data is in
+`notes/benchmarks/view-write-payload-reuse-2026-10-29.json`.
+
+Full output copying/index construction still scales with owner payload/topology.
+No O(1), production memory/throughput, durable-fsync or Python latency guarantee.
+Gates: **1,492 native / 54 ignored**, strict all-target core Clippy,
+**2,511 root Python / 1 skipped**, **244 executed documentation examples**, rebuilt/
+atomically staged extension and scoped formatting/syntax/diff checks. Three old
+unrelated FFI warnings remain; owner edits stay excluded. No new checklist rows
+or broad ownership/default/compound closure: **211 checked / 57 unchecked**.

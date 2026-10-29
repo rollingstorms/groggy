@@ -1,0 +1,276 @@
+{
+  "baseline_commit": "9b364219",
+  "variant": "weak adoption of accepted prepared view payload plus source identity fast path",
+  "method": "3 alternating quiet standalone process pairs; identical release fixture; 5 checked publications per size per process; source benchmark unchanged",
+  "summary": [
+    {
+      "nodes": 1000,
+      "baseline_median_seconds": 0.001464208,
+      "reuse_median_seconds": 0.000516791,
+      "ratio_baseline_over_reuse": 2.8332691552290967,
+      "samples_per_variant": 15
+    },
+    {
+      "nodes": 100000,
+      "baseline_median_seconds": 0.310443292,
+      "reuse_median_seconds": 0.076283,
+      "ratio_baseline_over_reuse": 4.069626155237732,
+      "samples_per_variant": 15
+    }
+  ],
+  "runs": [
+    {
+      "round": 1,
+      "variant": "baseline",
+      "result": {
+        "cases": [
+          {
+            "edges": 999,
+            "final_state": 6,
+            "nodes": 1000,
+            "publication_seconds": [
+              0.001480708,
+              0.001788917,
+              0.001506708,
+              0.0013685,
+              0.001318958
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          },
+          {
+            "edges": 99999,
+            "final_state": 6,
+            "nodes": 100000,
+            "publication_seconds": [
+              0.322950166,
+              0.32552075,
+              0.29522825,
+              0.309232375,
+              0.310443292
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          }
+        ],
+        "fixture": "chain, f64 scalar and 16-element f64 vector per node; two-node immutable scope; five sequential score writes with original capture retained; includes publication and refreshed payload construction",
+        "profile": "release"
+      }
+    },
+    {
+      "round": 1,
+      "variant": "reuse",
+      "result": {
+        "cases": [
+          {
+            "edges": 999,
+            "final_state": 6,
+            "nodes": 1000,
+            "publication_seconds": [
+              0.000951125,
+              0.000848083,
+              0.000656,
+              0.000685917,
+              0.000643208
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          },
+          {
+            "edges": 99999,
+            "final_state": 6,
+            "nodes": 100000,
+            "publication_seconds": [
+              0.09575875,
+              0.082764125,
+              0.0583555,
+              0.060958875,
+              0.074443041
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          }
+        ],
+        "fixture": "chain, f64 scalar and 16-element f64 vector per node; two-node immutable scope; five sequential score writes with original capture retained; includes publication and refreshed payload construction",
+        "profile": "release"
+      }
+    },
+    {
+      "round": 2,
+      "variant": "reuse",
+      "result": {
+        "cases": [
+          {
+            "edges": 999,
+            "final_state": 6,
+            "nodes": 1000,
+            "publication_seconds": [
+              0.000545417,
+              0.000516791,
+              0.000452625,
+              0.000385375,
+              0.000419791
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          },
+          {
+            "edges": 99999,
+            "final_state": 6,
+            "nodes": 100000,
+            "publication_seconds": [
+              0.115786292,
+              0.074350167,
+              0.076283,
+              0.069993833,
+              0.072235875
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          }
+        ],
+        "fixture": "chain, f64 scalar and 16-element f64 vector per node; two-node immutable scope; five sequential score writes with original capture retained; includes publication and refreshed payload construction",
+        "profile": "release"
+      }
+    },
+    {
+      "round": 2,
+      "variant": "baseline",
+      "result": {
+        "cases": [
+          {
+            "edges": 999,
+            "final_state": 6,
+            "nodes": 1000,
+            "publication_seconds": [
+              0.001544875,
+              0.001464208,
+              0.00146175,
+              0.001362084,
+              0.001301042
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          },
+          {
+            "edges": 99999,
+            "final_state": 6,
+            "nodes": 100000,
+            "publication_seconds": [
+              0.311622375,
+              0.306335916,
+              0.321092292,
+              0.307909833,
+              0.324946583
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          }
+        ],
+        "fixture": "chain, f64 scalar and 16-element f64 vector per node; two-node immutable scope; five sequential score writes with original capture retained; includes publication and refreshed payload construction",
+        "profile": "release"
+      }
+    },
+    {
+      "round": 3,
+      "variant": "baseline",
+      "result": {
+        "cases": [
+          {
+            "edges": 999,
+            "final_state": 6,
+            "nodes": 1000,
+            "publication_seconds": [
+              0.001594666,
+              0.00153175,
+              0.001401167,
+              0.001369416,
+              0.001545584
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          },
+          {
+            "edges": 99999,
+            "final_state": 6,
+            "nodes": 100000,
+            "publication_seconds": [
+              0.305097375,
+              0.318609833,
+              0.324050208,
+              0.306969708,
+              0.300329875
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          }
+        ],
+        "fixture": "chain, f64 scalar and 16-element f64 vector per node; two-node immutable scope; five sequential score writes with original capture retained; includes publication and refreshed payload construction",
+        "profile": "release"
+      }
+    },
+    {
+      "round": 3,
+      "variant": "reuse",
+      "result": {
+        "cases": [
+          {
+            "edges": 999,
+            "final_state": 6,
+            "nodes": 1000,
+            "publication_seconds": [
+              0.000564209,
+              0.000487875,
+              0.000396125,
+              0.000422542,
+              0.000428667
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          },
+          {
+            "edges": 99999,
+            "final_state": 6,
+            "nodes": 100000,
+            "publication_seconds": [
+              0.093712375,
+              0.080596708,
+              0.081325,
+              0.056803834,
+              0.077756666
+            ],
+            "selected_edges": 1,
+            "selected_nodes": 2,
+            "vector_dimensions": 16
+          }
+        ],
+        "fixture": "chain, f64 scalar and 16-element f64 vector per node; two-node immutable scope; five sequential score writes with original capture retained; includes publication and refreshed payload construction",
+        "profile": "release"
+      }
+    }
+  ],
+  "memory_method": "One macOS /usr/bin/time -l process per variant; maximum resident bytes include entire fixture construction and both sizes, not isolated operation allocations.",
+  "memory_processes": [
+    {
+      "variant": "baseline",
+      "maximum_resident_bytes": 623149056,
+      "raw_time_report": "        3.27 real         3.07 user         0.15 sys\n           623149056  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n               44772  page reclaims\n                  51  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                   0  voluntary context switches\n                 470  involuntary context switches\n         17150246121  instructions retired\n          9423775036  cycles elapsed\n           562678208  peak memory footprint\n"
+    },
+    {
+      "variant": "reuse",
+      "maximum_resident_bytes": 617988096,
+      "raw_time_report": "        1.75 real         1.59 user         0.13 sys\n           617988096  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n               44619  page reclaims\n                  66  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                   1  voluntary context switches\n                 285  involuntary context switches\n         11159362410  instructions retired\n          5036244292  cycles elapsed\n           556697984  peak memory footprint\n"
+    }
+  ]
+}

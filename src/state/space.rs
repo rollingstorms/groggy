@@ -890,6 +890,18 @@ impl GraphSpace {
         Ok(state)
     }
 
+    /// Remember a fully prepared snapshot after its matching publication succeeds.
+    /// The graph coordinator owns that precondition. Retention remains weak, and
+    /// every ordinary space mutation still invalidates this cache.
+    pub(crate) fn cache_accepted_read(&self, state: &super::PinnedReadState) {
+        let snapshot = state.snapshot();
+        *self.current_read.borrow_mut() = Some(CurrentReadCache {
+            checkpoint: snapshot.state_id,
+            graph_type: snapshot.graph_type,
+            data: state.downgrade_data(),
+        });
+    }
+
     /// Materialize current active values in attribute-first order for an immutable read pin.
     /// This captures uncheckpointed edits and never changes history or pool values.
     pub(crate) fn capture_read_snapshot(

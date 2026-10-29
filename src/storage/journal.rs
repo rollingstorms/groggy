@@ -931,10 +931,7 @@ impl DurableGraph {
             author,
             additional_schema,
         )?;
-        Ok(crate::ViewBatchResult {
-            batch,
-            view: prepared.view,
-        })
+        Ok(self.graph.accepted_view_result(batch, prepared.view))
     }
 
     fn execute_prepared_batch(

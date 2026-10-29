@@ -57,10 +57,18 @@ impl Graph {
     ) -> GraphResult<ViewBatchResult> {
         let prepared = self.prepare_view_publication(view, batch, schema, None)?;
         let batch = self.execute_publication(prepared.publication, message, author)?;
-        Ok(ViewBatchResult {
-            batch,
-            view: prepared.view,
-        })
+        Ok(self.accepted_view_result(batch, prepared.view))
+    }
+
+    /// Reuse only the complete output prepared before this accepted write. This
+    /// is shared with durable publication after the journal append and execution.
+    pub(crate) fn accepted_view_result(
+        &self,
+        batch: BatchResult,
+        view: GraphView,
+    ) -> ViewBatchResult {
+        self.space.cache_accepted_read(view.read_state());
+        ViewBatchResult { batch, view }
     }
 
     pub(crate) fn prepare_view_publication(
@@ -87,12 +95,13 @@ impl Graph {
             ));
         }
         self.validate_write_head(origin.state)?;
-        // One current capture both validates raw indices/endpoints and detects low-level
-        // storage escapes that changed data without advancing the checked head.
-        let mut snapshot = self
-            .space
-            .capture_read_snapshot(&self.pool.borrow(), self.current_commit)?;
-        if !same_values(&snapshot, view.read_state().snapshot())? {
+        // A live current payload has already passed immutable capture validation.
+        // Distinct payloads still receive exact comparison after cache invalidation
+        // (for example physical maintenance that leaves the logical head unchanged).
+        let current = self.pin_current_state()?;
+        if !std::ptr::eq(current.snapshot(), view.read_state().snapshot())
+            && !same_values(current.snapshot(), view.read_state().snapshot())?
+        {
             return Err(invalid(
                 "Working graph no longer matches the view's captured state",
             ));
@@ -106,11 +115,12 @@ impl Graph {
         let counts = self.pool.borrow().statistics();
         validate_scope(
             view,
-            &snapshot,
+            current.snapshot(),
             &prepared.batch,
             counts.node_count,
             counts.edge_count,
         )?;
+        let mut snapshot = current.snapshot().clone();
         let (nodes, edges) = project(
             &mut snapshot,
             view,
@@ -392,5 +402,42 @@ mod tests {
             assert!(!same_values(&a, &b).unwrap());
             assert!(same_values(&a, &a).unwrap());
         }
+    }
+    #[test]
+    fn accepted_payload_cache_is_weak_and_fresh_captures_keep_distinct_identity() {
+        let mut graph = Graph::new();
+        graph.add_node().unwrap();
+        let source = graph.read_view().unwrap();
+        let batch = GraphBatch {
+            node_attrs: HashMap::from([(
+                "value".into(),
+                vec![(crate::BatchNodeRef::Existing(0), AttrValue::Int(7))],
+            )]),
+            ..Default::default()
+        };
+        let result = graph
+            .apply_view_batch(&source, batch, "update".into(), "test".into())
+            .unwrap();
+        let current = graph.read_view().unwrap();
+        assert!(std::ptr::eq(
+            current.read_state().snapshot(),
+            result.view.read_state().snapshot()
+        ));
+        assert!(!current
+            .read_state()
+            .shares_capture(result.view.read_state()));
+        let weak = result.view.read_state().downgrade_data();
+        drop(current);
+        drop(result);
+        assert!(weak.upgrade().is_none());
+        assert_eq!(source.node_attr(0, &"value".into()).unwrap(), None);
+        assert_eq!(
+            graph
+                .read_view()
+                .unwrap()
+                .node_attr(0, &"value".into())
+                .unwrap(),
+            Some(AttrValue::Int(7))
+        );
     }
 }
