@@ -1,5 +1,8 @@
 # Native connected column alignment
 
+Default selections now retain their source; see [immutable defaults](default-immutable-views.md).
+The explicit connected examples below preserve the current-owner compatibility contract.
+
 The native Rust Subgraph compatibility readers now retain every requested row:
 
 - `node_ids()` and `edge_ids()` return ascending original IDs, reusing cached order.
@@ -55,7 +58,7 @@ from groggy import Graph
 
 graph = Graph()
 graph.add_nodes([{"score": 0.123456789012345}, {}, {"score": None}, {"score": 7}])
-connected = graph.view()
+connected = graph.connected_view()
 frozen = connected.pin_view()
 assert connected.node_ids.to_list() == frozen.node_ids == [0, 1, 2, 3]
 assert connected["score"].to_list() == frozen["score"].to_list() == [0.123456789012345, None, None, 7]

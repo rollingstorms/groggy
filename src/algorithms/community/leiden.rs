@@ -209,6 +209,11 @@ impl Algorithm for Leiden {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let subgraph = if subgraph.frozen_view().is_some() {
+            subgraph.execution_scope(ctx.persist_results())?
+        } else {
+            subgraph
+        };
         if ctx.is_cancelled() {
             return Err(anyhow!("community detection cancelled"));
         }

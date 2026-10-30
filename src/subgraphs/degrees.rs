@@ -65,6 +65,35 @@ impl Subgraph {
         mode: DegreeMode,
         full_graph: bool,
     ) -> GraphResult<SubgraphDegreeRead> {
+        if let Some(view) = self.frozen_view() {
+            let domain = if full_graph {
+                crate::GraphView::all(view.read_state().clone())
+            } else {
+                view.clone()
+            };
+            let incoming = domain.is_directed() && mode == DegreeMode::Incoming;
+            let primary = crate::algorithms::AlgorithmRead::with_topology(
+                domain.clone(),
+                !domain.is_directed() || mode != DegreeMode::Outgoing,
+                false,
+            )?
+            .shared_csr();
+            let outgoing = if incoming {
+                Some(
+                    crate::algorithms::AlgorithmRead::with_topology(domain.clone(), false, false)?
+                        .shared_csr(),
+                )
+            } else {
+                None
+            };
+            return Ok(SubgraphDegreeRead {
+                allowed: self.ordered_nodes(),
+                nodes: Arc::from(domain.node_ids()),
+                primary,
+                outgoing,
+            });
+        }
+
         let owner = self.graph();
         let graph = owner.borrow();
         self.validate_query_scope(&graph)?;

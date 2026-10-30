@@ -128,13 +128,14 @@ pub struct Pipeline {
 impl Pipeline {
     /// Execute sequentially with the existing per-algorithm publication policy.
     pub fn run(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        self.run_steps(ctx, subgraph, None)
+        self.run_steps(ctx, subgraph.execution_scope(ctx.persist_results())?, None)
     }
 
     /// Stage all certified property algorithms and accept exactly once on success.
     /// Unsupported effects reject before any execution. Earlier staged properties
     /// are visible to later algorithms; errors/cancellation discard the outer batch.
     pub fn run_atomic_properties(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let subgraph = subgraph.execution_scope(ctx.persist_results())?;
         if ctx.property_batch.is_some() {
             return Err(anyhow!(
                 "Nested outer atomic pipeline execution is unsupported"

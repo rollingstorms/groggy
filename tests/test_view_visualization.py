@@ -6,7 +6,7 @@ import textwrap
 import pytest
 
 
-@pytest.mark.parametrize("captured", [False, True])
+@pytest.mark.parametrize("captured", [False, True, "components"])
 def test_visualization_snapshot_keeps_only_selected_entities_after_owner_changes(captured):
     code = textwrap.dedent('''
         import json, re, sys, types, urllib.request
@@ -23,8 +23,10 @@ def test_visualization_snapshot_keeps_only_selected_entities_after_owner_changes
         graph.add_edge(3, 3)
         graph.add_edge(0, 4)
         selected = graph.subgraph_from_edges([1, 2])
-        if CAPTURED:
+        if CAPTURED is True:
             selected = selected.pin_view()
+        elif CAPTURED == "components":
+            selected = selected.connected_components()
         accessor = selected.viz
         graph.remove_node(1)
         accessor.show(layout="grid")

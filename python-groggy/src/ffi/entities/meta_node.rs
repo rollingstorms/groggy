@@ -180,19 +180,9 @@ impl PyMetaNode {
 
         match self.inner.subgraph() {
             Ok(Some(subgraph_trait_obj)) => {
-                // Extract the data from the trait object and create a concrete subgraph
-                use crate::ffi::subgraphs::subgraph::PySubgraph;
-                use groggy::subgraphs::Subgraph;
-
-                // Create a new concrete Subgraph from the trait object data
-                let concrete_subgraph = Subgraph::new(
-                    subgraph_trait_obj.graph_ref().clone(),
-                    subgraph_trait_obj.node_set().clone(),
-                    subgraph_trait_obj.edge_set().clone(),
-                    format!("expanded_subgraph_{}", self.inner.id()),
-                );
-
-                let py_subgraph = PySubgraph::from_core_subgraph(concrete_subgraph)?;
+                let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_trait_object(
+                    subgraph_trait_obj,
+                )?;
                 Ok(Some(Py::new(py, py_subgraph)?.to_object(py)))
             }
             Ok(None) => Ok(None),

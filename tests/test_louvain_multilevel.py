@@ -34,14 +34,14 @@ def modularity(labels, edges):
 def test_multilevel_improves_original_objective_and_preserves_source_topology():
     graph, nodes, edges = ring()
     view = graph.induced_subgraph(nodes)
-    view.apply(algorithms.community.louvain(max_iter=100, max_phases=1))
+    view = view.apply(algorithms.community.louvain(max_iter=100, max_phases=1))
     local = [graph.get_node_attr(n, "community") for n in nodes]
-    view.apply(algorithms.community.louvain(max_iter=100, max_phases=10))
+    view = view.apply(algorithms.community.louvain(max_iter=100, max_phases=10))
     multi = [graph.get_node_attr(n, "community") for n in nodes]
     assert modularity(multi, edges) > modularity(local, edges)
     assert multi[-1] not in multi[:-1]
     assert len(graph.edge_ids) == len(edges)
-    view.apply(algorithms.community.louvain(max_iter=100))
+    view = view.apply(algorithms.community.louvain(max_iter=100))
     assert [graph.get_node_attr(n, "community") for n in nodes] == multi
 
 
@@ -49,15 +49,15 @@ def test_multilevel_improves_original_objective_and_preserves_source_topology():
 def test_phase_budget_validation_preserves_prior_result(phases):
     graph, nodes, _ = ring()
     view = graph.induced_subgraph(nodes)
-    view.apply(algorithms.community.louvain())
+    view = view.apply(algorithms.community.louvain())
     before = [graph.get_node_attr(n, "community") for n in nodes]
     with pytest.raises(Exception, match="max_phases"):
-        view.apply(algorithms.community.louvain(max_phases=phases))
+        view = view.apply(algorithms.community.louvain(max_phases=phases))
     assert [graph.get_node_attr(n, "community") for n in nodes] == before
 
 
 def test_existing_positional_arguments_keep_their_meaning():
     graph, nodes, _ = ring()
     view = graph.induced_subgraph(nodes)
-    view.apply(algorithms.community.louvain(1.0, 100, "legacy", max_phases=1))
+    view = view.apply(algorithms.community.louvain(1.0, 100, "legacy", max_phases=1))
     assert all(graph.get_node_attr(n, "legacy") is not None for n in nodes)

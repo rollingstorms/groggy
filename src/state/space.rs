@@ -43,6 +43,10 @@ impl Eq for SpaceVersion {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MembershipRevision(SpaceVersion);
 
+/// Opaque revision of all current readable mappings, not just membership.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadRevision(SpaceVersion);
+
 /// Current-space incidence convention. Kept in one owner for cache assembly and
 /// verification; algorithm-specific/frozen adjacency policy remains separate.
 fn incidence_neighbors(
@@ -153,6 +157,8 @@ pub struct GraphSpace {
     /// Version counter - increments on structural changes
     version: u64,
     membership_version: u64,
+    read_revision: u64,
+    default_capture: RefCell<Option<super::read_state::WeakReadCapture>>,
     cache_identity: Arc<()>,
 
     /*
@@ -189,6 +195,8 @@ impl GraphSpace {
             pool,
             version: 1, // Start at 1 so empty cache (version 0) is immediately stale
             membership_version: 1,
+            read_revision: 1,
+            default_capture: RefCell::new(None),
             cache_identity: Arc::new(()),
             cache: RwLock::new(CacheState::new()),
             current_read: RefCell::new(None),
@@ -890,6 +898,26 @@ impl GraphSpace {
     /// Raw pool access and selected mapping/topology changes must discard reuse.
     pub(crate) fn invalidate_current_read(&mut self) {
         self.current_read.get_mut().take();
+        self.default_capture.get_mut().take();
+        self.read_revision = self.read_revision.wrapping_add(1);
+    }
+
+    pub(crate) fn cached_default_capture(&self) -> Option<super::PinnedReadState> {
+        self.default_capture.borrow().as_ref()?.upgrade()
+    }
+    pub(crate) fn cache_default_capture(&self, state: &super::PinnedReadState) {
+        *self.default_capture.borrow_mut() = Some(state.downgrade_capture());
+    }
+    /// Read-only cache stamp; retains an instance marker, never graph payloads.
+    pub fn read_revision(&self) -> ReadRevision {
+        ReadRevision(SpaceVersion {
+            instance: self.cache_identity.clone(),
+            version: self.read_revision,
+        })
+    }
+    pub(crate) fn matches_read_revision(&self, revision: &ReadRevision) -> bool {
+        Arc::ptr_eq(&self.cache_identity, &revision.0.instance)
+            && self.read_revision == revision.0.version
     }
 
     /// Reuse current frozen data while a reader holds it. Provenance and retained

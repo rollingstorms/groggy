@@ -642,6 +642,7 @@ impl PySubgraphArray {
         Ok(crate::ffi::api::graph::PyGraph {
             inner: merged_graph.into_shared(),
             cached_view: RefCell::new(None),
+            cached_live_view: std::cell::RefCell::new(None),
         })
     }
 }

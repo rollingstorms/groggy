@@ -12,7 +12,7 @@ from groggy import Graph
 graph = Graph(directed=True)
 graph.add_nodes(3)
 graph.add_edge(0, 1, weight=2.5)
-connected = graph.view()
+connected = graph.connected_view()
 frozen = connected.pin_view()
 owned = connected.adjacency_matrix(sparse=True, weight_attr="weight")
 assert owned.shape == (3, 3)

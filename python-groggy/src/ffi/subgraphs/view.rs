@@ -586,8 +586,13 @@ impl PyGraphView {
     /// Cheap ownership copy; the frozen state and selected membership remain shared.
     /// Independent publishing graph containing exactly this captured selection.
     fn to_graph(&self) -> PyResult<crate::ffi::api::graph::PyGraph> {
-        self.inner.to_graph()
-            .map(|graph| crate::ffi::api::graph::PyGraph { inner: graph.into_shared(), cached_view: std::cell::RefCell::new(None) })
+        self.inner
+            .to_graph()
+            .map(|graph| crate::ffi::api::graph::PyGraph {
+                inner: graph.into_shared(),
+                cached_view: std::cell::RefCell::new(None),
+                cached_live_view: std::cell::RefCell::new(None),
+            })
             .map_err(graph_error_to_py_err)
     }
     /// Immutable visualization capture of exactly this selected state.
@@ -610,7 +615,7 @@ fn community_count(value: Option<&PyAny>, name: &str, default: usize) -> PyResul
 }
 
 // Only immutable input and owned Send numerical data cross the GIL boundary.
-fn owned_matrix(
+pub(super) fn owned_matrix(
     py: Python,
     view: &GraphView,
     operation: impl FnOnce(&GraphView) -> groggy::GraphResult<groggy::storage::GraphMatrix> + Send,

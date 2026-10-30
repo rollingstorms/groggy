@@ -28,10 +28,9 @@ def test_legacy_and_frozen_queries_cannot_expand_parent_membership(directed):
         assert parent.filter_edges(gr.EdgeFilter.connects_nodes(b, a)).edge_count() == int(not directed)
     graph.set_node_attr(a, "keep", False)
     assert frozen.filter_nodes("keep == true").node_ids == [a, b]
-    assert list(legacy.filter_nodes("keep == true").node_ids) == [b]
+    assert list(legacy.filter_nodes("keep == true").node_ids) == [a, b]
     graph.remove_edge(first)
-    with pytest.raises((ValueError, RuntimeError)):
-        legacy.filter_nodes("keep == true")
+    assert list(legacy.filter_nodes("keep == true").edge_ids) == [first]
     del legacy, graph
     assert frozen.filter_edges("keep == true").edge_ids == [first]
     assert excluded not in frozen.edge_ids

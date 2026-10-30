@@ -43,11 +43,11 @@ owner.set_node_attr(1, "x", 99)
 assert nodes["x"] == 20
 ```
 
-Legacy `Subgraph` and accessors themselves still read their connected parent.
-This change pins their **table outputs**, not all legacy object behavior. Each
-fresh export sees current values and validates the current selection. A subgraph
-with any stale selected member rejects the export; it does not partly export a
-selection whose graph scope is no longer valid.
+Default `Subgraph` selections and their node/edge adapters now retain the original
+capture, so subsequent table exports use the same original state. Explicit
+`graph.connected_view()` and working graph accessors capture current state when
+exported, rejecting inactive or malformed selected membership. See
+[immutable defaults](default-immutable-views.md).
 
 Manual dirty working state can be captured for inspection. Such a capture has
 no accepted source state and remains read-only for checked source publication.

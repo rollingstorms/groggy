@@ -36,14 +36,14 @@ def objective(graph, nodes, labels):
 def test_refined_levels_improve_the_original_objective_and_preserve_source():
     graph, nodes = fixture()
     view = graph.induced_subgraph(nodes)
-    view.apply(algorithms.community.leiden(max_iter=100, max_phases=1, seed=42))
+    view = view.apply(algorithms.community.leiden(max_iter=100, max_phases=1, seed=42))
     single = [graph.get_node_attr(n, "community") for n in nodes]
-    view.apply(algorithms.community.leiden(max_iter=100, max_phases=10, seed=42))
+    view = view.apply(algorithms.community.leiden(max_iter=100, max_phases=10, seed=42))
     multi = [graph.get_node_attr(n, "community") for n in nodes]
     assert objective(graph, nodes, multi) > objective(graph, nodes, single)
     assert multi[-1] not in multi[:-1]
     assert len(graph.edge_ids) == 64
-    view.apply(algorithms.community.leiden(max_iter=100, max_phases=10, seed=42))
+    view = view.apply(algorithms.community.leiden(max_iter=100, max_phases=10, seed=42))
     assert [graph.get_node_attr(n, "community") for n in nodes] == multi
 
 
@@ -51,10 +51,10 @@ def test_refined_levels_improve_the_original_objective_and_preserve_source():
 def test_invalid_refinement_temperature_preserves_prior_labels(theta):
     graph, nodes = fixture()
     view = graph.induced_subgraph(nodes)
-    view.apply(algorithms.community.leiden(seed=42))
+    view = view.apply(algorithms.community.leiden(seed=42))
     before = [graph.get_node_attr(n, "community") for n in nodes]
     with pytest.raises(Exception, match="theta"):
-        view.apply(algorithms.community.leiden(seed=42, theta=theta))
+        view = view.apply(algorithms.community.leiden(seed=42, theta=theta))
     assert [graph.get_node_attr(n, "community") for n in nodes] == before
 
 
@@ -64,7 +64,7 @@ def test_temperature_extremes_remain_finite_and_repeatable(theta):
     view = graph.induced_subgraph(nodes)
     outputs = []
     for _ in range(2):
-        view.apply(algorithms.community.leiden(1.0, 100, 10, 42, "legacy", theta=theta))
+        view = view.apply(algorithms.community.leiden(1.0, 100, 10, 42, "legacy", theta=theta))
         outputs.append([graph.get_node_attr(n, "legacy") for n in nodes])
     assert outputs[0] == outputs[1]
     assert all(value is not None for value in outputs[0])

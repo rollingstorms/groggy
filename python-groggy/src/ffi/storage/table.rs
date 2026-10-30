@@ -5383,6 +5383,7 @@ impl PyGraphTable {
         Ok(crate::ffi::api::graph::PyGraph {
             inner: graph.into_shared(),
             cached_view: std::cell::RefCell::new(None),
+            cached_live_view: std::cell::RefCell::new(None),
         })
     }
 

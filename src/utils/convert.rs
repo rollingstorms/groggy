@@ -176,6 +176,62 @@ pub fn graph_to_networkx(graph: &Graph) -> GraphResult<NetworkXGraph> {
 
 /// Convert a Subgraph to NetworkX format
 pub fn subgraph_to_networkx(subgraph: &Subgraph) -> GraphResult<NetworkXGraph> {
+    if let Some(view) = subgraph.frozen_view() {
+        let mut snapshot = view.to_snapshot();
+        let attributes = |attrs: HashMap<String, AttrValue>| {
+            attrs
+                .into_iter()
+                .map(|(key, value)| (key, NetworkXValue::from(&value)))
+                .collect()
+        };
+        let mut nodes: Vec<_> = snapshot
+            .active_nodes
+            .into_iter()
+            .map(|id| NetworkXNode {
+                id,
+                attributes: attributes(snapshot.node_attributes.remove(&id).unwrap_or_default()),
+            })
+            .collect();
+        nodes.sort_unstable_by_key(|node| node.id);
+        let mut entries: Vec<_> = snapshot.edges.into_iter().collect();
+        entries.sort_unstable_by_key(|(id, _)| *id);
+        let edges = entries
+            .into_iter()
+            .map(|(id, (source, target))| NetworkXEdge {
+                source,
+                target,
+                attributes: attributes(snapshot.edge_attributes.remove(&id).unwrap_or_default()),
+            })
+            .collect();
+        return Ok(NetworkXGraph {
+            directed: view.is_directed(),
+            nodes,
+            edges,
+            graph_attrs: HashMap::from([
+                (
+                    "groggy_version".into(),
+                    NetworkXValue::String(crate::VERSION.into()),
+                ),
+                (
+                    "directed".into(),
+                    NetworkXValue::Boolean(view.is_directed()),
+                ),
+                (
+                    "subgraph_type".into(),
+                    NetworkXValue::String(subgraph.subgraph_type().into()),
+                ),
+                (
+                    "subgraph_node_count".into(),
+                    NetworkXValue::Integer(view.node_count() as i64),
+                ),
+                (
+                    "subgraph_edge_count".into(),
+                    NetworkXValue::Integer(view.edge_count() as i64),
+                ),
+            ]),
+        });
+    }
+
     let graph = subgraph.graph();
     let graph_borrow = graph.borrow();
     let directed = graph_borrow.is_directed();

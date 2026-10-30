@@ -11,13 +11,19 @@ use std::{
 /// Active membership at a captured state; independent of later working-graph edits.
 #[derive(Debug, Clone)]
 pub struct ExistenceIndex {
-    nodes: HashSet<NodeId>,
-    edges: HashSet<EdgeId>,
+    nodes: Arc<HashSet<NodeId>>,
+    edges: Arc<HashSet<EdgeId>>,
 }
 impl ExistenceIndex {
     /// Build membership from explicit sets.
     pub fn new(nodes: HashSet<NodeId>, edges: HashSet<EdgeId>) -> Self {
-        Self { nodes, edges }
+        Self {
+            nodes: Arc::new(nodes),
+            edges: Arc::new(edges),
+        }
+    }
+    pub(crate) fn shared_membership(&self) -> (Arc<HashSet<NodeId>>, Arc<HashSet<EdgeId>>) {
+        (self.nodes.clone(), self.edges.clone())
     }
     /// Whether the node belongs to the captured state.
     pub fn contains_node(&self, id: NodeId) -> bool {
@@ -68,6 +74,27 @@ impl WeakReadData {
         })
     }
 }
+/// Non-owning cache of one logical capture, including its identity. Metadata does
+/// not retain graph/history payloads; both values and group catalogs stay weak.
+#[derive(Debug)]
+pub(crate) struct WeakReadCapture {
+    data: Weak<ReadData>,
+    capture: Weak<()>,
+    groups: Weak<HashMap<crate::types::SubgraphId, crate::storage::retained_group::RetainedGroup>>,
+    origin: Option<Arc<ReadOrigin>>,
+    read_time: Option<Arc<super::effective_read::ReadTime>>,
+}
+impl WeakReadCapture {
+    pub(crate) fn upgrade(&self) -> Option<PinnedReadState> {
+        Some(PinnedReadState {
+            data: self.data.upgrade()?,
+            capture: self.capture.upgrade()?,
+            groups: self.groups.upgrade()?,
+            origin: self.origin.clone(),
+            read_time: self.read_time.clone(),
+        })
+    }
+}
 /// In-process checked-write provenance, shared by derived immutable selections.
 #[derive(Debug)]
 pub(crate) struct ReadOrigin {
@@ -88,6 +115,15 @@ pub struct PinnedReadState {
     groups: Arc<HashMap<crate::types::SubgraphId, crate::storage::retained_group::RetainedGroup>>,
 }
 impl PinnedReadState {
+    pub(crate) fn downgrade_capture(&self) -> WeakReadCapture {
+        WeakReadCapture {
+            data: Arc::downgrade(&self.data),
+            capture: Arc::downgrade(&self.capture),
+            groups: Arc::downgrade(&self.groups),
+            origin: self.origin.clone(),
+            read_time: self.read_time.clone(),
+        }
+    }
     pub(crate) fn downgrade_data(&self) -> WeakReadData {
         WeakReadData(Arc::downgrade(&self.data))
     }

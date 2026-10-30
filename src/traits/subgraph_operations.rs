@@ -240,6 +240,11 @@ impl Default for EdgeAggregationConfig {
 /// - **Zero Copying**: Methods return references to existing data structures
 /// - **Trait Objects**: Methods return Box<dyn SubgraphOperations> for composability
 pub trait SubgraphOperations: GraphEntity {
+    /// Immutable source for a bound read; explicit execution scopes return None.
+    fn frozen_view(&self) -> Option<&crate::GraphView> {
+        None
+    }
+
     /// Reference to our efficient node set (no copying)
     ///
     /// # Returns
@@ -316,6 +321,9 @@ pub trait SubgraphOperations: GraphEntity {
     /// # Performance
     /// O(1) - Uses existing efficient node_count() and edge_count() methods
     fn density(&self) -> f64 {
+        if let Some(view) = self.frozen_view() {
+            return view.density();
+        }
         let directed = self.graph_ref().borrow().is_directed();
         crate::algorithms::structural::density(self.node_count(), self.edge_count(), directed)
     }
@@ -340,6 +348,9 @@ pub trait SubgraphOperations: GraphEntity {
             return Err(GraphError::InvalidInput(format!(
                 "Node {node_id} is outside the subgraph selection"
             )));
+        }
+        if let Some(view) = self.frozen_view() {
+            return view.node_attr(node_id, name);
         }
         let binding = self.graph_ref();
         let graph = binding.borrow();
@@ -371,6 +382,9 @@ pub trait SubgraphOperations: GraphEntity {
                 "Edge {edge_id} is outside the subgraph selection"
             )));
         }
+        if let Some(view) = self.frozen_view() {
+            return view.edge_attr(edge_id, name);
+        }
         let binding = self.graph_ref();
         let graph = binding.borrow();
         graph.get_edge_attr(edge_id, name)
@@ -387,6 +401,9 @@ pub trait SubgraphOperations: GraphEntity {
     /// # Performance
     /// Uses existing optimized neighbor algorithm with subgraph filtering
     fn neighbors(&self, node_id: NodeId) -> GraphResult<Vec<NodeId>> {
+        if let Some(view) = self.frozen_view() {
+            return view.neighbors(node_id);
+        }
         let binding = self.graph_ref();
         let graph = binding.borrow();
         graph.neighbors_filtered(node_id, self.node_set())
@@ -403,6 +420,9 @@ pub trait SubgraphOperations: GraphEntity {
     /// # Performance
     /// Uses existing optimized degree algorithm with subgraph filtering
     fn degree(&self, node_id: NodeId) -> GraphResult<usize> {
+        if let Some(view) = self.frozen_view() {
+            return view.degree(node_id);
+        }
         let binding = self.graph_ref();
         let graph = binding.borrow();
         graph.degree_filtered(node_id, self.node_set())
@@ -419,6 +439,9 @@ pub trait SubgraphOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient edge endpoint lookup
     fn edge_endpoints(&self, edge_id: EdgeId) -> GraphResult<(NodeId, NodeId)> {
+        if let Some(view) = self.frozen_view() {
+            return view.edge_endpoints(edge_id);
+        }
         let graph_ref = self.graph_ref();
         let graph = graph_ref.borrow();
         graph.edge_endpoints(edge_id)
@@ -436,6 +459,11 @@ pub trait SubgraphOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient edge existence check
     fn has_edge_between(&self, source: NodeId, target: NodeId) -> GraphResult<bool> {
+        if let Some(view) = self.frozen_view() {
+            return Ok(view.contains_node(source)
+                && view.contains_node(target)
+                && view.neighbors(source)?.contains(&target));
+        }
         let binding = self.graph_ref();
         let graph = binding.borrow();
         graph.has_edge_between_filtered(source, target, self.edge_set())
@@ -602,13 +630,11 @@ pub trait SubgraphOperations: GraphEntity {
 
         // Collect all values for this attribute from nodes in the subgraph
         let mut values = Vec::new();
-        let binding = self.graph_ref();
-        let graph = binding.borrow();
 
         let mut nodes: Vec<_> = self.node_set().iter().copied().collect();
         nodes.sort_unstable();
         for node_id in nodes {
-            if let Some(value) = graph.get_node_attr(node_id, &attr_name)? {
+            if let Some(value) = self.get_node_attribute(node_id, &attr_name)? {
                 values.push(value);
             }
         }
@@ -626,10 +652,6 @@ pub trait SubgraphOperations: GraphEntity {
             };
             Ok(default)
         } else {
-            // Release borrow before aggregation
-            drop(graph);
-            drop(binding);
-
             // Apply aggregation with collected values
             agg_func.aggregate(&values)
         }
@@ -647,6 +669,9 @@ pub trait SubgraphOperations: GraphEntity {
     ) -> GraphResult<()> {
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
+        if let Some(view) = self.frozen_view() {
+            graph.validate_bound_source(view, true)?;
+        }
         if !graph.contains_node(meta_node_id) {
             return Err(GraphError::InvalidInput("Meta-node is inactive".into()));
         }
@@ -772,8 +797,22 @@ pub trait SubgraphOperations: GraphEntity {
         &self,
         attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> GraphResult<()> {
+        if let Some(view) = self.frozen_view() {
+            if attrs_values
+                .values()
+                .flatten()
+                .any(|(id, _)| !view.contains_node(*id))
+            {
+                return Err(GraphError::InvalidInput(
+                    "Write target is outside the bound selection".into(),
+                ));
+            }
+        }
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
+        if let Some(view) = self.frozen_view() {
+            graph.validate_bound_source(view, true)?;
+        }
         graph.set_node_attrs(attrs_values)
     }
 
@@ -784,8 +823,18 @@ pub trait SubgraphOperations: GraphEntity {
         attr_name: AttrName,
         node_values: Vec<(NodeId, AttrValue)>,
     ) -> GraphResult<()> {
+        if let Some(view) = self.frozen_view() {
+            if node_values.iter().any(|(id, _)| !view.contains_node(*id)) {
+                return Err(GraphError::InvalidInput(
+                    "Write target is outside the bound selection".into(),
+                ));
+            }
+        }
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
+        if let Some(view) = self.frozen_view() {
+            graph.validate_bound_source(view, true)?;
+        }
         graph.set_node_attr_column(attr_name, node_values)
     }
 
@@ -800,8 +849,22 @@ pub trait SubgraphOperations: GraphEntity {
         &self,
         attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> GraphResult<()> {
+        if let Some(view) = self.frozen_view() {
+            if attrs_values
+                .values()
+                .flatten()
+                .any(|(id, _)| !view.contains_edge(*id))
+            {
+                return Err(GraphError::InvalidInput(
+                    "Write target is outside the bound selection".into(),
+                ));
+            }
+        }
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
+        if let Some(view) = self.frozen_view() {
+            graph.validate_bound_source(view, true)?;
+        }
 
         graph.set_edge_attrs(attrs_values)
     }

@@ -55,6 +55,10 @@ impl Subgraph {
     /// selected edges with both endpoints sampled. This remains a connected view;
     /// call pin_view for immutable values. Invalid live scope rejects even for zero.
     pub fn sample(&self, count: usize, seed: Option<u64>) -> GraphResult<Self> {
+        if let Some(view) = self.frozen_view() {
+            return Ok(self.bound_selection(view.sample(count, seed)?, "sample".into()));
+        }
+
         self.validate_query_scope(&self.graph().borrow())?;
         if count >= self.nodes().len() {
             return Ok(self.clone());

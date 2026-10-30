@@ -24,10 +24,10 @@ def test_invalid_resolution_rejects_without_replacing_scores(name, resolution):
     a, b = graph.add_node(), graph.add_node()
     graph.add_edge(a, b)
     view = graph.induced_subgraph([a, b])
-    view.apply(algorithm(name))
+    view = view.apply(algorithm(name))
     before = [graph.get_node_attr(n, "c") for n in (a, b)]
     with pytest.raises(Exception, match="resolution"):
-        view.apply(algorithm(name, resolution=resolution))
+        view = view.apply(algorithm(name, resolution=resolution))
     assert [graph.get_node_attr(n, "c") for n in (a, b)] == before
 
 
@@ -61,8 +61,8 @@ def test_leiden_seed_repeats_labels_and_negative_seed_rejects():
     view = graph.induced_subgraph(nodes)
     labels = []
     for _ in range(4):
-        view.apply(algorithm("leiden", seed=42))
+        view = view.apply(algorithm("leiden", seed=42))
         labels.append([graph.get_node_attr(n, "c") for n in nodes])
     assert all(value == labels[0] for value in labels)
     with pytest.raises(Exception, match="seed"):
-        view.apply(algorithm("leiden", seed=-1))
+        view = view.apply(algorithm("leiden", seed=-1))

@@ -3,8 +3,9 @@
 `view.to_graph()` creates an independent publishing graph containing exactly the
 selected nodes, selected edge instances and frozen property values. It preserves
 original IDs, direction, parallel instances, loops and explicit null/absence.
-Connected `Subgraph.to_graph()` first captures/validates its current selection;
-immutable `GraphView.to_graph()` copies its original state after owner changes.
+Default `Subgraph.to_graph()` and `GraphView.to_graph()` copy their original state
+after owner changes. An explicit `graph.connected_view().to_graph()` first
+captures and validates its current selection.
 
 ```python
 from groggy import Graph

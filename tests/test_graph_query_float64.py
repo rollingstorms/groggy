@@ -19,7 +19,7 @@ def test_live_and_captured_graph_queries_preserve_f64_literals_and_f32_identity(
             assert list(source.filter_nodes(query).node_ids) == expected
             assert list(source.filter_edges(query).edge_ids) == expected
     graph.set_node_attr(nodes[1], "x", AttrValue.float64(0))
-    assert list(legacy.filter_nodes("x == 1.0000000000009095").node_ids) == []
+    assert list(legacy.filter_nodes("x == 1.0000000000009095").node_ids) == [nodes[1]]
     assert list(frozen.filter_nodes("x == 1.0000000000009095").node_ids) == [nodes[1]]
 
 

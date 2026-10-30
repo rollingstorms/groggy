@@ -95,10 +95,16 @@ pub trait FilterOperations: SubgraphOperations {
     /// O(1) calculation using existing efficient counts
     fn filter_stats(&self) -> FilterStats {
         // Calculate against full graph for comparison
-        let graph_ref = self.graph_ref();
-        let graph = graph_ref.borrow();
-        let total_nodes = graph.node_ids().len();
-        let total_edges = graph.edge_ids().len();
+        let (total_nodes, total_edges) = if let Some(view) = self.frozen_view() {
+            (
+                view.read_state().existence().nodes().len(),
+                view.read_state().existence().edges().len(),
+            )
+        } else {
+            let owner = self.graph_ref();
+            let graph = owner.borrow();
+            (graph.node_count(), graph.edge_count())
+        };
 
         FilterStats {
             filtered_nodes: self.node_count(),
@@ -130,6 +136,11 @@ pub trait FilterOperations: SubgraphOperations {
     /// # Performance
     /// Uses existing attribute lookup with criteria matching
     fn matches_node_filter(&self, node_id: NodeId) -> GraphResult<bool> {
+        if let Some(view) = self.frozen_view() {
+            return self
+                .filter_criteria()
+                .matches_node_view(node_id, &crate::GraphView::all(view.read_state().clone()));
+        }
         self.filter_criteria()
             .matches_node(node_id, &self.graph_ref().borrow())
     }
@@ -145,6 +156,11 @@ pub trait FilterOperations: SubgraphOperations {
     /// # Performance
     /// Uses existing attribute lookup with criteria matching
     fn matches_edge_filter(&self, edge_id: EdgeId) -> GraphResult<bool> {
+        if let Some(view) = self.frozen_view() {
+            return self
+                .filter_criteria()
+                .matches_edge_view(edge_id, &crate::GraphView::all(view.read_state().clone()));
+        }
         self.filter_criteria()
             .matches_edge(edge_id, &self.graph_ref().borrow())
     }
@@ -199,11 +215,19 @@ impl FilterCriteria {
     }
 
     /// Check if a node matches this filter criteria
+    /// Match against an immutable source using the same criteria semantics.
+    pub fn matches_node_view(&self, node_id: NodeId, view: &crate::GraphView) -> GraphResult<bool> {
+        self.matches_node_read(node_id, view)
+    }
+    /// Match against the current working graph.
     pub fn matches_node(
         &self,
         node_id: NodeId,
         graph: &crate::api::graph::Graph,
     ) -> GraphResult<bool> {
+        self.matches_node_read(node_id, graph)
+    }
+    fn matches_node_read(&self, node_id: NodeId, graph: &impl CriteriaRead) -> GraphResult<bool> {
         match self {
             FilterCriteria::NodeAttributeEquals { name, value } => {
                 if let Some(node_value) = graph.get_node_attr(node_id, name)? {
@@ -225,7 +249,7 @@ impl FilterCriteria {
             }
             FilterCriteria::And(criteria) => {
                 for criterion in criteria {
-                    if !criterion.matches_node(node_id, graph)? {
+                    if !criterion.matches_node_read(node_id, graph)? {
                         return Ok(false);
                     }
                 }
@@ -233,23 +257,31 @@ impl FilterCriteria {
             }
             FilterCriteria::Or(criteria) => {
                 for criterion in criteria {
-                    if criterion.matches_node(node_id, graph)? {
+                    if criterion.matches_node_read(node_id, graph)? {
                         return Ok(true);
                     }
                 }
                 Ok(false)
             }
-            FilterCriteria::Not(criteria) => Ok(!criteria.matches_node(node_id, graph)?),
+            FilterCriteria::Not(criteria) => Ok(!criteria.matches_node_read(node_id, graph)?),
             _ => Ok(true), // Node criteria always pass for edges (node filtering already done)
         }
     }
 
     /// Check if an edge matches this filter criteria
+    /// Match against an immutable source using the same criteria semantics.
+    pub fn matches_edge_view(&self, edge_id: EdgeId, view: &crate::GraphView) -> GraphResult<bool> {
+        self.matches_edge_read(edge_id, view)
+    }
+    /// Match against the current working graph.
     pub fn matches_edge(
         &self,
         edge_id: EdgeId,
         graph: &crate::api::graph::Graph,
     ) -> GraphResult<bool> {
+        self.matches_edge_read(edge_id, graph)
+    }
+    fn matches_edge_read(&self, edge_id: EdgeId, graph: &impl CriteriaRead) -> GraphResult<bool> {
         match self {
             FilterCriteria::EdgeAttributeEquals { name, value } => {
                 if let Some(edge_value) = graph.get_edge_attr(edge_id, name)? {
@@ -267,7 +299,7 @@ impl FilterCriteria {
             }
             FilterCriteria::And(criteria) => {
                 for criterion in criteria {
-                    if !criterion.matches_edge(edge_id, graph)? {
+                    if !criterion.matches_edge_read(edge_id, graph)? {
                         return Ok(false);
                     }
                 }
@@ -275,13 +307,13 @@ impl FilterCriteria {
             }
             FilterCriteria::Or(criteria) => {
                 for criterion in criteria {
-                    if criterion.matches_edge(edge_id, graph)? {
+                    if criterion.matches_edge_read(edge_id, graph)? {
                         return Ok(true);
                     }
                 }
                 Ok(false)
             }
-            FilterCriteria::Not(criteria) => Ok(!criteria.matches_edge(edge_id, graph)?),
+            FilterCriteria::Not(criteria) => Ok(!criteria.matches_edge_read(edge_id, graph)?),
             _ => Ok(true), // Node criteria always pass for edges (node filtering already done)
         }
     }
@@ -316,5 +348,33 @@ impl FilterStats {
     /// Calculate selectivity (how selective the filter is)
     pub fn selectivity(&self) -> f64 {
         (self.node_retention_rate + self.edge_retention_rate) / 2.0
+    }
+}
+
+trait CriteriaRead {
+    fn get_node_attr(&self, id: NodeId, name: &AttrName) -> GraphResult<Option<AttrValue>>;
+    fn get_edge_attr(&self, id: EdgeId, name: &AttrName) -> GraphResult<Option<AttrValue>>;
+    fn degree(&self, id: NodeId) -> GraphResult<usize>;
+}
+impl CriteriaRead for crate::api::graph::Graph {
+    fn get_node_attr(&self, id: NodeId, name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        self.get_node_attr(id, name).map_err(Into::into)
+    }
+    fn get_edge_attr(&self, id: EdgeId, name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        self.get_edge_attr(id, name)
+    }
+    fn degree(&self, id: NodeId) -> GraphResult<usize> {
+        self.degree(id)
+    }
+}
+impl CriteriaRead for crate::GraphView {
+    fn get_node_attr(&self, id: NodeId, name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        self.node_attr(id, name)
+    }
+    fn get_edge_attr(&self, id: EdgeId, name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        self.edge_attr(id, name)
+    }
+    fn degree(&self, id: NodeId) -> GraphResult<usize> {
+        self.degree(id)
     }
 }

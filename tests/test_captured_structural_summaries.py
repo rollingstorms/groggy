@@ -85,12 +85,13 @@ def test_local_node_ids_reject_noninteger_negative_boolean_and_overflow(node, su
         source.clustering_coefficient(node)
 
 
-def test_connected_prepared_csr_refreshes_after_rewiring_and_property_writes():
+def test_older_structural_reads_stay_fixed_while_fresh_selections_see_changes():
     graph = fixture()
     selected = graph.induced_subgraph([0, 1, 2, 3])
     assert selected.clustering_coefficient() == 0.75
     graph.set_edge_endpoints(2, 2, 3)
-    assert selected.clustering_coefficient() == 0
-    assert selected.transitivity() == 0
+    assert selected.clustering_coefficient() == 0.75
+    assert graph.induced_subgraph([0, 1, 2, 3]).clustering_coefficient() == 0
+    before = selected.transitivity()
     graph.set_node_attr(0, "arbitrary", "new")
-    assert selected.transitivity() == 0
+    assert selected.transitivity() == before

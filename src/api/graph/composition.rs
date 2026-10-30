@@ -111,6 +111,7 @@ impl Graph {
             .prepare_frozen_group(source.clone(), kind)?;
         let id = prepared.id;
         self.pool.borrow_mut().install_stored_subgraph(prepared);
+        self.space.invalidate_current_read();
         Ok(id)
     }
     /// Install a revision prepared independently of the mutable graph owner.
@@ -121,6 +122,7 @@ impl Graph {
         let prepared = self.pool.borrow_mut().prepare_group_revision(group)?;
         let id = prepared.id;
         self.pool.borrow_mut().install_stored_subgraph(prepared);
+        self.space.invalidate_current_read();
         Ok(id)
     }
     /// Upgrade a membership-only group using a caller-chosen source state.

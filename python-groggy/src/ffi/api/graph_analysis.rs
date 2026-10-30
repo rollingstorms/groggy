@@ -285,7 +285,7 @@ impl PyGraphAnalysis {
                 let subgraph =
                     Subgraph::new(core_graph, node_set, edge_set, "shortest_path".to_string());
 
-                let py_subgraph = PySubgraph { inner: subgraph };
+                let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
                 Ok(Py::new(py, py_subgraph)?.to_object(py))
             }
             None => Ok(py.None()),
@@ -360,7 +360,7 @@ impl PyGraphAnalysis {
         }
 
         let subgraph = Subgraph::new(core_graph, node_set, edge_set, "bfs_traversal".to_string());
-        let py_subgraph = PySubgraph { inner: subgraph };
+        let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
         Ok(Py::new(py, py_subgraph)?.to_object(py))
     }
 
@@ -432,7 +432,7 @@ impl PyGraphAnalysis {
         }
 
         let subgraph = Subgraph::new(core_graph, node_set, edge_set, "dfs_traversal".to_string());
-        let py_subgraph = PySubgraph { inner: subgraph };
+        let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
         Ok(Py::new(py, py_subgraph)?.to_object(py))
     }
 }

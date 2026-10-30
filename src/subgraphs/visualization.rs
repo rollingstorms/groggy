@@ -42,13 +42,25 @@ struct ExtractedEdge {
 impl SubgraphDataSource {
     /// Create from any SubgraphOperations implementor by extracting all data immediately
     pub fn from_subgraph_operations<T: crate::traits::SubgraphOperations>(subgraph: &T) -> Self {
+        let frozen = subgraph.frozen_view().map(|view| view.to_snapshot());
         let graph_ref = subgraph.graph_ref();
-        let graph = graph_ref.borrow();
+        let graph = frozen.is_none().then(|| graph_ref.borrow());
 
         // Extract nodes
         let mut nodes = Vec::new();
         for &node_id in subgraph.node_set() {
-            let attributes = graph.get_node_attrs(node_id).unwrap_or_default();
+            let attributes = if let Some(snapshot) = &frozen {
+                snapshot
+                    .node_attributes
+                    .get(&node_id)
+                    .cloned()
+                    .unwrap_or_default()
+            } else {
+                graph
+                    .as_ref()
+                    .and_then(|graph| graph.get_node_attrs(node_id).ok())
+                    .unwrap_or_default()
+            };
             let label = attributes
                 .get("label")
                 .and_then(|v| match v {
@@ -67,8 +79,25 @@ impl SubgraphDataSource {
         // Extract edges
         let mut edges = Vec::new();
         for &edge_id in subgraph.edge_set() {
-            if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                let attributes = graph.get_edge_attrs(edge_id).unwrap_or_default();
+            if let Some((source, target)) = if let Some(snapshot) = &frozen {
+                snapshot.edges.get(&edge_id).copied()
+            } else {
+                graph
+                    .as_ref()
+                    .and_then(|graph| graph.edge_endpoints(edge_id).ok())
+            } {
+                let attributes = if let Some(snapshot) = &frozen {
+                    snapshot
+                        .edge_attributes
+                        .get(&edge_id)
+                        .cloned()
+                        .unwrap_or_default()
+                } else {
+                    graph
+                        .as_ref()
+                        .and_then(|graph| graph.get_edge_attrs(edge_id).ok())
+                        .unwrap_or_default()
+                };
                 let label = attributes.get("label").and_then(|v| match v {
                     AttrValue::Text(s) => Some(s.clone()),
                     _ => None,
@@ -94,7 +123,10 @@ impl SubgraphDataSource {
         let metadata = GraphMetadata {
             node_count: nodes.len(),
             edge_count: edges.len(),
-            is_directed: true, // TODO: Get from graph if available
+            is_directed: subgraph.frozen_view().map_or_else(
+                || graph.as_ref().is_some_and(|graph| graph.is_directed()),
+                |view| view.is_directed(),
+            ),
             has_weights: edges.iter().any(|e| e.weight.is_some()),
             attribute_types: HashMap::new(),
         };

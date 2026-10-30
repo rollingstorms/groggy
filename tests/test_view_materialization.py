@@ -47,7 +47,7 @@ def test_connected_copy_rejects_stale_membership_and_empty_copy_stays_empty():
     assert empty.current_state_id == 0
     assert empty.is_directed
     graph.add_nodes(2)
-    selected = graph.view()
+    selected = graph.connected_view()
     graph.remove_node(1)
     with pytest.raises((ValueError, RuntimeError)):
         selected.to_graph()

@@ -62,8 +62,7 @@ def test_explicit_pin_keeps_legacy_edge_scope_and_outlives_owner():
     assert frozen.edge_ids == [first]
     assert frozen.select_nodes([a, b]).edge_ids == [first]
     graph.remove_edge(first)
-    with pytest.raises((ValueError, RuntimeError)):
-        legacy.pin_view()
+    assert legacy.pin_view().edge_ids == [first]
     del legacy, graph
     assert frozen.neighbors(a) == [b]
     with ThreadPoolExecutor(max_workers=2) as workers:

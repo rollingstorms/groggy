@@ -9,7 +9,7 @@ def test_stale_connected_matrix_rejects_instead_of_filtering_inactive_selection(
     graph = Graph(directed=True)
     graph.add_nodes(3)
     graph.add_edge(0, 1, weight=2.5)
-    selection = graph.view()
+    selection = graph.connected_view()
     frozen = selection.pin_view()
     before = selection.adjacency_matrix(sparse=sparse, weight_attr="weight")
     assert before.shape == (3, 3)
@@ -28,7 +28,7 @@ def test_stale_connected_matrix_rejects_instead_of_filtering_inactive_selection(
             selection.adj()
 
 
-def test_rewired_outside_endpoints_reject_while_valid_inside_revisions_remain_live():
+def test_default_matrix_keeps_original_endpoints_after_owner_rewiring():
     graph = Graph(directed=True)
     graph.add_nodes(4)
     graph.add_edge(0, 1)
@@ -36,5 +36,5 @@ def test_rewired_outside_endpoints_reject_while_valid_inside_revisions_remain_li
     graph.set_edge_endpoints(0, 2, 1)
     assert selection.adjacency_matrix(sparse=True).shape == (3, 3)
     graph.set_edge_endpoints(0, 3, 1)
-    with pytest.raises((ValueError, RuntimeError)):
-        selection.adjacency_matrix(sparse=True)
+    assert selection.adjacency_matrix(sparse=True).shape == (3, 3)
+    assert selection.pin_view().edge_endpoints(0) == (0, 1)

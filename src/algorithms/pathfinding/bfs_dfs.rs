@@ -277,6 +277,11 @@ impl Algorithm for BfsTraversal {
         Self::metadata_template()
     }
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let subgraph = if subgraph.frozen_view().is_some() {
+            subgraph.execution_scope(ctx.persist_results())?
+        } else {
+            subgraph
+        };
         execute_traversal(
             ctx,
             subgraph,
@@ -342,6 +347,11 @@ impl Algorithm for DfsTraversal {
         Self::metadata_template()
     }
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let subgraph = if subgraph.frozen_view().is_some() {
+            subgraph.execution_scope(ctx.persist_results())?
+        } else {
+            subgraph
+        };
         execute_traversal(
             ctx,
             subgraph,

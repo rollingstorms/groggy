@@ -52,6 +52,12 @@ pub struct NeighborhoodSubgraph {
 }
 
 impl NeighborhoodSubgraph {
+    /// Retain selected values/topology while preserving specialized metadata.
+    pub fn freeze(mut self) -> GraphResult<Self> {
+        self.selection = self.selection.freeze()?;
+        Ok(self)
+    }
+
     /// Borrow the canonical connected selection without copying its membership.
     pub fn as_subgraph(&self) -> &crate::subgraphs::Subgraph {
         &self.selection
@@ -195,6 +201,9 @@ impl GraphEntity for NeighborhoodSubgraph {
 
 /// SubgraphOperations trait implementation for NeighborhoodSubgraph
 impl SubgraphOperations for NeighborhoodSubgraph {
+    fn frozen_view(&self) -> Option<&crate::GraphView> {
+        self.selection.frozen_view()
+    }
     fn node_set(&self) -> &HashSet<NodeId> {
         self.selection.nodes()
     }
@@ -281,10 +290,24 @@ impl crate::traits::NeighborhoodOperations for NeighborhoodSubgraph {
         &self,
         additional_hops: usize,
     ) -> GraphResult<Box<dyn crate::traits::NeighborhoodOperations>> {
+        let new_hops = self.hops.checked_add(additional_hops).ok_or_else(|| {
+            crate::GraphError::InvalidInput("Neighborhood hop count overflow".into())
+        })?;
+        if let Some(view) = self.frozen_view() {
+            let root = crate::GraphView::all(view.read_state().clone());
+            let child = root.within_hops(
+                &self.central_nodes,
+                new_hops,
+                crate::query::TraversalDirection::Outgoing,
+            )?;
+            let mut result =
+                self.wrap_selection(self.selection.bound_selection(child, "neighborhood".into()));
+            result.hops = new_hops;
+            return Ok(Box::new(result));
+        }
         // Use existing neighborhood sampling to expand
         let mut sampler = NeighborhoodSampler::new();
         sampler.set_graph_ref(&self.selection.graph());
-        let new_hops = self.hops + additional_hops;
 
         // For simplicity, expand from the first central node
         // In a full implementation, we'd merge expansions from all central nodes
@@ -316,6 +339,29 @@ impl crate::traits::NeighborhoodOperations for NeighborhoodSubgraph {
         &self,
         other: &dyn crate::traits::NeighborhoodOperations,
     ) -> GraphResult<Box<dyn crate::traits::NeighborhoodOperations>> {
+        if self.frozen_view().is_some() || other.frozen_view().is_some() {
+            let left = self.frozen_view().ok_or_else(|| {
+                crate::GraphError::InvalidInput(
+                    "Freeze both neighborhood sources before merging".into(),
+                )
+            })?;
+            let right = other.frozen_view().ok_or_else(|| {
+                crate::GraphError::InvalidInput(
+                    "Freeze both neighborhood sources before merging".into(),
+                )
+            })?;
+            let mut result = self.wrap_selection(
+                self.selection
+                    .bound_selection(left.merge_with(right)?, "neighborhood".into()),
+            );
+            for &center in other.central_nodes() {
+                if !result.central_nodes.contains(&center) {
+                    result.central_nodes.push(center);
+                }
+            }
+            result.hops = self.hops.max(other.hops());
+            return Ok(Box::new(result));
+        }
         // Union of node and edge sets
         let mut merged_nodes = self.selection.nodes().clone();
         let other_nodes = other.node_set();

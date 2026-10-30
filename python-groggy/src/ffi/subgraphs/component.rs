@@ -16,8 +16,12 @@ pub struct PyComponentSubgraph {
 
 impl PyComponentSubgraph {
     /// Create from Rust ComponentSubgraph
-    pub fn from_core_component(component: ComponentSubgraph) -> Self {
-        Self { inner: component }
+    pub fn from_core_component(component: ComponentSubgraph) -> PyResult<Self> {
+        Ok(Self {
+            inner: component
+                .freeze()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        })
     }
 }
 

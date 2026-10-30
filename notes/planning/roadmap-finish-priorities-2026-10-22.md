@@ -14,9 +14,12 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Current remainder (2026-10-29): compound topology execution and typed effects
-(09.4b.2), ordinary connected Subgraph ownership (26.1/AR4/AR7.5) and legacy pinned
-query migration (21.2). Repeated current read captures now share weakly cached
+Current remainder (2026-10-30): compound topology execution and typed effects
+(09.4b.2/AR3), followed by legacy pinned query migration (21.2). Default immutable
+Subgraph ownership **26.1/AR4/AR7.5 is complete**; see
+`default-immutable-views-2026-10-30.md` for verification, compatibility and measured
+cold/warm costs. The chronological receipts below retain their earlier boundaries.
+Repeated current read captures now share weakly cached
 frozen payloads with fresh provenance and mutation invalidation; see
 `current-read-sharing-2026-10-28.md`. Sparse frozen adjacency now avoids empty per-node entries, with measured
 capture/memory/probe trade-offs in `pinned-read-adjacency-2026-10-28.md`.

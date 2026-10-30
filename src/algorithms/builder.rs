@@ -148,6 +148,11 @@ impl Algorithm for StepPipelineAlgorithm {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let subgraph = if subgraph.frozen_view().is_some() {
+            subgraph.execution_scope(ctx.persist_results())?
+        } else {
+            subgraph
+        };
         let inherited = ctx.property_batch.is_some();
         if inherited && !self.supports_atomic_properties() {
             return Err(anyhow!(
@@ -296,6 +301,7 @@ impl StepSamplePipeline {
     }
 
     pub fn run(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Vec<Subgraph>> {
+        let subgraph = subgraph.execution_scope(ctx.persist_results())?;
         let execution_id = EXECUTION_COUNTER.fetch_add(1, Ordering::SeqCst);
         if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
             eprintln!(

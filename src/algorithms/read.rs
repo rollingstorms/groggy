@@ -22,6 +22,14 @@ pub struct AlgorithmRead {
 impl AlgorithmRead {
     /// Prepare exactly the captured view's selected nodes and edge instances.
     pub fn new(view: GraphView) -> GraphResult<Self> {
+        let reverse = !view.is_directed();
+        Self::with_topology(view, reverse, true)
+    }
+    pub(crate) fn with_topology(
+        view: GraphView,
+        reverse: bool,
+        sort_neighbors: bool,
+    ) -> GraphResult<Self> {
         let nodes: Arc<[NodeId]> = view.node_ids().into();
         let index: FxHashMap<_, _> = nodes
             .iter()
@@ -50,8 +58,8 @@ impl AlgorithmRead {
                 }
             },
             CsrOptions {
-                add_reverse_edges: !view.is_directed(),
-                sort_neighbors: true,
+                add_reverse_edges: reverse,
+                sort_neighbors,
             },
         );
         if let Some(error) = failure {
@@ -63,6 +71,9 @@ impl AlgorithmRead {
             index: Arc::new(index),
             csr: Arc::new(csr),
         })
+    }
+    pub(crate) fn shared_csr(&self) -> Arc<Csr> {
+        self.csr.clone()
     }
     pub(crate) fn into_adjacency_read(self) -> crate::subgraphs::AdjacencyRead {
         crate::subgraphs::AdjacencyRead::new(self.nodes, self.csr)

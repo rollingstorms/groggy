@@ -1,0 +1,297 @@
+{
+  "fixture": "undirected chain with one f64 score per node; release in-tree extension; construction excluded; cold views dropped between captures; warm captured/live views held; process CPU separate from elapsed wall time",
+  "cases": [
+    {
+      "nodes": 1000,
+      "edges": 999,
+      "cold_capture": [
+        {
+          "wall_ns_per_call": 1694583.0,
+          "cpu_ns_per_call": 1012000.0
+        },
+        {
+          "wall_ns_per_call": 775708.0,
+          "cpu_ns_per_call": 776000.0
+        },
+        {
+          "wall_ns_per_call": 694291.0,
+          "cpu_ns_per_call": 693000.0
+        },
+        {
+          "wall_ns_per_call": 864958.0,
+          "cpu_ns_per_call": 817000.0
+        },
+        {
+          "wall_ns_per_call": 721208.0,
+          "cpu_ns_per_call": 720000.0
+        }
+      ],
+      "warm_meta_expansion": [
+        {
+          "wall_ns_per_call": 930.58203125,
+          "cpu_ns_per_call": 666.015625
+        },
+        {
+          "wall_ns_per_call": 538.77734375,
+          "cpu_ns_per_call": 538.0859375
+        },
+        {
+          "wall_ns_per_call": 548.0556640625,
+          "cpu_ns_per_call": 547.8515625
+        },
+        {
+          "wall_ns_per_call": 542.48046875,
+          "cpu_ns_per_call": 542.96875
+        },
+        {
+          "wall_ns_per_call": 594.8486328125,
+          "cpu_ns_per_call": 570.3125
+        },
+        {
+          "wall_ns_per_call": 522.134765625,
+          "cpu_ns_per_call": 521.484375
+        },
+        {
+          "wall_ns_per_call": 500.28515625,
+          "cpu_ns_per_call": 500.0
+        }
+      ],
+      "warm_default_view": [
+        {
+          "wall_ns_per_call": 72.55078125,
+          "cpu_ns_per_call": 72.265625
+        },
+        {
+          "wall_ns_per_call": 66.8544921875,
+          "cpu_ns_per_call": 67.3828125
+        },
+        {
+          "wall_ns_per_call": 68.9697265625,
+          "cpu_ns_per_call": 69.3359375
+        },
+        {
+          "wall_ns_per_call": 68.603515625,
+          "cpu_ns_per_call": 68.359375
+        },
+        {
+          "wall_ns_per_call": 67.626953125,
+          "cpu_ns_per_call": 67.3828125
+        },
+        {
+          "wall_ns_per_call": 67.9931640625,
+          "cpu_ns_per_call": 67.3828125
+        },
+        {
+          "wall_ns_per_call": 66.69140625,
+          "cpu_ns_per_call": 66.40625
+        }
+      ],
+      "warm_explicit_connected_view": [
+        {
+          "wall_ns_per_call": 38.126953125,
+          "cpu_ns_per_call": 38.0859375
+        },
+        {
+          "wall_ns_per_call": 38.0859375,
+          "cpu_ns_per_call": 38.0859375
+        },
+        {
+          "wall_ns_per_call": 37.9638671875,
+          "cpu_ns_per_call": 39.0625
+        },
+        {
+          "wall_ns_per_call": 37.8828125,
+          "cpu_ns_per_call": 37.109375
+        },
+        {
+          "wall_ns_per_call": 38.9404296875,
+          "cpu_ns_per_call": 39.0625
+        },
+        {
+          "wall_ns_per_call": 38.859375,
+          "cpu_ns_per_call": 39.0625
+        },
+        {
+          "wall_ns_per_call": 38.6142578125,
+          "cpu_ns_per_call": 39.0625
+        }
+      ],
+      "warm_owner_degree": [
+        {
+          "wall_ns_per_call": 603.5556640625,
+          "cpu_ns_per_call": 594.7265625
+        },
+        {
+          "wall_ns_per_call": 615.193359375,
+          "cpu_ns_per_call": 615.234375
+        },
+        {
+          "wall_ns_per_call": 609.7412109375,
+          "cpu_ns_per_call": 609.375
+        },
+        {
+          "wall_ns_per_call": 598.5927734375,
+          "cpu_ns_per_call": 598.6328125
+        },
+        {
+          "wall_ns_per_call": 569.6611328125,
+          "cpu_ns_per_call": 569.3359375
+        },
+        {
+          "wall_ns_per_call": 630.0048828125,
+          "cpu_ns_per_call": 607.421875
+        },
+        {
+          "wall_ns_per_call": 681.5595703125,
+          "cpu_ns_per_call": 641.6015625
+        }
+      ]
+    },
+    {
+      "nodes": 100000,
+      "edges": 99999,
+      "cold_capture": [
+        {
+          "wall_ns_per_call": 134689708.0,
+          "cpu_ns_per_call": 134173000.0
+        },
+        {
+          "wall_ns_per_call": 161983917.0,
+          "cpu_ns_per_call": 161364000.0
+        },
+        {
+          "wall_ns_per_call": 154590625.0,
+          "cpu_ns_per_call": 151837000.0
+        },
+        {
+          "wall_ns_per_call": 147878875.0,
+          "cpu_ns_per_call": 146793000.0
+        },
+        {
+          "wall_ns_per_call": 123457666.0,
+          "cpu_ns_per_call": 122929000.0
+        }
+      ],
+      "warm_meta_expansion": [
+        {
+          "wall_ns_per_call": 522.5830078125,
+          "cpu_ns_per_call": 521.484375
+        },
+        {
+          "wall_ns_per_call": 556.72265625,
+          "cpu_ns_per_call": 546.875
+        },
+        {
+          "wall_ns_per_call": 519.6123046875,
+          "cpu_ns_per_call": 519.53125
+        },
+        {
+          "wall_ns_per_call": 499.9189453125,
+          "cpu_ns_per_call": 500.0
+        },
+        {
+          "wall_ns_per_call": 487.751953125,
+          "cpu_ns_per_call": 487.3046875
+        },
+        {
+          "wall_ns_per_call": 488.728515625,
+          "cpu_ns_per_call": 488.28125
+        },
+        {
+          "wall_ns_per_call": 502.1572265625,
+          "cpu_ns_per_call": 501.953125
+        }
+      ],
+      "warm_default_view": [
+        {
+          "wall_ns_per_call": 72.3876953125,
+          "cpu_ns_per_call": 73.2421875
+        },
+        {
+          "wall_ns_per_call": 66.0810546875,
+          "cpu_ns_per_call": 66.40625
+        },
+        {
+          "wall_ns_per_call": 66.650390625,
+          "cpu_ns_per_call": 67.3828125
+        },
+        {
+          "wall_ns_per_call": 66.0400390625,
+          "cpu_ns_per_call": 66.40625
+        },
+        {
+          "wall_ns_per_call": 65.8779296875,
+          "cpu_ns_per_call": 66.40625
+        },
+        {
+          "wall_ns_per_call": 66.568359375,
+          "cpu_ns_per_call": 67.3828125
+        },
+        {
+          "wall_ns_per_call": 65.91796875,
+          "cpu_ns_per_call": 65.4296875
+        }
+      ],
+      "warm_explicit_connected_view": [
+        {
+          "wall_ns_per_call": 38.248046875,
+          "cpu_ns_per_call": 38.0859375
+        },
+        {
+          "wall_ns_per_call": 37.4755859375,
+          "cpu_ns_per_call": 37.109375
+        },
+        {
+          "wall_ns_per_call": 37.4755859375,
+          "cpu_ns_per_call": 38.0859375
+        },
+        {
+          "wall_ns_per_call": 37.556640625,
+          "cpu_ns_per_call": 37.109375
+        },
+        {
+          "wall_ns_per_call": 37.4755859375,
+          "cpu_ns_per_call": 37.109375
+        },
+        {
+          "wall_ns_per_call": 38.2080078125,
+          "cpu_ns_per_call": 39.0625
+        },
+        {
+          "wall_ns_per_call": 37.80078125,
+          "cpu_ns_per_call": 38.0859375
+        }
+      ],
+      "warm_owner_degree": [
+        {
+          "wall_ns_per_call": 584.3505859375,
+          "cpu_ns_per_call": 584.9609375
+        },
+        {
+          "wall_ns_per_call": 576.8642578125,
+          "cpu_ns_per_call": 577.1484375
+        },
+        {
+          "wall_ns_per_call": 577.7998046875,
+          "cpu_ns_per_call": 578.125
+        },
+        {
+          "wall_ns_per_call": 632.1611328125,
+          "cpu_ns_per_call": 616.2109375
+        },
+        {
+          "wall_ns_per_call": 619.873046875,
+          "cpu_ns_per_call": 620.1171875
+        },
+        {
+          "wall_ns_per_call": 622.3544921875,
+          "cpu_ns_per_call": 622.0703125
+        },
+        {
+          "wall_ns_per_call": 613.607421875,
+          "cpu_ns_per_call": 614.2578125
+        }
+      ]
+    }
+  ]
+}

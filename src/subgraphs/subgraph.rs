@@ -17,6 +17,7 @@
 //! - Consistent API regardless of graph or subgraph context
 //! - Performance: operations stay in Rust core
 
+mod binding;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
@@ -67,7 +68,11 @@ struct ComponentCacheStore {
 }
 
 /// A Subgraph represents a subset of nodes and edges from a parent Graph
-/// with full Graph API capabilities through delegation.
+/// with graph operations delegated through a selected scope.
+/// `new` constructs a current-owner execution scope; `freeze` binds immutable
+/// reads while retaining an explicit checked write owner. Default Python results
+/// are frozen. Derived frozen reads preserve their source; execution resolves
+/// only against matching owner state.
 ///
 /// CORE CONCEPT: Subgraph IS-A Graph
 /// - All Graph operations work: filter_nodes, bfs, dfs, algorithms
@@ -80,6 +85,7 @@ pub struct Subgraph {
     /// This enables all Graph operations to work on Subgraphs
     /// Uses RefCell for interior mutability to allow batch operations
     graph: Rc<RefCell<Graph>>,
+    frozen: Option<crate::GraphView>,
 
     /// Set of node IDs that are included in this subgraph
     /// Operations are filtered to only these nodes
@@ -197,6 +203,7 @@ impl Subgraph {
 
         Self {
             graph,
+            frozen: None,
             nodes,
             edges,
             subgraph_type,
@@ -246,6 +253,7 @@ impl Subgraph {
 
         Self {
             graph,
+            frozen: None,
             nodes,
             edges,
             subgraph_type,
@@ -329,6 +337,10 @@ impl Subgraph {
     /// Explicitly freeze this selection's current values/topology, without changing its write owner.
     /// Fails if selected IDs are no longer active; does not reconstruct a historical state.
     pub fn pin_view(&self) -> GraphResult<crate::subgraphs::GraphView> {
+        if let Some(view) = &self.frozen {
+            return Ok(view.clone());
+        }
+
         crate::subgraphs::GraphView::from_membership(
             self.graph.borrow().pin_current_state()?,
             self.nodes.as_ref().clone(),
@@ -408,12 +420,17 @@ impl Subgraph {
 
     /// Compute an owned numerical snapshot of this view's selected edges.
     /// Stale membership or endpoints outside the selection reject instead of shrinking output.
-    /// The view itself continues to read its live parent graph.
+    /// Frozen bindings use captured properties/topology; explicit live scopes
+    /// validate the current owner before exporting.
     pub fn adjacency_matrix(
         &self,
         sparse: bool,
         weight_attr: Option<&str>,
     ) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
+        if let Some(view) = &self.frozen {
+            return view.adjacency_matrix::<f64>(sparse, weight_attr);
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         let nodes = self.ordered_nodes();
@@ -460,6 +477,15 @@ impl Subgraph {
     /// # Returns
     /// Arc to cached or newly built CSR
     pub(super) fn get_or_build_csr_internal(&self, add_reverse: bool) -> GraphResult<Arc<Csr>> {
+        if let Some(view) = &self.frozen {
+            return Ok(crate::algorithms::AlgorithmRead::with_topology(
+                view.clone(),
+                add_reverse,
+                false,
+            )?
+            .shared_csr());
+        }
+
         // Retained pool endpoints are historical storage, not proof of current
         // liveness. Validate even on cache hits; the stamp makes unchanged reads
         // cheap and distinguishes restored spaces with equal numeric versions.
@@ -560,6 +586,13 @@ impl Subgraph {
         filter: &crate::query::NodeFilter,
         suffix: &str,
     ) -> GraphResult<Self> {
+        if let Some(view) = &self.frozen {
+            return Ok(self.bound_selection(
+                view.filter_nodes(filter)?,
+                format!("{}_{suffix}", self.subgraph_type),
+            ));
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         let pool = graph.pool();
@@ -584,6 +617,13 @@ impl Subgraph {
     }
     /// Filter current selected edge instances, keeping only their selected endpoints.
     pub fn filter_edges(&self, filter: &crate::query::EdgeFilter) -> GraphResult<Self> {
+        if let Some(view) = &self.frozen {
+            return Ok(self.bound_selection(
+                view.filter_edges(filter)?,
+                format!("{}_filtered_edges", self.subgraph_type),
+            ));
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         let pool = graph.pool();
@@ -695,6 +735,10 @@ impl Subgraph {
     /// # }
     /// ```ignore
     pub fn has_path(&self, node1_id: NodeId, node2_id: NodeId) -> GraphResult<bool> {
+        if let Some(view) = &self.frozen {
+            return view.has_path(node1_id, node2_id);
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         crate::query::scoped_traversal::has_path(
@@ -716,16 +760,27 @@ impl Subgraph {
     }
 }
 
-/// Aligned native columns; these compatibility reads still use the current owner.
+/// Aligned native columns from captured state or an explicit current execution scope.
 impl Subgraph {
     /// Values aligned with ascending node_ids(); absent properties project to Null.
-    /// Every selected node must remain active. Values are copied through one bulk column read.
+    /// Live scopes require active IDs; frozen bindings keep their captured values.
     pub fn get_node_attribute_column(&self, attr_name: &AttrName) -> GraphResult<Vec<AttrValue>> {
         self.get_node_attributes_for_nodes(&self.ordered_nodes(), attr_name)
     }
 
     /// Values aligned with ascending edge_ids(); absent properties project to Null.
     pub fn get_edge_attribute_column(&self, attr_name: &AttrName) -> GraphResult<Vec<AttrValue>> {
+        if let Some(view) = &self.frozen {
+            return self
+                .ordered_edges()
+                .iter()
+                .map(|&id| {
+                    view.edge_attr(id, attr_name)
+                        .map(|value| value.unwrap_or(AttrValue::Null))
+                })
+                .collect();
+        }
+
         let graph = self.graph.borrow();
         let ids = self.ordered_edges();
         for &id in ids.iter() {
@@ -747,6 +802,16 @@ impl Subgraph {
         node_ids: &[NodeId],
         attr_name: &AttrName,
     ) -> GraphResult<Vec<AttrValue>> {
+        if let Some(view) = &self.frozen {
+            return node_ids
+                .iter()
+                .map(|&id| {
+                    view.node_attr(id, attr_name)
+                        .map(|value| value.unwrap_or(AttrValue::Null))
+                })
+                .collect();
+        }
+
         let graph = self.graph.borrow();
         for &id in node_ids {
             if !self.nodes.contains(&id) || !graph.has_node(id) {
@@ -870,6 +935,10 @@ impl Subgraph {
 
     /// Prepare immutable topology-only summaries without capturing property/history payloads.
     pub fn structural_read(&self) -> GraphResult<crate::algorithms::UndirectedStructure> {
+        if let Some(view) = &self.frozen {
+            return view.structural_read();
+        }
+
         {
             let graph = self.graph.borrow();
             if graph.is_directed() {
@@ -897,6 +966,10 @@ impl Subgraph {
 
     /// Edge-instance density with the directed/undirected denominator; may exceed one.
     pub fn density(&self) -> f64 {
+        if let Some(view) = &self.frozen {
+            return view.density();
+        }
+
         crate::algorithms::structural::density(
             self.nodes.len(),
             self.edges.len(),
@@ -907,6 +980,10 @@ impl Subgraph {
     // === SUBGRAPH SET OPERATIONS ===
 
     fn common_views(&self, other: &Subgraph) -> GraphResult<(super::GraphView, super::GraphView)> {
+        if self.frozen.is_some() || other.frozen.is_some() {
+            return Ok((self.pin_view()?, other.pin_view()?));
+        }
+
         if !Rc::ptr_eq(&self.graph, &other.graph) {
             return Err(GraphError::InvalidInput(
                 "Subgraph algebra requires the same graph owner".into(),
@@ -922,6 +999,10 @@ impl Subgraph {
     }
 
     fn connected_named_result(&self, view: super::GraphView, name: String) -> Self {
+        if self.frozen.is_some() {
+            return self.bound_selection(view, name);
+        }
+
         let (nodes, edges) = view.into_membership();
         Self::new(self.graph.clone(), nodes, edges, name)
     }
@@ -1061,6 +1142,9 @@ impl GraphEntity for Subgraph {
 /// SubgraphOperations trait implementation for Subgraph
 /// This provides the standard subgraph interface using existing efficient storage
 impl SubgraphOperations for Subgraph {
+    fn frozen_view(&self) -> Option<&crate::GraphView> {
+        self.frozen.as_ref()
+    }
     fn node_set(&self) -> &HashSet<NodeId> {
         self.nodes.as_ref()
     }
@@ -1131,6 +1215,10 @@ impl SubgraphOperations for Subgraph {
     // Following STYLE_ALGO pattern used by PageRank, LPA, and other algorithms
 
     fn neighbors(&self, node_id: NodeId) -> GraphResult<Vec<NodeId>> {
+        if let Some(view) = &self.frozen {
+            return view.neighbors(node_id);
+        }
+
         // Build CSR with reverse edges when the backing graph is undirected so that
         // single stored edges appear for both endpoints.
         let add_reverse = {
@@ -1165,6 +1253,10 @@ impl SubgraphOperations for Subgraph {
     }
 
     fn degree(&self, node_id: NodeId) -> GraphResult<usize> {
+        if let Some(view) = &self.frozen {
+            return view.degree(node_id);
+        }
+
         // Degree counts incident edge instances, including incoming directed
         // edges; reverse CSR inserts self-loops only once.
         let csr = self.get_or_build_csr_internal(true)?;
@@ -1190,6 +1282,18 @@ impl SubgraphOperations for Subgraph {
 // Typed results keep metadata adapters from cloning membership through trait objects.
 impl Subgraph {
     pub(super) fn induced_selection(&self, nodes: &[NodeId]) -> GraphResult<Subgraph> {
+        if let Some(view) = &self.frozen {
+            let ids: Vec<_> = nodes
+                .iter()
+                .copied()
+                .filter(|id| view.contains_node(*id))
+                .collect();
+            return Ok(self.bound_selection(
+                view.select_nodes(&ids)?,
+                format!("{}_induced", self.subgraph_type),
+            ));
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         // Connected results need membership, not a frozen copy of owner values.
@@ -1213,6 +1317,18 @@ impl Subgraph {
         ))
     }
     pub(super) fn edge_selection(&self, edges: &[EdgeId]) -> GraphResult<Subgraph> {
+        if let Some(view) = &self.frozen {
+            let ids: Vec<_> = edges
+                .iter()
+                .copied()
+                .filter(|id| view.contains_edge(*id))
+                .collect();
+            return Ok(self.bound_selection(
+                view.select_edges(&ids)?,
+                format!("{}_from_edges", self.subgraph_type),
+            ));
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         let edges: HashSet<_> = edges
@@ -1233,6 +1349,14 @@ impl Subgraph {
         ))
     }
     pub(super) fn component_selections(&self) -> GraphResult<Vec<Subgraph>> {
+        if let Some(view) = &self.frozen {
+            return view
+                .connected_components(crate::algorithms::community::ComponentMode::Weak)?
+                .into_iter()
+                .map(|child| Ok(self.bound_selection(child, "component".into())))
+                .collect();
+        }
+
         if let Some(cached) = self.component_cache_get(ComponentCacheMode::Undirected) {
             let mut component_subgraphs = Vec::with_capacity(cached.components.len());
             for (i, component) in cached.components.iter().enumerate() {
@@ -1323,6 +1447,10 @@ impl Subgraph {
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Subgraph> {
+        if let Some(view) = &self.frozen {
+            return Ok(self.bound_selection(view.bfs(start, max_depth)?, "traversal".into()));
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         let (nodes, edges) = crate::query::scoped_traversal::bfs(
@@ -1342,6 +1470,10 @@ impl Subgraph {
         start: NodeId,
         max_depth: Option<usize>,
     ) -> GraphResult<Subgraph> {
+        if let Some(view) = &self.frozen {
+            return Ok(self.bound_selection(view.dfs(start, max_depth)?, "traversal".into()));
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         let (nodes, edges) = crate::query::scoped_traversal::dfs(
@@ -1361,6 +1493,12 @@ impl Subgraph {
         source: NodeId,
         target: NodeId,
     ) -> GraphResult<Option<Subgraph>> {
+        if let Some(view) = &self.frozen {
+            return Ok(view
+                .shortest_path_subgraph(source, target)?
+                .map(|child| self.bound_selection(child, "path".into())));
+        }
+
         let graph = self.graph.borrow();
         self.validate_query_scope(&graph)?;
         Ok(crate::query::scoped_traversal::shortest_path(

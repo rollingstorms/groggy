@@ -23,6 +23,7 @@ pub struct PyComponentsArray {
     // Store only the lightweight metadata, not materialized subgraphs!
     components_data: Vec<(HashSet<NodeId>, HashSet<EdgeId>)>,
     graph_ref: Rc<RefCell<Graph>>,
+    source: groggy::GraphView,
 
     // Lazy cache for materialized components (only created when accessed)
     materialized_cache: RefCell<HashMap<usize, PySubgraph>>,
@@ -43,18 +44,20 @@ impl PyComponentsArray {
     pub fn from_components(
         components: Vec<Box<dyn groggy::traits::SubgraphOperations>>,
         graph_ref: Rc<RefCell<Graph>>,
-    ) -> Self {
+        source: groggy::GraphView,
+    ) -> PyResult<Self> {
         // Extract lightweight data from trait objects
         let components_data: Vec<(HashSet<NodeId>, HashSet<EdgeId>)> = components
             .into_iter()
             .map(|comp| (comp.node_set().clone(), comp.edge_set().clone()))
             .collect();
 
-        Self {
+        Ok(Self {
+            source,
             components_data,
             graph_ref,
             materialized_cache: RefCell::new(HashMap::new()),
-        }
+        })
     }
 }
 
@@ -91,13 +94,17 @@ impl PyComponentsArray {
 
         // Lazy materialization - create PySubgraph on-demand
         let (nodes, edges) = &self.components_data[actual_index];
-        let subgraph = Subgraph::new(
-            self.graph_ref.clone(),
+        let view = groggy::GraphView::from_membership(
+            self.source.read_state().clone(),
             nodes.clone(),
             edges.clone(),
+        )
+        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let subgraph = Subgraph::from_frozen_view(
+            self.graph_ref.clone(),
+            view,
             format!("component_{}", actual_index),
         );
-
         let py_subgraph = PySubgraph::from_core_subgraph(subgraph).map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to create component subgraph: {}", e))
         })?;
@@ -154,8 +161,18 @@ impl PyComponentsArray {
     ) -> PyResult<Vec<Py<PyMetaNode>>> {
         let mut meta_nodes = Vec::with_capacity(self.components_data.len());
 
-        for index in 0..self.components_data.len() {
-            let component = self.__getitem__(index as isize)?;
+        // Resolve every source before the first explicit collection effect.
+        let components = (0..self.components_data.len())
+            .map(|index| {
+                let component = self.__getitem__(index as isize)?;
+                component
+                    .inner
+                    .execution_scope(true)
+                    .map(PySubgraph::from_live_subgraph)
+                    .map_err(crate::ffi::utils::graph_error_to_py_err)
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        for component in components {
             let meta_node = component.collapse(
                 py,
                 node_aggs,
@@ -296,6 +313,7 @@ impl PyComponentsArray {
         });
 
         Ok(Self {
+            source: self.source.clone(),
             components_data: filtered_data,
             graph_ref: self.graph_ref.clone(),
             materialized_cache: RefCell::new(HashMap::new()),
@@ -307,58 +325,22 @@ impl PyComponentsArray {
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
         use groggy::viz::streaming::GraphDataSource;
 
-        // Create a combined graph from all components
-        let mut viz_graph = groggy::api::graph::Graph::new_manual();
-        let mut node_mapping = std::collections::HashMap::new();
-
-        // Add all nodes and edges from all components to viz graph
-        for (component_nodes, component_edges) in &self.components_data {
-            // Add nodes from this component
-            for &node_id in component_nodes {
-                use std::collections::hash_map::Entry;
-                if let Entry::Vacant(e) = node_mapping.entry(node_id) {
-                    let new_node_id = viz_graph
-                        .add_node()
-                        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-                    e.insert(new_node_id);
-
-                    // Copy node attributes
-                    if let Ok(attrs) = self.graph_ref.borrow().get_node_attrs(node_id) {
-                        for (attr_name, attr_value) in attrs {
-                            let _ = viz_graph.set_node_attr(
-                                new_node_id,
-                                attr_name.to_string(),
-                                attr_value.clone(),
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Add edges from this component
-            for &edge_id in component_edges {
-                if let Ok((source, target)) = self.graph_ref.borrow().edge_endpoints(edge_id) {
-                    if let (Some(&viz_source), Some(&viz_target)) =
-                        (node_mapping.get(&source), node_mapping.get(&target))
-                    {
-                        if let Ok(new_edge_id) = viz_graph.add_edge(viz_source, viz_target) {
-                            // Copy edge attributes
-                            if let Ok(attrs) = self.graph_ref.borrow().get_edge_attrs(edge_id) {
-                                for (attr_name, attr_value) in attrs {
-                                    let _ = viz_graph.set_edge_attr(
-                                        new_edge_id,
-                                        attr_name.to_string(),
-                                        attr_value.clone(),
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let graph_data_source = GraphDataSource::new(&viz_graph);
+        let source = &self.source;
+        let nodes = self
+            .components_data
+            .iter()
+            .flat_map(|(nodes, _)| nodes.iter().copied())
+            .collect();
+        let edges = self
+            .components_data
+            .iter()
+            .flat_map(|(_, edges)| edges.iter().copied())
+            .collect();
+        let view = groggy::GraphView::from_membership(source.read_state().clone(), nodes, edges)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let graph_data_source = py
+            .allow_threads(|| GraphDataSource::from_view(&view))
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
             "ComponentsArray".to_string(),

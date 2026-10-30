@@ -71,22 +71,20 @@ impl Graph {
         ViewBatchResult { batch, view }
     }
 
-    pub(crate) fn prepare_view_publication(
+    pub(crate) fn validate_bound_source(
         &self,
         view: &GraphView,
-        batch: GraphBatch,
-        schema: Option<&GraphSchema>,
-        additional_schema: Option<&GraphSchema>,
-    ) -> GraphResult<PreparedViewPublication> {
+        require_accepted: bool,
+    ) -> GraphResult<PinnedReadState> {
         let origin = view.read_state().origin().ok_or_else(|| {
             invalid("View has no current graph write provenance; capture a fresh read_view")
         })?;
         if !Arc::ptr_eq(&origin.history, self.history.identity()) {
             return Err(invalid("View belongs to a different graph history"));
         }
-        if !origin.clean {
+        if require_accepted && !origin.clean {
             return Err(invalid(
-                "View captured unpublished state and is read-only; use a fresh accepted-state view",
+                "View captured unpublished/uncommitted state and is read-only; use a fresh accepted-state view",
             ));
         }
         if origin.branch != self.current_branch {
@@ -94,7 +92,13 @@ impl Graph {
                 "View belongs to a different branch; capture a fresh view",
             ));
         }
-        self.validate_write_head(origin.state)?;
+        if require_accepted {
+            self.validate_write_head(origin.state)?;
+        } else if origin.state != self.current_commit {
+            return Err(invalid(
+                "View belongs to a stale state; capture a fresh view",
+            ));
+        }
         // A live current payload has already passed immutable capture validation.
         // Distinct payloads still receive exact comparison after cache invalidation
         // (for example physical maintenance that leaves the logical head unchanged).
@@ -106,6 +110,21 @@ impl Graph {
                 "Working graph no longer matches the view's captured state",
             ));
         }
+        Ok(current)
+    }
+
+    pub(crate) fn prepare_view_publication(
+        &self,
+        view: &GraphView,
+        batch: GraphBatch,
+        schema: Option<&GraphSchema>,
+        additional_schema: Option<&GraphSchema>,
+    ) -> GraphResult<PreparedViewPublication> {
+        let current = self.validate_bound_source(view, true)?;
+        let origin = view
+            .read_state()
+            .origin()
+            .ok_or_else(|| invalid("Missing view source"))?;
         let prepared = self.prepare_publication_with_additional_schema(
             batch,
             origin.state,

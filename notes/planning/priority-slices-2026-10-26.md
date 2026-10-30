@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after the continuation: **211 checked / 57
+Current inventory after the continuation: **214 checked / 54
 open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.
@@ -1533,3 +1533,15 @@ server/RSS/universal speed claim. Gates: **1,508 native / 54 ignored**, strict
 Clippy, **2,567 root Python / 1 skipped**, **251 docs**, rebuilt/staged release
 extension and scoped checks. **211 checked / 57 open**; main remaining boundary is
 frozen default read binding and explicit checked execution/writeback.
+
+
+### Default immutable ownership completed — 2026-10-30
+
+Closed existing **26.1 / AR4 / AR7.5** with default frozen selections, preserved
+specialized derivations, lazy component/retained meta sources, checked explicit
+effects and weak canonical capture caches. No checklist rows added: **214 checked /
+54 open / 268 total**. Verification: **1,514 native / 54 ignored**, strict Clippy,
+**2,574 Python / 1 skipped**, **255 executable docs**. Warm held defaults measure
+66–68 ns at 1k/100k; cold 100k capture remains 147.879 ms. Full scope and limits:
+`default-immutable-views-2026-10-30.md`. Next existing priorities are compound
+topology/effect acceptance and legacy query migration.

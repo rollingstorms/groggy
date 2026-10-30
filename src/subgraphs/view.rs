@@ -12,8 +12,8 @@ enum Membership {
 }
 #[derive(Debug)]
 struct Selection {
-    nodes: HashSet<NodeId>,
-    edges: HashSet<EdgeId>,
+    nodes: Arc<HashSet<NodeId>>,
+    edges: Arc<HashSet<EdgeId>>,
 }
 /// Immutable graph selection. Clones and nested selections share frozen state.
 /// Working-graph mutation targets belong to adapters, never to this read representation.
@@ -36,12 +36,19 @@ impl GraphView {
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>,
     ) -> GraphResult<Self> {
+        Self::from_shared_membership(state, Arc::new(nodes), Arc::new(edges))
+    }
+    pub(crate) fn from_shared_membership(
+        state: PinnedReadState,
+        nodes: Arc<HashSet<NodeId>>,
+        edges: Arc<HashSet<EdgeId>>,
+    ) -> GraphResult<Self> {
         if nodes.iter().any(|&id| !state.existence().contains_node(id)) {
             return Err(Self::invalid(
                 "View contains a node outside its captured state",
             ));
         }
-        for &edge in &edges {
+        for &edge in edges.iter() {
             let &(source, target) =
                 state.snapshot().edges.get(&edge).ok_or_else(|| {
                     Self::invalid("View contains an edge outside its captured state")
@@ -67,8 +74,17 @@ impl GraphView {
                     nodes: shared.nodes.clone(),
                     edges: shared.edges.clone(),
                 });
-                (selection.nodes, selection.edges)
+                (
+                    Arc::try_unwrap(selection.nodes).unwrap_or_else(|nodes| (*nodes).clone()),
+                    Arc::try_unwrap(selection.edges).unwrap_or_else(|edges| (*edges).clone()),
+                )
             }
+        }
+    }
+    pub(crate) fn shared_membership(&self) -> (Arc<HashSet<NodeId>>, Arc<HashSet<EdgeId>>) {
+        match &self.membership {
+            Membership::Full => self.state.existence().shared_membership(),
+            Membership::Selected(selection) => (selection.nodes.clone(), selection.edges.clone()),
         }
     }
     /// Read a meta-node's immutable source group, independent of current liveness.

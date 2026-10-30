@@ -29,7 +29,7 @@ def test_degree_rows_match_captured_domain_without_skipping_ids(directed, method
 
 @pytest.mark.parametrize("warm", [False, True])
 @pytest.mark.parametrize("removal", ["node", "edge", "rewire"])
-def test_stale_neighbor_and_degree_reads_reject_but_frozen_remains_readable(warm, removal):
+def test_default_neighbor_and_degree_reads_retain_the_captured_domain(warm, removal):
     graph = gr.Graph()
     graph.add_nodes(3)
     graph.add_edge(0, 1)
@@ -47,13 +47,15 @@ def test_stale_neighbor_and_degree_reads_reject_but_frozen_remains_readable(warm
         graph.set_edge_endpoints(0, 0, 2)
     before = graph.current_state_id
     for node in [0, 1]:
-        with pytest.raises((ValueError, RuntimeError, KeyError)):
-            selected.neighbors(node)
+        assert selected.neighbors(node).to_list() == frozen.neighbors(node)
     for method in ["degree", "in_degree", "out_degree"]:
         for full in [False, True]:
             for ids in [None, 0, 1, [1, 0], []]:
-                with pytest.raises((ValueError, RuntimeError, KeyError)):
-                    getattr(selected, method)(ids, full_graph=full)
+                values = getattr(selected, method)(ids, full_graph=full)
+                if isinstance(ids, int):
+                    assert values == 1
+                else:
+                    assert values.to_list() == ([1, 1] if ids is None or ids else [])
         assert getattr(frozen, method)(1) == 1
     assert frozen.neighbors(0) == [1]
     assert graph.current_state_id == before

@@ -13,7 +13,8 @@ through an excluded node or edge and later re-enter the result. Induction keeps
 all selected parallel instances and self-loops; it never adds owner-only edges.
 Connected induction scans selected edges once, and explicit edge selection
 resolves only requested selected instances. Neither needs to capture owner
-property values; immutable value capture remains explicit through `pin_view()`.
+property values; native execution scopes remain live until `.freeze()` is called. Default Python
+selections are frozen on return; `pin_view()` exposes their owner-free source.
 A component wrapper is not assumed to be connected merely because of its name:
 its actual selected components are computed. Derived results retain their
 specialized wrapper type and metadata context.
@@ -37,7 +38,7 @@ sets. Neighborhood Python conversion uses this shared representation and retains
 its existing neighborhood type label. Cache entries keep the same instance/version
 validity rules as the base subgraph.
 
-Each native wrapper exposes `pin_view()`. The component and neighborhood Python
+Each native wrapper exposes `freeze()` and `pin_view()`. The component and neighborhood Python
 classes also expose it, and public neighborhood-array items retain their existing
 base `Subgraph` API. Capturing returns a readonly `GraphView` with the selected
 values/topology from that moment. Specialized metadata remains on the wrapper;
@@ -58,8 +59,12 @@ graph.remove_node(1)
 assert frozen.bfs(0).node_ids == [0, 1]
 ```
 
-These wrappers remain connected by default. This consolidation and explicit
-capture path advance AR7.5/26.1; they do not complete immutable default/filter
-returns, effectful facades or the broader visualizer migration. Metadata-specific
-filter reapplication/neighborhood expansion retain their explicit current-owner
-meaning. Native integration examples: `tests/specialized_selection_scope.rs`.
+Explicit native constructors create current-owner execution scopes; `.freeze()`
+keeps specialized metadata while binding read operations to one immutable source.
+Frozen filter combinations, complements, additional criteria, statistics and
+matches preserve that source. `reapply_filter()` explicitly returns a fresh capture
+of current owner data without changing the earlier filter. Frozen neighborhood
+expansion, exact hop rows and merges retain the original source and central-node
+metadata, with checked hop overflow. Default Python neighborhood/component outputs
+are frozen on return. Native integration examples remain in
+`tests/specialized_selection_scope.rs` and the binding regression module.

@@ -1,5 +1,9 @@
 # Checked subgraph bulk writes
 
+Ownership update: [default selections are immutable](default-immutable-views.md).
+The earlier live-scope details below apply to explicit native execution scopes
+and `graph.connected_view()`; default bound writes require a matching source.
+
 Native `SubgraphOperations::set_node_attrs` and `set_node_attr_column` pass the
 complete supplied assignments to the owning graph's validator. Inactive,
 unknown and duplicate targets reject the entire call. Original row positions

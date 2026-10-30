@@ -28,6 +28,9 @@ pub(crate) fn compose_with_label<T: SubgraphOperations + ?Sized>(
 ) -> GraphResult<NodeId> {
     let binding = selection.graph_ref();
     let mut graph = binding.borrow_mut();
+    if let Some(view) = selection.frozen_view() {
+        graph.validate_bound_source(view, true)?;
+    }
     let mut nodes: Vec<_> = selection.node_set().iter().copied().collect();
     nodes.sort_unstable();
     for &node in &nodes {

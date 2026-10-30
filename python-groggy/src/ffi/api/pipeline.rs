@@ -309,7 +309,13 @@ pub fn py_run_sample_pipeline(
 
     let mut ctx = groggy::algorithms::Context::new();
     let subgraphs = pipeline
-        .run(&mut ctx, subgraph.inner.clone())
+        .run(
+            &mut ctx,
+            subgraph
+                .inner
+                .execution_scope(true)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        )
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let py_subgraphs = subgraphs
         .into_iter()

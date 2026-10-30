@@ -1,11 +1,9 @@
 # Connected degree and neighbor reads
 
-Legacy `Subgraph` objects still select from their current owner. Their neighbor
-and degree readers now validate the entire selected scope before using retained
-pool endpoints or cached topology. Removing a selected node/edge or moving a
-selected edge endpoint outside the selection makes that connected selection
-invalid; reads reject rather than returning historical neighbors or zero degrees.
-An explicit frozen `GraphView` remains readable in its original state.
+Default `Subgraph` results now retain their captured values and topology. Their
+neighbor/degree reads remain valid after owner changes. Explicit
+`graph.connected_view()` and native execution scopes keep the active-owner
+validation described below. See [immutable defaults](default-immutable-views.md).
 
 ```python
 import groggy as gr
@@ -23,12 +21,8 @@ assert selected.out_degree().to_list() == [1, 1]
 assert selected.degree(1, full_graph=True) == 3
 
 graph.remove_node(1)
-try:
-    selected.neighbors(0)
-except (ValueError, RuntimeError):
-    pass
-else:
-    raise AssertionError("A stale connected selection must reject")
+assert selected.neighbors(0).to_list() == [1]
+assert selected.degree(1) == 2
 assert frozen.degree(1) == 2
 assert frozen.neighbors(0) == [1]
 ```
@@ -70,5 +64,5 @@ persist that wider cache in the original selection. First/invalidated preparatio
 costs scale with the selected topology; warm native scalar incident degree keeps
 its cached row lookup. Requested rows use sorted-ID lookups.
 
-This closes the reproduced stale-neighbor/degree compatibility defect. It does
-not make legacy connected objects immutable by default or complete roadmap 26.1.
+The explicit connected compatibility path continues to reject stale identities.
+Default immutable ownership is documented separately in the linked contract.

@@ -2522,7 +2522,8 @@ impl PyEdgesAccessor {
                 subgraph_name,
             );
 
-            subgraphs.push(crate::ffi::subgraphs::subgraph::PySubgraph { inner: subgraph });
+            subgraphs
+                .push(crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(subgraph)?);
         }
 
         Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(

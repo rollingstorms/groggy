@@ -29,8 +29,7 @@ def test_selected_adjacency_does_not_induce_excluded_parallel_instances(directed
     expected = {0: [1], 1: [1] if directed else [0, 1]}
     assert selected.adjacency_list() == frozen.adjacency_list() == expected
     graph.remove_edge(1)
-    with pytest.raises((ValueError, RuntimeError)):
-        selected.adjacency_list()
+    assert selected.adjacency_list() == expected
     assert frozen.adjacency_list() == expected
 
 

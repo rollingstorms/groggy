@@ -99,7 +99,7 @@ def test_empty_single_node_outside_scope_and_direction_contracts():
     assert view.shortest_path_subgraph(1, 0) is None
 
 
-def test_connected_components_fallback_and_cache_do_not_use_unselected_bridge():
+def test_selected_components_keep_original_edges_after_owner_removal():
     graph = fixture(directed=False)
     selected = graph.subgraph_from_edges([0, 6])
     for _ in range(2):
@@ -107,11 +107,10 @@ def test_connected_components_fallback_and_cache_do_not_use_unselected_bridge():
     graph.set_node_attr(0, "new_value", 1)
     assert len(selected.connected_components()) == 2
     graph.remove_edge(0)
-    with pytest.raises((ValueError, RuntimeError)):
-        selected.connected_components()
+    assert len(selected.connected_components()) == 2
 
 
-def test_restoration_invalidates_scope_csr_and_components_even_when_space_versions_repeat():
+def test_restoration_preserves_old_reads_and_refreshes_new_selections():
     graph = gr.Graph()
     graph.add_nodes(3)
     graph.add_edge(0, 1)
@@ -124,8 +123,9 @@ def test_restoration_invalidates_scope_csr_and_components_even_when_space_versio
     assert not selected.has_path(0, 2)
     assert len(selected.connected_components()) == 2
     graph.restore_state(second, mode="switch")
-    assert selected.neighbors(0).to_list() == [2]
-    assert selected.has_path(0, 2)
-    assert not selected.has_path(0, 1)
-    assert selected.bfs(0).has_node(2)
-    assert not selected.bfs(0).has_node(1)
+    assert selected.neighbors(0).to_list() == [1]
+    assert not selected.has_path(0, 2)
+    assert selected.has_path(0, 1)
+    fresh = graph.induced_subgraph([0, 1, 2])
+    assert fresh.bfs(0).has_node(2)
+    assert not fresh.bfs(0).has_node(1)

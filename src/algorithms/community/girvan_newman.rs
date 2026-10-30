@@ -269,6 +269,11 @@ impl Algorithm for GirvanNewman {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let subgraph = if subgraph.frozen_view().is_some() {
+            subgraph.execution_scope(ctx.persist_results())?
+        } else {
+            subgraph
+        };
         let t0 = Instant::now();
 
         let communities = self.compute(ctx, &subgraph)?;

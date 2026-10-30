@@ -12,23 +12,18 @@ def test_view_column_indexing_is_sorted_aligned_and_preserves_absent_rows(captur
     assert subject["score"].to_list() == [0.123456789012345, None, None, 7]
     assert subject["unknown"].to_list() == [None] * 4
     accessor = subject.to_nodes()
-    ids = accessor.ids if captured else accessor.ids()
+    ids = accessor.ids
     assert ids.to_list() == [0, 1, 2, 3]
     graph.remove_node(0)
-    if captured:
-        assert subject["score"].to_list() == [0.123456789012345, None, None, 7]
-    else:
-        with pytest.raises((ValueError, RuntimeError)):
-            subject["score"]
+    assert subject["score"].to_list() == [0.123456789012345, None, None, 7]
 
 
-def test_connected_column_indexing_rejects_removed_ids_instead_of_silently_substituting_null():
+def test_default_column_retains_removed_entities_and_their_values():
     graph = Graph()
     graph.add_nodes([{"score": 11}, {"score": 12}])
     selection = graph.view()
     graph.remove_node(1)
-    with pytest.raises((ValueError, RuntimeError)):
-        selection["score"]
+    assert selection["score"].to_list() == [11, 12]
 
 
 @pytest.mark.parametrize("captured", [False, True])
@@ -52,10 +47,10 @@ def test_subset_columns_and_node_edge_adapters_use_the_same_ascending_id_order(c
     assert list(subject.edge_ids) == [2, 5, 7]
     assert subject["score"].to_list() == [2, 3, 5, 6, 7, 8]
     for accessor in [subject.nodes, subject.to_nodes()]:
-        ids = accessor.ids if captured else accessor.ids()
+        ids = accessor.ids
         assert ids.to_list() == [2, 3, 5, 6, 7, 8]
     for accessor in [subject.edges, subject.to_edges()]:
-        ids = accessor.ids if captured else accessor.ids()
+        ids = accessor.ids
         assert ids.to_list() == [2, 5, 7]
 
 

@@ -19,8 +19,7 @@ def test_neighborhood_bridge_keeps_exact_scope_and_frozen_read_lifetime(directed
     assert neighborhood.induced_subgraph([0, 1, 2, 3]).node_count() == 3
     assert graph.current_state_id == before
     graph.remove_node(2)
-    with pytest.raises((ValueError, RuntimeError, KeyError)):
-        neighborhood.neighbors(0)
+    assert neighborhood.neighbors(0).to_list() == frozen.neighbors(0)
     assert frozen.bfs(0).node_ids == [0, 1, 2]
     assert frozen.shortest_path_subgraph(0, 2).edge_ids == [0, 1]
 

@@ -46,17 +46,18 @@ def test_full_view_cache_restoration_does_not_reuse_equal_numeric_space_versions
     assert after is not before
 
 
-def test_property_and_endpoint_only_writes_preserve_cached_membership_and_current_reads():
+def test_property_and_endpoint_writes_refresh_cache_preserving_older_reads():
     graph = Graph(directed=True)
     graph.add_nodes(3)
     graph.add_edge(0, 1)
     original = graph.view()
     assert original.neighbors(0).to_list() == [1]
     graph.set_node_attr(0, "value", 7)
-    assert graph.view() is original
+    assert graph.view() is not original
     assert graph.view().pin_view().node_attr(0, "value") == 7
     graph.set_edge_endpoints(0, 2, 1)
-    assert graph.view() is original
+    assert graph.view() is not original
     assert graph.view().neighbors(0).to_list() == []
     assert graph.view().neighbors(2).to_list() == [1]
     assert graph.view().pin_view().edge_endpoints(0) == (2, 1)
+    assert original.pin_view().edge_endpoints(0) == (0, 1)

@@ -1232,3 +1232,19 @@ delta. Switch of an already-selected clean state is a no-op. Switch accepts no
 change timestamps. This section supersedes the earlier pending tracked-revert
 question and earlier reference-only restore signatures; existing history semantics
 and explicit checkpoints are unchanged. Details: `docs/api/state-restoration.md`.
+
+
+## View ownership implementation — 2026-10-30
+
+The accepted immutable-view model is now the default for Python graph selections.
+Views retain properties/topology and derived read outputs; explicit bound methods
+validate their original source before writing. Continue algorithm effects from the
+returned refreshed view, or select a fresh source; the input remains immutable.
+`graph.connected_view()` exposes explicit live-owner compatibility, and native
+execution constructors remain available. `pin_view()` exposes the owner-free
+captured read. Selection node/edge adapters are readonly (`ids` is a property).
+Native specialized metadata is retained by `.freeze()` and captured derivations;
+filter reapplication explicitly returns a new current capture. No new workbook
+answer is required for this implementation of AR4/26.1/AR7.5. Contract and receipt:
+`../../docs/api/default-immutable-views.md` and
+`default-immutable-views-2026-10-30.md`.

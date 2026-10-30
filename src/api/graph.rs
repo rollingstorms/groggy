@@ -45,6 +45,8 @@ mod storage_boundary_tests;
 mod tables;
 mod view_updates;
 mod view_materialization;
+mod current_view;
+pub use current_view::ViewRevision;
 mod write_coordinate;
 use identity::ExternalIdentityIndex;
 pub use identity::{EdgeUpsert, ExternalEntityRef, NodeUpsert, EXTERNAL_ID};

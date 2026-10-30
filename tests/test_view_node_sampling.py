@@ -42,7 +42,7 @@ def test_seeded_node_sampling_is_repeatable_and_rejects_invalid_controls(source)
             subject.sample(invalid)
 
 
-def test_connected_and_frozen_samples_share_scope_and_pin_values_after_owner_change():
+def test_default_and_owner_free_samples_retain_source_after_owner_changes():
     graph = Graph(directed=True)
     graph.add_nodes(8)
     for node in range(6):
@@ -56,14 +56,13 @@ def test_connected_and_frozen_samples_share_scope_and_pin_values_after_owner_cha
     node = sample.node_ids[0]
     graph.remove_node(node)
     for count in [0, 2, 100]:
-        with pytest.raises((ValueError, RuntimeError)):
-            selected.sample(count)
+        assert selected.sample(count).node_count() == min(count, 6)
     assert sample.node_count() == 3
     assert sample.node_ids[0] == node
     assert sample.write_state_id == frozen.write_state_id
 
 
-def test_component_and_subgraph_arrays_sample_each_input_and_propagate_invalid_scope():
+def test_component_arrays_sample_each_input_from_the_original_source():
     graph = Graph()
     graph.add_nodes(6)
     graph.add_edge(0, 1)
@@ -75,8 +74,7 @@ def test_component_and_subgraph_arrays_sample_each_input_and_propagate_invalid_s
     assert all(item.node_count() == 1 and item.edge_count() == 0 for item in samples)
     assert all(item.node_count() == 0 for item in samples.sample(0))
     graph.remove_node(0)
-    with pytest.raises((ValueError, RuntimeError)):
-        components.sample(0)
+    assert all(item.node_count() == 0 for item in components.sample(0))
 
 
 def test_sample_preserves_temporal_clocks_without_current_write_authority():

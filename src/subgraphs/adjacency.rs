@@ -39,6 +39,10 @@ impl Subgraph {
     /// Capture only current selected topology for owner-free worker/export calls.
     /// Invalid live membership/endpoints reject before cached CSR can be reused.
     pub fn adjacency_read(&self) -> GraphResult<AdjacencyRead> {
+        if let Some(view) = self.frozen_view() {
+            return view.adjacency_read();
+        }
+
         let reverse = self.graph().borrow().is_undirected();
         Ok(AdjacencyRead::new(
             self.ordered_nodes(),

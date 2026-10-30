@@ -15,7 +15,7 @@ for edge in [(0, 1), (0, 1), (1, 1), (2, 0)]:
     graph.add_edge(*edge)
 expected = {0: [1, 1], 1: [1], 2: [0], 3: []}
 assert graph.adjacency_list() == expected
-connected = graph.view()
+connected = graph.connected_view()
 frozen = connected.pin_view()
 assert connected.adjacency_list() == frozen.adjacency_list() == expected
 subset = frozen.select_edges([1, 2])

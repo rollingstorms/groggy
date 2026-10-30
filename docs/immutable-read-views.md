@@ -43,10 +43,11 @@ child = parent.select_nodes([a, b])
 assert child.edge_ids == [first]  # The excluded parallel edge stays excluded.
 ```
 
-An existing `Subgraph` can be frozen explicitly with `subgraph.pin_view()`. This
-captures its current selection and fails if selected IDs are no longer active.
-The existing connected `Subgraph` and table adapters are still being migrated;
-they do not yet have the immutable read behavior described here.
+Default `Subgraph` results now retain their creation-time state.
+`subgraph.pin_view()` returns that same source as an owner-free `GraphView`;
+`graph.view()` pairs the frozen read with explicit checked methods on its owner.
+See [default immutable selections](api/default-immutable-views.md) for writes,
+cache identity, entity adapters and explicit `graph.connected_view()` compatibility.
 
 ## Read properties and topology
 
@@ -128,7 +129,8 @@ assert view.nodes_table()["score"].to_list() == [7, None]
 ```
 
 These exports share the native projection code used by `Graph` and `Subgraph`.
-A fresh legacy export reads the current working state. Stale selected IDs,
+Default Subgraph exports read their captured state. Explicit connected scopes
+read the current working state. Stale connected IDs,
 unreadable value references and properties colliding with structural column names
 raise errors. Exports preserve IDs and now carry an immutable source pin and row identity for
 [explicit checked source writeback](api/table-source-pins.md). They hold no mutable
@@ -166,7 +168,8 @@ either endpoint orientation qualifies, and querying a node as its own neighbor
 requires a self-loop. This differs from outgoing `neighbors()`. ConnectsNodes
 matches both orientations only for undirected graphs. Python filtering releases
 the GIL over captured state. Legacy Subgraph filters share these predicates and
-respect their selection, but still read current working values.
+respect their selection and retain captured values. Explicit connected scopes
+continue to read current working values.
 
 This reuses the current parser and filter types. It does not add a new query
 language, certify placeholder endpoint-attribute conveniences, or implement

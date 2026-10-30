@@ -1,5 +1,9 @@
 # Property access respects selected membership
 
+Ownership update: [default selections are immutable](default-immutable-views.md).
+The earlier live-scope details below apply to explicit native execution scopes
+and `graph.connected_view()`; default bound writes require a matching source.
+
 Shared connected-subgraph property getters now enforce the selection in addition
 to the owner's active-state rules. An active node outside a node selection is
 not readable through it. A parallel edge

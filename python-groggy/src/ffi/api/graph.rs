@@ -214,7 +214,9 @@ impl PyAggregationResult {
 pub struct PyGraph {
     pub inner: Rc<RefCell<RustGraph>>,
     // Cache for the full graph view to avoid expensive recreation
-    pub cached_view: RefCell<Option<(groggy::state::space::MembershipRevision, Py<PySubgraph>)>>,
+    pub cached_view: RefCell<Option<(groggy::api::graph::ViewRevision, PyObject)>>,
+    pub cached_live_view:
+        RefCell<Option<(groggy::state::space::MembershipRevision, Py<PySubgraph>)>>,
 }
 
 impl Clone for PyGraph {
@@ -222,6 +224,7 @@ impl Clone for PyGraph {
         PyGraph {
             inner: self.inner.clone(),
             cached_view: RefCell::new(None), // Don't clone cache - let each instance build its own
+            cached_live_view: std::cell::RefCell::new(None),
         }
     }
 }
@@ -268,7 +271,7 @@ impl PyGraph {
     where
         F: for<'a> FnOnce(PyRef<'a, PySubgraph>, Python<'a>) -> PyResult<R>,
     {
-        let view = Self::view(graph_ref, py)?;
+        let view = Self::connected_view(graph_ref, py)?;
         f(view.borrow(py), py)
     }
 
@@ -282,7 +285,7 @@ impl PyGraph {
         method_name: &str,
         args: &pyo3::types::PyTuple,
     ) -> PyResult<PyObject> {
-        let view = Self::view(graph_ref, py)?;
+        let view = Self::connected_view(graph_ref, py)?;
         view.call_method1(py, method_name, args)
     }
 
@@ -294,7 +297,7 @@ impl PyGraph {
         args: &pyo3::types::PyTuple,
         kwargs: Option<&PyDict>,
     ) -> PyResult<PyObject> {
-        let view = Self::view(graph_ref, py)?;
+        let view = Self::connected_view(graph_ref, py)?;
         view.call_method(py, method_name, args, kwargs)
     }
 }
@@ -400,6 +403,7 @@ impl PyGraph {
         Ok(Self {
             inner,
             cached_view: RefCell::new(None),
+            cached_live_view: std::cell::RefCell::new(None),
         })
     }
 
@@ -424,6 +428,7 @@ impl PyGraph {
         Ok(Self {
             inner: graph.into_shared(),
             cached_view: RefCell::new(None),
+            cached_live_view: std::cell::RefCell::new(None),
         })
     }
 
@@ -461,6 +466,7 @@ impl PyGraph {
         Ok(Self {
             inner: graph.into_shared(),
             cached_view: RefCell::new(None),
+            cached_live_view: std::cell::RefCell::new(None),
         })
     }
 
@@ -2527,47 +2533,53 @@ impl PyGraph {
     /// Return a full-view Subgraph (whole graph as a subgraph).
     /// Downstream code can always resolve parent graph from this object.
     pub fn view(self_: PyRef<Self>, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
-        // Membership stamps avoid both cardinality collisions and O(n) ID-vector
-        // allocation on a warm hit. Endpoint/value readers have their own caches.
-        let current_version = self_.inner.borrow().space().membership_revision();
-
-        // Check if we have a cached view for this version
         {
             let cache = self_.cached_view.borrow();
-            if let Some((cached_version, cached_subgraph)) = cache.as_ref() {
-                if *cached_version == current_version {
-                    // Cache hit - return cached result
-                    return Ok(cached_subgraph.clone());
+            if let Some((revision, weak)) = cache.as_ref() {
+                if self_.inner.borrow().view_revision_is_current(revision) {
+                    let value = weak.call0(py)?;
+                    if !value.is_none(py) {
+                        return value.extract::<Py<PySubgraph>>(py);
+                    }
                 }
             }
         }
-        // Cache miss - need to rebuild
+        let graph = self_.inner.borrow();
+        let revision = graph.view_revision();
+        let source = graph.view().map_err(graph_error_to_py_err)?;
+        drop(graph);
+        let subgraph = Subgraph::from_frozen_view(self_.inner.clone(), source, "full_view".into());
+        let result = Py::new(py, PySubgraph::from_core_subgraph(subgraph)?)?;
+        let weak = py
+            .import("weakref")?
+            .getattr("ref")?
+            .call1((result.clone_ref(py),))?
+            .into_py(py);
+        *self_.cached_view.borrow_mut() = Some((revision, weak));
+        Ok(result)
+    }
 
-        // OPTIMIZATION: Get HashSets directly (avoids Vec intermediate)
-        let graph_ref = self_.inner.borrow();
-        let node_set = graph_ref.node_ids_set();
-        let edge_set = graph_ref.edge_ids_set();
-        drop(graph_ref);
-
-        // OPTIMIZATION: Use reserved ID 1 for cached views (avoids atomic counter overhead)
-        let subgraph = groggy::subgraphs::Subgraph::new_with_simple_id(
-            self_.inner.clone(),
-            node_set,
-            edge_set,
-            "cached_full_view".to_string(),
-            1, // Reserved ID for cached views
-        );
-
-        let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
-        let py_result = Py::new(py, py_subgraph)?;
-
-        // Cache the result for future calls
-        {
-            let mut cache = self_.cached_view.borrow_mut();
-            *cache = Some((current_version, py_result.clone()));
+    /// Explicit current-owner selection for compatibility and owner execution.
+    /// Its reads follow the owner and reject inactive selected IDs.
+    pub fn connected_view(self_: PyRef<Self>, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
+        let revision = self_.inner.borrow().space().membership_revision();
+        if let Some((previous, view)) = self_.cached_live_view.borrow().as_ref() {
+            if *previous == revision {
+                return Ok(view.clone_ref(py));
+            }
         }
-
-        Ok(py_result)
+        let graph = self_.inner.borrow();
+        let subgraph = Subgraph::new_with_simple_id(
+            self_.inner.clone(),
+            graph.node_ids_set(),
+            graph.edge_ids_set(),
+            "connected_full_view".into(),
+            1,
+        );
+        drop(graph);
+        let result = Py::new(py, PySubgraph::from_live_subgraph(subgraph))?;
+        *self_.cached_live_view.borrow_mut() = Some((revision, result.clone_ref(py)));
+        Ok(result)
     }
 
     /// Check if the graph is connected (delegates to subgraph implementation)
@@ -2610,7 +2622,13 @@ impl PyGraph {
                 crate::ffi::storage::components::PyComponentsArray::from_components(
                     components,
                     subgraph.inner.graph().clone(),
-                ),
+                    subgraph
+                        .inner
+                        .clone()
+                        .freeze()
+                        .and_then(|scope| scope.pin_view())
+                        .map_err(graph_error_to_py_err)?,
+                )?,
             )
         })
     }
@@ -2778,19 +2796,17 @@ impl PyGraph {
     // === CONVERSION METHODS (via Python) ===
 
     /// Convert to NodesAccessor - delegates via Python.
-    pub fn to_nodes(
-        slf: PyRef<Self>,
-        py: Python,
-    ) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
-        Self::with_full_view(slf, py, |subgraph, _py| subgraph.to_nodes())
+    pub fn to_nodes(slf: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+        let view = Self::view(slf, py)?;
+        let result = view.borrow(py).to_nodes(py);
+        result
     }
 
     /// Convert to EdgesAccessor - delegates via Python.
-    pub fn to_edges(
-        slf: PyRef<Self>,
-        py: Python,
-    ) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
-        Self::with_full_view(slf, py, |subgraph, _py| subgraph.to_edges())
+    pub fn to_edges(slf: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+        let view = Self::view(slf, py)?;
+        let result = view.borrow(py).to_edges(py);
+        result
     }
 
     /// Get edges table - delegates via Python.

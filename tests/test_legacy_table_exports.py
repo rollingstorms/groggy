@@ -63,7 +63,7 @@ def test_selected_explicit_null_property_is_retained_as_present():
 
 
 @pytest.mark.parametrize("kind", ["nodes", "edges"])
-def test_stale_constrained_accessors_reject_without_synthetic_rows(kind):
+def test_constrained_default_accessors_retain_original_rows_after_removal(kind):
     graph = fixture()
     accessor = graph.nodes[[2]].nodes if kind == "nodes" else graph.edges[[2]].edges
     old = accessor.table().base_table()
@@ -71,8 +71,7 @@ def test_stale_constrained_accessors_reject_without_synthetic_rows(kind):
         graph.remove_node(2)
     else:
         graph.remove_edge(2)
-    with pytest.raises(ValueError):
-        accessor.table()
+    assert accessor.table().base_table().source_entity_ids == [2]
     assert old.source_entity_ids == [2]
 
 
@@ -94,7 +93,7 @@ def test_legacy_subgraph_bundle_keeps_capture_after_parent_changes():
     assert table.edges.base_table().source_entity_ids == [0, 1, 2]
     graph.set_node_attr(0, "x", 99)
     assert table.nodes.base_table().source_views()[0].node_attr(0, "x") == 1.0000000000000002
-    assert column(subgraph.table().nodes.base_table(), "x")[0] == 99
+    assert column(subgraph.table().nodes.base_table(), "x")[0] == 1.0000000000000002
 
 
 def test_separately_exported_components_do_not_forge_one_shared_capture():

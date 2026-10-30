@@ -223,18 +223,14 @@ impl MetaNodeOperations for MetaNode {
 
     fn subgraph(&self) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
         if let Some(subgraph_id) = self.subgraph_id() {
-            // Get the stored subgraph data from the graph pool
-            let (nodes, edges, _subgraph_type) = {
-                let graph = self.graph.borrow();
-                let result = graph.pool().get_subgraph(subgraph_id)?;
-                result
-            };
-
-            // Reconstruct a concrete Subgraph instance
-            let subgraph = crate::subgraphs::Subgraph::new(
+            // A group revision owns its original immutable source, including
+            // identities no longer active in the current graph.
+            let view = self.graph.borrow().pool().retained_groups()
+                .get(&subgraph_id).map(|group| group.view.clone())
+                .ok_or_else(|| crate::GraphError::InvalidInput(format!("Group {subgraph_id} has no frozen source revision; pin an explicit source view")))?;
+            let subgraph = crate::subgraphs::Subgraph::from_frozen_view(
                 self.graph.clone(),
-                nodes,
-                edges,
+                view,
                 format!("expanded_from_meta_node_{}", self.id),
             );
 

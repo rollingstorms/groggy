@@ -72,7 +72,7 @@ def test_direction_and_selected_boundary_are_respected(directed):
 def test_persistent_output_uses_integer_properties_for_reached_nodes():
     g, nodes = fixture()
     sub = g.induced_subgraph(nodes)
-    sub.apply(algorithms.pathfinding.bfs("start", "b"))
+    sub = sub.apply(algorithms.pathfinding.bfs("start", "b"))
     sub.apply(algorithms.pathfinding.dfs("start", "d"))
     assert [g.get_node_attr(n, "b") for n in nodes] == [0, 1, 1, 2, None]
     assert [g.get_node_attr(n, "d") for n in nodes] == [0, 1, 3, 2, None]

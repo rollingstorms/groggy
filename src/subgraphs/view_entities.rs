@@ -105,6 +105,11 @@ pub struct GraphViewEntities {
     ids: Arc<OnceLock<Arc<[usize]>>>,
 }
 impl GraphViewEntities {
+    /// Captured graph selection underlying this homogeneous entity adapter.
+    pub fn graph_view(&self) -> &GraphView {
+        &self.view
+    }
+
     /// Ascending original IDs; never floats or positional aliases.
     pub fn ids(&self) -> &[usize] {
         self.ids.get_or_init(|| match self.kind {

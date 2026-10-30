@@ -115,6 +115,34 @@ pub trait NeighborhoodOperations: SubgraphOperations {
             return Ok(Vec::new());
         }
 
+        if let Some(view) = self.frozen_view() {
+            let seeds: Vec<_> = self
+                .central_nodes()
+                .iter()
+                .copied()
+                .filter(|id| view.contains_node(*id))
+                .collect();
+            let reached = view.within_hops(
+                &seeds,
+                hop_distance,
+                crate::query::TraversalDirection::Outgoing,
+            )?;
+            if hop_distance == 0 {
+                return Ok(reached.node_ids());
+            }
+            let earlier = view.within_hops(
+                &seeds,
+                hop_distance - 1,
+                crate::query::TraversalDirection::Outgoing,
+            )?;
+            let mut nodes: Vec<_> = reached
+                .nodes()
+                .difference(earlier.nodes())
+                .copied()
+                .collect();
+            nodes.sort_unstable();
+            return Ok(nodes);
+        }
         // Use BFS from central nodes with exact hop matching
         let binding = self.graph_ref();
         let graph = binding.borrow();

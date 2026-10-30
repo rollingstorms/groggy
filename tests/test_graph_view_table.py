@@ -32,10 +32,9 @@ def test_sparse_properties_are_aligned_across_graph_subgraph_and_frozen_tables()
         assert values(table.edges, "target") == [nodes[2], nodes[3]]
     graph.set_node_attr(nodes[3], "late", 999)
     assert values(frozen.nodes_table(), "late") == [None, None, None, 77]
-    assert values(legacy.table().nodes, "late") == [None, None, None, 999]
+    assert values(legacy.table().nodes, "late") == [None, None, None, 77]
     graph.remove_node(nodes[3])
-    with pytest.raises((ValueError, RuntimeError)):
-        legacy.table()
+    assert values(legacy.table().nodes, "node_id") == nodes
     assert values(frozen.edges_table(), "edge_id") == [first, second]
 
 

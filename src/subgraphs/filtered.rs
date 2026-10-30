@@ -38,6 +38,43 @@ pub struct FilteredSubgraph {
 }
 
 impl FilteredSubgraph {
+    fn with_view_criteria(
+        &self,
+        source: crate::GraphView,
+        criteria: FilterCriteria,
+    ) -> GraphResult<Self> {
+        let mut nodes = Vec::new();
+        for id in source.node_ids() {
+            if criteria.matches_node_view(id, &source)? {
+                nodes.push(id);
+            }
+        }
+        let selected = source.select_nodes(&nodes)?;
+        let mut edges = HashSet::new();
+        for id in selected.edge_ids() {
+            if criteria.matches_edge_view(id, &source)? {
+                edges.insert(id);
+            }
+        }
+        let view = crate::GraphView::from_membership(
+            source.read_state().clone(),
+            selected.nodes().clone(),
+            edges,
+        )?;
+        let mut result =
+            self.wrap_selection(self.selection.bound_selection(view, "filtered".into()));
+        result.filter_criteria = criteria;
+        result.original_node_count = source.node_count();
+        result.original_edge_count = source.edge_count();
+        Ok(result)
+    }
+
+    /// Retain selected values/topology while preserving specialized metadata.
+    pub fn freeze(mut self) -> GraphResult<Self> {
+        self.selection = self.selection.freeze()?;
+        Ok(self)
+    }
+
     /// Borrow the canonical connected selection without copying its membership.
     pub fn as_subgraph(&self) -> &crate::subgraphs::Subgraph {
         &self.selection
@@ -189,6 +226,9 @@ impl GraphEntity for FilteredSubgraph {
 }
 
 impl SubgraphOperations for FilteredSubgraph {
+    fn frozen_view(&self) -> Option<&crate::GraphView> {
+        self.selection.frozen_view()
+    }
     fn node_set(&self) -> &HashSet<NodeId> {
         self.selection.nodes()
     }
@@ -267,6 +307,12 @@ impl FilterOperations for FilteredSubgraph {
     }
 
     fn reapply_filter(&self) -> GraphResult<Box<dyn FilterOperations>> {
+        if self.frozen_view().is_some() {
+            let source = self.selection.graph().borrow().view()?;
+            return Ok(Box::new(
+                self.with_view_criteria(source, self.filter_criteria.clone())?,
+            ));
+        }
         let new_subgraph =
             FilteredSubgraph::from_criteria(self.selection.graph(), self.filter_criteria.clone())?;
 
@@ -274,6 +320,28 @@ impl FilterOperations for FilteredSubgraph {
     }
 
     fn and_filter(&self, other: &dyn FilterOperations) -> GraphResult<Box<dyn FilterOperations>> {
+        if self.frozen_view().is_some() || other.frozen_view().is_some() {
+            let left = self.frozen_view().ok_or_else(|| {
+                crate::GraphError::InvalidInput(
+                    "Freeze both filter sources before combining them".into(),
+                )
+            })?;
+            let right = other.frozen_view().ok_or_else(|| {
+                crate::GraphError::InvalidInput(
+                    "Freeze both filter sources before combining them".into(),
+                )
+            })?;
+            let mut result = self.wrap_selection(
+                self.selection
+                    .bound_selection(left.intersect_with(right)?, "filtered".into()),
+            );
+            result.filter_criteria = FilterCriteria::And(vec![
+                self.filter_criteria.clone(),
+                other.filter_criteria().clone(),
+            ]);
+            return Ok(Box::new(result));
+        }
+
         // Create intersection of node and edge sets
         let intersected_nodes: HashSet<NodeId> = self
             .selection
@@ -307,6 +375,28 @@ impl FilterOperations for FilteredSubgraph {
     }
 
     fn or_filter(&self, other: &dyn FilterOperations) -> GraphResult<Box<dyn FilterOperations>> {
+        if self.frozen_view().is_some() || other.frozen_view().is_some() {
+            let left = self.frozen_view().ok_or_else(|| {
+                crate::GraphError::InvalidInput(
+                    "Freeze both filter sources before combining them".into(),
+                )
+            })?;
+            let right = other.frozen_view().ok_or_else(|| {
+                crate::GraphError::InvalidInput(
+                    "Freeze both filter sources before combining them".into(),
+                )
+            })?;
+            let mut result = self.wrap_selection(
+                self.selection
+                    .bound_selection(left.merge_with(right)?, "filtered".into()),
+            );
+            result.filter_criteria = FilterCriteria::Or(vec![
+                self.filter_criteria.clone(),
+                other.filter_criteria().clone(),
+            ]);
+            return Ok(Box::new(result));
+        }
+
         // Create union of node and edge sets
         let mut unioned_nodes = self.selection.nodes().clone();
         unioned_nodes.extend(other.node_set());
@@ -332,6 +422,16 @@ impl FilterOperations for FilteredSubgraph {
     }
 
     fn not_filter(&self) -> GraphResult<Box<dyn FilterOperations>> {
+        if let Some(view) = self.frozen_view() {
+            let root = crate::GraphView::all(view.read_state().clone());
+            let nodes: Vec<_> = root.nodes().difference(view.nodes()).copied().collect();
+            let mut result = self.wrap_selection(
+                self.selection
+                    .bound_selection(root.select_nodes(&nodes)?, "filtered".into()),
+            );
+            result.filter_criteria = FilterCriteria::Not(Box::new(self.filter_criteria.clone()));
+            return Ok(Box::new(result));
+        }
         // Create complement against full graph
         let owner = self.selection.graph();
         let graph_borrow = owner.borrow();
@@ -377,6 +477,12 @@ impl FilterOperations for FilteredSubgraph {
         let combined_criteria =
             FilterCriteria::And(vec![self.filter_criteria.clone(), additional_criteria]);
 
+        if let Some(view) = self.frozen_view() {
+            return Ok(Box::new(self.with_view_criteria(
+                crate::GraphView::all(view.read_state().clone()),
+                combined_criteria,
+            )?));
+        }
         // Reapply combined criteria to current graph
         let new_subgraph =
             FilteredSubgraph::from_criteria(self.selection.graph(), combined_criteria)?;

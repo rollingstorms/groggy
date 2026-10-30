@@ -19,7 +19,7 @@ graph = Graph(directed=True)
 graph.add_nodes(8)
 for node in range(8):
     graph.add_edge(node, node)
-connected = graph.view()
+connected = graph.connected_view()
 frozen = connected.pin_view()
 a = connected.sample(3, seed=17)
 b = frozen.sample(3, seed=17)
@@ -41,9 +41,9 @@ else:
     raise AssertionError("An invalid current-owner scope must reject even at k=0")
 ```
 
-Connected sampling validates the complete active endpoint-closed input even for
-zero or oversized requests. Its output remains a connected selection with live
-owner reads; capture explicitly for frozen state. Immutable sampling shares the
+Explicit connected sampling validates the complete active endpoint-closed input
+even for zero or oversized requests. Default-facing output selections are frozen;
+`graph.view()` and ordinary selections already retain their source. Immutable sampling shares the
 original capture, clocks, retained group catalog and checked-write provenance.
 It never reconstructs a writable graph or silently recaptures a later owner state.
 Neither form allocates graph entities or publishes deltas. An explicit subsequent

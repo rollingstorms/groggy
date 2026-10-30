@@ -49,16 +49,15 @@ def test_captured_scan_pages_match_explicit_indexes(descending, offset, limit):
         sorted(query.node_ids, reverse=descending)[offset:][:limit]
 
 
-def test_connected_query_capture_is_immutable_and_stale_selections_reject():
+def test_default_query_retains_values_after_owner_updates_and_removal():
     graph = fixture()
     connected = graph.filter_nodes("score > 0")
     query = connected.query()
     graph.set_node_attr(0, "score", -5)
     assert query.query_nodes("score > 0") == [0, 1]
-    assert connected.query().query_nodes("score > 0") == [1]
+    assert connected.query().query_nodes("score > 0") == [0, 1]
     graph.remove_node(1)
-    with pytest.raises(ValueError, match="outside|inactive|View"):
-        connected.query()
+    assert connected.query().query_nodes("score > 0") == [0, 1]
     assert query.query_nodes("score > 0") == [0, 1]
 
 

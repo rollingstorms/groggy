@@ -37,6 +37,12 @@ pub struct ComponentSubgraph {
 }
 
 impl ComponentSubgraph {
+    /// Retain selected values/topology while preserving specialized metadata.
+    pub fn freeze(mut self) -> GraphResult<Self> {
+        self.selection = self.selection.freeze()?;
+        Ok(self)
+    }
+
     /// Borrow the canonical connected selection without copying its membership.
     pub fn as_subgraph(&self) -> &crate::subgraphs::Subgraph {
         &self.selection
@@ -170,6 +176,9 @@ impl GraphEntity for ComponentSubgraph {
 }
 
 impl SubgraphOperations for ComponentSubgraph {
+    fn frozen_view(&self) -> Option<&crate::GraphView> {
+        self.selection.frozen_view()
+    }
     fn node_set(&self) -> &HashSet<NodeId> {
         self.selection.nodes()
     }

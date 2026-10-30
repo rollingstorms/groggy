@@ -90,5 +90,5 @@ def test_connected_set_operations_are_implemented_and_use_the_same_owner():
     assert left.intersect_with(right).node_count() == 1
     other = fixture().induced_subgraph([1])
     for method in ("merge_with", "intersect_with", "subtract_from"):
-        with pytest.raises((ValueError, RuntimeError), match="same graph owner"):
+        with pytest.raises((ValueError, RuntimeError), match="same capture"):
             getattr(left, method)(other)

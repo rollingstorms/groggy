@@ -96,6 +96,26 @@ pub struct PyGraphViewEntities {
 }
 #[pymethods]
 impl PyGraphViewEntities {
+    /// Owned source-bound table of the captured node or edge component.
+    fn table(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let view = self.inner.graph_view();
+        if self.inner.is_nodes() {
+            let table = py
+                .allow_threads(|| view.node_table_data())
+                .map_err(graph_error_to_py_err)?
+                .into_nodes_table()
+                .map_err(graph_error_to_py_err)?;
+            Ok(Py::new(py, crate::ffi::storage::table::PyNodesTable { table })?.into_py(py))
+        } else {
+            let table = py
+                .allow_threads(|| view.edge_table_data())
+                .map_err(graph_error_to_py_err)?
+                .into_edges_table()
+                .map_err(graph_error_to_py_err)?;
+            Ok(Py::new(py, crate::ffi::storage::table::PyEdgesTable { table })?.into_py(py))
+        }
+    }
+
     fn __len__(&self) -> usize {
         self.inner.len()
     }

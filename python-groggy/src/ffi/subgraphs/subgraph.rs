@@ -11,7 +11,7 @@ use crate::ffi::storage::subgraph_array::PySubgraphArray;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
 use groggy::storage::array::BaseArray;
 use groggy::subgraphs::Subgraph;
-use groggy::traits::{GraphEntity, SubgraphOperations};
+use groggy::traits::SubgraphOperations;
 use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
@@ -31,7 +31,7 @@ use crate::PyNumArray;
 ///
 /// This completely replaces the complex dual-mode PySubgraph with simple delegation
 /// to the existing SubgraphOperations trait methods. Same API, much simpler implementation.
-#[pyclass(name = "Subgraph", unsendable)]
+#[pyclass(name = "Subgraph", unsendable, weakref)]
 #[derive(Clone)]
 pub struct PySubgraph {
     pub inner: Subgraph,
@@ -40,18 +40,34 @@ pub struct PySubgraph {
 impl PySubgraph {
     /// Create from Rust Subgraph
     pub fn from_core_subgraph(subgraph: Subgraph) -> PyResult<Self> {
-        Ok(Self { inner: subgraph })
+        Ok(Self {
+            inner: subgraph
+                .freeze()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        })
     }
 
-    /// Create from trait object (used by trait delegation)
+    /// Explicit live compatibility scope, used only by owner execution adapters.
+    pub fn from_live_subgraph(inner: Subgraph) -> Self {
+        Self { inner }
+    }
+
+    /// Preserve a derived trait object's original immutable source.
     pub fn from_trait_object(
-        _subgraph: Box<dyn groggy::traits::SubgraphOperations>,
+        subgraph: Box<dyn groggy::traits::SubgraphOperations>,
     ) -> PyResult<Self> {
-        // For now, we'll use a simpler approach - assume we can only handle concrete Subgraph types
-        // In the future, we might need better trait object handling with proper Any downcasting
-        Err(PyRuntimeError::new_err(
-            "from_trait_object not yet implemented - use concrete Subgraph types",
-        ))
+        let graph = subgraph.graph_ref();
+        let inner = if let Some(view) = subgraph.frozen_view() {
+            Subgraph::from_frozen_view(graph, view.clone(), "derived".into())
+        } else {
+            Subgraph::new(
+                graph,
+                subgraph.node_set().clone(),
+                subgraph.edge_set().clone(),
+                "derived".into(),
+            )
+        };
+        Self::from_core_subgraph(inner)
     }
 
     fn degree_result(
@@ -209,30 +225,45 @@ impl PySubgraph {
 
     /// Get nodes as a property that supports indexing and attribute access
     #[getter]
-    fn nodes(&self, py: Python) -> PyResult<Py<PyNodesAccessor>> {
-        let node_collection = self.inner.node_ids();
-
-        Py::new(
+    fn nodes(&self, py: Python) -> PyResult<PyObject> {
+        if let Some(view) = self.inner.frozen_view() {
+            return Ok(Py::new(
+                py,
+                super::view_entities::PyGraphViewEntities {
+                    inner: view.node_accessor(),
+                },
+            )?
+            .into_py(py));
+        }
+        Ok(Py::new(
             py,
             PyNodesAccessor {
                 graph: self.inner.graph(),
-                constrained_nodes: Some(node_collection),
+                constrained_nodes: Some(self.inner.node_ids()),
             },
-        )
+        )?
+        .into_py(py))
     }
 
-    /// Get edges as a property that supports indexing and attribute access
     #[getter]
-    fn edges(&self, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
-        let edge_collection = self.inner.edge_ids();
-
-        Py::new(
+    fn edges(&self, py: Python) -> PyResult<PyObject> {
+        if let Some(view) = self.inner.frozen_view() {
+            return Ok(Py::new(
+                py,
+                super::view_entities::PyGraphViewEntities {
+                    inner: view.edge_accessor(),
+                },
+            )?
+            .into_py(py));
+        }
+        Ok(Py::new(
             py,
             PyEdgesAccessor {
                 graph: self.inner.graph(),
-                constrained_edges: Some(edge_collection),
+                constrained_edges: Some(self.inner.edge_ids()),
             },
-        )
+        )?
+        .into_py(py))
     }
 
     /// Get viz accessor for visualization operations
@@ -402,8 +433,15 @@ impl PySubgraph {
             .map_err(|e| PyRuntimeError::new_err(format!("Connected components error: {}", e)))?;
 
         // Create lazy ComponentsArray - no immediate PySubgraph materialization!
-        let components_array =
-            PyComponentsArray::from_components(components, self.inner.graph().clone());
+        let components_array = PyComponentsArray::from_components(
+            components,
+            self.inner.graph().clone(),
+            self.inner
+                .clone()
+                .freeze()
+                .and_then(|scope| scope.pin_view())
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        )?;
 
         Ok(components_array)
     }
@@ -469,7 +507,7 @@ impl PySubgraph {
     // === Filtering Methods - delegate to SubgraphOperations ===
 
     /// Filter nodes and return new subgraph  
-    fn filter_nodes(&self, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Extract the filter from Python object - support both NodeFilter objects and string queries
         let node_filter = if let Ok(filter_obj) =
             filter.extract::<crate::ffi::query::query::PyNodeFilter>()
@@ -487,6 +525,16 @@ impl PySubgraph {
             ));
         };
 
+        if let Some(view) = self.inner.frozen_view() {
+            let child = py
+                .allow_threads(|| view.filter_nodes(&node_filter))
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            return Self::from_core_subgraph(Subgraph::from_frozen_view(
+                self.inner.graph(),
+                child,
+                "filtered".into(),
+            ));
+        }
         let subgraph = self
             .inner
             .filter_nodes(&node_filter)
@@ -495,7 +543,7 @@ impl PySubgraph {
     }
 
     /// Filter edges and return new subgraph
-    fn filter_edges(&self, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Extract the filter from Python object - support both EdgeFilter objects and string queries
         let edge_filter = if let Ok(filter_obj) =
             filter.extract::<crate::ffi::query::query::PyEdgeFilter>()
@@ -513,6 +561,16 @@ impl PySubgraph {
             ));
         };
 
+        if let Some(view) = self.inner.frozen_view() {
+            let child = py
+                .allow_threads(|| view.filter_edges(&edge_filter))
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            return Self::from_core_subgraph(Subgraph::from_frozen_view(
+                self.inner.graph(),
+                child,
+                "filtered".into(),
+            ));
+        }
         let subgraph = self
             .inner
             .filter_edges(&edge_filter)
@@ -524,9 +582,16 @@ impl PySubgraph {
 
     /// Materialize the validated selected state into an independent publishing graph.
     fn to_graph(&self) -> PyResult<PyGraph> {
-        let graph = self.inner.pin_view().and_then(|view| view.to_graph())
+        let graph = self
+            .inner
+            .pin_view()
+            .and_then(|view| view.to_graph())
             .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-        Ok(PyGraph { inner: graph.into_shared(), cached_view: std::cell::RefCell::new(None) })
+        Ok(PyGraph {
+            inner: graph.into_shared(),
+            cached_view: std::cell::RefCell::new(None),
+            cached_live_view: std::cell::RefCell::new(None),
+        })
     }
 
     /// Convert to NetworkX graph (if available)
@@ -668,10 +733,30 @@ impl PySubgraph {
             ));
         }
 
+        if let Some(view) = self.inner.frozen_view() {
+            let mut subgraphs = Vec::with_capacity(central_nodes_vec.len());
+            for center in central_nodes_vec {
+                let child = view
+                    .within_hops(
+                        &[center],
+                        hops,
+                        groggy::query::selection::TraversalDirection::Both,
+                    )
+                    .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+                subgraphs.push(Self::from_core_subgraph(Subgraph::from_frozen_view(
+                    self.inner.graph(),
+                    child,
+                    "neighborhood".into(),
+                ))?);
+            }
+            return Ok(PySubgraphArray::new(subgraphs));
+        }
+
         // Create a temporary PyGraph wrapper
         let py_graph = PyGraph {
             inner: self.inner.graph(),
             cached_view: std::cell::RefCell::new(None),
+            cached_live_view: std::cell::RefCell::new(None),
         };
 
         // Create PyGraphAnalysis and delegate to it
@@ -753,14 +838,13 @@ impl PySubgraph {
 
     /// Get neighbors of a node within the subgraph
     fn neighbors(&self, py: Python, node_id: NodeId) -> PyResult<Py<PyNumArray>> {
-        match self.inner.neighbors(node_id) {
-            Ok(neighbor_ids) => {
-                let values: Vec<f64> = neighbor_ids.into_iter().map(|id| id as f64).collect();
-                let py_array = PyNumArray::new(values);
-                Py::new(py, py_array)
-            }
-            Err(e) => Err(PyRuntimeError::new_err(format!("Neighbors error: {}", e))),
+        let ids = if let Some(view) = self.inner.frozen_view() {
+            py.allow_threads(|| view.neighbors(node_id))
+        } else {
+            self.inner.neighbors(node_id)
         }
+        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Py::new(py, PyNumArray::from_node_ids(ids)?)
     }
 
     /// Get edge endpoints (source, target)
@@ -828,18 +912,28 @@ impl PySubgraph {
 
     /// Set multiple node attributes (bulk operation) - delegates to accessor
     fn set_node_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
-        // Get the nodes accessor and delegate to its internal method
-        let nodes_accessor = self.nodes(py)?;
-        let nodes_accessor_ref: PyRef<PyNodesAccessor> = nodes_accessor.extract(py)?;
-        nodes_accessor_ref.set_attrs_internal(py, attrs_dict)
+        let scope = self
+            .inner
+            .execution_scope(true)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        PyNodesAccessor {
+            graph: scope.graph(),
+            constrained_nodes: Some(scope.node_ids()),
+        }
+        .set_attrs_internal(py, attrs_dict)
     }
 
-    /// Set multiple edge attributes (bulk operation) - delegates to accessor  
+    /// Publish an explicit checked bulk edge update; this read stays unchanged.
     fn set_edge_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
-        // Get the edges accessor and delegate to its internal method
-        let edges_accessor = self.edges(py)?;
-        let edges_accessor_ref: PyRef<PyEdgesAccessor> = edges_accessor.extract(py)?;
-        edges_accessor_ref.set_attrs_internal(py, attrs_dict)
+        let scope = self
+            .inner
+            .execution_scope(true)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        PyEdgesAccessor {
+            graph: scope.graph(),
+            constrained_edges: Some(scope.edge_ids()),
+        }
+        .set_attrs_internal(py, attrs_dict)
     }
 
     // === MISSING GRAPH METRICS ===
@@ -865,139 +959,68 @@ impl PySubgraph {
 
     // === MISSING SUBGRAPH OPERATIONS ===
 
-    /// BFS traversal - returns subgraph result
+    /// Traverse the captured selection and preserve its source.
     fn bfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
-        let result = self.inner.bfs(start, max_depth);
-
-        match result {
-            Ok(boxed_subgraph) => {
-                // Create concrete Subgraph from the trait object data
-                use groggy::subgraphs::Subgraph;
-                let concrete_subgraph = Subgraph::new(
-                    self.inner.graph(),
-                    boxed_subgraph.node_set().clone(),
-                    boxed_subgraph.edge_set().clone(),
-                    format!("bfs_from_{}", start),
-                );
-                Ok(PySubgraph {
-                    inner: concrete_subgraph,
-                })
-            }
-            Err(e) => Err(PyRuntimeError::new_err(format!("BFS error: {}", e))),
-        }
+        Self::from_trait_object(
+            self.inner
+                .bfs(start, max_depth)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        )
     }
-
-    /// DFS traversal - returns subgraph result
     fn dfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
-        let result = self.inner.dfs(start, max_depth);
-
-        match result {
-            Ok(boxed_subgraph) => {
-                // Create concrete Subgraph from the trait object data
-                use groggy::subgraphs::Subgraph;
-                let concrete_subgraph = Subgraph::new(
-                    self.inner.graph(),
-                    boxed_subgraph.node_set().clone(),
-                    boxed_subgraph.edge_set().clone(),
-                    format!("dfs_from_{}", start),
-                );
-                Ok(PySubgraph {
-                    inner: concrete_subgraph,
-                })
-            }
-            Err(e) => Err(PyRuntimeError::new_err(format!("DFS error: {}", e))),
-        }
+        Self::from_trait_object(
+            self.inner
+                .dfs(start, max_depth)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        )
     }
-
-    /// Create subgraph representing shortest path between two nodes
     fn shortest_path_subgraph(
         &self,
         _py: Python,
         source: NodeId,
         target: NodeId,
     ) -> PyResult<Option<PySubgraph>> {
-        match self.inner.shortest_path_subgraph(source, target) {
-            Ok(Some(boxed_subgraph)) => {
-                // Create a concrete Subgraph from the trait object data
-                use groggy::subgraphs::Subgraph;
-
-                let concrete_subgraph = Subgraph::new(
-                    self.inner.graph(),
-                    boxed_subgraph.node_set().clone(),
-                    boxed_subgraph.edge_set().clone(),
-                    format!("shortest_path_{}_{}", source, target),
-                );
-                Ok(Some(PySubgraph {
-                    inner: concrete_subgraph,
-                }))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Shortest path error: {}",
-                e
-            ))),
-        }
+        self.inner
+            .shortest_path_subgraph(source, target)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?
+            .map(Self::from_trait_object)
+            .transpose()
     }
-
-    /// Create induced subgraph from list of nodes
     fn induced_subgraph(&self, _py: Python, nodes: Vec<NodeId>) -> PyResult<PySubgraph> {
-        match self.inner.induced_subgraph(&nodes) {
-            Ok(boxed_subgraph) => {
-                // Create a concrete Subgraph from the trait object data
-                use groggy::subgraphs::Subgraph;
-
-                let concrete_subgraph = Subgraph::new(
-                    self.inner.graph(),
-                    boxed_subgraph.node_set().clone(),
-                    boxed_subgraph.edge_set().clone(),
-                    "induced_subgraph".to_string(),
-                );
-                Ok(PySubgraph {
-                    inner: concrete_subgraph,
-                })
-            }
-            Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Induced subgraph error: {}",
-                e
-            ))),
-        }
+        Self::from_trait_object(
+            self.inner
+                .induced_subgraph(&nodes)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        )
     }
-
-    /// Create subgraph from list of edges
     fn subgraph_from_edges(&self, _py: Python, edges: Vec<EdgeId>) -> PyResult<PySubgraph> {
-        match self.inner.subgraph_from_edges(&edges) {
-            Ok(boxed_subgraph) => {
-                // Create a concrete Subgraph from the trait object data
-                use groggy::subgraphs::Subgraph;
-
-                let concrete_subgraph = Subgraph::new(
-                    self.inner.graph(),
-                    boxed_subgraph.node_set().clone(),
-                    boxed_subgraph.edge_set().clone(),
-                    "subgraph_from_edges".to_string(),
-                );
-                Ok(PySubgraph {
-                    inner: concrete_subgraph,
-                })
-            }
-            Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Subgraph from edges error: {}",
-                e
-            ))),
-        }
+        Self::from_trait_object(
+            self.inner
+                .subgraph_from_edges(&edges)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        )
     }
 
     /// Exact membership algebra over a common live owner.
     fn merge_with(&self, _py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
-        self.inner.merge_with(&other.inner).map(|inner| PySubgraph { inner }).map_err(crate::ffi::utils::graph_error_to_py_err)
+        self.inner
+            .merge_with(&other.inner)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+            .and_then(Self::from_core_subgraph)
     }
 
     fn intersect_with(&self, _py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
-        self.inner.intersect_with(&other.inner).map(|inner| PySubgraph { inner }).map_err(crate::ffi::utils::graph_error_to_py_err)
+        self.inner
+            .intersect_with(&other.inner)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+            .and_then(Self::from_core_subgraph)
     }
 
     fn subtract_from(&self, _py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
-        self.inner.subtract_from(&other.inner).map(|inner| PySubgraph { inner }).map_err(crate::ffi::utils::graph_error_to_py_err)
+        self.inner
+            .subtract_from(&other.inner)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+            .and_then(Self::from_core_subgraph)
     }
 
     /// Enhanced collapse supporting three syntax forms for flexible aggregation
@@ -1209,13 +1232,9 @@ impl PySubgraph {
             result.push_str("\n  ID    Source → Target");
             result.push_str("\n  ----  ---------------");
 
-            // Get graph reference to access edge endpoints
-            let graph = self.inner.graph_ref();
-            let graph_borrowed = graph.borrow();
-
             // Iterate through edges in the subgraph
             for &edge_id in self.inner.edge_set() {
-                if let Ok((source, target)) = graph_borrowed.edge_endpoints(edge_id) {
+                if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
                     result.push_str(&format!("\n  {:4}  {:6} → {}", edge_id, source, target));
                 }
             }
@@ -1228,34 +1247,19 @@ impl PySubgraph {
     // PHASE 3: Cross-Type Conversions - Enable unified delegation architecture
     // ========================================================================
 
-    /// Get nodes from this subgraph as a NodesAccessor
-    /// Enables chaining like: subgraph.to_nodes().table().stats()
-    pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
-        let node_ids = self.inner.node_ids();
-
-        // Create a NodesAccessor using the same pattern as the getter method
-        Ok(crate::ffi::storage::accessors::PyNodesAccessor {
-            graph: self.inner.graph(),
-            constrained_nodes: Some(node_ids),
-        })
+    /// Return immutable node accessors sharing the captured source.
+    pub fn to_nodes(&self, py: Python) -> PyResult<PyObject> {
+        self.nodes(py)
     }
-
-    /// Get edges from this subgraph as an EdgesAccessor  
-    /// Enables chaining like: subgraph.to_edges().to_nodes().connected_components()
-    pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
-        let edge_ids = self.inner.edge_ids();
-
-        // Create an EdgesAccessor using the struct syntax
-        Ok(crate::ffi::storage::accessors::PyEdgesAccessor {
-            graph: self.inner.graph(),
-            constrained_edges: Some(edge_ids),
-        })
+    /// Return immutable edge accessors sharing the captured source.
+    pub fn to_edges(&self, py: Python) -> PyResult<PyObject> {
+        self.edges(py)
     }
 
     /// Convert this subgraph to its adjacency matrix representation
     /// Enables chaining like: subgraph.to_matrix().eigen().stats()
-    pub fn to_matrix(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
-        self.adjacency_matrix(false, None)
+    pub fn to_matrix(&self, py: Python) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        self.adjacency_matrix(py, false, None)
     }
 
     // === ADJACENCY METHODS (moved from Graph to Subgraph) ===
@@ -1265,9 +1269,15 @@ impl PySubgraph {
     #[pyo3(signature = (*, sparse=false, weight_attr=None))]
     fn adjacency_matrix(
         &self,
+        py: Python,
         sparse: bool,
         weight_attr: Option<&str>,
     ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        if let Some(view) = self.inner.frozen_view() {
+            return super::view::owned_matrix(py, view, |view| {
+                view.adjacency_matrix::<f64>(sparse, weight_attr)
+            });
+        }
         let matrix = self
             .inner
             .adjacency_matrix(sparse, weight_attr)
@@ -1279,10 +1289,11 @@ impl PySubgraph {
     #[pyo3(signature = (*, sparse=false, weight_attr=None))]
     fn adj(
         &self,
+        py: Python,
         sparse: bool,
         weight_attr: Option<&str>,
     ) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
-        self.adjacency_matrix(sparse, weight_attr)
+        self.adjacency_matrix(py, sparse, weight_attr)
     }
 
     /// Selected outgoing adjacency from a detached topology-only read.
@@ -1365,6 +1376,40 @@ impl PySubgraph {
                 )));
             }
             _ => {}
+        }
+
+        if let Some(view) = self.inner.frozen_view() {
+            let nodes = view.node_accessor();
+            let edges = view.edge_accessor();
+            let project = |accessor: groggy::subgraphs::GraphViewEntities| -> PyResult<PyObject> {
+                let result = PyDict::new(py);
+                for id in accessor.ids() {
+                    let value = accessor
+                        .by_id(*id)
+                        .map_err(crate::ffi::utils::graph_error_to_py_err)?
+                        .get(&name);
+                    result.set_item(
+                        id,
+                        match value {
+                            Some(value) => {
+                                crate::ffi::utils::attr_value_to_python_value(py, &value)?
+                            }
+                            None => py.None(),
+                        },
+                    )?;
+                }
+                Ok(result.into())
+            };
+            if nodes.attribute_names().contains(&name) {
+                return project(nodes);
+            }
+            if edges.attribute_names().contains(&name) {
+                return project(edges);
+            }
+            return Err(PyAttributeError::new_err(format!(
+                "'Subgraph' object has no attribute '{}'",
+                name
+            )));
         }
 
         // Get all available node attribute names in this subgraph
