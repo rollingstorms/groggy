@@ -5,7 +5,7 @@ to 90 minutes of priority slices, aiming to complete existing tasks and document
 remaining work. The follow-on window began 03:49 UTC. This record consolidates
 its outcomes and the remaining core priorities. No new checklist rows were added.
 
-Current inventory after the continuation: **214 checked / 54
+Current inventory after the continuation: **215 checked / 53
 open**. Explicit state restoration advances existing 13.3 without adding rows. Completed full retained archive/import (10.3, `9d78131d`) and explicit
 recovery baseline/locked replacement component (10.4). The first-window receipts
 below retain their original counts; second-window results follow at the end.

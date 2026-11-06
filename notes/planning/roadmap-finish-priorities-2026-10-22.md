@@ -14,50 +14,16 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Current remainder (2026-10-30): compound topology execution and typed effects
-(09.4b.2/AR3), followed by legacy pinned query migration (21.2). Default immutable
-Subgraph ownership **26.1/AR4/AR7.5 is complete**; see
-`default-immutable-views-2026-10-30.md` for verification, compatibility and measured
-cold/warm costs. The chronological receipts below retain their earlier boundaries.
-Repeated current read captures now share weakly cached
-frozen payloads with fresh provenance and mutation invalidation; see
-`current-read-sharing-2026-10-28.md`. Sparse frozen adjacency now avoids empty per-node entries, with measured
-capture/memory/probe trade-offs in `pinned-read-adjacency-2026-10-28.md`.
-ID-ordered indexed presence/exact pages now borrow existing postings rather than
-materializing all matches (`query-page-postings-2026-10-28.md`). The 1k/100k/1m
-complete core workflow and archive framing receipts make reconstruction/recovery
-memory costs explicit. First/invalidated full value materialization and legacy
-connected ownership remain open. With these measured read prerequisites in place,
-all thirteen classic algorithms now support captured input, including the five
-community kernels (`captured-communities-2026-10-29.md`). Captured read parity now
-also covers exact algebra/grouping, scoped traversal trees/hop paths, structural
-summaries and readonly entities/aligned columns. Connected compatibility repairs
-preserve selected traversal/induction/component scope, invalidate caches across
-equal-version restoration, and align native columns through the attribute-first
-bulk reader. Window receipts: `captured-view-algebra-2026-10-29.md`,
-`captured-view-traversal-2026-10-29.md`, `structural-summaries-2026-10-29.md`,
-`captured-view-entities-2026-10-29.md`, `connected-column-alignment-2026-10-29.md`.
-The remaining ownership work is the actual default/legacy filter return migration,
-connected mutable entity/accessor and effectful algorithm/composition facades,
-and specialized view/viz adapters; the new read prerequisites do not complete
-those boundaries. The closing-review CSR liveness defect is now repaired: connected neighbor/degree reads validate scope before cached topology, and Python degree adapters delegate to one topology-only Rust input with ordered whole-request errors and GIL-free row computation (`connected-degree-reads-2026-10-29.md`). Filtered/component/neighborhood selections now share canonical membership, caches, scoped traversal and explicit frozen capture (`specialized-selection-scope-2026-10-29.md`), retiring their owner-traverse/filter implementations. Checked view writes now cover the complete prepared batch, including unset/revision scope, refreshed topology/absence and retained group catalogs (`view-batch-completeness-2026-10-29.md`). Accepted view payload reuse removes repeated source materialization and keeps the cache weak; paired 100k scoped publication improves 310→76 ms, while full output copying remains linear (`view-write-payload-reuse-2026-10-29.md`). Actual immutable default/filter returns and compound topology acceptance remain the next priorities;
-do not expand adjacent audits merely to create more checklist slices. The listed secondary-index families now complete 18.2:
-property/label/type/topology, effective events/activation, exact property intervals
-and retained group membership/reverse references. See
-`secondary-indexes-exit-review-2026-10-28.md`. Native default and
-raw storage escape migrations are complete. Endpoint revisions (04.2), explicit
-tracked/reference restoration (13.3), checked three-way merges (14.2) and transient
-secondary-index lifecycle (18.3) are complete within their documented domains.
-Indexed predicates, ordering/pages, captured bounded traversal, finite graph
-patterns and owner capture/build complete 21.1. See `graph-patterns-2026-10-27.md`.
-
-Core reclamation (15/06.3), full retained archive/import (10.3), explicit outer
-property pipelines, branch lifecycle (14.1), exact owned snapshots (12.2), property
-history (11.2), effective reconstruction (16.2/16.3), checkpoint semantics (12.3),
-and table facade/writeback (27.1/27.2/AR7.10) are complete within their recorded
-scopes. Wider storage platform/migration/scale (10.4), numerical production gates
-and service/Graphiti work retain their original boundaries. See the current flat
-checklist and linked exit receipts; fixed inventory is 211 checked / 57 open.
+Current remainder (2026-11-05): compound topology execution and typed effects
+(09.4b.2/AR3), followed by typed pipeline intermediates and execution contracts
+(30.1/AR7.8). Default immutable Subgraph ownership **26.1/AR4/AR7.5** and pinned
+query migration **21.2 are complete**. See `default-immutable-views-2026-10-30.md`
+and `pinned-query-exit-review-2026-11-05.md`. Explicit connected views remain a
+compatibility choice. Full cold capture remains linear; weak caches avoid keeping
+unowned snapshots alive. Storage platform/migration/scale (10.4), numerical
+production gates and service/Graphiti work retain their separate boundaries.
+The chronological receipts below retain their earlier completion boundaries;
+the current flat checklist is authoritative: **215 checked / 53 open / 268 total**.
 
 Execution rule agreed with the owner's prioritization concern on 2026-10-25:
 prioritize usable core vertical slices and measured workloads. Take incidental
