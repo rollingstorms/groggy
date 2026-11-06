@@ -3,6 +3,19 @@ use super::GraphView;
 use crate::query::scoped_traversal as traversal;
 use crate::{GraphResult, NodeId};
 impl GraphView {
+    /// Neighborhood of the lowest selected node ID, with an explicit hop/direction
+    /// policy. Empty selections retain their source coordinate and graph type.
+    pub fn neighborhood_from_first(
+        &self,
+        hops: usize,
+        direction: crate::query::selection::TraversalDirection,
+    ) -> GraphResult<Self> {
+        match self.nodes().iter().copied().min() {
+            Some(center) => self.within_hops(&[center], hops, direction),
+            None => Ok(self.clone()),
+        }
+    }
+
     /// Ascending-neighbor BFS discovery tree, following selected outgoing instances.
     pub fn bfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Self> {
         let (nodes, edges) = traversal::bfs(self, start, max_depth)?;

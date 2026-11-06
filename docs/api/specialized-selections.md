@@ -68,3 +68,30 @@ expansion, exact hop rows and merges retain the original source and central-node
 metadata, with checked hop overflow. Default Python neighborhood/component outputs
 are frozen on return. Native integration examples remain in
 `tests/specialized_selection_scope.rs` and the binding regression module.
+
+## Default component neighborhoods
+
+ComponentsArray.neighborhood() returns one actual one-hop neighborhood per
+component, centered at its lowest node ID, using both incoming and outgoing
+connections within that captured component. It retains edge instances between
+selected nodes and the captured graph direction. The input components remain
+unchanged. Empty collections return an empty array; isolated nodes remain
+single-node neighborhoods. Errors propagate rather than dropping a component.
+
+```python
+from groggy import Graph
+neighborhood_graph = Graph(directed=True)
+neighborhood_graph.add_nodes(4)
+neighborhood_graph.add_edges([(0, 1), (1, 2), (2, 3)])
+component_capture = neighborhood_graph.connected_components()
+neighborhood_graph.remove_node(1)
+near_first = component_capture.neighborhood()
+assert near_first[0].node_ids.to_list() == [0, 1]
+assert component_capture[0].node_count() == 4
+```
+
+For a different center, depth or traversal workflow, select a component and use
+its explicit neighborhood/traversal API. Native GraphView.neighborhood_from_first
+accepts hop count and direction and preserves an empty selection's source/type.
+The old implementation computed a neighborhood and discarded it, returning the
+whole component. The convenience method no longer returns that placeholder.

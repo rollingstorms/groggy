@@ -69,3 +69,6 @@ Fixed reader inventory closed here: table-column extraction, present observation
 extraction, merge and visualization. Summary density and error propagation reuse
 existing native contracts. Other transform placeholders are named above; this
 receipt does not count them as implemented.
+
+Follow-up: the component neighborhood convenience placeholder named above is
+completed separately in `component-neighborhood-defaults-2026-11-05.md`.

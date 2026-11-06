@@ -1601,3 +1601,22 @@ Million-row i64 chain improves 21.453 → 8.497 ms, AttrValue 24.265 → 14.672 
 f64 filter 26.159 → 14.787 ms; peak requested bytes remain stable. Direct eager
 reference remains 0.742 ms, so production/compiled-throughput gaps stay open.
 Receipt: `typed-scalar-lowering-2026-11-05.md`. No rows added: **215 / 53 / 268**.
+
+
+## 2026-11-05 — actual captured component neighborhoods; window handoff
+
+Completed the component neighborhood convenience path in existing
+26.1/AR2/30.1/AR7.8. Both wrappers now return actual one-hop captured selections
+from the lowest node ID, delegate traversal to Rust, release the GIL and propagate
+errors. They no longer discard computed results and return whole components.
+Original source values/edge instances survive owner changes; empty/isolated and
+explicit native direction/depth controls are covered. Full final gates:
+**1,535 native / 54 ignored**, strict Clippy, **2,593 maintained root Python /
+1 skipped**, **258 executable docs**. Receipt:
+`component-neighborhood-defaults-2026-11-05.md`.
+
+This work window closes existing 21.2 and completes five implementation slices;
+no rows were added. **215 checked / 53 open / 268 total**. Remaining priorities:
+compound topology and typed graph/table pipeline execution (09.4b.2/AR3/30.1/AR7.8),
+measured small-group captured projection costs (32.2/AR7.5), and wider numerical/
+conformance/scale/release gates. Adapter/retrieval/service deferrals are unchanged.

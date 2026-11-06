@@ -5,11 +5,10 @@
 use groggy::api::graph::Graph;
 use groggy::storage::array::{ArrayIterator, ArrayOps, SubgraphLike};
 use groggy::subgraphs::Subgraph;
-use groggy::traits::SubgraphOperations;
 use groggy::{EdgeId, NodeId};
 use pyo3::exceptions::{PyIndexError, PyRuntimeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -245,35 +244,14 @@ impl PyComponentsArray {
     }
 
     /// Direct delegation: Apply neighborhood() to each component and return PySubgraphArray
-    fn neighborhood(&self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
-        let mut neighborhoods = Vec::new();
-
-        Python::with_gil(|py| {
-            for i in 0..self.components_data.len() {
-                if let Ok(component) = self.__getitem__(i as isize) {
-                    // For simplicity, use first node as central and 1 hop
-                    let node_ids: Vec<groggy::NodeId> =
-                        component.inner.node_set().iter().take(1).copied().collect();
-                    if !node_ids.is_empty() {
-                        let node_list = PyList::new(py, &node_ids);
-                        let node_any: &PyAny = node_list.as_ref();
-                        match component.neighborhood(py, Some(node_any), 1) {
-                            Ok(_neighborhood_result) => {
-                                // For now, return the original component as placeholder
-                                neighborhoods.push(component);
-                            }
-                            Err(_) => continue, // Skip failed components
-                        }
-                    } else {
-                        neighborhoods.push(component); // No nodes, just return original
-                    }
-                }
-            }
-        });
-
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
-            neighborhoods,
-        ))
+    fn neighborhood(
+        &self,
+        py: Python,
+    ) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        component_neighborhoods(
+            py,
+            (0..self.components_data.len()).map(|index| self.__getitem__(index as isize)),
+        )
     }
 
     /// Direct delegation: Apply filter to components
@@ -489,37 +467,41 @@ impl PyComponentsIterator {
         ))
     }
 
-    /// Apply neighborhood() to each component and return PySubgraphArray (simplified version)
-    fn neighborhood(&mut self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
-        let components = self.inner.clone().into_vec();
-        let mut neighborhoods = Vec::new();
-
-        Python::with_gil(|py| {
-            for component in components {
-                // For simplicity, use first node as central and 1 hop
-                let node_ids: Vec<groggy::NodeId> =
-                    component.inner.node_set().iter().take(1).copied().collect();
-                if !node_ids.is_empty() {
-                    let node_list = PyList::new(py, &node_ids);
-                    let node_any: &PyAny = node_list.as_ref();
-                    match component.neighborhood(py, Some(node_any), 1) {
-                        Ok(_neighborhood_result) => {
-                            // For now, return the original component as placeholder
-                            // In full implementation, would extract subgraph from neighborhood result
-                            neighborhoods.push(component);
-                        }
-                        Err(_) => continue, // Skip failed components
-                    }
-                } else {
-                    neighborhoods.push(component); // No nodes, just return original
-                }
-            }
-        });
-
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
-            neighborhoods,
-        ))
+    /// Return captured one-hop neighborhoods from each component's lowest node ID.
+    fn neighborhood(
+        &mut self,
+        py: Python,
+    ) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        component_neighborhoods(py, self.inner.clone().into_vec().into_iter().map(Ok))
     }
+}
+
+/// Default argument adaptation only; native captured traversal owns the policy.
+fn component_neighborhoods(
+    py: Python,
+    components: impl IntoIterator<Item = PyResult<PySubgraph>>,
+) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+    let mut neighborhoods = Vec::new();
+    for component in components {
+        let component = component?;
+        let view = component
+            .inner
+            .pin_view()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let child = py
+            .allow_threads(|| {
+                view.neighborhood_from_first(1, groggy::query::selection::TraversalDirection::Both)
+            })
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        neighborhoods.push(PySubgraph::from_core_subgraph(Subgraph::from_frozen_view(
+            component.inner.graph(),
+            child,
+            "neighborhood".into(),
+        ))?);
+    }
+    Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+        neighborhoods,
+    ))
 }
 
 /// Python wrapper for ArrayIterator<MetaNode>

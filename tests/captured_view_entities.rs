@@ -220,6 +220,20 @@ fn parallel_column_and_presence_projection_preserve_exact_sorted_alignment() {
         assert_eq!(present, &V::Bool(id % 3 != 2));
     }
     assert_eq!(nodes.select_mask(&presence).unwrap().node_count(), 668);
+    let expected_observations = (0..1001)
+        .filter(|id| id % 3 != 2)
+        .map(|id| {
+            if id % 3 == 0 {
+                V::Int(id as i64)
+            } else {
+                V::Null
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        nodes.present_column(&"v".into()).data(),
+        &expected_observations
+    );
 }
 
 #[test]

@@ -1149,19 +1149,19 @@ impl PySubgraph {
         allow_missing_attributes: bool,
         meta_targets: Option<Vec<usize>>,
     ) -> PyResult<PyObject> {
-    let options = crate::ffi::subgraphs::composer::parse_composer_options(
-        node_aggs,
-        edge_aggs,
-        edge_strategy,
-        node_strategy,
-        preset,
-        include_edge_count,
-        mark_entity_type,
-        entity_type,
-    )?;
-    let plan = self.inner.collapse_with_options(options).map_err(|e| {
-        pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {e}"))
-    })?;
+        let options = crate::ffi::subgraphs::composer::parse_composer_options(
+            node_aggs,
+            edge_aggs,
+            edge_strategy,
+            node_strategy,
+            preset,
+            include_edge_count,
+            mark_entity_type,
+            entity_type,
+        )?;
+        let plan = self.inner.collapse_with_options(options).map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {e}"))
+        })?;
         let meta_node = plan
             .execute_configured(
                 &self.inner,

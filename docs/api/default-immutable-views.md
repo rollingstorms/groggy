@@ -125,6 +125,6 @@ array of empty selections still retains its captured source/direction.
 
 Array table/grouping failures and component predicate/truth-conversion errors
 propagate instead of silently dropping entries. Caller callbacks keep their own
-side effects; this is error propagation, not callback rollback. Generic eager
-marker iterators and the older component-neighborhood convenience placeholders
-remain separate unfinished pipeline work.
+side effects; this is error propagation, not callback rollback. The component-neighborhood convenience method now returns actual captured
+one-hop results; see [specialized selections](specialized-selections.md).
+Generic eager marker iterators retain separate unfinished pipeline work.
