@@ -76,3 +76,21 @@ Compatibility: `Token::Remainder` and `LazyOperation::SampleSeeded` add enum
 variants; downstream exhaustive native matches need to account for them. Existing
 query constructors and collection result types remain available. Native lazy
 iterators are not a Python API addition in this slice.
+
+## Typed numeric execution
+
+Primitive i32/i64/f32/f64 columns dispatch once per filter and lower to a numeric
+predicate plan using the existing exact scalar comparator. Numeric AttrValue
+cells select integer/floating plans while text, bool, null, and other cells retain
+the generic policy. usize conversion remains checked against the property range.
+No per-row dynamic value wrapper or repeated literal classification is required
+for primitive numeric columns.
+
+A numeric plan may convert an integer threshold to f64 only when it round-trips
+exactly, or an integral finite floating threshold to an in-range integer. Other
+thresholds keep exact mixed-type comparison. Stored values and original literal
+identities are not rewritten. NaN, infinity, signed zero, subnormal and large
+integer semantics are preserved. Predicate lowering is proportional to query
+size and performs no operation reordering or row skipping; control and value
+errors retain the checked path. This is a typed scalar interpreter, not SIMD,
+JIT compilation, streaming or a production throughput guarantee.

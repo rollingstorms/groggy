@@ -339,3 +339,134 @@ fn scalar_extensions_do_not_silently_extend_graph_query_language() {
         .evaluate(&V::Text("NaN".into()))
         .unwrap());
 }
+
+#[test]
+fn typed_numeric_lowering_matches_generic_predicates_bit_for_bit() {
+    let integers = vec![
+        i64::MIN,
+        -9007199254740993,
+        -3,
+        -2,
+        -1,
+        0,
+        1,
+        2,
+        3,
+        9007199254740993,
+        i64::MAX,
+    ];
+    let floats = vec![
+        f64::NEG_INFINITY,
+        -9007199254740992.0,
+        -2f64.powi(63),
+        2f64.powi(63),
+        -2.5,
+        -2.0,
+        -0.0,
+        0.0,
+        f64::from_bits(1),
+        2.0,
+        2.5,
+        9007199254740992.0,
+        f64::INFINITY,
+        f64::from_bits(0x7ff8000000000042),
+    ];
+    let queries = [
+        "true",
+        "false",
+        "value",
+        "length",
+        "length == 0",
+        "length > -1",
+        "value == 2.0",
+        "value == 9223372036854775807.0",
+        "value >= 9223372036854775807",
+        "value > -9223372036854775808.0",
+        "value == 9007199254740993.0",
+        "value == 1.0000000000000002",
+        "value == -0.0",
+        "value != 2",
+        "value >= 9007199254740993",
+        "value < -9007199254740993.0",
+        "value % 2 == 0",
+        "NOT (value % 2 == 0)",
+        "value > 0 AND value <= 3",
+        "false OR (value % 2 == 0 AND NOT value == 2)",
+        "value == '2'",
+        "value != true",
+        "value == null",
+        "value == inf",
+        "value != NaN",
+        "value >= -inf",
+        "NOT value > 0",
+    ];
+    for query in queries {
+        let generic = QueryEvaluator::new(query);
+        let expected = integers
+            .iter()
+            .copied()
+            .filter(|&value| generic.evaluate(&V::Int(value)).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            LazyArrayIterator::new(integers.clone())
+                .filter(query)
+                .collect()
+                .unwrap(),
+            expected,
+            "{query}"
+        );
+        let expected = floats
+            .iter()
+            .copied()
+            .filter(|&value| generic.evaluate(&V::Float64(value)).unwrap())
+            .map(f64::to_bits)
+            .collect::<Vec<_>>();
+        let actual = LazyArrayIterator::new(floats.clone())
+            .filter(query)
+            .collect()
+            .unwrap()
+            .into_iter()
+            .map(f64::to_bits)
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "{query}");
+        let narrow = [0x00000001, 0x80000000, 0x3f800001, 0x7f800000, 0x7fc00042]
+            .map(f32::from_bits)
+            .to_vec();
+        let expected = narrow
+            .iter()
+            .copied()
+            .filter(|&value| generic.evaluate(&V::Float(value)).unwrap())
+            .map(f32::to_bits)
+            .collect::<Vec<_>>();
+        let actual = LazyArrayIterator::new(narrow)
+            .filter(query)
+            .collect()
+            .unwrap()
+            .into_iter()
+            .map(f32::to_bits)
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "f32 {query}");
+        let mut heterogeneous = integers.iter().copied().map(V::Int).collect::<Vec<_>>();
+        heterogeneous.extend(floats.iter().copied().map(V::Float64));
+        heterogeneous.extend([
+            V::Bool(true),
+            V::Bool(false),
+            V::Null,
+            V::Text("2".into()),
+            V::IntVec(vec![1, 2]),
+        ]);
+        let expected = heterogeneous
+            .iter()
+            .filter(|value| generic.evaluate(value).unwrap())
+            .map(|value| format!("{value:?}"))
+            .collect::<Vec<_>>();
+        let actual = LazyArrayIterator::new(heterogeneous)
+            .filter(query)
+            .collect()
+            .unwrap()
+            .iter()
+            .map(|value| format!("{value:?}"))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "{query}");
+    }
+}

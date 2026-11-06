@@ -53,6 +53,125 @@ impl QueryEvaluator {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum NumericColumnKind {
+    Integer,
+    Floating,
+}
+
+fn numeric_target(
+    number: crate::storage::numeric::scalar::NumericInput,
+    kind: NumericColumnKind,
+) -> crate::storage::numeric::scalar::NumericInput {
+    use crate::storage::numeric::scalar::{convert, ConversionPolicy, NumericInput as N};
+    // Reuse the authoritative exact conversion policy. Failure merely retains
+    // exact mixed-type comparison; no stored value or literal identity is changed.
+    match (kind, number) {
+        (NumericColumnKind::Floating, N::Integer(_)) => {
+            convert::<f64>(number, ConversionPolicy::Exact).map_or(number, N::Float)
+        }
+        (NumericColumnKind::Integer, N::Float(_)) => {
+            convert::<i64>(number, ConversionPolicy::Exact)
+                .map_or(number, |value| N::Integer(i128::from(value)))
+        }
+        _ => number,
+    }
+}
+
+/// Typed numeric lowering for owned scalar columns; not a new query language.
+/// Text/bool/null domain differences are resolved once, preserving array policy.
+pub(crate) enum NumericPredicate {
+    Constant(bool),
+    Compare(
+        crate::storage::numeric::scalar::NumericInput,
+        crate::storage::numeric::scalar::NumericComparison,
+    ),
+    Even,
+    And(Vec<Self>),
+    Or(Vec<Self>),
+    Not(Box<Self>),
+}
+impl NumericPredicate {
+    #[inline]
+    pub(crate) fn evaluate(&self, value: crate::storage::numeric::scalar::NumericInput) -> bool {
+        use crate::storage::numeric::scalar::{comparison, NumericInput};
+        match self {
+            Self::Constant(value) => *value,
+            Self::Compare(target, operator) => comparison(value, *target, *operator),
+            Self::Even => match value {
+                NumericInput::Integer(value) => value % 2 == 0,
+                NumericInput::Float(value) => value.is_finite() && value % 2.0 == 0.0,
+                NumericInput::Bool(_) => false,
+            },
+            Self::And(parts) => parts.iter().all(|part| part.evaluate(value)),
+            Self::Or(parts) => parts.iter().any(|part| part.evaluate(value)),
+            Self::Not(part) => !part.evaluate(value),
+        }
+    }
+}
+impl QueryEvaluator {
+    pub(crate) fn numeric_predicate(
+        &self,
+        kind: NumericColumnKind,
+    ) -> GraphResult<NumericPredicate> {
+        self.predicate
+            .as_ref()
+            .map(|predicate| predicate.numeric_predicate(kind))
+            .map_err(Clone::clone)
+    }
+}
+impl Predicate {
+    fn numeric_predicate(&self, kind: NumericColumnKind) -> NumericPredicate {
+        use crate::storage::numeric::scalar::{attribute_number, NumericComparison as C};
+        use NumericPredicate as P;
+        match self {
+            Self::Exists => P::Constant(true),
+            Self::Compare(Operand::Value, filter) => {
+                let (target, operator) = match filter {
+                    AttributeFilter::Equals(target) => (target, C::Equal),
+                    AttributeFilter::NotEquals(target) => (target, C::NotEqual),
+                    AttributeFilter::GreaterThan(target) => (target, C::Greater),
+                    AttributeFilter::LessThan(target) => (target, C::Less),
+                    AttributeFilter::GreaterThanOrEqual(target) => (target, C::GreaterEqual),
+                    AttributeFilter::LessThanOrEqual(target) => (target, C::LessEqual),
+                };
+                attribute_number(target).map_or(P::Constant(false), |number| {
+                    P::Compare(numeric_target(number, kind), operator)
+                })
+            }
+            Self::Compare(Operand::Length, filter) => {
+                P::Constant(scalar_matches(&AttrValue::Int(0), filter))
+            }
+            Self::Compare(Operand::Constant, filter) => {
+                P::Constant(scalar_matches(&AttrValue::Bool(true), filter))
+            }
+            Self::Compare(Operand::Even, filter) => {
+                match (
+                    scalar_matches(&AttrValue::Bool(true), filter),
+                    scalar_matches(&AttrValue::Bool(false), filter),
+                ) {
+                    (true, false) => P::Even,
+                    (false, true) => P::Not(Box::new(P::Even)),
+                    (value, _) => P::Constant(value),
+                }
+            }
+            Self::And(parts) => P::And(
+                parts
+                    .iter()
+                    .map(|part| part.numeric_predicate(kind))
+                    .collect(),
+            ),
+            Self::Or(parts) => P::Or(
+                parts
+                    .iter()
+                    .map(|part| part.numeric_predicate(kind))
+                    .collect(),
+            ),
+            Self::Not(part) => P::Not(Box::new(part.numeric_predicate(kind))),
+        }
+    }
+}
+
 fn operand(name: &str) -> GraphResult<Operand> {
     match name {
         "value" => Ok(Operand::Value),

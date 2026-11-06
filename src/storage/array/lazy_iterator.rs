@@ -160,22 +160,7 @@ impl<T: Clone + 'static> LazyArrayIterator<T> {
                     result
                 }
                 PreparedOperation::Filter(evaluator) => {
-                    let mut failure = None;
-                    result.retain(|element| {
-                        if failure.is_some() {
-                            return false;
-                        }
-                        match scalar_value(element).and_then(|value| evaluator.evaluate(&value)) {
-                            Ok(keep) => keep,
-                            Err(error) => {
-                                failure = Some(error);
-                                false
-                            }
-                        }
-                    });
-                    if let Some(error) = failure {
-                        return Err(error);
-                    }
+                    retain_scalar_rows(&mut result, &evaluator)?;
                     result
                 }
                 PreparedOperation::Sample(0, _) => Vec::new(),
@@ -206,6 +191,70 @@ impl<T: Clone + 'static> LazyArrayIterator<T> {
     pub fn collect_as_array(self) -> GraphResult<Box<dyn ArrayOps<T>>> {
         Ok(Box::new(LazyCollectedArray::new(self.collect()?)))
     }
+}
+
+fn retain_scalar_rows<T: 'static>(
+    rows: &mut Vec<T>,
+    evaluator: &crate::storage::array::QueryEvaluator,
+) -> GraphResult<()> {
+    use super::query::NumericColumnKind;
+    use crate::storage::numeric::scalar::NumericInput;
+    // Dispatch once per column, never once per row. These numeric types cannot
+    // raise value-conversion errors; heterogeneous/usize paths retain checked reads.
+    let values = rows as &mut dyn Any;
+    macro_rules! numeric_column {
+        ($type:ty, $kind:expr, $convert:expr) => {
+            if let Some(values) = values.downcast_mut::<Vec<$type>>() {
+                let predicate = evaluator.numeric_predicate($kind)?;
+                values.retain(|&value| predicate.evaluate(($convert)(value)));
+                return Ok(());
+            }
+        };
+    }
+    numeric_column!(i32, NumericColumnKind::Integer, |value| {
+        NumericInput::Integer(i128::from(value))
+    });
+    numeric_column!(i64, NumericColumnKind::Integer, |value| {
+        NumericInput::Integer(i128::from(value))
+    });
+    numeric_column!(f32, NumericColumnKind::Floating, |value| {
+        NumericInput::Float(f64::from(value))
+    });
+    numeric_column!(f64, NumericColumnKind::Floating, NumericInput::Float);
+    if let Some(values) = values.downcast_mut::<Vec<crate::AttrValue>>() {
+        let integers = evaluator.numeric_predicate(NumericColumnKind::Integer)?;
+        let floats = evaluator.numeric_predicate(NumericColumnKind::Floating)?;
+        return retain_checked(values, |value| {
+            match crate::storage::numeric::scalar::attribute_number(value) {
+                Some(number @ NumericInput::Integer(_)) => Ok(integers.evaluate(number)),
+                Some(number @ NumericInput::Float(_)) => Ok(floats.evaluate(number)),
+                _ => evaluator.evaluate(value),
+            }
+        });
+    }
+    retain_checked(rows, |element| {
+        scalar_value(element).and_then(|value| evaluator.evaluate(&value))
+    })
+}
+
+fn retain_checked<T>(
+    rows: &mut Vec<T>,
+    mut predicate: impl FnMut(&T) -> GraphResult<bool>,
+) -> GraphResult<()> {
+    let mut failure = None;
+    rows.retain(|element| {
+        if failure.is_some() {
+            return false;
+        }
+        match predicate(element) {
+            Ok(keep) => keep,
+            Err(error) => {
+                failure = Some(error);
+                false
+            }
+        }
+    });
+    failure.map_or(Ok(()), Err)
 }
 
 fn scalar_type<T: 'static>() -> bool {

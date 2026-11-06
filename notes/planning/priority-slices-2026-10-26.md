@@ -1587,3 +1587,17 @@ strict Clippy, 2,591 Python / 1 skipped and 257 docs. Large-group table projecti
 improves 35.594 → 11.132 ms; 100-small-group observations regress 14.071 → 39.848 ms
 and retain an explicit existing performance gap. See
 `subgraph-array-projection-2026-11-05.md`. No new rows: **215 checked / 53 open / 268 total**.
+
+
+## 2026-11-05 — measured typed numeric predicate lowering
+
+Completed a numerical/execution component within existing 29.6/29.26/AR7.8.
+Typed numeric plans dispatch once per primitive column and preserve the generic
+policy for heterogeneous nonnumeric cells. Threshold normalization uses the
+existing Exact conversion policy; source values/literal identity never change.
+Differential bit checks cover f32/f64 edge cases and wide integers. Full gates:
+1,533 native / 54 ignored, strict Clippy, 2,591 Python / 1 skipped, 257 docs.
+Million-row i64 chain improves 21.453 → 8.497 ms, AttrValue 24.265 → 14.672 ms and
+f64 filter 26.159 → 14.787 ms; peak requested bytes remain stable. Direct eager
+reference remains 0.742 ms, so production/compiled-throughput gaps stay open.
+Receipt: `typed-scalar-lowering-2026-11-05.md`. No rows added: **215 / 53 / 268**.

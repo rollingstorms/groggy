@@ -1,0 +1,922 @@
+{
+  "benchmark": "lazy_scalar_arrays",
+  "cases": [
+    {
+      "median_allocation_calls": 47.0,
+      "median_peak_additional_live_bytes": 10473.0,
+      "median_requested_bytes": 12898.0,
+      "median_seconds": 0.000048833,
+      "name": "lazy_i64_chain_1000",
+      "samples": [
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 10473,
+          "requested_bytes": 12898,
+          "seconds": 0.000047917
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 10473,
+          "requested_bytes": 12898,
+          "seconds": 0.000048833
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 10473,
+          "requested_bytes": 12898,
+          "seconds": 0.00005325
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 10473,
+          "requested_bytes": 12898,
+          "seconds": 0.0000495
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 10473,
+          "requested_bytes": 12898,
+          "seconds": 0.000046292
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 10473,
+          "requested_bytes": 12898,
+          "seconds": 0.000044959
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 10473,
+          "requested_bytes": 12898,
+          "seconds": 0.000052125
+        }
+      ],
+      "shape": [
+        1000
+      ]
+    },
+    {
+      "median_allocation_calls": 1.0,
+      "median_peak_additional_live_bytes": 8000.0,
+      "median_requested_bytes": 8000.0,
+      "median_seconds": 2.417e-6,
+      "name": "eager_i64_reference_1000",
+      "samples": [
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000,
+          "requested_bytes": 8000,
+          "seconds": 2.792e-6
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000,
+          "requested_bytes": 8000,
+          "seconds": 2.5e-6
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000,
+          "requested_bytes": 8000,
+          "seconds": 2.417e-6
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000,
+          "requested_bytes": 8000,
+          "seconds": 2.375e-6
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000,
+          "requested_bytes": 8000,
+          "seconds": 2.333e-6
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000,
+          "requested_bytes": 8000,
+          "seconds": 2.333e-6
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000,
+          "requested_bytes": 8000,
+          "seconds": 2.417e-6
+        }
+      ],
+      "shape": [
+        1000
+      ]
+    },
+    {
+      "median_allocation_calls": 49.0,
+      "median_peak_additional_live_bytes": 50473.0,
+      "median_requested_bytes": 53090.0,
+      "median_seconds": 0.000062042,
+      "name": "lazy_attributes_chain_1000",
+      "samples": [
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 50473,
+          "requested_bytes": 53090,
+          "seconds": 0.000073667
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 50473,
+          "requested_bytes": 53090,
+          "seconds": 0.000062708
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 50473,
+          "requested_bytes": 53090,
+          "seconds": 0.000062083
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 50473,
+          "requested_bytes": 53090,
+          "seconds": 0.000061917
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 50473,
+          "requested_bytes": 53090,
+          "seconds": 0.000062042
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 50473,
+          "requested_bytes": 53090,
+          "seconds": 0.000061917
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 50473,
+          "requested_bytes": 53090,
+          "seconds": 0.000062042
+        }
+      ],
+      "shape": [
+        1000
+      ]
+    },
+    {
+      "median_allocation_calls": 24.0,
+      "median_peak_additional_live_bytes": 9277.0,
+      "median_requested_bytes": 9732.0,
+      "median_seconds": 0.000035125,
+      "name": "lazy_f64_filter_1000",
+      "samples": [
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 9277,
+          "requested_bytes": 9732,
+          "seconds": 0.000045916
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 9277,
+          "requested_bytes": 9732,
+          "seconds": 0.000035166
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 9277,
+          "requested_bytes": 9732,
+          "seconds": 0.000035292
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 9277,
+          "requested_bytes": 9732,
+          "seconds": 0.000035125
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 9277,
+          "requested_bytes": 9732,
+          "seconds": 0.000034416
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 9277,
+          "requested_bytes": 9732,
+          "seconds": 0.000034916
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 9277,
+          "requested_bytes": 9732,
+          "seconds": 0.000034875
+        }
+      ],
+      "shape": [
+        1000
+      ]
+    },
+    {
+      "median_allocation_calls": 4.0,
+      "median_peak_additional_live_bytes": 8512.0,
+      "median_requested_bytes": 8736.0,
+      "median_seconds": 5.125e-6,
+      "name": "seeded_i64_sample_1000",
+      "samples": [
+        {
+          "allocation_calls": 4,
+          "checksum": 22489.0,
+          "peak_additional_live_bytes": 8512,
+          "requested_bytes": 8736,
+          "seconds": 0.000033709
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 22489.0,
+          "peak_additional_live_bytes": 8512,
+          "requested_bytes": 8736,
+          "seconds": 5.917e-6
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 22489.0,
+          "peak_additional_live_bytes": 8512,
+          "requested_bytes": 8736,
+          "seconds": 5.333e-6
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 22489.0,
+          "peak_additional_live_bytes": 8512,
+          "requested_bytes": 8736,
+          "seconds": 4.959e-6
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 22489.0,
+          "peak_additional_live_bytes": 8512,
+          "requested_bytes": 8736,
+          "seconds": 4.833e-6
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 22489.0,
+          "peak_additional_live_bytes": 8512,
+          "requested_bytes": 8736,
+          "seconds": 5.125e-6
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 22489.0,
+          "peak_additional_live_bytes": 8512,
+          "requested_bytes": 8736,
+          "seconds": 4.917e-6
+        }
+      ],
+      "shape": [
+        1000
+      ]
+    },
+    {
+      "median_allocation_calls": 47.0,
+      "median_peak_additional_live_bytes": 802473.0,
+      "median_requested_bytes": 804898.0,
+      "median_seconds": 0.001618083,
+      "name": "lazy_i64_chain_100000",
+      "samples": [
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 802473,
+          "requested_bytes": 804898,
+          "seconds": 0.001725542
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 802473,
+          "requested_bytes": 804898,
+          "seconds": 0.001661
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 802473,
+          "requested_bytes": 804898,
+          "seconds": 0.0016195
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 802473,
+          "requested_bytes": 804898,
+          "seconds": 0.001618083
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 802473,
+          "requested_bytes": 804898,
+          "seconds": 0.001488583
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 802473,
+          "requested_bytes": 804898,
+          "seconds": 0.001416959
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 802473,
+          "requested_bytes": 804898,
+          "seconds": 0.001408125
+        }
+      ],
+      "shape": [
+        100000
+      ]
+    },
+    {
+      "median_allocation_calls": 1.0,
+      "median_peak_additional_live_bytes": 800000.0,
+      "median_requested_bytes": 800000.0,
+      "median_seconds": 0.000109583,
+      "name": "eager_i64_reference_100000",
+      "samples": [
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 800000,
+          "requested_bytes": 800000,
+          "seconds": 0.00011175
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 800000,
+          "requested_bytes": 800000,
+          "seconds": 0.000105416
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 800000,
+          "requested_bytes": 800000,
+          "seconds": 0.000106292
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 800000,
+          "requested_bytes": 800000,
+          "seconds": 0.000109583
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 800000,
+          "requested_bytes": 800000,
+          "seconds": 0.000106958
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 800000,
+          "requested_bytes": 800000,
+          "seconds": 0.000112875
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 800000,
+          "requested_bytes": 800000,
+          "seconds": 0.000113125
+        }
+      ],
+      "shape": [
+        100000
+      ]
+    },
+    {
+      "median_allocation_calls": 49.0,
+      "median_peak_additional_live_bytes": 4802473.0,
+      "median_requested_bytes": 4805090.0,
+      "median_seconds": 0.001917042,
+      "name": "lazy_attributes_chain_100000",
+      "samples": [
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 4802473,
+          "requested_bytes": 4805090,
+          "seconds": 0.003165083
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 4802473,
+          "requested_bytes": 4805090,
+          "seconds": 0.002209084
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 4802473,
+          "requested_bytes": 4805090,
+          "seconds": 0.002091333
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 4802473,
+          "requested_bytes": 4805090,
+          "seconds": 0.001917042
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 4802473,
+          "requested_bytes": 4805090,
+          "seconds": 0.00188
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 4802473,
+          "requested_bytes": 4805090,
+          "seconds": 0.001891833
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 4802473,
+          "requested_bytes": 4805090,
+          "seconds": 0.001909208
+        }
+      ],
+      "shape": [
+        100000
+      ]
+    },
+    {
+      "median_allocation_calls": 24.0,
+      "median_peak_additional_live_bytes": 801277.0,
+      "median_requested_bytes": 801732.0,
+      "median_seconds": 0.0017465,
+      "name": "lazy_f64_filter_100000",
+      "samples": [
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 801277,
+          "requested_bytes": 801732,
+          "seconds": 0.001765958
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 801277,
+          "requested_bytes": 801732,
+          "seconds": 0.0017465
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 801277,
+          "requested_bytes": 801732,
+          "seconds": 0.001762458
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 801277,
+          "requested_bytes": 801732,
+          "seconds": 0.001769583
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 801277,
+          "requested_bytes": 801732,
+          "seconds": 0.001631417
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 801277,
+          "requested_bytes": 801732,
+          "seconds": 0.00162975
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 801277,
+          "requested_bytes": 801732,
+          "seconds": 0.001627625
+        }
+      ],
+      "shape": [
+        100000
+      ]
+    },
+    {
+      "median_allocation_calls": 4.0,
+      "median_peak_additional_live_bytes": 800512.0,
+      "median_requested_bytes": 800736.0,
+      "median_seconds": 0.000176625,
+      "name": "seeded_i64_sample_100000",
+      "samples": [
+        {
+          "allocation_calls": 4,
+          "checksum": 2398257.0,
+          "peak_additional_live_bytes": 800512,
+          "requested_bytes": 800736,
+          "seconds": 0.000177042
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 2398257.0,
+          "peak_additional_live_bytes": 800512,
+          "requested_bytes": 800736,
+          "seconds": 0.000172167
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 2398257.0,
+          "peak_additional_live_bytes": 800512,
+          "requested_bytes": 800736,
+          "seconds": 0.000177833
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 2398257.0,
+          "peak_additional_live_bytes": 800512,
+          "requested_bytes": 800736,
+          "seconds": 0.000178333
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 2398257.0,
+          "peak_additional_live_bytes": 800512,
+          "requested_bytes": 800736,
+          "seconds": 0.000176625
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 2398257.0,
+          "peak_additional_live_bytes": 800512,
+          "requested_bytes": 800736,
+          "seconds": 0.000174792
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 2398257.0,
+          "peak_additional_live_bytes": 800512,
+          "requested_bytes": 800736,
+          "seconds": 0.000176083
+        }
+      ],
+      "shape": [
+        100000
+      ]
+    },
+    {
+      "median_allocation_calls": 47.0,
+      "median_peak_additional_live_bytes": 8002473.0,
+      "median_requested_bytes": 8004898.0,
+      "median_seconds": 0.008496792,
+      "name": "lazy_i64_chain_1000000",
+      "samples": [
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8002473,
+          "requested_bytes": 8004898,
+          "seconds": 0.008417458
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8002473,
+          "requested_bytes": 8004898,
+          "seconds": 0.0086545
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8002473,
+          "requested_bytes": 8004898,
+          "seconds": 0.008496792
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8002473,
+          "requested_bytes": 8004898,
+          "seconds": 0.008451625
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8002473,
+          "requested_bytes": 8004898,
+          "seconds": 0.008623333
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8002473,
+          "requested_bytes": 8004898,
+          "seconds": 0.00841325
+        },
+        {
+          "allocation_calls": 47,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8002473,
+          "requested_bytes": 8004898,
+          "seconds": 0.008570334
+        }
+      ],
+      "shape": [
+        1000000
+      ]
+    },
+    {
+      "median_allocation_calls": 1.0,
+      "median_peak_additional_live_bytes": 8000000.0,
+      "median_requested_bytes": 8000000.0,
+      "median_seconds": 0.000742125,
+      "name": "eager_i64_reference_1000000",
+      "samples": [
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000000,
+          "requested_bytes": 8000000,
+          "seconds": 0.00072975
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000000,
+          "requested_bytes": 8000000,
+          "seconds": 0.000704375
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000000,
+          "requested_bytes": 8000000,
+          "seconds": 0.000749291
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000000,
+          "requested_bytes": 8000000,
+          "seconds": 0.000754875
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000000,
+          "requested_bytes": 8000000,
+          "seconds": 0.000758916
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000000,
+          "requested_bytes": 8000000,
+          "seconds": 0.000742125
+        },
+        {
+          "allocation_calls": 1,
+          "checksum": 12450.0,
+          "peak_additional_live_bytes": 8000000,
+          "requested_bytes": 8000000,
+          "seconds": 0.000665083
+        }
+      ],
+      "shape": [
+        1000000
+      ]
+    },
+    {
+      "median_allocation_calls": 49.0,
+      "median_peak_additional_live_bytes": 48002473.0,
+      "median_requested_bytes": 48005090.0,
+      "median_seconds": 0.014672208,
+      "name": "lazy_attributes_chain_1000000",
+      "samples": [
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 48002473,
+          "requested_bytes": 48005090,
+          "seconds": 0.014481417
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 48002473,
+          "requested_bytes": 48005090,
+          "seconds": 0.014705833
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 48002473,
+          "requested_bytes": 48005090,
+          "seconds": 0.014291667
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 48002473,
+          "requested_bytes": 48005090,
+          "seconds": 0.014742917
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 48002473,
+          "requested_bytes": 48005090,
+          "seconds": 0.014672208
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 48002473,
+          "requested_bytes": 48005090,
+          "seconds": 0.016380875
+        },
+        {
+          "allocation_calls": 49,
+          "checksum": 50.0,
+          "peak_additional_live_bytes": 48002473,
+          "requested_bytes": 48005090,
+          "seconds": 0.01456375
+        }
+      ],
+      "shape": [
+        1000000
+      ]
+    },
+    {
+      "median_allocation_calls": 24.0,
+      "median_peak_additional_live_bytes": 8001277.0,
+      "median_requested_bytes": 8001732.0,
+      "median_seconds": 0.014786625,
+      "name": "lazy_f64_filter_1000000",
+      "samples": [
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 8001277,
+          "requested_bytes": 8001732,
+          "seconds": 0.014864208
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 8001277,
+          "requested_bytes": 8001732,
+          "seconds": 0.014817959
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 8001277,
+          "requested_bytes": 8001732,
+          "seconds": 0.014796125
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 8001277,
+          "requested_bytes": 8001732,
+          "seconds": 0.014786625
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 8001277,
+          "requested_bytes": 8001732,
+          "seconds": 0.014062084
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 8001277,
+          "requested_bytes": 8001732,
+          "seconds": 0.0136325
+        },
+        {
+          "allocation_calls": 24,
+          "checksum": 1485.0,
+          "peak_additional_live_bytes": 8001277,
+          "requested_bytes": 8001732,
+          "seconds": 0.013350791
+        }
+      ],
+      "shape": [
+        1000000
+      ]
+    },
+    {
+      "median_allocation_calls": 4.0,
+      "median_peak_additional_live_bytes": 8000512.0,
+      "median_requested_bytes": 8000736.0,
+      "median_seconds": 0.001416667,
+      "name": "seeded_i64_sample_1000000",
+      "samples": [
+        {
+          "allocation_calls": 4,
+          "checksum": 25554440.0,
+          "peak_additional_live_bytes": 8000512,
+          "requested_bytes": 8000736,
+          "seconds": 0.001425416
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 25554440.0,
+          "peak_additional_live_bytes": 8000512,
+          "requested_bytes": 8000736,
+          "seconds": 0.001427166
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 25554440.0,
+          "peak_additional_live_bytes": 8000512,
+          "requested_bytes": 8000736,
+          "seconds": 0.001416667
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 25554440.0,
+          "peak_additional_live_bytes": 8000512,
+          "requested_bytes": 8000736,
+          "seconds": 0.001410875
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 25554440.0,
+          "peak_additional_live_bytes": 8000512,
+          "requested_bytes": 8000736,
+          "seconds": 0.00141
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 25554440.0,
+          "peak_additional_live_bytes": 8000512,
+          "requested_bytes": 8000736,
+          "seconds": 0.001437291
+        },
+        {
+          "allocation_calls": 4,
+          "checksum": 25554440.0,
+          "peak_additional_live_bytes": 8000512,
+          "requested_bytes": 8000736,
+          "seconds": 0.001415541
+        }
+      ],
+      "shape": [
+        1000000
+      ]
+    }
+  ],
+  "profile": "release",
+  "scope": "single runner; owned source clone, query compilation, execution and output assertions included; fixtures excluded; requested Rust allocations, not RSS or FFI; eager path is independent exact-result reference; deferred vector execution, not streaming"
+}
