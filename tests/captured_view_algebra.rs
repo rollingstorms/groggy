@@ -224,3 +224,19 @@ fn connected_adapters_reuse_canonical_membership_and_reject_other_owners() {
         .calculate_similarity(&other, SimilarityMetric::Jaccard)
         .is_err());
 }
+
+#[test]
+fn collection_union_preserves_capture_and_exact_instances_without_filler_members() {
+    let (_, root) = fixture();
+    let left = exact(&root, &[0, 1], &[0, 3]);
+    let right = exact(&root, &[0, 1, 2], &[1, 2]);
+    let union = GraphView::merge_all(&[left.clone(), right, left])
+        .unwrap()
+        .unwrap();
+    assert_eq!(union.node_ids(), vec![0, 1, 2]);
+    assert_eq!(union.edge_ids(), vec![0, 1, 2, 3]);
+    assert!(root.merge_with(&union).is_ok());
+    assert!(GraphView::merge_all(&[]).unwrap().is_none());
+    let (_, unrelated) = fixture();
+    assert!(GraphView::merge_all(&[union, unrelated]).is_err());
+}

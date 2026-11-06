@@ -1573,3 +1573,17 @@ pass. Million-row i64 chain: 21.453 ms / 45 requested allocations / 8,002,473 pe
 additional live bytes; direct eager reference 0.776 ms. Interpreter throughput
 remains an explicit existing numerical/execution gap. Receipt:
 `lazy-scalar-arrays-2026-11-05.md`. No new rows: **215 checked / 53 open / 268 total**.
+
+
+## 2026-11-05 — captured collection projection and materialization
+
+Closed four demonstrated current-owner bypasses in existing 26.1/AR4/AR7.5:
+SubgraphArray table columns, observations, merge and visualization. Canonical
+source reads preserve sorted IDs, null/absence, direction, exact parallel edges
+and retained groups. Native merge_all validates one capture and unions once;
+materialization delegates to checked owned-copy code. Summaries use native
+density and collection errors propagate. Full gates: 1,532 native / 54 ignored,
+strict Clippy, 2,591 Python / 1 skipped and 257 docs. Large-group table projection
+improves 35.594 → 11.132 ms; 100-small-group observations regress 14.071 → 39.848 ms
+and retain an explicit existing performance gap. See
+`subgraph-array-projection-2026-11-05.md`. No new rows: **215 checked / 53 open / 268 total**.

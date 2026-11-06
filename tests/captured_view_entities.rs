@@ -221,3 +221,33 @@ fn parallel_column_and_presence_projection_preserve_exact_sorted_alignment() {
     }
     assert_eq!(nodes.select_mask(&presence).unwrap().node_count(), 668);
 }
+
+#[test]
+fn present_columns_keep_explicit_null_and_original_order_after_owner_changes() {
+    let (mut graph, view) = fixture();
+    let nodes = view.node_accessor();
+    assert_eq!(
+        nodes.present_column(&"score".into()).data(),
+        &vec![V::Float64(2.5), V::Null, V::Int(9_007_199_254_740_993)]
+    );
+    assert_eq!(
+        nodes.column(&"score".into()).data(),
+        &vec![
+            V::Float64(2.5),
+            V::Null,
+            V::Null,
+            V::Int(9_007_199_254_740_993)
+        ]
+    );
+    graph.set_node_attr(0, "score".into(), V::Int(99)).unwrap();
+    graph.remove_node(2).unwrap();
+    assert_eq!(
+        nodes.present_column(&"score".into()).data(),
+        &vec![V::Float64(2.5), V::Null, V::Int(9_007_199_254_740_993)]
+    );
+    assert_eq!(
+        view.edge_accessor().present_column(&"weight".into()).data(),
+        &vec![V::Float64(2.)]
+    );
+    assert!(nodes.present_column(&"absent".into()).data().is_empty());
+}

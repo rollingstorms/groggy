@@ -216,6 +216,21 @@ impl GraphViewEntities {
                 .unwrap_or(AttrValue::Null)
         })
     }
+    /// Owned observations in ascending entity-ID order, omitting only absent cells.
+    /// Explicit null values remain present. Use column() for aligned projection.
+    pub fn present_column(&self, name: &AttrName) -> BaseArray<AttrValue> {
+        let ids = self.ids();
+        let present = |&id: &usize| {
+            attributes(&self.view, self.kind, id)
+                .and_then(|attrs| attrs.get(name))
+                .cloned()
+        };
+        BaseArray::new(if ids.len() > 1000 {
+            ids.par_iter().filter_map(present).collect()
+        } else {
+            ids.iter().filter_map(present).collect()
+        })
+    }
     /// Aligned explicit presence bits; null remains present.
     pub fn presence(&self, name: &AttrName) -> BaseArray<AttrValue> {
         self.project_column(|id| {

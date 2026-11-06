@@ -222,20 +222,12 @@ impl PyComponentsArray {
 
     /// Direct delegation: Apply table() to each component and return PyTableArray
     fn table(&self) -> PyResult<crate::ffi::storage::table_array::PyTableArray> {
-        let mut tables = Vec::new();
-
         Python::with_gil(|py| {
-            for i in 0..self.components_data.len() {
-                if let Ok(component) = self.__getitem__(i as isize) {
-                    match component.table(py) {
-                        Ok(table) => tables.push(table),
-                        Err(_) => continue, // Skip failed components
-                    }
-                }
-            }
-        });
-
-        Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
+            let tables = (0..self.components_data.len())
+                .map(|index| self.__getitem__(index as isize)?.table(py))
+                .collect::<PyResult<Vec<_>>>()?;
+            Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
+        })
     }
 
     /// Direct delegation: Apply sample(k) to each component and return PySubgraphArray
@@ -286,24 +278,21 @@ impl PyComponentsArray {
 
     /// Direct delegation: Apply filter to components
     fn filter(&self, predicate: PyObject) -> PyResult<Self> {
-        let mut filtered_data = Vec::new();
-
-        Python::with_gil(|py| {
-            for i in 0..self.components_data.len() {
-                if let Ok(component) = self.__getitem__(i as isize) {
-                    // Apply Python predicate function to each component
-                    match predicate.call1(py, (component.clone(),)) {
-                        Ok(result) => {
-                            if result.is_true(py).unwrap_or(false) {
-                                filtered_data.push(self.components_data[i].clone());
-                            }
-                        }
-                        Err(_) => continue, // Skip on error
-                    }
+        let filtered_data = Python::with_gil(|py| {
+            if !predicate.as_ref(py).is_callable() {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "component filter requires a callable",
+                ));
+            }
+            let mut selected = Vec::new();
+            for index in 0..self.components_data.len() {
+                let component = self.__getitem__(index as isize)?;
+                if predicate.call1(py, (component,))?.is_true(py)? {
+                    selected.push(self.components_data[index].clone());
                 }
             }
-        });
-
+            Ok(selected)
+        })?;
         Ok(Self {
             source: self.source.clone(),
             components_data: filtered_data,

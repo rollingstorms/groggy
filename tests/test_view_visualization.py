@@ -6,7 +6,7 @@ import textwrap
 import pytest
 
 
-@pytest.mark.parametrize("captured", [False, True, "components"])
+@pytest.mark.parametrize("captured", [False, True, "components", "array"])
 def test_visualization_snapshot_keeps_only_selected_entities_after_owner_changes(captured):
     code = textwrap.dedent('''
         import json, re, sys, types, urllib.request
@@ -27,6 +27,8 @@ def test_visualization_snapshot_keeps_only_selected_entities_after_owner_changes
             selected = selected.pin_view()
         elif CAPTURED == "components":
             selected = selected.connected_components()
+        elif CAPTURED == "array":
+            selected = selected.neighborhood([1], hops=1)
         accessor = selected.viz
         graph.remove_node(1)
         accessor.show(layout="grid")

@@ -50,51 +50,42 @@ impl PySubgraphArray {
         &self.inner
     }
 
+    /// Marshal source-bound selections to one canonical immutable union.
+    fn merged_source(&self, py: Python) -> PyResult<Option<groggy::GraphView>> {
+        let views = self
+            .inner
+            .iter()
+            .map(|selection| selection.inner.pin_view())
+            .collect::<groggy::GraphResult<Vec<_>>>()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        py.allow_threads(|| groggy::GraphView::merge_all(&views))
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
     /// Helper: Extract multiple columns from each subgraph's nodes and return as TableArray
     fn extract_columns_as_tables(&self, py: Python, columns: &[String]) -> PyResult<PyObject> {
-        use groggy::storage::array::BaseArray;
         use groggy::storage::table::BaseTable;
         use std::collections::HashMap;
-
-        let mut tables = Vec::new();
-
+        let mut tables = Vec::with_capacity(self.inner.len());
         for subgraph in self.inner.iter() {
-            let graph_ref = subgraph.inner.graph();
-            let graph_borrow = graph_ref.borrow();
-
-            // Build columns map for this subgraph
-            let mut column_map = HashMap::new();
-
-            for col_name in columns {
-                let mut col_values = Vec::new();
-
-                // Extract attribute values from all nodes in this subgraph
-                for &node_id in subgraph.inner.nodes() {
-                    if let Ok(Some(attr_value)) = graph_borrow.get_node_attr(node_id, col_name) {
-                        col_values.push(attr_value);
-                    } else {
-                        // If any node is missing this attribute, use Null
-                        col_values.push(groggy::types::AttrValue::Null);
-                    }
-                }
-
-                column_map.insert(col_name.clone(), BaseArray::from_attr_values(col_values));
-            }
-
-            // Create BaseTable for this subgraph
-            match BaseTable::from_columns(column_map) {
-                Ok(table) => {
-                    // Wrap in PyBaseTable and convert to PyObject
-                    let py_table = crate::ffi::storage::table::PyBaseTable::from_table(table);
-                    tables.push(py_table.into_py(py));
-                }
-                Err(_) => continue, // Skip failed tables
-            }
+            let view = subgraph
+                .inner
+                .pin_view()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            let table = py
+                .allow_threads(|| {
+                    let nodes = view.node_accessor();
+                    BaseTable::from_columns(
+                        columns
+                            .iter()
+                            .map(|name| (name.clone(), nodes.column(name)))
+                            .collect::<HashMap<_, _>>(),
+                    )
+                })
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            tables.push(crate::ffi::storage::table::PyBaseTable::from_table(table).into_py(py));
         }
-
-        // Wrap in PyTableArray
-        let table_array = crate::ffi::storage::table_array::PyTableArray::new(tables);
-        Ok(table_array.into_py(py))
+        Ok(crate::ffi::storage::table_array::PyTableArray::new(tables).into_py(py))
     }
 }
 
@@ -158,67 +149,37 @@ impl PySubgraphArray {
 
     /// Extract a node attribute from all subgraphs and return as ArrayArray
     fn extract_node_attribute(&self, py: Python, attr_name: &str) -> PyResult<PyObject> {
-        use groggy::storage::array::{ArrayArray, BaseArray};
-        use groggy::types::AttrValue;
-
-        let mut arrays = Vec::new();
-        let mut keys = Vec::new();
-        let attr_name_string = attr_name.to_string();
-
-        for (idx, subgraph) in self.inner.iter().enumerate() {
-            // Get graph reference and extract node attribute values
-            let graph_ref = subgraph.inner.graph();
-            let graph_borrow = graph_ref.borrow();
-
-            let node_values: Vec<AttrValue> = subgraph
+        use groggy::storage::array::ArrayArray;
+        let mut arrays = Vec::with_capacity(self.inner.len());
+        let mut keys = Vec::with_capacity(self.inner.len());
+        let name = attr_name.to_owned();
+        for (index, subgraph) in self.inner.iter().enumerate() {
+            let view = subgraph
                 .inner
-                .nodes()
-                .iter() // Add .iter() to iterate over HashSet
-                .filter_map(|&node_id| {
-                    graph_borrow
-                        .get_node_attr(node_id, &attr_name_string)
-                        .ok()
-                        .flatten()
+                .pin_view()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            // Preserve the legacy node-first/edge-fallback selector. Native readers
+            // own presence semantics and ordered projection from the captured source.
+            let values = py
+                .allow_threads(|| {
+                    let nodes = view.node_accessor();
+                    if nodes.has_column(&name) {
+                        return Some(nodes.present_column(&name));
+                    }
+                    let edges = view.edge_accessor();
+                    edges.has_column(&name).then(|| edges.present_column(&name))
                 })
-                .collect();
-
-            // If no node values found, try extracting from edges
-            if node_values.is_empty() {
-                let edge_values: Vec<AttrValue> = subgraph
-                    .inner
-                    .edges()
-                    .iter()
-                    .filter_map(|&edge_id| {
-                        graph_borrow
-                            .get_edge_attr(edge_id, &attr_name_string)
-                            .ok()
-                            .flatten()
-                    })
-                    .collect();
-
-                if edge_values.is_empty() {
-                    return Err(pyo3::exceptions::PyKeyError::new_err(format!(
-                        "Attribute '{}' not found in subgraph {}",
-                        attr_name, idx
-                    )));
-                }
-
-                arrays.push(BaseArray::from_attr_values(edge_values));
-                keys.push(format!("subgraph_{}", idx));
-                continue;
-            }
-
-            arrays.push(BaseArray::from_attr_values(node_values));
-            keys.push(format!("subgraph_{}", idx));
+                .ok_or_else(|| {
+                    pyo3::exceptions::PyKeyError::new_err(format!(
+                        "Attribute '{attr_name}' not found in subgraph {index}"
+                    ))
+                })?;
+            arrays.push(values);
+            keys.push(format!("subgraph_{index}"));
         }
-
-        // Create ArrayArray with keys
-        let array_array = ArrayArray::with_keys(arrays, keys)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-
-        // Wrap in PyArrayArray
-        let py_array_array = crate::PyArrayArray::from_array_array(array_array);
-        Ok(py_array_array.into_py(py))
+        let array = ArrayArray::with_keys(arrays, keys)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Ok(crate::PyArrayArray::from_array_array(array).into_py(py))
     }
 
     /// Iterate over subgraphs
@@ -295,18 +256,14 @@ impl PySubgraphArray {
 
     /// Apply table() to all subgraphs and return PyTableArray
     fn table(&self) -> PyResult<crate::ffi::storage::table_array::PyTableArray> {
-        let mut tables = Vec::new();
-
         Python::with_gil(|py| {
-            for subgraph in self.inner.iter() {
-                match subgraph.table(py) {
-                    Ok(table) => tables.push(table),
-                    Err(_) => continue, // Skip failed subgraphs
-                }
-            }
-        });
-
-        Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
+            let tables = self
+                .inner
+                .iter()
+                .map(|subgraph| subgraph.table(py))
+                .collect::<PyResult<Vec<_>>>()?;
+            Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
+        })
     }
 
     /// Apply sample(k) to all subgraphs
@@ -333,23 +290,16 @@ impl PySubgraphArray {
     ///     nested_groups = subgraph_array.group_by('department', 'nodes')
     ///     # Returns all department groups from all input subgraphs
     pub fn group_by(&self, attr_name: String, element_type: String) -> PyResult<PySubgraphArray> {
-        let mut all_groups = Vec::new();
-
-        // Apply group_by to each subgraph and flatten results
-        for subgraph in self.inner.iter() {
-            match subgraph.group_by(attr_name.clone(), element_type.clone()) {
-                Ok(groups) => {
-                    // Flatten the groups into our result vector
-                    for i in 0..groups.len() {
-                        if let Some(group_subgraph) = groups.get(i) {
-                            all_groups.push(group_subgraph.clone());
-                        }
-                    }
-                }
-                Err(_) => continue, // Skip failed subgraphs
-            }
+        if !matches!(element_type.as_str(), "nodes" | "edges") {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "element_type must be either 'nodes' or 'edges'",
+            ));
         }
-
+        let mut all_groups = Vec::new();
+        for subgraph in self.inner.iter() {
+            let groups = subgraph.group_by(attr_name.clone(), element_type.clone())?;
+            all_groups.extend(groups.as_vec().iter().cloned());
+        }
         Ok(PySubgraphArray::new(all_groups))
     }
 
@@ -363,19 +313,17 @@ impl PySubgraphArray {
     ///     node_tables = components.nodes_table()
     ///     # Returns TableArray with one table per component
     fn nodes_table(&self, py: Python) -> PyResult<crate::ffi::storage::table_array::PyTableArray> {
-        let mut tables = Vec::new();
-
-        for subgraph in self.inner.iter() {
-            match subgraph.inner.nodes_table() {
-                Ok(nodes_table) => {
-                    // Wrap NodesTable in PyNodesTable
-                    let py_table = crate::ffi::storage::table::PyNodesTable { table: nodes_table };
-                    tables.push(py_table.into_py(py));
-                }
-                Err(_) => continue, // Skip failed subgraphs
-            }
+        let mut tables = Vec::with_capacity(self.inner.len());
+        for selection in self.inner.iter() {
+            let view = selection
+                .inner
+                .pin_view()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            let table = py
+                .allow_threads(|| view.nodes_table())
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            tables.push(crate::ffi::storage::table::PyNodesTable { table }.into_py(py));
         }
-
         Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
     }
 
@@ -389,19 +337,17 @@ impl PySubgraphArray {
     ///     edge_tables = components.edges_table()
     ///     # Returns TableArray with one table per component
     fn edges_table(&self, py: Python) -> PyResult<crate::ffi::storage::table_array::PyTableArray> {
-        let mut tables = Vec::new();
-
-        for subgraph in self.inner.iter() {
-            match subgraph.inner.edges_table() {
-                Ok(edges_table) => {
-                    // Wrap EdgesTable in PyEdgesTable
-                    let py_table = crate::ffi::storage::table::PyEdgesTable { table: edges_table };
-                    tables.push(py_table.into_py(py));
-                }
-                Err(_) => continue, // Skip failed subgraphs
-            }
+        let mut tables = Vec::with_capacity(self.inner.len());
+        for selection in self.inner.iter() {
+            let view = selection
+                .inner
+                .pin_view()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            let table = py
+                .allow_threads(|| view.edges_table())
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            tables.push(crate::ffi::storage::table::PyEdgesTable { table }.into_py(py));
         }
-
         Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
     }
 
@@ -432,13 +378,7 @@ impl PySubgraphArray {
             let node_count = subgraph.inner.node_count();
             let edge_count = subgraph.inner.edge_count();
 
-            // Calculate density: 2 * edges / (nodes * (nodes - 1)) for undirected
-            let density = if node_count < 2 {
-                0.0
-            } else {
-                let max_edges = (node_count * (node_count - 1)) / 2;
-                edge_count as f64 / max_edges as f64
-            };
+            let density = subgraph.inner.density();
 
             ids.push(AttrValue::Int(idx as i64));
             node_counts.push(AttrValue::Int(node_count as i64));
@@ -473,51 +413,19 @@ impl PySubgraphArray {
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
         use groggy::viz::streaming::GraphDataSource;
-
-        // For SubgraphArray, create a graph that contains all subgraphs
-        let mut viz_graph = groggy::api::graph::Graph::new_manual();
-
-        for subgraph in self.inner.iter() {
-            let node_ids = subgraph.inner.node_ids();
-            let edge_ids = subgraph.inner.edge_ids();
-
-            // Copy nodes with their attributes
-            for &node_id in &node_ids {
-                // Check if node already exists to avoid duplicates
-                if !viz_graph.node_ids().contains(&node_id) {
-                    viz_graph
-                        .add_node()
-                        .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-                    if let Ok(attrs) = subgraph.inner.graph().borrow().get_node_attrs(node_id) {
-                        for (attr_name, attr_value) in attrs {
-                            let _ = viz_graph.set_node_attr(node_id, attr_name, attr_value);
-                        }
-                    }
-                }
-            }
-
-            // Copy edges with their attributes
-            let graph_ref = subgraph.inner.graph();
-            for &edge_id in &edge_ids {
-                if let Ok((source, target)) = graph_ref.borrow().edge_endpoints(edge_id) {
-                    if let Ok(new_edge_id) = viz_graph.add_edge(source, target) {
-                        if let Ok(attrs) = graph_ref.borrow().get_edge_attrs(edge_id) {
-                            for (attr_name, attr_value) in attrs {
-                                let _ = viz_graph.set_edge_attr(new_edge_id, attr_name, attr_value);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let graph_data_source = GraphDataSource::new(&viz_graph);
-        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
-            graph_data_source,
-            "SubgraphArray".to_string(),
-        );
-
-        Py::new(py, viz_accessor)
+        let view = match self.merged_source(py)? {
+            Some(view) => view,
+            None => groggy::Graph::new()
+                .read_view()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+        };
+        let data = py
+            .allow_threads(|| GraphDataSource::from_view(&view))
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        Py::new(
+            py,
+            crate::ffi::viz_accessor::VizAccessor::with_data_source(data, "SubgraphArray".into()),
+        )
     }
 
     /// Map a function over all subgraphs and return a BaseArray
@@ -560,7 +468,8 @@ impl PySubgraphArray {
     ///
     /// Combines all nodes and edges from all subgraphs into one unified graph.
     /// Node and edge IDs are preserved from the original graph.
-    /// Duplicate nodes/edges are handled by taking the first occurrence.
+    /// Overlapping instances are included once. Inputs must share one capture;
+    /// current owner changes are never consulted and no extra edges are induced.
     ///
     /// Returns:
     ///     PyGraph containing all merged subgraphs
@@ -571,74 +480,16 @@ impl PySubgraphArray {
     /// dept_groups = g.nodes.group_by('department')
     /// merged_graph = dept_groups.merge()
     /// ```
-    fn merge(&self, _py: Python) -> PyResult<crate::ffi::api::graph::PyGraph> {
-        use std::cell::RefCell;
-        use std::collections::HashSet;
-
-        // Create a new graph
-        let mut merged_graph = groggy::api::graph::Graph::new_manual();
-        let mut seen_nodes = HashSet::new();
-        let mut seen_edges = HashSet::new();
-
-        // Iterate over all subgraphs
-        for subgraph in self.inner.iter() {
-            let graph_ref = subgraph.inner.graph();
-            let graph_borrow = graph_ref.borrow();
-
-            // Copy nodes with their attributes
-            for &node_id in subgraph.inner.nodes() {
-                if !seen_nodes.contains(&node_id) {
-                    seen_nodes.insert(node_id);
-
-                    // Create enough nodes to include this node_id
-                    while merged_graph.node_ids().len() <= node_id {
-                        merged_graph
-                            .add_node()
-                            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-                    }
-
-                    // Copy attributes
-                    if let Ok(attrs) = graph_borrow.get_node_attrs(node_id) {
-                        for (attr_name, attr_value) in attrs {
-                            let _ = merged_graph.set_node_attr(node_id, attr_name, attr_value);
-                        }
-                    }
-                }
-            }
-
-            // Copy edges with their attributes
-            for &edge_id in subgraph.inner.edges() {
-                if !seen_edges.contains(&edge_id) {
-                    seen_edges.insert(edge_id);
-
-                    // Get edge endpoints
-                    if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
-                        // Add edge to merged graph
-                        if let Ok(new_edge_id) = merged_graph.add_edge(source, target) {
-                            // Copy attributes
-                            if let Ok(attrs) = graph_borrow.get_edge_attrs(edge_id) {
-                                for (attr_name, attr_value) in attrs {
-                                    let _ = merged_graph.set_edge_attr(
-                                        new_edge_id,
-                                        attr_name,
-                                        attr_value,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let merged_graph = merged_graph
-            .into_publishing()
-            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-
-        // Wrap the independently assembled graph after native publication.
+    fn merge(&self, py: Python) -> PyResult<crate::ffi::api::graph::PyGraph> {
+        let graph = match self.merged_source(py)? {
+            Some(view) => view
+                .to_graph()
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+            None => groggy::Graph::new(),
+        };
         Ok(crate::ffi::api::graph::PyGraph {
-            inner: merged_graph.into_shared(),
-            cached_view: RefCell::new(None),
+            inner: graph.into_shared(),
+            cached_view: std::cell::RefCell::new(None),
             cached_live_view: std::cell::RefCell::new(None),
         })
     }

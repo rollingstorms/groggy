@@ -119,3 +119,9 @@ for publication, stale-source and scope validation.
 Native connected Subgraph column helpers now retain aligned missing rows and use
 the existing bulk storage reader. See [native column alignment](connected-column-alignment.md)
 for their live ownership and explicit-sequence rules.
+
+Native GraphViewEntities.present_column(name) returns owned observations in
+ascending entity-ID order, omitting absent cells while retaining explicit null.
+column(name) remains the aligned projection; presence(name) distinguishes its
+null padding from explicitly stored null. SubgraphArray's compatibility column
+selectors delegate to these captured readers.

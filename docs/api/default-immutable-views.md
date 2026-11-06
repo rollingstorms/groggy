@@ -90,3 +90,41 @@ Owner operations use a separate lightweight execution cache and do not capture a
 properties just to compute a degree. Keeping a selection alive retains its source
 snapshot, including the full captured state used by selected reads; it is not a
 constant-memory detached copy of only the selected rows.
+
+## Collection readers
+
+SubgraphArray column extraction, table projection, merge and visualization read
+captured sources. Multi-column tables align rows by ascending selected node ID
+and represent absence as null. The legacy single-column selector returns present
+observations (including explicit null), preferring node properties and falling
+back to edge properties only when no selected node has that property.
+
+```python
+from groggy import Graph
+collection_graph = Graph(directed=True)
+collection_graph.add_nodes([{"x": value} for value in range(5)])
+collection_graph.add_edges([(0, 4), (1, 3), (1, 3), (3, 3)])
+collection = collection_graph.subgraph_from_edges([1, 2, 3]).neighborhood([1, 3], hops=1)
+collection_graph.remove_node(1)
+collection_graph.set_node_attr(3, "x", 999)
+assert collection[["x"]][0].column("x").to_list() == [1, 3]
+owned = collection.merge()
+assert owned.is_directed
+assert sorted(owned.node_ids) == [1, 3]
+assert sorted(owned.edge_ids) == [1, 2, 3]
+assert owned.get_node_attr(3, "x") == 3
+```
+
+Collection merge unions exact membership from one capture, then uses the existing
+checked owned graph materialization. Overlaps count once; no connecting edges or
+filler nodes are invented. Native GraphView.merge_all performs one membership
+pass and rejects mixed captures. Visualization reads that union directly without
+constructing a temporary working graph. A zero-item array has no source coordinate;
+its merge retains the existing fresh default-empty graph behavior. A nonempty
+array of empty selections still retains its captured source/direction.
+
+Array table/grouping failures and component predicate/truth-conversion errors
+propagate instead of silently dropping entries. Caller callbacks keep their own
+side effects; this is error propagation, not callback rollback. Generic eager
+marker iterators and the older component-neighborhood convenience placeholders
+remain separate unfinished pipeline work.

@@ -23,6 +23,24 @@ impl GraphView {
         )
     }
 
+    /// Union a collection in one membership pass. All inputs must share a capture;
+    /// empty input has no source coordinate and returns None. No edges are induced.
+    pub fn merge_all(views: &[Self]) -> GraphResult<Option<Self>> {
+        let Some(first) = views.first() else {
+            return Ok(None);
+        };
+        for view in views {
+            first.require_common_capture(view)?;
+        }
+        let mut nodes = HashSet::new();
+        let mut edges = HashSet::new();
+        for view in views {
+            nodes.extend(view.nodes().iter().copied());
+            edges.extend(view.edges().iter().copied());
+        }
+        Self::from_membership(first.read_state().clone(), nodes, edges).map(Some)
+    }
+
     /// Intersection of exact node/edge membership from one capture.
     pub fn intersect_with(&self, other: &Self) -> GraphResult<Self> {
         self.require_common_capture(other)?;
