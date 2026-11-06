@@ -31,6 +31,27 @@ pub(crate) fn compose_with_label<T: SubgraphOperations + ?Sized>(
     if let Some(view) = selection.frozen_view() {
         graph.validate_bound_source(view, true)?;
     }
+    let composition = prepare_composition(
+        &graph,
+        selection,
+        specs,
+        config,
+        lenient,
+        semantic_kind,
+        graph.pool().statistics().node_count,
+    )?;
+    graph.apply_meta_composition(composition)
+}
+
+pub(crate) fn prepare_composition<T: SubgraphOperations + ?Sized>(
+    graph: &Graph,
+    selection: &T,
+    specs: &[AggregationSpec],
+    config: &EdgeAggregationConfig,
+    lenient: bool,
+    semantic_kind: Option<&str>,
+    meta: NodeId,
+) -> GraphResult<MetaComposition> {
     let mut nodes: Vec<_> = selection.node_set().iter().copied().collect();
     nodes.sort_unstable();
     for &node in &nodes {
@@ -123,11 +144,10 @@ pub(crate) fn compose_with_label<T: SubgraphOperations + ?Sized>(
             }
         }
     }
-    let meta = graph.pool().statistics().node_count;
     let staged = if config.edge_to_external == ExternalEdgeStrategy::Contract {
-        contraction_edges(&graph, selection.node_set(), selection.edge_set(), config)?
+        contraction_edges(graph, selection.node_set(), selection.edge_set(), config)?
     } else {
-        boundary_edges(&graph, selection.node_set(), meta, config)?
+        boundary_edges(graph, selection.node_set(), meta, config)?
     };
     let boundary = staged
         .into_iter()
@@ -142,7 +162,7 @@ pub(crate) fn compose_with_label<T: SubgraphOperations + ?Sized>(
             (resolve(source), resolve(target), attrs)
         })
         .collect();
-    graph.apply_meta_composition(MetaComposition {
+    Ok(MetaComposition {
         nodes: selection.node_set().clone(),
         edges: selection.edge_set().clone(),
         kind: selection.entity_type().into(),

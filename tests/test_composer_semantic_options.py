@@ -153,5 +153,5 @@ def test_component_array_forwards_omitted_preset_options_without_overwriting():
     before = graph.current_state_id
     metas = graph.connected_components().collapse(preset="org_hierarchy")
     assert len(metas) == 2
-    assert graph.current_state_id == before + 2
+    assert graph.current_state_id == before + 1
     assert all(graph.node_labels(meta.id) == ["department"] for meta in metas)

@@ -93,3 +93,71 @@ def test_lenient_missing_and_compact_text_aggregation():
     assert graph.get_node_attr(meta.id, "missing") == 0
     edge = next(e for e in graph.edge_ids if meta.id in graph.edge_endpoints(e))
     assert graph.get_edge_attr(edge, "tag") == "b,a"
+
+
+@pytest.mark.parametrize("manual", [False, True])
+@pytest.mark.parametrize("strategy", ["extract", "collapse"])
+def test_component_collection_is_one_mutation_and_old_components_stay_readable(manual, strategy):
+    graph = Graph(manual=manual)
+    graph.add_nodes([{"x": 2}, {"x": 4}, {"x": 7}, {"x": 9}])
+    graph.add_edges([(0, 1), (2, 3)])
+    graph.commit("before", "test")
+    components = graph.connected_components()
+    before = graph.current_state_id
+    metas = components.collapse(
+        node_aggs={"total": ("sum", "x")}, node_strategy=strategy,
+        allow_missing_attributes=False,
+    )
+    assert graph.current_state_id == before + (not manual)
+    assert {meta.id for meta in metas} == {4, 5}
+    assert sorted(graph.get_node_attr(meta.id, "total") for meta in metas) == [6, 16]
+    assert sorted(sorted(meta.expand().node_ids) for meta in metas) == [[0, 1], [2, 3]]
+    assert sorted(sorted(comp["x"].to_list()) for comp in components) == [[2, 4], [7, 9]]
+    assert graph.node_count() == (2 if strategy == "collapse" else 6)
+    if manual:
+        assert graph.has_uncommitted_changes()
+        graph.commit("after", "test")
+    assert not graph.has_uncommitted_changes()
+
+
+def test_late_component_aggregation_failure_does_not_leave_partial_topology():
+    graph = Graph()
+    graph.add_nodes([{"x": 2}, {}])
+    components = graph.connected_components()
+    before = graph.current_state_id
+    with pytest.raises((ValueError, RuntimeError)):
+        components.collapse(
+            node_aggs={"total": ("sum", "x")}, node_strategy="collapse",
+            allow_missing_attributes=False,
+        )
+    assert graph.current_state_id == before
+    assert sorted(graph.node_ids) == [0, 1]
+    assert list(graph.edge_ids) == []
+    assert not graph.has_uncommitted_changes()
+    assert graph.add_node() == 2
+
+
+def test_subgraph_array_collapse_uses_the_same_outer_boundary():
+    graph = Graph(directed=True)
+    graph.add_nodes([{"x": 2}, {"x": 4}, {}])
+    graph.add_edges([(0, 2), (2, 1)])
+    selections = graph.view().neighborhood([0, 1], hops=0)
+    before = graph.current_state_id
+    metas = selections.collapse(node_aggs={"total": ("sum", "x")}, node_strategy="collapse")
+    assert graph.current_state_id == before + 1
+    assert [graph.get_node_attr(meta.id, "total") for meta in metas] == [2, 4]
+    assert {graph.edge_endpoints(edge) for edge in graph.edge_ids} == {(3, 2), (2, 4)}
+    assert selections[0]["x"].to_list() == [2]
+
+
+def test_collection_rejects_stale_sources_before_any_effect():
+    graph = Graph()
+    graph.add_nodes(2)
+    components = graph.connected_components()
+    graph.set_node_attr(0, "x", 9)
+    before = graph.current_state_id
+    with pytest.raises((ValueError, RuntimeError)):
+        components.collapse(node_strategy="collapse")
+    assert graph.current_state_id == before
+    assert sorted(graph.node_ids) == [0, 1]
+    assert graph.add_node() == 2

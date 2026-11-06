@@ -46,9 +46,10 @@ branch, accepted head and exact source values before using the owner. A stale or
 unpublished bound source rejects before its effect. An explicit setter leaves its
 input unchanged. An algorithm returns a refreshed immutable result: continue from
 that result, or obtain a fresh selection for the next write. Atomic pipeline
-publication rules remain those of the pipeline API. A component collection resolves
-all its sources before its sequential composition effects; this does not introduce
-a new outer atomic transaction.
+publication rules remain those of the pipeline API. Component and subgraph-array collapse resolve
+all source plans and apply one checked mutation for the entire collection. See
+[atomic collection collapse](meta-composition.md#atomic-collection-collapse) for
+rejection rules and the remaining multistage pipeline boundary.
 
 ```python
 try:

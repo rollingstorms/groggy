@@ -1,0 +1,72 @@
+{
+  "label": "22a05d11 sequential collection",
+  "fixture": "disconnected pairs, one integer property per node, destructive component collection collapse with sum; release in-tree extension; construction excluded",
+  "cases": [
+    {
+      "components": 10,
+      "source_nodes": 20,
+      "source_edges": 10,
+      "samples": [
+        {
+          "wall_ns": 1107375,
+          "cpu_ns": 1102000,
+          "accepted_states": 10
+        },
+        {
+          "wall_ns": 343541,
+          "cpu_ns": 341000,
+          "accepted_states": 10
+        },
+        {
+          "wall_ns": 257417,
+          "cpu_ns": 257000,
+          "accepted_states": 10
+        }
+      ]
+    },
+    {
+      "components": 100,
+      "source_nodes": 200,
+      "source_edges": 100,
+      "samples": [
+        {
+          "wall_ns": 10814792,
+          "cpu_ns": 10619000,
+          "accepted_states": 100
+        },
+        {
+          "wall_ns": 11018250,
+          "cpu_ns": 11002000,
+          "accepted_states": 100
+        },
+        {
+          "wall_ns": 11084625,
+          "cpu_ns": 10944000,
+          "accepted_states": 100
+        }
+      ]
+    },
+    {
+      "components": 500,
+      "source_nodes": 1000,
+      "source_edges": 500,
+      "samples": [
+        {
+          "wall_ns": 259547875,
+          "cpu_ns": 245104000,
+          "accepted_states": 500
+        },
+        {
+          "wall_ns": 249061708,
+          "cpu_ns": 245972000,
+          "accepted_states": 500
+        },
+        {
+          "wall_ns": 249146625,
+          "cpu_ns": 244053000,
+          "accepted_states": 500
+        }
+      ]
+    }
+  ]
+}

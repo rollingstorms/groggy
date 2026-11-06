@@ -69,9 +69,8 @@ preset resolution and real external-pair contraction are described in
 ## Retained scope
 
 Canonical node identity remains meta; preset/custom domain kinds become semantic
-labels. Group storage here retains immutable membership only; portable pool
-persistence and full pinned source-state group revisions remain separate checklist
-work. This completes the three composer requirements in 09.4b.2b, not every native
+labels. Group storage retains immutable selected membership, properties and topology
+from its source state; retained archives preserve those revisions. This completes the three composer requirements in 09.4b.2b, not every native
 constructor, mutable storage accessor, algorithm or table writeback.
 
 Native `Graph::create_meta_node(reference)` also uses prepared execution in both
@@ -88,5 +87,38 @@ group revision. `graph.read_view_at(T).meta_subgraph(meta_id)` reads that explic
 source, including after original members are deactivated. Subnode updates do not
 change older group revisions. To choose another source state, retain a new group
 and explicitly publish its reference; see [effective-time reads](effective-time-reads.md).
-Connected legacy `expand()` adapters retain their compatibility contract; canonical
-frozen group reads use GraphView.meta_subgraph. Their broad migration remains 26.1.
+Default `expand()` results and GraphView.meta_subgraph read that retained source.
+Explicit connected compatibility is available separately.
+
+## Atomic collection collapse
+
+`ComponentsArray.collapse(...)` and `SubgraphArray.collapse(...)` evaluate every
+plan against the same captured source, then publish **one** mutation for the
+whole collection. Each summary keeps its own immutable retained group revision.
+A later aggregation/selection/validation failure leaves earlier selections,
+properties, retained groups, next IDs and accepted history unchanged. Manual
+mode stages the whole collection for a later explicit checkpoint.
+
+```python
+pairs = Graph()
+pairs.add_nodes([{"x": 2}, {"x": 4}, {"x": 7}, {"x": 9}])
+pairs.add_edges([(0, 1), (2, 3)])
+components = pairs.connected_components()
+head = pairs.current_state_id
+summaries = components.collapse(
+    node_aggs={"total": ("sum", "x")}, node_strategy="collapse",
+    allow_missing_attributes=False,
+)
+assert pairs.current_state_id == head + 1
+assert sorted(pairs.get_node_attr(meta.id, "total") for meta in summaries) == [6, 16]
+assert sorted(sorted(meta.expand().node_ids) for meta in summaries) == [[0, 1], [2, 3]]
+```
+
+This changes collection publication from one version per selection to one version
+per operation. Empty collections publish nothing. Stale or mixed-owner inputs
+reject before effects. Destructive overlapping selections and boundary edges
+pointing at nodes removed by another plan reject explicitly; arbitrary cross-plan
+rewiring is not implied. Native callers use `MetaNodePlan::execute_many` with
+`(MetaNodePlan, Subgraph)` pairs. All plans are declarative: unrestricted custom
+callbacks do not become atomic by calling this API. Streaming iterators and
+multistage topology pipelines remain separate unfinished work.

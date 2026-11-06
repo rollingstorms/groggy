@@ -159,38 +159,30 @@ impl PyComponentsArray {
         allow_missing_attributes: bool,
         meta_targets: Option<Vec<usize>>,
     ) -> PyResult<Vec<Py<PyMetaNode>>> {
-        let mut meta_nodes = Vec::with_capacity(self.components_data.len());
-
-        // Resolve every source before the first explicit collection effect.
-        let components = (0..self.components_data.len())
+        use crate::ffi::subgraphs::composer::{collapse_many, parse_composer_options};
+        let options = parse_composer_options(
+            node_aggs,
+            edge_aggs,
+            edge_strategy,
+            node_strategy,
+            preset,
+            include_edge_count,
+            mark_entity_type,
+            entity_type,
+        )?;
+        let selections = (0..self.components_data.len())
             .map(|index| {
-                let component = self.__getitem__(index as isize)?;
-                component
-                    .inner
-                    .execution_scope(true)
-                    .map(PySubgraph::from_live_subgraph)
-                    .map_err(crate::ffi::utils::graph_error_to_py_err)
+                self.__getitem__(index as isize)
+                    .map(|component| component.inner)
             })
             .collect::<PyResult<Vec<_>>>()?;
-        for component in components {
-            let meta_node = component.collapse(
-                py,
-                node_aggs,
-                edge_aggs,
-                edge_strategy,
-                node_strategy,
-                preset.clone(),
-                include_edge_count,
-                mark_entity_type,
-                entity_type,
-                allow_missing_attributes,
-                meta_targets.clone(),
-            )?;
-
-            meta_nodes.push(meta_node.extract::<Py<PyMetaNode>>(py)?);
-        }
-
-        Ok(meta_nodes)
+        collapse_many(
+            py,
+            selections,
+            options,
+            allow_missing_attributes,
+            meta_targets.as_deref(),
+        )
     }
 
     /// Convert to regular Python list (materializes all components)

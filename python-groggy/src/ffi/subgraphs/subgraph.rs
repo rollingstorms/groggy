@@ -1149,58 +1149,19 @@ impl PySubgraph {
         allow_missing_attributes: bool,
         meta_targets: Option<Vec<usize>>,
     ) -> PyResult<PyObject> {
-        use crate::ffi::subgraphs::composer::{
-            parse_edge_aggs_from_python, parse_node_aggs_from_python,
-        };
-        use groggy::subgraphs::composer::EdgeStrategy;
-        use groggy::traits::subgraph_operations::NodeStrategy;
-
-        // Parse input parameters
-        let parsed_node_aggs = if let Some(aggs) = node_aggs {
-            parse_node_aggs_from_python(aggs)?
-        } else {
-            Vec::new()
-        };
-
-        let parsed_edge_aggs = if let Some(aggs) = edge_aggs {
-            parse_edge_aggs_from_python(aggs)?
-        } else {
-            Vec::new()
-        };
-
-        let strategy = edge_strategy
-            .map(EdgeStrategy::from_str)
-            .transpose()
-            .map_err(|e| {
-                pyo3::exceptions::PyValueError::new_err(format!("Invalid edge strategy: {e}"))
-            })?;
-
-        let node_strategy = match node_strategy {
-            "extract" => NodeStrategy::Extract,
-            "collapse" => NodeStrategy::Collapse,
-            _ => {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "Invalid node strategy '{}'. Must be 'extract' or 'collapse'",
-                    node_strategy
-                )))
-            }
-        };
-
-        let plan = self
-            .inner
-            .collapse_with_options(groggy::subgraphs::composer::ComposerOptions {
-                preset,
-                node_aggs: parsed_node_aggs,
-                edge_aggs: parsed_edge_aggs,
-                edge_strategy: strategy,
-                node_strategy: Some(node_strategy),
-                include_edge_count,
-                mark_entity_type,
-                entity_type: entity_type.map(str::to_string),
-            })
-            .map_err(|e| {
-                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {e}"))
-            })?;
+    let options = crate::ffi::subgraphs::composer::parse_composer_options(
+        node_aggs,
+        edge_aggs,
+        edge_strategy,
+        node_strategy,
+        preset,
+        include_edge_count,
+        mark_entity_type,
+        entity_type,
+    )?;
+    let plan = self.inner.collapse_with_options(options).map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {e}"))
+    })?;
         let meta_node = plan
             .execute_configured(
                 &self.inner,

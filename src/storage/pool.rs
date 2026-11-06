@@ -1229,6 +1229,37 @@ impl GraphPool {
         })
     }
 
+    /// Check collisions among staged groups and reserve the whole installation.
+    /// Individual preparation checks existing storage; a collection must also
+    /// compare revisions that have not been installed yet.
+    pub(crate) fn validate_and_reserve_group_batch(
+        &mut self,
+        groups: &[PreparedStoredSubgraph],
+    ) -> GraphResult<()> {
+        let mut seen: HashMap<crate::types::SubgraphId, &PreparedStoredSubgraph> = HashMap::new();
+        for group in groups {
+            if let Some(previous) = seen.insert(group.id, group) {
+                let same_values = match (&previous.retained, &group.retained) {
+                    (Some(a), Some(b)) => a.same_content(b)?,
+                    (None, None) => true, // Both were checked against existing storage.
+                    _ => false,
+                };
+                if previous.content != group.content || !same_values {
+                    return Err(GraphError::InvalidInput(
+                        "Staged retained group collision".into(),
+                    ));
+                }
+            }
+        }
+        self.stored_subgraphs
+            .try_reserve(seen.len())
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        std::sync::Arc::make_mut(&mut self.retained_groups)
+            .try_reserve(seen.len())
+            .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
+        Ok(())
+    }
+
     pub(crate) fn install_stored_subgraph(&mut self, prepared: PreparedStoredSubgraph) {
         if let Some(group) = prepared.retained {
             std::sync::Arc::make_mut(&mut self.retained_groups)
@@ -1515,5 +1546,45 @@ mod restoration_tests {
         assert_eq!(column.restore_value(&AttrValue::Int(42)), 1);
         assert_eq!(column.restore_value(&AttrValue::Int(42)), 1);
         assert_eq!(column.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod prepared_group_batch_tests {
+    use super::*;
+
+    #[test]
+    fn staged_group_collisions_fail_before_any_installation() {
+        let graph = crate::Graph::new();
+        let source = graph.read_view().unwrap();
+        let mut pool = GraphPool::new();
+        let first = pool
+            .prepare_frozen_group(source.clone(), "first".into())
+            .unwrap();
+        let mut second = pool.prepare_frozen_group(source, "second".into()).unwrap();
+        second.id = first.id; // Exercise the collision guard without finding a hash collision.
+        assert!(pool
+            .validate_and_reserve_group_batch(&[first, second])
+            .is_err());
+        assert_eq!(pool.subgraph_count(), 0);
+        assert!(pool.retained_groups.is_empty());
+    }
+
+    #[test]
+    fn identical_staged_groups_share_one_retained_reference() {
+        let graph = crate::Graph::new();
+        let source = graph.read_view().unwrap();
+        let mut pool = GraphPool::new();
+        let first = pool
+            .prepare_frozen_group(source.clone(), "same".into())
+            .unwrap();
+        let second = pool.prepare_frozen_group(source, "same".into()).unwrap();
+        let groups = vec![first, second];
+        pool.validate_and_reserve_group_batch(&groups).unwrap();
+        for group in groups {
+            pool.install_stored_subgraph(group);
+        }
+        assert_eq!(pool.subgraph_count(), 1);
+        assert_eq!(pool.retained_groups.len(), 1);
     }
 }

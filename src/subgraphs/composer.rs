@@ -404,6 +404,76 @@ impl MetaNodePlan {
         lenient: bool,
         meta_targets: Option<&[NodeId]>,
     ) -> GraphResult<MetaNode> {
+        let binding = subgraph.graph_ref();
+        let node = {
+            let mut graph = binding.borrow_mut();
+            if let Some(view) = subgraph.frozen_view() {
+                graph.validate_bound_source(view, true)?;
+            }
+            let prepared = self.prepare_configured(
+                &graph,
+                subgraph,
+                lenient,
+                meta_targets,
+                graph.pool().statistics().node_count,
+            )?;
+            graph.apply_meta_composition(prepared)?
+        };
+        MetaNode::new(node, binding)
+    }
+
+    /// Evaluate every plan against the same owner state, then apply one mutation.
+    /// Errors preserve topology, properties, retained groups and allocation IDs.
+    /// Destructive overlapping selections and boundaries targeting removed nodes
+    /// reject explicitly; no implicit cross-plan rewiring is performed.
+    pub fn execute_many(
+        plans: &[(Self, crate::subgraphs::Subgraph)],
+        lenient: bool,
+        meta_targets: Option<&[NodeId]>,
+    ) -> GraphResult<Vec<MetaNode>> {
+        let Some((_, first)) = plans.first() else {
+            return Ok(Vec::new());
+        };
+        let binding = first.graph();
+        let nodes = {
+            let mut graph = binding.borrow_mut();
+            let mut prepared = Vec::with_capacity(plans.len());
+            let first_meta = graph.pool().statistics().node_count;
+            for (position, (plan, selection)) in plans.iter().enumerate() {
+                if !std::rc::Rc::ptr_eq(&binding, &selection.graph()) {
+                    return Err(GraphError::InvalidInput(
+                        "Composition plans have different graph owners".into(),
+                    ));
+                }
+                if let Some(view) = selection.frozen_view() {
+                    graph.validate_bound_source(view, true)?;
+                }
+                prepared.push(plan.prepare_configured(
+                    &graph,
+                    selection,
+                    lenient,
+                    meta_targets,
+                    first_meta.checked_add(position).ok_or_else(|| {
+                        GraphError::InvalidInput("Meta node allocation exceeds ID range".into())
+                    })?,
+                )?);
+            }
+            graph.apply_meta_compositions(prepared)?
+        };
+        nodes
+            .into_iter()
+            .map(|node| MetaNode::new(node, binding.clone()))
+            .collect()
+    }
+
+    fn prepare_configured<T: SubgraphOperations + ?Sized>(
+        &self,
+        graph: &crate::Graph,
+        subgraph: &T,
+        lenient: bool,
+        meta_targets: Option<&[NodeId]>,
+        meta: NodeId,
+    ) -> GraphResult<crate::api::graph::composition::MetaComposition> {
         if &self.source_nodes != subgraph.node_set() || &self.source_edges != subgraph.edge_set() {
             return Err(GraphError::InvalidInput(
                 "Composition plan selection has changed".into(),
@@ -425,14 +495,15 @@ impl MetaNodePlan {
                 targets.iter().copied(),
             )?;
         }
-        let node = crate::subgraphs::composition::compose_with_label(
+        crate::subgraphs::composition::prepare_composition(
+            graph,
             subgraph,
             &specs,
             &config,
             lenient,
             Some(&self.entity_type),
-        )?;
-        MetaNode::new(node, subgraph.graph_ref())
+            meta,
+        )
     }
 
     /// Convert node aggregations to HashMap format expected by existing code

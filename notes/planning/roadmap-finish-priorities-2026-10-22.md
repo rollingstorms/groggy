@@ -1935,3 +1935,17 @@ server/RSS/universal speed claim. Gates: **1,508 native / 54 ignored**, strict
 Clippy, **2,567 root Python / 1 skipped**, **251 docs**, rebuilt/staged release
 extension and scoped checks. **211 checked / 57 open**; main remaining boundary is
 frozen default read binding and explicit checked execution/writeback.
+
+
+## 2026-11-05 — pinned query closure and atomic collection collapse
+
+Closed existing 21.2 after the immutable default/filter migration exit review.
+Completed the collection-collapse component of existing 09.4b.2/AR3: all plans
+prepare against one source and publish once; late failures preserve topology,
+properties, retained groups and IDs. Both ComponentsArray and SubgraphArray use
+the native declarative boundary. Destructive overlap/cross-plan rewiring rejects
+explicitly. See `pinned-query-exit-review-2026-11-05.md` and
+`compound-collection-collapse-2026-11-05.md` for full gates, compatibility and raw
+release receipts. The 500-component fixture improves 249.147 → 19.219 ms median
+wall time while reducing 500 acceptances to one. Generic topology pipelines and
+typed effects remain open. No rows added: **215 checked / 53 open / 268 total**.

@@ -367,3 +367,78 @@ impl PyMetaNodePlanExecutor {
         self.__str__()
     }
 }
+
+/// Translate the shared collapse facade's options; resolution remains in Rust core.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn parse_composer_options(
+    node_aggs: Option<&PyAny>,
+    edge_aggs: Option<&PyAny>,
+    edge_strategy: Option<&str>,
+    node_strategy: &str,
+    preset: Option<String>,
+    include_edge_count: Option<bool>,
+    mark_entity_type: Option<bool>,
+    entity_type: Option<&str>,
+) -> PyResult<groggy::subgraphs::composer::ComposerOptions> {
+    use groggy::traits::subgraph_operations::NodeStrategy;
+    Ok(groggy::subgraphs::composer::ComposerOptions {
+        preset,
+        node_aggs: node_aggs
+            .map(parse_node_aggs_from_python)
+            .transpose()?
+            .unwrap_or_default(),
+        edge_aggs: edge_aggs
+            .map(parse_edge_aggs_from_python)
+            .transpose()?
+            .unwrap_or_default(),
+        edge_strategy: edge_strategy
+            .map(EdgeStrategy::from_str)
+            .transpose()
+            .map_err(|e| PyValueError::new_err(format!("Invalid edge strategy: {e}")))?,
+        node_strategy: Some(match node_strategy {
+            "extract" => NodeStrategy::Extract,
+            "collapse" => NodeStrategy::Collapse,
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid node strategy '{node_strategy}'. Must be 'extract' or 'collapse'"
+                )))
+            }
+        }),
+        include_edge_count,
+        mark_entity_type,
+        entity_type: entity_type.map(str::to_string),
+    })
+}
+
+/// Marshal an entire collection to the core prepared composition boundary.
+pub(crate) fn collapse_many(
+    py: Python,
+    selections: impl IntoIterator<Item = groggy::subgraphs::Subgraph>,
+    options: groggy::subgraphs::composer::ComposerOptions,
+    allow_missing_attributes: bool,
+    meta_targets: Option<&[usize]>,
+) -> PyResult<Vec<Py<crate::ffi::entities::meta_node::PyMetaNode>>> {
+    use groggy::traits::SubgraphOperations;
+    let plans = selections
+        .into_iter()
+        .map(|selection| {
+            let plan = MetaNodePlan::from_options(
+                selection.node_set().clone(),
+                selection.edge_set().clone(),
+                options.clone(),
+            )
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create plan: {e}")))?;
+            Ok((plan, selection))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    MetaNodePlan::execute_many(&plans, allow_missing_attributes, meta_targets)
+        .map_err(|e| PyRuntimeError::new_err(format!("Failed to create meta-nodes: {e}")))?
+        .into_iter()
+        .map(|meta| {
+            Py::new(
+                py,
+                crate::ffi::entities::meta_node::PyMetaNode::from_meta_node(meta),
+            )
+        })
+        .collect()
+}

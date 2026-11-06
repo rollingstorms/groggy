@@ -10,7 +10,8 @@ Python collapse now distinguishes omitted options from explicit overrides.
 Preset defaults apply first; supplied edge_strategy, include_edge_count,
 mark_entity_type and entity_type override them. Without a preset, omitted options
 retain their previous defaults. The same forwarding applies to component/subgraph
-arrays; those retain their existing per-selection acceptance behavior.
+arrays; collection collapse prepares all plans and accepts one mutation, as
+described in [atomic collection collapse](meta-composition.md#atomic-collection-collapse).
 
 The native ComposerOptions type and collapse_with_options provide the same
 resolution. Existing fully specified native collapse and MetaNodePlan builders

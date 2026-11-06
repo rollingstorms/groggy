@@ -1545,3 +1545,17 @@ effects and weak canonical capture caches. No checklist rows added: **214 checke
 66–68 ns at 1k/100k; cold 100k capture remains 147.879 ms. Full scope and limits:
 `default-immutable-views-2026-10-30.md`. Next existing priorities are compound
 topology/effect acceptance and legacy query migration.
+
+
+## 2026-11-05 — pinned query closure and atomic collection collapse
+
+Closed existing 21.2 after the immutable default/filter migration exit review.
+Completed the collection-collapse component of existing 09.4b.2/AR3: all plans
+prepare against one source and publish once; late failures preserve topology,
+properties, retained groups and IDs. Both ComponentsArray and SubgraphArray use
+the native declarative boundary. Destructive overlap/cross-plan rewiring rejects
+explicitly. See `pinned-query-exit-review-2026-11-05.md` and
+`compound-collection-collapse-2026-11-05.md` for full gates, compatibility and raw
+release receipts. The 500-component fixture improves 249.147 → 19.219 ms median
+wall time while reducing 500 acceptances to one. Generic topology pipelines and
+typed effects remain open. No rows added: **215 checked / 53 open / 268 total**.

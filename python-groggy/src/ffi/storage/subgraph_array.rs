@@ -273,27 +273,24 @@ impl PySubgraphArray {
         allow_missing_attributes: bool,
         meta_targets: Option<Vec<usize>>,
     ) -> PyResult<Vec<Py<PyMetaNode>>> {
-        let mut results = Vec::with_capacity(self.inner.len());
-
-        for subgraph in self.inner.iter() {
-            let meta_node = subgraph.collapse(
-                py,
-                node_aggs,
-                edge_aggs,
-                edge_strategy,
-                node_strategy,
-                preset.clone(),
-                include_edge_count,
-                mark_entity_type,
-                entity_type,
-                allow_missing_attributes,
-                meta_targets.clone(),
-            )?;
-            let meta_node = meta_node.extract::<Py<PyMetaNode>>(py)?;
-            results.push(meta_node);
-        }
-
-        Ok(results)
+        use crate::ffi::subgraphs::composer::{collapse_many, parse_composer_options};
+        let options = parse_composer_options(
+            node_aggs,
+            edge_aggs,
+            edge_strategy,
+            node_strategy,
+            preset,
+            include_edge_count,
+            mark_entity_type,
+            entity_type,
+        )?;
+        collapse_many(
+            py,
+            self.inner.iter().map(|selection| selection.inner.clone()),
+            options,
+            allow_missing_attributes,
+            meta_targets.as_deref(),
+        )
     }
 
     /// Apply table() to all subgraphs and return PyTableArray
