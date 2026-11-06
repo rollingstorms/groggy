@@ -1,200 +1,251 @@
-//! Simple query parser for lazy array filtering operations
-//! Supports basic filtering expressions like "value > 100", "length > 5", etc.
+//! Compiled scalar array predicates using the graph query lexer and boolean grammar.
+use crate::{
+    errors::{GraphError, GraphResult},
+    query::{
+        query_parser::{CompOp, QueryParser, Token},
+        AttributeFilter, NodeFilter,
+    },
+    types::AttrValue,
+};
 
-use crate::errors::GraphResult;
-use crate::types::AttrValue;
-
-/// Simple query evaluator for AttrValue filtering
+/// An array predicate compiled once, with errors surfaced by evaluate/validate.
+/// Infallible construction is retained for native source compatibility.
 pub struct QueryEvaluator {
-    query: String,
+    predicate: GraphResult<Predicate>,
+}
+
+#[derive(Debug)]
+enum Operand {
+    Value,
+    Length,
+    Even,
+    Constant,
+}
+#[derive(Debug)]
+enum Predicate {
+    Compare(Operand, AttributeFilter),
+    Exists,
+    And(Vec<Predicate>),
+    Or(Vec<Predicate>),
+    Not(Box<Predicate>),
+}
+fn invalid(message: impl Into<String>) -> GraphError {
+    GraphError::InvalidInput(message.into())
 }
 
 impl QueryEvaluator {
-    /// Create a new query evaluator
+    /// Compile an expression. Call validate to surface errors before reading rows.
     pub fn new(query: &str) -> Self {
         Self {
-            query: query.to_string(),
+            predicate: compile(query),
         }
     }
-
-    /// Evaluate the query against a single AttrValue
+    /// Validate even when the input array is empty.
+    pub fn validate(&self) -> GraphResult<()> {
+        self.predicate.as_ref().map(|_| ()).map_err(Clone::clone)
+    }
+    /// Evaluate with exact mixed integer/float comparisons and no row parsing.
     pub fn evaluate(&self, value: &AttrValue) -> GraphResult<bool> {
-        // Parse simple expressions like "value > 100", "length > 5", etc.
-        if self.query.contains("OR") {
-            return self.evaluate_or_expression(value);
-        }
-
-        if self.query.contains("AND") {
-            return self.evaluate_and_expression(value);
-        }
-
-        self.evaluate_simple_expression(value)
+        self.predicate
+            .as_ref()
+            .map_err(Clone::clone)?
+            .evaluate(value)
     }
+}
 
-    /// Evaluate OR expression (any condition can be true)
-    fn evaluate_or_expression(&self, value: &AttrValue) -> GraphResult<bool> {
-        let parts: Vec<&str> = self.query.split("OR").map(|s| s.trim()).collect();
-
-        for part in parts {
-            let evaluator = QueryEvaluator::new(part);
-            if evaluator.evaluate(value)? {
-                return Ok(true);
+fn operand(name: &str) -> GraphResult<Operand> {
+    match name {
+        "value" => Ok(Operand::Value),
+        "length" => Ok(Operand::Length),
+        "__array_even" => Ok(Operand::Even),
+        "__array_constant" => Ok(Operand::Constant),
+        _ => Err(invalid(format!(
+            "Unsupported array query operand '{name}'; use value or length"
+        ))),
+    }
+}
+fn lower(filter: NodeFilter) -> GraphResult<Predicate> {
+    Ok(match filter {
+        NodeFilter::HasAttribute { name } => {
+            operand(&name)?;
+            Predicate::Exists
+        }
+        NodeFilter::AttributeEquals { name, value } => {
+            Predicate::Compare(operand(&name)?, AttributeFilter::Equals(value))
+        }
+        NodeFilter::AttributeFilter { name, filter } => Predicate::Compare(operand(&name)?, filter),
+        NodeFilter::And(parts) => {
+            Predicate::And(parts.into_iter().map(lower).collect::<GraphResult<_>>()?)
+        }
+        NodeFilter::Or(parts) => {
+            Predicate::Or(parts.into_iter().map(lower).collect::<GraphResult<_>>()?)
+        }
+        NodeFilter::Not(part) => Predicate::Not(Box::new(lower(*part)?)),
+        _ => {
+            return Err(invalid(
+                "Graph traversal predicates are unsupported on scalar arrays",
+            ))
+        }
+    })
+}
+fn compile(query: &str) -> GraphResult<Predicate> {
+    let tokens = QueryParser::scalar_tokens(query).map_err(|e| invalid(e.to_string()))?;
+    // Adapt only token patterns, never raw text: quoted AND/OR/operator text is
+    // left intact. Preserve the documented parity shorthand and bare text RHS.
+    let mut adapted = Vec::with_capacity(tokens.len());
+    let mut position = 0;
+    while position < tokens.len() {
+        let rest = &tokens[position..];
+        if let [Token::Identifier(name), Token::Remainder, Token::Value(divisor), Token::Operator(CompOp::Equals), Token::Value(remainder), ..] =
+            rest
+        {
+            if name == "value" && *divisor == AttrValue::Int(2) && *remainder == AttrValue::Int(0) {
+                adapted.extend([
+                    Token::Identifier("__array_even".into()),
+                    Token::Operator(CompOp::Equals),
+                    Token::Value(AttrValue::Bool(true)),
+                ]);
+                position += 5;
+                continue;
             }
         }
-
-        Ok(false)
-    }
-
-    /// Evaluate AND expression (all conditions must be true)
-    fn evaluate_and_expression(&self, value: &AttrValue) -> GraphResult<bool> {
-        let parts: Vec<&str> = self.query.split("AND").map(|s| s.trim()).collect();
-
-        for part in parts {
-            let evaluator = QueryEvaluator::new(part);
-            if !evaluator.evaluate(value)? {
-                return Ok(false);
+        let token = &tokens[position];
+        let begins_atom = adapted.last().is_none_or(|previous| {
+            matches!(
+                previous,
+                Token::LeftParen | Token::LogicalOp(_) | Token::Not
+            )
+        });
+        match token {
+            Token::Value(AttrValue::Bool(value)) if begins_atom => {
+                adapted.extend([
+                    Token::Identifier("__array_constant".into()),
+                    Token::Operator(CompOp::Equals),
+                    Token::Value(AttrValue::Bool(*value)),
+                ]);
             }
-        }
-
-        Ok(true)
-    }
-
-    /// Evaluate simple expressions like "value > 100"
-    fn evaluate_simple_expression(&self, value: &AttrValue) -> GraphResult<bool> {
-        // Handle special cases first
-        if self.query == "true" {
-            return Ok(true);
-        }
-        if self.query == "false" {
-            return Ok(false);
-        }
-
-        // Match the longest token first so >= and <= are not consumed as > or <.
-        for operator in [">=", "<=", "==", "!=", ">", "<"] {
-            if let Some(result) = self.try_parse_comparison(value, operator)? {
-                return Ok(result);
+            Token::Identifier(text)
+                if matches!(adapted.last(), Some(Token::Operator(_)))
+                    && !text.eq_ignore_ascii_case("null") =>
+            {
+                adapted.push(Token::Value(AttrValue::Text(text.clone())));
             }
+            Token::Identifier(name) if name.starts_with("__array_") => {
+                return Err(invalid("Reserved internal array query operand"))
+            }
+            _ => adapted.push(token.clone()),
         }
-
-        // Handle special expressions
-        if self.query.starts_with("length >") {
-            return self.evaluate_length_expression(value);
-        }
-        if self.query.contains("% 2 == 0") {
-            return self.evaluate_even_expression(value);
-        }
-
-        // Default: return true (pass-through filter)
-        Ok(true)
+        position += 1;
     }
+    lower(QueryParser::scalar_predicate(adapted).map_err(|e| invalid(e.to_string()))?)
+}
 
-    /// Try to parse and evaluate a comparison expression
-    fn try_parse_comparison(&self, value: &AttrValue, operator: &str) -> GraphResult<Option<bool>> {
-        if !self.query.contains(operator) {
-            return Ok(None);
-        }
-
-        let parts: Vec<&str> = self.query.split(operator).map(|s| s.trim()).collect();
-        if parts.len() != 2 {
-            return Ok(None);
-        }
-
-        let left = parts[0];
-        let right = parts[1];
-
-        // Handle "value" comparisons
-        if left == "value" {
-            let target_value = self.parse_value(right)?;
-            return Ok(Some(self.compare_values(value, &target_value, operator)?));
-        }
-
-        Ok(None)
+impl Predicate {
+    fn evaluate(&self, value: &AttrValue) -> GraphResult<bool> {
+        Ok(match self {
+            Self::Exists => true,
+            Self::Compare(Operand::Value, filter) => scalar_matches(value, filter),
+            Self::Compare(Operand::Length, filter) => {
+                let length = match value {
+                    AttrValue::Text(_)
+                    | AttrValue::CompactText(_)
+                    | AttrValue::CompressedText(_) => value.text_content().map_err(invalid)?.len(),
+                    AttrValue::FloatVec(values) => values.len(),
+                    AttrValue::Float64Vec(values) => values.len(),
+                    AttrValue::IntVec(values) => values.len(),
+                    AttrValue::TextVec(values) => values.len(),
+                    AttrValue::BoolVec(values) => values.len(),
+                    AttrValue::NodeArray(values) | AttrValue::EdgeArray(values) => values.len(),
+                    AttrValue::CompressedFloatVec(values) => {
+                        values.decompress_float_vec().map_err(invalid)?.len()
+                    }
+                    AttrValue::Bytes(values) => values.len(),
+                    _ => 0,
+                };
+                let length =
+                    i64::try_from(length).map_err(|_| invalid("Array value length exceeds i64"))?;
+                scalar_matches(&AttrValue::Int(length), filter)
+            }
+            Self::Compare(Operand::Even, filter) => {
+                let even = match value {
+                    AttrValue::Int(value) => value % 2 == 0,
+                    AttrValue::SmallInt(value) => value % 2 == 0,
+                    AttrValue::Float(value) => value.is_finite() && f64::from(*value) % 2.0 == 0.0,
+                    AttrValue::Float64(value) => value.is_finite() && *value % 2.0 == 0.0,
+                    _ => false,
+                };
+                scalar_matches(&AttrValue::Bool(even), filter)
+            }
+            Self::Compare(Operand::Constant, filter) => {
+                scalar_matches(&AttrValue::Bool(true), filter)
+            }
+            Self::And(parts) => {
+                for part in parts {
+                    if !part.evaluate(value)? {
+                        return Ok(false);
+                    }
+                }
+                true
+            }
+            Self::Or(parts) => {
+                for part in parts {
+                    if part.evaluate(value)? {
+                        return Ok(true);
+                    }
+                }
+                false
+            }
+            Self::Not(part) => !part.evaluate(value)?,
+        })
     }
+}
 
-    /// Parse a string into an AttrValue
-    fn parse_value(&self, s: &str) -> GraphResult<AttrValue> {
-        // Try to parse as different types
-        if let Ok(int_val) = s.parse::<i64>() {
-            return Ok(AttrValue::Int(int_val));
-        }
-
-        if let Ok(float_val) = s.parse::<f64>() {
-            return Ok(AttrValue::Float64(float_val));
-        }
-
-        if s == "true" {
-            return Ok(AttrValue::Bool(true));
-        }
-
-        if s == "false" {
-            return Ok(AttrValue::Bool(false));
-        }
-
-        // Default to string (remove quotes if present)
-        let cleaned = s.trim_matches('"').trim_matches('\'');
-        Ok(AttrValue::Text(cleaned.to_string()))
-    }
-
-    /// Compare two AttrValues using the specified operator
-    fn compare_values(
-        &self,
-        left: &AttrValue,
-        right: &AttrValue,
-        operator: &str,
-    ) -> GraphResult<bool> {
-        use crate::storage::numeric::scalar::{attribute_number, compare_operator};
-        if let Some((a, b)) = attribute_number(left).zip(attribute_number(right)) {
-            return Ok(compare_operator(a, b, operator));
-        }
-        match (left, right) {
-            (AttrValue::Text(a), AttrValue::Text(b)) => Ok(match operator {
-                "==" => a == b,
-                "!=" => a != b,
-                ">" => a > b,
-                "<" => a < b,
-                ">=" => a >= b,
-                "<=" => a <= b,
-                _ => false,
-            }),
-            (AttrValue::Bool(a), AttrValue::Bool(b)) => Ok(match operator {
-                "==" => a == b,
-                "!=" => a != b,
-                _ => false,
-            }),
-            _ => Ok(false), // Type mismatch
-        }
-    }
-
-    /// Evaluate length-based expressions like "length > 5"
-    fn evaluate_length_expression(&self, value: &AttrValue) -> GraphResult<bool> {
-        let length = match value {
-            AttrValue::Text(s) => s.len(),
-            AttrValue::FloatVec(v) => v.len(),
-            AttrValue::Float64Vec(v) => v.len(),
-            AttrValue::Bytes(b) => b.len(),
-            _ => 0,
+fn scalar_matches(value: &AttrValue, filter: &AttributeFilter) -> bool {
+    use crate::storage::numeric::scalar::{attribute_number, compare_operator};
+    use std::cmp::Ordering;
+    let target = match filter {
+        AttributeFilter::Equals(target)
+        | AttributeFilter::NotEquals(target)
+        | AttributeFilter::GreaterThan(target)
+        | AttributeFilter::LessThan(target)
+        | AttributeFilter::GreaterThanOrEqual(target)
+        | AttributeFilter::LessThanOrEqual(target) => target,
+    };
+    if let Some((left, right)) = attribute_number(value).zip(attribute_number(target)) {
+        let operator = match filter {
+            AttributeFilter::Equals(_) => "==",
+            AttributeFilter::NotEquals(_) => "!=",
+            AttributeFilter::GreaterThan(_) => ">",
+            AttributeFilter::LessThan(_) => "<",
+            AttributeFilter::GreaterThanOrEqual(_) => ">=",
+            AttributeFilter::LessThanOrEqual(_) => "<=",
         };
-
-        // Parse the threshold
-        let parts: Vec<&str> = self.query.split(">").collect();
-        if parts.len() == 2 {
-            if let Ok(threshold) = parts[1].trim().parse::<usize>() {
-                return Ok(length > threshold);
-            }
-        }
-
-        Ok(false)
+        return compare_operator(left, right, operator);
     }
-
-    /// Evaluate even/odd expressions like "value % 2 == 0"
-    fn evaluate_even_expression(&self, value: &AttrValue) -> GraphResult<bool> {
-        match value {
-            AttrValue::Int(i) => Ok(*i % 2 == 0),
-            AttrValue::SmallInt(i) => Ok(*i % 2 == 0),
-            AttrValue::Float(f) => Ok(f.is_finite() && f64::from(*f) % 2.0 == 0.0),
-            AttrValue::Float64(f) => Ok(f.is_finite() && *f % 2.0 == 0.0),
-            _ => Ok(false),
-        }
+    if let Some((left, right)) = value.text_content().ok().zip(target.text_content().ok()) {
+        let compared = left.cmp(&right);
+        return match filter {
+            AttributeFilter::Equals(_) => compared == Ordering::Equal,
+            AttributeFilter::NotEquals(_) => compared != Ordering::Equal,
+            AttributeFilter::GreaterThan(_) => compared == Ordering::Greater,
+            AttributeFilter::LessThan(_) => compared == Ordering::Less,
+            AttributeFilter::GreaterThanOrEqual(_) => compared != Ordering::Less,
+            AttributeFilter::LessThanOrEqual(_) => compared != Ordering::Greater,
+        };
+    }
+    // Preserve array filtering's separate boolean and mismatched-domain policy.
+    match (value, target, filter) {
+        (
+            AttrValue::Bool(_),
+            AttrValue::Bool(_),
+            AttributeFilter::Equals(_) | AttributeFilter::NotEquals(_),
+        )
+        | (
+            AttrValue::Null,
+            AttrValue::Null,
+            AttributeFilter::Equals(_) | AttributeFilter::NotEquals(_),
+        ) => filter.matches(value),
+        _ => false,
     }
 }
 
@@ -213,6 +264,7 @@ impl BatchQueryEvaluator {
 
     /// Filter a vector of values using the query
     pub fn filter_values(&self, values: Vec<AttrValue>) -> GraphResult<Vec<AttrValue>> {
+        self.evaluator.validate()?;
         let mut result = Vec::new();
 
         for value in values {
@@ -226,6 +278,7 @@ impl BatchQueryEvaluator {
 
     /// Get indices of values that pass the filter
     pub fn filter_indices(&self, values: &[AttrValue]) -> GraphResult<Vec<usize>> {
+        self.evaluator.validate()?;
         let mut result = Vec::new();
 
         for (i, value) in values.iter().enumerate() {

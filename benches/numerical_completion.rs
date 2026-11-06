@@ -1,7 +1,7 @@
 //! Release numerical corpus with process-wide allocation receipts (single runner).
 use groggy::{
     storage::{
-        array::BaseArray,
+        array::{BaseArray, LazyArrayIterator},
         matrix::{MatrixLayout, MatrixStats, UnifiedMatrix},
         table::{BaseTable, Table},
         Axis, GraphMatrix, NumArray,
@@ -109,6 +109,9 @@ fn matrix(n: usize) -> GraphMatrix<f64> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cfg!(debug_assertions) {
         return Err("Run this corpus with cargo bench --bench numerical_completion".into());
+    }
+    if std::env::args().any(|arg| arg == "--lazy-arrays") {
+        return lazy_array_corpus();
     }
     let mut cases = Vec::new();
     let a = matrix(64);
@@ -351,9 +354,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             || {
                 let output = input.describe()?;
                 match output.column("values").and_then(|column| column.get(2)) {
-                    Some(AttrValue::Float64(value)) if *value > 2. && *value < 3. => {
-                        Ok(*value)
-                    }
+                    Some(AttrValue::Float64(value)) if *value > 2. && *value < 3. => Ok(*value),
                     _ => Err(groggy::GraphError::InvalidInput(
                         "Invalid high-offset describe spread".into(),
                     )),
@@ -395,6 +396,120 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "Wrote {} numerical release cases to {output}",
         report["cases"].as_array().map_or(0, Vec::len)
+    );
+    Ok(())
+}
+
+fn lazy_array_corpus() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cases = Vec::new();
+    for count in [1_000usize, 100_000, 1_000_000] {
+        let input = (0..count).map(|value| value as i64).collect::<Vec<_>>();
+        let eager = || {
+            let mut values = input.clone();
+            values.retain(|&value| value % 2 == 0 || value > 800);
+            values.truncate(1000);
+            values.drain(..100.min(values.len()));
+            values.retain(|&value| !(500..=900).contains(&value));
+            values.truncate(50);
+            values
+        };
+        let lazy = || {
+            LazyArrayIterator::new(input.clone())
+                .filter("value % 2 == 0 OR value > 800")
+                .take(1000)
+                .skip(100)
+                .filter("value < 500 OR value > 900")
+                .take(50)
+                .collect()
+        };
+        let expected = eager();
+        assert_eq!(lazy()?, expected);
+        cases.push(measure(
+            &format!("lazy_i64_chain_{count}"),
+            &[count],
+            || {
+                let result = lazy()?;
+                assert_eq!(result, expected);
+                Ok(result.iter().sum::<i64>() as f64)
+            },
+        )?);
+        cases.push(measure(
+            &format!("eager_i64_reference_{count}"),
+            &[count],
+            || {
+                let result = eager();
+                assert_eq!(result, expected);
+                Ok(result.iter().sum::<i64>() as f64)
+            },
+        )?);
+        let attributes = input
+            .iter()
+            .copied()
+            .map(AttrValue::Int)
+            .collect::<Vec<_>>();
+        let expected_attributes = expected
+            .iter()
+            .copied()
+            .map(AttrValue::Int)
+            .collect::<Vec<_>>();
+        cases.push(measure(
+            &format!("lazy_attributes_chain_{count}"),
+            &[count],
+            || {
+                let result = LazyArrayIterator::new(attributes.clone())
+                    .filter("value % 2 == 0 OR value > 800")
+                    .take(1000)
+                    .skip(100)
+                    .filter("value < 500 OR value > 900")
+                    .take(50)
+                    .collect()?;
+                assert_eq!(result, expected_attributes);
+                Ok(result.len() as f64)
+            },
+        )?);
+        let fractional = input
+            .iter()
+            .map(|&value| value as f64 / 10.)
+            .collect::<Vec<_>>();
+        let expected_sum = fractional
+            .iter()
+            .copied()
+            .filter(|value| *value > 10. && *value < 20.)
+            .sum::<f64>();
+        cases.push(measure(
+            &format!("lazy_f64_filter_{count}"),
+            &[count],
+            || {
+                let result = LazyArrayIterator::new(fractional.clone())
+                    .filter("value > 10 AND value < 20")
+                    .collect()?;
+                let sum = result.iter().sum::<f64>();
+                assert_eq!(sum, expected_sum);
+                Ok(sum)
+            },
+        )?);
+        cases.push(measure(
+            &format!("seeded_i64_sample_{count}"),
+            &[count],
+            || {
+                let sample = LazyArrayIterator::new(input.clone())
+                    .sample_seeded(50, 42)
+                    .collect()?;
+                assert_eq!(sample.len(), 50);
+                assert!(sample
+                    .iter()
+                    .all(|&value| (0..count as i64).contains(&value)));
+                Ok(sample.iter().sum::<i64>() as f64)
+            },
+        )?);
+    }
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "benchmark":"lazy_scalar_arrays", "profile":"release",
+            "scope":"single runner; owned source clone, query compilation, execution and output assertions included; fixtures excluded; requested Rust allocations, not RSS or FFI; eager path is independent exact-result reference; deferred vector execution, not streaming",
+            "cases":cases,
+        }))?
     );
     Ok(())
 }

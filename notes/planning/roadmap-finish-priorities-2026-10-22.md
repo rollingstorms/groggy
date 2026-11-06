@@ -1949,3 +1949,17 @@ explicitly. See `pinned-query-exit-review-2026-11-05.md` and
 release receipts. The 500-component fixture improves 249.147 → 19.219 ms median
 wall time while reducing 500 acceptances to one. Generic topology pipelines and
 typed effects remain open. No rows added: **215 checked / 53 open / 268 total**.
+
+
+## 2026-11-05 — checked native lazy scalar arrays
+
+Completed a scalar execution component within existing 29.3/30.1/AR7.7/AR7.8.
+Random filtering and semantic operation reordering are replaced by a fully
+validated, statement-ordered plan with compiled queries and private seeded
+sampling. Unsupported graph/type-changing operations reject explicitly. Array
+and graph languages share lexer/boolean parsing while preserving intentional
+numeric equality and nonfinite-literal policies. Full native/Python/docs gates
+pass. Million-row i64 chain: 21.453 ms / 45 requested allocations / 8,002,473 peak
+additional live bytes; direct eager reference 0.776 ms. Interpreter throughput
+remains an explicit existing numerical/execution gap. Receipt:
+`lazy-scalar-arrays-2026-11-05.md`. No new rows: **215 checked / 53 open / 268 total**.

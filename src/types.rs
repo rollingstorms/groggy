@@ -446,7 +446,7 @@ impl AttrValue {
 }
 
 impl AttrValue {
-    fn text_content(&self) -> Result<std::borrow::Cow<'_, str>, &'static str> {
+    pub(crate) fn text_content(&self) -> Result<std::borrow::Cow<'_, str>, &'static str> {
         match self {
             Self::Text(value) => Ok(std::borrow::Cow::Borrowed(value)),
             Self::CompactText(value) => Ok(std::borrow::Cow::Borrowed(value.as_str())),

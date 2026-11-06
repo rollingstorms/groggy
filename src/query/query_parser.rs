@@ -86,6 +86,8 @@ pub enum Token {
     LeftParen,
     RightParen,
     Not,
+    /// Remainder token for scalar adapters; graph predicates do not lower it.
+    Remainder,
 }
 
 /// Comparison operators
@@ -148,14 +150,40 @@ impl QueryParser {
         Ok(filter)
     }
 
+    /// Shared lexer for scalar adapters, preserving literal and operator rules.
+    pub(crate) fn scalar_tokens(query: &str) -> QueryResult<Vec<Token>> {
+        let mut parser = Self::new();
+        parser.tokenize_with_policy(query, true)?;
+        Ok(parser.tokens)
+    }
+
+    /// Lower adapted scalar operands through the existing boolean grammar.
+    pub(crate) fn scalar_predicate(tokens: Vec<Token>) -> QueryResult<NodeFilter> {
+        if tokens.is_empty() {
+            return Err(QueryError::EmptyQuery);
+        }
+        let mut parser = Self {
+            tokens,
+            position: 0,
+        };
+        let filter = parser.parse_node_expression()?;
+        parser.expect_end()?;
+        Ok(filter)
+    }
+
     /// Tokenize the input query string
     fn tokenize(&mut self, query: &str) -> QueryResult<()> {
+        self.tokenize_with_policy(query, false)
+    }
+
+    fn tokenize_with_policy(&mut self, query: &str, allow_nonfinite: bool) -> QueryResult<()> {
         self.tokens.clear();
         let mut chars = query.char_indices().peekable();
 
         while let Some((pos, ch)) = chars.next() {
             match ch {
                 ' ' | '\t' | '\n' => continue, // Skip whitespace
+                '%' => self.tokens.push(Token::Remainder),
                 '(' => self.tokens.push(Token::LeftParen),
                 ')' => self.tokens.push(Token::RightParen),
                 '=' => {
@@ -241,8 +269,15 @@ impl QueryParser {
                             break;
                         }
                     }
-                    self.tokens
-                        .push(Token::Value(parse_numeric_literal(&literal, start_pos)?));
+                    let nonfinite = allow_nonfinite
+                        .then(|| literal.parse::<f64>().ok())
+                        .flatten()
+                        .filter(|value| !value.is_finite());
+                    let value = match nonfinite {
+                        Some(value) => AttrValue::Float64(value),
+                        None => parse_numeric_literal(&literal, start_pos)?,
+                    };
+                    self.tokens.push(Token::Value(value));
                 }
                 _ if ch.is_ascii_alphabetic() || ch == '_' => {
                     // Parse identifier or keyword
@@ -258,6 +293,14 @@ impl QueryParser {
                         }
                     }
 
+                    if allow_nonfinite {
+                        if let Ok(value) = ident.parse::<f64>() {
+                            if !value.is_finite() {
+                                self.tokens.push(Token::Value(AttrValue::Float64(value)));
+                                continue;
+                            }
+                        }
+                    }
                     match ident.to_uppercase().as_str() {
                         "AND" => self.tokens.push(Token::LogicalOp(LogicalOp::And)),
                         "OR" => self.tokens.push(Token::LogicalOp(LogicalOp::Or)),
