@@ -1701,3 +1701,26 @@ retain their prior scope. **215 checked / 53 open / 268 total**; no rows added.
 The status overview now distinguishes its earlier 209/59 record from this current
 inventory, and the workbook appendix records the implemented typed read stages
 without filling the unanswered A14.1 naming decision.
+
+
+## November 12 — ownership diagnosis and atomic terminal removals
+
+- 19.2: a minimal isolated cyclic-GC diagnostic reproduces wrong-thread PyGraph
+  finalization without algorithms. Owner-thread Graph collection and worker
+  collection of detached views pass. The full-suite allocation path and safe
+  writable lifetime design remain open (`graph-thread-lifetime-2026-11-12.md`).
+- 09.4b.2/AR3: local atomic builders combine property calculations with multiple
+  node/edge removals in one canonical acceptance; strict controls, map-key targets,
+  cascade times, rollback and exact surviving output selections are complete.
+  Generic staged topology reads/additions/other effects remain open.
+  Receipt: `terminal-topology-pipeline-2026-11-12.md`.
+- Verification: full native 1,551 passed/54 ignored, final focused native 5 passed,
+  strict all-target Clippy, rebuilt in-tree release, maintained Python 2,633
+  passed/1 skipped/15 warnings, 263 documentation examples. Ownership warning
+  and three existing FFI build warnings remain. Measured native removal medians
+  0.362 ms (1k nodes) and 33.164 ms (100k); selected membership scans remain linear.
+
+**215 checked / 53 open / 268 total**, no rows added. Next core execution work:
+explicit immutable staged graph/table values after topology, then broader
+addition/revision effects and outer execution contracts. Naming/cache policy,
+scale promises and deferred Graphiti/service work retain their prior boundaries.

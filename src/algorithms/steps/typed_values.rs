@@ -114,7 +114,7 @@ fn array<'a>(spec: &'a StepSpec, key: &str) -> Result<&'a [serde_json::Value]> {
     }
 }
 
-fn ids(spec: &StepSpec, key: &str) -> Result<Vec<usize>> {
+pub(super) fn ids(spec: &StepSpec, key: &str) -> Result<Vec<usize>> {
     // Builder lowering preserves homogeneous integer arrays as IntList.
     // Direct registry callers may supply the original JSON array instead.
     if let Some(AlgorithmParamValue::IntList(values)) = spec.params.get(key) {

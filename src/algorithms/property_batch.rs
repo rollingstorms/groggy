@@ -1,9 +1,10 @@
-//! Property-only staging for explicitly atomic builder execution.
+//! Property staging and terminal removals for explicitly atomic builder execution.
 use super::Context;
 use crate::{
     api::graph::WriteCoordinate,
     api::graph::{kinds, Graph},
-    AttrName, AttrValue, BatchEdgeRef, BatchNodeRef, EdgeId, GraphBatch, GraphResult, NodeId,
+    AttrName, AttrValue, BatchChangeRef, BatchEdgeRef, BatchNodeRef, EdgeId, GraphBatch,
+    GraphResult, NodeId,
 };
 use crate::{subgraphs::Subgraph, traits::SubgraphOperations};
 use anyhow::{anyhow, Result};
@@ -14,6 +15,9 @@ pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
     nodes: BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
     edges: BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
+    remove_nodes: Vec<BatchNodeRef>,
+    remove_edges: Vec<BatchEdgeRef>,
+    change_times: Vec<(BatchChangeRef, crate::TimestampMicros)>,
 }
 impl PropertyBatch {
     pub fn new(coordinate: WriteCoordinate) -> Self {
@@ -21,6 +25,9 @@ impl PropertyBatch {
             coordinate,
             nodes: BTreeMap::new(),
             edges: BTreeMap::new(),
+            remove_nodes: Vec::new(),
+            remove_edges: Vec::new(),
+            change_times: Vec::new(),
         }
     }
     pub fn get(&self, node: bool, id: usize, name: &AttrName) -> Option<&AttrValue> {
@@ -53,12 +60,40 @@ impl PropertyBatch {
         }
         Ok(())
     }
+    pub(crate) fn stage_removals(
+        &mut self,
+        nodes: bool,
+        ids: Vec<usize>,
+        effective_at: Option<crate::TimestampMicros>,
+    ) {
+        for id in ids {
+            let target = if nodes {
+                let reference = BatchNodeRef::Existing(id);
+                self.remove_nodes.push(reference);
+                BatchChangeRef::NodeRemoved(reference)
+            } else {
+                let reference = BatchEdgeRef::Existing(id);
+                self.remove_edges.push(reference);
+                BatchChangeRef::EdgeRemoved(reference)
+            };
+            if let Some(at) = effective_at {
+                self.change_times.push((target, at));
+            }
+        }
+    }
     pub fn accept(self, graph: &mut Graph) -> GraphResult<()> {
         graph.validate_write_coordinate(&self.coordinate)?;
-        if self.nodes.is_empty() && self.edges.is_empty() {
+        if self.nodes.is_empty()
+            && self.edges.is_empty()
+            && self.remove_nodes.is_empty()
+            && self.remove_edges.is_empty()
+        {
             return Ok(());
         }
         let batch = GraphBatch {
+            remove_nodes: self.remove_nodes,
+            remove_edges: self.remove_edges,
+            change_times: self.change_times,
             node_attrs: self
                 .nodes
                 .into_iter()
@@ -88,7 +123,7 @@ impl PropertyBatch {
         graph.apply_batch(
             batch,
             self.coordinate.state_id(),
-            "atomic builder properties".into(),
+            "atomic builder effects".into(),
             "groggy".into(),
         )?;
         Ok(())

@@ -10,6 +10,9 @@ use groggy::{
 use serde_json::json;
 use std::{cell::RefCell, rc::Rc, time::Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--terminal-removals") {
+        return terminal_removals_receipt();
+    }
     if std::env::args().any(|arg| arg == "--typed-values") {
         return typed_values_receipt();
     }
@@ -170,5 +173,68 @@ fn typed_values_receipt() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote typed pipeline receipt to {path}");
+    Ok(())
+}
+
+fn terminal_removals_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::{BatchNodeRef as N, GraphBatch};
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [1_000, 100_000] {
+        let mut params = AlgorithmParams::new();
+        params.set_text(
+            "steps",
+            json!({"atomic":true,"steps":[
+                {"id":"graph.remove_edges","params":{"ids":[0]}},
+                {"id":"graph.remove_nodes","params":{"ids":[count-1]}}
+            ]})
+            .to_string(),
+        );
+        let algorithm = registry.instantiate(&AlgorithmSpec {
+            id: "builder.step_pipeline".into(),
+            params,
+        })?;
+        let mut samples = Vec::new();
+        for _ in 0..5 {
+            let mut graph = Graph::new();
+            graph.apply_batch(
+                GraphBatch {
+                    add_nodes: count,
+                    add_edges: (1..count)
+                        .map(|id| (N::Added(id - 1), N::Added(id)))
+                        .collect(),
+                    ..Default::default()
+                },
+                0,
+                "fixture".into(),
+                "bench".into(),
+            )?;
+            let graph = Rc::new(RefCell::new(graph));
+            let view = graph.borrow().read_view()?;
+            let selection = Subgraph::from_frozen_view(graph.clone(), view, "bench".into());
+            let mut ctx = Context::new();
+            let started = Instant::now();
+            let result = algorithm.execute(&mut ctx, selection)?;
+            let seconds = started.elapsed().as_secs_f64();
+            assert_eq!(graph.borrow().current_state_id(), 2);
+            assert_eq!(graph.borrow().node_count(), count - 1);
+            assert_eq!(graph.borrow().edge_count(), count - 3);
+            assert_eq!(result.node_count(), count - 1);
+            assert_eq!(result.edge_count(), count - 3);
+            samples.push(seconds);
+        }
+        cases.push(json!({"nodes":count,"initial_edges":count-1,"seconds":samples}));
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "terminal_topology_pipeline.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release, five samples. Two removal stages on a captured full path graph, includes execution-scope validation, staging, one checked publication and surviving exact membership reconstruction. Fixture, initial capture, compilation and result assertions excluded. No FFI, allocation/RSS, before/after speedup or large-scale guarantee. Membership reconstruction is linear in selected nodes/edges, not mutation count.",
+            "cases":cases
+        }))?,
+    )?;
+    println!("Wrote terminal topology receipt to {path}");
     Ok(())
 }

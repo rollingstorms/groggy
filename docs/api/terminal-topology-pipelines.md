@@ -1,0 +1,93 @@
+# Terminal removals in atomic builders
+
+A native step pipeline can calculate properties, then stage multiple node/edge
+removals, and accept the complete operation as **one delta**. No working-graph
+clone or intermediate publication is used.
+
+```python
+from groggy import Graph
+from groggy.builder import step_pipeline
+
+graph = Graph()
+graph.add_nodes(3)
+graph.add_edges([(0, 1), (1, 2)])
+before = graph.read_view()
+head = graph.current_state_id
+remove = step_pipeline("remove middle node", [
+    {"id": "graph.remove_nodes", "params": {"ids": [1]}},
+], atomic=True)
+remaining = graph.apply(remove, persist=True)
+assert graph.current_state_id == head + 1
+assert sorted(remaining.node_ids) == [0, 2]
+assert sorted(remaining.edge_ids) == []
+assert sorted(before.node_ids) == [0, 1, 2]
+assert sorted(before.edge_ids) == [0, 1]
+```
+
+## Stage controls
+
+| Stage | Target |
+|---|---|
+| `graph.remove_nodes` | Selected active node IDs; incident edges cascade in the owner graph, including edges outside the selection. |
+| `graph.remove_edges` | Selected active edge IDs; parallel instances and self-loops retain their individual IDs. |
+
+Exactly one target input is required:
+
+- `ids`: nonnegative integer IDs. Duplicate removals reject the whole operation,
+  including duplicates across stages.
+- `source`: a matching node/edge map variable, or a node column. **Every key is a
+  removal target; values are not interpreted as booleans.** A filtering step
+  returns only matching keys, making it a suitable source.
+
+An optional `effective_at` is a signed integer Unix timestamp in microseconds,
+used for each removal in that stage. Omitted times use the single acceptance
+clock. Node cascades use the existing canonical timing rules: the earliest
+removed endpoint time, with an explicit edge removal taking precedence. Property
+writes retain their existing effective-time rules.
+
+```python
+from groggy import Graph
+from groggy.builder import step_pipeline
+
+graph = Graph()
+graph.add_nodes([{"discard": True}, {"discard": False}])
+filtered = step_pipeline("remove matching keys", [
+    {"id": "core.filter_nodes_by_attr", "params": {
+        "attr": "discard", "target": "chosen",
+        "predicate": {"type": "eq", "value": {"type": "Bool", "value": True}},
+    }},
+    {"id": "graph.remove_nodes", "params": {"source": "chosen"}},
+], atomic=True)
+graph.apply(filtered)
+assert sorted(graph.node_ids) == [1]
+```
+
+## Execution boundary
+
+Removal stages must be a **terminal suffix** of a local `atomic=True` builder.
+All property calculations, attachments, aliases and immutable result emissions
+must precede that suffix. `persist=True` is required. A certified prefix and all
+removals share one checked publication; any target, duplicate, property/time
+conflict, cancellation or final publication failure discards staging and restores
+prior Context outputs. No-op removals create no version.
+
+Property writes to removed entities, including edges removed by cascade, reject
+under the existing GraphBatch resulting-state validation. They are not silently
+dropped. A stale immutable write source rejects. The returned selection contains
+only surviving originally selected IDs; it does not expand induced edges. The
+Python result is frozen at the accepted state. A subsequent ordinary pipeline
+algorithm receives that surviving selection.
+
+This does not implement read-after-topology-write within a builder, topology
+loops, additions, endpoint revision stages or arbitrary custom effect rollback.
+Outer `Pipeline(..., atomic=True)` remains a property-only boundary and rejects
+these builders before executing any algorithm. A regular outer pipeline may
+execute a local atomic builder; later algorithms then see its accepted topology,
+with the regular outer pipeline's existing per-algorithm failure boundary.
+
+The implementation stages touched IDs/properties. Reconstructing the returned
+selection scans selected nodes and edges; this is not constant time in removals.
+The Python adapter's existing final frozen capture cost also remains. Cancellation
+is checked during staging and before acceptance; acceptance itself is not an
+interruptible transaction. Custom native step capability declarations remain a
+trusted extension contract.

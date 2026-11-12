@@ -28,6 +28,7 @@ mod sampling;
 pub mod schema;
 mod structural;
 pub mod temporal;
+mod topology;
 mod transformations;
 mod typed_values;
 pub mod validation;

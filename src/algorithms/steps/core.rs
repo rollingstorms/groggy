@@ -18,6 +18,13 @@ use super::super::{AlgorithmParamValue, AlgorithmParams, Context, CostHint};
 
 /// Trait implemented by all step primitives.
 pub trait Step: Send + Sync {
+    /// Certified staging-only topology effect. These steps may only form the
+    /// terminal suffix of a persistent local atomic builder. They must stage
+    /// into Context, never mutate the graph or read pending topology.
+    fn is_terminal_topology_effect(&self) -> bool {
+        false
+    }
+
     /// Whether graph reads/writes follow the property-only atomic scope contract.
     /// Custom/unsupported steps reject before an atomic run executes any step.
     fn supports_atomic_properties(&self) -> bool {

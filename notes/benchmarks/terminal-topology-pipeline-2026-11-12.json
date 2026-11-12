@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "initial_edges": 999,
+      "nodes": 1000,
+      "seconds": [
+        0.000557125,
+        0.000396709,
+        0.000268667,
+        0.000361583,
+        0.00035875
+      ]
+    },
+    {
+      "initial_edges": 99999,
+      "nodes": 100000,
+      "seconds": [
+        0.037235458,
+        0.032969334,
+        0.0341945,
+        0.033164334,
+        0.0330215
+      ]
+    }
+  ],
+  "scope": "Native release, five samples. Two removal stages on a captured full path graph, includes execution-scope validation, staging, one checked publication and surviving exact membership reconstruction. Fixture, initial capture, compilation and result assertions excluded. No FFI, allocation/RSS, before/after speedup or large-scale guarantee. Membership reconstruction is linear in selected nodes/edges, not mutation count."
+}

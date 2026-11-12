@@ -103,9 +103,23 @@ impl StepPipelineAlgorithm {
                 .to_string()
         };
 
+        let mut topology_suffix = false;
+        for step in &instantiated_steps {
+            if step.is_terminal_topology_effect() {
+                if !definition.atomic {
+                    return Err(anyhow!("Topology stages require atomic=True"));
+                }
+                topology_suffix = true;
+            } else if topology_suffix {
+                return Err(anyhow!(
+                    "Step '{}' cannot run after staged topology; topology effects must be a terminal suffix",
+                    step.id()
+                ));
+            }
+        }
         if definition.atomic {
             for step in &instantiated_steps {
-                if !step.supports_atomic_properties() {
+                if !step.supports_atomic_properties() && !step.is_terminal_topology_effect() {
                     return Err(anyhow!(
                         "Step '{}' does not yet support atomic property execution",
                         step.id()
@@ -148,6 +162,13 @@ impl Algorithm for StepPipelineAlgorithm {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let topology = self
+            .steps
+            .iter()
+            .any(|step| step.is_terminal_topology_effect());
+        if topology && !ctx.persist_results() {
+            return Err(anyhow!("Topology stages require persist=True"));
+        }
         let subgraph = if subgraph.frozen_view().is_some() {
             subgraph.execution_scope(ctx.persist_results())?
         } else {
@@ -255,7 +276,34 @@ impl Algorithm for StepPipelineAlgorithm {
             ctx.finish_output_scope(previous_outputs, result.is_ok());
         }
         result?;
-        Ok(subgraph)
+        if topology {
+            // Publication has succeeded. Return the surviving exact selection,
+            // excluding explicitly removed and cascaded edge IDs. No induced
+            // edge expansion or stale membership is exposed to the next algorithm.
+            let binding = subgraph.graph();
+            let graph = binding.borrow();
+            let nodes = subgraph
+                .nodes()
+                .iter()
+                .copied()
+                .filter(|id| graph.has_node(*id))
+                .collect();
+            let edges = subgraph
+                .edges()
+                .iter()
+                .copied()
+                .filter(|id| graph.has_edge(*id))
+                .collect();
+            drop(graph);
+            Ok(Subgraph::new(
+                binding,
+                nodes,
+                edges,
+                subgraph.subgraph_type().into(),
+            ))
+        } else {
+            Ok(subgraph)
+        }
     }
 }
 
