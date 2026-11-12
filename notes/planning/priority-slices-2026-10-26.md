@@ -1620,3 +1620,19 @@ no rows were added. **215 checked / 53 open / 268 total**. Remaining priorities:
 compound topology and typed graph/table pipeline execution (09.4b.2/AR3/30.1/AR7.8),
 measured small-group captured projection costs (32.2/AR7.5), and wider numerical/
 conformance/scale/release gates. Adapter/retrieval/service deferrals are unchanged.
+
+
+## 2026-11-11 — bulk captured collection projection
+
+Completed the measured many-small-group regression within existing 32.2/AR7.5.
+Native comparison isolates scheduling: unchanged readers take 32.599 ms across
+100 groups sequentially versus 4.727 ms across existing workers; sorting is
+1.064 ms. One GIL-free native collection call now preserves frozen sources,
+input order, sorted entity rows, explicit null/absence and missing-column errors.
+No persistent column/membership cache was added. Quiet Python release medians
+for 100k nodes/100 groups improve tables 49.426 → 9.837 ms and observations
+36.039 → 6.282 ms; single-group changes are small and mixed. Full native gate:
+1,537 passed / 54 ignored. Maintained Python: 2,594 passed / 1 skipped; 258 docs.
+Receipt: `bulk-captured-projection-2026-11-11.md`. Strict all-target Clippy and
+whitespace checks passed. Broad scale/pipeline parents remain open:
+**215 checked / 53 open / 268 total**, no rows added.

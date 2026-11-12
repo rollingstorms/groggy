@@ -153,3 +153,33 @@ def test_collection_validation_and_late_callback_errors_do_not_return_partial_re
         components.filter(fail_late)
     assert calls == [1, 1]
     assert len(components) == 2 and graph.current_state_id == before
+
+
+def test_many_captured_groups_keep_order_nulls_and_late_missing_attribute_errors():
+    graph = Graph()
+    count, groups = 8192, 64
+    graph.add_nodes([
+        {"group": node % groups, "y": node + 0.5,
+         **({"x": node if node % 3 == 0 else None} if node % 3 != 2 else {}),
+         **({"early": node} if node % groups < groups - 1 else {})}
+        for node in range(count)
+    ])
+    selected = graph.view().group_by("group", "nodes")
+    graph.set_node_attr(0, "x", -1)
+    graph.remove_node(1)
+    before = graph.current_state_id
+    tables = selected[["x", "y", "absent"]]
+    observations = selected["x"]
+    for group in range(groups):
+        ids = list(range(group, count, groups))
+        assert tables[group].column("x").to_list() == [
+            node if node % 3 == 0 else None for node in ids
+        ]
+        assert tables[group].column("y").to_list() == [node + 0.5 for node in ids]
+        assert tables[group].column("absent").to_list() == [None] * len(ids)
+        assert observations[group].to_list() == [
+            node if node % 3 == 0 else None for node in ids if node % 3 != 2
+        ]
+    with pytest.raises(KeyError, match="subgraph 63"):
+        selected["early"]
+    assert graph.current_state_id == before

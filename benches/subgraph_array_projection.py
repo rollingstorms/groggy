@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--label", required=True)
     args = parser.parse_args()
     cases = []
-    for count, groups in [(1000, 1), (100000, 1), (100000, 100)]:
+    for count, groups in [(1000, 1), (100000, 1), (100000, 100), (100000, 4), (100000, 1000)]:
         graph = Graph()
         graph.add_nodes([{"group": node % groups, "x": node, "y": 2 * node} for node in range(count)])
         selected = graph.view().group_by("group", "nodes")

@@ -50,41 +50,32 @@ impl PySubgraphArray {
         &self.inner
     }
 
-    /// Marshal source-bound selections to one canonical immutable union.
-    fn merged_source(&self, py: Python) -> PyResult<Option<groggy::GraphView>> {
-        let views = self
-            .inner
+    /// Marshal source-bound selections without retaining Python owners off-thread.
+    fn captured_sources(&self) -> PyResult<Vec<groggy::GraphView>> {
+        self.inner
             .iter()
             .map(|selection| selection.inner.pin_view())
             .collect::<groggy::GraphResult<Vec<_>>>()
-            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            .map_err(crate::ffi::utils::graph_error_to_py_err)
+    }
+
+    /// Marshal source-bound selections to one canonical immutable union.
+    fn merged_source(&self, py: Python) -> PyResult<Option<groggy::GraphView>> {
+        let views = self.captured_sources()?;
         py.allow_threads(|| groggy::GraphView::merge_all(&views))
             .map_err(crate::ffi::utils::graph_error_to_py_err)
     }
 
     /// Helper: Extract multiple columns from each subgraph's nodes and return as TableArray
     fn extract_columns_as_tables(&self, py: Python, columns: &[String]) -> PyResult<PyObject> {
-        use groggy::storage::table::BaseTable;
-        use std::collections::HashMap;
-        let mut tables = Vec::with_capacity(self.inner.len());
-        for subgraph in self.inner.iter() {
-            let view = subgraph
-                .inner
-                .pin_view()
-                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-            let table = py
-                .allow_threads(|| {
-                    let nodes = view.node_accessor();
-                    BaseTable::from_columns(
-                        columns
-                            .iter()
-                            .map(|name| (name.clone(), nodes.column(name)))
-                            .collect::<HashMap<_, _>>(),
-                    )
-                })
-                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-            tables.push(crate::ffi::storage::table::PyBaseTable::from_table(table).into_py(py));
-        }
+        let views = self.captured_sources()?;
+        let projected = py
+            .allow_threads(|| groggy::GraphView::project_node_columns(&views, columns))
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        let tables = projected
+            .into_iter()
+            .map(|table| crate::ffi::storage::table::PyBaseTable::from_table(table).into_py(py))
+            .collect();
         Ok(crate::ffi::storage::table_array::PyTableArray::new(tables).into_py(py))
     }
 }
@@ -153,27 +144,15 @@ impl PySubgraphArray {
         let mut arrays = Vec::with_capacity(self.inner.len());
         let mut keys = Vec::with_capacity(self.inner.len());
         let name = attr_name.to_owned();
-        for (index, subgraph) in self.inner.iter().enumerate() {
-            let view = subgraph
-                .inner
-                .pin_view()
-                .map_err(crate::ffi::utils::graph_error_to_py_err)?;
-            // Preserve the legacy node-first/edge-fallback selector. Native readers
-            // own presence semantics and ordered projection from the captured source.
-            let values = py
-                .allow_threads(|| {
-                    let nodes = view.node_accessor();
-                    if nodes.has_column(&name) {
-                        return Some(nodes.present_column(&name));
-                    }
-                    let edges = view.edge_accessor();
-                    edges.has_column(&name).then(|| edges.present_column(&name))
-                })
-                .ok_or_else(|| {
-                    pyo3::exceptions::PyKeyError::new_err(format!(
-                        "Attribute '{attr_name}' not found in subgraph {index}"
-                    ))
-                })?;
+        let views = self.captured_sources()?;
+        let projected =
+            py.allow_threads(|| groggy::GraphView::project_attribute_observations(&views, &name));
+        for (index, values) in projected.into_iter().enumerate() {
+            let values = values.ok_or_else(|| {
+                pyo3::exceptions::PyKeyError::new_err(format!(
+                    "Attribute '{attr_name}' not found in subgraph {index}"
+                ))
+            })?;
             arrays.push(values);
             keys.push(format!("subgraph_{index}"));
         }

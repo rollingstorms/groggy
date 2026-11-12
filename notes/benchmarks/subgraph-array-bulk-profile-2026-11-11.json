@@ -1,0 +1,154 @@
+{
+  "cases": [
+    {
+      "direct_scalar_seconds": [
+        1.4372079999999998e-7,
+        1.311166e-7,
+        7.04791e-8,
+        1.103292e-7,
+        1.053125e-7
+      ],
+      "first_sorted_ids_seconds": 0.000018958,
+      "fresh_accessor_scalar_seconds": [
+        2.353e-7,
+        1.445708e-7,
+        1.527167e-7,
+        1.6459999999999998e-7,
+        1.819791e-7
+      ],
+      "mask_selection_seconds": [
+        0.00007475,
+        0.00007125,
+        0.00007025,
+        0.000074584,
+        0.000075916
+      ],
+      "nodes": 1000,
+      "owned_column_seconds": [
+        0.00009875,
+        0.000076334,
+        0.000075959,
+        0.000077459,
+        0.000081833
+      ],
+      "presence_seconds": [
+        0.000055375,
+        0.000051167,
+        0.000050792,
+        0.000054417,
+        0.000054125
+      ],
+      "reused_accessor_scalar_seconds": [
+        1.56625e-7,
+        8.123749999999999e-8,
+        1.340333e-7,
+        1.1104999999999999e-7,
+        1.196542e-7
+      ]
+    },
+    {
+      "direct_scalar_seconds": [
+        7.20625e-8,
+        6.44792e-8,
+        6.48583e-8,
+        6.68083e-8,
+        6.48917e-8
+      ],
+      "first_sorted_ids_seconds": 0.001353625,
+      "fresh_accessor_scalar_seconds": [
+        1.033458e-7,
+        1.039875e-7,
+        1.047875e-7,
+        1.011916e-7,
+        1.019042e-7
+      ],
+      "mask_selection_seconds": [
+        0.005722375,
+        0.0053615,
+        0.004818166,
+        0.005201,
+        0.005238333
+      ],
+      "nodes": 100000,
+      "owned_column_seconds": [
+        0.004150625,
+        0.003394291,
+        0.003732333,
+        0.003188792,
+        0.003249458
+      ],
+      "presence_seconds": [
+        0.002866292,
+        0.00261575,
+        0.002572875,
+        0.00265525,
+        0.002746292
+      ],
+      "reused_accessor_scalar_seconds": [
+        7.22166e-8,
+        7.454169999999999e-8,
+        7.756669999999999e-8,
+        6.97375e-8,
+        7.2925e-8
+      ]
+    }
+  ],
+  "fixture": "accepted isolates; one typed integer/null/absent column; scalar reads run before any ID-order materialization; setup excluded; five samples; 10000 scalar calls/sample",
+  "grouped_projection": {
+    "cases": [
+      {
+        "groups": 1,
+        "nodes": 100000,
+        "parallel_group_observations_seconds": [
+          0.007122125,
+          0.009692208,
+          0.005654291,
+          0.006851458,
+          0.006816833
+        ],
+        "sequential_group_observations_seconds": [
+          0.007713417,
+          0.006049209,
+          0.009030166,
+          0.006176333,
+          0.006493375
+        ],
+        "sort_only_seconds": [
+          0.001277791,
+          0.001248167,
+          0.001210708,
+          0.001249833,
+          0.0012525
+        ]
+      },
+      {
+        "groups": 100,
+        "nodes": 100000,
+        "parallel_group_observations_seconds": [
+          0.004660958,
+          0.004693666,
+          0.004878875,
+          0.004726833,
+          0.004737708
+        ],
+        "sequential_group_observations_seconds": [
+          0.034144333,
+          0.031570667,
+          0.035339083,
+          0.032599458,
+          0.032565542
+        ],
+        "sort_only_seconds": [
+          0.001068125,
+          0.001032125,
+          0.001064083,
+          0.001081833,
+          0.001082792
+        ]
+      }
+    ],
+    "scope": "fresh entity accessors each sample; capture/grouping and output validation excluded; per-column reader unchanged; parallel comparison changes only group scheduling; no Python/GIL transitions",
+    "threads": 8
+  },
+  "profile": "release"
+}

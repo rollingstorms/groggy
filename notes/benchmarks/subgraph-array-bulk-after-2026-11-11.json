@@ -1,0 +1,246 @@
+{
+  "label": "after-native-bulk",
+  "scope": "release in-tree extension; captured grouped nodes held; graph/selection construction and output validation excluded; no owner mutations; x/y exact i64 values; wall and process CPU are distinct; no RSS/allocation claim",
+  "cases": [
+    {
+      "nodes": 1000,
+      "groups": 1,
+      "tables": [
+        {
+          "wall_ns": 742625,
+          "cpu_ns": 1123000
+        },
+        {
+          "wall_ns": 185167,
+          "cpu_ns": 183000
+        },
+        {
+          "wall_ns": 148459,
+          "cpu_ns": 147000
+        },
+        {
+          "wall_ns": 154750,
+          "cpu_ns": 154000
+        },
+        {
+          "wall_ns": 131208,
+          "cpu_ns": 131000
+        }
+      ],
+      "observations": [
+        {
+          "wall_ns": 151084,
+          "cpu_ns": 130000
+        },
+        {
+          "wall_ns": 107333,
+          "cpu_ns": 107000
+        },
+        {
+          "wall_ns": 69583,
+          "cpu_ns": 70000
+        },
+        {
+          "wall_ns": 68375,
+          "cpu_ns": 68000
+        },
+        {
+          "wall_ns": 67625,
+          "cpu_ns": 67000
+        }
+      ]
+    },
+    {
+      "nodes": 100000,
+      "groups": 1,
+      "tables": [
+        {
+          "wall_ns": 12532208,
+          "cpu_ns": 75311000
+        },
+        {
+          "wall_ns": 13169500,
+          "cpu_ns": 78323000
+        },
+        {
+          "wall_ns": 11191167,
+          "cpu_ns": 67263000
+        },
+        {
+          "wall_ns": 11996958,
+          "cpu_ns": 71422000
+        },
+        {
+          "wall_ns": 11529542,
+          "cpu_ns": 70659000
+        }
+      ],
+      "observations": [
+        {
+          "wall_ns": 7612083,
+          "cpu_ns": 42731000
+        },
+        {
+          "wall_ns": 8731584,
+          "cpu_ns": 40287000
+        },
+        {
+          "wall_ns": 7664792,
+          "cpu_ns": 40007000
+        },
+        {
+          "wall_ns": 7769375,
+          "cpu_ns": 40835000
+        },
+        {
+          "wall_ns": 7571375,
+          "cpu_ns": 41275000
+        }
+      ]
+    },
+    {
+      "nodes": 100000,
+      "groups": 100,
+      "tables": [
+        {
+          "wall_ns": 9956042,
+          "cpu_ns": 65336000
+        },
+        {
+          "wall_ns": 10138959,
+          "cpu_ns": 63726000
+        },
+        {
+          "wall_ns": 9836583,
+          "cpu_ns": 60991000
+        },
+        {
+          "wall_ns": 9252125,
+          "cpu_ns": 58981000
+        },
+        {
+          "wall_ns": 9322084,
+          "cpu_ns": 59068000
+        }
+      ],
+      "observations": [
+        {
+          "wall_ns": 6226209,
+          "cpu_ns": 41131000
+        },
+        {
+          "wall_ns": 6282250,
+          "cpu_ns": 40775000
+        },
+        {
+          "wall_ns": 6093959,
+          "cpu_ns": 39180000
+        },
+        {
+          "wall_ns": 6734542,
+          "cpu_ns": 39875000
+        },
+        {
+          "wall_ns": 8641000,
+          "cpu_ns": 39500000
+        }
+      ]
+    },
+    {
+      "nodes": 100000,
+      "groups": 4,
+      "tables": [
+        {
+          "wall_ns": 11697292,
+          "cpu_ns": 67075000
+        },
+        {
+          "wall_ns": 11081417,
+          "cpu_ns": 67268000
+        },
+        {
+          "wall_ns": 10807084,
+          "cpu_ns": 66100000
+        },
+        {
+          "wall_ns": 10645958,
+          "cpu_ns": 64057000
+        },
+        {
+          "wall_ns": 10903459,
+          "cpu_ns": 65929000
+        }
+      ],
+      "observations": [
+        {
+          "wall_ns": 8140375,
+          "cpu_ns": 44832000
+        },
+        {
+          "wall_ns": 8008583,
+          "cpu_ns": 45720000
+        },
+        {
+          "wall_ns": 7041833,
+          "cpu_ns": 42076000
+        },
+        {
+          "wall_ns": 7146250,
+          "cpu_ns": 42251000
+        },
+        {
+          "wall_ns": 7972500,
+          "cpu_ns": 43336000
+        }
+      ]
+    },
+    {
+      "nodes": 100000,
+      "groups": 1000,
+      "tables": [
+        {
+          "wall_ns": 12691458,
+          "cpu_ns": 81659000
+        },
+        {
+          "wall_ns": 18495708,
+          "cpu_ns": 82961000
+        },
+        {
+          "wall_ns": 15724916,
+          "cpu_ns": 75224000
+        },
+        {
+          "wall_ns": 13910334,
+          "cpu_ns": 71881000
+        },
+        {
+          "wall_ns": 14663625,
+          "cpu_ns": 72851000
+        }
+      ],
+      "observations": [
+        {
+          "wall_ns": 7102500,
+          "cpu_ns": 44612000
+        },
+        {
+          "wall_ns": 6561958,
+          "cpu_ns": 42227000
+        },
+        {
+          "wall_ns": 6503000,
+          "cpu_ns": 41117000
+        },
+        {
+          "wall_ns": 7236042,
+          "cpu_ns": 42254000
+        },
+        {
+          "wall_ns": 7040375,
+          "cpu_ns": 42194000
+        }
+      ]
+    }
+  ]
+}

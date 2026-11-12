@@ -14,7 +14,7 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 See the flat checklist for each supported scope and evidence.
 
-Current remainder (2026-11-05): compound topology execution and typed effects
+Current remainder (2026-11-11): compound topology execution and typed effects
 (09.4b.2/AR3), followed by typed pipeline intermediates and execution contracts
 (30.1/AR7.8). Default immutable Subgraph ownership **26.1/AR4/AR7.5** and pinned
 query migration **21.2 are complete**. See `default-immutable-views-2026-10-30.md`
@@ -2010,3 +2010,14 @@ no rows were added. **215 checked / 53 open / 268 total**. Remaining priorities:
 compound topology and typed graph/table pipeline execution (09.4b.2/AR3/30.1/AR7.8),
 measured small-group captured projection costs (32.2/AR7.5), and wider numerical/
 conformance/scale/release gates. Adapter/retrieval/service deferrals are unchanged.
+
+
+## 2026-11-11 — captured group projection throughput
+
+The measured many-small-group regression is repaired using one native collection
+projection call and existing worker scheduling, without new retained caches.
+100k nodes/100 groups: tables 49.426 → 9.837 ms, observations 36.039 → 6.282 ms.
+Native/Python/doc gates: 1,537 / 2,594 / 258 passed; 54 native ignored and one
+Python skip. Strict all-target Clippy passed. Full evidence and remaining limits:
+`bulk-captured-projection-2026-11-11.md`. Existing 32.2 remains open for its wider
+scale/storage/memory inventory. **215 checked / 53 open / 268 total**.

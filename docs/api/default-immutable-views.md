@@ -99,6 +99,14 @@ and represent absence as null. The legacy single-column selector returns present
 observations (including explicit null), preferring node properties and falling
 back to edge properties only when no selected node has that property.
 
+Collection column requests pass captured native views to Rust in one call with
+the GIL released. Many groups can run across the existing worker pool; one or
+few large groups retain row-parallel projection. Results keep collection order
+and ascending IDs within each group. Tables and observations are detached owned
+outputs; projection does not retain an extra sorted-membership/column cache or
+publish a delta. Native callers can use `GraphView::project_node_columns` and
+`GraphView::project_attribute_observations` for the same collection semantics.
+
 ```python
 from groggy import Graph
 collection_graph = Graph(directed=True)
