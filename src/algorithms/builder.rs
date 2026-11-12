@@ -169,6 +169,9 @@ impl Algorithm for StepPipelineAlgorithm {
                 graph.write_coordinate(),
             ));
         }
+        // The outer atomic coordinator already owns its output rollback. A local
+        // atomic builder also restores outputs on execution/publication failure.
+        let previous_outputs = (self.atomic && !inherited).then(|| ctx.take_outputs());
         let result: Result<()> = (|| {
             let execution_id = EXECUTION_COUNTER.fetch_add(1, Ordering::SeqCst);
             if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
@@ -237,15 +240,21 @@ impl Algorithm for StepPipelineAlgorithm {
             }
             Ok(())
         })();
-        if staged {
+        let result = if staged {
             let pending = ctx.property_batch.take();
-            result?;
-            if let Some(pending) = pending {
-                pending.accept(&mut subgraph.graph().borrow_mut())?;
-            }
+            result.and_then(|()| {
+                if let Some(pending) = pending {
+                    pending.accept(&mut subgraph.graph().borrow_mut())?;
+                }
+                Ok(())
+            })
         } else {
-            result?;
+            result
+        };
+        if let Some(previous_outputs) = previous_outputs {
+            ctx.finish_output_scope(previous_outputs, result.is_ok());
         }
+        result?;
         Ok(subgraph)
     }
 }

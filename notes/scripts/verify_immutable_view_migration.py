@@ -13,6 +13,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCS = ['docs/immutable-read-views.md',
+ 'docs/api/typed-pipeline-values.md',
  'docs/api/float64-properties.md',
  'docs/api/property-numeric-predicates.md',
  'docs/api/float64-numerical-results.md',

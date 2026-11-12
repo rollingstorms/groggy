@@ -1652,3 +1652,22 @@ Full gates: 1,538 native / 54 ignored; strict all-target Clippy; 2,594 maintaine
 Python / 1 skipped; 258 executable docs. Three existing FFI warnings remain.
 Generic topology intermediates and typed pipeline work remain open:
 **215 checked / 53 open / 268 total**, no rows added.
+
+
+## 2026-11-11 — typed immutable graph/table pipeline inventory
+
+Completed nine native read primitives within 30.1/AR7.8: explicit retained
+snapshot → graph, node/edge selection, node/edge tables, selected rows/columns,
+and explicit graph/table outputs. Typed variables preserve captured data, IDs,
+null/absence alignment, exact values and table provenance. Generic aliasing and
+shared output-scope completion preserve representation and roll back local/outer
+atomic outputs without deep-copying prior buffers. A thin step_pipeline factory
+uses the existing BuiltAlgorithm/interpreter; naming policy/IR behavior is not
+redefined. Native 100k snapshot-to-table workflow measures 67.908 ms; retaining
+one million previous output rows does not copy its buffer. Receipt and exact
+remaining domains: `typed-pipeline-values-2026-11-11.md`.
+Full gates: **1,543 native / 54 ignored**, strict all-target Clippy, **2,611
+maintained Python / 1 skipped**, **260 executable docs**. Rebuilt in-tree release
+extension retains three existing FFI warnings. Current staged/topology graph
+intermediates, remaining DSL/IR lowering, naming/cache/streaming remain open.
+**215 checked / 53 open / 268 total**, no checklist rows added.

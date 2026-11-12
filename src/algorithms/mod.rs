@@ -682,6 +682,20 @@ impl Context {
         std::mem::take(&mut self.outputs)
     }
 
+    /// Complete a native output scope without cloning retained result buffers.
+    /// Successful scopes merge produced values; failures restore prior outputs.
+    pub(crate) fn finish_output_scope(
+        &mut self,
+        previous: HashMap<String, AlgorithmOutput>,
+        accepted: bool,
+    ) {
+        let produced = self.take_outputs();
+        self.outputs = previous;
+        if accepted {
+            self.outputs.extend(produced);
+        }
+    }
+
     /// Whether cancellation has been requested.
     pub fn is_cancelled(&self) -> bool {
         self.cancel_token
@@ -817,6 +831,10 @@ pub struct IterationEvent {
 /// Structured owned payload returned by algorithm execution.
 #[derive(Clone, Debug)]
 pub enum AlgorithmOutput {
+    /// Immutable graph output retaining source state, topology and original IDs.
+    GraphView(crate::GraphView),
+    /// Owned table output, shared immutably until explicitly copied for editing.
+    Table(Arc<crate::storage::table::BaseTable>),
     /// Owned bin counts, never graph entity IDs.
     Histogram(Vec<i64>),
     /// Owned typed node property column produced without a graph mutation.

@@ -1,0 +1,49 @@
+{
+  "output_scopes": [
+    {
+      "empty_atomic_run_seconds": [
+        4.333e-6,
+        7.5e-7,
+        7.08e-7,
+        6.67e-7,
+        6.67e-7
+      ],
+      "original_buffer_pointer_preserved": true,
+      "retained_output_rows": 0
+    },
+    {
+      "empty_atomic_run_seconds": [
+        1.208e-6,
+        7.5e-7,
+        6.67e-7,
+        7.08e-7,
+        6.67e-7
+      ],
+      "original_buffer_pointer_preserved": true,
+      "retained_output_rows": 1000000
+    }
+  ],
+  "scope": "Native release, five samples. Reconstruction/projection runs include retained snapshot reconstruction, graph alias, node table projection, column selection and explicit emission; construction/compilation and output validation excluded. Output-scope cases exclude retained buffer construction and assert pointer identity after every run. No before/after speedup, allocation/RSS, GIL or throughput guarantee.",
+  "typed_reads": [
+    {
+      "nodes": 1000,
+      "retained_snapshot_to_table_seconds": [
+        0.001199834,
+        0.000914166,
+        0.000953666,
+        0.000968375,
+        0.000924583
+      ]
+    },
+    {
+      "nodes": 100000,
+      "retained_snapshot_to_table_seconds": [
+        0.067405792,
+        0.067907584,
+        0.071507458,
+        0.071043,
+        0.065582042
+      ]
+    }
+  ]
+}

@@ -180,11 +180,7 @@ impl Pipeline {
         if staged {
             ctx.property_batch = None;
         }
-        let outputs = ctx.take_outputs();
-        ctx.outputs = previous_outputs;
-        if result.is_ok() {
-            ctx.outputs.extend(outputs);
-        }
+        ctx.finish_output_scope(previous_outputs, result.is_ok());
         result
     }
 

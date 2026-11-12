@@ -29,6 +29,7 @@ pub mod schema;
 mod structural;
 pub mod temporal;
 mod transformations;
+mod typed_values;
 pub mod validation;
 
 // Re-export core types

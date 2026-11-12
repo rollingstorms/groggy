@@ -191,6 +191,7 @@ fn sampling_spec(params: &AlgorithmParams) -> Result<super::sampling::SampleSpec
 
 /// Register the core steps that ship with the engine.
 pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
+    super::typed_values::register(registry)?;
     registry.register(
         "core.init_nodes",
         StepMetadata {

@@ -65,7 +65,18 @@ __all__ = [
     "BuiltAlgorithm",
     "BuiltSampler",
     "builder",
+    "step_pipeline",
     "algorithm",
     "compiled",
     "traced",
 ]
+
+
+def step_pipeline(name: str, steps: list, *, atomic: bool = False) -> BuiltAlgorithm:
+    """Build registered native stages without a second lowering/execution engine.
+
+    Rows are native ``{"id": ..., "params": ...}`` StepSpecs. Controls and value
+    domains are validated by Rust. Set atomic=True to stage certified property
+    effects and publish once; immutable graph/table stages publish no changes.
+    """
+    return BuiltAlgorithm.from_native_steps(name, steps, atomic=atomic)

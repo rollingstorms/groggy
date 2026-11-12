@@ -234,6 +234,21 @@ pub fn py_run_pipeline(
     let py_outputs = PyDict::new(py);
     for (key, output) in outputs {
         match output {
+            groggy::algorithms::AlgorithmOutput::GraphView(inner) => {
+                py_outputs.set_item(
+                    key,
+                    Py::new(py, crate::ffi::subgraphs::view::PyGraphView { inner })?,
+                )?;
+            }
+            groggy::algorithms::AlgorithmOutput::Table(table) => {
+                py_outputs.set_item(
+                    key,
+                    Py::new(
+                        py,
+                        crate::ffi::storage::table::PyBaseTable::from_table((*table).clone()),
+                    )?,
+                )?;
+            }
             groggy::algorithms::AlgorithmOutput::Histogram(counts) => {
                 py_outputs.set_item(key, counts)?;
             }

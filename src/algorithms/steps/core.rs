@@ -60,6 +60,10 @@ pub struct StepSpec {
 #[derive(Clone, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum StepValue {
+    /// Immutable graph selection retaining its exact captured source.
+    GraphView(crate::GraphView),
+    /// Immutable intermediate table; transformations create another owned table.
+    Table(Arc<crate::storage::table::BaseTable>),
     /// Mapping from node id → value.
     NodeMap(HashMap<NodeId, AlgorithmParamValue>),
     /// Columnar node storage maintaining deterministic order.
@@ -216,6 +220,34 @@ impl NeighborCache {
 }
 
 impl StepVariables {
+    /// Inspect a typed intermediate without guessing its representation.
+    pub fn value(&self, name: &str) -> Option<&StepValue> {
+        self.values.get(name)
+    }
+
+    /// Install a completely prepared typed value. Replacing a name is explicit.
+    pub fn set_value(&mut self, name: impl Into<String>, value: StepValue) {
+        self.values.insert(name.into(), value);
+    }
+
+    /// Retrieve an immutable captured graph; wrong-type inputs fail explicitly.
+    pub fn graph_view(&self, name: &str) -> Result<&crate::GraphView> {
+        match self.values.get(name) {
+            Some(StepValue::GraphView(view)) => Ok(view),
+            Some(_) => Err(anyhow!("variable '{name}' is not a graph view")),
+            None => Err(anyhow!("variable '{name}' not found")),
+        }
+    }
+
+    /// Retrieve an immutable table intermediate, retaining its graph provenance.
+    pub fn table(&self, name: &str) -> Result<&crate::storage::table::BaseTable> {
+        match self.values.get(name) {
+            Some(StepValue::Table(table)) => Ok(table),
+            Some(_) => Err(anyhow!("variable '{name}' is not a table")),
+            None => Err(anyhow!("variable '{name}' not found")),
+        }
+    }
+
     pub fn set_node_map(
         &mut self,
         name: impl Into<String>,

@@ -8,6 +8,7 @@ monolithic builder implementation while the trait-based package is the public AP
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
 from groggy import _groggy
@@ -215,6 +216,22 @@ class BuiltAlgorithm(AlgorithmHandle):
         self._name = name
         self._steps = steps
         self._validated = False
+        self._native_steps = False
+
+    @classmethod
+    def from_native_steps(
+        cls, name: str, steps: list, *, atomic: bool = False
+    ) -> "BuiltAlgorithm":
+        """Use registered native StepSpecs through the existing interpreter.
+
+        Each row contains ``id`` and ``params`` (optionally inputs/outputs).
+        Rust validates controls and runtime value types. Statement order and
+        native aliases are preserved; legacy encoding/IR optimization is skipped.
+        The caller's list is copied before being retained by the handle.
+        """
+        result = cls(name, deepcopy(steps), atomic=atomic)
+        result._native_steps = True
+        return result
 
     @property
     def id(self) -> str:
@@ -228,7 +245,7 @@ class BuiltAlgorithm(AlgorithmHandle):
 
     @property
     def steps(self) -> list:
-        """Expose legacy step list for inspection/testing."""
+        """Expose the ordered legacy or native step program for inspection."""
         return self._steps
 
     def to_spec(self) -> Dict[str, Any]:
@@ -237,18 +254,21 @@ class BuiltAlgorithm(AlgorithmHandle):
         alias_map: Dict[str, str] = {}
         encoded_steps: list[Dict[str, Any]] = []
 
-        for step in self._steps:
-            if step.get("type") == "alias":
-                source = step.get("source")
-                target = step.get("target")
-                if source and target:
-                    resolved_source = self._resolve_with_alias(source, alias_map)
-                    alias_map[target] = resolved_source
-                continue
+        if self._native_steps:
+            encoded_steps = self._steps
+        else:
+            for step in self._steps:
+                if step.get("type") == "alias":
+                    source = step.get("source")
+                    target = step.get("target")
+                    if source and target:
+                        resolved_source = self._resolve_with_alias(source, alias_map)
+                        alias_map[target] = resolved_source
+                    continue
 
-            encoded = self._encode_step(step, alias_map)
-            if encoded is not None:
-                encoded_steps.append(encoded)
+                encoded = self._encode_step(step, alias_map)
+                if encoded is not None:
+                    encoded_steps.append(encoded)
 
         pipeline_definition = {
             "name": self._name,
