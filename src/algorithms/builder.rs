@@ -12,8 +12,8 @@ use crate::subgraphs::Subgraph;
 use super::pipeline::AlgorithmSpec;
 use super::registry::Registry;
 use super::steps::{
-    ensure_core_steps_registered, global_step_registry, PipelineValidator, SchemaRegistry, Step,
-    StepScope, StepSpec, StepVariables, ValidationReport,
+    ensure_core_steps_registered, global_step_registry, AtomicStepEffect, PipelineValidator,
+    SchemaRegistry, Step, StepScope, StepSpec, StepVariables, ValidationReport,
 };
 use super::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, AlgorithmParams, Context, CostHint,
@@ -105,21 +105,33 @@ impl StepPipelineAlgorithm {
 
         let mut topology_suffix = false;
         for step in &instantiated_steps {
-            if step.is_terminal_topology_effect() {
-                if !definition.atomic {
-                    return Err(anyhow!("Topology stages require atomic=True"));
-                }
-                topology_suffix = true;
-            } else if topology_suffix {
+            let effect = step.atomic_effect();
+            if matches!(
+                effect,
+                AtomicStepEffect::Topology | AtomicStepEffect::StagedCapture
+            ) && !definition.atomic
+            {
                 return Err(anyhow!(
-                    "Step '{}' cannot run after staged topology; topology effects must be a terminal suffix",
+                    "Topology/staged capture stages require atomic=True"
+                ));
+            }
+            if effect == AtomicStepEffect::Topology {
+                topology_suffix = true;
+            } else if topology_suffix
+                && !matches!(
+                    effect,
+                    AtomicStepEffect::ImmutableInputs | AtomicStepEffect::StagedCapture
+                )
+            {
+                return Err(anyhow!(
+                    "Step '{}' cannot run after staged topology; only staged captures, immutable inputs and topology effects may follow",
                     step.id()
                 ));
             }
         }
         if definition.atomic {
             for step in &instantiated_steps {
-                if !step.supports_atomic_properties() && !step.is_terminal_topology_effect() {
+                if step.atomic_effect() == AtomicStepEffect::Unsupported {
                     return Err(anyhow!(
                         "Step '{}' does not yet support atomic property execution",
                         step.id()
@@ -165,9 +177,17 @@ impl Algorithm for StepPipelineAlgorithm {
         let topology = self
             .steps
             .iter()
-            .any(|step| step.is_terminal_topology_effect());
-        if topology && !ctx.persist_results() {
-            return Err(anyhow!("Topology stages require persist=True"));
+            .any(|step| step.atomic_effect() == AtomicStepEffect::Topology);
+        let local_effects = self.steps.iter().any(|step| {
+            matches!(
+                step.atomic_effect(),
+                AtomicStepEffect::Topology | AtomicStepEffect::StagedCapture
+            )
+        });
+        if local_effects && !ctx.persist_results() {
+            return Err(anyhow!(
+                "Topology/staged capture stages require persist=True"
+            ));
         }
         let subgraph = if subgraph.frozen_view().is_some() {
             subgraph.execution_scope(ctx.persist_results())?

@@ -368,6 +368,9 @@ impl AliasStep {
 }
 
 impl Step for AliasStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        super::core::AtomicStepEffect::ImmutableInputs
+    }
     fn supports_atomic_properties(&self) -> bool {
         true
     }

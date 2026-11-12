@@ -10,7 +10,7 @@ use groggy::{
 use serde_json::json;
 use std::{cell::RefCell, rc::Rc, time::Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::args().any(|arg| arg == "--terminal-removals") {
+    if std::env::args().any(|arg| arg == "--terminal-removals" || arg == "--staged-capture") {
         return terminal_removals_receipt();
     }
     if std::env::args().any(|arg| arg == "--typed-values") {
@@ -181,16 +181,22 @@ fn terminal_removals_receipt() -> Result<(), Box<dyn std::error::Error>> {
     let registry = Registry::default();
     register_algorithms(&registry)?;
     let mut cases = Vec::new();
+    let with_capture = std::env::args().any(|arg| arg == "--staged-capture");
     for count in [1_000, 100_000] {
+        let mut steps = vec![
+            json!({"id":"graph.remove_edges","params":{"ids":[0]}}),
+            json!({"id":"graph.remove_nodes","params":{"ids":[count-1]}}),
+        ];
+        if with_capture {
+            steps.extend([
+                json!({"id":"graph.capture_staged","params":{"output":"pending"}}),
+                json!({"id":"graph.nodes_table","params":{"source":"pending","output":"nodes"}}),
+                json!({"id":"table.emit","params":{"source":"nodes","name":"nodes"}}),
+                json!({"id":"graph.emit","params":{"source":"pending","name":"pending"}}),
+            ]);
+        }
         let mut params = AlgorithmParams::new();
-        params.set_text(
-            "steps",
-            json!({"atomic":true,"steps":[
-                {"id":"graph.remove_edges","params":{"ids":[0]}},
-                {"id":"graph.remove_nodes","params":{"ids":[count-1]}}
-            ]})
-            .to_string(),
-        );
+        params.set_text("steps", json!({"atomic":true,"steps":steps}).to_string());
         let algorithm = registry.instantiate(&AlgorithmSpec {
             id: "builder.step_pipeline".into(),
             params,
@@ -222,6 +228,21 @@ fn terminal_removals_receipt() -> Result<(), Box<dyn std::error::Error>> {
             assert_eq!(graph.borrow().edge_count(), count - 3);
             assert_eq!(result.node_count(), count - 1);
             assert_eq!(result.edge_count(), count - 3);
+            if with_capture {
+                let outputs = ctx.take_outputs();
+                let groggy::algorithms::AlgorithmOutput::GraphView(view) = &outputs["pending"]
+                else {
+                    return Err("missing pending graph output".into());
+                };
+                assert_eq!(view.write_state_id(), None);
+                assert_eq!(view.node_count(), count - 1);
+                assert_eq!(view.edge_count(), count - 3);
+                let groggy::algorithms::AlgorithmOutput::Table(table) = &outputs["nodes"] else {
+                    return Err("missing pending node table".into());
+                };
+                use groggy::storage::table::Table;
+                assert_eq!(table.shape().0, count - 1);
+            }
             samples.push(seconds);
         }
         cases.push(json!({"nodes":count,"initial_edges":count-1,"seconds":samples}));
@@ -231,7 +252,8 @@ fn terminal_removals_receipt() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(
         &path,
         serde_json::to_vec_pretty(&json!({
-            "scope":"Native release, five samples. Two removal stages on a captured full path graph, includes execution-scope validation, staging, one checked publication and surviving exact membership reconstruction. Fixture, initial capture, compilation and result assertions excluded. No FFI, allocation/RSS, before/after speedup or large-scale guarantee. Membership reconstruction is linear in selected nodes/edges, not mutation count.",
+            "scope":"Native release, five samples. Two removal stages on a captured full path graph, includes execution-scope validation, staging, one checked publication and surviving exact membership reconstruction. When staged_capture is true, also materializes an explicit pending graph, projects its node table and emits both values before publication. Fixture, initial capture, compilation and result assertions excluded. No FFI, allocation/RSS, before/after speedup or large-scale guarantee. Membership reconstruction and explicit capture/projection are linear in selected data, not mutation count.",
+            "staged_capture": with_capture,
             "cases":cases
         }))?,
     )?;

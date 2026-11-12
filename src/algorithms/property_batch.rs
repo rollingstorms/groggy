@@ -8,7 +8,7 @@ use crate::{
 };
 use crate::{subgraphs::Subgraph, traits::SubgraphOperations};
 use anyhow::{anyhow, Result};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Debug)]
 pub(crate) struct PropertyBatch {
@@ -20,6 +20,84 @@ pub(crate) struct PropertyBatch {
     change_times: Vec<(BatchChangeRef, crate::TimestampMicros)>,
 }
 impl PropertyBatch {
+    /// Materialize exactly the selected pending working state as a detached,
+    /// read-only value. It has no accepted write provenance or history claim.
+    /// This copies selected values, never clones a writable Graph/history/pool.
+    pub(crate) fn capture(&self, subgraph: &Subgraph) -> GraphResult<crate::GraphView> {
+        subgraph
+            .graph()
+            .borrow()
+            .validate_write_coordinate(&self.coordinate)?;
+        let base = subgraph.pin_view()?;
+        let mut removed_nodes = HashSet::with_capacity(self.remove_nodes.len());
+        for reference in &self.remove_nodes {
+            let BatchNodeRef::Existing(id) = reference else {
+                return Err(crate::GraphError::InvalidInput(
+                    "Unsupported staged added node removal".into(),
+                ));
+            };
+            removed_nodes.insert(*id);
+        }
+        let mut removed_edges = HashSet::with_capacity(self.remove_edges.len());
+        for reference in &self.remove_edges {
+            let BatchEdgeRef::Existing(id) = reference else {
+                return Err(crate::GraphError::InvalidInput(
+                    "Unsupported staged added edge removal".into(),
+                ));
+            };
+            removed_edges.insert(*id);
+        }
+        let nodes = base
+            .nodes()
+            .iter()
+            .copied()
+            .filter(|id| !removed_nodes.contains(id))
+            .collect();
+        let mut edges = HashSet::new();
+        for &id in base.edges() {
+            let (source, target) = base.edge_endpoints(id)?;
+            if !removed_edges.contains(&id)
+                && !removed_nodes.contains(&source)
+                && !removed_nodes.contains(&target)
+            {
+                edges.insert(id);
+            }
+        }
+        let selected = crate::GraphView::from_membership(base.read_state().clone(), nodes, edges)?;
+        let mut snapshot = selected.to_snapshot();
+        for (name, rows) in &self.nodes {
+            for (&id, value) in rows {
+                if !selected.nodes().contains(&id) {
+                    return Err(crate::GraphError::InvalidInput(format!(
+                        "Staged node property target {id} is outside the resulting selection"
+                    )));
+                }
+                snapshot
+                    .node_attributes
+                    .entry(id)
+                    .or_default()
+                    .insert(name.clone(), value.clone());
+            }
+        }
+        for (name, rows) in &self.edges {
+            for (&id, value) in rows {
+                if !selected.edges().contains(&id) {
+                    return Err(crate::GraphError::InvalidInput(format!(
+                        "Staged edge property target {id} is outside the resulting selection"
+                    )));
+                }
+                snapshot
+                    .edge_attributes
+                    .entry(id)
+                    .or_default()
+                    .insert(name.clone(), value.clone());
+            }
+        }
+        let state = crate::state::read_state::PinnedReadState::from_snapshot(snapshot)?
+            .with_groups(base.read_state().groups().clone());
+        Ok(crate::GraphView::all(state))
+    }
+
     pub fn new(coordinate: WriteCoordinate) -> Self {
         Self {
             coordinate,

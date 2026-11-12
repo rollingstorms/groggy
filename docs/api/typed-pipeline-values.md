@@ -120,3 +120,12 @@ mutation intermediates/read-after-write, remaining DSL/IR lowering, automatic
 naming/cache policy and streaming. This fixed nine-stage read inventory is
 implemented; it is not a claim that every graph/table operation is a pipeline
 primitive or that the broad pipeline parent is complete.
+
+
+## Selected pending working-state inputs
+
+In addition to retained snapshots, a persistent local atomic builder can produce
+`graph.capture_staged(output=...)`. The resulting graph/table values include
+pending properties and removals. These captures have no accepted write pin and
+materialize selected data explicitly. See [staged captures](staged-graph-captures.md)
+for effect ordering, ownership, cost and the remaining unsupported scope.

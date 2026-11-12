@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "initial_edges": 999,
+      "nodes": 1000,
+      "seconds": [
+        0.000400583,
+        0.000533042,
+        0.000485625,
+        0.000288417,
+        0.000426041
+      ]
+    },
+    {
+      "initial_edges": 99999,
+      "nodes": 100000,
+      "seconds": [
+        0.044845667,
+        0.038465833,
+        0.044744792,
+        0.034181125,
+        0.033593542
+      ]
+    }
+  ],
+  "scope": "Native release, five samples. Two removal stages on a captured full path graph, includes execution-scope validation, staging, one checked publication and surviving exact membership reconstruction. When staged_capture is true, also materializes an explicit pending graph, projects its node table and emits both values before publication. Fixture, initial capture, compilation and result assertions excluded. No FFI, allocation/RSS, before/after speedup or large-scale guarantee. Membership reconstruction and explicit capture/projection are linear in selected data, not mutation count.",
+  "staged_capture": false
+}

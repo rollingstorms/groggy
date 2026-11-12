@@ -16,13 +16,32 @@ use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, AlgorithmParams, Context, CostHint};
 
+/// Conservative native execution capabilities used before a builder runs.
+/// Custom declarations are trusted; this is not a callback effect sandbox.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AtomicStepEffect {
+    /// No certified atomic execution contract.
+    Unsupported,
+    /// Existing property-overlay calculations/attachments; reads base topology.
+    Properties,
+    /// Reads only explicit variable inputs, never working topology/properties.
+    ImmutableInputs,
+    /// Creates an independent read-only value from the local pending batch.
+    StagedCapture,
+    /// Stages topology in the local batch without mutating the owner.
+    Topology,
+}
+
 /// Trait implemented by all step primitives.
 pub trait Step: Send + Sync {
-    /// Certified staging-only topology effect. These steps may only form the
-    /// terminal suffix of a persistent local atomic builder. They must stage
-    /// into Context, never mutate the graph or read pending topology.
-    fn is_terminal_topology_effect(&self) -> bool {
-        false
+    /// Effect classification for local atomic execution. Existing property
+    /// certification remains conservative for extensions and nested executors.
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        if self.supports_atomic_properties() {
+            AtomicStepEffect::Properties
+        } else {
+            AtomicStepEffect::Unsupported
+        }
     }
 
     /// Whether graph reads/writes follow the property-only atomic scope contract.

@@ -52,6 +52,10 @@ the existing Python frozen result capture cost is outside this native receipt.
 
 ## Remaining boundary
 
+This section records the initial `d65b0165` boundary. The same-day follow-on
+`staged-graph-capture-2026-11-12.md` extends it with explicit immutable graph/table
+reads after removals; ordinary unadapted calculations remain prohibited there.
+
 Non-atomic and transient topology builders reject. Outer atomic pipelines still
 certify property-only effects and reject these builders before executing any
 algorithm. Removal stages must end the local step program; even aliases and

@@ -14,6 +14,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 DOCS = ['docs/immutable-read-views.md',
  'docs/api/terminal-topology-pipelines.md',
+ 'docs/api/staged-graph-captures.md',
  'docs/api/display-foundation.md',
  'docs/api/typed-pipeline-values.md',
  'docs/api/float64-properties.md',

@@ -1,5 +1,7 @@
 //! Terminal topology effects: prepare removals, publish through one checked batch.
-use super::core::{Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue};
+use super::core::{
+    AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue,
+};
 use crate::algorithms::{AlgorithmParamValue, Context, CostHint};
 use anyhow::{anyhow, bail, Result};
 
@@ -15,6 +17,35 @@ enum RemovalInput {
     Keys(String),
 }
 
+struct CaptureStagedStep {
+    output: String,
+}
+
+impl Step for CaptureStagedStep {
+    fn id(&self) -> &'static str {
+        "graph.capture_staged"
+    }
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::StagedCapture
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            bail!("staged graph capture cancelled");
+        }
+        let pending = ctx.property_batch.as_ref().ok_or_else(|| {
+            anyhow!("graph.capture_staged requires a persistent local atomic builder")
+        })?;
+        let view = pending.capture(scope.subgraph())?;
+        if ctx.is_cancelled() {
+            bail!("staged graph capture cancelled");
+        }
+        scope
+            .variables_mut()
+            .set_value(&self.output, StepValue::GraphView(view));
+        Ok(())
+    }
+}
+
 impl Step for RemoveStep {
     fn id(&self) -> &'static str {
         if self.nodes {
@@ -24,8 +55,8 @@ impl Step for RemoveStep {
         }
     }
 
-    fn is_terminal_topology_effect(&self) -> bool {
-        true
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::Topology
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
@@ -113,6 +144,28 @@ fn instantiate(spec: &StepSpec, nodes: bool) -> Result<Box<dyn Step>> {
 }
 
 pub(super) fn register(registry: &StepRegistry) -> Result<()> {
+    registry.register(
+        "graph.capture_staged",
+        StepMetadata {
+            id: "graph.capture_staged".into(),
+            description: "Capture a detached immutable selected pending graph state".into(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            for (key, _) in spec.params.iter() {
+                if key != "output" {
+                    bail!("graph.capture_staged does not support parameter '{key}'");
+                }
+            }
+            let output = spec.params.expect_text("output")?;
+            if output.trim().is_empty() {
+                bail!("graph.capture_staged requires a nonempty output");
+            }
+            Ok(Box::new(CaptureStagedStep {
+                output: output.into(),
+            }))
+        },
+    )?;
     for (id, nodes) in [("graph.remove_nodes", true), ("graph.remove_edges", false)] {
         registry.register(
             id,

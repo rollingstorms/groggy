@@ -1,6 +1,8 @@
 //! Typed immutable graph/table stages over explicit captured inputs.
 //! No working-graph clone, implicit publication or staged-property recapture.
-use super::core::{Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue};
+use super::core::{
+    AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue,
+};
 use crate::{
     algorithms::{AlgorithmOutput, AlgorithmParamValue, Context, CostHint},
     storage::table::Table,
@@ -36,6 +38,9 @@ fn check_cancelled(ctx: &Context) -> Result<()> {
 }
 
 impl Step for TypedReadStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
     fn supports_atomic_properties(&self) -> bool {
         // Explicit immutable inputs are independent of in-flight property writes.
         true

@@ -64,9 +64,10 @@ assert sorted(graph.node_ids) == [1]
 
 ## Execution boundary
 
-Removal stages must be a **terminal suffix** of a local `atomic=True` builder.
-All property calculations, attachments, aliases and immutable result emissions
-must precede that suffix. `persist=True` is required. A certified prefix and all
+Removal stages begin the **topology phase** of a local `atomic=True` builder.
+All ordinary property calculations and attachments must precede that phase.
+Further removals, explicit `graph.capture_staged`, immutable graph/table stages
+and variable aliases may follow; see [staged graph captures](staged-graph-captures.md). `persist=True` is required. A certified prefix and all
 removals share one checked publication; any target, duplicate, property/time
 conflict, cancellation or final publication failure discards staging and restores
 prior Context outputs. No-op removals create no version.
@@ -78,8 +79,9 @@ only surviving originally selected IDs; it does not expand induced edges. The
 Python result is frozen at the accepted state. A subsequent ordinary pipeline
 algorithm receives that surviving selection.
 
-This does not implement read-after-topology-write within a builder, topology
-loops, additions, endpoint revision stages or arbitrary custom effect rollback.
+Read-after-removal through explicit immutable staged captures is supported.
+Ordinary calculations over an implicit topology overlay, topology loops, additions,
+endpoint revision stages and arbitrary custom effect rollback remain unsupported.
 Outer `Pipeline(..., atomic=True)` remains a property-only boundary and rejects
 these builders before executing any algorithm. A regular outer pipeline may
 execute a local atomic builder; later algorithms then see its accepted topology,

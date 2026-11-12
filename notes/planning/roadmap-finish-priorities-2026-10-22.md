@@ -14,9 +14,11 @@ logical change records, and 07.3a f64 representation, supported consumer migrati
 and ordinary Python default switching, plus 07.3b native temporal properties.
 The nine-stage typed immutable graph/table read inventory and native display ownership component are also implemented (`typed-pipeline-values-2026-11-11.md`, `display-foundation-2026-11-11.md`). See the flat checklist for supported scopes and remaining exits.
 
-Current remainder (2026-11-11): compound topology execution and typed effects
-(09.4b.2/AR3), followed by remaining current/staged pipeline intermediates and execution contracts
-(30.1/AR7.8). Default immutable Subgraph ownership **26.1/AR4/AR7.5** and pinned
+Current remainder (2026-11-12): broader topology execution/effects
+(09.4b.2/AR3), especially addition/revision stages, ordinary algorithms over staged
+topology and wider execution scopes (30.1/AR7.8). Local atomic removals and explicit
+immutable selected pending graph/table reads are implemented
+(`terminal-topology-pipeline-2026-11-12.md`, `staged-graph-capture-2026-11-12.md`). Default immutable Subgraph ownership **26.1/AR4/AR7.5** and pinned
 query migration **21.2 are complete**. See `default-immutable-views-2026-10-30.md`
 and `pinned-query-exit-review-2026-11-05.md`. Explicit connected views remain a
 compatibility choice. Full cold capture remains linear; weak caches avoid keeping
@@ -2109,3 +2111,30 @@ without filling the unanswered A14.1 naming decision.
 explicit immutable staged graph/table values after topology, then broader
 addition/revision effects and outer execution contracts. Naming/cache policy,
 scale promises and deferred Graphiti/service work retain their prior boundaries.
+
+
+### November 12 follow-on — selected pending graph/table reads completed
+
+`graph.capture_staged` captures explicit immutable selected values before/after
+pending properties and removals. Existing graph/table primitives and aliases can
+read them after topology staging; native effect classification rejects unadapted
+calculations. One canonical acceptance/output rollback boundary is retained.
+Captures keep typed values, exact identities, meta-group sources and worker-safe
+lifetimes, but have no accepted-state write pin. Capture-only runs add no history.
+
+This is selected-data materialization, not a lazy/constant-time overlay. The same
+release binary measures removal-only medians 0.426/38.466 ms (1k/100k nodes),
+versus 1.177/193.629 ms when also capturing a pending graph, projecting its node
+table and emitting both. No implicit capture is introduced on ordinary mutations.
+Full scopes, raw samples and limitations: `staged-graph-capture-2026-11-12.md`.
+
+Final checks: **1,555 Rust passed / 54 ignored**, final targeted native **13 passed**,
+strict all-target Clippy, rebuilt/staged release, **2,645 maintained Python passed /
+1 skipped / 15 warnings**, **264 executable docs**. The known writable graph GC
+warning and three existing FFI compile warnings remain. Naming/cache workbook
+question A14.1 stays unanswered; no policy inferred.
+
+Next core execution scope: addition/endpoint-revision stages, ordinary algorithms
+over staged topology and wider nested/outer effect execution; broader DSL,
+streaming, scale and release contracts remain. **215 checked / 53 open / 268 total**;
+no rows added and no broad parent checked off for this bounded component.
