@@ -1,0 +1,602 @@
+{
+  "scope": "Three additional quiet runs of the final release binary, without compilation or tests; same toolchain/profile/fixture. Samples retained rather than replacing initial measurements.",
+  "runs": [
+    {
+      "cases": [
+        {
+          "ascii_output_hash": "dc084747850b2701",
+          "mode": "compact",
+          "output_bytes": 323,
+          "rows": 0,
+          "seconds_per_render": [
+            1.66334e-06,
+            1.33542e-06,
+            1.32542e-06,
+            1.32041e-06,
+            1.32e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "dc084747850b2701",
+          "mode": "full",
+          "output_bytes": 323,
+          "rows": 0,
+          "seconds_per_render": [
+            1.2566699999999998e-06,
+            1.2525e-06,
+            1.2520899999999998e-06,
+            1.2558400000000002e-06,
+            1.24917e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "98960f0d7fb22aef",
+          "mode": "html",
+          "output_bytes": 5624,
+          "rows": 0,
+          "seconds_per_render": [
+            2.69209e-06,
+            2.5295899999999996e-06,
+            2.59375e-06,
+            2.5212500000000002e-06,
+            2.52041e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "71894943c7fe54f2",
+          "mode": "compact",
+          "output_bytes": 442,
+          "rows": 1,
+          "seconds_per_render": [
+            1.95209e-06,
+            1.94166e-06,
+            1.93917e-06,
+            1.94208e-06,
+            1.94208e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "71894943c7fe54f2",
+          "mode": "full",
+          "output_bytes": 442,
+          "rows": 1,
+          "seconds_per_render": [
+            1.95583e-06,
+            1.95958e-06,
+            1.95458e-06,
+            1.95958e-06,
+            1.95209e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "7a2c2f4d9667a7b2",
+          "mode": "html",
+          "output_bytes": 6049,
+          "rows": 1,
+          "seconds_per_render": [
+            7.0475e-06,
+            8.0325e-06,
+            6.719589999999999e-06,
+            6.69708e-06,
+            6.695409999999999e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "68a8b19351d913fa",
+          "mode": "compact",
+          "output_bytes": 883,
+          "rows": 10,
+          "seconds_per_render": [
+            7.2866700000000005e-06,
+            7.26834e-06,
+            7.26125e-06,
+            7.25916e-06,
+            7.31958e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "68a8b19351d913fa",
+          "mode": "full",
+          "output_bytes": 883,
+          "rows": 10,
+          "seconds_per_render": [
+            7.40375e-06,
+            7.40958e-06,
+            7.404999999999999e-06,
+            7.42666e-06,
+            7.4025e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "25b7e3bc699b72cb",
+          "mode": "html",
+          "output_bytes": 9874,
+          "rows": 10,
+          "seconds_per_render": [
+            4.624291e-05,
+            4.6870000000000004e-05,
+            4.654833e-05,
+            4.7275420000000006e-05,
+            4.61475e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "84c5e01d66594097",
+          "mode": "compact",
+          "output_bytes": 5513,
+          "rows": 100,
+          "seconds_per_render": [
+            6.375040999999999e-05,
+            6.564166e-05,
+            6.324917e-05,
+            6.557875e-05,
+            6.444292e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "84c5e01d66594097",
+          "mode": "full",
+          "output_bytes": 5513,
+          "rows": 100,
+          "seconds_per_render": [
+            6.627167e-05,
+            6.473209e-05,
+            6.552625e-05,
+            8.410959e-05,
+            6.390416e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "47e143bf7abac2e5",
+          "mode": "html",
+          "output_bytes": 48394,
+          "rows": 100,
+          "seconds_per_render": [
+            0.00045373917,
+            0.00045344792,
+            0.00045686333000000004,
+            0.00045302125,
+            0.00045561083
+          ]
+        }
+      ],
+      "scope": "Native release ASCII display corpus: compact/full Unicode and themed semantic HTML. Five samples of 100 renders; fixture/config construction excluded, rendering allocations included but not counted. Fingerprints use DefaultHasher only for a same-toolchain matched refactor comparison, not a stable external hash. Text-prefix cases compare the prior safe helper from 97705924 against the bounded helper in the same binary; budget 20; construction excluded and outputs validated outside timing. Whole HTML still escapes full tooltip content. No allocation/RSS/GIL/production claim.",
+      "text_prefix": [
+        {
+          "bounded_prefix_seconds": [
+            1.3e-07,
+            1.2792e-07,
+            1.2792e-07,
+            1.2792e-07,
+            1.2791e-07
+          ],
+          "budget_characters": 20,
+          "input_characters": 1000,
+          "prior_count_all_seconds": [
+            4.7208e-07,
+            4.0040999999999997e-07,
+            4.0000000000000003e-07,
+            3.9875e-07,
+            3.9791e-07
+          ]
+        },
+        {
+          "bounded_prefix_seconds": [
+            1.3e-07,
+            1.5582999999999999e-07,
+            1.3166e-07,
+            1.3125000000000001e-07,
+            1.2834e-07
+          ],
+          "budget_characters": 20,
+          "input_characters": 1000000,
+          "prior_count_all_seconds": [
+            0.00014438708,
+            0.00014526291,
+            0.00014395125,
+            0.00014249542,
+            0.00014429375
+          ]
+        }
+      ]
+    },
+    {
+      "cases": [
+        {
+          "ascii_output_hash": "dc084747850b2701",
+          "mode": "compact",
+          "output_bytes": 323,
+          "rows": 0,
+          "seconds_per_render": [
+            1.47708e-06,
+            1.28125e-06,
+            1.27792e-06,
+            1.2820900000000001e-06,
+            1.28084e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "dc084747850b2701",
+          "mode": "full",
+          "output_bytes": 323,
+          "rows": 0,
+          "seconds_per_render": [
+            1.23375e-06,
+            1.23083e-06,
+            1.23084e-06,
+            1.23e-06,
+            1.23e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "98960f0d7fb22aef",
+          "mode": "html",
+          "output_bytes": 5624,
+          "rows": 0,
+          "seconds_per_render": [
+            4.31709e-06,
+            2.52042e-06,
+            2.51583e-06,
+            2.5170800000000003e-06,
+            2.515e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "71894943c7fe54f2",
+          "mode": "compact",
+          "output_bytes": 442,
+          "rows": 1,
+          "seconds_per_render": [
+            1.92666e-06,
+            1.91583e-06,
+            1.91417e-06,
+            1.9158399999999998e-06,
+            1.91459e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "71894943c7fe54f2",
+          "mode": "full",
+          "output_bytes": 442,
+          "rows": 1,
+          "seconds_per_render": [
+            1.92834e-06,
+            1.92834e-06,
+            1.92208e-06,
+            1.92666e-06,
+            1.92417e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "7a2c2f4d9667a7b2",
+          "mode": "html",
+          "output_bytes": 6049,
+          "rows": 1,
+          "seconds_per_render": [
+            7.15625e-06,
+            7.029169999999999e-06,
+            6.833330000000001e-06,
+            6.83875e-06,
+            6.85125e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "68a8b19351d913fa",
+          "mode": "compact",
+          "output_bytes": 883,
+          "rows": 10,
+          "seconds_per_render": [
+            7.394580000000001e-06,
+            7.389160000000001e-06,
+            7.4162499999999995e-06,
+            7.38583e-06,
+            7.6237500000000005e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "68a8b19351d913fa",
+          "mode": "full",
+          "output_bytes": 883,
+          "rows": 10,
+          "seconds_per_render": [
+            7.40584e-06,
+            7.3995899999999996e-06,
+            7.40084e-06,
+            7.395e-06,
+            7.40333e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "25b7e3bc699b72cb",
+          "mode": "html",
+          "output_bytes": 9874,
+          "rows": 10,
+          "seconds_per_render": [
+            4.7592499999999995e-05,
+            4.668667e-05,
+            4.6734159999999994e-05,
+            4.6519580000000006e-05,
+            4.693917e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "84c5e01d66594097",
+          "mode": "compact",
+          "output_bytes": 5513,
+          "rows": 100,
+          "seconds_per_render": [
+            6.469875e-05,
+            6.336459e-05,
+            6.355124999999999e-05,
+            6.422541e-05,
+            6.403459e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "84c5e01d66594097",
+          "mode": "full",
+          "output_bytes": 5513,
+          "rows": 100,
+          "seconds_per_render": [
+            6.413792e-05,
+            6.342166e-05,
+            6.384875e-05,
+            6.348833e-05,
+            6.340625e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "47e143bf7abac2e5",
+          "mode": "html",
+          "output_bytes": 48394,
+          "rows": 100,
+          "seconds_per_render": [
+            0.00045424542,
+            0.00045537124999999996,
+            0.00045433,
+            0.00045267083999999996,
+            0.00045448707999999995
+          ]
+        }
+      ],
+      "scope": "Native release ASCII display corpus: compact/full Unicode and themed semantic HTML. Five samples of 100 renders; fixture/config construction excluded, rendering allocations included but not counted. Fingerprints use DefaultHasher only for a same-toolchain matched refactor comparison, not a stable external hash. Text-prefix cases compare the prior safe helper from 97705924 against the bounded helper in the same binary; budget 20; construction excluded and outputs validated outside timing. Whole HTML still escapes full tooltip content. No allocation/RSS/GIL/production claim.",
+      "text_prefix": [
+        {
+          "bounded_prefix_seconds": [
+            1.3458e-07,
+            1.3292e-07,
+            1.3333e-07,
+            1.3333e-07,
+            1.3334e-07
+          ],
+          "budget_characters": 20,
+          "input_characters": 1000,
+          "prior_count_all_seconds": [
+            4.4792e-07,
+            3.9875e-07,
+            3.9833000000000005e-07,
+            3.9666e-07,
+            3.9792e-07
+          ]
+        },
+        {
+          "bounded_prefix_seconds": [
+            1.3208e-07,
+            1.55e-07,
+            1.3e-07,
+            1.3417000000000002e-07,
+            1.3083e-07
+          ],
+          "budget_characters": 20,
+          "input_characters": 1000000,
+          "prior_count_all_seconds": [
+            0.00014291959,
+            0.0001426725,
+            0.00014328583,
+            0.00014345709,
+            0.0001442475
+          ]
+        }
+      ]
+    },
+    {
+      "cases": [
+        {
+          "ascii_output_hash": "dc084747850b2701",
+          "mode": "compact",
+          "output_bytes": 323,
+          "rows": 0,
+          "seconds_per_render": [
+            1.48375e-06,
+            1.2912500000000001e-06,
+            1.29292e-06,
+            2.51875e-06,
+            1.3125e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "dc084747850b2701",
+          "mode": "full",
+          "output_bytes": 323,
+          "rows": 0,
+          "seconds_per_render": [
+            1.27041e-06,
+            1.26166e-06,
+            1.26083e-06,
+            1.2595900000000001e-06,
+            1.2650000000000002e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "98960f0d7fb22aef",
+          "mode": "html",
+          "output_bytes": 5624,
+          "rows": 0,
+          "seconds_per_render": [
+            2.8216599999999998e-06,
+            2.60291e-06,
+            2.71959e-06,
+            2.5895900000000003e-06,
+            2.57375e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "71894943c7fe54f2",
+          "mode": "compact",
+          "output_bytes": 442,
+          "rows": 1,
+          "seconds_per_render": [
+            2.0245899999999998e-06,
+            1.9379200000000002e-06,
+            1.93041e-06,
+            1.9349999999999997e-06,
+            1.93166e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "71894943c7fe54f2",
+          "mode": "full",
+          "output_bytes": 442,
+          "rows": 1,
+          "seconds_per_render": [
+            1.9375e-06,
+            1.9387500000000003e-06,
+            1.9375e-06,
+            1.9358299999999997e-06,
+            1.93625e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "7a2c2f4d9667a7b2",
+          "mode": "html",
+          "output_bytes": 6049,
+          "rows": 1,
+          "seconds_per_render": [
+            7.0204100000000004e-06,
+            6.88167e-06,
+            7.30084e-06,
+            6.89167e-06,
+            6.88833e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "68a8b19351d913fa",
+          "mode": "compact",
+          "output_bytes": 883,
+          "rows": 10,
+          "seconds_per_render": [
+            7.97709e-06,
+            7.41042e-06,
+            7.41834e-06,
+            7.412090000000001e-06,
+            7.42584e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "68a8b19351d913fa",
+          "mode": "full",
+          "output_bytes": 883,
+          "rows": 10,
+          "seconds_per_render": [
+            7.43041e-06,
+            7.42542e-06,
+            7.4291699999999995e-06,
+            7.425e-06,
+            7.4354200000000005e-06
+          ]
+        },
+        {
+          "ascii_output_hash": "25b7e3bc699b72cb",
+          "mode": "html",
+          "output_bytes": 9874,
+          "rows": 10,
+          "seconds_per_render": [
+            4.863542e-05,
+            4.6404169999999997e-05,
+            4.698583e-05,
+            4.6947500000000004e-05,
+            4.6249580000000004e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "84c5e01d66594097",
+          "mode": "compact",
+          "output_bytes": 5513,
+          "rows": 100,
+          "seconds_per_render": [
+            6.481708e-05,
+            6.369833e-05,
+            6.330458e-05,
+            6.471958e-05,
+            6.451792e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "84c5e01d66594097",
+          "mode": "full",
+          "output_bytes": 5513,
+          "rows": 100,
+          "seconds_per_render": [
+            6.4485e-05,
+            6.450833e-05,
+            6.361459e-05,
+            6.399625e-05,
+            6.377375e-05
+          ]
+        },
+        {
+          "ascii_output_hash": "47e143bf7abac2e5",
+          "mode": "html",
+          "output_bytes": 48394,
+          "rows": 100,
+          "seconds_per_render": [
+            0.00045816708,
+            0.00046015125,
+            0.00046287666,
+            0.0004661175,
+            0.00045737083999999997
+          ]
+        }
+      ],
+      "scope": "Native release ASCII display corpus: compact/full Unicode and themed semantic HTML. Five samples of 100 renders; fixture/config construction excluded, rendering allocations included but not counted. Fingerprints use DefaultHasher only for a same-toolchain matched refactor comparison, not a stable external hash. Text-prefix cases compare the prior safe helper from 97705924 against the bounded helper in the same binary; budget 20; construction excluded and outputs validated outside timing. Whole HTML still escapes full tooltip content. No allocation/RSS/GIL/production claim.",
+      "text_prefix": [
+        {
+          "bounded_prefix_seconds": [
+            1.3709e-07,
+            1.3458e-07,
+            1.3459e-07,
+            1.3416e-07,
+            1.3459e-07
+          ],
+          "budget_characters": 20,
+          "input_characters": 1000,
+          "prior_count_all_seconds": [
+            4.6167e-07,
+            3.9834e-07,
+            3.9625e-07,
+            3.9666999999999996e-07,
+            4.6292e-07
+          ]
+        },
+        {
+          "bounded_prefix_seconds": [
+            1.3291e-07,
+            1.3292e-07,
+            1.3333e-07,
+            1.3125000000000001e-07,
+            1.3708e-07
+          ],
+          "budget_characters": 20,
+          "input_characters": 1000000,
+          "prior_count_all_seconds": [
+            0.00014188708,
+            0.00014408708,
+            0.00014476292,
+            0.00014353792000000002,
+            0.00014298708
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+{
+  "cases": [
+    {
+      "ascii_output_hash": "dc084747850b2701",
+      "mode": "compact",
+      "output_bytes": 323,
+      "rows": 0,
+      "seconds_per_render": [
+        4.4812500000000005e-6,
+        3.1550000000000003e-6,
+        3.13917e-6,
+        3.15958e-6,
+        3.15666e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "dc084747850b2701",
+      "mode": "full",
+      "output_bytes": 323,
+      "rows": 0,
+      "seconds_per_render": [
+        3.23334e-6,
+        3.06083e-6,
+        3.09667e-6,
+        3.0487500000000002e-6,
+        3.04916e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "98960f0d7fb22aef",
+      "mode": "html",
+      "output_bytes": 5624,
+      "rows": 0,
+      "seconds_per_render": [
+        6.475e-6,
+        6.179160000000001e-6,
+        6.18458e-6,
+        7.22625e-6,
+        6.205e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "71894943c7fe54f2",
+      "mode": "compact",
+      "output_bytes": 442,
+      "rows": 1,
+      "seconds_per_render": [
+        4.71625e-6,
+        4.02875e-6,
+        4.02416e-6,
+        4.0225e-6,
+        4.0175e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "71894943c7fe54f2",
+      "mode": "full",
+      "output_bytes": 442,
+      "rows": 1,
+      "seconds_per_render": [
+        4.03917e-6,
+        4.04084e-6,
+        4.03292e-6,
+        4.03417e-6,
+        4.03292e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "7a2c2f4d9667a7b2",
+      "mode": "html",
+      "output_bytes": 6049,
+      "rows": 1,
+      "seconds_per_render": [
+        0.00001496167,
+        0.00001409708,
+        0.000012425830000000001,
+        0.00001338792,
+        0.000012518340000000001
+      ]
+    },
+    {
+      "ascii_output_hash": "68a8b19351d913fa",
+      "mode": "compact",
+      "output_bytes": 883,
+      "rows": 10,
+      "seconds_per_render": [
+        0.00001340625,
+        0.00001338833,
+        0.00001183208,
+        0.00001258583,
+        0.000011848749999999999
+      ]
+    },
+    {
+      "ascii_output_hash": "68a8b19351d913fa",
+      "mode": "full",
+      "output_bytes": 883,
+      "rows": 10,
+      "seconds_per_render": [
+        0.00001185958,
+        9.71542e-6,
+        8.81584e-6,
+        8.76542e-6,
+        9.36583e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "25b7e3bc699b72cb",
+      "mode": "html",
+      "output_bytes": 9874,
+      "rows": 10,
+      "seconds_per_render": [
+        0.00006747791,
+        0.00006282707999999999,
+        0.000058553750000000005,
+        0.000055218339999999996,
+        0.000055127500000000004
+      ]
+    },
+    {
+      "ascii_output_hash": "84c5e01d66594097",
+      "mode": "compact",
+      "output_bytes": 5513,
+      "rows": 100,
+      "seconds_per_render": [
+        0.00006987333,
+        0.00006877000000000001,
+        0.00006510833,
+        0.00006407333,
+        0.00006378667000000001
+      ]
+    },
+    {
+      "ascii_output_hash": "84c5e01d66594097",
+      "mode": "full",
+      "output_bytes": 5513,
+      "rows": 100,
+      "seconds_per_render": [
+        0.00006407917,
+        0.00006354125,
+        0.00006467375,
+        0.00006376708000000001,
+        0.00006497166
+      ]
+    },
+    {
+      "ascii_output_hash": "47e143bf7abac2e5",
+      "mode": "html",
+      "output_bytes": 48394,
+      "rows": 100,
+      "seconds_per_render": [
+        0.00045939916999999995,
+        0.000461835,
+        0.00046231916999999996,
+        0.00046220791999999997,
+        0.000458035
+      ]
+    }
+  ],
+  "scope": "Native release ASCII display corpus: compact/full Unicode and themed semantic HTML. Five samples of 100 renders; fixture/config construction excluded, rendering allocations included but not counted. Fingerprints use DefaultHasher only for a same-toolchain matched refactor comparison, not a stable external hash. Text-prefix cases compare the prior safe helper from 97705924 against the bounded helper in the same binary; budget 20; construction excluded and outputs validated outside timing. Whole HTML still escapes full tooltip content. No allocation/RSS/GIL/production claim.",
+  "text_prefix": [
+    {
+      "bounded_prefix_seconds": [
+        1.3333e-7,
+        1.3042e-7,
+        1.3e-7,
+        1.3e-7,
+        1.3041e-7
+      ],
+      "budget_characters": 20,
+      "input_characters": 1000,
+      "prior_count_all_seconds": [
+        5.5875e-7,
+        3.9333e-7,
+        3.9416e-7,
+        3.925e-7,
+        3.9291e-7
+      ]
+    },
+    {
+      "bounded_prefix_seconds": [
+        1.3125000000000001e-7,
+        1.5916e-7,
+        1.6249999999999998e-7,
+        1.5582999999999999e-7,
+        1.3292e-7
+      ],
+      "budget_characters": 20,
+      "input_characters": 1000000,
+      "prior_count_all_seconds": [
+        0.00014225459,
+        0.00014529792,
+        0.00014384292,
+        0.00014217167,
+        0.00014299208
+      ]
+    }
+  ]
+}

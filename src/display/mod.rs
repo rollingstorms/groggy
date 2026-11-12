@@ -1,10 +1,14 @@
 /*!
-Pure Rust display formatting for GraphArray, GraphMatrix, and GraphTable.
+Native display formatting and rendering for arrays, matrices, tables and graph views.
 
-This module provides professional Unicode table formatting without Python dependencies,
-replacing the previous Python-based display system for better performance and
-architectural consistency.
+`render` owns typed DataWindow/schema, render configuration, themes and Unicode/HTML
+engines. Legacy JSON-dictionary formatters retain their distinct public input/config
+contracts here. Python adapters and compatibility imports delegate to these native
+owners; the separate historical Python formatter classes still await migration.
 */
+
+/// Native typed rendering, theme/configuration and DataWindow ownership.
+pub mod render;
 
 pub mod array_formatter;
 pub mod matrix_formatter;

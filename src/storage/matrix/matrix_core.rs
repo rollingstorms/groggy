@@ -22,7 +22,7 @@ use crate::storage::matrix::{
 };
 use crate::storage::table::BaseTable;
 use crate::types::{AttrValue, NodeId};
-use crate::viz::display::DisplayConfig;
+use crate::display::render::DisplayConfig;
 use std::sync::Arc;
 
 /// Owned solution plus a rounded normwise backward-error estimate.

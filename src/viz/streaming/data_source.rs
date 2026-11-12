@@ -4,7 +4,7 @@
 //! virtual scrolling, and real-time updates.
 
 use crate::types::AttrValue;
-use crate::viz::display::{ColumnSchema, DataType};
+use crate::display::render::{ColumnSchema, DataType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

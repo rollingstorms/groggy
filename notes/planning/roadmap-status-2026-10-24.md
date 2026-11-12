@@ -1,7 +1,27 @@
 # Groggy roadmap status — 2026-10-24
 
+## Current checkpoint — 2026-11-11
+
+The authoritative [flat checklist](graph-engine-flat-checklist.md) has
+**215 checked / 53 open / 268 total**, including overlapping parent/component
+entries. The [execution priorities](roadmap-finish-priorities-2026-10-22.md)
+record the remaining work and gates. No rows were added in this work window.
+
+Completed component slices: bulk captured collection projection, incident-indexed
+frozen composition planning, nine typed immutable graph/table pipeline read
+stages, and native display ownership/caller migration with safe rendering fixes.
+See the dated slice ledger and receipts. These complete concrete inventories;
+generic current/staged topology intermediates, naming/cache policy, historical
+Python display adapters and broader numerical/storage/release gates remain open.
+
+## Earlier status record
+
+The material below retains its earlier completion boundaries and counts for
+historical context. It is not the current checklist inventory; use the links
+above for present status.
+
 Branch: `groggy-roadmap-2026-10-20`. The [flat checklist](graph-engine-flat-checklist.md)
-currently contains **209 checked and 59 unchecked entries**. Entries overlap:
+at this earlier checkpoint contained **209 checked and 59 unchecked entries**. Entries overlap:
 parent workstreams and smaller repair slices both appear, and unchecked entries
 include partial, open, review and deferred work. These counts are an inventory,
 not a completion percentage or an estimate of remaining implementation effort.

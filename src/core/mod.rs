@@ -1,13 +1,11 @@
-//! Core functionality for Groggy graph library
+//! Compatibility aliases for historical display and streaming imports.
 //!
-//! This module contains the core data structures, algorithms, and systems
-//! that form the foundation of the Groggy graph library.
-//!
-//! Note: Display and streaming functionality has been moved to the viz module
-//! for unified visualization capabilities.
+//! Authoritative typed rendering lives in crate::display::render. Streaming owns
+//! its separate visualization/service types in crate::viz::streaming. Native
+//! consumers refer to those owners directly; these aliases preserve old imports.
 
-// Re-export key display functionality from viz module for backward compatibility
-pub use crate::viz::display::{
+// Compatibility aliases only; native callers use display::render directly.
+pub use crate::display::render::{
     BuiltInTheme, ColumnSchema, DataType, DisplayConfig, DisplayEngine, OutputFormat, Theme,
     ThemeSystem, TruncationStrategy,
 };
@@ -20,7 +18,9 @@ pub use crate::viz::streaming::{
 };
 
 // Qualified re-exports to avoid conflicts
-pub use crate::viz::display::{DataSchema as DisplayDataSchema, DataWindow as DisplayDataWindow};
+pub use crate::display::render::{
+    DataSchema as DisplayDataSchema, DataWindow as DisplayDataWindow,
+};
 pub use crate::viz::streaming::{
     DataSchema as StreamingDataSchema, DataWindow as StreamingDataWindow,
 };

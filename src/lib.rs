@@ -153,7 +153,7 @@ pub mod temporal; // Temporal snapshot utilities
 pub mod traits;
 pub mod utils; // Utilities and configuration // Graph entity traits
 
-// Display formatting (legacy - being replaced by core::display)
+// Native display formatting/rendering and compatibility frontends
 pub mod display;
 
 // Visualization module for interactive graph exploration

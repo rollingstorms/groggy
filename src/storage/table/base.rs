@@ -6,11 +6,11 @@ mod joins;
 mod row_ops;
 
 use super::traits::Table;
-use crate::core::{DisplayDataSchema, DisplayDataWindow};
+use crate::display::render::{DataSchema as DisplayDataSchema, DataWindow as DisplayDataWindow};
 use crate::errors::GraphResult;
 use crate::storage::array::BaseArray;
 use crate::types::AttrValue;
-use crate::viz::display::{ColumnSchema, DataType, DisplayConfig, DisplayEngine, OutputFormat};
+use crate::display::render::{ColumnSchema, DataType, DisplayConfig, DisplayEngine, OutputFormat};
 use crate::viz::streaming::data_source::{DataSchema, DataWindow};
 use crate::viz::streaming::data_source::{GraphNode, LayoutAlgorithm, NodePosition};
 use crate::viz::streaming::server::StreamingServer;

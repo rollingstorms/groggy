@@ -3,7 +3,7 @@
 //! This module contains the DisplayEngine that orchestrates all display formatting.
 //! It's implemented ONLY in BaseTable and BaseArray - all other types delegate.
 
-use crate::viz::display::{
+use crate::display::render::{
     CompactFormatter, DataWindow, HtmlRenderer, ThemeSystem, TruncationStrategy,
 };
 
@@ -81,7 +81,7 @@ impl DisplayEngine {
     }
 
     /// Get current theme
-    pub fn get_current_theme(&self) -> &crate::viz::display::Theme {
+    pub fn get_current_theme(&self) -> &crate::display::render::Theme {
         self.theme_system.get_theme(&self.config.theme)
     }
 }
@@ -235,7 +235,7 @@ impl std::fmt::Display for OutputFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::display::{ColumnSchema, DataSchema, DataType, DataWindow};
+    use crate::display::render::{ColumnSchema, DataSchema, DataType, DataWindow};
 
     fn create_test_data() -> DataWindow {
         let headers = vec!["name".to_string(), "age".to_string(), "score".to_string()];

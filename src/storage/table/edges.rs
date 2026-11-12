@@ -6,7 +6,7 @@ use super::traits::Table;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::array::BaseArray;
 use crate::types::{AttrValue, EdgeId, NodeId};
-use crate::viz::display::{ColumnSchema, DataType};
+use crate::display::render::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
     DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm,
     NodePosition, Position,

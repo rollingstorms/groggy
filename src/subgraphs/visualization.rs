@@ -4,7 +4,7 @@
 use crate::core::{StreamingDataSchema, StreamingDataWindow};
 use crate::subgraphs::Subgraph;
 use crate::types::{AttrValue, EdgeId, NodeId};
-use crate::viz::display::{ColumnSchema, DataType};
+use crate::display::render::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
     DataSource, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm, NodePosition, Position,
 };

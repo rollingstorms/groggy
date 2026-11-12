@@ -442,7 +442,7 @@ Code / record context:
 
 Roadmap: 30 / AR5. Timing: AFTER PRIMITIVE REPAIRS.
 
-**Current code / problem:** The pipeline/builder already exists and should be extended from its working behavior. Intermediate result names, cache ownership, provenance and whether a run becomes a graph entity remain unresolved.
+**Current code / problem:** The pipeline/builder already exists. Nine typed captured graph/table read stages and explicit named outputs now use its native interpreter, with local/outer atomic output rollback and preserved source provenance (`typed-pipeline-values-2026-11-11.md`). Optional generated names, cache ownership and broader current/topology intermediates remain unresolved. A14.2 already confirms transient runs by default; it is not an unanswered policy.
 
 **Already agreed:** Pin each run to an input state. Keep pipeline execution on the corrected core and numerical operations.
 

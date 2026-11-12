@@ -12,10 +12,10 @@ Implemented: AR7.2–AR7.4 consolidation, numerical completion slices and receip
 AR7.5a–l immutable reads through components and centralities, AR7.9a canonical
 logical change records, and 07.3a f64 representation, supported consumer migration
 and ordinary Python default switching, plus 07.3b native temporal properties.
-See the flat checklist for each supported scope and evidence.
+The nine-stage typed immutable graph/table read inventory and native display ownership component are also implemented (`typed-pipeline-values-2026-11-11.md`, `display-foundation-2026-11-11.md`). See the flat checklist for supported scopes and remaining exits.
 
 Current remainder (2026-11-11): compound topology execution and typed effects
-(09.4b.2/AR3), followed by typed pipeline intermediates and execution contracts
+(09.4b.2/AR3), followed by remaining current/staged pipeline intermediates and execution contracts
 (30.1/AR7.8). Default immutable Subgraph ownership **26.1/AR4/AR7.5** and pinned
 query migration **21.2 are complete**. See `default-immutable-views-2026-10-30.md`
 and `pinned-query-exit-review-2026-11-05.md`. Explicit connected views remain a
@@ -2056,3 +2056,33 @@ maintained Python / 1 skipped**, **260 executable docs**. Rebuilt in-tree releas
 extension retains three existing FFI warnings. Current staged/topology graph
 intermediates, remaining DSL/IR lowering, naming/cache/streaming remain open.
 **215 checked / 53 open / 268 total**, no checklist rows added.
+
+
+## 2026-11-11 — native display ownership, compatibility and rendering safety
+
+Completed the native ownership/caller migration component of AR7.6/AR7.11.
+Typed windows/schema, configuration, renderers, themes and existing CSS now have
+one owner under display::render; core/viz display paths remain type-identical
+aliases. Native storage/graph callers use the owner directly. Fixed reproduced
+UTF-8 JSON clipping and signed-minimum HTML failures plus zero-budget underflow.
+Shared bounded clipping uses an ASCII prefix fast path; old positive-budget ASCII
+layouts retain all 12 corpus fingerprints. Native prefix work for one million
+characters improves 142.943 → 0.128 μs in a same-binary comparison; whole rendering
+still includes full tooltip escaping. Full render timings are mixed and preserved
+in the receipts, including quiet repeats. No universal throughput claim.
+Receipt: `display-foundation-2026-11-11.md`.
+
+Final gates: **1,547 native / 54 ignored**, strict all-target Clippy, rebuilt release
+in-tree extension, **2,612 maintained Python / 1 skipped**, **261 executable docs**.
+Three existing FFI compile warnings remain. The Python gate also emitted a
+PyGraph unsendable-finalization warning (15 total warnings instead of the usual
+14); this is recorded under existing 19.2 without attributing it to the test where
+GC reported it. It remains unresolved; no unsafe Send workaround was introduced.
+
+Historical Python formatter adapters/shared scalar presentation policy and wider
+compatibility/performance gates remain in AR7.6. Current/staged topology pipeline
+intermediates, naming/cache policy and broader scale/numerical/release gates
+retain their prior scope. **215 checked / 53 open / 268 total**; no rows added.
+The status overview now distinguishes its earlier 209/59 record from this current
+inventory, and the workbook appendix records the implemented typed read stages
+without filling the unanswered A14.1 naming decision.

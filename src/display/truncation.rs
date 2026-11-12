@@ -5,13 +5,55 @@ Direct Rust port of the Python truncation.py module.
 
 use std::cmp;
 
-/// Truncate a string to specified width, adding ellipsis if needed
+/// Truncate to a Unicode scalar-character budget, adding ellipsis if needed.
+/// A zero budget returns empty text. This is not terminal/grapheme display width.
+#[inline]
 pub fn truncate_string(text: &str, max_width: usize) -> String {
-    if text.chars().count() <= max_width {
-        text.to_string()
+    if max_width == 0 {
+        return String::new();
+    }
+    if text.as_bytes()[..text.len().min(max_width.saturating_add(1))].is_ascii() {
+        if text.len() <= max_width {
+            return text.to_owned();
+        }
+        // Only a bounded ASCII prefix is inspected, including the cut position.
+        return format!(
+            "{}{}",
+            &text[..max_width - 1],
+            super::unicode_chars::Symbols::ELLIPSIS
+        );
+    }
+    let mut chars = text.char_indices();
+    let Some((end, _)) = chars.nth(max_width - 1) else {
+        return text.to_owned();
+    };
+    if chars.next().is_none() {
+        return text.to_owned();
+    }
+    // end comes from this immutable str's char_indices, so slicing cannot split
+    // UTF-8. Only the visible budget plus one character is inspected.
+    format!(
+        "{}{}",
+        &text[..end],
+        super::unicode_chars::Symbols::ELLIPSIS
+    )
+}
+
+#[inline]
+pub(crate) fn exceeds_character_budget(text: &str, max_width: usize) -> bool {
+    if text.as_bytes()[..text.len().min(max_width.saturating_add(1))].is_ascii() {
+        text.len() > max_width
     } else {
-        let truncated: String = text.chars().take(max_width.saturating_sub(1)).collect();
-        format!("{}{}", truncated, super::unicode_chars::Symbols::ELLIPSIS)
+        text.chars().nth(max_width).is_some()
+    }
+}
+
+#[inline]
+pub(crate) fn character_width_up_to(text: &str, limit: usize) -> usize {
+    if text.as_bytes()[..text.len().min(limit)].is_ascii() {
+        text.len().min(limit)
+    } else {
+        text.chars().take(limit).count()
     }
 }
 
@@ -21,7 +63,7 @@ pub fn truncate_rows<T: Clone>(data: Vec<T>, max_rows: usize) -> (Vec<T>, bool) 
         (data, false)
     } else {
         let show_first = max_rows / 2;
-        let show_last = max_rows - show_first - 1; // -1 for ellipsis row
+        let show_last = max_rows.saturating_sub(show_first + 1); // reserve ellipsis row
 
         let mut result = Vec::new();
 
@@ -50,7 +92,7 @@ pub fn truncate_columns<T: Clone>(
         (headers, data, false)
     } else {
         let show_first = max_cols / 2;
-        let show_last = max_cols - show_first - 1; // -1 for ellipsis column
+        let show_last = max_cols.saturating_sub(show_first + 1); // reserve ellipsis column
 
         // Truncate headers
         let mut truncated_headers = Vec::new();

@@ -1,0 +1,161 @@
+{
+  "cases": [
+    {
+      "ascii_output_hash": "dc084747850b2701",
+      "mode": "compact",
+      "output_bytes": 323,
+      "rows": 0,
+      "seconds_per_render": [
+        1.6425000000000002e-6,
+        1.33334e-6,
+        1.3316700000000001e-6,
+        1.315e-6,
+        1.32167e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "dc084747850b2701",
+      "mode": "full",
+      "output_bytes": 323,
+      "rows": 0,
+      "seconds_per_render": [
+        1.24792e-6,
+        1.25e-6,
+        1.24833e-6,
+        1.24542e-6,
+        1.23833e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "98960f0d7fb22aef",
+      "mode": "html",
+      "output_bytes": 5624,
+      "rows": 0,
+      "seconds_per_render": [
+        2.8041600000000004e-6,
+        2.62375e-6,
+        3.2933399999999997e-6,
+        2.6395900000000003e-6,
+        2.6425e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "71894943c7fe54f2",
+      "mode": "compact",
+      "output_bytes": 442,
+      "rows": 1,
+      "seconds_per_render": [
+        1.9475e-6,
+        1.84667e-6,
+        1.8612500000000002e-6,
+        1.84458e-6,
+        1.84334e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "71894943c7fe54f2",
+      "mode": "full",
+      "output_bytes": 442,
+      "rows": 1,
+      "seconds_per_render": [
+        1.86708e-6,
+        1.85042e-6,
+        1.8608399999999999e-6,
+        1.8425000000000001e-6,
+        1.8625e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "7a2c2f4d9667a7b2",
+      "mode": "html",
+      "output_bytes": 6049,
+      "rows": 1,
+      "seconds_per_render": [
+        7.14791e-6,
+        7.02542e-6,
+        7.90166e-6,
+        7.17208e-6,
+        7.18292e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "68a8b19351d913fa",
+      "mode": "compact",
+      "output_bytes": 883,
+      "rows": 10,
+      "seconds_per_render": [
+        7.00417e-6,
+        6.89625e-6,
+        7.09459e-6,
+        8.06709e-6,
+        7.20375e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "68a8b19351d913fa",
+      "mode": "full",
+      "output_bytes": 883,
+      "rows": 10,
+      "seconds_per_render": [
+        7.22042e-6,
+        7.27709e-6,
+        7.375e-6,
+        7.2900000000000005e-6,
+        7.885e-6
+      ]
+    },
+    {
+      "ascii_output_hash": "25b7e3bc699b72cb",
+      "mode": "html",
+      "output_bytes": 9874,
+      "rows": 10,
+      "seconds_per_render": [
+        0.00005080584,
+        0.000050794589999999996,
+        0.00005288959,
+        0.00005536875,
+        0.000060076670000000005
+      ]
+    },
+    {
+      "ascii_output_hash": "84c5e01d66594097",
+      "mode": "compact",
+      "output_bytes": 5513,
+      "rows": 100,
+      "seconds_per_render": [
+        0.00007134958,
+        0.0000655625,
+        0.00006406875000000001,
+        0.00006176291,
+        0.000059224589999999995
+      ]
+    },
+    {
+      "ascii_output_hash": "84c5e01d66594097",
+      "mode": "full",
+      "output_bytes": 5513,
+      "rows": 100,
+      "seconds_per_render": [
+        0.00005751125,
+        0.00005588125,
+        0.0000553725,
+        0.00005526166,
+        0.00005543417
+      ]
+    },
+    {
+      "ascii_output_hash": "47e143bf7abac2e5",
+      "mode": "html",
+      "output_bytes": 48394,
+      "rows": 100,
+      "seconds_per_render": [
+        0.00045059666999999997,
+        0.000451465,
+        0.00045084792,
+        0.00045147916000000003,
+        0.00044970625
+      ]
+    }
+  ],
+  "scope": "Native release ASCII display corpus: compact/full Unicode and themed semantic HTML. Five samples of 100 renders; fixture/config construction excluded, rendering allocations included but not counted. Fingerprints use DefaultHasher only for a same-toolchain matched refactor comparison, not a stable external hash. No allocation/RSS/GIL/production claim."
+}

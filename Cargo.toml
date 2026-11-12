@@ -406,3 +406,7 @@ harness = false
 [[bench]]
 name = "view_adjacency_export"
 harness = false
+
+[[bench]]
+name = "display_rendering"
+harness = false

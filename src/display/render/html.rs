@@ -2,7 +2,7 @@
 //!
 //! Creates professional HTML tables with responsive CSS and theming support.
 
-use crate::viz::display::{DataType, DataWindow, DisplayConfig, Theme};
+use crate::display::render::{DataType, DataWindow, DisplayConfig, Theme};
 
 /// HTML renderer for semantic table generation
 #[derive(Clone, Debug)]
@@ -76,7 +76,7 @@ impl HtmlRenderer {
     fn render_header_row(
         &self,
         headers: &[String],
-        schema: &crate::viz::display::DataSchema,
+        schema: &crate::display::render::DataSchema,
         _config: &DisplayConfig,
     ) -> String {
         let mut row = String::from("<tr>");
@@ -103,7 +103,7 @@ impl HtmlRenderer {
     fn render_data_row(
         &self,
         row: &[String],
-        schema: &crate::viz::display::DataSchema,
+        schema: &crate::display::render::DataSchema,
         config: &DisplayConfig,
     ) -> String {
         let mut html_row = String::from("<tr>");
@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fn format_integer_value(&self, value: &str) -> String {
         // Add thousand separators for large numbers in HTML
         if let Ok(num) = value.parse::<i64>() {
-            if num.abs() > 9999 {
+            if num.unsigned_abs() > 9999 {
                 self.add_thousand_separators(&num.to_string())
             } else {
                 value.to_string()
@@ -258,11 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     fn format_json_value(&self, value: &str, config: &DisplayConfig) -> String {
         // Truncate JSON to prevent very wide cells
-        if value.len() > config.max_cell_width {
-            format!("{}…", &value[..config.max_cell_width.saturating_sub(1)])
-        } else {
-            value.to_string()
-        }
+        crate::display::truncation::truncate_string(value, config.max_cell_width)
     }
 
     fn add_thousand_separators(&self, num_str: &str) -> String {
@@ -289,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
         _data_type: &DataType,
         config: &DisplayConfig,
     ) -> bool {
-        value.len() > config.max_cell_width
+        crate::display::truncation::exceeds_character_budget(value, config.max_cell_width)
     }
 
     fn escape_html(&self, text: &str) -> String {
@@ -315,7 +311,7 @@ impl Default for HtmlRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::display::{
+    use crate::display::render::{
         ColumnSchema, DataSchema, DataType, DataWindow, DisplayConfig, Theme,
     };
 

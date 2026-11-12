@@ -3,7 +3,7 @@
 //! This is the core of the "compact mode" - calculates minimum required widths
 //! instead of distributing to full terminal width, with smart truncation.
 
-use crate::viz::display::{DataType, DataWindow, DisplayConfig, TruncationStrategy};
+use crate::display::render::{DataType, DataWindow, DisplayConfig, TruncationStrategy};
 
 /// Unicode box-drawing characters for table rendering
 #[derive(Clone, Debug)]
@@ -109,7 +109,8 @@ impl CompactFormatter {
 
         for (col_idx, header) in data.headers.iter().enumerate() {
             // Start with header width
-            let mut max_width = header.len();
+            let mut max_width =
+                crate::display::truncation::character_width_up_to(header, config.max_cell_width);
 
             // Check all data rows for this column
             for row in &data.rows {
@@ -128,7 +129,10 @@ impl CompactFormatter {
                         data_type,
                         &config.truncation_strategy,
                     );
-                    max_width = max_width.max(truncated_value.len());
+                    max_width = max_width.max(crate::display::truncation::character_width_up_to(
+                        &truncated_value,
+                        config.max_cell_width,
+                    ));
                 }
             }
 
@@ -185,19 +189,13 @@ impl CompactFormatter {
         data_type: &DataType,
         strategy: &TruncationStrategy,
     ) -> String {
-        if value.len() <= max_width {
+        if !crate::display::truncation::exceeds_character_budget(value, max_width) {
             return value.to_string();
         }
 
         match strategy {
             TruncationStrategy::None => value.to_string(),
-            TruncationStrategy::Ellipsis => {
-                if max_width <= 1 {
-                    value.chars().take(max_width).collect()
-                } else {
-                    format!("{}…", value.chars().take(max_width - 1).collect::<String>())
-                }
-            }
+            TruncationStrategy::Ellipsis => self.truncate_string(value, max_width),
             TruncationStrategy::TypeAware => {
                 self.type_aware_truncation(value, max_width, data_type)
             }
@@ -256,13 +254,10 @@ impl CompactFormatter {
     }
 
     fn truncate_string(&self, value: &str, max_width: usize) -> String {
-        let char_count = value.chars().count();
-        if char_count <= max_width {
-            value.to_string()
-        } else if max_width <= 1 {
+        if max_width <= 1 {
             value.chars().take(max_width).collect()
         } else {
-            format!("{}…", value.chars().take(max_width - 1).collect::<String>())
+            crate::display::truncation::truncate_string(value, max_width)
         }
     }
 
@@ -343,7 +338,7 @@ impl CompactFormatter {
         &self,
         row: &[String],
         widths: &[usize],
-        schema: &crate::viz::display::DataSchema,
+        schema: &crate::display::render::DataSchema,
         config: &DisplayConfig,
     ) -> String {
         let mut line = String::new();
@@ -432,7 +427,7 @@ impl Default for CompactFormatter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::display::{ColumnSchema, DataSchema, DataType, DataWindow, DisplayConfig};
+    use crate::display::render::{ColumnSchema, DataSchema, DataType, DataWindow, DisplayConfig};
 
     fn create_test_data() -> DataWindow {
         let headers = vec!["name".to_string(), "age".to_string(), "score".to_string()];
