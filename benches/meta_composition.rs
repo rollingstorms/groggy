@@ -8,6 +8,9 @@ use serde_json::json;
 use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Instant};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--collection") {
+        return collection_receipt();
+    }
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
         for selected in [1, count / 2] {
@@ -62,5 +65,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote composition receipt to {output}");
+    Ok(())
+}
+
+fn collection_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cases = Vec::new();
+    for count in [10, 100, 500, 2000] {
+        let mut samples = Vec::new();
+        for _ in 0..5 {
+            let mut graph = Graph::new();
+            graph.add_nodes(2 * count)?;
+            graph.add_edges(&(0..count).map(|i| (2 * i, 2 * i + 1)).collect::<Vec<_>>())?;
+            let head = graph.current_state_id();
+            let shared = Rc::new(RefCell::new(graph));
+            let plans = (0..count)
+                .map(|i| {
+                    let nodes = HashSet::from([2 * i, 2 * i + 1]);
+                    let edges = HashSet::from([i]);
+                    let selection =
+                        Subgraph::new(shared.clone(), nodes.clone(), edges.clone(), "bench".into())
+                            .freeze()?;
+                    let mut plan = MetaNodePlan::new(nodes, edges).with_node_agg(
+                        "size".into(),
+                        "count".into(),
+                        None,
+                    );
+                    plan.node_strategy = NodeStrategy::Collapse;
+                    Ok((plan, selection))
+                })
+                .collect::<groggy::GraphResult<Vec<_>>>()?;
+            let start = Instant::now();
+            let metas = MetaNodePlan::execute_many(&plans, false, None)?;
+            samples.push(start.elapsed().as_secs_f64());
+            std::hint::black_box(&metas);
+            let graph = shared.borrow();
+            assert_eq!(metas.len(), count);
+            assert_eq!(graph.node_count(), count);
+            assert_eq!(graph.edge_count(), 0);
+            assert_eq!(graph.current_state_id(), head + 1);
+            assert!(!graph.has_uncommitted_changes());
+        }
+        cases.push(json!({"components":count,"source_nodes":2*count,"source_edges":count,"seconds":samples}));
+    }
+    let output = std::env::var("GROGGY_COMPOSITION_PROFILE")
+        .unwrap_or_else(|_| "meta_composition_collection.json".into());
+    std::fs::write(
+        &output,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release disconnected pairs; captured selections and graph construction excluded; count aggregation; destructive collection collapse; five samples; validation excluded; no memory/SLA claim", "cases":cases
+        }))?,
+    )?;
+    println!("Wrote collection composition receipt to {output}");
     Ok(())
 }

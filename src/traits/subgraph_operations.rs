@@ -678,6 +678,7 @@ pub trait SubgraphOperations: GraphEntity {
         let staged = if config.edge_to_external == ExternalEdgeStrategy::Contract {
             crate::subgraphs::composition::contraction_edges(
                 &graph,
+                self.frozen_view().map(|view| view.read_state()),
                 self.node_set(),
                 self.edge_set(),
                 config,
@@ -685,6 +686,7 @@ pub trait SubgraphOperations: GraphEntity {
         } else {
             crate::subgraphs::composition::boundary_edges(
                 &graph,
+                self.frozen_view().map(|view| view.read_state()),
                 self.node_set(),
                 meta_node_id,
                 config,

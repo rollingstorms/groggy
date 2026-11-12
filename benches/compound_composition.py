@@ -18,7 +18,7 @@ def main():
     parser.add_argument("--label", required=True)
     args = parser.parse_args()
     results = []
-    for components in [10, 100, 500]:
+    for components in [10, 100, 500, 2000]:
         samples = []
         for _ in range(3):
             graph = Graph()

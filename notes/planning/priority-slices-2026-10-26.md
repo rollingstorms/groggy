@@ -1636,3 +1636,19 @@ for 100k nodes/100 groups improve tables 49.426 → 9.837 ms and observations
 Receipt: `bulk-captured-projection-2026-11-11.md`. Strict all-target Clippy and
 whitespace checks passed. Broad scale/pipeline parents remain open:
 **215 checked / 53 open / 268 total**, no rows added.
+
+
+## 2026-11-11 — captured incident-edge composition planning
+
+Frozen collapse/contraction reuse the validated source's existing incident rows,
+retaining stable edge ordering, distinct parallel IDs, exact internal traversal
+and one mixed acceptance. Connected compatibility retains its scan. Exhaustive
+small-selection differential coverage includes direction, endpoints, tombstones,
+loops, all external strategies and meta selectors. Native 2,000-component median
+improves 192.406 → 40.904 ms; Python 203.355 → 47.797 ms. These are separate
+fixtures, not an FFI-overhead comparison or a linear-total-scaling claim.
+Receipt: `captured-incident-composition-2026-11-11.md`.
+Full gates: 1,538 native / 54 ignored; strict all-target Clippy; 2,594 maintained
+Python / 1 skipped; 258 executable docs. Three existing FFI warnings remain.
+Generic topology intermediates and typed pipeline work remain open:
+**215 checked / 53 open / 268 total**, no rows added.

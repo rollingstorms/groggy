@@ -1,0 +1,94 @@
+{
+  "label": "after-incident-planning",
+  "fixture": "disconnected pairs, one integer property per node, destructive component collection collapse with sum; release in-tree extension; construction excluded",
+  "cases": [
+    {
+      "components": 10,
+      "source_nodes": 20,
+      "source_edges": 10,
+      "samples": [
+        {
+          "wall_ns": 749250,
+          "cpu_ns": 747000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 166167,
+          "cpu_ns": 165000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 140666,
+          "cpu_ns": 140000,
+          "accepted_states": 1
+        }
+      ]
+    },
+    {
+      "components": 100,
+      "source_nodes": 200,
+      "source_edges": 100,
+      "samples": [
+        {
+          "wall_ns": 1344500,
+          "cpu_ns": 1344000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 1303709,
+          "cpu_ns": 1303000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 1251000,
+          "cpu_ns": 1250000,
+          "accepted_states": 1
+        }
+      ]
+    },
+    {
+      "components": 500,
+      "source_nodes": 1000,
+      "source_edges": 500,
+      "samples": [
+        {
+          "wall_ns": 7803917,
+          "cpu_ns": 7791000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 7797792,
+          "cpu_ns": 7784000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 7786334,
+          "cpu_ns": 7783000,
+          "accepted_states": 1
+        }
+      ]
+    },
+    {
+      "components": 2000,
+      "source_nodes": 4000,
+      "source_edges": 2000,
+      "samples": [
+        {
+          "wall_ns": 45724125,
+          "cpu_ns": 45712000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 50937541,
+          "cpu_ns": 50885000,
+          "accepted_states": 1
+        },
+        {
+          "wall_ns": 47796667,
+          "cpu_ns": 47790000,
+          "accepted_states": 1
+        }
+      ]
+    }
+  ]
+}

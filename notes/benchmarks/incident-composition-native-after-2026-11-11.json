@@ -1,0 +1,53 @@
+{
+  "cases": [
+    {
+      "components": 10,
+      "seconds": [
+        0.000590333,
+        0.000365083,
+        0.0003405,
+        0.000259291,
+        0.000260083
+      ],
+      "source_edges": 10,
+      "source_nodes": 20
+    },
+    {
+      "components": 100,
+      "seconds": [
+        0.002602416,
+        0.001068125,
+        0.0020825,
+        0.002098166,
+        0.001834208
+      ],
+      "source_edges": 100,
+      "source_nodes": 200
+    },
+    {
+      "components": 500,
+      "seconds": [
+        0.009236958,
+        0.007531,
+        0.006690333,
+        0.006176792,
+        0.005949541
+      ],
+      "source_edges": 500,
+      "source_nodes": 1000
+    },
+    {
+      "components": 2000,
+      "seconds": [
+        0.04155425,
+        0.04091325,
+        0.040833291,
+        0.040893292,
+        0.040904292
+      ],
+      "source_edges": 2000,
+      "source_nodes": 4000
+    }
+  ],
+  "scope": "Native release disconnected pairs; captured selections and graph construction excluded; count aggregation; destructive collection collapse; five samples; validation excluded; no memory/SLA claim"
+}

@@ -1,5 +1,6 @@
 //! Evaluate a whole composition before allocating entities or retained group contents.
 use crate::api::graph::{composition::MetaComposition, Graph};
+use crate::state::PinnedReadState;
 use crate::subgraphs::hierarchical::AggregationFunction;
 use crate::traits::subgraph_operations::{
     AggregationSpec, EdgeAggregationConfig, ExternalEdgeStrategy, MetaEdgeStrategy, NodeStrategy,
@@ -144,10 +145,18 @@ pub(crate) fn prepare_composition<T: SubgraphOperations + ?Sized>(
             }
         }
     }
+    // Composition entry points validate frozen source provenance before preparing.
+    let source = selection.frozen_view().map(|view| view.read_state());
     let staged = if config.edge_to_external == ExternalEdgeStrategy::Contract {
-        contraction_edges(graph, selection.node_set(), selection.edge_set(), config)?
+        contraction_edges(
+            graph,
+            source,
+            selection.node_set(),
+            selection.edge_set(),
+            config,
+        )?
     } else {
-        boundary_edges(graph, selection.node_set(), meta, config)?
+        boundary_edges(graph, source, selection.node_set(), meta, config)?
     };
     let boundary = staged
         .into_iter()
@@ -172,8 +181,35 @@ pub(crate) fn prepare_composition<T: SubgraphOperations + ?Sized>(
     })
 }
 
+// Frozen sources have already passed exact owner/branch/head validation at the
+// effect boundary. Their incident rows cover the entire source, not only the
+// selected internal edges. Connected compatibility keeps its current-owner scan.
+fn candidate_edges(
+    graph: &Graph,
+    source: Option<&PinnedReadState>,
+    nodes: &HashSet<NodeId>,
+) -> GraphResult<Vec<crate::EdgeId>> {
+    let mut edges = if let Some(source) = source {
+        let mut edges = Vec::new();
+        for &node in nodes {
+            edges.extend_from_slice(source.incident_edges(node).ok_or_else(|| {
+                GraphError::InvalidInput("Composition node is outside its captured source".into())
+            })?);
+        }
+        edges
+    } else {
+        graph.edge_ids()
+    };
+    edges.sort_unstable();
+    // Internal edges can occur in both endpoint rows. Loops occur once; distinct
+    // parallel edge IDs must not coalesce. Stable ID ordering controls first/last.
+    edges.dedup();
+    Ok(edges)
+}
+
 pub(crate) fn boundary_edges(
     graph: &Graph,
+    source: Option<&PinnedReadState>,
     nodes: &HashSet<NodeId>,
     meta: NodeId,
     config: &EdgeAggregationConfig,
@@ -183,9 +219,7 @@ pub(crate) fn boundary_edges(
         return Ok(Vec::new());
     }
     let mut groups: BTreeMap<(NodeId, NodeId), Vec<HashMap<AttrName, AttrValue>>> = BTreeMap::new();
-    let mut edges = graph.edge_ids();
-    edges.sort_unstable();
-    for edge in edges {
+    for edge in candidate_edges(graph, source, nodes)? {
         let (source, target) = graph.edge_endpoints(edge)?;
         let (inside_source, inside_target) = (nodes.contains(&source), nodes.contains(&target));
         if inside_source == inside_target {
@@ -327,6 +361,7 @@ fn reachable(
 /// Internal traversal is bounded by the exact selected edge set, never the owner CSR.
 pub(crate) fn contraction_edges(
     graph: &Graph,
+    source: Option<&PinnedReadState>,
     nodes: &HashSet<NodeId>,
     internal: &HashSet<crate::EdgeId>,
     config: &EdgeAggregationConfig,
@@ -359,9 +394,7 @@ pub(crate) fn contraction_edges(
     }
     let mut incoming: BTreeMap<NodeId, Vec<(NodeId, crate::EdgeId)>> = BTreeMap::new();
     let mut outgoing: BTreeMap<NodeId, Vec<(NodeId, crate::EdgeId)>> = BTreeMap::new();
-    let mut all = graph.edge_ids();
-    all.sort_unstable();
-    for edge in all {
+    for edge in candidate_edges(graph, source, nodes)? {
         let (source, target) = graph.edge_endpoints(edge)?;
         match (nodes.contains(&source), nodes.contains(&target)) {
             (false, true) if meta_target_allowed(graph, source, config) => {
@@ -572,9 +605,14 @@ mod tests {
                     .collect(),
                     ..Default::default()
                 };
-                let rows =
-                    contraction_edges(&graph, &[1, 2].into_iter().collect(), &internal, &config)
-                        .unwrap();
+                let rows = contraction_edges(
+                    &graph,
+                    None,
+                    &[1, 2].into_iter().collect(),
+                    &internal,
+                    &config,
+                )
+                .unwrap();
                 let expected: Vec<_> = [(0, 3), (3, 0)]
                     .into_iter()
                     .filter(|&(left, right)| (directed || left < right) && closure[left][right])
@@ -624,13 +662,21 @@ mod tests {
             ..Default::default()
         };
         let nodes = [1, 2].into_iter().collect();
-        assert!(contraction_edges(&graph, &nodes, &HashSet::new(), &config)
-            .unwrap()
-            .is_empty());
-        assert_eq!(
-            contraction_edges(&graph, &nodes, &[internal].into_iter().collect(), &config)
+        assert!(
+            contraction_edges(&graph, None, &nodes, &HashSet::new(), &config)
                 .unwrap()
-                .len(),
+                .is_empty()
+        );
+        assert_eq!(
+            contraction_edges(
+                &graph,
+                None,
+                &nodes,
+                &[internal].into_iter().collect(),
+                &config
+            )
+            .unwrap()
+            .len(),
             1
         );
     }
@@ -710,19 +756,19 @@ mod tests {
         let selected =
             EdgeAggregationConfig::default().with_meta_targets([outside].into_iter().collect());
         assert_eq!(
-            boundary_edges(&graph, selection.node_set(), 99, &selected)
+            boundary_edges(&graph, None, selection.node_set(), 99, &selected)
                 .unwrap()
                 .len(),
             2
         );
         let excluded = EdgeAggregationConfig::default().with_meta_targets(HashSet::new());
-        let rows = boundary_edges(&graph, selection.node_set(), 99, &excluded).unwrap();
+        let rows = boundary_edges(&graph, None, selection.node_set(), 99, &excluded).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!((rows[0].0, rows[0].1), (99, 2));
         for invalid in [0, 2, 999] {
             let config =
                 EdgeAggregationConfig::default().with_meta_targets([invalid].into_iter().collect());
-            assert!(boundary_edges(&graph, selection.node_set(), 99, &config).is_err());
+            assert!(boundary_edges(&graph, None, selection.node_set(), 99, &config).is_err());
         }
         assert!(MetaEdgeStrategy::selected([outside, outside]).is_err());
     }
@@ -828,15 +874,17 @@ mod tests {
             ..Default::default()
         };
         let graph = shared.borrow();
-        let rows =
-            boundary_edges(&graph, selection.node_set(), 10, &config).expect("no meta boundary");
+        let rows = boundary_edges(&graph, None, selection.node_set(), 10, &config)
+            .expect("no meta boundary");
         assert_eq!(rows.len(), 1);
         config.min_edge_count = 2;
-        assert!(boundary_edges(&graph, selection.node_set(), 10, &config)
-            .expect("threshold")
-            .is_empty());
+        assert!(
+            boundary_edges(&graph, None, selection.node_set(), 10, &config)
+                .expect("threshold")
+                .is_empty()
+        );
         config.edge_to_meta = MetaEdgeStrategy::Explicit;
-        assert!(boundary_edges(&graph, selection.node_set(), 10, &config).is_err());
+        assert!(boundary_edges(&graph, None, selection.node_set(), 10, &config).is_err());
     }
 
     #[test]
@@ -866,5 +914,109 @@ mod tests {
         );
         assert_eq!(graph.current_state_id(), 0);
         assert!(graph.has_uncommitted_changes());
+    }
+
+    #[test]
+    fn captured_incident_planning_matches_global_scan_for_every_small_selection() {
+        use crate::traits::subgraph_operations::EdgeAggregationFunction;
+        for directed in [false, true] {
+            let mut graph = if directed {
+                Graph::new_directed_manual()
+            } else {
+                Graph::new_manual()
+            };
+            graph.add_nodes(7).unwrap();
+            graph
+                .add_edges(&[
+                    (0, 1),
+                    (0, 1),
+                    (1, 0),
+                    (1, 1),
+                    (1, 2),
+                    (2, 3),
+                    (3, 4),
+                    (4, 0),
+                    (4, 5),
+                    (5, 5),
+                ])
+                .unwrap();
+            graph.remove_edge(1).unwrap();
+            graph.set_edge_endpoints(0, 5, 2).unwrap();
+            graph.remove_node(3).unwrap();
+            graph.remove_node(6).unwrap();
+            let stored = graph
+                .pool_mut()
+                .store_subgraph(HashSet::from([5]), HashSet::new(), "outside".into())
+                .unwrap();
+            let meta = graph.create_meta_node(stored).unwrap();
+            graph.add_edges(&[(0, meta), (meta, 2)]).unwrap();
+            for edge in graph.edge_ids() {
+                graph
+                    .set_edge_attr(edge, "w".into(), AttrValue::Int(edge as i64))
+                    .unwrap();
+            }
+            let view = graph.read_view().unwrap();
+            let source = Some(view.read_state());
+            let ids = [0, 1, 2, 4, 5];
+            for mask in 0..(1 << ids.len()) {
+                let nodes: HashSet<_> = ids
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(bit, &id)| ((mask & (1 << bit)) != 0).then_some(id))
+                    .collect();
+                let internal: HashSet<_> = graph
+                    .edge_ids()
+                    .into_iter()
+                    .filter(|&edge| {
+                        let (u, v) = graph.edge_endpoints(edge).unwrap();
+                        nodes.contains(&u) && nodes.contains(&v) && edge % 2 == 0
+                    })
+                    .collect();
+                for strategy in [
+                    ExternalEdgeStrategy::None,
+                    ExternalEdgeStrategy::Copy,
+                    ExternalEdgeStrategy::Count,
+                    ExternalEdgeStrategy::Aggregate,
+                    ExternalEdgeStrategy::Contract,
+                ] {
+                    for aggregation in [
+                        EdgeAggregationFunction::First,
+                        EdgeAggregationFunction::Last,
+                        EdgeAggregationFunction::Sum,
+                    ] {
+                        for targets in [
+                            MetaEdgeStrategy::Auto,
+                            MetaEdgeStrategy::None,
+                            MetaEdgeStrategy::Selected(HashSet::from([meta])),
+                            MetaEdgeStrategy::Selected(HashSet::new()),
+                        ] {
+                            let config = EdgeAggregationConfig {
+                                edge_to_external: strategy.clone(),
+                                default_aggregation: aggregation.clone(),
+                                edge_to_meta: targets,
+                                ..Default::default()
+                            };
+                            let (indexed, scanned) = if strategy == ExternalEdgeStrategy::Contract {
+                                (
+                                    contraction_edges(&graph, source, &nodes, &internal, &config),
+                                    contraction_edges(&graph, None, &nodes, &internal, &config),
+                                )
+                            } else {
+                                (
+                                    boundary_edges(&graph, source, &nodes, 999, &config),
+                                    boundary_edges(&graph, None, &nodes, 999, &config),
+                                )
+                            };
+                            assert_eq!(
+                                indexed.unwrap(),
+                                scanned.unwrap(),
+                                "mask={mask}, directed={directed}, strategy={strategy:?}"
+                            );
+                        }
+                    }
+                }
+            }
+            assert!(candidate_edges(&graph, source, &HashSet::from([3])).is_err());
+        }
     }
 }

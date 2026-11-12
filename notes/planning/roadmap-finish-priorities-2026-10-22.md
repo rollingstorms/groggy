@@ -2021,3 +2021,19 @@ Native/Python/doc gates: 1,537 / 2,594 / 258 passed; 54 native ignored and one
 Python skip. Strict all-target Clippy passed. Full evidence and remaining limits:
 `bulk-captured-projection-2026-11-11.md`. Existing 32.2 remains open for its wider
 scale/storage/memory inventory. **215 checked / 53 open / 268 total**.
+
+
+## 2026-11-11 — captured incident-edge composition planning
+
+Frozen collapse/contraction reuse the validated source's existing incident rows,
+retaining stable edge ordering, distinct parallel IDs, exact internal traversal
+and one mixed acceptance. Connected compatibility retains its scan. Exhaustive
+small-selection differential coverage includes direction, endpoints, tombstones,
+loops, all external strategies and meta selectors. Native 2,000-component median
+improves 192.406 → 40.904 ms; Python 203.355 → 47.797 ms. These are separate
+fixtures, not an FFI-overhead comparison or a linear-total-scaling claim.
+Receipt: `captured-incident-composition-2026-11-11.md`.
+Full gates: 1,538 native / 54 ignored; strict all-target Clippy; 2,594 maintained
+Python / 1 skipped; 258 executable docs. Three existing FFI warnings remain.
+Generic topology intermediates and typed pipeline work remain open:
+**215 checked / 53 open / 268 total**, no rows added.
