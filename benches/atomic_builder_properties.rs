@@ -10,6 +10,9 @@ use groggy::{
 use serde_json::json;
 use std::{cell::RefCell, rc::Rc, time::Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--captured-degrees") {
+        return captured_degrees_receipt();
+    }
     if std::env::args().any(|arg| arg == "--endpoint-revisions") {
         return endpoint_revisions_receipt();
     }
@@ -329,5 +332,86 @@ fn endpoint_revisions_receipt() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote endpoint revision receipt to {path}");
+    Ok(())
+}
+
+fn captured_degrees_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::{
+        algorithms::steps::{
+            ensure_core_steps_registered, global_step_registry, StepScope, StepSpec, StepValue,
+            StepVariables,
+        },
+        storage::table::Table,
+        BatchNodeRef as N, GraphBatch,
+    };
+    ensure_core_steps_registered();
+    let mut params = AlgorithmParams::new();
+    params.set_text("source", "input");
+    params.set_text("output", "metrics");
+    let step = global_step_registry().instantiate(&StepSpec {
+        id: "graph.degrees_table".into(),
+        params,
+        inputs: vec![],
+        outputs: vec![],
+    })?;
+    let mut cases = Vec::new();
+    for count in [1_000, 100_000] {
+        let mut g = Graph::new_directed();
+        let mut edges: Vec<_> = (1..count)
+            .map(|id| (N::Added(id - 1), N::Added(id)))
+            .collect();
+        edges.extend([
+            (N::Added(0), N::Added(1)),
+            (N::Added(count - 1), N::Added(count - 1)),
+        ]);
+        g.apply_batch(
+            GraphBatch {
+                add_nodes: count,
+                add_edges: edges,
+                ..Default::default()
+            },
+            0,
+            "fixture".into(),
+            "bench".into(),
+        )?;
+        let g = Rc::new(RefCell::new(g));
+        let view = g.borrow().read_view()?;
+        let selected = Subgraph::from_frozen_view(g.clone(), view.clone(), "bench".into());
+        let mut samples = Vec::new();
+        for _ in 0..5 {
+            let mut vars = StepVariables::default();
+            vars.set_value("input", StepValue::GraphView(view.clone()));
+            let mut ctx = Context::new();
+            let start = Instant::now();
+            step.apply(&mut ctx, &mut StepScope::new(&selected, &mut vars))?;
+            let seconds = start.elapsed().as_secs_f64();
+            let table = vars.table("metrics")?;
+            assert_eq!(table.shape(), (count, 4));
+            assert_eq!(
+                table
+                    .column("out_degree")
+                    .and_then(|column| column.data().first()),
+                Some(&AttrValue::Int(2))
+            );
+            assert_eq!(
+                table
+                    .column("in_degree")
+                    .and_then(|column| column.data().last()),
+                Some(&AttrValue::Int(2))
+            );
+            assert_eq!(g.borrow().current_state_id(), 1);
+            samples.push(seconds);
+        }
+        cases.push(json!({"nodes":count,"edges":count+1,"seconds":samples}));
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "captured_pipeline_degrees.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release, five samples, directed captured path plus one parallel and one loop edge. Measures only the degree-table stage including selected ID ordering, three canonical degree computations, four owned columns and provenance binding. Fixture, source capture, scope/variable construction, compilation, assertions and result destruction excluded. No FFI, allocation/RSS, before/after speedup or scale budget claim.","cases":cases
+        }))?,
+    )?;
+    println!("Wrote captured degree receipt to {path}");
     Ok(())
 }

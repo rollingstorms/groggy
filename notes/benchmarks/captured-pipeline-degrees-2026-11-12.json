@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "edges": 1001,
+      "nodes": 1000,
+      "seconds": [
+        0.000432833,
+        0.000315625,
+        0.000318125,
+        0.000331166,
+        0.000341709
+      ]
+    },
+    {
+      "edges": 100001,
+      "nodes": 100000,
+      "seconds": [
+        0.113007833,
+        0.113682958,
+        0.114407209,
+        0.115066208,
+        0.1140565
+      ]
+    }
+  ],
+  "scope": "Native release, five samples, directed captured path plus one parallel and one loop edge. Measures only the degree-table stage including selected ID ordering, three canonical degree computations, four owned columns and provenance binding. Fixture, source capture, scope/variable construction, compilation, assertions and result destruction excluded. No FFI, allocation/RSS, before/after speedup or scale budget claim."
+}

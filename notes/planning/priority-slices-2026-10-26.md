@@ -1768,3 +1768,31 @@ release, 2,662 maintained Python passed/1 skipped/15 warnings, 265 docs examples
 Known ownership/FFI warnings remain. **215 checked / 53 open / 268 total**;
 no added checkbox or broad-parent completion claim. Additions and broader
 staged-topology computation/outer execution still require work.
+
+
+### November 12 continuation — captured structural computation completed
+
+`graph.degrees_table` computes incident/incoming/outgoing columns from an explicit
+immutable input after staged revisions/removals or from retained history. Exact
+source IDs, loop/parallel conventions and output provenance are preserved; owner
+liveness and stored degree properties are not substituted. Empty/late-error and
+all local/outer/persistence read modes are covered. Larger columns use pure
+captured inputs and disjoint output buffers on the existing native worker pool.
+
+Five-sample release medians: initial sequential 0.331/114.056 ms for 1k/100k
+nodes; final small sequential/large parallel 0.352/18.957 ms. Intermediate samples
+and the small-buffer adjustment are retained in the receipt, with no universal
+speedup, GIL, memory or scale budget claim. Receipt:
+`captured-pipeline-degrees-2026-11-12.md`; contract:
+`docs/api/captured-pipeline-degrees.md`.
+
+Final checks: **1,561 Rust passed / 54 ignored**, strict all-target Clippy,
+rebuilt/staged release, **2,676 maintained Python passed / 1 skipped / 15 warnings**,
+**266 executable docs**. A broad run overlapping compilation failed an existing
+Cholesky worker-progress timing assertion; quiet full reruns passed unchanged.
+Known PyGraph cyclic-GC and three existing FFI warnings remain.
+
+**215 checked / 53 open / 268 total**, no new checkbox rows. Next priority:
+addition stages with safe references before allocation, broader captured
+algorithm adapters and nested/outer topology execution. High-level lowering,
+naming/cache policy and scale/release work remain in their existing scopes.

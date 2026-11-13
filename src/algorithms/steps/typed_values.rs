@@ -17,6 +17,7 @@ enum Operation {
     SelectEdges(Vec<usize>),
     NodesTable,
     EdgesTable,
+    DegreesTable,
     SelectColumns(Vec<String>),
     SelectRows(Vec<usize>),
     EmitGraph,
@@ -73,6 +74,10 @@ impl Step for TypedReadStep {
                     .edge_table_data()?
                     .into_base_table()?,
             )),
+            Operation::DegreesTable => StepValue::Table(Arc::new(degrees_table(
+                ctx,
+                vars.graph_view(&self.source)?,
+            )?)),
             Operation::SelectColumns(names) => {
                 StepValue::Table(Arc::new(vars.table(&self.source)?.select(names)?))
             }
@@ -102,6 +107,74 @@ impl Step for TypedReadStep {
         scope.variables_mut().set_value(&self.output, value);
         Ok(())
     }
+}
+
+fn degrees_table(ctx: &Context, view: &GraphView) -> Result<crate::storage::table::BaseTable> {
+    use crate::AttrValue;
+    use rayon::prelude::*;
+    use std::sync::atomic::Ordering;
+    let nodes = view.node_ids();
+    let token = ctx.cancel_token();
+    let counts = |node| -> Result<[AttrValue; 3]> {
+        if token
+            .as_ref()
+            .is_some_and(|token| token.load(Ordering::Relaxed))
+        {
+            bail!("degree table cancelled");
+        }
+        let count = |value: usize| -> Result<AttrValue> {
+            Ok(AttrValue::Int(i64::try_from(value).map_err(|_| {
+                anyhow!("degree exceeds table integer range")
+            })?))
+        };
+        // Reuse the captured view's selected edge-instance conventions. There
+        // is no lookup against the writable owner or dense positional node IDs.
+        Ok([
+            count(view.degree(node)?)?,
+            count(view.in_degree(node)?)?,
+            count(view.out_degree(node)?)?,
+        ])
+    };
+    let mut incident = Vec::with_capacity(nodes.len());
+    let mut incoming = Vec::with_capacity(nodes.len());
+    let mut outgoing = Vec::with_capacity(nodes.len());
+    if nodes.len() >= 4096 {
+        incident.resize(nodes.len(), AttrValue::Null);
+        incoming.resize(nodes.len(), AttrValue::Null);
+        outgoing.resize(nodes.len(), AttrValue::Null);
+        // Only detached captured inputs, cancellation and disjoint owned cells
+        // cross workers. Context and the writable owner stay on their thread.
+        nodes
+            .par_iter()
+            .zip(incident.par_iter_mut())
+            .zip(incoming.par_iter_mut())
+            .zip(outgoing.par_iter_mut())
+            .try_for_each(|(((&node, incident), incoming), outgoing)| -> Result<()> {
+                let [degree, indegree, outdegree] = counts(node)?;
+                *incident = degree;
+                *incoming = indegree;
+                *outgoing = outdegree;
+                Ok(())
+            })?;
+    } else {
+        for &node in &nodes {
+            let [degree, indegree, outdegree] = counts(node)?;
+            incident.push(degree);
+            incoming.push(indegree);
+            outgoing.push(outdegree);
+        }
+    }
+    let mut table = crate::storage::table::projection::nodes(&nodes, Vec::new(), |_, _| Ok(None))?
+        .with_graph_source(view.clone(), true, nodes)?
+        .into_base_table()?;
+    for (name, values) in [
+        ("degree", incident),
+        ("in_degree", incoming),
+        ("out_degree", outgoing),
+    ] {
+        table.set_column(name, values)?;
+    }
+    Ok(table)
 }
 
 fn text(spec: &StepSpec, key: &str) -> Result<String> {
@@ -173,6 +246,7 @@ pub(super) fn register(registry: &StepRegistry) -> Result<()> {
         "graph.select_edges",
         "graph.nodes_table",
         "graph.edges_table",
+        "graph.degrees_table",
         "table.select_columns",
         "table.select_rows",
         "graph.emit",
@@ -205,6 +279,7 @@ pub(super) fn register(registry: &StepRegistry) -> Result<()> {
                     "graph.select_edges" => Operation::SelectEdges(ids(spec, "ids")?),
                     "graph.nodes_table" => Operation::NodesTable,
                     "graph.edges_table" => Operation::EdgesTable,
+                    "graph.degrees_table" => Operation::DegreesTable,
                     "table.select_rows" => Operation::SelectRows(ids(spec, "rows")?),
                     "table.select_columns" => Operation::SelectColumns(columns(spec)?),
                     "graph.emit" => Operation::EmitGraph,

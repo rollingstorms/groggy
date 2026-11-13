@@ -48,7 +48,8 @@ certified operations are accepted:
 
 - Further staged removals and existing-edge endpoint revisions.
 - `graph.capture_staged`.
-- The nine explicit immutable graph/table read stages and variable `alias`.
+- The original immutable graph/table read stages, captured `graph.degrees_table`
+  computation and variable `alias`.
 
 Thus a pending graph can be selected, projected to tables, sliced, and emitted
 before acceptance. Ordinary property/structural calculations, topology loops,

@@ -442,7 +442,7 @@ Code / record context:
 
 Roadmap: 30 / AR5. Timing: AFTER PRIMITIVE REPAIRS.
 
-**Current code / problem:** The pipeline/builder already exists. Nine typed captured graph/table read stages and explicit named outputs now use its native interpreter, with local/outer atomic output rollback and preserved source provenance (`typed-pipeline-values-2026-11-11.md`). Explicit immutable selected pending captures, including graph/table reads after staged removals, are also implemented (`staged-graph-capture-2026-11-12.md`). Broader topology algorithms/effects and generated-name/cache policy remain open; A14.1 is still unanswered. A14.2 already confirms transient runs by default; it is not an unanswered policy.
+**Current code / problem:** The pipeline/builder already exists. Nine typed captured graph/table read stages and explicit named outputs now use its native interpreter, with local/outer atomic output rollback and preserved source provenance (`typed-pipeline-values-2026-11-11.md`). Explicit immutable selected pending captures, including graph/table reads after staged removals, are also implemented (`staged-graph-capture-2026-11-12.md`). Existing-edge endpoint revisions and captured degree-table computation are also implemented (`pipeline-endpoint-revisions-2026-11-12.md`, `captured-pipeline-degrees-2026-11-12.md`). Additions, broader topology algorithms/effects and generated-name/cache policy remain open; A14.1 is still unanswered. A14.2 already confirms transient runs by default; it is not an unanswered policy.
 
 **Already agreed:** Pin each run to an input state. Keep pipeline execution on the corrected core and numerical operations.
 

@@ -71,6 +71,7 @@ All stages require a `source` variable. Intermediate-producing stages require
 | `graph.select_edges` | GraphView → GraphView | `ids`: exact original edge IDs; keeps their endpoints |
 | `graph.nodes_table` | GraphView → BaseTable | None; includes structural node IDs |
 | `graph.edges_table` | GraphView → BaseTable | None; includes IDs and endpoints |
+| `graph.degrees_table` | GraphView → BaseTable | None; node IDs and incident/incoming/outgoing counts |
 | `table.select_columns` | BaseTable → BaseTable | `columns`: ordered column names |
 | `table.select_rows` | BaseTable → BaseTable | `rows`: positions; caller order/duplicates retained |
 | `graph.emit` | GraphView → named result | `name` |
@@ -115,17 +116,18 @@ Cancellation is checked before and after each typed operation; this does not add
 interruptible inner kernels or streaming. The existing Python pipeline coordinator
 still owns its execution thread; this slice makes no new GIL-release guarantee.
 
-Remaining item 30.1/AR7.8 work includes current staged graph captures, topology
-mutation intermediates/read-after-write, remaining DSL/IR lowering, automatic
-naming/cache policy and streaming. This fixed nine-stage read inventory is
-implemented; it is not a claim that every graph/table operation is a pipeline
-primitive or that the broad pipeline parent is complete.
+The original nine-stage read inventory and explicit selected pending captures
+are implemented. `graph.degrees_table` adds captured structural computation;
+see [degree tables](captured-pipeline-degrees.md). Remaining item 30.1/AR7.8 work
+includes addition stages, broader topology computation/execution, DSL/IR lowering,
+automatic naming/cache policy and streaming. Further graph/table methods need pipeline adapters; the broad pipeline parent
+remains open.
 
 
 ## Selected pending working-state inputs
 
 In addition to retained snapshots, a persistent local atomic builder can produce
 `graph.capture_staged(output=...)`. The resulting graph/table values include
-pending properties and removals. These captures have no accepted write pin and
+pending properties, endpoint revisions and removals. These captures have no accepted write pin and
 materialize selected data explicitly. See [staged captures](staged-graph-captures.md)
 for effect ordering, ownership, cost and the remaining unsupported scope.
