@@ -2,7 +2,7 @@
 
 `graph.capture_staged` produces an immutable **selected pending working-state**
 value inside a persistent local atomic builder. It includes properties staged so
-far, explicit edge removals and node-removal cascades. Later stages and later
+far, endpoint revisions, explicit edge removals and node-removal cascades. Later stages and later
 owner edits cannot alter the captured value.
 
 ```python
@@ -46,7 +46,7 @@ The native interpreter classifies steps before running them. Existing property
 calculations can precede topology effects. After a topology effect, only these
 certified operations are accepted:
 
-- Further staged removals.
+- Further staged removals and existing-edge endpoint revisions.
 - `graph.capture_staged`.
 - The nine explicit immutable graph/table read stages and variable `alias`.
 

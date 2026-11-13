@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "initial_edges": 999,
+      "nodes": 1000,
+      "seconds": [
+        0.001294334,
+        0.001146333,
+        0.001100209,
+        0.001269833,
+        0.001105916
+      ]
+    },
+    {
+      "initial_edges": 99999,
+      "nodes": 100000,
+      "seconds": [
+        0.236693292,
+        0.224030042,
+        0.220863125,
+        0.218607958,
+        0.215639625
+      ]
+    }
+  ],
+  "scope": "Native release, five samples. Existing-edge revision, old-endpoint removal, explicit pending graph capture/emission, one publication and surviving selection on a directed path. Fixture, initial capture, compilation and assertions excluded. No before/after speedup, FFI, allocation/RSS or scale budget claim."
+}

@@ -10,6 +10,9 @@ use groggy::{
 use serde_json::json;
 use std::{cell::RefCell, rc::Rc, time::Instant};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--endpoint-revisions") {
+        return endpoint_revisions_receipt();
+    }
     if std::env::args().any(|arg| arg == "--terminal-removals" || arg == "--staged-capture") {
         return terminal_removals_receipt();
     }
@@ -258,5 +261,73 @@ fn terminal_removals_receipt() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote terminal topology receipt to {path}");
+    Ok(())
+}
+
+fn endpoint_revisions_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::{BatchNodeRef as N, GraphBatch};
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [1_000, 100_000] {
+        let mut params = AlgorithmParams::new();
+        params.set_text(
+            "steps",
+            json!({"atomic":true,"steps":[
+                {"id":"graph.set_edge_endpoints","params":{"revisions":[[0,0,count-1]]}},
+                {"id":"graph.remove_nodes","params":{"ids":[1]}},
+                {"id":"graph.capture_staged","params":{"output":"pending"}},
+                {"id":"graph.emit","params":{"source":"pending","name":"pending"}}
+            ]})
+            .to_string(),
+        );
+        let algorithm = registry.instantiate(&AlgorithmSpec {
+            id: "builder.step_pipeline".into(),
+            params,
+        })?;
+        let mut samples = Vec::new();
+        for _ in 0..5 {
+            let mut graph = Graph::new_directed();
+            graph.apply_batch(
+                GraphBatch {
+                    add_nodes: count,
+                    add_edges: (1..count)
+                        .map(|id| (N::Added(id - 1), N::Added(id)))
+                        .collect(),
+                    ..Default::default()
+                },
+                0,
+                "fixture".into(),
+                "bench".into(),
+            )?;
+            let graph = Rc::new(RefCell::new(graph));
+            let view = graph.borrow().read_view()?;
+            let selected = Subgraph::from_frozen_view(graph.clone(), view, "bench".into());
+            let mut ctx = Context::new();
+            let started = Instant::now();
+            let result = algorithm.execute(&mut ctx, selected)?;
+            let seconds = started.elapsed().as_secs_f64();
+            assert_eq!(graph.borrow().current_state_id(), 2);
+            assert_eq!(result.node_count(), count - 1);
+            assert_eq!(result.edge_count(), count - 2);
+            let outputs = ctx.take_outputs();
+            let groggy::algorithms::AlgorithmOutput::GraphView(view) = &outputs["pending"] else {
+                return Err("missing pending graph".into());
+            };
+            assert_eq!(view.edge_endpoints(0)?, (0, count - 1));
+            assert_eq!(view.neighbors(0)?, vec![count - 1]);
+            samples.push(seconds);
+        }
+        cases.push(json!({"nodes":count,"initial_edges":count-1,"seconds":samples}));
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "pipeline_endpoint_revisions.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release, five samples. Existing-edge revision, old-endpoint removal, explicit pending graph capture/emission, one publication and surviving selection on a directed path. Fixture, initial capture, compilation and assertions excluded. No before/after speedup, FFI, allocation/RSS or scale budget claim.","cases":cases
+        }))?,
+    )?;
+    println!("Wrote endpoint revision receipt to {path}");
     Ok(())
 }

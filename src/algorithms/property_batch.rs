@@ -17,6 +17,7 @@ pub(crate) struct PropertyBatch {
     edges: BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
     remove_nodes: Vec<BatchNodeRef>,
     remove_edges: Vec<BatchEdgeRef>,
+    edge_endpoints: Vec<(EdgeId, BatchNodeRef, BatchNodeRef)>,
     change_times: Vec<(BatchChangeRef, crate::TimestampMicros)>,
 }
 impl PropertyBatch {
@@ -29,6 +30,20 @@ impl PropertyBatch {
             .borrow()
             .validate_write_coordinate(&self.coordinate)?;
         let base = subgraph.pin_view()?;
+        let mut revisions = HashMap::with_capacity(self.edge_endpoints.len());
+        for &(edge, source, target) in &self.edge_endpoints {
+            let (BatchNodeRef::Existing(source), BatchNodeRef::Existing(target)) = (source, target)
+            else {
+                return Err(crate::GraphError::InvalidInput(
+                    "Unsupported staged added endpoint".into(),
+                ));
+            };
+            if revisions.insert(edge, (source, target)).is_some() {
+                return Err(crate::GraphError::InvalidInput(format!(
+                    "Duplicate staged endpoint revision for edge {edge}"
+                )));
+            }
+        }
         let mut removed_nodes = HashSet::with_capacity(self.remove_nodes.len());
         for reference in &self.remove_nodes {
             let BatchNodeRef::Existing(id) = reference else {
@@ -47,27 +62,45 @@ impl PropertyBatch {
             };
             removed_edges.insert(*id);
         }
-        let nodes = base
+        let nodes: HashSet<_> = base
             .nodes()
             .iter()
             .copied()
             .filter(|id| !removed_nodes.contains(id))
             .collect();
-        let mut edges = HashSet::new();
+        // Revisions precede node cascades in the canonical batch model. An edge
+        // moved off a removed endpoint must survive in this provisional value.
+        let original = base.read_state().snapshot();
+        let mut snapshot = crate::state::state::GraphSnapshot::empty_with_type(
+            original.state_id,
+            original.graph_type,
+        );
+        snapshot.active_nodes = nodes.iter().copied().collect();
+        snapshot.active_nodes.sort_unstable();
+        for id in &snapshot.active_nodes {
+            if let Some(attrs) = original.node_attributes.get(id) {
+                snapshot.node_attributes.insert(*id, attrs.clone());
+            }
+        }
         for &id in base.edges() {
-            let (source, target) = base.edge_endpoints(id)?;
+            let (source, target) = revisions
+                .get(&id)
+                .copied()
+                .map(Ok)
+                .unwrap_or_else(|| base.edge_endpoints(id))?;
             if !removed_edges.contains(&id)
                 && !removed_nodes.contains(&source)
                 && !removed_nodes.contains(&target)
             {
-                edges.insert(id);
+                snapshot.edges.insert(id, (source, target));
+                if let Some(attrs) = original.edge_attributes.get(&id) {
+                    snapshot.edge_attributes.insert(id, attrs.clone());
+                }
             }
         }
-        let selected = crate::GraphView::from_membership(base.read_state().clone(), nodes, edges)?;
-        let mut snapshot = selected.to_snapshot();
         for (name, rows) in &self.nodes {
             for (&id, value) in rows {
-                if !selected.nodes().contains(&id) {
+                if !nodes.contains(&id) {
                     return Err(crate::GraphError::InvalidInput(format!(
                         "Staged node property target {id} is outside the resulting selection"
                     )));
@@ -81,7 +114,7 @@ impl PropertyBatch {
         }
         for (name, rows) in &self.edges {
             for (&id, value) in rows {
-                if !selected.edges().contains(&id) {
+                if !snapshot.edges.contains_key(&id) {
                     return Err(crate::GraphError::InvalidInput(format!(
                         "Staged edge property target {id} is outside the resulting selection"
                     )));
@@ -105,6 +138,7 @@ impl PropertyBatch {
             edges: BTreeMap::new(),
             remove_nodes: Vec::new(),
             remove_edges: Vec::new(),
+            edge_endpoints: Vec::new(),
             change_times: Vec::new(),
         }
     }
@@ -159,12 +193,32 @@ impl PropertyBatch {
             }
         }
     }
+    pub(crate) fn stage_endpoint_revisions(
+        &mut self,
+        rows: Vec<(EdgeId, NodeId, NodeId)>,
+        effective_at: Option<crate::TimestampMicros>,
+    ) {
+        for (edge, source, target) in rows {
+            self.edge_endpoints.push((
+                edge,
+                BatchNodeRef::Existing(source),
+                BatchNodeRef::Existing(target),
+            ));
+            if let Some(at) = effective_at {
+                self.change_times.push((
+                    BatchChangeRef::EdgeEndpoints(BatchEdgeRef::Existing(edge)),
+                    at,
+                ));
+            }
+        }
+    }
     pub fn accept(self, graph: &mut Graph) -> GraphResult<()> {
         graph.validate_write_coordinate(&self.coordinate)?;
         if self.nodes.is_empty()
             && self.edges.is_empty()
             && self.remove_nodes.is_empty()
             && self.remove_edges.is_empty()
+            && self.edge_endpoints.is_empty()
         {
             return Ok(());
         }
@@ -172,6 +226,7 @@ impl PropertyBatch {
             remove_nodes: self.remove_nodes,
             remove_edges: self.remove_edges,
             change_times: self.change_times,
+            edge_endpoints: self.edge_endpoints,
             node_attrs: self
                 .nodes
                 .into_iter()

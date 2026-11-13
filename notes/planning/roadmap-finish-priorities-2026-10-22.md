@@ -15,7 +15,7 @@ and ordinary Python default switching, plus 07.3b native temporal properties.
 The nine-stage typed immutable graph/table read inventory and native display ownership component are also implemented (`typed-pipeline-values-2026-11-11.md`, `display-foundation-2026-11-11.md`). See the flat checklist for supported scopes and remaining exits.
 
 Current remainder (2026-11-12): broader topology execution/effects
-(09.4b.2/AR3), especially addition/revision stages, ordinary algorithms over staged
+(09.4b.2/AR3), especially addition stages, ordinary algorithms over staged
 topology and wider execution scopes (30.1/AR7.8). Local atomic removals and explicit
 immutable selected pending graph/table reads are implemented
 (`terminal-topology-pipeline-2026-11-12.md`, `staged-graph-capture-2026-11-12.md`). Default immutable Subgraph ownership **26.1/AR4/AR7.5** and pinned
@@ -2138,3 +2138,20 @@ Next core execution scope: addition/endpoint-revision stages, ordinary algorithm
 over staged topology and wider nested/outer effect execution; broader DSL,
 streaming, scale and release contracts remain. **215 checked / 53 open / 268 total**;
 no rows added and no broad parent checked off for this bounded component.
+
+
+### November 12 continuation — existing-edge endpoint stage completed
+
+`graph.set_edge_endpoints` stages checked selected rows and explicit/default times
+with properties/removals in one acceptance. Pending captures now preserve revised
+adjacency and rescued edges when old endpoint nodes are removed. Row duplicates,
+explicit edge-removal conflicts, invalid resulting endpoints/timelines and late
+failures discard the complete run. Both staging orders, directions, loops,
+parallel identities, historical reads and original properties are covered.
+Receipt: `pipeline-endpoint-revisions-2026-11-12.md`.
+
+Checks: 1,558 Rust passed/54 ignored, strict all-target Clippy, rebuilt/staged
+release, 2,662 maintained Python passed/1 skipped/15 warnings, 265 docs examples.
+Known ownership/FFI warnings remain. **215 checked / 53 open / 268 total**;
+no added checkbox or broad-parent completion claim. Additions and broader
+staged-topology computation/outer execution still require work.

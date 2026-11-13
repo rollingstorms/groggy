@@ -21,6 +21,82 @@ struct CaptureStagedStep {
     output: String,
 }
 
+struct ReviseEndpointsStep {
+    rows: Vec<(usize, usize, usize)>,
+    effective_at: Option<crate::TimestampMicros>,
+}
+
+impl Step for ReviseEndpointsStep {
+    fn id(&self) -> &'static str {
+        "graph.set_edge_endpoints"
+    }
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::Topology
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if !ctx.persist_results() || ctx.property_batch.is_none() {
+            bail!("{} requires a persistent local atomic builder", self.id());
+        }
+        let binding = scope.subgraph().graph();
+        let graph = binding.borrow();
+        for &(edge, source, target) in &self.rows {
+            if ctx.is_cancelled() {
+                bail!("endpoint revision cancelled");
+            }
+            if !scope.subgraph().edges().contains(&edge)
+                || !graph.has_edge(edge)
+                || [source, target]
+                    .iter()
+                    .any(|id| !scope.subgraph().nodes().contains(id) || !graph.has_node(*id))
+            {
+                bail!("endpoint revision ({edge}, {source}, {target}) is outside the active execution selection");
+            }
+        }
+        if ctx.is_cancelled() {
+            bail!("endpoint revision cancelled");
+        }
+        drop(graph);
+        ctx.property_batch
+            .as_mut()
+            .ok_or_else(|| anyhow!("missing atomic effect scope"))?
+            .stage_endpoint_revisions(self.rows.clone(), self.effective_at);
+        Ok(())
+    }
+}
+
+fn effective_time(spec: &StepSpec) -> Result<Option<crate::TimestampMicros>> {
+    match spec.params.get("effective_at") {
+        None => Ok(None),
+        Some(AlgorithmParamValue::Int(at)) => Ok(Some(*at)),
+        _ => bail!("effective_at must be a signed integer Unix timestamp in microseconds"),
+    }
+}
+
+fn endpoint_rows(spec: &StepSpec) -> Result<Vec<(usize, usize, usize)>> {
+    let rows = match spec.params.get("revisions") {
+        Some(AlgorithmParamValue::Json(serde_json::Value::Array(rows))) => rows,
+        Some(AlgorithmParamValue::IntList(rows)) if rows.is_empty() => return Ok(Vec::new()),
+        _ => bail!("revisions must be an array of [edge_id, source_id, target_id] rows"),
+    };
+    rows.iter()
+        .map(|row| {
+            let row = row
+                .as_array()
+                .filter(|row| row.len() == 3)
+                .ok_or_else(|| anyhow!("each endpoint revision must contain exactly three IDs"))?;
+            let id = |value: &serde_json::Value| {
+                value
+                    .as_u64()
+                    .and_then(|id| usize::try_from(id).ok())
+                    .ok_or_else(|| {
+                        anyhow!("endpoint revision IDs must be nonnegative integers fitting usize")
+                    })
+            };
+            Ok((id(&row[0])?, id(&row[1])?, id(&row[2])?))
+        })
+        .collect()
+}
+
 impl Step for CaptureStagedStep {
     fn id(&self) -> &'static str {
         "graph.capture_staged"
@@ -131,11 +207,7 @@ fn instantiate(spec: &StepSpec, nodes: bool) -> Result<Box<dyn Step>> {
             spec.id
         ),
     };
-    let effective_at = match spec.params.get("effective_at") {
-        None => None,
-        Some(AlgorithmParamValue::Int(at)) => Some(*at),
-        _ => bail!("effective_at must be a signed integer Unix timestamp in microseconds"),
-    };
+    let effective_at = effective_time(spec)?;
     Ok(Box::new(RemoveStep {
         nodes,
         input,
@@ -144,6 +216,25 @@ fn instantiate(spec: &StepSpec, nodes: bool) -> Result<Box<dyn Step>> {
 }
 
 pub(super) fn register(registry: &StepRegistry) -> Result<()> {
+    registry.register(
+        "graph.set_edge_endpoints",
+        StepMetadata {
+            id: "graph.set_edge_endpoints".into(),
+            description: "Stage existing edge endpoint revisions in one checked publication".into(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            for (key, _) in spec.params.iter() {
+                if !matches!(key.as_str(), "revisions" | "effective_at") {
+                    bail!("graph.set_edge_endpoints does not support parameter '{key}'");
+                }
+            }
+            Ok(Box::new(ReviseEndpointsStep {
+                rows: endpoint_rows(spec)?,
+                effective_at: effective_time(spec)?,
+            }))
+        },
+    )?;
     registry.register(
         "graph.capture_staged",
         StepMetadata {
