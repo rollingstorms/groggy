@@ -1397,7 +1397,7 @@ impl PyBaseArray {
 }
 
 /// Python wrapper for ArrayIterator<AttrValue> that supports method chaining
-#[pyclass(name = "BaseArrayIterator", unsendable)]
+#[pyclass(name = "BaseArrayIterator")]
 pub struct PyBaseArrayIterator {
     inner: ArrayIterator<RustAttrValue>,
 }
@@ -1490,7 +1490,7 @@ impl PyBaseArrayIterator {
 // =============================================================================
 
 /// Python wrapper for NodesArray - specialized array for NodeId collections
-#[pyclass(name = "NodesArray", unsendable)]
+#[pyclass(name = "NodesArray")]
 pub struct PyNodesArray {
     pub inner: NodesArray,
 }
@@ -1616,7 +1616,7 @@ impl PyNodesArray {
 }
 
 /// Python wrapper for ArrayIterator<NodeId> with node-specific chaining operations
-#[pyclass(name = "NodesArrayIterator", unsendable)]
+#[pyclass(name = "NodesArrayIterator")]
 pub struct PyNodesArrayIterator {
     inner: ArrayIterator<NodeId>,
 }
@@ -1666,7 +1666,7 @@ impl PyNodesArrayIterator {
 }
 
 /// Python wrapper for EdgesArray - specialized array for EdgeId collections
-#[pyclass(name = "EdgesArray", unsendable)]
+#[pyclass(name = "EdgesArray")]
 pub struct PyEdgesArray {
     pub inner: EdgesArray,
 }
@@ -1777,7 +1777,7 @@ impl PyEdgesArray {
 }
 
 /// Python wrapper for ArrayIterator<EdgeId> with edge-specific chaining operations
-#[pyclass(name = "EdgesArrayIterator", unsendable)]
+#[pyclass(name = "EdgesArrayIterator")]
 pub struct PyEdgesArrayIterator {
     inner: ArrayIterator<EdgeId>,
 }
@@ -1816,7 +1816,7 @@ impl PyEdgesArrayIterator {
 }
 
 /// Python wrapper for MetaNodeArray - specialized array for MetaNode collections
-#[pyclass(name = "MetaNodeArray", unsendable)]
+#[pyclass(name = "MetaNodeArray")]
 pub struct PyMetaNodeArray {
     pub inner: MetaNodeArray,
 }
@@ -1844,7 +1844,7 @@ impl PyMetaNodeArray {
 }
 
 /// Python wrapper for ArrayIterator<MetaNode> with meta-node-specific chaining operations
-#[pyclass(name = "MetaNodeArrayIterator", unsendable)]
+#[pyclass(name = "MetaNodeArrayIterator")]
 pub struct PyMetaNodeArrayIterator {
     inner: ArrayIterator<MetaNode>,
 }
@@ -1888,7 +1888,7 @@ impl PyMetaNodeArrayIterator {
 // Supporting iterator types for complex return values
 // =============================================================================
 
-#[pyclass(name = "NeighborsArrayIterator", unsendable)]
+#[pyclass(name = "NeighborsArrayIterator")]
 pub struct PyNeighborsArrayIterator {
     inner: ArrayIterator<Vec<NodeId>>,
 }
@@ -1919,7 +1919,7 @@ impl PyNeighborsArrayIterator {
     }
 }
 
-#[pyclass(name = "SubgraphArrayIterator", unsendable)]
+#[pyclass(name = "SubgraphArrayIterator")]
 pub struct PySubgraphArrayIterator {
     inner: ArrayIterator<groggy::subgraphs::subgraph::Subgraph>,
 }
@@ -1944,7 +1944,7 @@ impl PySubgraphArrayIterator {
     }
 }
 
-#[pyclass(name = "EdgeGroupsIterator", unsendable)]
+#[pyclass(name = "EdgeGroupsIterator")]
 pub struct PyEdgeGroupsIterator {
     inner: ArrayIterator<Vec<EdgeId>>,
 }

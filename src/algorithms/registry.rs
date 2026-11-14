@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::Arc;
+use std::sync::OnceLock;
+use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 
@@ -112,10 +114,10 @@ mod tests {
     use super::*;
     use crate::algorithms::{Algorithm, AlgorithmParams, Context};
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     struct Dummy;
 
@@ -149,7 +151,7 @@ mod tests {
         let mut nodes = HashSet::new();
         nodes.insert(node);
         let sg =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".to_string()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".to_string()).unwrap();
 
         let mut ctx = Context::new();
         let result = algo.execute(&mut ctx, sg).unwrap();

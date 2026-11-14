@@ -2,15 +2,13 @@ use groggy::algorithms::community::GirvanNewman;
 use groggy::algorithms::{
     ensure_algorithms_registered, global_registry, Algorithm, Context, PipelineBuilder,
 };
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
-type Shared = Rc<RefCell<Graph>>;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -28,7 +26,7 @@ fn triangles(reverse: bool, bridges: usize) -> Shared {
         g.set_edge_attr(e, "w".into(), AttrValue::Int(if i == 0 { 1 } else { 100 }))
             .unwrap();
     }
-    Rc::new(RefCell::new(g))
+    Arc::new(OwnerCell::new(g))
 }
 fn run(g: &Shared, levels: usize, weighted: bool) -> Context {
     let mut ctx = Context::new();
@@ -124,7 +122,7 @@ fn invalid_inputs_and_cancelled_or_stale_selections_preserve_existing_output() {
         .is_err());
     let mut directed = Graph::new_directed_manual();
     directed.add_node().unwrap();
-    let g = Rc::new(RefCell::new(directed));
+    let g = Arc::new(OwnerCell::new(directed));
     assert!(GirvanNewman::new(None, None, None, "c".into())
         .execute(&mut Context::new(), selected(&g))
         .unwrap_err()
@@ -147,7 +145,7 @@ fn empty_and_single_node_selections_are_valid() {
     for count in [0, 1] {
         let mut graph = Graph::new_manual();
         graph.add_nodes(count).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         GirvanNewman::new(None, None, None, "c".into())
             .execute(&mut Context::new(), selected(&g))
             .unwrap();

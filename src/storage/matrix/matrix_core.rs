@@ -16,13 +16,11 @@ mod numerical_data;
 use crate::storage::matrix::autodiff::{FactorOutput, Operation};
 pub use numerical_data::NumericalMatrixData;
 
+use crate::display::render::DisplayConfig;
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::matrix::{
-    AdvancedMemoryPool, ComputationGraph, NumericType, UnifiedMatrix,
-};
+use crate::storage::matrix::{AdvancedMemoryPool, ComputationGraph, NumericType, UnifiedMatrix};
 use crate::storage::table::BaseTable;
 use crate::types::{AttrValue, NodeId};
-use crate::display::render::DisplayConfig;
 use std::sync::Arc;
 
 /// Owned solution plus a rounded normwise backward-error estimate.
@@ -130,7 +128,7 @@ pub struct GraphMatrix<T: NumericType = f64> {
     properties: Option<MatrixProperties>,
     /// Reference to the source graph (optional)
     #[allow(dead_code)]
-    graph: Option<std::rc::Rc<crate::api::graph::Graph>>,
+    graph: Option<std::sync::Arc<crate::api::graph::Graph>>,
 }
 
 impl<T: NumericType> GraphMatrix<T> {

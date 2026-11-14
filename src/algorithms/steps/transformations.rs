@@ -590,12 +590,13 @@ impl Step for UpdateInPlaceStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::{
         algorithms::steps::{expression::BinaryOp, StepVariables},
         subgraphs::Subgraph,
         Graph,
     };
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::Arc;
 
     fn path() -> Subgraph {
         let mut graph = Graph::new_undirected_manual();
@@ -603,7 +604,7 @@ mod tests {
         graph.add_edge(0, 1).expect("edge");
         graph.add_edge(1, 2).expect("edge");
         Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..3).collect(),
             "path".into(),
         )

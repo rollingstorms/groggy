@@ -2,13 +2,13 @@
 
 use crate::api::graph::Graph;
 use crate::entities::meta_node::MetaNode;
+use crate::ownership::OwnerCell;
 use crate::storage::array::{
     ArrayIterator, ArrayOps, EdgeLike, MetaNodeLike, NodeIdLike, SubgraphLike,
 };
 use crate::subgraphs::subgraph::Subgraph;
 use crate::types::{EdgeId, NodeId};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 // =============================================================================
 // NodesArray - specialized array for NodeId collections
@@ -19,7 +19,7 @@ pub struct NodesArray {
     /// Node IDs in this array
     node_ids: Vec<NodeId>,
     /// Optional reference to the parent graph for graph-aware operations
-    graph_ref: Option<Rc<RefCell<Graph>>>,
+    graph_ref: Option<Arc<OwnerCell<Graph>>>,
     /// Optional name for debugging
     name: Option<String>,
 }
@@ -35,7 +35,7 @@ impl NodesArray {
     }
 
     /// Create a new NodesArray with graph reference
-    pub fn with_graph(node_ids: Vec<NodeId>, graph: Rc<RefCell<Graph>>) -> Self {
+    pub fn with_graph(node_ids: Vec<NodeId>, graph: Arc<OwnerCell<Graph>>) -> Self {
         Self {
             node_ids,
             graph_ref: Some(graph),
@@ -97,7 +97,7 @@ pub struct EdgesArray {
     /// Edge IDs in this array
     edge_ids: Vec<EdgeId>,
     /// Optional reference to the parent graph for graph-aware operations
-    graph_ref: Option<Rc<RefCell<Graph>>>,
+    graph_ref: Option<Arc<OwnerCell<Graph>>>,
     /// Optional name for debugging
     #[allow(dead_code)]
     name: Option<String>,
@@ -114,7 +114,7 @@ impl EdgesArray {
     }
 
     /// Create a new EdgesArray with graph reference
-    pub fn with_graph(edge_ids: Vec<EdgeId>, graph: Rc<RefCell<Graph>>) -> Self {
+    pub fn with_graph(edge_ids: Vec<EdgeId>, graph: Arc<OwnerCell<Graph>>) -> Self {
         Self {
             edge_ids,
             graph_ref: Some(graph),
@@ -162,7 +162,7 @@ pub struct MetaNodeArray {
     /// Meta-nodes in this array
     meta_nodes: Vec<MetaNode>,
     /// Optional reference to the parent graph for graph-aware operations
-    graph_ref: Option<Rc<RefCell<Graph>>>,
+    graph_ref: Option<Arc<OwnerCell<Graph>>>,
     /// Optional name for debugging
     #[allow(dead_code)]
     name: Option<String>,
@@ -179,7 +179,7 @@ impl MetaNodeArray {
     }
 
     /// Create a new MetaNodeArray with graph reference
-    pub fn with_graph(meta_nodes: Vec<MetaNode>, graph: Rc<RefCell<Graph>>) -> Self {
+    pub fn with_graph(meta_nodes: Vec<MetaNode>, graph: Arc<OwnerCell<Graph>>) -> Self {
         Self {
             meta_nodes,
             graph_ref: Some(graph),

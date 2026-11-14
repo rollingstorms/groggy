@@ -1,4 +1,5 @@
 //! Degree table computations use explicit immutable topology, never the owner.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         steps::{
@@ -11,11 +12,8 @@ use groggy::{
     subgraphs::Subgraph,
     AttrValue, Graph, GraphView,
 };
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 fn apply(
     view: GraphView,
     ctx: &mut Context,
@@ -56,7 +54,7 @@ fn selected_sparse_directed_and_undirected_instances_use_canonical_degree_defini
             [0, 1, 2, 3].into(),
         )
         .unwrap();
-        let g = Rc::new(RefCell::new(g));
+        let g = Arc::new(OwnerCell::new(g));
         let scope = Subgraph::from_frozen_view(g.clone(), view.clone(), "old".into());
         g.borrow_mut().remove_node(2).unwrap();
         let table = apply(view.clone(), &mut Context::new(), &scope).unwrap();
@@ -114,7 +112,7 @@ fn selected_sparse_directed_and_undirected_instances_use_canonical_degree_defini
 }
 #[test]
 fn empty_and_cancelled_computations_do_not_install_partial_results() {
-    let g = Rc::new(RefCell::new(Graph::new()));
+    let g = Arc::new(OwnerCell::new(Graph::new()));
     let view = g.borrow().read_view().unwrap();
     let scope = Subgraph::from_frozen_view(g, view.clone(), "empty".into());
     assert_eq!(
@@ -146,7 +144,7 @@ fn parallel_degree_columns_keep_sparse_identity_and_three_distinct_count_modes_a
         edges.extend([(0, 2), (2, 2)]);
         g.add_edges(&edges).unwrap();
         let view = g.read_view().unwrap();
-        let g = Rc::new(RefCell::new(g));
+        let g = Arc::new(OwnerCell::new(g));
         let scope = Subgraph::from_frozen_view(g, view.clone(), "large".into());
         let table = apply(view, &mut Context::new(), &scope).unwrap();
         let ids = table.source_entity_ids().unwrap();

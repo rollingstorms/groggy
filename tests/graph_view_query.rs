@@ -1,10 +1,12 @@
+use groggy::ownership::OwnerCell;
 use groggy::{
     query::{AttributeFilter as A, EdgeFilter as E, NodeFilter as N},
     subgraphs::Subgraph,
     types::GraphType,
     AttrValue as V, Graph,
 };
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 fn set(ids: impl IntoIterator<Item = usize>) -> HashSet<usize> {
     ids.into_iter().collect()
 }
@@ -91,7 +93,7 @@ fn all_native_node_predicates_share_live_and_frozen_results() {
 #[test]
 fn scoped_queries_never_reintroduce_parent_nodes_or_excluded_parallel_instances() {
     for directed in [false, true] {
-        let graph = Rc::new(RefCell::new(Graph::new_with_type_manual(if directed {
+        let graph = Arc::new(OwnerCell::new(Graph::new_with_type_manual(if directed {
             GraphType::Directed
         } else {
             GraphType::Undirected

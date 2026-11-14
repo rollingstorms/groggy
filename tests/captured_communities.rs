@@ -1,14 +1,12 @@
 //! Community kernels consume the same frozen topology/values as other classic reads.
 use groggy::algorithms::{community::*, Algorithm, Context};
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, types::GraphType, AttrValue, Graph, GraphView};
-use std::{
-    cell::RefCell,
-    collections::HashSet,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::collections::HashSet;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
-fn fixture(directed: bool) -> (Rc<RefCell<Graph>>, Subgraph, GraphView) {
+fn fixture(directed: bool) -> (Arc<OwnerCell<Graph>>, Subgraph, GraphView) {
     let mut graph = Graph::new_with_type_manual(if directed {
         GraphType::Directed
     } else {
@@ -51,7 +49,7 @@ fn fixture(directed: bool) -> (Rc<RefCell<Graph>>, Subgraph, GraphView) {
         edges.clone(),
     )
     .unwrap();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let selected = Subgraph::new(graph.clone(), nodes, edges, "communities".into());
     (graph, selected, view)
 }

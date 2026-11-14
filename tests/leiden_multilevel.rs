@@ -1,14 +1,13 @@
 use groggy::algorithms::community::Leiden;
 use groggy::algorithms::{Algorithm, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::Graph;
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 
-type Shared = Rc<RefCell<Graph>>;
+type Shared = Arc<OwnerCell<Graph>>;
 fn ring() -> Shared {
     let mut g = Graph::new_manual();
     g.add_nodes(50).unwrap();
@@ -24,7 +23,7 @@ fn ring() -> Shared {
             g.add_edge(u, v).unwrap();
         }
     }
-    Rc::new(RefCell::new(g))
+    Arc::new(OwnerCell::new(g))
 }
 fn sub(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()

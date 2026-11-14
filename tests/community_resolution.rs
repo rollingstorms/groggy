@@ -6,14 +6,12 @@ use groggy::algorithms::community::{Leiden, Louvain};
 use groggy::algorithms::{
     ensure_algorithms_registered, global_registry, Algorithm, Context, PipelineBuilder,
 };
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 // Independent adjacency-matrix definition, with a loop represented twice on the diagonal.
 fn reference(labels: &[usize], edges: &[(usize, usize)], gamma: f64) -> f64 {
@@ -115,10 +113,10 @@ fn algorithm(leiden: bool, gamma: f64) -> Box<dyn Algorithm> {
         Box::new(Louvain::new(100, 1, gamma, "c".into()).unwrap())
     }
 }
-fn selected(g: &Rc<RefCell<Graph>>) -> Subgraph {
+fn selected(g: &Arc<OwnerCell<Graph>>) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
-fn read(g: &Rc<RefCell<Graph>>, nodes: &[usize]) -> Vec<AttrValue> {
+fn read(g: &Arc<OwnerCell<Graph>>, nodes: &[usize]) -> Vec<AttrValue> {
     nodes
         .iter()
         .map(|&n| g.borrow().get_node_attr(n, &"c".into()).unwrap().unwrap())
@@ -131,7 +129,7 @@ fn resolution_changes_local_moves_in_both_algorithms() {
             let mut graph = Graph::new_manual();
             graph.add_nodes(2).unwrap();
             graph.add_edge(1, 0).unwrap();
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             algorithm(leiden, gamma)
                 .execute(&mut Context::new(), selected(&g))
                 .unwrap();
@@ -160,7 +158,7 @@ fn loop_and_parallel_topology_matches_full_objective_and_keeps_isolates() {
         for &(u, v) in &edges {
             graph.add_edge(u, v).unwrap();
         }
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         algorithm(leiden, 1.)
             .execute(&mut Context::new(), selected(&g))
             .unwrap();
@@ -195,7 +193,7 @@ fn empty_edgeless_stale_directed_and_cancelled_inputs_have_explicit_behavior() {
         for count in [0, 1, 3] {
             let mut graph = Graph::new_manual();
             graph.add_nodes(count).unwrap();
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             algorithm(leiden, 1.)
                 .execute(&mut Context::new(), selected(&g))
                 .unwrap();
@@ -206,17 +204,17 @@ fn empty_edgeless_stale_directed_and_cancelled_inputs_have_explicit_behavior() {
         }
         let mut graph = Graph::new_manual();
         graph.add_nodes(1).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let sub = selected(&g);
         g.borrow_mut().remove_node(0).unwrap();
         assert!(algorithm(leiden, 1.)
             .execute(&mut Context::new(), sub)
             .is_err());
-        let g = Rc::new(RefCell::new(Graph::new_directed_manual()));
+        let g = Arc::new(OwnerCell::new(Graph::new_directed_manual()));
         assert!(algorithm(leiden, 1.)
             .execute(&mut Context::new(), selected(&g))
             .is_err());
-        let g = Rc::new(RefCell::new(Graph::new_manual()));
+        let g = Arc::new(OwnerCell::new(Graph::new_manual()));
         let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
         assert!(algorithm(leiden, 1.)
             .execute(&mut ctx, selected(&g))
@@ -249,7 +247,7 @@ fn seeded_leiden_is_reproducible_without_global_rng_side_effects() {
         graph.add_edge(i, (i + 1) % 8).unwrap();
         graph.add_edge(i, (i + 3) % 8).unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let algo = Leiden::new(50, 5, 1., Some(42), "c".into()).unwrap();
     let mut previous = None;
     for _ in 0..4 {

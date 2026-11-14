@@ -1,4 +1,5 @@
 //! Bounded native release receipt for community helpers plus checked publication.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         builder::register_algorithms, AlgorithmParamValue, AlgorithmParams, AlgorithmSpec, Context,
@@ -8,7 +9,8 @@ use groggy::{
     AttrValue, Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let registry = Registry::default();
     register_algorithms(&registry)?;
@@ -59,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 graph.commit("fixture".into(), "bench".into())?;
                 let before = graph.current_state_id();
-                let shared = Rc::new(RefCell::new(graph));
+                let shared = Arc::new(OwnerCell::new(graph));
                 let selected =
                     Subgraph::from_nodes(shared.clone(), (0..count).collect(), "community".into())?;
                 let start = Instant::now();

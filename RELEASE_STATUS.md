@@ -16,37 +16,41 @@ remain deferred; they are not silently included in this release.
   CPython 3.9. An isolated subprocess with site-packages disabled imports the
   unpacked wheel, not the checkout:
   distribution/runtime/native versions agree at 0.6.0, all 104 declared exports
-  resolve, and graph/snapshot/f64/numerical smoke assertions pass. Both archive
-  and journal acceptance workflows also pass against each of the three wheels.
+  resolve, and graph/snapshot/f64/numerical smoke assertions pass. Initial root,
+  nested and extracted-source wheels passed both storage workflows; the updated
+  ownership wheel also passes the isolated archive/journal workflows.
 - Source distribution builds with the standard backend, with no extension import
   or stub regeneration during packaging. Rebuilding the extracted source and
   alternate entry-point qualification are recorded in the current receipt.
 - Eight focused regressions pass: version/exports/display delegation and the
   cross-surface archive/journal workflow. See
   [the executable workflow](docs/api/core-release-workflow.md).
-- Maintained Python gate: 2,684 passed, one skipped, 15 warnings; 266 executable
-  documentation examples pass. The known writable PyGraph finalization warning
-  remains among these warnings; passing assertions do not erase that defect.
-- Native gates: 1,561 Rust tests passed, 54 ignored; strict all-target Clippy passed.
+- Ownership follow-up: creator-checked Arc/OwnerCell handles fix foreign cyclic-GC
+  finalization without allowing foreign live mutations. Thirty-four Python cases
+  include immediate durable file-lock release and cleanup after creator exit;
+  five native cases prove destruction and ownership traits. See
+  [Python owner lifetimes](docs/api/python-owner-lifetimes.md).
+- Maintained Python gate: 2,718 passed, one skipped, 14 existing builder warnings;
+  267 executable documentation examples pass. The former finalization warning is
+  absent, with no suppression or production GC changes.
+- Native gates: 1,566 Rust tests passed, 54 ignored; strict all-target Clippy passed.
 - Existing native workflow benchmark: three fresh processes each at 1k/100k
-  nodes and edges. At 100k, median bulk acceptance is 0.600 seconds and archive
-  save/recovery 1.418/0.841 seconds; whole-process peak RSS is 836–869 MiB.
+  nodes and edges. After the ownership follow-up, median bulk acceptance at 100k
+  is 0.582 seconds and archive save/recovery 1.452/0.859 seconds; whole-process
+  peak RSS is 855–882 MiB. The paired Python access fixture shows small read
+  variation and about 2.6% overhead for a checked 1,000-property batch.
   These are bounded fixture measurements, not universal budgets or a matched
   before/after comparison. Memory/recovery costs remain existing scale work.
 
 ## Remaining release decisions and checks
 
-- **Ownership defect:** wrong-thread cyclic collection of a writable Graph can
-  report an unraisable error and skip its native destructor. Existing Rc/RefCell
-  ownership reaches into core pools/spaces and connected wrappers. No unsafe Send,
-  global GC suppression or test-only workaround has been applied. A safe fix or
-  explicit narrower release decision is required before declaring release-ready.
 - Cross-platform wheel/import/test qualification remains open. Local CPython 3.9
   evidence does not certify all advertised Python versions or operating systems.
 - Broad old-format migration and platform/power-loss guarantees remain unproven;
   preserve the supported storage boundaries in the release notes.
 - Native tests, Clippy and workload measurements are recorded in the
-  [current qualification receipt](notes/planning/release-060-qualification-2026-11-14.md).
+  [initial qualification receipt](notes/planning/release-060-qualification-2026-11-14.md)
+  and [ownership follow-up](notes/planning/python-owner-lifetime-2026-11-14.md).
   A public release still needs review of the resulting artifact and scope.
 
 This scope does not require completing all 53 open checklist rows. It also does

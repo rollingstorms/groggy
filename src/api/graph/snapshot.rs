@@ -45,7 +45,7 @@ impl SnapshotMaterialization {
             )
         })?;
         let mut graph = Graph::with_config_manual(self.config.clone())?;
-        graph.pool = Rc::new(RefCell::new(owned.pool.clone()));
+        graph.pool = Arc::new(OwnerCell::new(owned.pool.clone()));
         graph.history = owned.history.detached_copy();
         graph.identities = owned.identities.clone();
         graph.current_branch = owned.branch.clone();

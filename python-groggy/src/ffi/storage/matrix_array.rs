@@ -7,7 +7,7 @@ use pyo3::types::PyAny;
 
 /// MatrixArray: Collection of GraphMatrix objects with delegation to NumArray
 /// Provides basic array operations plus statistical operations on matrix collections
-#[pyclass(name = "MatrixArray", unsendable)]
+#[pyclass(name = "MatrixArray")]
 pub struct PyMatrixArray {
     // Delegates to NumArray for numerical operations
     // Note: NumArray contains BaseArray internally
@@ -298,7 +298,7 @@ impl PyMatrixArray {
 }
 
 /// Iterator for MatrixArray that enables method chaining
-#[pyclass(name = "MatrixArrayIterator", unsendable)]
+#[pyclass(name = "MatrixArrayIterator")]
 pub struct PyMatrixArrayIterator {
     inner: ArrayIterator<PyGraphMatrix>,
 }

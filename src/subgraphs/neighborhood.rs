@@ -13,13 +13,15 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::state::space::GraphSpace;
 use crate::storage::pool::GraphPool;
 use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{EdgeId, EntityId, NodeId, SubgraphId};
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::rc::{Rc, Weak};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::sync::Weak;
 
 /// Result of neighborhood sampling operations
 #[derive(Debug, Clone)]
@@ -69,7 +71,8 @@ impl NeighborhoodSubgraph {
     }
 
     fn selection_id(central_nodes: &[NodeId], hops: usize, node_count: usize) -> SubgraphId {
-        use std::hash::{Hash, Hasher};
+        use std::hash::Hash;
+        use std::hash::Hasher;
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         for central in central_nodes {
             central.hash(&mut hasher);
@@ -90,7 +93,7 @@ impl NeighborhoodSubgraph {
 
     /// Create a new NeighborhoodSubgraph from expansion results
     pub fn from_expansion(
-        graph_ref: Rc<RefCell<Graph>>,
+        graph_ref: Arc<OwnerCell<Graph>>,
         central_nodes: Vec<NodeId>,
         hops: usize,
         result: crate::subgraphs::neighborhood::NeighborhoodResult,
@@ -126,7 +129,7 @@ impl NeighborhoodSubgraph {
 
     /// Create a new NeighborhoodSubgraph from stored data
     pub fn from_stored(
-        graph_ref: Rc<RefCell<Graph>>,
+        graph_ref: Arc<OwnerCell<Graph>>,
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>,
         central_nodes: Vec<NodeId>,
@@ -137,7 +140,7 @@ impl NeighborhoodSubgraph {
 
     /// Create a new NeighborhoodSubgraph
     pub fn new(
-        graph_ref: Rc<RefCell<Graph>>,
+        graph_ref: Arc<OwnerCell<Graph>>,
         central_nodes: Vec<NodeId>,
         hops: usize,
         nodes: HashSet<NodeId>,
@@ -169,7 +172,7 @@ impl GraphEntity for NeighborhoodSubgraph {
         "neighborhood"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.selection.graph()
     }
 
@@ -400,7 +403,7 @@ pub struct NeighborhoodSampler {
     /// Performance statistics
     stats: NeighborhoodStats,
     /// Weak self-reference for constructing subgraphs tied to the live graph
-    graph_ref: Option<Weak<RefCell<Graph>>>,
+    graph_ref: Option<Weak<OwnerCell<Graph>>>,
 }
 
 impl NeighborhoodSampler {
@@ -412,11 +415,11 @@ impl NeighborhoodSampler {
     }
 
     /// Attach the owning graph so generated subgraphs can mutate the real graph
-    pub fn set_graph_ref(&mut self, graph_ref: &Rc<RefCell<Graph>>) {
-        self.graph_ref = Some(Rc::downgrade(graph_ref));
+    pub fn set_graph_ref(&mut self, graph_ref: &Arc<OwnerCell<Graph>>) {
+        self.graph_ref = Some(Arc::downgrade(graph_ref));
     }
 
-    fn graph_ref(&self) -> Option<Rc<RefCell<Graph>>> {
+    fn graph_ref(&self) -> Option<Arc<OwnerCell<Graph>>> {
         self.graph_ref.as_ref().and_then(|weak| weak.upgrade())
     }
 
@@ -456,12 +459,13 @@ impl NeighborhoodSampler {
         // Use the live graph when available so downstream operations mutate shared state
         let graph_ref = self
             .graph_ref()
-            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
+            .unwrap_or_else(|| Arc::new(OwnerCell::new(Graph::new_manual())));
 
         // Generate proper SubgraphId using hash of content
         let subgraph_id = {
             use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
+            use std::hash::Hash;
+            use std::hash::Hasher;
             let mut hasher = DefaultHasher::new();
             let mut sorted_nodes: Vec<NodeId> = nodes_vec.to_vec();
             sorted_nodes.sort();
@@ -561,7 +565,7 @@ impl NeighborhoodSampler {
                 .record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
             let graph_ref = self
                 .graph_ref()
-                .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
+                .unwrap_or_else(|| Arc::new(OwnerCell::new(Graph::new_manual())));
             let subgraph_id = 1;
             return Ok(NeighborhoodSubgraph {
                 selection: crate::subgraphs::Subgraph::new(
@@ -619,7 +623,7 @@ impl NeighborhoodSampler {
 
         let graph_ref = self
             .graph_ref()
-            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
+            .unwrap_or_else(|| Arc::new(OwnerCell::new(Graph::new_manual())));
         let subgraph_id = 2;
         Ok(NeighborhoodSubgraph {
             selection: crate::subgraphs::Subgraph::new(
@@ -687,7 +691,7 @@ impl NeighborhoodSampler {
 
         let graph_ref = self
             .graph_ref()
-            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new_manual())));
+            .unwrap_or_else(|| Arc::new(OwnerCell::new(Graph::new_manual())));
         let subgraph_id = 3;
         Ok(NeighborhoodSubgraph {
             selection: crate::subgraphs::Subgraph::new(
@@ -766,9 +770,9 @@ impl NeighborhoodStats {
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::traits::NeighborhoodOperations;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn test_neighborhood_operations() {
@@ -785,7 +789,7 @@ mod tests {
         let _edge2 = graph.add_edge(center, node2).unwrap();
         let _edge3 = graph.add_edge(node1, node3).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
 
         // Create a neighborhood manually for testing
         let nodes = std::collections::HashSet::from([center, node1, node2]);

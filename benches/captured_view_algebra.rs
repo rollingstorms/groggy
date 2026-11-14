@@ -1,7 +1,10 @@
 //! Captured/connected grouping and exact algebra costs; capture is a separate measurement.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, AttrValue as V, Graph, GraphView};
 use serde_json::json;
-use std::{cell::RefCell, hint::black_box, rc::Rc, time::Instant};
+use std::hint::black_box;
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000usize, 10_000] {
@@ -18,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let root = graph.read_view()?;
             let capture = start.elapsed().as_secs_f64();
             let selected = Subgraph::new(
-                Rc::new(RefCell::new(graph)),
+                Arc::new(OwnerCell::new(graph)),
                 root.nodes().clone(),
                 root.edges().clone(),
                 "bench".into(),

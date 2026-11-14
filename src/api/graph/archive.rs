@@ -5,7 +5,8 @@ use crate::storage::pool::PoolDocument;
 #[cfg(test)]
 use crate::storage::retained_group;
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
+use std::io::Read;
+use std::io::Write;
 
 const MAGIC: &[u8; 8] = b"GROGGYA1";
 const VERSION: u32 = 1;
@@ -412,7 +413,7 @@ impl GraphArchive {
             }
         }
         let mut graph = Graph::with_config_manual(self.config)?;
-        graph.pool = Rc::new(RefCell::new(pool));
+        graph.pool = Arc::new(OwnerCell::new(pool));
         graph.space = GraphSpace::new(graph.pool.clone(), self.state);
         graph.history = history;
         graph.identities = self.identities;

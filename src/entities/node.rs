@@ -6,10 +6,10 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::traits::{GraphEntity, NodeOperations};
 use crate::types::{EntityId, NodeId};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A regular graph node
 ///
@@ -21,7 +21,7 @@ pub struct Node {
     /// The unique identifier for this node
     id: NodeId,
     /// Reference to the graph containing this node
-    graph: Rc<RefCell<Graph>>,
+    graph: Arc<OwnerCell<Graph>>,
 }
 
 impl Node {
@@ -36,7 +36,7 @@ impl Node {
     ///
     /// # Errors
     /// Returns GraphError if the node ID doesn't exist in the graph
-    pub fn new(id: NodeId, graph: Rc<RefCell<Graph>>) -> GraphResult<Self> {
+    pub fn new(id: NodeId, graph: Arc<OwnerCell<Graph>>) -> GraphResult<Self> {
         // Validate that the node exists in the graph
         {
             let graph_borrowed = graph.borrow();
@@ -54,10 +54,10 @@ impl Node {
     }
 
     // Compatibility construction preserves the historical unchecked handle API.
-    pub(crate) fn from_id_unchecked(id: NodeId, graph: Rc<RefCell<Graph>>) -> Self {
+    pub(crate) fn from_id_unchecked(id: NodeId, graph: Arc<OwnerCell<Graph>>) -> Self {
         Self { id, graph }
     }
-    pub(crate) fn graph_handle(&self) -> &Rc<RefCell<Graph>> {
+    pub(crate) fn graph_handle(&self) -> &Arc<OwnerCell<Graph>> {
         &self.graph
     }
 
@@ -79,7 +79,7 @@ impl GraphEntity for Node {
         "node"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.graph.clone()
     }
 

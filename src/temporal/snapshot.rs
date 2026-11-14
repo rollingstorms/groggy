@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -232,7 +231,7 @@ impl TemporalSnapshot {
         } else {
             Graph::from_snapshot(self.state.snapshot().clone())?
         };
-        let rc = Rc::new(std::cell::RefCell::new(graph));
+        let rc = Arc::new(crate::ownership::OwnerCell::new(graph));
         let nodes = self.state.existence().nodes().clone();
         let edges = self.state.existence().edges().clone();
         Ok(Subgraph::new(rc, nodes, edges, "TemporalSnapshot".into()))

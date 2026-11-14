@@ -1,7 +1,6 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -512,10 +511,10 @@ mod tests {
     use super::*;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::traits::SubgraphOperations;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn pagerank_handles_small_graph() {
@@ -530,7 +529,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = PageRank::new(0.85, 30, 1e-6, None, "pagerank".into()).unwrap();
         let mut ctx = Context::new();

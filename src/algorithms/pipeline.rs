@@ -188,7 +188,7 @@ impl Pipeline {
         &self,
         ctx: &mut Context,
         mut subgraph: Subgraph,
-        source: Option<&std::rc::Rc<std::cell::RefCell<crate::Graph>>>,
+        source: Option<&std::sync::Arc<crate::ownership::OwnerCell<crate::Graph>>>,
     ) -> Result<Subgraph> {
         let pipeline_start = Instant::now();
         for (idx, step) in self.steps.iter().enumerate() {
@@ -202,7 +202,7 @@ impl Pipeline {
             ctx.record_duration(timer_label, step_start.elapsed());
             ctx.finish_step();
             subgraph = result?;
-            if source.is_some_and(|owner| !std::rc::Rc::ptr_eq(owner, &subgraph.graph())) {
+            if source.is_some_and(|owner| !std::sync::Arc::ptr_eq(owner, &subgraph.graph())) {
                 return Err(anyhow!("Atomic pipeline changed graph owner at step {idx}"));
             }
         }
@@ -253,10 +253,10 @@ mod tests {
     use super::*;
     use crate::algorithms::Algorithm;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use crate::algorithms::registry::Registry;
     use crate::algorithms::{AlgorithmParams, Context};
@@ -288,7 +288,7 @@ mod tests {
         let mut nodes = HashSet::new();
         nodes.insert(node);
         let sg =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".to_string()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".to_string()).unwrap();
 
         let mut ctx = Context::new();
         let result = pipeline.run(&mut ctx, sg).expect("run");
@@ -330,16 +330,12 @@ mod tests {
 mod atomic_property_tests {
     use super::*;
     use crate::algorithms::AlgorithmOutput;
+    use crate::ownership::OwnerCell;
     use crate::{AttrValue, Graph};
-    use std::{
-        cell::RefCell,
-        collections::HashMap,
-        rc::Rc,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    };
+    use std::collections::HashMap;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
 
     struct Stage {
         name: &'static str,
@@ -390,7 +386,7 @@ mod atomic_property_tests {
             let mut graph = Graph::new_publishing();
             graph.insert_nodes(1)?;
             Ok(Subgraph::from_nodes(
-                Rc::new(RefCell::new(graph)),
+                Arc::new(OwnerCell::new(graph)),
                 [0].into_iter().collect(),
                 "foreign".into(),
             )?)
@@ -424,10 +420,10 @@ mod atomic_property_tests {
                 .collect(),
         }
     }
-    fn fixture() -> (Rc<RefCell<Graph>>, Subgraph) {
+    fn fixture() -> (Arc<OwnerCell<Graph>>, Subgraph) {
         let mut graph = Graph::new_publishing();
         graph.insert_nodes(1).unwrap();
-        let graph = Rc::new(RefCell::new(graph));
+        let graph = Arc::new(OwnerCell::new(graph));
         let selected =
             Subgraph::from_nodes(graph.clone(), [0].into_iter().collect(), "selected".into())
                 .unwrap();

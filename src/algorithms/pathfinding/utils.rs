@@ -1,4 +1,6 @@
-use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::collections::BinaryHeap;
+use std::collections::HashMap;
+use std::collections::VecDeque;
 
 use rustc_hash::FxHashMap;
 
@@ -458,11 +460,11 @@ pub fn dijkstra_csr(
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::state::topology::{build_csr_from_edges_with_scratch, CsrOptions};
     use crate::subgraphs::Subgraph;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     fn create_test_graph() -> (Graph, Vec<NodeId>) {
         let mut g = Graph::new_manual();
@@ -486,7 +488,7 @@ mod tests {
         let (graph, test_nodes) = create_test_graph();
         let node_set: HashSet<NodeId> = test_nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         let source = test_nodes[0];
 
@@ -543,7 +545,7 @@ mod tests {
         let (graph, test_nodes) = create_test_graph();
         let node_set: HashSet<NodeId> = test_nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         let source = test_nodes[0];
 
@@ -614,7 +616,7 @@ mod tests {
 
         let node_set: HashSet<NodeId> = test_nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(g)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(g)), node_set, "test".into()).unwrap();
 
         let nodes = subgraph.ordered_nodes();
         let indexer = NodeIndexer::new(&nodes);
@@ -659,7 +661,7 @@ mod tests {
         let (graph, test_nodes) = create_test_graph();
         let node_set: HashSet<NodeId> = test_nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         let source = test_nodes[0];
 

@@ -2,10 +2,12 @@ use groggy::algorithms::pathfinding::DijkstraShortestPath;
 use groggy::algorithms::steps::ShortestPathMapStep;
 use groggy::algorithms::steps::{Step, StepScope, StepVariables};
 use groggy::algorithms::{Algorithm, AlgorithmParamValue, Context};
+use groggy::ownership::OwnerCell;
 use groggy::query::{PathFindingOptions, TraversalOptions};
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 fn weighted() -> PathFindingOptions {
     PathFindingOptions {
         weight_attribute: Some("w".into()),
@@ -83,14 +85,14 @@ fn compact_integer_missing_zero_and_parallel_weights_are_respected() {
     assert_eq!(path.edges, vec![unit]);
     assert_eq!(path.total_weight, 1.);
 }
-fn algorithm_fixture(weight: AttrValue) -> (Rc<RefCell<Graph>>, Subgraph, usize) {
+fn algorithm_fixture(weight: AttrValue) -> (Arc<OwnerCell<Graph>>, Subgraph, usize) {
     let mut g = Graph::new_manual();
     let n = g.add_nodes(2).unwrap();
     g.set_node_attr(n[1], "source".into(), AttrValue::Bool(true))
         .unwrap();
     let e = g.add_edge(n[0], n[1]).unwrap();
     g.set_edge_attr(e, "w".into(), weight).unwrap();
-    let g = Rc::new(RefCell::new(g));
+    let g = Arc::new(OwnerCell::new(g));
     let sub = Subgraph::from_nodes(g.clone(), HashSet::from([n[0], n[1]]), "test".into()).unwrap();
     (g, sub, n[0])
 }
@@ -144,7 +146,7 @@ fn tiny_distance_improvements_are_not_dropped_as_epsilon_noise() {
         g.set_edge_attr(e, "w".into(), AttrValue::Float(w)).unwrap();
     }
     let sub = Subgraph::from_nodes(
-        Rc::new(RefCell::new(g)),
+        Arc::new(OwnerCell::new(g)),
         n.iter().copied().collect(),
         "test".into(),
     )
@@ -171,7 +173,7 @@ fn algorithm_distance_overflow_rejects_before_persisting_any_result() {
         g.set_edge_attr(e, "w".into(), AttrValue::Float64(f64::MAX))
             .unwrap();
     }
-    let g = Rc::new(RefCell::new(g));
+    let g = Arc::new(OwnerCell::new(g));
     let sub =
         Subgraph::from_nodes(g.clone(), nodes.iter().copied().collect(), "test".into()).unwrap();
     assert!(

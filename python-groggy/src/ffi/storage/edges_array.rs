@@ -8,7 +8,7 @@ use pyo3::types::PyAny;
 
 /// EdgesArray: Collection of EdgesAccessor objects with delegation to BaseArray
 /// Provides basic array operations and graph-specific transformations
-#[pyclass(name = "EdgesArray", unsendable)]
+#[pyclass(name = "EdgesArray")]
 pub struct PyEdgesArray {
     // Delegates to BaseArray for basic operations
     base: BaseArray<PyEdgesAccessor>,
@@ -271,7 +271,7 @@ impl PyEdgesArray {
 }
 
 /// Iterator for EdgesArray that enables method chaining
-#[pyclass(name = "EdgesArrayIterator", unsendable)]
+#[pyclass(name = "EdgesArrayIterator")]
 pub struct PyEdgesArrayIterator {
     inner: ArrayIterator<PyEdgesAccessor>,
 }

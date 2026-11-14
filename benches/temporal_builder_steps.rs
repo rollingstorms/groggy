@@ -1,4 +1,5 @@
 //! Bounded retained snapshot and checked decay kernel receipt.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         steps::{
@@ -11,7 +12,8 @@ use groggy::{
     Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::sync::Arc;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
@@ -23,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let state = graph.commit("fixture".into(), "bench".into())?;
         let selected = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..count).collect(),
             "temporal".into(),
         )?;

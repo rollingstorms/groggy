@@ -29,7 +29,7 @@ use crate::ffi::subgraphs::subgraph::PySubgraph;
 /// Smart helper function to create appropriate Node entity from core Graph
 /// Returns PyMetaNode for meta-nodes, PyNode for regular nodes
 fn create_node_entity_from_core(
-    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     py: Python,
     node_id: NodeId,
 ) -> PyResult<PyObject> {
@@ -82,7 +82,7 @@ fn create_node_entity_from_core(
 /// Smart helper function to create appropriate Edge entity from core Graph
 /// Returns PyMetaEdge for meta-edges, PyEdge for regular edges
 fn create_edge_entity_from_core(
-    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     py: Python,
     edge_id: EdgeId,
 ) -> PyResult<PyObject> {
@@ -141,9 +141,9 @@ fn create_edge_entity_from_core(
 }
 
 /// Iterator for nodes that yields NodeViews
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct NodesIterator {
-    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     node_ids: Vec<NodeId>,
     index: usize,
 }
@@ -170,9 +170,9 @@ impl NodesIterator {
 
 /// Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
 #[derive(Clone)]
-#[pyclass(name = "NodesAccessor", unsendable)]
+#[pyclass(name = "NodesAccessor")]
 pub struct PyNodesAccessor {
-    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    pub graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     /// Optional constraint: if Some, only these nodes are accessible
     pub constrained_nodes: Option<Vec<NodeId>>,
 }
@@ -1590,9 +1590,9 @@ impl PyNodesAccessor {
 }
 
 /// Iterator for edges that yields EdgeViews
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct EdgesIterator {
-    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     edge_ids: Vec<EdgeId>,
     index: usize,
 }
@@ -1619,9 +1619,9 @@ impl EdgesIterator {
 
 /// Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
 #[derive(Clone)]
-#[pyclass(name = "EdgesAccessor", unsendable)]
+#[pyclass(name = "EdgesAccessor")]
 pub struct PyEdgesAccessor {
-    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    pub graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     /// Optional constraint: if Some, only these edges are accessible
     pub constrained_edges: Option<Vec<EdgeId>>,
 }

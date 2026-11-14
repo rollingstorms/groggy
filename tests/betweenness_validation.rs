@@ -1,10 +1,11 @@
 use groggy::algorithms::centrality::BetweennessCentrality;
 use groggy::algorithms::{Algorithm, AlgorithmOutput, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 
-type SharedGraph = Rc<RefCell<Graph>>;
+type SharedGraph = Arc<OwnerCell<Graph>>;
 fn selected(g: &SharedGraph) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "betweenness".into()).unwrap()
 }
@@ -131,7 +132,7 @@ fn directed_and_undirected_scores_match_exhaustive_edge_path_reference() {
                     .unwrap();
             }
         }
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         // Warm the shared unweighted CSR, then verify weighted filtering doesn't contaminate it.
         for (weighted, normalized) in [(false, false), (true, false), (true, true), (false, true)] {
             execute(&g, weighted, normalized).unwrap();
@@ -196,7 +197,7 @@ fn zero_invalid_and_nonfinite_weights_preserve_prior_results() {
         graph.add_nodes(3).unwrap();
         let e = graph.add_edge(0, 1).unwrap();
         graph.add_edge(1, 2).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         execute(&g, true, false).unwrap();
         let before: Vec<_> = (0..3).map(|n| score(&g, n)).collect();
         g.borrow_mut().set_edge_attr(e, "w".into(), bad).unwrap();
@@ -217,7 +218,7 @@ fn tiny_positive_lengths_do_not_become_spurious_ties() {
             .set_edge_attr(e, "w".into(), AttrValue::Float(w))
             .unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     execute(&g, true, false).unwrap();
     assert_eq!(score(&g, 2), 1.);
 }
@@ -226,7 +227,7 @@ fn tiny_positive_lengths_do_not_become_spurious_ties() {
 fn stale_selection_rejects_even_for_a_single_node() {
     let mut graph = Graph::new_manual();
     let node = graph.add_node().unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let sub = selected(&g);
     g.borrow_mut().remove_node(node).unwrap();
     assert!(BetweennessCentrality::new(false, None, "score".into())
@@ -244,7 +245,7 @@ fn rounded_away_distance_and_path_count_overflow_reject() {
             .set_edge_attr(e, "w".into(), AttrValue::Float(w))
             .unwrap();
     }
-    assert!(execute(&Rc::new(RefCell::new(graph)), true, false)
+    assert!(execute(&Arc::new(OwnerCell::new(graph)), true, false)
         .unwrap_err()
         .to_string()
         .contains("cannot advance"));
@@ -254,7 +255,7 @@ fn rounded_away_distance_and_path_count_overflow_reject() {
         graph.add_edge(n, n + 1).unwrap();
         graph.add_edge(n, n + 1).unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     for weighted in [false, true] {
         assert!(execute(&g, weighted, false)
             .unwrap_err()

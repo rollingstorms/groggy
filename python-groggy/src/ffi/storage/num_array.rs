@@ -27,7 +27,7 @@ fn numeric_error(error: groggy::GraphError) -> PyErr {
 }
 
 /// Unified statistical array supporting all numeric types internally
-#[pyclass(name = "NumArray", unsendable)]
+#[pyclass(name = "NumArray")]
 #[derive(Clone)]
 pub struct PyNumArray {
     inner: NumericArrayData,

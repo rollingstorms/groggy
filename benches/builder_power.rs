@@ -1,4 +1,5 @@
 //! Bounded native column-power receipts, separate from graph construction/history.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         steps::{
@@ -10,7 +11,10 @@ use groggy::{
     Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, collections::HashSet, hint::black_box, rc::Rc, time::Instant};
+use std::collections::HashSet;
+use std::hint::black_box;
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     ensure_core_steps_registered();
     let mut params = AlgorithmParams::new();
@@ -28,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut graph = Graph::new();
         graph.add_nodes(count)?;
         let selected = Subgraph::new(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..count).collect(),
             HashSet::new(),
             "benchmark".into(),

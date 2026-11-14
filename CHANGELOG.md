@@ -22,11 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   public native display helper exports.
 - Executable embedded-core acceptance workflow across graph, table, numerical,
   temporal and recovery APIs.
+- Creator-checked Arc/OwnerCell handles permit safe native finalization on any
+  thread, fixing writable Graph/connected-wrapper cyclic-GC destruction errors.
+  Durable GC releases file locks without owner polling; foreign live access still
+  rejects. Native attribute collections and matrix-view metadata retain their
+  backing owners. Explicit Rust handle types and custom temporal strategy bounds
+  have migration changes documented in the owner-lifetime guide.
 
 This is an unreleased development version. See [0.6.0 scope and migration
 notes](RELEASE_NOTES_0.6.0.md) and [release qualification](RELEASE_STATUS.md).
-The writable-owner cyclic finalization defect remains unresolved. Graphiti is
-planned as a separate plugin, outside the core release.
+The writable-owner cyclic finalization defect is fixed within the documented
+thread-access boundary. Graphiti is planned as a separate plugin, outside the
+core release.
 
 ## [0.5.2] - 2024-12-04
 

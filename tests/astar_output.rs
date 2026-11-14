@@ -1,13 +1,11 @@
 use groggy::algorithms::pathfinding::{AStarPathfinding, BfsTraversal};
 use groggy::algorithms::{Algorithm, AlgorithmOutput, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
-type Shared = Rc<RefCell<Graph>>;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -65,7 +63,7 @@ fn every_small_graph_and_endpoint_pair_matches_floyd_warshall_cost() {
                     }
                 }
             }
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             let mut warm = Context::new();
             warm.set_persist_results(false);
             let cached = BfsTraversal::new("s0".into(), "unused".into())
@@ -131,7 +129,7 @@ fn cancelled_trivial_paths_stale_and_open_selections_preserve_old_values() {
     graph
         .set_node_attr(0, "out".into(), AttrValue::Int(7))
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let algo = AStarPathfinding::new("s".into(), "g".into(), None, None, "out".into());
     for persist in [false, true] {
         let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
@@ -177,7 +175,7 @@ fn sparse_path_rows_and_large_f64_costs_do_not_require_f32_distance_properties()
             .set_edge_attr(e, "w".into(), AttrValue::Float(f32::MAX))
             .unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let algo = AStarPathfinding::new("s".into(), "g".into(), Some("w".into()), None, "out".into());
     let mut ctx = Context::new();
     ctx.set_persist_results(false);

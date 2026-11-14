@@ -2,13 +2,11 @@ use groggy::algorithms::community::LabelPropagation;
 use groggy::algorithms::{
     ensure_algorithms_registered, global_registry, Algorithm, Context, PipelineBuilder,
 };
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 // Independent direct adjacency/value implementation; no CSR or interned IDs.
 #[test]
@@ -59,7 +57,7 @@ fn all_three_node_directed_graphs_match_direct_value_propagation() {
                     break;
                 }
             }
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             let sub =
                 Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap();
             LabelPropagation::new(10, 0., "label".into(), Some("initial".into()))
@@ -85,7 +83,7 @@ fn local_seed_is_repeatable_and_failure_preserves_labels() {
     for (u, v) in [(0, 2), (0, 2), (2, 3), (3, 4), (4, 0), (4, 4)] {
         graph.add_edge(u, v).unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let sub = Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap();
     let algo = LabelPropagation::new(10, 0., "label".into(), None)
         .unwrap()
@@ -118,7 +116,7 @@ fn invalid_controls_and_empty_cancellation_reject() {
             .build(global_registry())
             .is_err());
     }
-    let g = Rc::new(RefCell::new(Graph::new_manual()));
+    let g = Arc::new(OwnerCell::new(Graph::new_manual()));
     let sub = Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "empty".into()).unwrap();
     let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
     assert!(LabelPropagation::new(1, 0., "c".into(), None)
@@ -133,7 +131,7 @@ fn nonpersistent_empty_and_edgeless_outputs_retain_node_identity() {
     for n in [0, 1, 3] {
         let mut graph = Graph::new_manual();
         graph.add_nodes(n).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let sub =
             Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap();
         let mut ctx = Context::new();

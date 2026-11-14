@@ -1,13 +1,11 @@
 use groggy::algorithms::centrality::{ClosenessCentrality, ClosenessDirection};
 use groggy::algorithms::{Algorithm, AlgorithmOutput, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
-type Shared = Rc<RefCell<Graph>>;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -87,7 +85,7 @@ fn exhaustive_small_graphs_match_floyd_warshall_for_all_modes() {
                         }
                     }
                 }
-                let g = Rc::new(RefCell::new(graph));
+                let g = Arc::new(OwnerCell::new(graph));
                 for harmonic in [false, true] {
                     for incoming in [false, true] {
                         for normalized in [false, true] {
@@ -144,7 +142,7 @@ fn invalid_lengths_and_persistent_overflow_preserve_previous_values() {
         graph
             .set_node_attr(0, "c".into(), AttrValue::Int(7))
             .unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         for harmonic in [false, true] {
             assert!(
                 ClosenessCentrality::new(harmonic, Some("w".into()), "c".into())
@@ -163,7 +161,7 @@ fn invalid_lengths_and_persistent_overflow_preserve_previous_values() {
     graph
         .set_edge_attr(e, "w".into(), AttrValue::Float(f32::from_bits(1)))
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     for harmonic in [false, true] {
         let value = scores(&g, harmonic, false, false, true)[0].1;
         assert!(value.is_finite() && value > f32::MAX as f64);
@@ -181,7 +179,7 @@ fn empty_singleton_sparse_parallel_and_cached_direction_cases() {
     for n in [0, 1, 3] {
         let mut graph = Graph::new_manual();
         graph.add_nodes(n).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         assert_eq!(
             scores(&g, true, false, true, false),
             (0..n).map(|n| (n, 0.)).collect::<Vec<_>>()
@@ -200,7 +198,7 @@ fn empty_singleton_sparse_parallel_and_cached_direction_cases() {
         .unwrap();
     graph.add_edge(2, 3).unwrap();
     graph.add_edge(2, 2).unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let mut sub = selected(&g);
     for incoming in [true, false, true, false] {
         let mut ctx = Context::new();
@@ -239,7 +237,7 @@ fn stale_open_and_cancelled_selections_reject_before_writes() {
     let mut graph = Graph::new_manual();
     graph.add_nodes(2).unwrap();
     let e = graph.add_edge(0, 1).unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let sub = selected(&g);
     let algo = ClosenessCentrality::new(true, None, "c".into());
     let invalid = Subgraph::new(

@@ -137,6 +137,7 @@
 
 // Core type definitions
 pub mod errors;
+pub mod ownership;
 pub mod types;
 
 // Core functionality

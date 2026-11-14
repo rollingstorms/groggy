@@ -9,7 +9,7 @@ use groggy::NodeId;
 use pyo3::prelude::*;
 
 /// Python wrapper for NeighborhoodSubgraph
-#[pyclass(name = "NeighborhoodSubgraph", unsendable)]
+#[pyclass(name = "NeighborhoodSubgraph")]
 #[derive(Clone)]
 pub struct PyNeighborhoodSubgraph {
     pub inner: NeighborhoodSubgraph,
@@ -100,7 +100,7 @@ impl PyNeighborhoodSubgraph {
 ///
 /// This replaces NeighborhoodResult and provides both SubgraphArray operations
 /// and neighborhood-specific metadata methods.
-#[pyclass(name = "NeighborhoodArray", unsendable)]
+#[pyclass(name = "NeighborhoodArray")]
 #[derive(Clone)]
 pub struct PyNeighborhoodArray {
     /// Internal subgraph array
@@ -435,7 +435,7 @@ impl PyNeighborhoodArray {
 }
 
 /// Iterator for PyNeighborhoodArray
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct PyNeighborhoodArrayIterator {
     array: crate::ffi::storage::subgraph_array::PySubgraphArray,
     index: usize,
@@ -461,7 +461,7 @@ impl PyNeighborhoodArrayIterator {
 /// Python wrapper for NeighborhoodResult (backward compatibility)
 ///
 /// This is kept for backward compatibility but now wraps PyNeighborhoodArray
-#[pyclass(name = "NeighborhoodResult", unsendable)]
+#[pyclass(name = "NeighborhoodResult")]
 #[derive(Clone)]
 pub struct PyNeighborhoodResult {
     pub inner: NeighborhoodResult,
@@ -529,7 +529,7 @@ impl PyNeighborhoodResult {
 }
 
 /// Iterator for NeighborhoodResult
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct PyNeighborhoodResultIterator {
     inner: NeighborhoodResult,
     index: usize,

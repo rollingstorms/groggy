@@ -1,10 +1,10 @@
+use groggy::ownership::OwnerCell;
 use groggy::storage::edge::EntityEdge;
 use groggy::storage::node::EntityNode;
 use groggy::traits::{EdgeOperations, GraphEntity, NodeOperations};
 use groggy::types::AttrValue;
 use groggy::Graph;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[test]
 fn live_reads_exclude_removed_edges_and_nodes() {
@@ -40,7 +40,7 @@ fn live_reads_exclude_removed_edges_and_nodes() {
 
 #[test]
 fn entity_handles_cannot_read_inactive_values_from_the_pool() {
-    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let graph = Arc::new(OwnerCell::new(Graph::new_manual()));
     let source = graph.borrow_mut().add_node().unwrap();
     let target = graph.borrow_mut().add_node().unwrap();
     let edge = graph.borrow_mut().add_edge(source, target).unwrap();

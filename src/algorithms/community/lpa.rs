@@ -527,11 +527,11 @@ mod tests {
     use super::*;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::traits::SubgraphOperations;
     use crate::types::AttrName;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn label_propagation_clusters_components() {
@@ -548,7 +548,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [a, b, c, d].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = LabelPropagation::new(10, 0.0, "community".into(), None).unwrap();
 

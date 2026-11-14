@@ -12,9 +12,9 @@ use crate::ffi::api::graph_attributes::PyGraphAttr;
 use crate::ffi::types::PyAttrValue;
 
 /// A view of a specific node with access to its attributes
-#[pyclass(name = "NodeView", unsendable)]
+#[pyclass(name = "NodeView")]
 pub struct PyNodeView {
-    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    pub graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     pub node_id: NodeId,
 }
 
@@ -231,9 +231,9 @@ impl Clone for PyNodeView {
 }
 
 /// A view of a specific edge with access to its attributes and endpoints
-#[pyclass(name = "EdgeView", unsendable)]
+#[pyclass(name = "EdgeView")]
 pub struct PyEdgeView {
-    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    pub graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     pub edge_id: EdgeId,
 }
 

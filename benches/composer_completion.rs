@@ -1,16 +1,15 @@
 //! Checked composer presets, selectors and bounded connectivity contraction receipt.
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{ComposerOptions, EdgeStrategy, MetaNodePlan, Subgraph},
     traits::SubgraphOperations,
     AttrValue, Graph,
 };
 use serde_json::json;
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-    time::Instant,
-};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
@@ -44,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         })
                         .collect(),
                 )?;
-                let shared = Rc::new(RefCell::new(graph));
+                let shared = Arc::new(OwnerCell::new(graph));
                 let outer = if contract {
                     None
                 } else {

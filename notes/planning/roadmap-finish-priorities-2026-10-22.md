@@ -10,6 +10,14 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 ### Proposed bounded 0.6.0 qualification — 2026-11-14
 
+Ownership follow-up: native finalization is repaired with creator-checked
+Arc/OwnerCell handles. Foreign GC and creator exit free native owners and durable
+locks without polling; live writes remain creator-bound. Verification now passes
+1,566 native / 54 ignored, 2,718 maintained Python / 1 skipped / 14 existing builder
+warnings and 267 docs examples. See `python-owner-lifetime-2026-11-14.md` for
+native migration, measured costs and remaining release/platform scope. The older
+qualification paragraph below retains the initial 2,684/15-warning baseline.
+
 Execution started with the owner's approval. Package/export qualification is
 committed as `1313b4d2`, and the executable archive/journal acceptance workflow as
 `f2f95456`. Both build entry points and an extracted source distribution produce

@@ -4,6 +4,7 @@ use crate::ffi::api::graph_batch::parse_batch;
 //
 // Main Python bindings for the Graph API.
 
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::traits::SubgraphOperations;
 use groggy::{
@@ -13,9 +14,8 @@ use groggy::{
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 // Import all graph modules
 use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essential FFI - re-enabled
@@ -210,21 +210,21 @@ impl PyAggregationResult {
 }
 
 /// Python wrapper for the main Graph
-#[pyclass(name = "Graph", unsendable)]
+#[pyclass(name = "Graph")]
 pub struct PyGraph {
-    pub inner: Rc<RefCell<RustGraph>>,
+    pub inner: Arc<OwnerCell<RustGraph>>,
     // Cache for the full graph view to avoid expensive recreation
-    pub cached_view: RefCell<Option<(groggy::api::graph::ViewRevision, PyObject)>>,
+    pub cached_view: OwnerCell<Option<(groggy::api::graph::ViewRevision, PyObject)>>,
     pub cached_live_view:
-        RefCell<Option<(groggy::state::space::MembershipRevision, Py<PySubgraph>)>>,
+        OwnerCell<Option<(groggy::state::space::MembershipRevision, Py<PySubgraph>)>>,
 }
 
 impl Clone for PyGraph {
     fn clone(&self) -> Self {
         PyGraph {
             inner: self.inner.clone(),
-            cached_view: RefCell::new(None), // Don't clone cache - let each instance build its own
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: OwnerCell::new(None), // Don't clone cache - let each instance build its own
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         }
     }
 }
@@ -402,8 +402,8 @@ impl PyGraph {
         let inner = rust_graph.into_shared();
         Ok(Self {
             inner,
-            cached_view: RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         })
     }
 
@@ -427,8 +427,8 @@ impl PyGraph {
         .map_err(graph_error_to_py_err)?;
         Ok(Self {
             inner: graph.into_shared(),
-            cached_view: RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         })
     }
 
@@ -465,8 +465,8 @@ impl PyGraph {
         let graph = prepared.restore().map_err(graph_error_to_py_err)?;
         Ok(Self {
             inner: graph.into_shared(),
-            cached_view: RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         })
     }
 
@@ -2521,7 +2521,7 @@ impl PyGraph {
     /// Node and edge IDs may be remapped to avoid conflicts.
     /// Attributes are preserved during the merge.
     pub fn add_graph(&mut self, _py: Python, other: &PyGraph) -> PyResult<()> {
-        if Rc::ptr_eq(&self.inner, &other.inner) {
+        if Arc::ptr_eq(&self.inner, &other.inner) {
             return Err(PyValueError::new_err("Cannot add a graph to itself"));
         }
         self.inner

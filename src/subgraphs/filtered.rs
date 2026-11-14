@@ -6,12 +6,12 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::traits::filter_operations::FilterCriteria;
 use crate::traits::{FilterOperations, GraphEntity, SubgraphOperations};
 use crate::types::{EdgeId, EntityId, NodeId};
-use std::cell::RefCell;
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A filtered subgraph using our existing efficient subgraph storage
 ///
@@ -107,7 +107,7 @@ impl FilteredSubgraph {
     /// # Returns
     /// New FilteredSubgraph using efficient storage
     pub fn new(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>,
         criteria: FilterCriteria,
@@ -130,7 +130,7 @@ impl FilteredSubgraph {
     ///
     /// # Returns
     /// New FilteredSubgraph with criteria applied to current graph state
-    pub fn from_criteria(graph: Rc<RefCell<Graph>>, criteria: FilterCriteria) -> GraphResult<Self> {
+    pub fn from_criteria(graph: Arc<OwnerCell<Graph>>, criteria: FilterCriteria) -> GraphResult<Self> {
         let mut filtered_nodes = HashSet::new();
         let mut filtered_edges = HashSet::new();
 
@@ -183,7 +183,8 @@ impl GraphEntity for FilteredSubgraph {
     fn entity_id(&self) -> EntityId {
         // Use hash of filter criteria as unique ID
         use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use std::hash::Hash;
+        use std::hash::Hasher;
         let mut hasher = DefaultHasher::new();
         format!("{:?}", self.filter_criteria).hash(&mut hasher);
         EntityId::Subgraph(hasher.finish() as crate::types::SubgraphId)
@@ -193,7 +194,7 @@ impl GraphEntity for FilteredSubgraph {
         "filtered_subgraph"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.selection.graph()
     }
 
@@ -495,9 +496,9 @@ impl FilterOperations for FilteredSubgraph {
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::types::AttrValue;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn test_filtered_subgraph_creation() {
@@ -534,7 +535,7 @@ mod tests {
         let _edge1 = graph.add_edge(node1, node2).unwrap(); // Should be filtered out (node2 is not important)
         let edge2 = graph.add_edge(node1, node3).unwrap(); // Should be included (both nodes important)
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
 
         // Create filter criteria
         let criteria = FilterCriteria::NodeAttributeEquals {
@@ -587,7 +588,7 @@ mod tests {
             .set_node_attr(node2, "value".to_string(), AttrValue::Int(20))
             .unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
 
         // Create two different filters
         let filter1 = FilteredSubgraph::from_criteria(

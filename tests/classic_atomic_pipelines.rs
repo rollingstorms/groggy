@@ -1,9 +1,11 @@
 //! Registry algorithms compose through the same outer property transaction as builders.
 use groggy::algorithms::{global_registry, pipeline::PipelineBuilder, AlgorithmParams, Context};
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, AttrValue, Graph};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
-fn fixture() -> (Rc<RefCell<Graph>>, Subgraph) {
+fn fixture() -> (Arc<OwnerCell<Graph>>, Subgraph) {
     let mut graph = Graph::new();
     graph.add_nodes(4).unwrap();
     graph.add_edge(0, 1).unwrap();
@@ -16,7 +18,7 @@ fn fixture() -> (Rc<RefCell<Graph>>, Subgraph) {
     graph
         .set_node_attr(2, "goal".into(), AttrValue::Null)
         .unwrap();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let selected = Subgraph::new(
         graph.clone(),
         HashSet::from([0, 1, 2]),

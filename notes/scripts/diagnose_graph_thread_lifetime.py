@@ -1,8 +1,8 @@
 """Isolate cyclic GC of thread-bound Graph versus detached immutable GraphView.
 
-Run with the in-tree extension. Each case uses a fresh interpreter because the
-known wrong-thread Graph destructor reports an unraisable error and skips its
-Rust destructor. This is a diagnostic, not a supported Graph threading API.
+Run with the in-tree extension. Each case uses a fresh interpreter to isolate GC
+from other retained Python objects. Final release is safe on any thread; live
+Graph access remains confined to its creating thread.
 """
 import json
 import subprocess
@@ -38,10 +38,7 @@ def main():
             check=True, capture_output=True, text=True,
         )
         errors = json.loads(result.stdout)
-        if name == "graph_worker":
-            assert len(errors) == 1 and "PyGraph is unsendable" in errors[0], errors
-        else:
-            assert errors == [], errors
+        assert errors == [], errors
         print(name + ": " + json.dumps(errors))
 
 

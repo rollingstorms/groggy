@@ -1,8 +1,12 @@
 //! Compare shared community kernels without changing legacy preparation or publishing results.
 use groggy::algorithms::{community::*, Algorithm, Context};
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, Graph, GraphView};
 use serde_json::json;
-use std::{cell::RefCell, collections::HashSet, hint::black_box, rc::Rc, time::Instant};
+use std::collections::HashSet;
+use std::hint::black_box;
+use std::sync::Arc;
+use std::time::Instant;
 
 fn read(view: &GraphView, kind: usize) -> groggy::GraphResult<usize> {
     Ok(match kind {
@@ -42,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let start = Instant::now();
             let input = view.algorithm_input()?;
             let preparation = start.elapsed().as_secs_f64();
-            let graph = Rc::new(RefCell::new(graph));
+            let graph = Arc::new(OwnerCell::new(graph));
             let selected = Subgraph::new(graph, nodes, edges, "benchmark".into());
             let algorithm: Box<dyn Algorithm> = match kind {
                 0 => Box::new(Louvain::new(20, 10, 1.0, "out".into())?),

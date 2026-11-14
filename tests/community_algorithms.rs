@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use groggy::ownership::OwnerCell;
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use groggy::algorithms::{ensure_algorithms_registered, PipelineBuilder};
 use groggy::api::graph::Graph;
@@ -23,7 +23,7 @@ fn sample_graph() -> Subgraph {
     graph.add_edge(c, b).unwrap();
 
     let nodes: HashSet<NodeId> = [a, b, c, d].into_iter().collect();
-    Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap()
+    Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap()
 }
 
 #[test]

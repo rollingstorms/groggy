@@ -1,9 +1,11 @@
 //! Algebra never changes capture identity, invents edges or leaves dangling endpoints.
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{SimilarityMetric, Subgraph},
     AttrValue, Graph, GraphView,
 };
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 fn fixture() -> (Graph, GraphView) {
     let mut graph = Graph::new_manual();
@@ -196,7 +198,7 @@ fn grouping_uses_typed_order_and_frozen_values_without_expanding_edge_scope() {
 #[test]
 fn connected_adapters_reuse_canonical_membership_and_reject_other_owners() {
     let (graph, _) = fixture();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let make = |nodes: &[usize], edges: &[usize]| {
         Subgraph::new(
             graph.clone(),
@@ -212,7 +214,7 @@ fn connected_adapters_reuse_canonical_membership_and_reject_other_owners() {
     assert_eq!(difference.edge_count(), 0);
     let (other, _) = fixture();
     let other = Subgraph::new(
-        Rc::new(RefCell::new(other)),
+        Arc::new(OwnerCell::new(other)),
         HashSet::from([1]),
         HashSet::new(),
         "other".into(),

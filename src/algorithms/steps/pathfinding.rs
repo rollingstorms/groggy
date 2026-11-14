@@ -10,7 +10,10 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::BinaryHeap;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::collections::VecDeque;
 
 fn check(ctx: &Context) -> Result<()> {
     if ctx.is_cancelled() {
@@ -542,10 +545,10 @@ impl Step for RandomWalkStep {
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn test_shortest_path_map_unweighted() {
@@ -558,7 +561,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let mut ctx = Context::new();
         let mut vars = super::super::core::StepVariables::default();
@@ -587,7 +590,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let mut ctx = Context::new();
         let mut vars = super::super::core::StepVariables::default();
@@ -619,12 +622,10 @@ mod tests {
 #[cfg(test)]
 mod checked_tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::{algorithms::steps::StepVariables, subgraphs::Subgraph, AttrValue, Graph};
-    use std::{
-        cell::RefCell,
-        rc::Rc,
-        sync::{atomic::AtomicBool, Arc},
-    };
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
     fn enumerate(
         topology: &PathTopology,
@@ -740,7 +741,7 @@ mod checked_tests {
                 .expect("weight");
         }
         Subgraph::new(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             HashSet::from([0, 1, 2]),
             HashSet::from([0, 1, 2, 3]),
             "selected".into(),
@@ -818,7 +819,7 @@ mod checked_tests {
                 .expect("weight");
         }
         let selected = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..3).collect(),
             "walk".into(),
         )

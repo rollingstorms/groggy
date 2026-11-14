@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use std::sync::Arc;
 
 /// Specialized array for table objects (PyObject wrapper for tables)
-#[pyclass(name = "TableArray", unsendable)]
+#[pyclass(name = "TableArray")]
 #[derive(Clone)]
 pub struct PyTableArray {
     /// Internal storage of tables as PyObjects
@@ -257,7 +257,7 @@ impl PyTableArrayIterator {
 }
 
 /// Chainable iterator for PyTableArray that supports method forwarding
-#[pyclass(name = "TableArrayIterator", unsendable)]
+#[pyclass(name = "TableArrayIterator")]
 pub struct PyTableArrayChainIterator {
     inner: Vec<PyObject>,
 }

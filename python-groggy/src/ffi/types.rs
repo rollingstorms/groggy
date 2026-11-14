@@ -293,9 +293,9 @@ impl PyResultHandle {
 }
 
 /// Python wrapper for high-performance attribute collections
-#[pyclass(unsendable)]
+#[pyclass]
 pub struct PyAttributeCollection {
-    pub graph_ref: *const groggy::Graph, // Unsafe but controlled access
+    pub graph_ref: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
     pub node_ids: Vec<NodeId>,
     pub attr_name: String,
 }
@@ -309,8 +309,7 @@ impl PyAttributeCollection {
 
     /// Compute statistics directly in Rust
     fn compute_stats(&self, py: Python) -> PyResult<PyObject> {
-        // Safe because we control the lifetime
-        let graph = unsafe { &*self.graph_ref };
+        let graph = self.graph_ref.borrow();
 
         let mut values = Vec::new();
         for &node_id in &self.node_ids {
@@ -350,7 +349,7 @@ impl PyAttributeCollection {
 
     /// Get sample values without converting all
     fn sample_values(&self, count: usize) -> PyResult<Vec<PyAttrValue>> {
-        let graph = unsafe { &*self.graph_ref };
+        let graph = self.graph_ref.borrow();
         let mut results = Vec::new();
 
         let step = if self.node_ids.len() <= count {

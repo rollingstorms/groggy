@@ -342,11 +342,11 @@ mod tests {
     use super::*;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
     use crate::traits::SubgraphOperations;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn test_girvan_newman_small_graph() {
@@ -375,7 +375,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = vec![n0, n1, n2, n3, n4, n5].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = GirvanNewman::new(Some(5), None, None, "community".into());
 
@@ -428,7 +428,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = vec![n0, n1, n2, n3, n4, n5].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = GirvanNewman::new(Some(5), None, None, "community".into());
 
@@ -487,7 +487,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = vec![n0, n1, n2, n3, n4, n5].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         // Run weighted version
         let algo_weighted =

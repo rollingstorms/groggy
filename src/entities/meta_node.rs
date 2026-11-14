@@ -6,10 +6,10 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::traits::{GraphEntity, MetaNodeOperations, NodeOperations, SubgraphOperations};
 use crate::types::{AttrValue, EntityId, NodeId};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A meta-node representing a collapsed subgraph
 ///
@@ -21,7 +21,7 @@ pub struct MetaNode {
     /// The unique identifier for this meta-node
     id: NodeId,
     /// Reference to the graph containing this meta-node
-    graph: Rc<RefCell<Graph>>,
+    graph: Arc<OwnerCell<Graph>>,
 }
 
 impl MetaNode {
@@ -36,7 +36,7 @@ impl MetaNode {
     ///
     /// # Errors
     /// Returns GraphError if the node doesn't exist or isn't a valid meta-node
-    pub fn new(id: NodeId, graph: Rc<RefCell<Graph>>) -> GraphResult<Self> {
+    pub fn new(id: NodeId, graph: Arc<OwnerCell<Graph>>) -> GraphResult<Self> {
         // Validate that the node exists
         {
             let graph_borrowed = graph.borrow();
@@ -116,7 +116,7 @@ impl GraphEntity for MetaNode {
         "meta_node"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.graph.clone()
     }
 

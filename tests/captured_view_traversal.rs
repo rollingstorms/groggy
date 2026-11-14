@@ -1,6 +1,8 @@
 //! Traversal may never leave selected edges/nodes and later re-enter the result.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, traits::SubgraphOperations, types::GraphType, Graph, GraphView};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 fn fixture(directed: bool) -> (Graph, GraphView) {
     let mut graph = Graph::new_with_type_manual(if directed {
         GraphType::Directed
@@ -108,7 +110,7 @@ fn all_three_node_directed_graphs_match_independent_reachability_and_hop_distanc
 fn captured_trees_outlive_mutation_and_drop_and_connected_adapters_share_scope() {
     let (graph, root) = fixture(true);
     let selected = exact(&root, &[0, 2, 4], &[6]);
-    let graph_owner = Rc::new(RefCell::new(graph));
+    let graph_owner = Arc::new(OwnerCell::new(graph));
     let live = Subgraph::new(
         graph_owner.clone(),
         selected.nodes().clone(),
@@ -142,7 +144,7 @@ fn captured_trees_outlive_mutation_and_drop_and_connected_adapters_share_scope()
 #[test]
 fn connected_component_fallback_and_cache_use_selected_edge_instances() {
     let (graph, root) = fixture(false);
-    let owner = Rc::new(RefCell::new(graph));
+    let owner = Arc::new(OwnerCell::new(graph));
     let selected = Subgraph::new(
         owner.clone(),
         HashSet::from([0, 1, 2]),
@@ -183,7 +185,7 @@ fn restoration_with_equal_numeric_space_versions_invalidates_connected_reader_ca
         .restore_state(first, second, groggy::StateRestoreMode::Switch)
         .unwrap();
     let first_version = graph.space().get_version();
-    let owner = Rc::new(RefCell::new(graph));
+    let owner = Arc::new(OwnerCell::new(graph));
     let selection = Subgraph::new(
         owner.clone(),
         HashSet::from([0, 1, 2]),
@@ -221,7 +223,7 @@ fn connected_csr_rejects_removed_entities_and_rewired_outside_endpoints() {
             graph.add_nodes(3).unwrap();
             graph.add_edge(0, 1).unwrap();
             let frozen = graph.read_view().unwrap();
-            let owner = Rc::new(RefCell::new(graph));
+            let owner = Arc::new(OwnerCell::new(graph));
             let selected = Subgraph::new(
                 owner.clone(),
                 HashSet::from([0, 1]),
@@ -250,7 +252,7 @@ fn connected_csr_rejects_removed_entities_and_rewired_outside_endpoints() {
     let mut graph = Graph::new();
     graph.add_nodes(3).unwrap();
     graph.add_edge(0, 1).unwrap();
-    let owner = Rc::new(RefCell::new(graph));
+    let owner = Arc::new(OwnerCell::new(graph));
     let selected = Subgraph::new(
         owner.clone(),
         HashSet::from([0, 1]),

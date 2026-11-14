@@ -6,13 +6,13 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::query::traversal::TraversalEngine;
 use crate::subgraphs::neighborhood::NeighborhoodSampler;
 use crate::traits::{GraphEntity, NodeOperations, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A wrapper around a NodeId that implements GraphEntity and NodeOperations
 ///
@@ -27,7 +27,7 @@ pub struct EntityNode {
 
 impl EntityNode {
     /// Create a new EntityNode wrapper for the given node
-    pub fn new(node_id: NodeId, graph_ref: Rc<RefCell<Graph>>) -> Self {
+    pub fn new(node_id: NodeId, graph_ref: Arc<OwnerCell<Graph>>) -> Self {
         Self {
             inner: crate::entities::Node::from_id_unchecked(node_id, graph_ref),
         }
@@ -53,7 +53,7 @@ impl GraphEntity for EntityNode {
         "node"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.inner.graph_handle().clone()
     }
 
@@ -259,9 +259,9 @@ impl NodeOperations for EntityNode {
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::types::AttrValue;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn test_entity_node_operations() {
@@ -289,7 +289,7 @@ mod tests {
             .unwrap();
 
         // Create EntityNode
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let entity_node = EntityNode::new(node1, graph_rc.clone());
 
         // Test GraphEntity interface

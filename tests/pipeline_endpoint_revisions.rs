@@ -1,4 +1,5 @@
 //! Endpoint staging shares canonical identity, cascade and timing semantics.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         global_registry,
@@ -9,8 +10,8 @@ use groggy::{
     AttrValue, BatchNodeRef as N, Graph, GraphBatch,
 };
 use serde_json::{json, Value};
-use std::{cell::RefCell, rc::Rc};
-fn fixture(directed: bool) -> Rc<RefCell<Graph>> {
+use std::sync::Arc;
+fn fixture(directed: bool) -> Arc<OwnerCell<Graph>> {
     let mut g = if directed {
         Graph::new_directed()
     } else {
@@ -37,9 +38,9 @@ fn fixture(directed: bool) -> Rc<RefCell<Graph>> {
         "test".into(),
     )
     .unwrap();
-    Rc::new(RefCell::new(g))
+    Arc::new(OwnerCell::new(g))
 }
-fn selected(g: &Rc<RefCell<Graph>>) -> Subgraph {
+fn selected(g: &Arc<OwnerCell<Graph>>) -> Subgraph {
     Subgraph::from_frozen_view(g.clone(), g.borrow().read_view().unwrap(), "test".into())
 }
 fn pipeline(rows: Value) -> anyhow::Result<Pipeline> {

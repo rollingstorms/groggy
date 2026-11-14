@@ -1,5 +1,10 @@
 # 0.6.0 embedded-core qualification — 2026-11-14
 
+Follow-up: the ownership defect described in this initial qualification is now
+fixed; see `python-owner-lifetime-2026-11-14.md`. The original 2,684/15-warning
+baseline and pending ownership assessment below are retained as historical
+evidence. Current release status incorporates the follow-up verification.
+
 Authorized scope: the proposed 6–10 hour release-preparation allocation. This
 receipt records actual results, not hours billed, time spent or a release promise.
 Graphiti remains future external plugin work. No tag/upload/publication performed.

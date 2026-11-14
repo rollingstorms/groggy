@@ -6,10 +6,10 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::traits::{EdgeOperations, GraphEntity};
 use crate::types::{EdgeId, EntityId};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A regular graph edge
 ///
@@ -20,7 +20,7 @@ pub struct Edge {
     /// The unique identifier for this edge
     id: EdgeId,
     /// Reference to the graph containing this edge
-    graph: Rc<RefCell<Graph>>,
+    graph: Arc<OwnerCell<Graph>>,
 }
 
 impl Edge {
@@ -35,7 +35,7 @@ impl Edge {
     ///
     /// # Errors
     /// Returns GraphError if the edge ID doesn't exist in the graph
-    pub fn new(id: EdgeId, graph: Rc<RefCell<Graph>>) -> GraphResult<Self> {
+    pub fn new(id: EdgeId, graph: Arc<OwnerCell<Graph>>) -> GraphResult<Self> {
         // Validate that the edge exists in the graph
         {
             let graph_borrowed = graph.borrow();
@@ -51,10 +51,10 @@ impl Edge {
     }
 
     // Compatibility construction preserves the historical unchecked handle API.
-    pub(crate) fn from_id_unchecked(id: EdgeId, graph: Rc<RefCell<Graph>>) -> Self {
+    pub(crate) fn from_id_unchecked(id: EdgeId, graph: Arc<OwnerCell<Graph>>) -> Self {
         Self { id, graph }
     }
-    pub(crate) fn graph_handle(&self) -> &Rc<RefCell<Graph>> {
+    pub(crate) fn graph_handle(&self) -> &Arc<OwnerCell<Graph>> {
         &self.graph
     }
 
@@ -76,7 +76,7 @@ impl GraphEntity for Edge {
         "edge"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.graph.clone()
     }
 

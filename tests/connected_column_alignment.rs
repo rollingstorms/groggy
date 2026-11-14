@@ -1,7 +1,9 @@
 //! Native compatibility columns keep every row and share the attribute-first bulk reader.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, AttrValue as V, Graph};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
-fn fixture() -> (Rc<RefCell<Graph>>, Subgraph) {
+use std::collections::HashSet;
+use std::sync::Arc;
+fn fixture() -> (Arc<OwnerCell<Graph>>, Subgraph) {
     let mut graph = Graph::new();
     graph.add_nodes(6).unwrap();
     graph.remove_node(1).unwrap();
@@ -17,7 +19,7 @@ fn fixture() -> (Rc<RefCell<Graph>>, Subgraph) {
         .set_edge_attr(0, "v".into(), V::Float64Vec(vec![1., -0.]))
         .unwrap();
     graph.set_edge_attr(2, "v".into(), V::Null).unwrap();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let selected = Subgraph::new(
         graph.clone(),
         HashSet::from([4, 0, 3, 2]),

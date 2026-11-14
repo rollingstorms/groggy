@@ -1,11 +1,13 @@
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{composer::MetaNodePlan, Subgraph},
     traits::{subgraph_operations::NodeStrategy, SubgraphOperations},
     AttrValue as V, Graph,
 };
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
-fn selection(graph: &Rc<RefCell<Graph>>, nodes: &[usize], edges: &[usize]) -> Subgraph {
+fn selection(graph: &Arc<OwnerCell<Graph>>, nodes: &[usize], edges: &[usize]) -> Subgraph {
     Subgraph::new(
         graph.clone(),
         nodes.iter().copied().collect(),
@@ -28,7 +30,7 @@ fn plan(selection: &Subgraph, destructive: bool) -> MetaNodePlan {
 fn collection_accepts_once_and_retains_each_original_source_in_both_policies() {
     for manual in [false, true] {
         for destructive in [false, true] {
-            let graph = Rc::new(RefCell::new(if manual {
+            let graph = Arc::new(OwnerCell::new(if manual {
                 Graph::new_manual()
             } else {
                 Graph::new()
@@ -95,7 +97,7 @@ fn collection_accepts_once_and_retains_each_original_source_in_both_policies() {
 
 #[test]
 fn late_aggregation_failure_preserves_everything_and_allocation() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
+    let graph = Arc::new(OwnerCell::new(Graph::new()));
     graph.borrow_mut().add_nodes(2).unwrap();
     graph
         .borrow_mut()
@@ -123,7 +125,7 @@ fn late_aggregation_failure_preserves_everything_and_allocation() {
 
 #[test]
 fn mismatched_owner_stale_source_and_destructive_overlap_reject_before_effects() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
+    let graph = Arc::new(OwnerCell::new(Graph::new()));
     graph.borrow_mut().add_node().unwrap();
     let first = selection(&graph, &[0], &[]);
     let empty_plan = || MetaNodePlan::new(HashSet::from([0]), HashSet::new());
@@ -136,7 +138,7 @@ fn mismatched_owner_stale_source_and_destructive_overlap_reject_before_effects()
         None
     )
     .is_err());
-    let other = Rc::new(RefCell::new(Graph::new()));
+    let other = Arc::new(OwnerCell::new(Graph::new()));
     other.borrow_mut().add_node().unwrap();
     assert!(MetaNodePlan::execute_many(
         &[
@@ -165,7 +167,7 @@ fn collection_remaps_each_new_meta_endpoint_and_publishes_one_clock() {
     let mut owner = Graph::new_directed();
     owner.add_nodes(3).unwrap();
     owner.add_edges(&[(0, 2), (2, 1)]).unwrap();
-    let graph = Rc::new(RefCell::new(owner));
+    let graph = Arc::new(OwnerCell::new(owner));
     let a = selection(&graph, &[0], &[]);
     let b = selection(&graph, &[1], &[]);
     let mut first = MetaNodePlan::new(HashSet::from([0]), HashSet::new());
@@ -211,7 +213,7 @@ fn collection_remaps_each_new_meta_endpoint_and_publishes_one_clock() {
 
 #[test]
 fn cross_selection_destructive_boundary_rejects_without_installing_groups() {
-    let graph = Rc::new(RefCell::new(Graph::new()));
+    let graph = Arc::new(OwnerCell::new(Graph::new()));
     graph.borrow_mut().add_nodes(2).unwrap();
     graph.borrow_mut().add_edge(0, 1).unwrap();
     let a = selection(&graph, &[0], &[]);

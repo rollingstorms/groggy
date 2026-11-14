@@ -5,7 +5,8 @@ use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
 
 use serde_json::Value;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 // JIT disabled temporarily due to Cranelift ARM64 compatibility issues
 // #[cfg(not(target_arch = "aarch64"))]
@@ -412,13 +413,11 @@ mod tests {
 
     #[test]
     fn cancelled_loop_checks_even_an_empty_body() {
+        use crate::ownership::OwnerCell;
         use crate::{api::graph::Graph, subgraphs::Subgraph};
-        use std::{
-            cell::RefCell,
-            rc::Rc,
-            sync::{atomic::AtomicBool, Arc},
-        };
-        let graph = Rc::new(RefCell::new(Graph::new_publishing()));
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+        let graph = Arc::new(OwnerCell::new(Graph::new_publishing()));
         let subgraph = Subgraph::from_nodes(graph, Default::default(), "cancel".into())
             .expect("empty selection");
         let mut variables = super::super::core::StepVariables::default();

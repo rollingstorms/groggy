@@ -1,13 +1,11 @@
 use groggy::algorithms::pathfinding::DijkstraShortestPath;
 use groggy::algorithms::{Algorithm, AlgorithmOutput, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
-type Shared = Rc<RefCell<Graph>>;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -71,7 +69,7 @@ fn exhaustive_zero_weight_multigraphs_match_floyd_warshall_for_every_source() {
                     .set_node_attr(source, format!("s{source}"), AttrValue::Bool(false))
                     .unwrap();
             }
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             let mut sub = selected(&g);
             for (source, row) in d.into_iter().enumerate() {
                 let expected: Vec<_> = row
@@ -117,7 +115,7 @@ fn missing_ambiguous_and_cancelled_sources_reject_without_result_writes() {
         graph
             .set_node_attr(0, "out".into(), AttrValue::Int(7))
             .unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let algo = DijkstraShortestPath::new("source".into(), None, "out".into());
         let mut ctx = Context::new();
         ctx.set_persist_results(false);
@@ -134,7 +132,7 @@ fn missing_ambiguous_and_cancelled_sources_reject_without_result_writes() {
     graph
         .set_node_attr(0, "source".into(), AttrValue::Int(0))
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let algo = DijkstraShortestPath::new("source".into(), None, "out".into());
     let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
     assert!(algo.execute(&mut ctx, selected(&g)).is_err());
@@ -144,7 +142,7 @@ fn missing_ambiguous_and_cancelled_sources_reject_without_result_writes() {
         .unwrap()
         .is_none());
     assert_eq!(run(&algo, selected(&g)).0, vec![(0, 0.)]);
-    let empty = Rc::new(RefCell::new(Graph::new_manual()));
+    let empty = Arc::new(OwnerCell::new(Graph::new_manual()));
     assert!(algo.execute(&mut Context::new(), selected(&empty)).is_err());
 }
 #[test]
@@ -164,7 +162,7 @@ fn invalid_unreachable_weights_open_and_stale_cached_selections_reject() {
             .unwrap();
         let e = graph.add_edge(1, 2).unwrap();
         graph.set_edge_attr(e, "w".into(), bad).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let mut ctx = Context::new();
         ctx.set_persist_results(false);
         assert!(
@@ -180,7 +178,7 @@ fn invalid_unreachable_weights_open_and_stale_cached_selections_reject() {
     graph
         .set_node_attr(0, "source".into(), AttrValue::Bool(true))
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let algo = DijkstraShortestPath::new("source".into(), None, "out".into());
     let invalid = Subgraph::new(
         g.clone(),
@@ -212,7 +210,7 @@ fn f64_rows_preserve_large_distances_and_tiny_improvements_with_sparse_ids() {
             .set_edge_attr(e, "w".into(), AttrValue::Float(f32::MAX))
             .unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let algo = DijkstraShortestPath::new("source".into(), Some("w".into()), "out".into());
     assert_eq!(
         run(&algo, selected(&g)).0,
@@ -236,7 +234,7 @@ fn f64_rows_preserve_large_distances_and_tiny_improvements_with_sparse_ids() {
             .set_edge_attr(e, "w".into(), AttrValue::Float(w))
             .unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let rows = run(&algo, selected(&g)).0;
     assert_eq!(rows[2].1, 2. * 5e-10_f32 as f64);
 }

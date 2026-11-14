@@ -6,9 +6,9 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::types::{AttrName, AttrValue, EntityId};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Universal trait that every entity in the graph universe implements
 ///
@@ -37,8 +37,8 @@ pub trait GraphEntity: std::fmt::Debug {
     /// Reference to our shared storage systems (GraphPool/Space/History)
     ///
     /// # Returns
-    /// Rc<RefCell<Graph>> providing access to all storage infrastructure
-    fn graph_ref(&self) -> Rc<RefCell<Graph>>;
+    /// Arc<OwnerCell<Graph>> providing access to all storage infrastructure
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>>;
 
     /// Get an attribute from the selected live graph state.
     ///

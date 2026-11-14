@@ -1,4 +1,5 @@
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::BinaryHeap;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -286,10 +287,10 @@ mod tests {
     use super::*;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::traits::SubgraphOperations;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn dijkstra_finds_shortest_distance() {
@@ -308,7 +309,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = DijkstraShortestPath::new("source".into(), None, "distance".into());
         let mut ctx = Context::new();

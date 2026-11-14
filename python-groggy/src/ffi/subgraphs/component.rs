@@ -8,7 +8,7 @@ use groggy::{EdgeId, NodeId};
 use pyo3::prelude::*;
 
 /// Python wrapper for ComponentSubgraph - Pure delegation to existing traits
-#[pyclass(name = "ComponentSubgraph", unsendable)]
+#[pyclass(name = "ComponentSubgraph")]
 #[derive(Clone)]
 pub struct PyComponentSubgraph {
     pub inner: ComponentSubgraph,

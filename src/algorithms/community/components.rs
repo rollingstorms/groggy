@@ -17,10 +17,9 @@
 //! - Tracks node/edge processing statistics
 //! - Per-component metrics for bottleneck analysis
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -955,13 +954,13 @@ pub fn register(registry: &Registry) -> Result<()> {
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
-    use std::cell::RefCell;
+    use crate::ownership::OwnerCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn test_undirected_components() -> Result<()> {
-        let graph = Rc::new(RefCell::new(Graph::new_manual()));
+        let graph = Arc::new(OwnerCell::new(Graph::new_manual()));
         let nodes = {
             let mut g = graph.borrow_mut();
             let ids = g.add_nodes(5).unwrap();
@@ -997,7 +996,7 @@ mod tests {
 
     #[test]
     fn test_strong_components() -> Result<()> {
-        let graph = Rc::new(RefCell::new(Graph::new_directed_manual()));
+        let graph = Arc::new(OwnerCell::new(Graph::new_directed_manual()));
         let nodes = {
             let mut g = graph.borrow_mut();
             let ids = g.add_nodes(4).unwrap();
@@ -1031,7 +1030,7 @@ mod tests {
 
     #[test]
     fn test_weak_vs_strong() -> Result<()> {
-        let graph = Rc::new(RefCell::new(Graph::new_directed_manual()));
+        let graph = Arc::new(OwnerCell::new(Graph::new_directed_manual()));
         let nodes = {
             let mut g = graph.borrow_mut();
             let ids = g.add_nodes(3).unwrap();

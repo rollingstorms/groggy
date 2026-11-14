@@ -290,11 +290,11 @@ mod tests {
     use super::*;
     use crate::algorithms::community::utils::find_connected_components;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::traits::SubgraphOperations;
     use crate::types::NodeId;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     fn make_two_cliques() -> (Graph, Vec<NodeId>) {
         let mut graph = Graph::new_manual();
@@ -328,7 +328,7 @@ mod tests {
         let (graph, nodes) = make_two_cliques();
         let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         let leiden = Leiden::new(20, 10, 1.0, Some(42), "community".into()).unwrap();
         let mut ctx = Context::new();
@@ -362,7 +362,7 @@ mod tests {
     fn test_leiden_empty_graph() {
         let graph = Graph::new_manual();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), HashSet::new(), "empty".into())
                 .unwrap();
 
         let leiden = Leiden::new(20, 10, 1.0, None, "community".into()).unwrap();

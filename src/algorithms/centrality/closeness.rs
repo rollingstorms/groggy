@@ -1,8 +1,9 @@
-use std::collections::{BinaryHeap, HashMap, VecDeque};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::collections::BinaryHeap;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -518,10 +519,10 @@ mod tests {
     use super::*;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::traits::SubgraphOperations;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn closeness_prefers_central_node() {
@@ -537,7 +538,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = ClosenessCentrality::new(true, None, "closeness".into());
         let mut ctx = Context::new();

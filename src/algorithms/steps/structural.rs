@@ -1,6 +1,7 @@
 //! Structural graph operation step primitives.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+use std::collections::VecDeque;
 
 use anyhow::{anyhow, Result};
 
@@ -451,12 +452,13 @@ fn incident_weight_sums(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::{
         algorithms::steps::{core::NodeColumn, StepVariables},
         api::graph::Graph,
         subgraphs::Subgraph,
     };
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::Arc;
 
     #[test]
     fn degree_uses_selected_edges_and_rejects_foreign_source_nodes() {
@@ -466,7 +468,7 @@ mod tests {
             graph.add_edge(u, v).expect("edge");
         }
         let selection = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             [0, 1].into_iter().collect(),
             "selected".into(),
         )
@@ -514,7 +516,7 @@ mod tests {
                 }
             }
             let selection = Subgraph::from_nodes(
-                Rc::new(RefCell::new(graph)),
+                Arc::new(OwnerCell::new(graph)),
                 (0..5).collect(),
                 "exhaustive".into(),
             )
@@ -575,14 +577,15 @@ mod tests {
 
     #[test]
     fn structural_steps_keep_selected_noncontiguous_ids_and_reject_cancellation() {
-        use std::sync::{atomic::AtomicBool, Arc};
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
         let mut graph = Graph::new_undirected_manual();
         graph.add_nodes(5).unwrap();
         for (u, v) in [(1, 2), (2, 3), (3, 1), (3, 4)] {
             graph.add_edge(u, v).expect("edge");
         }
         let selection = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             [1, 2, 3].into_iter().collect(),
             "selected".into(),
         )
@@ -615,9 +618,10 @@ mod tests {
 
     #[test]
     fn cancelled_degree_leaves_existing_result_intact() {
-        use std::sync::{atomic::AtomicBool, Arc};
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
         let selection = Subgraph::from_nodes(
-            Rc::new(RefCell::new(Graph::new_manual())),
+            Arc::new(OwnerCell::new(Graph::new_manual())),
             Default::default(),
             "empty".into(),
         )

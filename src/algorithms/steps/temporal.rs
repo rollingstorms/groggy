@@ -6,7 +6,8 @@
 //! - Filtering based on temporal properties
 //! - Tracking entity lifecycles
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -1027,8 +1028,10 @@ fn bool_to_param(value: bool) -> AlgorithmParamValue {
 mod tests {
     use super::*;
 
+    use crate::ownership::OwnerCell;
     use crate::{algorithms::steps::core::StepVariables, api::graph::Graph, subgraphs::Subgraph};
-    use std::{cell::RefCell, rc::Rc, sync::atomic::AtomicBool};
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
     fn fixture() -> Subgraph {
         let mut graph = Graph::new_manual();
@@ -1037,7 +1040,7 @@ mod tests {
         graph.add_edge(1, 2).unwrap();
         graph.commit("fixture".into(), "test".into()).unwrap();
         Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             [0, 1, 2].into_iter().collect(),
             "decay".into(),
         )

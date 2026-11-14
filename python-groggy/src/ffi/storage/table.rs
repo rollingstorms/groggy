@@ -5382,8 +5382,8 @@ impl PyGraphTable {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(crate::ffi::api::graph::PyGraph {
             inner: graph.into_shared(),
-            cached_view: std::cell::RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: groggy::ownership::OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         })
     }
 

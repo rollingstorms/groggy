@@ -1,11 +1,14 @@
 //! Topology-only compatibility degree and warmed neighbor costs; no property capture.
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{DegreeMode, Subgraph},
     traits::SubgraphOperations,
     Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, hint::black_box, rc::Rc, time::Instant};
+use std::hint::black_box;
+use std::sync::Arc;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
@@ -15,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for node in 1..count {
             graph.add_edge(node - 1, node)?;
         }
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         let selected = Subgraph::new(
             owner,
             (0..count).collect(),

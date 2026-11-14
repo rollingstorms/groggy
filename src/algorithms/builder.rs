@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 use anyhow::{anyhow, Result};
 
@@ -537,18 +538,17 @@ fn infer_array_param(items: Vec<serde_json::Value>) -> Result<AlgorithmParamValu
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn cancellation_after_attachment_discards_staging_and_context_can_be_reused() {
         use crate::algorithms::steps::{AttachNodeAttrStep, InitNodesStep};
-        use std::sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        };
+        use std::sync::atomic::AtomicBool;
+        use std::sync::atomic::Ordering;
+        use std::sync::Arc;
         struct Cancel(Arc<AtomicBool>);
         impl Step for Cancel {
             fn supports_atomic_properties(&self) -> bool {
@@ -564,7 +564,7 @@ mod tests {
         }
         let mut graph = Graph::new_publishing();
         graph.insert_nodes(1).expect("node");
-        let shared = Rc::new(RefCell::new(graph));
+        let shared = Arc::new(OwnerCell::new(graph));
         let sg = Subgraph::from_nodes(shared.clone(), [0].into_iter().collect(), "cancel".into())
             .expect("selection");
         let token = Arc::new(AtomicBool::new(false));
@@ -658,7 +658,7 @@ mod tests {
         let mut graph = Graph::new_manual();
         let node = graph.add_node().unwrap();
         let nodes: HashSet<_> = [node].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let mut ctx = Context::new();
         let result = algo.execute(&mut ctx, sg).unwrap();

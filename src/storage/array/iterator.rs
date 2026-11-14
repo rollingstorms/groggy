@@ -1,9 +1,9 @@
 //! ArrayIterator<T> - Universal iterator with trait-based method injection
 
 use crate::api::graph::Graph;
+use crate::ownership::OwnerCell;
 use crate::storage::array::{ArrayOps, EdgeLike, MetaNodeLike, NodeIdLike, SubgraphLike};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Universal iterator that supports chaining operations on any element type
 /// Methods become available automatically based on what traits T implements
@@ -12,7 +12,7 @@ pub struct ArrayIterator<T> {
     /// The elements being iterated over
     elements: Vec<T>,
     /// Optional reference to the parent graph for graph-aware operations
-    graph_ref: Option<Rc<RefCell<Graph>>>,
+    graph_ref: Option<Arc<OwnerCell<Graph>>>,
 }
 
 impl<T> ArrayIterator<T> {
@@ -25,7 +25,7 @@ impl<T> ArrayIterator<T> {
     }
 
     /// Create a new ArrayIterator with graph reference
-    pub fn with_graph(elements: Vec<T>, graph: Rc<RefCell<Graph>>) -> Self {
+    pub fn with_graph(elements: Vec<T>, graph: Arc<OwnerCell<Graph>>) -> Self {
         Self {
             elements,
             graph_ref: Some(graph),

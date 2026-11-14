@@ -21,11 +21,11 @@ struct ParsedAttributeColumn<T> {
 /// Clean attribute operations - 12 essential methods only
 /// Immutable attribute access (getters/utilities)
 pub struct PyGraphAttr {
-    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    pub graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
 }
 
 impl PyGraphAttr {
-    pub fn new(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>) -> Self {
+    pub fn new(graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>) -> Self {
         Self { graph }
     }
 
@@ -154,11 +154,11 @@ impl PyGraphAttr {
 
 /// Mutable attribute access (setters)
 pub struct PyGraphAttrMut {
-    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    pub graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>,
 }
 
 impl PyGraphAttrMut {
-    pub fn new(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>) -> Self {
+    pub fn new(graph: std::sync::Arc<groggy::ownership::OwnerCell<groggy::Graph>>) -> Self {
         Self { graph }
     }
 

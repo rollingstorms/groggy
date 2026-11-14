@@ -1,11 +1,14 @@
 //! Specialized wrappers reuse canonical scoped traversal and share large membership.
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{ComponentSubgraph, FilteredSubgraph, NeighborhoodSubgraph, Subgraph},
     traits::{filter_operations::FilterCriteria, SubgraphOperations},
     Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, hint::black_box, rc::Rc, time::Instant};
+use std::hint::black_box;
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000usize, 100_000] {
@@ -14,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for node in 1..count {
             graph.add_edge(node - 1, node)?;
         }
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         let base = Subgraph::new(
             owner.clone(),
             (0..count).collect(),

@@ -511,10 +511,11 @@ mod tests {
     use crate::algorithms::steps::{StepScope, StepVariables};
     use crate::algorithms::{AlgorithmParamValue, Context};
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
-    use std::cell::RefCell;
-    use std::collections::{HashMap, HashSet};
-    use std::rc::Rc;
+    use std::collections::HashMap;
+    use std::collections::HashSet;
+    use std::sync::Arc;
 
     #[test]
     fn test_fused_neighbor_mul_agg() {
@@ -528,7 +529,7 @@ mod tests {
 
         let nodes: HashSet<_> = [n0, n1, n2].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(g)), nodes, "test".to_string()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(g)), nodes, "test".to_string()).unwrap();
 
         let mut ctx = Context::default();
         let mut vars = StepVariables::default();
@@ -588,7 +589,7 @@ mod tests {
 
         let nodes: HashSet<_> = [n0, n1].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(g)), nodes, "test".to_string()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(g)), nodes, "test".to_string()).unwrap();
 
         let mut ctx = Context::default();
         let mut vars = StepVariables::default();
@@ -645,7 +646,7 @@ mod tests {
 
         let nodes: HashSet<_> = [n0, n1].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(g)), nodes, "test".to_string()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(g)), nodes, "test".to_string()).unwrap();
 
         let mut ctx = Context::default();
         let mut vars = StepVariables::default();

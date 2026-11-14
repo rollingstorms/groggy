@@ -12,7 +12,7 @@ use crate::viz::streaming::data_source::{
 use std::collections::HashMap;
 
 /// Thread-safe wrapper that implements DataSource for Subgraph data
-/// Extracts all data at creation time to avoid Rc<RefCell> threading issues
+/// Extracts all data at creation time to avoid Arc<OwnerCell> threading issues
 #[derive(Debug, Clone)]
 pub struct SubgraphDataSource {
     // Pre-extracted graph data (thread-safe)

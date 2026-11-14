@@ -1,4 +1,5 @@
 //! Explicit pending snapshots are immutable read values, never accepted-state pins.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         global_registry,
@@ -9,7 +10,7 @@ use groggy::{
     AttrValue, Graph,
 };
 use serde_json::{json, Value};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 
 fn pipeline(steps: Value) -> anyhow::Result<Pipeline> {
     PipelineBuilder::new()
@@ -18,7 +19,7 @@ fn pipeline(steps: Value) -> anyhow::Result<Pipeline> {
         })
         .build(global_registry())
 }
-fn scope(graph: &Rc<RefCell<Graph>>) -> Subgraph {
+fn scope(graph: &Arc<OwnerCell<Graph>>) -> Subgraph {
     Subgraph::from_frozen_view(
         graph.clone(),
         graph.borrow().read_view().unwrap(),
@@ -42,7 +43,7 @@ fn captures_before_after_properties_and_removals_keep_distinct_immutable_values(
     graph
         .add_edges(&[(0, 1), (0, 1), (1, 2), (2, 2), (2, 3)])
         .unwrap();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let head = graph.borrow().current_state_id();
     let steps = json!([
         {"id":"graph.capture_staged","params":{"output":"before"}},
@@ -106,7 +107,7 @@ fn captures_before_after_properties_and_removals_keep_distinct_immutable_values(
 fn late_capture_or_projection_errors_restore_old_outputs_and_discard_effects() {
     let mut graph = Graph::new();
     graph.add_nodes(3).unwrap();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let head = graph.borrow().current_state_id();
     for tail in [
         json!({"id":"graph.select_nodes","params":{"source":"pending","ids":[1],"output":"invalid"}}),
@@ -151,7 +152,7 @@ fn staged_graph_capture_does_not_enable_unadapted_topology_reads_or_property_eff
     }
     let mut graph = Graph::new();
     graph.add_nodes(1).unwrap();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let pipe =
         pipeline(json!([{"id":"graph.capture_staged","params":{"output":"value"}}])).unwrap();
     let mut ctx = Context::new();

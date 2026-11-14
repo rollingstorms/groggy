@@ -6,7 +6,7 @@ use groggy::types::{AttrName, EdgeId, NodeId, StateId};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
-#[pyclass(name = "TemporalSnapshot", unsendable)]
+#[pyclass(name = "TemporalSnapshot")]
 pub struct PyTemporalSnapshot {
     pub inner: TemporalSnapshot,
 }
@@ -114,8 +114,8 @@ impl PyTemporalSnapshot {
         let graph = self.inner.to_graph().map_err(graph_error_to_py_err)?;
         Ok(crate::ffi::api::graph::PyGraph {
             inner: graph.into_shared(),
-            cached_view: std::cell::RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: groggy::ownership::OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         })
     }
 
@@ -126,7 +126,7 @@ impl PyTemporalSnapshot {
     }
 }
 
-#[pyclass(name = "ExistenceIndex", unsendable)]
+#[pyclass(name = "ExistenceIndex")]
 pub struct PyExistenceIndex {
     pub inner: ExistenceIndex,
 }
@@ -151,7 +151,7 @@ impl PyExistenceIndex {
 }
 
 /// Python wrapper for TemporalIndex
-#[pyclass(name = "TemporalIndex", unsendable)]
+#[pyclass(name = "TemporalIndex")]
 pub struct PyTemporalIndex {
     pub inner: TemporalIndex,
 }
@@ -357,7 +357,7 @@ impl PyIndexStatistics {
 use groggy::algorithms::{ChangedEntities, TemporalDelta, TemporalScope};
 
 /// Python wrapper for TemporalScope
-#[pyclass(name = "TemporalScope", unsendable)]
+#[pyclass(name = "TemporalScope")]
 #[derive(Clone)]
 pub struct PyTemporalScope {
     pub inner: TemporalScope,

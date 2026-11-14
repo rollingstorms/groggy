@@ -1,5 +1,10 @@
 # Thread-bound graph cyclic collection — 2026-11-12
 
+Resolved by the creator-checked shared-owner migration on 2026-11-14. See
+`python-owner-lifetime-2026-11-14.md` for the finalization proof, current limits
+and measured costs. The text below is the historical investigation, not current
+release status. The diagnostic now expects all three cases to succeed.
+
 Existing scope: 19.2. Investigation outcome, not a fixed lifetime contract.
 
 The November 12 baseline repeats the November 11 unraisable `PyGraph is

@@ -1,5 +1,5 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use groggy::ownership::OwnerCell;
+use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use groggy::algorithms::community::{LabelPropagation, Louvain};
@@ -40,7 +40,7 @@ fn build_subgraph(num_clusters: usize, cluster_size: usize) -> Subgraph {
     }
 
     let all_nodes: HashSet<NodeId> = clusters.into_iter().flatten().collect();
-    Subgraph::from_nodes(Rc::new(RefCell::new(graph)), all_nodes, "bench".into()).unwrap()
+    Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), all_nodes, "bench".into()).unwrap()
 }
 
 fn bench_lpa(c: &mut Criterion) {

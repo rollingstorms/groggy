@@ -1,7 +1,9 @@
 //! Structural summary setup/reuse costs, with cold immutable capture reported separately.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, Graph};
 use serde_json::json;
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for (kind, count) in [
@@ -35,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         let selected = Subgraph::new(
             owner.clone(),
             (0..count).collect(),

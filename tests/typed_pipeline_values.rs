@@ -1,4 +1,5 @@
 //! Typed captured graph/table values compose without a temporary writable graph.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         global_registry,
@@ -14,11 +15,8 @@ use groggy::{
     AttrValue as V, Graph,
 };
 use serde_json::{json, Value};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 fn pipeline(steps: Value) -> Pipeline {
     PipelineBuilder::new()
@@ -28,11 +26,11 @@ fn pipeline(steps: Value) -> Pipeline {
         .build(global_registry())
         .unwrap()
 }
-fn selected(graph: &Rc<RefCell<Graph>>) -> Subgraph {
+fn selected(graph: &Arc<OwnerCell<Graph>>) -> Subgraph {
     let view = graph.borrow().read_view().unwrap();
     Subgraph::from_frozen_view(graph.clone(), view, "input".into())
 }
-fn fixture() -> (Rc<RefCell<Graph>>, u64) {
+fn fixture() -> (Arc<OwnerCell<Graph>>, u64) {
     let mut graph = Graph::new_directed();
     graph.add_nodes(6).unwrap();
     graph.remove_nodes(&[1, 3]).unwrap();
@@ -48,7 +46,7 @@ fn fixture() -> (Rc<RefCell<Graph>>, u64) {
         .set_edge_attr(1, "w".into(), V::Float64(2.0000000001))
         .unwrap();
     let state = graph.current_state_id();
-    (Rc::new(RefCell::new(graph)), state)
+    (Arc::new(OwnerCell::new(graph)), state)
 }
 fn capture(state: u64) -> Vec<Value> {
     vec![

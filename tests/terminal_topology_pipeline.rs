@@ -1,4 +1,5 @@
 //! Terminal topology effects share one checked acceptance with property work.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         global_registry,
@@ -9,13 +10,10 @@ use groggy::{
     AttrValue, BatchNodeRef as N, Graph, GraphBatch,
 };
 use serde_json::{json, Value};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
-fn fixture(directed: bool) -> Rc<RefCell<Graph>> {
+fn fixture(directed: bool) -> Arc<OwnerCell<Graph>> {
     let mut graph = if directed {
         Graph::new_directed()
     } else {
@@ -38,9 +36,9 @@ fn fixture(directed: bool) -> Rc<RefCell<Graph>> {
             "test".into(),
         )
         .unwrap();
-    Rc::new(RefCell::new(graph))
+    Arc::new(OwnerCell::new(graph))
 }
-fn scope(graph: &Rc<RefCell<Graph>>) -> Subgraph {
+fn scope(graph: &Arc<OwnerCell<Graph>>) -> Subgraph {
     let view = graph.borrow().read_view().unwrap();
     Subgraph::from_frozen_view(graph.clone(), view, "test".into())
 }

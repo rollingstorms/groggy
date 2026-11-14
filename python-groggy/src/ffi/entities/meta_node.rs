@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 /// Meta-nodes are special nodes that represent collapsed subgraphs. They have all
 /// the capabilities of regular nodes plus meta-specific operations like expanding
 /// back to the original subgraph.
-#[pyclass(name = "MetaNode", unsendable)]
+#[pyclass(name = "MetaNode")]
 pub struct PyMetaNode {
     /// The underlying Rust MetaNode entity
     pub inner: MetaNode,

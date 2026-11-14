@@ -1,13 +1,11 @@
 use groggy::algorithms::community::{ComponentMode, ConnectedComponents};
 use groggy::algorithms::{Algorithm, AlgorithmOutput, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
-type Shared = Rc<RefCell<Graph>>;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -42,7 +40,7 @@ fn exhaustive_three_node_graphs_match_independent_transitive_closure() {
                     }
                 }
             }
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             let sub = selected(&g);
             for mode in [
                 ComponentMode::Undirected,
@@ -96,7 +94,7 @@ fn cached_membership_rejects_stale_entities_and_cancellation() {
         let edge = graph.add_edge(2, 0).unwrap();
         graph.add_edge(2, 0).unwrap();
         graph.add_edge(2, 2).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let sub = selected(&g);
         let algo = ConnectedComponents::new(mode, "c".into());
         algo.execute(&mut Context::new(), sub.clone()).unwrap();
@@ -120,7 +118,7 @@ fn empty_singleton_closed_selection_and_nonpersistent_outputs() {
     for n in [0, 1, 3] {
         let mut graph = Graph::new_directed_manual();
         graph.add_nodes(n).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         for mode in [
             ComponentMode::Undirected,
             ComponentMode::Weak,
@@ -149,7 +147,7 @@ fn empty_singleton_closed_selection_and_nonpersistent_outputs() {
     let mut graph = Graph::new_manual();
     graph.add_nodes(2).unwrap();
     let edge = graph.add_edge(0, 1).unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let sub = Subgraph::new(
         g,
         [0].into_iter().collect(),
@@ -168,7 +166,7 @@ fn long_directed_path_uses_an_explicit_stack() {
     for n in 1..10_000 {
         graph.add_edge(n, n - 1).unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let mut ctx = Context::new();
     ctx.set_persist_results(false);
     ConnectedComponents::new(ComponentMode::Strong, "c".into())

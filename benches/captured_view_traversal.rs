@@ -1,4 +1,5 @@
 //! Scoped traversal cost, including the temporary connected compatibility capture boundary.
+use groggy::ownership::OwnerCell;
 use groggy::{
     query::{TraversalEngine, TraversalOptions},
     subgraphs::Subgraph,
@@ -6,7 +7,8 @@ use groggy::{
     Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000usize, 100_000] {
@@ -17,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let nodes = (0..count).collect();
         let edges = (0..count - 1).collect();
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         let connected = Subgraph::new(owner.clone(), nodes, edges, "benchmark".into());
         let start = Instant::now();
         let view = connected.pin_view()?;

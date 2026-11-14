@@ -419,10 +419,10 @@ mod tests {
     use crate::algorithms::steps::StepVariables;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     fn make_test_graph() -> (Graph, Vec<NodeId>) {
         let mut graph = Graph::new_manual();
@@ -447,7 +447,7 @@ mod tests {
         let (graph, nodes) = make_test_graph();
         let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         let step = CommunitySeedStep::new(SeedStrategy::Singleton, "labels", None, None);
         let mut ctx = Context::new();
@@ -473,7 +473,7 @@ mod tests {
         let (graph, nodes) = make_test_graph();
         let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         let step = CommunitySeedStep::new(SeedStrategy::Random, "labels", Some(3), Some(42));
         let mut ctx = Context::new();
@@ -497,7 +497,7 @@ mod tests {
         let (graph, nodes) = make_test_graph();
         let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         // Initialize with singleton labels
         let seed_step = CommunitySeedStep::new(SeedStrategy::Singleton, "labels", None, None);
@@ -524,7 +524,7 @@ mod tests {
     fn test_modularity_gain_empty_graph() {
         let graph = Graph::new_manual();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), HashSet::new(), "empty".into())
                 .unwrap();
 
         let step = ModularityGainStep::new("labels", "gains");
@@ -548,7 +548,7 @@ mod tests {
         let (graph, nodes) = make_test_graph();
         let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), node_set, "test".into()).unwrap();
 
         let mut ctx = Context::new();
         let mut vars = StepVariables::default();
@@ -581,8 +581,9 @@ mod tests {
 #[cfg(test)]
 mod checked_tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::{algorithms::steps::StepVariables, subgraphs::Subgraph, Graph};
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::Arc;
 
     /// Independent full objective recomputation, not the local move equation.
     fn objective(edges: &[(usize, usize)], labels: &[i64], directed: bool) -> f64 {
@@ -656,7 +657,7 @@ mod checked_tests {
                     graph.add_edge(source, target).expect("edge");
                 }
                 let selected = Subgraph::from_nodes(
-                    Rc::new(RefCell::new(graph)),
+                    Arc::new(OwnerCell::new(graph)),
                     (0..count).collect(),
                     "reference".into(),
                 )
@@ -724,7 +725,7 @@ mod checked_tests {
         graph.add_edge(1, 2).expect("edge");
         graph.add_edge(0, 2).expect("edge");
         let selected = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..3).collect(),
             "triangle".into(),
         )
@@ -773,7 +774,7 @@ mod checked_tests {
         graph.add_edge(1, 2).expect("edge");
         graph.add_edge(2, 3).expect("edge");
         let selected = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             [1, 2, 3].into_iter().collect(),
             "selected".into(),
         )

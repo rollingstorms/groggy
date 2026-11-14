@@ -10,11 +10,10 @@ use std::sync::Arc;
 
 /// Specialized array for PySubgraph objects
 ///
-/// Note: Uses Arc<Vec<PySubgraph>> for zero-copy sharing. PySubgraph is marked
-/// as `unsendable` so this won't be used across threads. Arc is used here for
-/// efficient cloning/sharing within a single thread.
+/// Uses Arc<Vec<PySubgraph>> for shared ownership and safe final release.
+/// Connected graph state is still protected by creator-thread borrow checks.
 #[allow(clippy::arc_with_non_send_sync)]
-#[pyclass(name = "SubgraphArray", unsendable)]
+#[pyclass(name = "SubgraphArray")]
 #[derive(Clone)]
 pub struct PySubgraphArray {
     /// Internal storage of subgraphs
@@ -468,8 +467,8 @@ impl PySubgraphArray {
         };
         Ok(crate::ffi::api::graph::PyGraph {
             inner: graph.into_shared(),
-            cached_view: std::cell::RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: groggy::ownership::OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         })
     }
 }

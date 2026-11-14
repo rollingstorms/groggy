@@ -1,12 +1,13 @@
+use groggy::ownership::OwnerCell;
 use groggy::{
     entities::{Edge, EntityEdge, EntityNode, Node},
     traits::{EdgeOperations, GraphEntity, NodeOperations},
     AttrValue, Graph,
 };
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 #[test]
 fn compatibility_names_share_canonical_owner_and_keep_constructor_policies() {
-    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let graph = Arc::new(OwnerCell::new(Graph::new_manual()));
     let a = graph.borrow_mut().add_node().unwrap();
     let b = graph.borrow_mut().add_node().unwrap();
     let edge = graph.borrow_mut().add_edge(a, b).unwrap();
@@ -16,8 +17,8 @@ fn compatibility_names_share_canonical_owner_and_keep_constructor_policies() {
     let legacy_edge: groggy::storage::edge::EntityEdge = EntityEdge::new(edge, graph.clone());
     assert_eq!(node.entity_id(), legacy.entity_id());
     assert_eq!(current_edge.entity_id(), legacy_edge.entity_id());
-    assert!(Rc::ptr_eq(&node.graph_ref(), &legacy.graph_ref()));
-    assert!(Rc::ptr_eq(
+    assert!(Arc::ptr_eq(&node.graph_ref(), &legacy.graph_ref()));
+    assert!(Arc::ptr_eq(
         &current_edge.graph_ref(),
         &legacy_edge.graph_ref()
     ));
@@ -37,7 +38,7 @@ fn compatibility_names_share_canonical_owner_and_keep_constructor_policies() {
 }
 #[test]
 fn adapter_mutations_and_retained_branch_restoration_use_the_same_graph() {
-    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let graph = Arc::new(OwnerCell::new(Graph::new_manual()));
     let a = graph.borrow_mut().add_node().unwrap();
     let b = graph.borrow_mut().add_node().unwrap();
     let edge = graph.borrow_mut().add_edge(a, b).unwrap();

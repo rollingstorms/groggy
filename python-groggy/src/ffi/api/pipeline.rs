@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::time::Instant;
 
 use pyo3::exceptions::PyRuntimeError;
@@ -171,14 +173,10 @@ pub fn py_run_pipeline(
     let clone_elapsed = clone_start.elapsed();
 
     let context_start = Instant::now();
-    // NOTE: GIL Release Limitation
-    // We cannot release the GIL here because Subgraph contains Rc<RefCell<Graph>>,
-    // which is not Send. To enable GIL release for long-running algorithms:
-    // 1. Refactor Graph to use Arc<RwLock<GraphInner>> instead of Rc<RefCell<Graph>>
-    // 2. Ensure all Subgraph clones use Arc for thread-safe reference counting
-    // 3. Update all graph operations to use RwLock instead of RefCell
-    // This would allow: py.allow_threads(|| pipeline.run(...))
-    // For now, Python threads will be blocked during algorithm execution.
+    // Shared ownership is Send, but live borrowing remains creator-thread bound.
+    // Keep this connected pipeline on its owner; detached read plans retain their
+    // separately certified GIL-release paths. Safe destruction does not authorize
+    // concurrent mutation or general pipeline scheduling on worker threads.
 
     let mut context = groggy::algorithms::Context::new();
     context.set_persist_results(persist_results);
@@ -354,8 +352,8 @@ pub fn py_get_pipeline_context_info() -> PyResult<HashMap<String, PyAttrValue>> 
     info.insert(
         "reason".to_string(),
         PyAttrValue::new(groggy::types::AttrValue::Text(
-            "Subgraph uses Rc<RefCell<Graph>> which is not Send. \
-             Refactor to Arc<RwLock<>> to enable parallel execution."
+            "Connected pipeline execution retains creator-thread graph access. \
+             Detached read plans have separately supported GIL-release paths."
                 .to_string(),
         )),
     );

@@ -8,7 +8,8 @@ use crate::errors::{GraphError, GraphResult};
 use crate::subgraphs::composer::{EdgeStrategy, MetaNodePlan};
 use crate::traits::GraphEntity;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// Enhanced aggregation specification supporting multiple syntax forms
 #[derive(Debug, Clone)]
@@ -235,7 +236,7 @@ impl Default for EdgeAggregationConfig {
 /// with our existing optimized algorithms accessed through the Graph reference.
 ///
 /// # Design Principles
-/// - **Same Storage**: All subgraphs use HashSet<NodeId> + HashSet<EdgeId> + Rc<RefCell<Graph>>
+/// - **Same Storage**: All subgraphs use HashSet<NodeId> + HashSet<EdgeId> + Arc<OwnerCell<Graph>>
 /// - **Algorithm Reuse**: All operations delegate to existing optimized algorithms
 /// - **Zero Copying**: Methods return references to existing data structures
 /// - **Trait Objects**: Methods return Box<dyn SubgraphOperations> for composability

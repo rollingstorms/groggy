@@ -1,3 +1,4 @@
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         centrality::{BetweennessCentrality, ClosenessCentrality, PageRank},
@@ -9,8 +10,8 @@ use groggy::{
     traits::EdgeOperations,
     AttrValue, Graph,
 };
-use std::{cell::RefCell, rc::Rc};
-fn selected(graph: &Rc<RefCell<Graph>>) -> Subgraph {
+use std::sync::Arc;
+fn selected(graph: &Arc<OwnerCell<Graph>>) -> Subgraph {
     Subgraph::from_nodes(graph.clone(), graph.borrow().node_ids_set(), "f64".into()).unwrap()
 }
 #[test]
@@ -31,7 +32,7 @@ fn persisted_scores_keep_the_exact_owned_f64_result() {
             .set_edge_attr(edge, "w".into(), AttrValue::Float64(weight))
             .unwrap();
     }
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let algorithms: Vec<(Box<dyn Algorithm>, &str)> = vec![
         (
             Box::new(DijkstraShortestPath::new(
@@ -85,7 +86,7 @@ fn canonical_and_compatibility_edges_share_wide_weight_and_capacity_access() {
     let mut graph = Graph::new_manual();
     graph.add_nodes(2).unwrap();
     let id = graph.add_edge(0, 1).unwrap();
-    let graph = Rc::new(RefCell::new(graph));
+    let graph = Arc::new(OwnerCell::new(graph));
     let edge = Edge::new(id, graph.clone()).unwrap();
     let old = EntityEdge::new(id, graph.clone());
     for weight in [1. + 2f64.powi(-40), 1e300] {

@@ -1,7 +1,11 @@
 //! Sampling excludes owner construction and the separately measured immutable capture.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, Graph};
 use serde_json::json;
-use std::{cell::RefCell, collections::HashSet, hint::black_box, rc::Rc, time::Instant};
+use std::collections::HashSet;
+use std::hint::black_box;
+use std::sync::Arc;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
@@ -9,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut graph = Graph::new_manual();
         graph.add_nodes(count)?;
         graph.add_edges(&(1..count).map(|id| (id - 1, id)).collect::<Vec<_>>())?;
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         let live = Subgraph::new(
             owner.clone(),
             (0..count).collect(),

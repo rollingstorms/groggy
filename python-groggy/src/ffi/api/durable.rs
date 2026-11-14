@@ -9,17 +9,20 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::path::PathBuf;
 
-#[pyclass(name = "DurableGraph", unsendable)]
+#[pyclass(name = "DurableGraph")]
 pub struct PyDurableGraph {
     store: Option<DurableGraph>,
+    owner: groggy::ownership::OwnerCell<()>,
 }
 impl PyDurableGraph {
     fn core(&self) -> PyResult<&DurableGraph> {
+        self.owner.assert_owner_thread();
         self.store
             .as_ref()
             .ok_or_else(|| PyValueError::new_err("DurableGraph is closed"))
     }
     pub(crate) fn core_mut(&mut self) -> PyResult<&mut DurableGraph> {
+        self.owner.assert_owner_thread();
         self.store
             .as_mut()
             .ok_or_else(|| PyValueError::new_err("DurableGraph is closed"))
@@ -38,6 +41,7 @@ impl PyDurableGraph {
         let config = parse_config(config, directed)?;
         let schema = schema.map(parse_schema).transpose()?;
         Ok(Self {
+            owner: groggy::ownership::OwnerCell::new(()),
             store: Some(
                 DurableGraph::create(&path, config, schema).map_err(graph_error_to_py_err)?,
             ),
@@ -53,6 +57,7 @@ impl PyDurableGraph {
     ) -> PyResult<Self> {
         let schema = schema.map(parse_schema).transpose()?;
         Ok(Self {
+            owner: groggy::ownership::OwnerCell::new(()),
             store: Some(
                 DurableGraph::create_from_graph(&path, &graph.inner.borrow(), schema)
                     .map_err(graph_error_to_py_err)?,
@@ -62,6 +67,7 @@ impl PyDurableGraph {
     #[staticmethod]
     fn open(path: PathBuf) -> PyResult<Self> {
         Ok(Self {
+            owner: groggy::ownership::OwnerCell::new(()),
             store: Some(DurableGraph::open(&path).map_err(graph_error_to_py_err)?),
         })
     }
@@ -176,10 +182,12 @@ impl PyDurableGraph {
     }
 
     fn close(&mut self) {
+        self.owner.assert_owner_thread();
         self.store = None;
     }
     #[getter]
     fn is_closed(&self) -> bool {
+        self.owner.assert_owner_thread();
         self.store.is_none()
     }
     fn __enter__(slf: PyRef<'_, Self>) -> PyResult<PyRef<'_, Self>> {
@@ -187,6 +195,7 @@ impl PyDurableGraph {
         Ok(slf)
     }
     fn __exit__(&mut self, _kind: &PyAny, _value: &PyAny, _traceback: &PyAny) -> bool {
+        self.owner.assert_owner_thread();
         self.store = None;
         false
     }

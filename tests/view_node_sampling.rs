@@ -1,5 +1,7 @@
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, AttrValue, Graph};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 fn fixture(directed: bool) -> Subgraph {
     let mut graph = if directed {
@@ -18,7 +20,7 @@ fn fixture(directed: bool) -> Subgraph {
         .set_node_attr(0, "value".into(), AttrValue::Int(42))
         .unwrap();
     Subgraph::new(
-        Rc::new(RefCell::new(graph)),
+        Arc::new(OwnerCell::new(graph)),
         (0..6).collect(),
         (0..10).collect(),
         "selected".into(),

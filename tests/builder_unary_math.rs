@@ -1,3 +1,4 @@
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         steps::{
@@ -8,17 +9,15 @@ use groggy::{
     subgraphs::Subgraph,
     Graph,
 };
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 fn selected() -> Subgraph {
     let mut graph = Graph::new();
     graph.add_nodes(2).unwrap();
     graph.add_edge(0, 1).unwrap();
     Subgraph::new(
-        Rc::new(RefCell::new(graph)),
+        Arc::new(OwnerCell::new(graph)),
         HashSet::from([0, 1]),
         HashSet::from([0]),
         "math".into(),

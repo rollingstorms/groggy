@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use groggy::ownership::OwnerCell;
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use groggy::algorithms::centrality::{BetweennessCentrality, ClosenessCentrality};
@@ -22,7 +22,7 @@ fn build_chain(length: usize) -> Subgraph {
         graph.add_edge(v, u).unwrap();
     }
     let set: HashSet<NodeId> = nodes.into_iter().collect();
-    Subgraph::from_nodes(Rc::new(RefCell::new(graph)), set, "centrality".into()).unwrap()
+    Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), set, "centrality".into()).unwrap()
 }
 
 fn bench_betweenness(c: &mut Criterion) {

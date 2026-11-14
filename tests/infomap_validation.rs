@@ -2,14 +2,12 @@ use groggy::algorithms::community::Infomap;
 use groggy::algorithms::{
     ensure_algorithms_registered, global_registry, Algorithm, Context, PipelineBuilder,
 };
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::Graph;
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
-type Shared = Rc<RefCell<Graph>>;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -26,7 +24,7 @@ fn cliques() -> Shared {
         }
     }
     graph.add_edge(3, 4).unwrap();
-    Rc::new(RefCell::new(graph))
+    Arc::new(OwnerCell::new(graph))
 }
 fn run(g: &Shared, tau: f64, trials: usize) -> Context {
     let mut ctx = Context::new();
@@ -87,7 +85,7 @@ fn direction_changes_stationary_code_length_and_rng_is_local() {
         };
         graph.add_nodes(2).unwrap();
         graph.add_edge(0, 1).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         fastrand::seed(123);
         let expected = fastrand::u64(..);
         fastrand::seed(123);
@@ -130,7 +128,7 @@ fn empty_singleton_edgeless_and_id_gap_cases_are_defined() {
     for n in [0, 1, 3] {
         let mut graph = Graph::new_manual();
         graph.add_nodes(n).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         run(&g, 0.15, 2);
         assert_eq!(labels(&g), vec![0; n]);
     }
@@ -140,7 +138,7 @@ fn empty_singleton_edgeless_and_id_gap_cases_are_defined() {
     graph.add_edge(0, 2).unwrap();
     graph.add_edge(2, 3).unwrap();
     graph.add_edge(3, 0).unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     run(&g, 0., 2);
     assert_eq!(labels(&g).len(), 3);
     assert!(g.borrow().get_node_attr(1, &"c".into()).is_err());

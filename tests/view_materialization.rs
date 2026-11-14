@@ -1,5 +1,6 @@
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, AttrValue, Graph};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 #[test]
 fn selected_copy_preserves_ids_values_direction_and_publishes_one_independent_base() {
     let mut original = Graph::new_directed();
@@ -12,7 +13,7 @@ fn selected_copy_preserves_ids_values_direction_and_publishes_one_independent_ba
     original
         .set_edge_attr(1, "refs".into(), AttrValue::NodeArray(vec![3, 1]))
         .unwrap();
-    let owner = Rc::new(RefCell::new(original));
+    let owner = Arc::new(OwnerCell::new(original));
     let selected = Subgraph::new(owner.clone(), [1, 3, 4].into(), [1].into(), "copy".into());
     let frozen = selected.pin_view().unwrap();
     owner.borrow_mut().remove_node(1).unwrap();

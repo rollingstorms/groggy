@@ -1,5 +1,7 @@
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, Graph};
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 fn fixture(directed: bool) -> Subgraph {
     let mut graph = if directed {
@@ -12,7 +14,7 @@ fn fixture(directed: bool) -> Subgraph {
         graph.add_edge(s, t).unwrap();
     }
     Subgraph::new(
-        Rc::new(RefCell::new(graph)),
+        Arc::new(OwnerCell::new(graph)),
         (0..5).collect(),
         (0..5).collect(),
         "selection".into(),

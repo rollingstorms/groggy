@@ -856,13 +856,14 @@ mod atomic_tests {
     }
 
     fn chain_selection() -> crate::subgraphs::Subgraph {
-        use std::{cell::RefCell, rc::Rc};
+        use crate::ownership::OwnerCell;
+        use std::sync::Arc;
         let mut graph = crate::api::graph::Graph::new_directed_manual();
         graph.add_nodes(3).unwrap();
         graph.add_edge(0, 1).expect("edge");
         graph.add_edge(1, 2).expect("edge");
         crate::subgraphs::Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             [0, 1, 2].into_iter().collect(),
             "chain".into(),
         )

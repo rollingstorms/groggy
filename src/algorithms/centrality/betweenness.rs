@@ -1,8 +1,8 @@
-use std::collections::{HashMap, VecDeque};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -694,10 +694,10 @@ mod tests {
     use super::*;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::traits::SubgraphOperations;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn indexer_handles_full_width_sparse_ids_without_overflow() {
@@ -727,7 +727,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [a, b, c, d].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = BetweennessCentrality::new(true, None, "betweenness".into());
         let mut ctx = Context::new();

@@ -1,4 +1,5 @@
 //! Explicit-index reuse versus ephemeral retained temporal kernels.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         steps::{
@@ -14,7 +15,9 @@ use groggy::{
     AttrValue, Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc, time::Instant};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000, 10_000] {
@@ -32,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let head = graph.commit("second".into(), "bench".into())?;
         let index = Arc::new(graph.build_temporal_index()?);
         let selected = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..count).collect(),
             "windows".into(),
         )?;

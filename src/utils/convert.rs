@@ -470,11 +470,11 @@ mod tests {
         let _edge2 = graph.add_edge(node2, node3).unwrap();
 
         // Create subgraph with just node2 and node3
-        use std::cell::RefCell;
+        use crate::ownership::OwnerCell;
         use std::collections::HashSet;
-        use std::rc::Rc;
+        use std::sync::Arc;
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let subgraph_nodes = HashSet::from([node2, node3]);
         let subgraph = Subgraph::from_nodes(graph_rc, subgraph_nodes, "test".to_string()).unwrap();
 

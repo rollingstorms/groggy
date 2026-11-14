@@ -590,8 +590,8 @@ impl PyGraphView {
             .to_graph()
             .map(|graph| crate::ffi::api::graph::PyGraph {
                 inner: graph.into_shared(),
-                cached_view: std::cell::RefCell::new(None),
-                cached_live_view: std::cell::RefCell::new(None),
+                cached_view: groggy::ownership::OwnerCell::new(None),
+                cached_live_view: groggy::ownership::OwnerCell::new(None),
             })
             .map_err(graph_error_to_py_err)
     }

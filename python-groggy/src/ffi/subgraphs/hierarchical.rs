@@ -15,7 +15,7 @@ use pyo3::types::{PyDict, PyType};
 use std::collections::HashMap;
 
 /// Python wrapper for AggregationFunction
-#[pyclass(name = "AggregationFunction", unsendable)]
+#[pyclass(name = "AggregationFunction")]
 #[derive(Clone)]
 pub struct PyAggregationFunction {
     pub inner: AggregationFunction,
@@ -127,7 +127,7 @@ impl PyAggregationFunction {
 }
 
 /// Python wrapper for ExternalEdgeStrategy
-#[pyclass(name = "ExternalEdgeStrategy", unsendable)]
+#[pyclass(name = "ExternalEdgeStrategy")]
 #[derive(Clone)]
 pub struct PyExternalEdgeStrategy {
     pub inner: ExternalEdgeStrategy,
@@ -177,7 +177,7 @@ impl PyExternalEdgeStrategy {
 }
 
 /// Python wrapper for MetaEdgeStrategy
-#[pyclass(name = "MetaEdgeStrategy", unsendable)]
+#[pyclass(name = "MetaEdgeStrategy")]
 #[derive(Clone)]
 pub struct PyMetaEdgeStrategy {
     pub inner: MetaEdgeStrategy,
@@ -227,7 +227,7 @@ impl PyMetaEdgeStrategy {
 }
 
 /// Python wrapper for EdgeAggregationFunction
-#[pyclass(name = "EdgeAggregationFunction", unsendable)]
+#[pyclass(name = "EdgeAggregationFunction")]
 #[derive(Clone)]
 pub struct PyEdgeAggregationFunction {
     pub inner: EdgeAggregationFunction,
@@ -317,7 +317,7 @@ impl PyEdgeAggregationFunction {
 }
 
 /// Python wrapper for EdgeAggregationConfig
-#[pyclass(name = "EdgeAggregationConfig", unsendable)]
+#[pyclass(name = "EdgeAggregationConfig")]
 #[derive(Clone, Default)]
 pub struct PyEdgeAggregationConfig {
     pub inner: EdgeAggregationConfig,
@@ -448,7 +448,7 @@ pub fn parse_edge_config(edge_config_dict: Option<&PyDict>) -> PyResult<EdgeAggr
 }
 
 /// DEPRECATED: Old Python wrapper for MetaNode - use crate::ffi::entities::PyMetaNode instead
-#[pyclass(name = "OldMetaNode", unsendable)]
+#[pyclass(name = "OldMetaNode")]
 pub struct PyMetaNodeOld {
     pub inner: MetaNode,
 }

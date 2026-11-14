@@ -1,3 +1,4 @@
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         steps::{
@@ -8,18 +9,16 @@ use groggy::{
     subgraphs::Subgraph,
     Graph,
 };
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 fn fixture() -> Subgraph {
     let mut graph = Graph::new();
     graph.add_nodes(3).unwrap();
     graph.add_edge(0, 2).unwrap();
     graph.add_edge(2, 0).unwrap();
     Subgraph::new(
-        Rc::new(RefCell::new(graph)),
+        Arc::new(OwnerCell::new(graph)),
         HashSet::from([0, 2]),
         HashSet::from([0, 1]),
         "power".into(),

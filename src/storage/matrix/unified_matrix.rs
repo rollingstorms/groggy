@@ -137,7 +137,7 @@ pub enum MatrixStorage<T: NumericType> {
     Dense(SharedBuffer<T>),
     /// Sparse storage - only non-zero elements stored
     Sparse(SparseMatrix<T>),
-    /// View of another matrix - no owned data
+    /// View of another matrix - retains its shared backing buffer
     View(MatrixView<T>),
     /// Lazy computation - computed on demand
     Lazy(LazyMatrix<T>),
@@ -152,9 +152,10 @@ pub struct SparseMatrix<T: NumericType> {
     pub shape: Shape,
 }
 
-/// View into another matrix
+/// View metadata retaining its immutable backing buffer.
+/// This storage variant remains unsupported by matrix operations.
 pub struct MatrixView<T: NumericType> {
-    pub data: *const T,
+    pub data: std::sync::Arc<[T]>,
     pub shape: Shape,
     pub strides: Strides,
     pub _phantom: PhantomData<T>,
@@ -165,7 +166,7 @@ impl<T: NumericType> std::fmt::Debug for MatrixView<T> {
         f.debug_struct("MatrixView")
             .field("shape", &self.shape)
             .field("strides", &self.strides)
-            .field("data", &"<raw pointer>")
+            .field("data", &"<retained buffer>")
             .finish()
     }
 }

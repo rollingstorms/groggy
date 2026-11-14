@@ -1,0 +1,353 @@
+{
+  "scope": "Three alternating fresh-process pairs, same CPython 3.9 and public fixture. Before: prior qualified 0.6.0 wheel, core unchanged through 867d8da1. After: optimized creator-checked ownership with cached ThreadId. Site-packages disabled; builds/tests completed before timing.",
+  "pairs": [
+    {
+      "before": {
+        "package": "/private/tmp/groggy-owner-baseline-package/groggy/__init__.py",
+        "version": "0.6.0",
+        "scope": "Seven samples per public operation, 1k scalar nodes, unchanged captured source; steady warm cache; timing includes Python loop, dispatch, FFI and native work. Bulk includes Python batch staging plus checked native publication. No allocation/RSS/GIL-concurrency or isolated 100ns FFI-budget claim.",
+        "live_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            310.9425,
+            308.35958,
+            343.24625,
+            312.07083,
+            305.94917,
+            306.03625,
+            307.70708
+          ],
+          "median_ns_per_call": 308.35958
+        },
+        "captured_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            283.9675,
+            268.89834,
+            268.07166,
+            267.55334,
+            259.85667,
+            244.98375,
+            252.58458
+          ],
+          "median_ns_per_call": 267.55334
+        },
+        "warm_capture": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            233.30708,
+            222.91125,
+            222.18167,
+            228.9225,
+            234.72042,
+            221.9325,
+            204.10416
+          ],
+          "median_ns_per_call": 222.91125
+        },
+        "bulk_1000_properties": {
+          "iterations": 10,
+          "samples_ns_per_call": [
+            2153412.5,
+            2031262.5,
+            2106983.3,
+            1987716.7,
+            1742529.2,
+            1742462.5,
+            1927662.5
+          ],
+          "median_ns_per_call": 1987716.7
+        }
+      },
+      "after": {
+        "package": "/Users/michaelroth/Documents/Code/groggy/python-groggy/python/groggy/__init__.py",
+        "version": "0.6.0",
+        "scope": "Seven samples per public operation, 1k scalar nodes, unchanged captured source; steady warm cache; timing includes Python loop, dispatch, FFI and native work. Bulk includes Python batch staging plus checked native publication. No allocation/RSS/GIL-concurrency or isolated 100ns FFI-budget claim.",
+        "live_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            326.85542,
+            288.18208,
+            301.58916,
+            327.96292,
+            290.08625,
+            295.48542,
+            321.65083
+          ],
+          "median_ns_per_call": 301.58916
+        },
+        "captured_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            289.97875,
+            280.4375,
+            243.33875,
+            243.65042,
+            264.55375,
+            266.45458,
+            266.62916
+          ],
+          "median_ns_per_call": 266.45458
+        },
+        "warm_capture": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            211.43375,
+            195.37917,
+            195.67458,
+            212.02167,
+            214.06125,
+            213.79042,
+            214.34333
+          ],
+          "median_ns_per_call": 212.02167
+        },
+        "bulk_1000_properties": {
+          "iterations": 10,
+          "samples_ns_per_call": [
+            2248783.3,
+            2061000.0,
+            2038650.0,
+            1745050.0,
+            1727175.0,
+            2021745.8,
+            2059945.8
+          ],
+          "median_ns_per_call": 2038650.0
+        }
+      }
+    },
+    {
+      "before": {
+        "package": "/private/tmp/groggy-owner-baseline-package/groggy/__init__.py",
+        "version": "0.6.0",
+        "scope": "Seven samples per public operation, 1k scalar nodes, unchanged captured source; steady warm cache; timing includes Python loop, dispatch, FFI and native work. Bulk includes Python batch staging plus checked native publication. No allocation/RSS/GIL-concurrency or isolated 100ns FFI-budget claim.",
+        "live_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            298.63583,
+            311.62542,
+            286.06667,
+            291.44042,
+            310.22834,
+            310.59417,
+            313.30208
+          ],
+          "median_ns_per_call": 310.22834
+        },
+        "captured_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            261.29291,
+            254.36167,
+            238.33083,
+            242.80917,
+            258.08333,
+            252.85208,
+            238.44084
+          ],
+          "median_ns_per_call": 252.85208
+        },
+        "warm_capture": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            202.1725,
+            216.40916,
+            215.81375,
+            216.16375,
+            217.29708,
+            202.47125,
+            199.0325
+          ],
+          "median_ns_per_call": 215.81375
+        },
+        "bulk_1000_properties": {
+          "iterations": 10,
+          "samples_ns_per_call": [
+            1860662.5,
+            2146670.8,
+            2122275.0,
+            1808112.5,
+            1737345.8,
+            1773250.0,
+            2158441.7
+          ],
+          "median_ns_per_call": 1860662.5
+        }
+      },
+      "after": {
+        "package": "/Users/michaelroth/Documents/Code/groggy/python-groggy/python/groggy/__init__.py",
+        "version": "0.6.0",
+        "scope": "Seven samples per public operation, 1k scalar nodes, unchanged captured source; steady warm cache; timing includes Python loop, dispatch, FFI and native work. Bulk includes Python batch staging plus checked native publication. No allocation/RSS/GIL-concurrency or isolated 100ns FFI-budget claim.",
+        "live_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            305.01416,
+            322.22541,
+            323.92625,
+            325.14292,
+            325.20125,
+            299.04833,
+            303.22625
+          ],
+          "median_ns_per_call": 322.22541
+        },
+        "captured_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            265.93458,
+            260.26083,
+            242.57333,
+            253.14916,
+            265.46917,
+            272.22042,
+            277.22209
+          ],
+          "median_ns_per_call": 265.46917
+        },
+        "warm_capture": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            210.20666,
+            208.41583,
+            207.06417,
+            207.17,
+            213.04709,
+            226.12708,
+            226.88125
+          ],
+          "median_ns_per_call": 210.20666
+        },
+        "bulk_1000_properties": {
+          "iterations": 10,
+          "samples_ns_per_call": [
+            2099608.3,
+            2058425.0,
+            2071558.3,
+            2079150.0,
+            1960329.2,
+            1735733.4,
+            1730079.2
+          ],
+          "median_ns_per_call": 2058425.0
+        }
+      }
+    },
+    {
+      "before": {
+        "package": "/private/tmp/groggy-owner-baseline-package/groggy/__init__.py",
+        "version": "0.6.0",
+        "scope": "Seven samples per public operation, 1k scalar nodes, unchanged captured source; steady warm cache; timing includes Python loop, dispatch, FFI and native work. Bulk includes Python batch staging plus checked native publication. No allocation/RSS/GIL-concurrency or isolated 100ns FFI-budget claim.",
+        "live_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            282.99917,
+            296.22833,
+            309.32,
+            327.06792,
+            311.57375,
+            282.93208,
+            298.62625
+          ],
+          "median_ns_per_call": 298.62625
+        },
+        "captured_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            278.54334,
+            270.12084,
+            262.21042,
+            242.14333,
+            253.67459,
+            267.26291,
+            267.78
+          ],
+          "median_ns_per_call": 267.26291
+        },
+        "warm_capture": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            199.38292,
+            203.03833,
+            225.0175,
+            218.19333,
+            198.58125,
+            198.2,
+            209.76959
+          ],
+          "median_ns_per_call": 203.03833
+        },
+        "bulk_1000_properties": {
+          "iterations": 10,
+          "samples_ns_per_call": [
+            2086887.5,
+            2089041.6,
+            2105245.8,
+            2083445.8,
+            1790162.5,
+            1756625.0,
+            1783141.6
+          ],
+          "median_ns_per_call": 2083445.8
+        }
+      },
+      "after": {
+        "package": "/Users/michaelroth/Documents/Code/groggy/python-groggy/python/groggy/__init__.py",
+        "version": "0.6.0",
+        "scope": "Seven samples per public operation, 1k scalar nodes, unchanged captured source; steady warm cache; timing includes Python loop, dispatch, FFI and native work. Bulk includes Python batch staging plus checked native publication. No allocation/RSS/GIL-concurrency or isolated 100ns FFI-budget claim.",
+        "live_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            323.93708,
+            282.12,
+            290.05041,
+            304.45125,
+            311.80333,
+            324.40667,
+            277.19125
+          ],
+          "median_ns_per_call": 304.45125
+        },
+        "captured_property": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            241.78334,
+            240.84875,
+            248.43791,
+            266.17375,
+            268.24625,
+            264.91167,
+            262.15125
+          ],
+          "median_ns_per_call": 262.15125
+        },
+        "warm_capture": {
+          "iterations": 100000,
+          "samples_ns_per_call": [
+            198.06708,
+            203.90166,
+            217.67625,
+            215.77,
+            218.35708,
+            218.16166,
+            217.22917
+          ],
+          "median_ns_per_call": 217.22917
+        },
+        "bulk_1000_properties": {
+          "iterations": 10,
+          "samples_ns_per_call": [
+            2108116.6,
+            1885775.0,
+            1731900.0,
+            1745945.8,
+            1997537.5,
+            2025345.9,
+            2068604.1
+          ],
+          "median_ns_per_call": 1997537.5
+        }
+      }
+    }
+  ]
+}

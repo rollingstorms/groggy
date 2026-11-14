@@ -13,6 +13,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCS = ['docs/immutable-read-views.md',
+ 'docs/api/python-owner-lifetimes.md',
  'docs/api/terminal-topology-pipelines.md',
  'docs/api/staged-graph-captures.md',
  'docs/api/pipeline-endpoint-revisions.md',

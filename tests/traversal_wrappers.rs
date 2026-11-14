@@ -1,14 +1,12 @@
 use groggy::algorithms::pathfinding::{BfsTraversal, DfsTraversal};
 use groggy::algorithms::{Algorithm, AlgorithmOutput, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    collections::VecDeque,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
-type Shared = Rc<RefCell<Graph>>;
+use std::collections::VecDeque;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -65,7 +63,7 @@ fn exhaustive_directed_and_undirected_graphs_match_independent_traversals() {
                     .set_node_attr(source, format!("start_{source}"), AttrValue::Bool(false))
                     .unwrap();
             }
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             let mut sub = selected(&g);
             for source in 0..3 {
                 let mut distances = [None; 3];
@@ -137,7 +135,7 @@ fn missing_or_ambiguous_markers_reject_before_writes_and_empty_has_no_source() {
         graph
             .set_node_attr(0, "out".into(), AttrValue::Int(7))
             .unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         for algo in [
             Box::new(BfsTraversal::new("start".into(), "out".into())) as Box<dyn Algorithm>,
             Box::new(DfsTraversal::new("start".into(), "out".into())),
@@ -150,7 +148,7 @@ fn missing_or_ambiguous_markers_reject_before_writes_and_empty_has_no_source() {
             );
         }
     }
-    let g = Rc::new(RefCell::new(Graph::new_manual()));
+    let g = Arc::new(OwnerCell::new(Graph::new_manual()));
     assert!(BfsTraversal::new("start".into(), "out".into())
         .execute(&mut Context::new(), selected(&g))
         .is_err());
@@ -164,7 +162,7 @@ fn stale_open_and_cancelled_selections_fail_without_outputs() {
         graph
             .set_node_attr(0, "start".into(), AttrValue::Int(0))
             .unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let sub = selected(&g);
         let algo: Box<dyn Algorithm> = if dfs {
             Box::new(DfsTraversal::new("start".into(), "out".into()))
@@ -210,7 +208,7 @@ fn sparse_ids_singletons_and_long_paths_preserve_exact_integer_rows() {
     graph
         .set_node_attr(3, "start".into(), AttrValue::Null)
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let sub = selected(&g);
     assert_eq!(
         run(
@@ -238,7 +236,7 @@ fn sparse_ids_singletons_and_long_paths_preserve_exact_integer_rows() {
     graph
         .set_node_attr(0, "start".into(), AttrValue::Bool(true))
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let rows = run(
         &DfsTraversal::new("start".into(), "out".into()),
         selected(&g),
@@ -252,7 +250,7 @@ fn sparse_ids_singletons_and_long_paths_preserve_exact_integer_rows() {
     graph
         .set_node_attr(0, "start".into(), AttrValue::Bool(false))
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     assert_eq!(
         run(
             &BfsTraversal::new("start".into(), "out".into()),

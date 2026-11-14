@@ -7,7 +7,7 @@ use pyo3::types::PyAny;
 
 /// NodesArray: Collection of NodesAccessor objects with delegation to BaseArray
 /// Provides basic array operations and graph-specific transformations
-#[pyclass(name = "NodesArray", unsendable)]
+#[pyclass(name = "NodesArray")]
 pub struct PyNodesArray {
     // Delegates to BaseArray for basic operations
     base: BaseArray<PyNodesAccessor>,
@@ -243,7 +243,7 @@ impl PyNodesArray {
 }
 
 /// Iterator for NodesArray that enables method chaining
-#[pyclass(name = "NodesArrayIterator", unsendable)]
+#[pyclass(name = "NodesArrayIterator")]
 pub struct PyNodesArrayIterator {
     inner: ArrayIterator<PyNodesAccessor>,
 }

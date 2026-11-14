@@ -1,9 +1,10 @@
+use groggy::ownership::OwnerCell;
 use groggy::{storage::table::Table, subgraphs::Subgraph, AttrValue, Graph};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 
 #[test]
 fn sparse_properties_follow_node_and_edge_identity_in_live_and_frozen_exports() {
-    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let graph = Arc::new(OwnerCell::new(Graph::new_manual()));
     let mut owner = graph.borrow_mut();
     let nodes = owner.add_nodes(4).unwrap();
     let edges = [

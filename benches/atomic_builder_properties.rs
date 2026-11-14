@@ -1,4 +1,5 @@
 //! Native atomic property-builder receipt; no whole-graph clone or speedup claim.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         builder::register_algorithms, AlgorithmParamValue, AlgorithmParams, AlgorithmSpec, Context,
@@ -8,7 +9,8 @@ use groggy::{
     AttrValue, Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().any(|arg| arg == "--captured-degrees") {
         return captured_degrees_receipt();
@@ -47,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             for _ in 0..5 {
                 let mut graph = Graph::new_publishing();
                 graph.insert_nodes(count)?;
-                let shared = Rc::new(RefCell::new(graph));
+                let shared = Arc::new(OwnerCell::new(graph));
                 let selection =
                     Subgraph::from_nodes(shared.clone(), (0..count).collect(), "bench".into())?;
                 let mut context = Context::new();
@@ -104,7 +106,7 @@ fn typed_values_receipt() -> Result<(), Box<dyn std::error::Error>> {
             "fixture".into(),
             "bench".into(),
         )?;
-        let shared = Rc::new(RefCell::new(graph));
+        let shared = Arc::new(OwnerCell::new(graph));
         let selected = Subgraph::from_nodes(shared.clone(), (0..count).collect(), "bench".into())?;
         let mut params = AlgorithmParams::new();
         params.set_text("steps", json!({"atomic":true,"steps":[
@@ -142,7 +144,7 @@ fn typed_values_receipt() -> Result<(), Box<dyn std::error::Error>> {
     }
     let mut graph = Graph::new();
     graph.add_node()?;
-    let shared = Rc::new(RefCell::new(graph));
+    let shared = Arc::new(OwnerCell::new(graph));
     let selected = Subgraph::from_nodes(shared.clone(), [0].into_iter().collect(), "bench".into())?;
     let mut params = AlgorithmParams::new();
     params.set_text("steps", json!({"atomic":true,"steps":[]}).to_string());
@@ -222,7 +224,7 @@ fn terminal_removals_receipt() -> Result<(), Box<dyn std::error::Error>> {
                 "fixture".into(),
                 "bench".into(),
             )?;
-            let graph = Rc::new(RefCell::new(graph));
+            let graph = Arc::new(OwnerCell::new(graph));
             let view = graph.borrow().read_view()?;
             let selection = Subgraph::from_frozen_view(graph.clone(), view, "bench".into());
             let mut ctx = Context::new();
@@ -303,7 +305,7 @@ fn endpoint_revisions_receipt() -> Result<(), Box<dyn std::error::Error>> {
                 "fixture".into(),
                 "bench".into(),
             )?;
-            let graph = Rc::new(RefCell::new(graph));
+            let graph = Arc::new(OwnerCell::new(graph));
             let view = graph.borrow().read_view()?;
             let selected = Subgraph::from_frozen_view(graph.clone(), view, "bench".into());
             let mut ctx = Context::new();
@@ -374,7 +376,7 @@ fn captured_degrees_receipt() -> Result<(), Box<dyn std::error::Error>> {
             "fixture".into(),
             "bench".into(),
         )?;
-        let g = Rc::new(RefCell::new(g));
+        let g = Arc::new(OwnerCell::new(g));
         let view = g.borrow().read_view()?;
         let selected = Subgraph::from_frozen_view(g.clone(), view.clone(), "bench".into());
         let mut samples = Vec::new();

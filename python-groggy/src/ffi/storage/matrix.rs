@@ -23,14 +23,14 @@ use crate::ffi::storage::num_array::PyNumArray;
 
 /// Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
 #[derive(Clone)]
-#[pyclass(name = "GraphMatrix", unsendable)]
+#[pyclass(name = "GraphMatrix")]
 pub struct PyGraphMatrix {
     /// Core GraphMatrix
     pub inner: GraphMatrix,
 }
 
 /// Owned complex eigendecomposition components without complex matrix storage.
-#[pyclass(name = "ComplexEigenResult", unsendable)]
+#[pyclass(name = "ComplexEigenResult")]
 pub struct PyComplexEigenResult {
     #[pyo3(get)]
     pub eigenvalues_real: Vec<f64>,

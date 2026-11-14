@@ -1,14 +1,16 @@
 //! Specialized wrappers must share canonical selected topology, not filter owner paths.
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{ComponentSubgraph, FilteredSubgraph, NeighborhoodSubgraph},
     traits::{filter_operations::FilterCriteria, SubgraphOperations},
     types::GraphType,
     Graph,
 };
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 fn variants(
-    owner: Rc<RefCell<Graph>>,
+    owner: Arc<OwnerCell<Graph>>,
     nodes: HashSet<usize>,
     edges: HashSet<usize>,
 ) -> Vec<Box<dyn SubgraphOperations>> {
@@ -45,7 +47,7 @@ fn specialized_traversal_cannot_leave_selected_edges_then_reenter() {
         for (s, t) in [(0, 1), (1, 2), (2, 4), (0, 2)] {
             graph.add_edge(s, t).unwrap();
         }
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         for view in variants(owner.clone(), HashSet::from([0, 2, 4]), HashSet::from([2])) {
             assert_eq!(
                 view.bfs(0, None).unwrap().node_set(),
@@ -86,7 +88,7 @@ fn selected_induction_preserves_parallel_instances_loops_and_empty_membership() 
         for (s, t) in [(0, 1), (0, 1), (1, 0), (1, 1), (1, 2)] {
             graph.add_edge(s, t).unwrap();
         }
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         for view in variants(
             owner.clone(),
             HashSet::from([0, 1, 4]),
@@ -126,7 +128,7 @@ fn specialized_clones_share_membership_and_frozen_reads_survive_owner_removal() 
     graph
         .set_node_attr(0, "value".into(), AttrValue::Int(7))
         .unwrap();
-    let owner = Rc::new(RefCell::new(graph));
+    let owner = Arc::new(OwnerCell::new(graph));
     let filter = FilteredSubgraph::new(
         owner.clone(),
         HashSet::from([0, 1]),
@@ -221,7 +223,7 @@ fn filtered_complement_never_retains_edges_with_excluded_endpoints() {
     for (s, t) in [(0, 1), (1, 2), (2, 3), (3, 3)] {
         graph.add_edge(s, t).unwrap();
     }
-    let owner = Rc::new(RefCell::new(graph));
+    let owner = Arc::new(OwnerCell::new(graph));
     let filter = FilteredSubgraph::new(
         owner,
         HashSet::from([0, 1]),

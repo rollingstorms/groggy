@@ -1,9 +1,10 @@
 //! Full-selection invalidation is independent of property and endpoint-only writes.
+use groggy::ownership::OwnerCell;
 use groggy::{state::space::GraphSpace, storage::pool::GraphPool, Graph, StateRestoreMode};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 #[test]
 fn every_scalar_and_bulk_membership_path_changes_the_stamp_only_when_ids_change() {
-    let pool = Rc::new(RefCell::new(GraphPool::new()));
+    let pool = Arc::new(OwnerCell::new(GraphPool::new()));
     pool.borrow_mut().add_nodes_bulk(8);
     pool.borrow_mut().add_edges(&[(0, 1), (1, 2)]);
     let mut space = GraphSpace::new(pool, 0);

@@ -20,7 +20,7 @@ impl Subgraph {
     }
     /// Attach an explicit write owner to an immutable read without recapturing it.
     pub fn from_frozen_view(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         view: crate::GraphView,
         name: String,
     ) -> Self {
@@ -32,11 +32,11 @@ impl Subgraph {
             edges,
             subgraph_type: name,
             subgraph_id: Self::generate_simple_id(),
-            component_cache: Rc::new(RefCell::new(ComponentCacheStore::default())),
+            component_cache: Arc::new(OwnerCell::new(ComponentCacheStore::default())),
             ordered_nodes_cache: Arc::new(OnceLock::new()),
             ordered_edges_cache: Arc::new(OnceLock::new()),
-            topology_cache: RefCell::new(HashMap::new()),
-            validated_scope: RefCell::new(None),
+            topology_cache: OwnerCell::new(HashMap::new()),
+            validated_scope: OwnerCell::new(None),
         }
     }
     pub(crate) fn bound_selection(&self, view: crate::GraphView, name: String) -> Self {
@@ -63,8 +63,8 @@ impl Subgraph {
 mod tests {
     use super::*;
 
-    fn selected() -> (Rc<RefCell<Graph>>, Subgraph, NodeId, NodeId, EdgeId) {
-        let owner = Rc::new(RefCell::new(Graph::new()));
+    fn selected() -> (Arc<OwnerCell<Graph>>, Subgraph, NodeId, NodeId, EdgeId) {
+        let owner = Arc::new(OwnerCell::new(Graph::new()));
         let a = owner.borrow_mut().add_node().unwrap();
         let b = owner.borrow_mut().add_node().unwrap();
         let edge = owner.borrow_mut().add_edge(a, b).unwrap();
@@ -165,7 +165,7 @@ mod specialized_tests {
 
     #[test]
     fn specialized_frozen_derivations_keep_sources_and_metadata() {
-        let owner = Rc::new(RefCell::new(Graph::new()));
+        let owner = Arc::new(OwnerCell::new(Graph::new()));
         for _ in 0..3 {
             owner.borrow_mut().add_node().unwrap();
         }

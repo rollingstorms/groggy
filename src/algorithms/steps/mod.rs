@@ -119,13 +119,12 @@ mod tests {
     use crate::algorithms::AlgorithmParamValue;
     use crate::algorithms::Context;
     use crate::api::graph::Graph;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::Subgraph;
     use crate::traits::SubgraphOperations;
     use crate::types::{AttrName, AttrValue, NodeId};
-    use std::cell::RefCell;
     use std::collections::HashMap;
     use std::collections::HashSet;
-    use std::rc::Rc;
     use std::sync::Arc;
 
     fn sample_subgraph() -> (Subgraph, Vec<NodeId>) {
@@ -135,7 +134,7 @@ mod tests {
         let nodes = vec![a, b];
         let set: HashSet<NodeId> = nodes.iter().copied().collect();
         let sg =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), set, "test".to_string()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), set, "test".to_string()).unwrap();
         (sg, nodes)
     }
 
@@ -165,7 +164,7 @@ mod tests {
             .set_node_attr(b, "score".into(), AttrValue::Float(1.5))
             .unwrap();
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = LoadNodeAttrStep::new(
@@ -185,7 +184,7 @@ mod tests {
         let a = graph.add_node().unwrap();
         let b = graph.add_node().unwrap();
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = LoadNodeAttrStep::new(
@@ -204,7 +203,7 @@ mod tests {
         for column in [false, true] {
             let mut graph = Graph::new_publishing();
             graph.insert_nodes(2).expect("nodes");
-            let shared = Rc::new(RefCell::new(graph));
+            let shared = Arc::new(OwnerCell::new(graph));
             let selection =
                 Subgraph::from_nodes(shared.clone(), [0, 1].into_iter().collect(), "stale".into())
                     .expect("selection");
@@ -252,7 +251,7 @@ mod tests {
         for column in [false, true] {
             let mut graph = Graph::new_publishing();
             graph.insert_nodes(2).expect("nodes");
-            let shared = Rc::new(RefCell::new(graph));
+            let shared = Arc::new(OwnerCell::new(graph));
             let sg = Subgraph::from_nodes(
                 shared.clone(),
                 [0, 1].into_iter().collect(),
@@ -307,7 +306,7 @@ mod tests {
         let mut graph = Graph::new_publishing();
         graph.insert_nodes(2).expect("nodes");
         graph.add_edge(0, 1).expect("edge");
-        let shared = Rc::new(RefCell::new(graph));
+        let shared = Arc::new(OwnerCell::new(graph));
         let sg = Subgraph::from_nodes(
             shared.clone(),
             [0, 1].into_iter().collect(),
@@ -456,7 +455,7 @@ mod tests {
         graph.add_edge(a, b).unwrap();
         graph.add_edge(b, c).unwrap();
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = NodeDegreeStep::new("degree", None);
@@ -587,7 +586,7 @@ mod tests {
             .unwrap();
 
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = WeightedDegreeStep::new(AttrName::from("weight".to_string()), "weighted_deg");
@@ -614,7 +613,7 @@ mod tests {
         graph.add_edge(d, a).unwrap(); // d only connected to a
 
         let nodes: HashSet<NodeId> = [a, b, c, d].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
 
@@ -645,7 +644,7 @@ mod tests {
         graph.add_edge(d, a).unwrap();
 
         let nodes: HashSet<NodeId> = [a, b, c, d].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = TriangleCountStep::new("triangles");
@@ -668,7 +667,7 @@ mod tests {
         let e2 = graph.add_edge(b, a).unwrap();
 
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
 
         // Create edge map with values 3.0 and 7.0 (sum = 10.0)
@@ -819,7 +818,7 @@ mod tests {
         let b = graph.add_node().unwrap();
         let commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let before = graph_rc.borrow().snapshot_at_commit(commit1).unwrap();
         let after = graph_rc.borrow().snapshot_at_commit(commit2).unwrap();
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
@@ -853,7 +852,7 @@ mod tests {
         graph.add_edge(a, b).unwrap();
         let commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let before = graph_rc.borrow().snapshot_at_commit(commit1).unwrap();
         let after = graph_rc.borrow().snapshot_at_commit(commit2).unwrap();
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
@@ -892,7 +891,7 @@ mod tests {
             .unwrap();
         let commit3 = graph.commit("c3".into(), "tester".into()).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes: HashSet<NodeId> = [node].into_iter().collect();
         let sg = Subgraph::from_nodes(graph_rc.clone(), nodes, "test".into()).unwrap();
 
@@ -922,7 +921,7 @@ mod tests {
         let b = graph.add_node().unwrap();
         let _commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
         let sg = Subgraph::from_nodes(graph_rc.clone(), nodes, "test".into()).unwrap();
 
@@ -946,7 +945,7 @@ mod tests {
         let b = graph.add_node().unwrap();
         let commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
         let sg = Subgraph::from_nodes(graph_rc.clone(), nodes, "test".into()).unwrap();
 
@@ -968,7 +967,7 @@ mod tests {
         let mut graph = Graph::new_manual();
         let node = graph.add_node().unwrap();
         let commit = graph.commit("c1".into(), "tester".into()).unwrap();
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes: HashSet<NodeId> = [node].into_iter().collect();
         let sg = Subgraph::from_nodes(graph_rc.clone(), nodes, "test".into()).unwrap();
 
@@ -991,7 +990,7 @@ mod tests {
         let b = graph.add_node().unwrap();
         let _commit2 = graph.commit("c2".into(), "tester".into()).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
         let sg = Subgraph::from_nodes(graph_rc.clone(), nodes, "test".into()).unwrap();
 
@@ -1022,7 +1021,7 @@ mod tests {
             .unwrap();
 
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
 

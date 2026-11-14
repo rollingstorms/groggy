@@ -3,14 +3,12 @@ use groggy::algorithms::{
     ensure_algorithms_registered, global_registry, Algorithm, AlgorithmOutput, Context,
     PipelineBuilder,
 };
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{atomic::AtomicBool, Arc},
-};
-type Shared = Rc<RefCell<Graph>>;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+type Shared = Arc<OwnerCell<Graph>>;
 fn selected(g: &Shared) -> Subgraph {
     Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap()
 }
@@ -95,7 +93,7 @@ fn all_three_node_graphs_match_a_direct_linear_solve() {
                     .set_node_attr(node, "p".into(), AttrValue::Int(value))
                     .unwrap();
             }
-            let g = Rc::new(RefCell::new(graph));
+            let g = Arc::new(OwnerCell::new(graph));
             for personal in [false, true] {
                 let reset = if personal {
                     [0.25, 0.75, 0.]
@@ -156,7 +154,7 @@ fn bad_personalization_and_stale_cancelled_runs_preserve_prior_scores() {
         graph
             .set_node_attr(0, "pr".into(), AttrValue::Int(7))
             .unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let algo = PageRank::new(0.85, 100, 1e-12, Some("p".into()), "pr".into()).unwrap();
         assert!(algo.execute(&mut Context::new(), selected(&g)).is_err());
         assert_eq!(
@@ -167,7 +165,7 @@ fn bad_personalization_and_stale_cancelled_runs_preserve_prior_scores() {
     let mut graph = Graph::new_manual();
     graph.add_nodes(2).unwrap();
     graph.add_edge(0, 1).unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let sub = selected(&g);
     let algo = PageRank::new(0.85, 100, 1e-12, None, "pr".into()).unwrap();
     let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
@@ -182,7 +180,7 @@ fn empty_singleton_missing_personalization_sparse_ids_and_bounded_runs() {
     for n in [0, 1, 3] {
         let mut graph = Graph::new_manual();
         graph.add_nodes(n).unwrap();
-        let g = Rc::new(RefCell::new(graph));
+        let g = Arc::new(OwnerCell::new(graph));
         let (scores, _) = run(&g, 0.85, false, 10);
         assert_eq!(scores.len(), n);
         for (_, value) in scores {
@@ -199,7 +197,7 @@ fn empty_singleton_missing_personalization_sparse_ids_and_bounded_runs() {
     graph
         .set_node_attr(3, "p".into(), AttrValue::Int(0))
         .unwrap();
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let (scores, ctx) = run(&g, 0.85, true, 1);
     assert_eq!(ctx.stat_snapshot()["pr.converged"], 0.);
     assert_eq!(
@@ -235,7 +233,7 @@ fn invalid_controls_reject_even_for_empty_input() {
             .build(global_registry())
             .is_err());
     }
-    let g = Rc::new(RefCell::new(Graph::new_manual()));
+    let g = Arc::new(OwnerCell::new(Graph::new_manual()));
     let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
     assert!(PageRank::new(0.85, 10, 1e-6, None, "pr".into())
         .unwrap()

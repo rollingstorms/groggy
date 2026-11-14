@@ -14,7 +14,7 @@ use std::collections::HashMap;
 /// Meta-edges are special edges that represent aggregated or summarized relationships
 /// between nodes. They have all the capabilities of regular edges plus meta-specific
 /// operations like getting aggregation counts.
-#[pyclass(name = "MetaEdge", unsendable)]
+#[pyclass(name = "MetaEdge")]
 pub struct PyMetaEdge {
     /// The underlying Rust MetaEdge entity
     pub inner: MetaEdge,

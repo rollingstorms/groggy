@@ -3,29 +3,30 @@
 //! Lazy array of connected components - only materializes PySubgraphs on access
 
 use groggy::api::graph::Graph;
+use groggy::ownership::OwnerCell;
 use groggy::storage::array::{ArrayIterator, ArrayOps, SubgraphLike};
 use groggy::subgraphs::Subgraph;
 use groggy::{EdgeId, NodeId};
 use pyo3::exceptions::{PyIndexError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use crate::ffi::entities::meta_node::PyMetaNode;
 use crate::ffi::subgraphs::subgraph::PySubgraph;
 
 /// Lazy array of connected components - avoids creating hundreds of PySubgraphs immediately
-#[pyclass(name = "ComponentsArray", unsendable)]
+#[pyclass(name = "ComponentsArray")]
 pub struct PyComponentsArray {
     // Store only the lightweight metadata, not materialized subgraphs!
     components_data: Vec<(HashSet<NodeId>, HashSet<EdgeId>)>,
-    graph_ref: Rc<RefCell<Graph>>,
+    graph_ref: Arc<OwnerCell<Graph>>,
     source: groggy::GraphView,
 
     // Lazy cache for materialized components (only created when accessed)
-    materialized_cache: RefCell<HashMap<usize, PySubgraph>>,
+    materialized_cache: OwnerCell<HashMap<usize, PySubgraph>>,
 }
 
 impl PyComponentsArray {
@@ -42,7 +43,7 @@ impl PyComponentsArray {
     /// Create new ComponentsArray from trait objects (internal use)
     pub fn from_components(
         components: Vec<Box<dyn groggy::traits::SubgraphOperations>>,
-        graph_ref: Rc<RefCell<Graph>>,
+        graph_ref: Arc<OwnerCell<Graph>>,
         source: groggy::GraphView,
     ) -> PyResult<Self> {
         // Extract lightweight data from trait objects
@@ -55,7 +56,7 @@ impl PyComponentsArray {
             source,
             components_data,
             graph_ref,
-            materialized_cache: RefCell::new(HashMap::new()),
+            materialized_cache: OwnerCell::new(HashMap::new()),
         })
     }
 }
@@ -275,7 +276,7 @@ impl PyComponentsArray {
             source: self.source.clone(),
             components_data: filtered_data,
             graph_ref: self.graph_ref.clone(),
-            materialized_cache: RefCell::new(HashMap::new()),
+            materialized_cache: OwnerCell::new(HashMap::new()),
         })
     }
 
@@ -379,7 +380,7 @@ impl SubgraphLike for PySubgraph {
 // =============================================================================
 
 /// Python wrapper for ArrayIterator<PySubgraph> that supports method chaining
-#[pyclass(name = "ComponentsIterator", unsendable)]
+#[pyclass(name = "ComponentsIterator")]
 pub struct PyComponentsIterator {
     inner: ArrayIterator<PySubgraph>,
 }
@@ -505,7 +506,7 @@ fn component_neighborhoods(
 }
 
 /// Python wrapper for ArrayIterator<MetaNode>
-#[pyclass(name = "MetaNodeIterator", unsendable)]
+#[pyclass(name = "MetaNodeIterator")]
 pub struct PyMetaNodeIterator {
     inner: ArrayIterator<()>, // Placeholder for now
 }

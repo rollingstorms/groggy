@@ -1,12 +1,13 @@
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, Graph};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 
 fn fixture() -> Subgraph {
     let mut graph = Graph::new_directed();
     graph.add_nodes(4).unwrap();
     graph.add_edge(0, 1).unwrap();
     Subgraph::new(
-        Rc::new(RefCell::new(graph)),
+        Arc::new(OwnerCell::new(graph)),
         (0..3).collect(),
         [0].into(),
         "selected".into(),

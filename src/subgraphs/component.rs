@@ -6,11 +6,11 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::traits::{ComponentOperations, GraphEntity, SubgraphOperations};
 use crate::types::{EdgeId, EntityId, NodeId};
-use std::cell::RefCell;
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A connected component using our existing efficient subgraph storage
 ///
@@ -75,7 +75,7 @@ impl ComponentSubgraph {
     /// # Returns
     /// New ComponentSubgraph using efficient storage
     pub fn new(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>,
         component_id: usize,
@@ -102,7 +102,7 @@ impl ComponentSubgraph {
     /// # Returns
     /// New ComponentSubgraph with computed metadata
     pub fn from_analysis(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         component_nodes: HashSet<NodeId>,
         component_edges: HashSet<EdgeId>,
         component_id: usize,
@@ -139,7 +139,7 @@ impl GraphEntity for ComponentSubgraph {
         "component"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.selection.graph()
     }
 
@@ -316,8 +316,8 @@ impl ComponentOperations for ComponentSubgraph {
 mod tests {
     use super::*;
     use crate::api::graph::Graph;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use crate::ownership::OwnerCell;
+    use std::sync::Arc;
 
     #[test]
     fn test_component_subgraph_creation() {
@@ -331,7 +331,7 @@ mod tests {
         let edge1 = graph.add_edge(node1, node2).unwrap();
         let edge2 = graph.add_edge(node2, node3).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes = HashSet::from([node1, node2, node3]);
         let edges = HashSet::from([edge1, edge2]);
 
@@ -377,7 +377,7 @@ mod tests {
         let edge2 = graph.add_edge(node2, node3).unwrap();
         let edge3 = graph.add_edge(node3, node4).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes = HashSet::from([node1, node2, node3, node4]);
         let edges = HashSet::from([edge1, edge2, edge3]);
 

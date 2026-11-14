@@ -1,7 +1,10 @@
 //! Native subgraph bulk-write receipt; fixtures excluded and no SLA claim.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, AttrValue, Graph};
 use serde_json::json;
-use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Instant};
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
@@ -12,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut graph = Graph::new_publishing();
                 graph.insert_nodes(count)?;
                 graph.add_edges(&(0..count - 1).map(|id| (id, id + 1)).collect::<Vec<_>>())?;
-                let shared = Rc::new(RefCell::new(graph));
+                let shared = Arc::new(OwnerCell::new(graph));
                 let selection = Subgraph::from_nodes(
                     shared.clone(),
                     (0..count).collect::<HashSet<_>>(),

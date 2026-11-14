@@ -1,6 +1,8 @@
 //! Structural summaries agree with independent simple undirected combinatorics.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, traits::SubgraphOperations, types::GraphType, Graph, GraphView};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 fn close(left: f64, right: f64) {
     assert!((left - right).abs() < 1e-12, "{left} != {right}");
 }
@@ -59,7 +61,7 @@ fn every_four_node_simple_graph_matches_independent_triangle_triple_counts() {
         let average = expected.iter().sum::<f64>() / 4.;
         close(view.clustering_coefficient(None).unwrap(), average);
         let selected = Subgraph::new(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             view.nodes().clone(),
             view.edges().clone(),
             "all".into(),
@@ -93,7 +95,7 @@ fn excluded_edges_loops_parallel_mass_and_isolates_do_not_invent_triangles() {
     close(view.clustering_coefficient(None).unwrap(), 0.);
     close(view.clustering_coefficient(Some(0)).unwrap(), 0.);
     close(view.transitivity().unwrap(), 0.);
-    let owner = Rc::new(RefCell::new(graph));
+    let owner = Arc::new(OwnerCell::new(graph));
     let selected = Subgraph::new(
         owner,
         view.nodes().clone(),
@@ -113,8 +115,8 @@ fn prepared_topology_outlives_property_changes_rewiring_owner_and_source_view() 
     for (s, t) in [(0, 1), (1, 2), (2, 0)] {
         graph.add_edge(s, t).unwrap();
     }
-    let owner = Rc::new(RefCell::new(graph));
-    let weak = Rc::downgrade(&owner);
+    let owner = Arc::new(OwnerCell::new(graph));
+    let weak = Arc::downgrade(&owner);
     let selected = Subgraph::new(
         owner.clone(),
         HashSet::from([0, 1, 2, 3]),
@@ -153,7 +155,7 @@ fn empty_one_node_invalid_ids_and_directed_domain_are_explicit() {
     assert!(view.clustering_coefficient(None).is_err());
     assert!(view.transitivity().is_err());
     let selected = Subgraph::new(
-        Rc::new(RefCell::new(graph)),
+        Arc::new(OwnerCell::new(graph)),
         view.nodes().clone(),
         view.edges().clone(),
         "directed".into(),

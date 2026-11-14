@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use groggy::ownership::OwnerCell;
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use groggy::algorithms::pathfinding::{BfsTraversal, DfsTraversal, DijkstraShortestPath};
@@ -27,7 +27,7 @@ fn make_line_graph(length: usize, start_attr: &str) -> Subgraph {
         graph.add_edge(v, u).unwrap();
     }
     let set: HashSet<NodeId> = nodes.into_iter().collect();
-    Subgraph::from_nodes(Rc::new(RefCell::new(graph)), set, "path".into()).unwrap()
+    Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), set, "path".into()).unwrap()
 }
 
 fn bench_bfs(c: &mut Criterion) {

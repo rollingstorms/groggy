@@ -236,11 +236,11 @@ pub fn register(registry: &Registry) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::types::NodeId;
     use crate::Graph;
-    use std::cell::RefCell;
     use std::collections::HashSet;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn test_infomap_basic() {
@@ -263,7 +263,7 @@ mod tests {
 
         let nodes: HashSet<NodeId> = [n0, n1, n2, n3, n4, n5].into_iter().collect();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let algo = Infomap::new(0.15, 5, 50, Some(42), "community".to_string()).unwrap();
         let mut ctx = Context::default();
 
@@ -275,7 +275,7 @@ mod tests {
     fn test_infomap_empty() {
         let graph = Graph::new_manual();
         let subgraph =
-            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), HashSet::new(), "empty".into())
                 .unwrap();
         let algo = Infomap::new(0.15, 5, 50, Some(42), "community".to_string()).unwrap();
         let mut ctx = Context::default();

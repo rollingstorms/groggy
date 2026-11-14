@@ -1,12 +1,13 @@
 use groggy::algorithms::pathfinding::AStarPathfinding;
 use groggy::algorithms::{Algorithm, Context};
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 
-fn run(g: Graph, heuristic: bool) -> anyhow::Result<Rc<RefCell<Graph>>> {
+fn run(g: Graph, heuristic: bool) -> anyhow::Result<Arc<OwnerCell<Graph>>> {
     let nodes = g.node_ids().into_iter().collect();
-    let g = Rc::new(RefCell::new(g));
+    let g = Arc::new(OwnerCell::new(g));
     let sub = Subgraph::from_nodes(g.clone(), nodes, "astar test".into())?;
     AStarPathfinding::new(
         "start".into(),

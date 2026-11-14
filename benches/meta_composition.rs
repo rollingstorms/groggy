@@ -1,11 +1,14 @@
 //! Native composition receipt: fixture construction excluded; no SLA claim.
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{MetaNodePlan, Subgraph},
     traits::NodeStrategy,
     Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Instant};
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().any(|arg| arg == "--collection") {
@@ -20,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut graph = Graph::new_publishing();
                     graph.insert_nodes(count)?;
                     graph.add_edges(&(0..count - 1).map(|id| (id, id + 1)).collect::<Vec<_>>())?;
-                    let shared = Rc::new(RefCell::new(graph));
+                    let shared = Arc::new(OwnerCell::new(graph));
                     let nodes: HashSet<_> = (0..selected).collect();
                     let edges: HashSet<_> = (0..selected.saturating_sub(1)).collect();
                     let selection =
@@ -77,7 +80,7 @@ fn collection_receipt() -> Result<(), Box<dyn std::error::Error>> {
             graph.add_nodes(2 * count)?;
             graph.add_edges(&(0..count).map(|i| (2 * i, 2 * i + 1)).collect::<Vec<_>>())?;
             let head = graph.current_state_id();
-            let shared = Rc::new(RefCell::new(graph));
+            let shared = Arc::new(OwnerCell::new(graph));
             let plans = (0..count)
                 .map(|i| {
                     let nodes = HashSet::from([2 * i, 2 * i + 1]);

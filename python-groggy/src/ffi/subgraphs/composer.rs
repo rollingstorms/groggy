@@ -314,7 +314,7 @@ pub fn parse_edge_aggs_from_python(edge_aggs: &PyAny) -> PyResult<Vec<(String, S
 
 /// Simplified Python wrapper for immediate execution
 ///
-/// Since we can't store Rc<RefCell<Graph>> in a PyClass, we'll execute immediately.
+/// Since we can't store Arc<OwnerCell<Graph>> in a PyClass, we'll execute immediately.
 /// This still provides the clean API but without the plan/execute separation.
 #[pyclass(name = "MetaNodePlan")]
 pub struct PyMetaNodePlanExecutor {

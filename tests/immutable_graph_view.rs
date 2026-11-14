@@ -1,5 +1,7 @@
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, types::GraphType, AttrValue, Graph, GraphView};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 #[test]
 fn nested_views_share_frozen_state_and_preserve_parent_edge_scope() {
     let mut graph = Graph::new_manual();
@@ -105,7 +107,7 @@ fn smallest_graph_empty_views_and_membership_errors_are_explicit() {
 }
 #[test]
 fn legacy_selection_can_be_explicitly_pinned_and_owned_projection_is_separate() {
-    let graph = Rc::new(RefCell::new(Graph::new_manual()));
+    let graph = Arc::new(OwnerCell::new(Graph::new_manual()));
     let nodes = graph.borrow_mut().add_nodes(2).unwrap();
     let edge = graph.borrow_mut().add_edge(nodes[0], nodes[1]).unwrap();
     graph

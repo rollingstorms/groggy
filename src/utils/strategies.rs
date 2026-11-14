@@ -38,7 +38,7 @@ The strategy pattern allows runtime selection based on workload characteristics.
 /// DESIGN: Each strategy implements a different approach to storing and reconstructing
 /// temporal graph states. The trait provides a common interface that ChangeTracker
 /// and History systems can work with regardless of the underlying storage strategy.
-pub trait TemporalStorageStrategy: std::fmt::Debug {
+pub trait TemporalStorageStrategy: std::fmt::Debug + Send + Sync {
     /*
     === CHANGE RECORDING ===
     How this strategy tracks modifications

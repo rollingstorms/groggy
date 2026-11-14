@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 ///
 /// Regular nodes are the basic building blocks of graphs. They provide access
 /// to node attributes, topology information (neighbors, degree), and graph operations.
-#[pyclass(name = "Node", unsendable)]
+#[pyclass(name = "Node")]
 pub struct PyNode {
     /// The underlying Rust Node entity
     pub inner: Node,

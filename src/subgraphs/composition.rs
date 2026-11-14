@@ -7,7 +7,9 @@ use crate::traits::subgraph_operations::{
 };
 use crate::traits::SubgraphOperations;
 use crate::{AttrName, AttrValue, BatchNodeRef, GraphError, GraphResult, NodeId};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 type EdgeRow = (NodeId, NodeId, HashMap<AttrName, AttrValue>);
 
@@ -509,11 +511,12 @@ pub(crate) fn decorate_edge(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::subgraphs::{MetaNodePlan, Subgraph};
     use crate::traits::NodeOperations;
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::Arc;
 
-    fn fixture(publishing: bool) -> (Rc<RefCell<Graph>>, Subgraph) {
+    fn fixture(publishing: bool) -> (Arc<OwnerCell<Graph>>, Subgraph) {
         let mut graph = if publishing {
             Graph::new_publishing()
         } else {
@@ -527,7 +530,7 @@ mod tests {
             .set_node_attr(nodes[1], "x".into(), AttrValue::Int(4))
             .expect("x");
         graph.add_edge(nodes[0], nodes[2]).expect("boundary");
-        let shared = Rc::new(RefCell::new(graph));
+        let shared = Arc::new(OwnerCell::new(graph));
         let selection = Subgraph::new(
             shared.clone(),
             [0, 1].into_iter().collect(),

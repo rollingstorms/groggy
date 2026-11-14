@@ -2,11 +2,12 @@ use groggy::algorithms::community::Louvain;
 use groggy::algorithms::{
     ensure_algorithms_registered, global_registry, Algorithm, Context, PipelineBuilder,
 };
+use groggy::ownership::OwnerCell;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrValue, Graph};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 
-fn ring(cliques: usize) -> Rc<RefCell<Graph>> {
+fn ring(cliques: usize) -> Arc<OwnerCell<Graph>> {
     let mut graph = Graph::new_manual();
     graph.add_nodes(cliques * 3 + 1).unwrap();
     for c in 0..cliques {
@@ -16,9 +17,9 @@ fn ring(cliques: usize) -> Rc<RefCell<Graph>> {
         graph.add_edge(a + 2, a).unwrap();
         graph.add_edge(a + 2, (a + 3) % (cliques * 3)).unwrap();
     }
-    Rc::new(RefCell::new(graph))
+    Arc::new(OwnerCell::new(graph))
 }
-fn run(g: &Rc<RefCell<Graph>>, phases: usize) -> (Vec<usize>, Context) {
+fn run(g: &Arc<OwnerCell<Graph>>, phases: usize) -> (Vec<usize>, Context) {
     let sub = Subgraph::from_nodes(g.clone(), g.borrow().node_ids_set(), "test".into()).unwrap();
     let mut ctx = Context::new();
     Louvain::new(100, phases, 1., "c".into())
@@ -45,7 +46,7 @@ fn run(g: &Rc<RefCell<Graph>>, phases: usize) -> (Vec<usize>, Context) {
     (labels, ctx)
 }
 // Original-graph objective from an independent adjacency-matrix calculation.
-fn objective(g: &Rc<RefCell<Graph>>, labels: &[usize]) -> f64 {
+fn objective(g: &Arc<OwnerCell<Graph>>, labels: &[usize]) -> f64 {
     let g = g.borrow();
     let n = labels.len();
     let mut a = vec![vec![0.; n]; n];
@@ -128,7 +129,7 @@ fn original_id_gaps_loops_parallel_edges_and_isolates_survive_projection() {
     for (u, v) in [(0, 1), (0, 1), (3, 4), (4, 4)] {
         graph.add_edge(u, v).unwrap();
     }
-    let g = Rc::new(RefCell::new(graph));
+    let g = Arc::new(OwnerCell::new(graph));
     let (labels, _) = run(&g, 10);
     assert_eq!(labels.len(), 5);
     assert_eq!(labels[0], labels[1]);

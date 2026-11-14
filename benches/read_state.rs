@@ -393,7 +393,7 @@ fn read_state(c: &mut Criterion) {
             },
         );
         let live = groggy::subgraphs::Subgraph::new(
-            std::rc::Rc::new(std::cell::RefCell::new(graph)),
+            std::sync::Arc::new(groggy::ownership::OwnerCell::new(graph)),
             nodes.iter().copied().collect(),
             pin.existence().edges().clone(),
             "query_fixture".into(),

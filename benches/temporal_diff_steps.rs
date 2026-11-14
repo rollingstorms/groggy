@@ -1,4 +1,5 @@
 //! Bounded release receipt for full logical diffs and atomic-capable diff masks.
+use groggy::ownership::OwnerCell;
 use groggy::{
     algorithms::{
         steps::{
@@ -12,7 +13,9 @@ use groggy::{
     AttrValue, Graph,
 };
 use serde_json::json;
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
@@ -43,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let head = graph.commit("after".into(), "bench".into())?;
         let after = graph.snapshot_at_commit(head)?;
         let selected = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..count).collect(),
             "diff".into(),
         )?;

@@ -440,7 +440,7 @@ impl MetaNodePlan {
             let mut prepared = Vec::with_capacity(plans.len());
             let first_meta = graph.pool().statistics().node_count;
             for (position, (plan, selection)) in plans.iter().enumerate() {
-                if !std::rc::Rc::ptr_eq(&binding, &selection.graph()) {
+                if !std::sync::Arc::ptr_eq(&binding, &selection.graph()) {
                     return Err(GraphError::InvalidInput(
                         "Composition plans have different graph owners".into(),
                     ));

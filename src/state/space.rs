@@ -16,10 +16,11 @@ use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, EdgeId, NodeId, StateId};
 use crate::{GraphError, GraphResult};
 pub(crate) use integrity::CachedTopologyCheck;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use crate::ownership::OwnerCell;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::sync::RwLock;
 
 /// Cache validity includes the space instance, since restoration replaces a space
 /// and may recreate the same numeric mutation version. This pins identity only.
@@ -136,7 +137,7 @@ struct CurrentReadCache {
 #[derive(Debug)]
 pub struct GraphSpace {
     /*
-    === ACTIVE SETS - Plain containers (no RefCell) ===
+    === ACTIVE SETS - Plain containers (no OwnerCell) ===
     */
     /// All currently active (not deleted) nodes
     active_nodes: HashSet<NodeId>,
@@ -149,7 +150,7 @@ pub struct GraphSpace {
     */
     /// Shared reference to the graph pool for topology rebuilding
     #[allow(dead_code)]
-    pool: Rc<std::cell::RefCell<GraphPool>>,
+    pool: Arc<crate::ownership::OwnerCell<GraphPool>>,
 
     /*
     === VERSION COUNTER - Plain u64 ===
@@ -158,7 +159,7 @@ pub struct GraphSpace {
     version: u64,
     membership_version: u64,
     read_revision: u64,
-    default_capture: RefCell<Option<super::read_state::WeakReadCapture>>,
+    default_capture: OwnerCell<Option<super::read_state::WeakReadCapture>>,
     cache_identity: Arc<()>,
 
     /*
@@ -168,7 +169,7 @@ pub struct GraphSpace {
     cache: RwLock<CacheState>,
 
     /// Weak ownership avoids extending reader lifetimes or retaining an old checkpoint.
-    current_read: RefCell<Option<CurrentReadCache>>,
+    current_read: OwnerCell<Option<CurrentReadCache>>,
 
     /*
     === ATTRIBUTE INDEX MAPPINGS - Plain HashMaps ===
@@ -188,7 +189,7 @@ pub struct GraphSpace {
 
 impl GraphSpace {
     /// Create a new empty graph space
-    pub fn new(pool: Rc<std::cell::RefCell<GraphPool>>, base_state: StateId) -> Self {
+    pub fn new(pool: Arc<crate::ownership::OwnerCell<GraphPool>>, base_state: StateId) -> Self {
         Self {
             active_nodes: HashSet::new(),
             active_edges: HashSet::new(),
@@ -196,10 +197,10 @@ impl GraphSpace {
             version: 1, // Start at 1 so empty cache (version 0) is immediately stale
             membership_version: 1,
             read_revision: 1,
-            default_capture: RefCell::new(None),
+            default_capture: OwnerCell::new(None),
             cache_identity: Arc::new(()),
             cache: RwLock::new(CacheState::new()),
-            current_read: RefCell::new(None),
+            current_read: OwnerCell::new(None),
             node_attribute_indices: HashMap::new(),
             edge_attribute_indices: HashMap::new(),
             base_state,
@@ -565,7 +566,7 @@ impl GraphSpace {
     ///
     /// PERFORMANCE: Eliminates all HashMap lookups for large sparse attribute queries
     /// This is what the query system should actually use
-    /// Get attribute values for specific nodes (ULTRA-OPTIMIZED: no RefCell churn)
+    /// Get attribute values for specific nodes (ULTRA-OPTIMIZED: no OwnerCell churn)
     pub fn get_attributes_for_nodes<'a>(
         &self,
         pool: &'a GraphPool,
@@ -588,7 +589,7 @@ impl GraphSpace {
         values
     }
 
-    /// Get attribute values for specific edges (ULTRA-OPTIMIZED: no RefCell churn)
+    /// Get attribute values for specific edges (ULTRA-OPTIMIZED: no OwnerCell churn)
     pub fn get_attributes_for_edges<'a>(
         &self,
         pool: &'a GraphPool,
@@ -653,12 +654,12 @@ impl GraphSpace {
         self.active_edges.contains(&edge_id)
     }
 
-    /// Get all active node IDs (compatibility with old RefCell API)
+    /// Get all active node IDs (compatibility with older cell-based accessors)
     pub fn get_active_nodes(&self) -> HashSet<NodeId> {
         self.active_nodes.clone()
     }
 
-    /// Get all active edge IDs (compatibility with old RefCell API)
+    /// Get all active edge IDs (compatibility with older cell-based accessors)
     pub fn get_active_edges(&self) -> HashSet<EdgeId> {
         self.active_edges.clone()
     }

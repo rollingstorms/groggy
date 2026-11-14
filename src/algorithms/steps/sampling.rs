@@ -7,8 +7,10 @@
 //!
 //! All sampling operations support seeded RNG for reproducibility.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::rc::Rc;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
@@ -241,7 +243,7 @@ impl SelectionTopology {
 
     fn validate(&self, ctx: &Context, scope: &StepScope<'_>, selector: &Subgraph) -> Result<()> {
         check_cancelled(ctx)?;
-        if !Rc::ptr_eq(&scope.subgraph().graph(), &selector.graph()) {
+        if !Arc::ptr_eq(&scope.subgraph().graph(), &selector.graph()) {
             bail!("Subgraph selector belongs to a different graph owner");
         }
         for &node in selector.node_set() {
@@ -970,12 +972,10 @@ mod tests {
 #[cfg(test)]
 mod checked_tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::Graph;
-    use std::{
-        cell::RefCell,
-        rc::Rc,
-        sync::{atomic::AtomicBool, Arc},
-    };
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
     fn selection() -> Subgraph {
         let mut graph = Graph::new_directed_manual();
@@ -984,7 +984,7 @@ mod checked_tests {
             graph.add_edge(source, target).expect("edge");
         }
         Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             [1, 3, 5].into_iter().collect(),
             "selection".into(),
         )
@@ -1119,11 +1119,10 @@ mod checked_tests {
 #[cfg(test)]
 mod subgraph_sampling_tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::Graph;
-    use std::{
-        cell::RefCell,
-        sync::{atomic::AtomicBool, Arc},
-    };
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
     fn selection(directed: bool) -> Subgraph {
         let mut graph = if directed {
@@ -1136,7 +1135,7 @@ mod subgraph_sampling_tests {
             graph.add_edge(u, v).expect("edge");
         }
         Subgraph::new(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             HashSet::from([1, 3, 5]),
             HashSet::from([0, 2, 3]),
             "bounded".into(),
@@ -1353,6 +1352,7 @@ mod subgraph_sampling_tests {
 #[cfg(test)]
 mod foreach_tests {
     use super::*;
+    use crate::ownership::OwnerCell;
     use crate::{
         algorithms::{
             steps::core::{global_step_registry, StepSpec},
@@ -1360,13 +1360,9 @@ mod foreach_tests {
         },
         AttrValue, Graph,
     };
-    use std::{
-        cell::RefCell,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    };
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
 
     fn fixture() -> Subgraph {
         let mut graph = Graph::new_directed_manual();
@@ -1374,7 +1370,7 @@ mod foreach_tests {
         graph.add_edge(0, 1).expect("edge");
         graph.add_edge(1, 2).expect("edge");
         Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..3).collect(),
             "root".into(),
         )

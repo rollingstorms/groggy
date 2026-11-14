@@ -50,11 +50,12 @@ step; checked-in stubs and the typing marker are included in the wheel.
 
 ## Boundaries and open risks
 
-- Writable Graph and connected owners are confined to their creating thread.
-  Python cyclic garbage collection on another thread can still cause an
-  unraisable PyGraph finalization error and skip its native destructor. This is
-  an unresolved ownership defect, not merely a supported threading restriction.
-  Detached immutable GraphView reads have a separate worker-safe contract.
+- Live Graph and connected owner access remains creator-thread bound. Native
+  finalization is now safe on any thread, including cyclic GC and release after
+  the creator exits. Detached immutable GraphView remains the supported worker
+  read interface; this does not add concurrent writable graph access. See
+  [Python owner lifetimes](docs/api/python-owner-lifetimes.md), including the
+  required migration for explicit native Rust handle types.
 - A multi-client database service and arbitrary concurrent writers are outside
   this embedded release scope.
 - General schema/format upgrade support, broad platform recovery evidence and

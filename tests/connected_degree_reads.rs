@@ -1,11 +1,13 @@
 //! Connected degree preparation validates liveness, then computes without an owner.
+use groggy::ownership::OwnerCell;
 use groggy::{
     subgraphs::{DegreeMode, Subgraph},
     traits::SubgraphOperations,
     types::GraphType,
     Graph,
 };
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 #[test]
 fn degree_rows_match_frozen_scope_direction_parallel_and_loop_semantics() {
@@ -20,7 +22,7 @@ fn degree_rows_match_frozen_scope_direction_parallel_and_loop_semantics() {
             graph.add_edge(source, target).unwrap();
         }
         let frozen = graph.read_view().unwrap();
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         let selected = Subgraph::new(
             owner.clone(),
             HashSet::from([0, 1, 4]),
@@ -80,7 +82,7 @@ fn degree_rows_match_frozen_scope_direction_parallel_and_loop_semantics() {
 
 #[test]
 fn empty_degree_preparation_is_valid_and_does_not_publish() {
-    let owner = Rc::new(RefCell::new(Graph::new()));
+    let owner = Arc::new(OwnerCell::new(Graph::new()));
     let selected = Subgraph::new(
         owner.clone(),
         HashSet::new(),

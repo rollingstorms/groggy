@@ -31,7 +31,7 @@ use crate::PyNumArray;
 ///
 /// This completely replaces the complex dual-mode PySubgraph with simple delegation
 /// to the existing SubgraphOperations trait methods. Same API, much simpler implementation.
-#[pyclass(name = "Subgraph", unsendable, weakref)]
+#[pyclass(name = "Subgraph", weakref)]
 #[derive(Clone)]
 pub struct PySubgraph {
     pub inner: Subgraph,
@@ -589,8 +589,8 @@ impl PySubgraph {
             .map_err(crate::ffi::utils::graph_error_to_py_err)?;
         Ok(PyGraph {
             inner: graph.into_shared(),
-            cached_view: std::cell::RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: groggy::ownership::OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         })
     }
 
@@ -755,8 +755,8 @@ impl PySubgraph {
         // Create a temporary PyGraph wrapper
         let py_graph = PyGraph {
             inner: self.inner.graph(),
-            cached_view: std::cell::RefCell::new(None),
-            cached_live_view: std::cell::RefCell::new(None),
+            cached_view: groggy::ownership::OwnerCell::new(None),
+            cached_live_view: groggy::ownership::OwnerCell::new(None),
         };
 
         // Create PyGraphAnalysis and delegate to it

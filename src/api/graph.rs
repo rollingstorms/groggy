@@ -57,6 +57,7 @@ pub use write_coordinate::WriteCoordinate;
 
 use crate::api::batch::{BatchResult, GraphBatch};
 use crate::errors::{GraphError, GraphResult};
+use crate::ownership::OwnerCell;
 use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
 use crate::query::traversal::TraversalEngine;
 use crate::state::change_tracker::ChangeTracker;
@@ -74,11 +75,11 @@ use crate::types::{
 };
 use crate::utils::config::GraphConfig;
 use crate::viz::VizModule;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
-use std::rc::{Rc, Weak};
 use std::sync::Arc;
+use std::sync::Weak;
 
 /*
 === THE GRAPH: MASTER COORDINATOR ===
@@ -117,8 +118,8 @@ pub struct Graph {
     */
     /// Attribute storage - holds columnar data for node and edge attributes
     /// This is where the actual attribute data lives
-    /// Wrapped in Rc<RefCell<>> for interior mutability access from GraphSpace
-    pool: Rc<RefCell<GraphPool>>,
+    /// Wrapped in Arc<OwnerCell<>> for interior mutability access from GraphSpace
+    pool: Arc<OwnerCell<GraphPool>>,
 
     /// Allocation-lifetime external identities, independent of active graph state.
     identities: ExternalIdentityIndex,
@@ -153,7 +154,7 @@ pub struct Graph {
     neighborhood_sampler: NeighborhoodSampler,
 
     /// Weak self-reference so components can access the live graph instance
-    self_reference: Option<Weak<RefCell<Graph>>>,
+    self_reference: Option<Weak<OwnerCell<Graph>>>,
 
     /*
     === TRANSACTION MANAGEMENT ===
@@ -258,7 +259,7 @@ impl Graph {
     }
 
     fn from_config(config: GraphConfig, automatic_publication: bool) -> Self {
-        let pool = Rc::new(RefCell::new(GraphPool::new_with_type(config.graph_type)));
+        let pool = Arc::new(OwnerCell::new(GraphPool::new_with_type(config.graph_type)));
         Self {
             space: GraphSpace::new(pool.clone(), 0), // base state = 0
             pool,
@@ -276,11 +277,11 @@ impl Graph {
         }
     }
 
-    /// Convert this graph into an `Rc<RefCell<Graph>>`, wiring internal back-references.
+    /// Convert this graph into an `Arc<OwnerCell<Graph>>`, wiring internal back-references.
     ///
     /// This is the safest way to obtain a shared handle required by entities and subgraphs.
-    pub fn into_shared(self) -> Rc<RefCell<Self>> {
-        let graph_rc = Rc::new(RefCell::new(self));
+    pub fn into_shared(self) -> Arc<OwnerCell<Self>> {
+        let graph_rc = Arc::new(OwnerCell::new(self));
         {
             let mut graph_mut = graph_rc.borrow_mut();
             graph_mut.attach_self_reference(&graph_rc);
@@ -289,13 +290,13 @@ impl Graph {
     }
 
     /// Attach a self reference so helpers like `NeighborhoodSampler` can access the live graph.
-    pub fn attach_self_reference(&mut self, graph_ref: &Rc<RefCell<Graph>>) {
-        self.self_reference = Some(Rc::downgrade(graph_ref));
+    pub fn attach_self_reference(&mut self, graph_ref: &Arc<OwnerCell<Graph>>) {
+        self.self_reference = Some(Arc::downgrade(graph_ref));
         self.neighborhood_sampler.set_graph_ref(graph_ref);
     }
 
     /// Retrieve a shared reference to this graph if one has been registered.
-    pub fn shared_reference(&self) -> Option<Rc<RefCell<Graph>>> {
+    pub fn shared_reference(&self) -> Option<Arc<OwnerCell<Graph>>> {
         self.self_reference.as_ref().and_then(|weak| weak.upgrade())
     }
 
@@ -352,7 +353,7 @@ impl Graph {
     /// This provides access to the columnar attribute storage and
     /// is used by traits and advanced operations that need direct
     /// access to the storage layer.
-    pub fn pool(&self) -> std::cell::Ref<'_, GraphPool> {
+    pub fn pool(&self) -> crate::ownership::OwnerReadGuard<'_, GraphPool> {
         self.pool.borrow()
     }
 
@@ -367,7 +368,7 @@ impl Graph {
     ///     graph.pool_mut();
     /// }
     /// ```
-    pub(crate) fn pool_mut(&mut self) -> std::cell::RefMut<'_, GraphPool> {
+    pub(crate) fn pool_mut(&mut self) -> crate::ownership::OwnerWriteGuard<'_, GraphPool> {
         self.space.invalidate_current_read();
         self.pool.borrow_mut()
     }

@@ -12,12 +12,12 @@
 
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
+use crate::ownership::OwnerCell;
 use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EntityId, NodeId};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Attribute aggregation functions for collapsing subgraphs into meta-nodes
 #[derive(Debug, Clone, PartialEq)]
@@ -145,14 +145,14 @@ pub struct MetaNode {
     /// The node ID of this meta-node in the graph
     node_id: NodeId,
     /// Reference to the graph containing this meta-node
-    graph_ref: Rc<RefCell<Graph>>,
+    graph_ref: Arc<OwnerCell<Graph>>,
     /// Cached metadata for efficient access
     contained_subgraph_id: Option<usize>, // SubgraphId from GraphPool
 }
 
 impl MetaNode {
     /// Create a new MetaNode from an existing node that contains a subgraph reference
-    pub fn new(node_id: NodeId, graph_ref: Rc<RefCell<Graph>>) -> GraphResult<Self> {
+    pub fn new(node_id: NodeId, graph_ref: Arc<OwnerCell<Graph>>) -> GraphResult<Self> {
         let contained_subgraph_id = {
             let graph = graph_ref.borrow();
             let x = match graph.get_node_attr(node_id, &"contains_subgraph".into())? {
@@ -335,7 +335,7 @@ impl GraphEntity for MetaNode {
         "meta_node"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.graph_ref.clone()
     }
 
@@ -557,7 +557,7 @@ mod tests {
         let node_id = graph.add_node().unwrap();
 
         // Test node without subgraph reference (should work but be empty)
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let meta_node = MetaNode::new(node_id, graph_rc.clone()).unwrap();
 
         assert_eq!(meta_node.node_id(), node_id);
@@ -594,7 +594,7 @@ mod tests {
         graph.add_edge(node2, node3).unwrap();
 
         // Create subgraph and test collapse
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes = HashSet::from([node1, node2, node3]);
         let subgraph =
             Subgraph::from_nodes(graph_rc.clone(), nodes, "test_subgraph".to_string()).unwrap();
@@ -640,7 +640,7 @@ mod tests {
             .set_node_attr(node2, "weight".into(), AttrValue::Float(2.5))
             .unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let nodes = HashSet::from([node1, node2]);
         let subgraph = Subgraph::from_nodes(graph_rc, nodes, "test_subgraph".to_string()).unwrap();
 

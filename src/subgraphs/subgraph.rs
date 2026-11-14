@@ -20,14 +20,15 @@
 mod binding;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
+use crate::ownership::OwnerCell;
 use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
 use crate::viz::VizModule;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use std::sync::{Arc, OnceLock};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::sync::OnceLock;
 
 /// Similarity metrics for comparing subgraphs
 #[derive(Debug, Clone, PartialEq)]
@@ -83,8 +84,8 @@ struct ComponentCacheStore {
 pub struct Subgraph {
     /// Reference to the parent graph (shared across all subgraphs)
     /// This enables all Graph operations to work on Subgraphs
-    /// Uses RefCell for interior mutability to allow batch operations
-    graph: Rc<RefCell<Graph>>,
+    /// Uses OwnerCell for interior mutability to allow batch operations
+    graph: Arc<OwnerCell<Graph>>,
     frozen: Option<crate::GraphView>,
 
     /// Set of node IDs that are included in this subgraph
@@ -104,7 +105,7 @@ pub struct Subgraph {
     subgraph_id: SubgraphId,
 
     /// Cached component computations keyed by traversal mode
-    component_cache: Rc<RefCell<ComponentCacheStore>>,
+    component_cache: Arc<OwnerCell<ComponentCacheStore>>,
 
     /// Cached ascending node order for deterministic algorithms
     ordered_nodes_cache: Arc<OnceLock<Arc<[NodeId]>>>,
@@ -113,8 +114,8 @@ pub struct Subgraph {
     ordered_edges_cache: Arc<OnceLock<Arc<[EdgeId]>>>,
 
     /// Cached CSR adjacency keyed by traversal mode (reverse flag)
-    topology_cache: RefCell<HashMap<CsrCacheKey, CsrCacheEntry>>,
-    validated_scope: RefCell<Option<crate::state::space::SpaceVersion>>,
+    topology_cache: OwnerCell<HashMap<CsrCacheKey, CsrCacheEntry>>,
+    validated_scope: OwnerCell<Option<crate::state::space::SpaceVersion>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -139,7 +140,7 @@ impl Subgraph {
     /// Use `new_with_content_id()` if you specifically need content-based IDs for
     /// pool storage or deduplication regardless of size.
     pub fn new(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>, // FIXED: Must be EdgeId, not NodeId
         subgraph_type: String,
@@ -174,7 +175,7 @@ impl Subgraph {
     /// - Deduplication of identical subgraphs
     /// - Subgraphs that will be looked up by content
     pub fn new_with_content_id(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>,
         subgraph_type: String,
@@ -182,7 +183,8 @@ impl Subgraph {
         // Generate subgraph ID using hash-based approach
         let subgraph_id = {
             use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
+            use std::hash::Hash;
+            use std::hash::Hasher;
             let mut hasher = DefaultHasher::new();
             let mut sorted_nodes: Vec<_> = nodes.iter().collect();
             sorted_nodes.sort();
@@ -208,17 +210,18 @@ impl Subgraph {
             edges,
             subgraph_type,
             subgraph_id,
-            component_cache: Rc::new(RefCell::new(ComponentCacheStore::default())),
+            component_cache: Arc::new(OwnerCell::new(ComponentCacheStore::default())),
             ordered_nodes_cache: Arc::new(OnceLock::new()),
             ordered_edges_cache: Arc::new(OnceLock::new()),
-            topology_cache: RefCell::new(HashMap::new()),
-            validated_scope: RefCell::new(None),
+            topology_cache: OwnerCell::new(HashMap::new()),
+            validated_scope: OwnerCell::new(None),
         }
     }
 
     /// Generate a unique simple ID using atomic counter
     fn generate_simple_id() -> SubgraphId {
-        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::atomic::AtomicUsize;
+        use std::sync::atomic::Ordering;
         // Start at 100 to avoid reserved IDs (0, 1 used for special views)
         static COUNTER: AtomicUsize = AtomicUsize::new(100);
         COUNTER.fetch_add(1, Ordering::Relaxed)
@@ -226,7 +229,7 @@ impl Subgraph {
 
     /// Create a new Subgraph with just nodes, calculating induced edges
     pub fn from_nodes(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         nodes: HashSet<NodeId>,
         subgraph_type: String,
     ) -> GraphResult<Self> {
@@ -242,7 +245,7 @@ impl Subgraph {
     /// Most users should call `new()` which automatically chooses between
     /// simple and content-based IDs based on size.
     pub fn new_with_simple_id(
-        graph: Rc<RefCell<Graph>>,
+        graph: Arc<OwnerCell<Graph>>,
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>,
         subgraph_type: String,
@@ -258,11 +261,11 @@ impl Subgraph {
             edges,
             subgraph_type,
             subgraph_id: simple_id,
-            component_cache: Rc::new(RefCell::new(ComponentCacheStore::default())),
+            component_cache: Arc::new(OwnerCell::new(ComponentCacheStore::default())),
             ordered_nodes_cache: Arc::new(OnceLock::new()),
             ordered_edges_cache: Arc::new(OnceLock::new()),
-            topology_cache: RefCell::new(HashMap::new()),
-            validated_scope: RefCell::new(None),
+            topology_cache: OwnerCell::new(HashMap::new()),
+            validated_scope: OwnerCell::new(None),
         }
     }
 
@@ -310,7 +313,7 @@ impl Subgraph {
     /// Uses columnar topology vectors for O(k) performance where k = number of active edges,
     /// which is much better than O(E) over all edges in the graph.
     pub fn calculate_induced_edges(
-        graph: &Rc<RefCell<Graph>>,
+        graph: &Arc<OwnerCell<Graph>>,
         nodes: &HashSet<NodeId>,
     ) -> GraphResult<HashSet<EdgeId>> {
         let mut induced_edges = HashSet::new();
@@ -349,7 +352,7 @@ impl Subgraph {
     }
 
     /// Get reference to the parent graph (for read operations)
-    pub fn graph(&self) -> Rc<RefCell<Graph>> {
+    pub fn graph(&self) -> Arc<OwnerCell<Graph>> {
         self.graph.clone()
     }
 
@@ -984,7 +987,7 @@ impl Subgraph {
             return Ok((self.pin_view()?, other.pin_view()?));
         }
 
-        if !Rc::ptr_eq(&self.graph, &other.graph) {
+        if !Arc::ptr_eq(&self.graph, &other.graph) {
             return Err(GraphError::InvalidInput(
                 "Subgraph algebra requires the same graph owner".into(),
             ));
@@ -1043,7 +1046,7 @@ impl Subgraph {
         other: &Subgraph,
         metric: SimilarityMetric,
     ) -> GraphResult<f64> {
-        if !Rc::ptr_eq(&self.graph, &other.graph) {
+        if !Arc::ptr_eq(&self.graph, &other.graph) {
             return Err(GraphError::InvalidInput(
                 "Subgraph similarity requires the same graph owner".into(),
             ));
@@ -1118,7 +1121,7 @@ impl GraphEntity for Subgraph {
         "subgraph"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.graph.clone()
     }
 
@@ -1523,7 +1526,7 @@ mod tests {
     use crate::api::graph::Graph;
     use crate::types::AttrValue;
 
-    fn mutation_fixture(publishing: bool) -> (Rc<RefCell<Graph>>, Subgraph) {
+    fn mutation_fixture(publishing: bool) -> (Arc<OwnerCell<Graph>>, Subgraph) {
         let mut graph = if publishing {
             Graph::new_publishing()
         } else {
@@ -1536,7 +1539,7 @@ mod tests {
                 .commit("fixture".into(), "test".into())
                 .expect("initial state");
         }
-        let shared = Rc::new(RefCell::new(graph));
+        let shared = Arc::new(OwnerCell::new(graph));
         let selection = Subgraph::from_nodes(
             shared.clone(),
             [0, 1, 2].into_iter().collect(),
@@ -1699,7 +1702,7 @@ mod tests {
             .unwrap();
 
         // Create subgraph
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let node_subset = HashSet::from([node1, node2]);
         let subgraph = Subgraph::from_nodes(graph_rc, node_subset, "test".to_string()).unwrap();
 
@@ -1730,7 +1733,7 @@ mod tests {
         let edge2 = graph.add_edge(node2, node3).unwrap();
         let _edge3 = graph.add_edge(node3, node1).unwrap(); // Triangle
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let node_subset = HashSet::from([node1, node2, node3, node4]);
         let subgraph = Subgraph::from_nodes(graph_rc, node_subset, "test".to_string()).unwrap();
 
@@ -1784,7 +1787,7 @@ mod tests {
         graph.add_edge(node3, node1).unwrap();
 
         // Create subgraph with all nodes
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
         let all_nodes = HashSet::from([node1, node2, node3]);
         let subgraph = Subgraph::from_nodes(graph_rc, all_nodes, "triangle".to_string()).unwrap();
 
@@ -1816,7 +1819,7 @@ mod tests {
         graph.add_edge(node2, node3).unwrap();
         graph.add_edge(node3, node4).unwrap();
 
-        let graph_rc = Rc::new(RefCell::new(graph));
+        let graph_rc = Arc::new(OwnerCell::new(graph));
 
         // Create two overlapping subgraphs
         let subgraph1_nodes = HashSet::from([node1, node2, node3]);

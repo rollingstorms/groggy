@@ -1,3 +1,4 @@
+use groggy::ownership::OwnerCell;
 use groggy::{
     storage::{
         adjacency::{MatrixFormat, MatrixType},
@@ -7,7 +8,7 @@ use groggy::{
     types::AttrValue,
     Graph,
 };
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Arc;
 #[test]
 fn edge_instances_sum_exactly_and_loops_contribute_once() {
     let edges = vec![(7, 9, 1e308), (7, 9, 1.), (7, 9, -1e308), (7, 7, 3.)];
@@ -62,7 +63,7 @@ fn selected_edges_are_not_replaced_by_induced_parent_edges() {
     g.set_edge_attr(other, "w".into(), AttrValue::Int(99))
         .unwrap();
     let view = Subgraph::new(
-        Rc::new(RefCell::new(g)),
+        Arc::new(OwnerCell::new(g)),
         [a, b].into_iter().collect(),
         [e, loop_edge].into_iter().collect(),
         "test".into(),

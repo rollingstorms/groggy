@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 ///
 /// Regular edges are the basic connections between nodes in graphs. They provide access
 /// to edge attributes, topology information (source/target), and graph operations.
-#[pyclass(name = "Edge", unsendable)]
+#[pyclass(name = "Edge")]
 pub struct PyEdge {
     /// The underlying Rust Edge entity
     pub inner: Edge,

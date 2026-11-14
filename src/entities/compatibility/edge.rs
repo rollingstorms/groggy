@@ -6,11 +6,11 @@
 
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
+use crate::ownership::OwnerCell;
 use crate::traits::{EdgeOperations, GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A wrapper around an EdgeId that implements GraphEntity and EdgeOperations
 ///
@@ -25,7 +25,7 @@ pub struct EntityEdge {
 
 impl EntityEdge {
     /// Create a new EntityEdge wrapper for the given edge
-    pub fn new(edge_id: EdgeId, graph_ref: Rc<RefCell<Graph>>) -> Self {
+    pub fn new(edge_id: EdgeId, graph_ref: Arc<OwnerCell<Graph>>) -> Self {
         Self {
             inner: crate::entities::Edge::from_id_unchecked(edge_id, graph_ref),
         }
@@ -51,7 +51,7 @@ impl GraphEntity for EntityEdge {
         "edge"
     }
 
-    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+    fn graph_ref(&self) -> Arc<OwnerCell<Graph>> {
         self.inner.graph_handle().clone()
     }
 

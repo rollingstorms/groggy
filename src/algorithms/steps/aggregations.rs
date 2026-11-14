@@ -1,6 +1,7 @@
 //! Aggregation and reduction step primitives.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
@@ -720,12 +721,13 @@ mod tests {
         step: &dyn Step,
         values: Vec<AlgorithmParamValue>,
     ) -> (super::super::core::StepVariables, Context) {
+        use crate::ownership::OwnerCell;
         use crate::{api::graph::Graph, subgraphs::Subgraph};
-        use std::{cell::RefCell, rc::Rc};
+        use std::sync::Arc;
         let mut graph = Graph::new_manual();
         graph.add_nodes(values.len()).unwrap();
         let selection = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             (0..values.len()).collect(),
             "stats".into(),
         )
@@ -815,14 +817,15 @@ mod tests {
 
     #[test]
     fn neighbor_selection_and_missing_weights_are_checked_without_overwriting_results() {
+        use crate::ownership::OwnerCell;
         use crate::{api::graph::Graph, subgraphs::Subgraph};
-        use std::{cell::RefCell, rc::Rc};
+        use std::sync::Arc;
         let mut graph = Graph::new_directed_manual();
         graph.add_nodes(3).unwrap();
         graph.add_edge(0, 2).expect("edge");
         graph.add_edge(1, 2).expect("outside edge");
         let selection = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
+            Arc::new(OwnerCell::new(graph)),
             [0, 2].into_iter().collect(),
             "scope".into(),
         )

@@ -1,14 +1,17 @@
 //! Cold/warm selected topology preparation and owner-free adjacency export.
+use groggy::ownership::OwnerCell;
 use groggy::{subgraphs::Subgraph, Graph};
 use serde_json::json;
-use std::{cell::RefCell, hint::black_box, rc::Rc, time::Instant};
+use std::hint::black_box;
+use std::sync::Arc;
+use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cases = Vec::new();
     for count in [1_000usize, 100_000] {
         let mut graph = Graph::new_directed_manual();
         graph.add_nodes(count)?;
         graph.add_edges(&(1..count).map(|id| (id - 1, id)).collect::<Vec<_>>())?;
-        let owner = Rc::new(RefCell::new(graph));
+        let owner = Arc::new(OwnerCell::new(graph));
         let connected = Subgraph::new(
             owner,
             (0..count).collect(),
