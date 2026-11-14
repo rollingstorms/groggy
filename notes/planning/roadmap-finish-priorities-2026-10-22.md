@@ -10,6 +10,15 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 ### Proposed bounded 0.6.0 qualification — 2026-11-14
 
+Execution started with the owner's approval. Package/export qualification is
+committed as `1313b4d2`, and the executable archive/journal acceptance workflow as
+`f2f95456`. Both build entry points and an extracted source distribution produce
+locally importable 0.6.0 wheels; all 104 declared exports resolve. Runtime uses the
+loaded extension's version. Maintained Python verification is 2,684 passed, one
+skipped, 15 warnings, plus 266 executable docs examples. The ownership warning
+remains unresolved. Current evidence/remaining gates are recorded in
+`release-060-qualification-2026-11-14.md`; no release has been published.
+
 The owner clarified that Graphiti belongs in a future external plugin repository,
 not the core package. Record the boundary now; no repository migration is requested.
 Adapter/driver compatibility is not a core release gate. The full checklist still

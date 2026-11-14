@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-11-11 on `groggy-roadmap-2026-10-20`.
+Updated 2026-11-14 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -44,6 +44,13 @@ See the status page for the names and verified boundaries. This pass adds no che
 are complete; this does not imply that finished repairs are still unimplemented.
 
 ## Execution priority — remaining work
+
+Current bounded release slice: prioritize 0.6.0 package/version/export
+qualification, a supported core acceptance workflow, existing workload baselines
+and release/migration documentation. Package and workflow components are complete;
+the writable-owner lifetime defect and platform qualification remain open.
+See `release-060-qualification-2026-11-14.md`. This adds no checklist rows or broad
+parent checkmarks; the full-engine dependency order below remains future work.
 
 The stable 01–34 and AR IDs below are retained. Consolidation is now tracked as
 AR7, with explicit tasks rather than an unimplemented proposal alone. Existing
@@ -305,7 +312,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [ ] **33.2 — Partial: integrity and operational visibility.** Add complete integrity scans, actionable metrics/errors, storage/version checks, and documented size/recovery/concurrent-writer limits. The fixed twelve-entry current-property reader family now rejects corrupt value indices consistently, preserving existing liveness/null/absence policies (`current-property-reads-2026-10-25.md`); broader scans/consumers remain open. Explicit retained-memory/schema check_integrity now verifies every retained state, including nonheads, with structured counts and contextual errors (`retained-integrity-2026-10-26.md`). Physical `DurableGraph.verify_storage` now shares the recovery parser, reads actual bytes without repairing tails, and checks full retained transitions/current schema (`storage-verification-2026-10-26.md`). Eligible current GraphSpace topology caches now verify captured columns, membership, neighbor rows and complete CSR incidence against authoritative active topology without rebuilding cold/stale caches; corruption, poisoned locks and detached lifetimes are covered (`current-topology-integrity-2026-10-27.md`). Secondary indexes, other cache families and wider service diagnostics retain their original scope.
 - [ ] **33.3 — Open: service deployment.** Complete the embedded-to-multi-user path, isolation/access boundaries, writer coordination, operational migration, and observability after the concurrency contract is decided.
 - [ ] **34.1 — Partial: capability matrix.** Publish scope, Rust/Python support, persistence, tests, limits, and remaining work per feature; a method existing is not proof that the contract is complete.
-- [ ] **34.2 — Partial: release documentation.** Synchronize examples/API docs/roadmap with tested behavior, remove obsolete completion claims, and keep deferred original-vision work visible. Preserve the owner's workbook answers and appendix.
+- [ ] **34.2 — Partial: release documentation.** Synchronize examples/API docs/roadmap with tested behavior, remove obsolete completion claims, and keep deferred original-vision work visible. Preserve the owner's workbook answers and appendix. Scoped 0.6.0 package/export qualification and the archive/journal acceptance example are complete; current release/migration notes and remaining qualification gates are recorded in `release-060-qualification-2026-11-14.md`. No broad release-completion claim.
 - [ ] **AR1 — Partial: one liveness authority.** Finish routing public live readers, algorithms, indexes, and views through GraphSpace while retaining GraphPool history; covered in part by 02, 18, 26, and 28.
 - [ ] **AR2 — Partial: one adjacency policy.** Consolidate endpoint/edge-instance/direction rules behind a narrow efficient internal interface; keep algorithm-specific definitions explicit and benchmark structural changes. Component convenience neighborhoods now delegate to captured hop selection from the lowest original ID, returning actual one-hop results with native direction/scope and failure behavior (`component-neighborhood-defaults-2026-11-05.md`); broader adjacency caller certification remains open.
 - [ ] **AR3 — Partial: one mutation coordinator.** Extend the typed checked publication path to every supported mutation; make diff/reset/revert/reconstruction consume actual coordinated changes rather than inferred storage offsets. Canonical records and tracked restoration are complete; legacy tracker inverse/conflict/merge helpers now reject unsupported history inference explicitly (`tracker-history-guards-2026-10-27.md`). Compound topology acceptance remains 09.4b.2.

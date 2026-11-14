@@ -7,14 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 🐛 Fixed
-- **Batch executor variable mapping bug**: Fixed critical issue where loop-carried variables in batch-compiled loops were using internal IR variable names instead of actual property names, causing "variable not stored" errors
-- **Batch compilation validation**: Added compatibility checks to prevent compilation of loops containing unsupported operations (e.g., `node_degree`, scalar operations), ensuring graceful fallback to step-by-step execution
-- **Loop variable storage names**: Corrected LoadNodeProp/StoreNodeProp instructions to use proper storage names for loop-carried variables
+### Preparing 0.6.0
 
-### ✨ Improved
-- Multi-iteration algorithms (PageRank, LPA) now execute reliably with batch optimization when operations are supported
-- Batch compiler now validates operations before attempting compilation, providing better error handling
+- Checked automatic Python mutation publication, explicit effective-time deltas,
+  immutable read defaults, pinned table/query identity and tracked restoration.
+- Retained archives, journal recovery, explicit checkpoints and retention tools,
+  within the documented storage and platform boundaries.
+- Consolidated matrix/numeric foundations, f64 property defaults and expanded
+  graph/numerical algorithms; broader conformance and scale work remains open.
+- Typed immutable pipeline inputs and selected atomic topology effects; general
+  staged additions and wider pending-topology execution remain unfinished.
+- Cargo-derived distribution/runtime version, standard Maturin builds without
+  build-time extension introspection, packaged stubs/typing marker, and working
+  public native display helper exports.
+- Executable embedded-core acceptance workflow across graph, table, numerical,
+  temporal and recovery APIs.
+
+This is an unreleased development version. See [0.6.0 scope and migration
+notes](RELEASE_NOTES_0.6.0.md) and [release qualification](RELEASE_STATUS.md).
+The writable-owner cyclic finalization defect remains unresolved. Graphiti is
+planned as a separate plugin, outside the core release.
 
 ## [0.5.2] - 2024-12-04
 

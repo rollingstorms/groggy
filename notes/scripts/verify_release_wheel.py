@@ -1,8 +1,8 @@
 """Check a built wheel without installing it or importing the source checkout.
 
 Usage: python notes/scripts/verify_release_wheel.py /path/to/groggy.whl
-Uses an isolated subprocess and a temporary unpacked wheel. Existing interpreter
-dependencies remain available; this is not a cross-platform installation test.
+Uses an isolated subprocess with site-packages disabled and a temporary unpacked
+wheel. This is not a cross-platform installation or optional integration test.
 """
 import argparse
 import json
@@ -19,7 +19,9 @@ SMOKE = r'''
 import importlib.metadata
 import json
 from pathlib import Path
+import runpy
 import sys
+from tempfile import TemporaryDirectory
 
 root = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(root))
@@ -41,8 +43,12 @@ graph.writer().set_node_attr(node, "score", 2.5)
 assert before.node_attr(node, "score") == 1.0000000000000002
 assert graph.read_view().node_attr(node, "score") == 2.5
 assert gr.GraphMatrix.from_data([[2., 0.], [0., 3.]]).determinant() == 6.
+run_workflow = runpy.run_path(sys.argv[3])["run_workflow"]
+with TemporaryDirectory(prefix="groggy-wheel-workflow-") as folder:
+    workflows = [run_workflow(folder), run_workflow(folder, durable=True)]
 print(json.dumps({"version": version, "exports": len(gr.__all__),
-                  "package": str(Path(gr.__file__).resolve())}))
+                  "package": str(Path(gr.__file__).resolve()),
+                  "workflows": workflows}))
 '''
 
 
@@ -50,8 +56,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("wheel", type=Path)
     args = parser.parse_args()
-    manifest = Path(__file__).resolve().parents[2] / "python-groggy/Cargo.toml"
+    repo = Path(__file__).resolve().parents[2]
+    manifest = repo / "python-groggy/Cargo.toml"
+    workflow = Path(__file__).with_name("core_release_workflow.py")
     expected = re.search(r'^version = "([^"]+)"', manifest.read_text(), re.M)[1]
+    core_version = re.search(r'^version = "([^"]+)"', (repo / "Cargo.toml").read_text(), re.M)[1]
+    if core_version != expected:
+        raise ValueError("Core and binding crate versions disagree")
     with tempfile.TemporaryDirectory(prefix="groggy-wheel-check-") as work:
         root = Path(work)
         with zipfile.ZipFile(args.wheel) as wheel:
@@ -69,7 +80,7 @@ def main():
                     raise ValueError("Wheel member escapes extraction directory: " + name)
             wheel.extractall(root)
         result = subprocess.run(
-            [sys.executable, "-I", "-c", SMOKE, str(root), expected],
+            [sys.executable, "-I", "-S", "-c", SMOKE, str(root), expected, str(workflow)],
             cwd=root, capture_output=True, text=True, timeout=60,
         )
         if result.returncode:
