@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "groggy"
 description = "Groggy - A Graph Language Engine for dynamic graphs and versioned state"
 dynamic = ["version"]
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.13"
 authors = [
     { name = "Groggy Contributors" }
 ]

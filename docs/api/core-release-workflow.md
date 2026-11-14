@@ -30,5 +30,23 @@ a retained in-memory graph archive and a journal-backed DurableGraph.
 The timestamps 100/200/300 are deterministic fixture values in Unix microseconds,
 not current application times. This is a supported-surface acceptance example,
 not a scale benchmark, complete format-migration proof or service-concurrency
-test. Writable owners stay on their creating thread. See the unresolved lifetime
-boundary in the [0.6.0 release notes](../../RELEASE_NOTES_0.6.0.md).
+test. Writable owners stay on their creating thread; final destruction can run
+on any thread. See [Python owner lifetimes](python-owner-lifetimes.md).
+
+## Run against a release artifact
+
+```sh
+python notes/scripts/verify_release_wheel.py /path/to/wheel-directory --tests ownership --report /tmp/wheel-qualification.json
+```
+
+The wheel verifier first checks metadata, all declared exports, typing assets and
+both workflow storage paths in a subprocess with site-packages disabled. The
+optional `ownership` gate then runs the two workflow tests and 34 ownership cases
+against the unpacked wheel. It requires pytest; it installs no wheel. A successful
+JSON receipt includes the wheel SHA256. Use a fresh report path for each run.
+
+Use `--tests maintained` for the maintained root suite and curated documentation
+examples against that same unpacked artifact. This requires the existing test
+dependencies; historical nested surveys are outside that gate. Detailed release
+commands and the pending platform gate are in the
+[release runbook](release-qualification.md).

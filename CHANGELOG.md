@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   public native display helper exports.
 - Executable embedded-core acceptance workflow across graph, table, numerical,
   temporal and recovery APIs.
+- Artifact-backed Python/docs and ownership gates, locked source-distribution
+  rebuild verification, SHA256 qualification receipts and publication gated by
+  native/platform checks. Manual artifact qualification cannot publish.
+- Package interpreter range `>=3.8,<3.13` matches the current PyO3 build limit;
+  the nested build no longer forces experimental forward compatibility.
 - Creator-checked Arc/OwnerCell handles permit safe native finalization on any
   thread, fixing writable Graph/connected-wrapper cyclic-GC destruction errors.
   Durable GC releases file locks without owner polling; foreign live access still

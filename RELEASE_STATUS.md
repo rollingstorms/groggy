@@ -1,242 +1,79 @@
 # Groggy 0.6.0 release qualification
 
-Updated 2026-11-14. **Unreleased; qualification in progress.** No tag, upload or
-publication has occurred as part of this release-preparation slice.
+Updated 2026-11-14. **Local preparation complete; platform CI pending. Unreleased.**
 
-## Supported release scope
+## Bounded release checklist
 
-An embedded Rust/Python graph and analytics library. See the
-[scope and migration notes](RELEASE_NOTES_0.6.0.md). Graphiti adapters/drivers are
-future external plugin work. Core retrieval expansion and multi-client services
-remain deferred; they are not silently included in this release.
+| Component | Status | Evidence |
+| --- | --- | --- |
+| One complete application workflow | Complete locally | Checked ingestion → immutable graph/table analysis → temporal correction/restore → archive/journal recovery, from unpacked wheels. |
+| Performance baseline | Complete for the documented fixtures | Current ownership implementation: three fresh native processes per size, plus matched public-Python access measurements. |
+| Scope, migration and release docs | Complete for this candidate | [Release notes](RELEASE_NOTES_0.6.0.md), [application workflow](docs/api/core-release-workflow.md), [qualification runbook](docs/api/release-qualification.md). |
+| Package qualification | Complete locally | Fresh root, nested and extracted-source wheels; versions, 104 declared exports, typing assets and both storage workflows pass. |
+| Native and artifact-backed regression gates | Passed locally | 1,566 Rust tests; serial checkpoint recovery; strict Clippy; 2,718 Python tests; 267 executable docs examples. |
+| Cross-platform qualification | Pending execution | CI gates are configured for 19 CPython/platform combinations. A configuration change is not a successful CI run. |
 
-## Evidence from this slice
+No tag, upload, publication, push or CI dispatch occurred in this preparation
+slice. Before publication, run and review the platform workflow and final artifact
+hashes/scope. Manual qualification cannot publish; a published tag release must
+pass native, wheel and extracted-source gates before reaching the existing PyPI
+environment boundary.
 
-- Root Maturin wheel builds offline with locked resolution on macOS arm64,
-  CPython 3.9. An isolated subprocess with site-packages disabled imports the
-  unpacked wheel, not the checkout:
-  distribution/runtime/native versions agree at 0.6.0, all 104 declared exports
-  resolve, and graph/snapshot/f64/numerical smoke assertions pass. Initial root,
-  nested and extracted-source wheels passed both storage workflows; the updated
-  ownership wheel also passes the isolated archive/journal workflows.
-- Source distribution builds with the standard backend, with no extension import
-  or stub regeneration during packaging. Rebuilding the extracted source and
-  alternate entry-point qualification are recorded in the current receipt.
-- Eight focused regressions pass: version/exports/display delegation and the
-  cross-surface archive/journal workflow. See
-  [the executable workflow](docs/api/core-release-workflow.md).
-- Ownership follow-up: creator-checked Arc/OwnerCell handles fix foreign cyclic-GC
-  finalization without allowing foreign live mutations. Thirty-four Python cases
-  include immediate durable file-lock release and cleanup after creator exit;
-  five native cases prove destruction and ownership traits. See
-  [Python owner lifetimes](docs/api/python-owner-lifetimes.md).
-- Maintained Python gate: 2,718 passed, one skipped, 14 existing builder warnings;
-  267 executable documentation examples pass. The former finalization warning is
-  absent, with no suppression or production GC changes.
-- Native gates: 1,566 Rust tests passed, 54 ignored; strict all-target Clippy passed.
-- Existing native workflow benchmark: three fresh processes each at 1k/100k
-  nodes and edges. After the ownership follow-up, median bulk acceptance at 100k
-  is 0.582 seconds and archive save/recovery 1.452/0.859 seconds; whole-process
-  peak RSS is 855–882 MiB. The paired Python access fixture shows small read
-  variation and about 2.6% overhead for a checked 1,000-property batch.
-  These are bounded fixture measurements, not universal budgets or a matched
-  before/after comparison. Memory/recovery costs remain existing scale work.
+## Supported scope and migration
 
-## Remaining release decisions and checks
+An embedded Rust/Python graph and analytics library. This candidate includes
+checked automatic publication, immutable captures, effective-time reconstruction,
+explicit checkpoints/restoration, table writeback, numerical operations and
+retained archive/journal recovery within documented boundaries. See the
+[scope and migration guide](RELEASE_NOTES_0.6.0.md).
 
-- Cross-platform wheel/import/test qualification remains open. Local CPython 3.9
-  evidence does not certify all advertised Python versions or operating systems.
-- Broad old-format migration and platform/power-loss guarantees remain unproven;
-  preserve the supported storage boundaries in the release notes.
-- Native tests, Clippy and workload measurements are recorded in the
-  [initial qualification receipt](notes/planning/release-060-qualification-2026-11-14.md)
-  and [ownership follow-up](notes/planning/python-owner-lifetime-2026-11-14.md).
-  A public release still needs review of the resulting artifact and scope.
+Both package entry points declare CPython `>=3.8,<3.13`, matching the current
+PyO3 0.20.3 build limit. CI targets Linux/Windows x86_64 and macOS Intel 3.8–3.12;
+macOS arm64 3.9–3.12. Only macOS arm64 CPython 3.9 has been executed locally here.
+Newer interpreters and PyPy have no qualification claim in this release receipt.
 
-This scope does not require completing all 53 open checklist rows. It also does
-not mark broad ownership, numerical, schema, scale or compatibility parents done.
+Creator-checked Arc/OwnerCell handles fix foreign-thread cyclic-GC finalization
+and immediate durable file-lock release while preserving creator-bound live
+access. Detached immutable GraphView remains the supported worker read interface.
+See [Python owner lifetimes](docs/api/python-owner-lifetimes.md) for explicit
+native Rust handle migration and the 34 Python/5 native ownership regressions.
 
----
+Graphiti remains future external plugin work. Core retrieval expansion,
+multi-client services, arbitrary old-format migration, universal power-loss
+claims and broad numerical/scale conformance remain outside this bounded release.
+They retain their existing roadmap boundaries.
 
-# Archived 0.5.2 status (historical, not current blockers)
+## Executed gates and measured costs
 
-The following text is retained as historical context. Its CI run references,
-completion claims and estimates do not describe the current branch.
+Fresh root, nested and extracted-source wheels pass isolated smoke and the
+application workflow with site-packages disabled. The maintained Python/docs gate
+also runs against the root unpacked artifact, not an installed/source extension.
+No wheel was installed during qualification.
 
-# Release 0.5.2 Status Summary
+- Maintained Python: **2,718 passed / 1 skipped / 14 established builder warnings**.
+- Executable documentation: **267 examples passed**.
+- Nested artifact workflow/ownership gate: **36 passed**.
+- Rust: **1,566 passed / 54 ignored / zero failed**; the explicit serial checkpoint
+  process-recovery gate additionally passes its one test.
+- Strict all-target Clippy and `git diff --check`: **passed**.
 
-**Date:** December 4, 2024  
-**Status:** ❌ BLOCKED - CI/Test Failures
+At 100k nodes and edges, the existing native directed-ring baseline has median
+batch acceptance **0.582 s**, cold capture **0.142 s**, effective read **0.252 s**,
+and archive save/recovery **1.452/0.859 s**. Whole-process peak RSS is **855–882
+MiB**. These are bounded fixture measurements, not universal performance budgets.
+The matched Python access fixture shows small read variation and about **2.6%**
+overhead for a checked 1,000-property batch after the ownership fix. Archive/memory
+scale work remains open.
 
----
+Current evidence, artifact/lock hashes and reproducible commands:
 
-## Current Situation
+- [Final local gate receipt](notes/planning/release-060-final-gates-2026-11-14.md)
+  and [machine-readable hashes/results](notes/planning/release-060-final-gates-2026-11-14.json).
+- [Qualification runbook](docs/api/release-qualification.md).
+- [Ownership implementation and performance comparison](notes/planning/python-owner-lifetime-2026-11-14.md).
+- [Initial qualification receipt](notes/planning/release-060-qualification-2026-11-14.md), retained historically.
 
-Both GitHub Actions workflows (ci.yml and test.yml) are failing on the latest commit (`0b10a6f`) with Rust compilation errors in the JIT module.
-
-### Failed Workflows
-- **CI Workflow:** Run #99 - Failed at 21:59 UTC
-- **Test Workflow:** Run #119 - Failed at 21:59 UTC
-- **Branch:** `main`
-- **Commit:** `0b10a6f24d00227e5e2a3a00a64df754cdbb8b08`
-
----
-
-## Root Cause
-
-The experimental **JIT compilation** feature (`src/algorithms/steps/loop_step.rs`) has thread-safety issues:
-
-1. **Sync Trait Violation:**
-   - `LoopStep` struct requires `Send + Sync` to implement the `Step` trait
-   - Contains `Mutex<Option<JitManager>>` which wraps `JITModule` from Cranelift
-   - Cranelift's `JITModule` contains non-`Send` function resolver callbacks
-   - This violates the `Sync` requirement for `Mutex<T>`
-
-2. **Type Mismatch Errors:**
-   - Lines 152, 174: Pattern matching treats `Result` as `Option`
-   - Line 187: Incorrect mutex guard dereferencing
-
-### Compilation Errors
-```
-error[E0277]: `(dyn for<'a> Fn(&'a str) -> Option<*const u8> + 'static)` cannot be sent between threads safely
-  --> src/algorithms/steps/loop_step.rs:36:12
-   |
-36 | pub struct LoopStep {
-   |            ^^^^^^^^ within `JITModule`, the trait `Send` is not implemented
-```
-
----
-
-## Impact Assessment
-
-### ✅ What Works
-All core features and deliverables for v0.5.2 are functional:
-- ✅ Native algorithms module (PageRank, LPA, Connected Components, etc.)
-- ✅ Builder DSL with trait-based decorators
-- ✅ Batch executor with slot allocation
-- ✅ FFI bridge and Python API
-- ✅ Documentation (algorithms, tutorials, API reference)
-- ✅ Test coverage for all algorithms
-- ✅ Release notes and changelog
-
-### ❌ What's Broken
-Only the experimental JIT feature:
-- ❌ `LoopStep` JIT compilation path
-- ❌ CI/Test workflows (can't compile)
-
-### 🔍 User Impact
-**NONE** - The JIT feature was part of the "Tier 2" roadmap and was never enabled or documented for users. All advertised features work correctly using the interpreted batch executor.
-
----
-
-## Resolution Options
-
-### Option A: Disable JIT Module (RECOMMENDED)
-**Effort:** 5 minutes  
-**Risk:** None  
-**Tradeoff:** Delays JIT feature to v0.6.0
-
-**Steps:**
-1. Add `#[cfg(feature = "jit")]` gates around JIT code
-2. Remove JIT imports from modules without the feature
-3. Document as "Known Issue" in release notes ✅ (Already Done)
-4. Push fix and verify CI passes
-
-### Option B: Fix Thread Safety
-**Effort:** 2-4 hours  
-**Risk:** Medium (could introduce subtle bugs)  
-**Tradeoff:** Blocks release today
-
-**Approaches:**
-- Wrap callbacks in `Arc<Mutex<>>` (might not work)
-- Use thread-local storage for JIT context
-- Refactor to avoid Sync requirement
-- Wait for upstream Cranelift fix
-
-### Option C: Remove JIT Code Entirely
-**Effort:** 10 minutes  
-**Risk:** Low  
-**Tradeoff:** Cleaner but more work to re-add later
-
-**Steps:**
-1. Delete `src/algorithms/execution/jit/` directory
-2. Remove JIT references from `loop_step.rs`
-3. Remove from documentation
-4. Re-add in dedicated v0.6.0 branch
-
----
-
-## Recommendation
-
-**Proceed with Option A** - Feature-gate the JIT code and ship v0.5.2 today.
-
-### Rationale
-1. **Zero user impact:** JIT was never public-facing
-2. **All deliverables complete:** 11 algorithms, Builder DSL, batch executor
-3. **Clean separation:** JIT belongs in its own release (v0.6.0)
-4. **Fast resolution:** 5 minutes vs 2-4 hours
-5. **Transparent:** Already documented in release notes
-
-### Next Steps (5 minutes)
-1. Add feature gate to `Cargo.toml`: `jit = ["cranelift-jit"]`
-2. Guard JIT code: `#[cfg(feature = "jit")]`
-3. Remove unconditional JIT imports
-4. Test locally: `cargo build --all-targets`
-5. Push and verify CI: `git push origin main`
-6. Create release tag: `git tag v0.5.2 && git push origin v0.5.2`
-
----
-
-## Release Notes Update
-
-✅ **Already Added:**  
-A "Known Issues" section documents the JIT block status, workaround (batch executor), and resolution timeline (v0.6.0).
-
----
-
-## Post-Release Plan
-
-### For v0.5.2
-- Monitor PyPI deployment
-- Update documentation website
-- Announce release (blog, social media)
-
-### For v0.6.0 (JIT Revival)
-- Create dedicated `feature/jit-thread-safety` branch
-- Research Cranelift thread-safety patterns
-- Consider alternative JIT backends (LLVM, Wasmer)
-- Implement comprehensive JIT test suite
-- Benchmark JIT vs interpreter performance
-
----
-
-## Files Modified Today
-
-### Release Prep (Completed)
-- ✅ `Cargo.toml` - Version bump to 0.5.2
-- ✅ `python-groggy/Cargo.toml` - Version bump to 0.5.2
-- ✅ `pyproject.toml` - Version bump to 0.5.2
-- ✅ `CHANGELOG.md` - Full release history
-- ✅ `RELEASE_NOTES_0.5.2.md` - Comprehensive release notes
-- ✅ `docs/algorithms/` - Native algorithm documentation
-- ✅ `docs/builder/` - Updated Builder DSL docs
-- ✅ `docs/tutorials/` - Updated tutorials 1-4
-- ✅ `mkdocs.yml` - Navigation updates
-
-### Needs Fix (5 minutes)
-- ❌ `Cargo.toml` - Add JIT feature flag
-- ❌ `src/algorithms/steps/loop_step.rs` - Add cfg gates
-- ❌ `src/algorithms/execution/mod.rs` - Conditional JIT exports
-
----
-
-## Contacts & Links
-
-- **GitHub Actions:** https://github.com/rollingstorms/groggy/actions
-- **Latest Run (CI):** https://github.com/rollingstorms/groggy/actions/runs/19945247889
-- **Latest Run (Test):** https://github.com/rollingstorms/groggy/actions/runs/19945247890
-- **Commit:** https://github.com/rollingstorms/groggy/commit/0b10a6f
-
----
-
-**Decision Required:** Approve Option A to proceed with release today?
+The broader flat checklist remains **215 checked / 53 open / 268 total**; its
+parent rows overlap and include deferred scope. This release preparation does not
+mark them all complete. Historical [0.5.2 status](notes/planning/release-052-status-historical.md)
+is archived separately.

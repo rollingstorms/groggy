@@ -48,6 +48,12 @@ The standard Maturin backend builds distributions without importing the extensio
 or regenerating stubs during the build. Stub updates are an explicit maintainer
 step; checked-in stubs and the typing marker are included in the wheel.
 
+The release targets CPython 3.8–3.12 (macOS arm64: 3.9–3.12). Both package
+entry points now declare `>=3.8,<3.13`, matching the current PyO3 0.20.3 build
+limit. The nested build no longer forces its experimental forward-compatibility
+bypass. Supporting newer interpreters requires a separate dependency upgrade and
+qualification; it is not implied by a successful local 3.9 build.
+
 ## Boundaries and open risks
 
 - Live Graph and connected owner access remains creator-thread bound. Native
@@ -73,3 +79,5 @@ step; checked-in stubs and the typing marker are included in the wheel.
 Use the current [release status](RELEASE_STATUS.md) for executed checks and open
 gates. Local qualification does not certify the full platform matrix. No release
 tag, upload or publication is implied by changing the development version.
+Use the [release runbook](docs/api/release-qualification.md) for artifact-backed
+tests, source rebuilds and the publication boundary.

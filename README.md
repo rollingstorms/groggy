@@ -6,6 +6,15 @@
 ### a graph analytics library for Python with a Rust core
 ---
 
+**Development version: 0.6.0, unreleased.** Start with the
+[scope and migration guide](RELEASE_NOTES_0.6.0.md) and
+[complete application workflow](docs/api/core-release-workflow.md) for current
+mutation, immutable-view, temporal and storage behavior. Package builds target
+CPython 3.8–3.12 (macOS arm64: 3.9–3.12); see
+[qualification status](RELEASE_STATUS.md) for executed checks and pending CI.
+`pip install groggy` installs the published release, which may differ from this
+development branch. Older examples below are not the 0.6.0 acceptance contract.
+
 ## 👀 **What is groggy?**
 groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, groggy lets you seamlessly work with graph data using familiar table-like operations.
 

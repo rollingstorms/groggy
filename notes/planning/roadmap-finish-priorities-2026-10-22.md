@@ -10,6 +10,14 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 ### Proposed bounded 0.6.0 qualification — 2026-11-14
 
+Application/baseline/release follow-up: the complete workflow now runs through
+artifact-backed qualification, including maintained Python/docs and ownership
+gates. Source distributions rebuild independently with retained lockfiles;
+successful receipts include wheel hashes. The release runbook and current status
+separate completed local evidence from pending platform CI. Publishing requires
+native, wheel and source gates; manual qualification cannot publish. See
+`release-060-final-gates-2026-11-14.md`. No additional broad checklist rows added.
+
 Ownership follow-up: native finalization is repaired with creator-checked
 Arc/OwnerCell handles. Foreign GC and creator exit free native owners and durable
 locks without polling; live writes remain creator-bound. Verification now passes

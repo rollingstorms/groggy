@@ -1,0 +1,160 @@
+{
+  "date": "2026-11-14",
+  "native_source_commit": "bada33453bc5ac28667599137095419be71139ad",
+  "scope": "Local macOS arm64 CPython 3.9 qualification. Export of committed native code plus listed packaging/qualification overlays and retained locks. Unrelated owner work excluded. No publication or CI run.",
+  "toolchain": {
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)",
+    "maturin": "maturin 1.9.0"
+  },
+  "export_overlays_sha256": {
+    ".github/workflows/publish.yml": "63aca4e690133968b2ad208bf75797a4d406162d76521f08e6dfee413801f1b4",
+    "pyproject.toml": "c470f4c096bf3cee9c35a7a9da909baef338e9dd00f126aac8ffea9d260e261e",
+    "python-groggy/pyproject.toml": "10296d0042c2975e88e685c139d0577f3250a52444c46eff76a851e2ed327726",
+    "notes/scripts/verify_release_wheel.py": "12d27bd64332ca249127662f03191594aa6f61d4f0638505f30dbdadc7b8dff4",
+    "notes/scripts/verify_release_sdist.py": "e52f9fc72ba1418ca35852f03534b4bbd8bd9a4f0afab54420d7617d1e29cd6d"
+  },
+  "lockfiles_sha256": {
+    "Cargo.lock": "d0a764734a99276e6842e2575d8d583e329de2a3af2cbf925ed5ff58f20f92a2",
+    "python-groggy/Cargo.lock": "5879608fc8f08a95914e9bf5adc648c098f6de80194d584b3b33e55f6d421a80"
+  },
+  "source_archive": {
+    "name": "groggy-0.6.0.tar.gz",
+    "sha256": "d355dd6636bc24e266d829ef8892f35909092ff93f3c16f54fd3641bcf119645"
+  },
+  "artifacts": {
+    "root": {
+      "python": "3.9.6 (default, Mar 12 2025, 20:22:46) \n[Clang 17.0.0 (clang-1700.0.13.3)]",
+      "platform": "macOS-26.3.1-arm64-arm-64bit",
+      "artifacts": [
+        {
+          "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+          "sha256": "89f3cbf72ca2e362e50517f6e962ccaf06ec082b8bba0afe0478f775627e61c1",
+          "smoke": {
+            "version": "0.6.0",
+            "exports": 104,
+            "package": "/private/var/folders/jy/34vkbxz97tbgm78bc07fmx380000gn/T/groggy-wheel-check-dpa252cc/groggy/__init__.py",
+            "workflows": [
+              {
+                "storage": "archive",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              },
+              {
+                "storage": "journal",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              }
+            ]
+          },
+          "tests": "maintained"
+        }
+      ]
+    },
+    "nested": {
+      "python": "3.9.6 (default, Mar 12 2025, 20:22:46) \n[Clang 17.0.0 (clang-1700.0.13.3)]",
+      "platform": "macOS-26.3.1-arm64-arm-64bit",
+      "artifacts": [
+        {
+          "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+          "sha256": "13c3aabfcdc7dcc74d43a842700ce0915634ce6ea9473a65f0b33500f0244b3c",
+          "smoke": {
+            "version": "0.6.0",
+            "exports": 104,
+            "package": "/private/var/folders/jy/34vkbxz97tbgm78bc07fmx380000gn/T/groggy-wheel-check-3zn9s2du/groggy/__init__.py",
+            "workflows": [
+              {
+                "storage": "archive",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              },
+              {
+                "storage": "journal",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              }
+            ]
+          },
+          "tests": "ownership"
+        }
+      ]
+    },
+    "source": {
+      "python": "3.9.6 (default, Mar 12 2025, 20:22:46) \n[Clang 17.0.0 (clang-1700.0.13.3)]",
+      "platform": "macOS-26.3.1-arm64-arm-64bit",
+      "artifacts": [
+        {
+          "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+          "sha256": "f402ef1fc2d28d9c9e84d3a1f860bf210cf661d50754bd6ada94500b4e84425f",
+          "smoke": {
+            "version": "0.6.0",
+            "exports": 104,
+            "package": "/private/var/folders/jy/34vkbxz97tbgm78bc07fmx380000gn/T/groggy-wheel-check-him7mi08/groggy/__init__.py",
+            "workflows": [
+              {
+                "storage": "archive",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              },
+              {
+                "storage": "journal",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              }
+            ]
+          },
+          "tests": "none"
+        }
+      ]
+    }
+  },
+  "gates": {
+    "native": {
+      "passed": 1566,
+      "failed": 0,
+      "ignored": 54,
+      "suite_results": 220
+    },
+    "serial_checkpoint_recovery": {
+      "passed": 1
+    },
+    "strict_all_target_clippy": "passed",
+    "artifact_python": {
+      "passed": 2718,
+      "skipped": 1,
+      "warnings": 14
+    },
+    "artifact_documentation_examples": 267,
+    "nested_workflow_and_ownership": {
+      "passed": 36
+    },
+    "negative_checks": [
+      "empty wheel directory rejects",
+      "mismatched release tag rejects",
+      "existing receipt rejects",
+      "escaping source archive member rejects"
+    ],
+    "workflow_yaml": "parsed locally; 19 matrix combinations and publication dependencies checked; not executed on GitHub"
+  },
+  "logs_sha256": {
+    "python": "47b7a9d3c5f668a32a74b9a12311951508e14d46036c0b7bc008566bd451ef92",
+    "nested-tests": "40e02171a4cfb87a72522d327b13eb68337f054abd22b361e0aa078a51bf77ee",
+    "native": "5c9ef43d9df4b8e32172ecbdd1f2f8b6f25fcd7f14521cd82a0db97bb4cf6299",
+    "checkpoint": "90fdf4aa72bfdbc664ff3610bac22e35b7863a0ab57e66865180c97765b9b6a9",
+    "clippy": "d3d730c8dc6554928e724e0acba95ac6cadae178e7d9f20b90b6abb197de6d7a",
+    "source-rebuild": "1aa5526bdf70e23588930629442cb2528f897d33fc0c07d9895c0a6c1bb114b9"
+  },
+  "performance_evidence": [
+    "notes/benchmarks/python-owner-workflow-2026-11-14.json",
+    "notes/benchmarks/python-owner-access-2026-11-14.json"
+  ],
+  "remaining": [
+    "Execute and review cross-platform artifact qualification before publication",
+    "Review final release artifact hashes and scope before a published tag release"
+  ]
+}
