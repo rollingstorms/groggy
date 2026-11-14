@@ -8,6 +8,29 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 ## Current execution checkpoint
 
+### Proposed bounded 0.6.0 qualification — 2026-11-14
+
+The owner clarified that Graphiti belongs in a future external plugin repository,
+not the core package. Record the boundary now; no repository migration is requested.
+Adapter/driver compatibility is not a core release gate. The full checklist still
+tracks the broader vision, including deferred core retrieval and service work.
+
+For a proposed 6–10 hour implementation/testing budget, prioritize a usable
+embedded-core release over completing all broad parents: packaging/version and
+import consistency; a bounded investigation/fix of writable PyGraph foreign-thread
+cyclic finalization; one end-to-end temporal/table/numerical/save-reopen acceptance
+workflow; a small repeatable performance baseline; and accurate capability,
+migration and release documentation. Use existing tests and fixtures, adding
+regressions for concrete defects rather than a new broad audit. Reserve time for
+native/FFI rebuilds and final regression gates. This budget is an allocation,
+not a claim these tasks will all finish or that a release is already qualified.
+
+If the ownership fix requires a large redesign, record the evidence and make an
+explicit release-scope decision; do not declare it fixed or hide the warning.
+Defer general staged-topology additions, service concurrency, universal format
+migration, billion-entity claims and new retrieval families from this time box.
+This proposed release scope does not mark existing checklist requirements complete.
+
 Implemented: AR7.2–AR7.4 consolidation, numerical completion slices and receipts,
 AR7.5a–l immutable reads through components and centralities, AR7.9a canonical
 logical change records, and 07.3a f64 representation, supported consumer migration

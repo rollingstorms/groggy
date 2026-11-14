@@ -13,6 +13,12 @@ box is unchecked. The decision record and API documents define the contracts.
 The [open-questions appendix](open-questions-appendix-2026-10-20.md) remains the
 place for unresolved owner choices; this checklist does not answer those choices.
 
+Owner clarification (2026-11-14): Graphiti adapters/drivers belong in a future
+separate plugin repository, not the core package. No repository migration has
+been performed. Their unchecked rows track external integration work and do not
+block a scoped core 0.6.0 release. General retrieval primitives remain separately
+deferred core work.
+
 Graphiti integration and retrieval remain deferred until the core. “Record a
 change” means accepting a mutation and its delta, with an explicit effective time
 or batch clock default. It does not mean computing a read records new history.

@@ -5,6 +5,15 @@ explicit clarification replies in this chat. Accepted directions authorize futur
 implementation; they do not claim that the code already implements them. Only
 answered questions change status. Unanswered or qualified choices remain visible.
 
+## Release scope clarification — 2026-11-14
+
+Graphiti integration will not be part of the Groggy core package. The owner
+intends a future separate plugin repository; record that direction now without
+creating or migrating a repository. Existing adapter/driver/compatibility items
+remain deferred external integration work, not core 0.6.0 release blockers.
+General graph, temporal, numerical and retrieval primitives retain their own
+core scope; moving the adapter does not automatically defer those primitives.
+
 ## Answer mapping
 
 | Question | Owner answer / clarification | Recorded direction and status |
