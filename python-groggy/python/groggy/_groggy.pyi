@@ -9,6 +9,12 @@ from typing import Any, List, Dict, Optional, Tuple, Union, Iterator, Iterable
 
 # Module-level functions
 
+__version__: str
+
+def detect_display_type(data: Dict[str, Any]) -> str: ...
+
+def format_data_structure(data: Dict[str, Any], data_type: Optional[str] = None, config: Optional[DisplayConfig] = None) -> str: ...
+
 def array(*args, **kwargs) -> Any:
     """
     Create a BaseArray or specialized array from a Python list

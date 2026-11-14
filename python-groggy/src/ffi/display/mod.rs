@@ -204,8 +204,28 @@ pub trait ToDisplayData {
 pub fn register_display_functions(_py: Python, m: &PyModule) -> PyResult<()> {
     // Add format_table function
     m.add_function(wrap_pyfunction!(format_table_function, m)?)?;
+    m.add_function(wrap_pyfunction!(format_data_structure, m)?)?;
+    m.add_function(wrap_pyfunction!(detect_display_type, m)?)?;
 
     Ok(())
+}
+
+/// Route a display dictionary through the canonical native formatter.
+#[pyfunction]
+#[pyo3(signature = (data, data_type=None, config=None))]
+fn format_data_structure(
+    data: HashMap<String, PyObject>,
+    data_type: Option<String>,
+    config: Option<&PyDisplayConfig>,
+) -> PyResult<String> {
+    PyTableFormatter::format_data_structure(data, data_type, config)
+}
+
+/// Detect the native display kind without duplicating its classification policy.
+#[pyfunction]
+fn detect_display_type(data: HashMap<String, PyObject>) -> PyResult<&'static str> {
+    let data = python_dict_to_rust_hashmap(data)?;
+    Ok(groggy::display::detect_display_type(&data))
 }
 
 /// Standalone function for formatting tables (exported to Python)

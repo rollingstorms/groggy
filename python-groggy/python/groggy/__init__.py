@@ -7,6 +7,7 @@ This package provides a Pythonic interface to the high-performance Rust graph li
 # GraphTable now comes from Rust FFI
 # Import directly from Rust extension for Phase 3 functionality
 from ._groggy import StatsArray  # Backward compatibility alias for NumArray
+from ._groggy import detect_display_type, format_data_structure
 from ._groggy import (  # Version control classes; Statistical arrays and matrices; Array factory functions for backward compatibility; Table classes; Builder functions with auto-conversion; Display functionality; Display system; Hierarchical subgraph functionality
     AggregationFunction, AggregationResult, AttributeFilter, AttrValue,
     BaseArray, BaseTable, BranchInfo, Commit, ComponentsArray, DisplayConfig,
@@ -64,7 +65,7 @@ if not _DISPLAY_AVAILABLE:
         return f"GraphTable(shape={shape})"
 
 
-__version__ = "0.5.1"
+__version__ = _groggy.__version__
 GraphView = _groggy.GraphView
 GraphViewEntity = _groggy.GraphViewEntity
 GraphViewEntities = _groggy.GraphViewEntities

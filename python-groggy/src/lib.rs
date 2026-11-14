@@ -434,6 +434,7 @@ fn int_array_factory(values: Vec<i64>) -> PyNumArray {
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     // Register core graph components
     m.add_class::<PyGraph>()?;
     m.add_class::<ffi::api::write_coordinate::PyWriteCoordinate>()?;
