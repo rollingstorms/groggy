@@ -410,8 +410,7 @@ impl DurableGraph {
             .parent()
             .filter(|p| !p.as_os_str().is_empty())
             .unwrap_or_else(|| Path::new("."));
-        File::open(parent)
-            .and_then(|dir| dir.sync_all())
+        crate::storage::filesystem::sync_directory(parent)
             .map_err(|e| io_error(parent, "sync_journal_directory", e))?;
         Ok(store)
     }
@@ -721,8 +720,7 @@ impl DurableGraph {
         temporary
             .persist_noclobber(destination)
             .map_err(|e| io_error(destination, "publish_backup_without_overwrite", e.error))?;
-        File::open(parent)
-            .and_then(|directory| directory.sync_all())
+        crate::storage::filesystem::sync_directory(parent)
             .map_err(|e| io_error(parent, "sync_backup_directory", e))?;
         Ok(())
     }

@@ -150,8 +150,7 @@ impl PreparedArchive {
         temporary
             .persist_noclobber(path)
             .map_err(|e| io_error(path, "publish_archive_without_overwrite", e.error))?;
-        std::fs::File::open(parent)
-            .and_then(|f| f.sync_all())
+        crate::storage::filesystem::sync_directory(parent)
             .map_err(|e| io_error(parent, "sync_archive_directory", e))
     }
     /// Read framed bytes without constructing thread-local graph ownership.

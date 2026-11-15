@@ -8,7 +8,8 @@ Groggy wheel. Publishing is a separate release action.
 ## Artifact gates
 
 Use a clean checkout of the intended commit. Python, Rust, Maturin 1.9.0 and the
-existing test dependencies must be available. Select the Python interpreter
+existing test dependencies must be available. Qualification pins Rust 1.96.1
+(the locally verified compiler) rather than following new stable lint changes. Select the Python interpreter
 explicitly; the current PyO3 dependency is not qualified for Python 3.13 or later.
 Both package entry points declare `>=3.8,<3.13`, matching that build limit.
 

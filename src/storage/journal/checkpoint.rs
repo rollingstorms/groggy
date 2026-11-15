@@ -409,8 +409,7 @@ impl StorageCheckpointPlan {
         *invalidate_owner = true;
         #[cfg(test)]
         self.inject(CheckpointFailure::AfterReplace)?;
-        File::open(parent)
-            .and_then(|directory| directory.sync_all())
+        crate::storage::filesystem::sync_directory(parent)
             .map_err(|e| io_error(parent, "sync_storage_checkpoint_directory", e))?;
         #[cfg(test)]
         self.inject(CheckpointFailure::AfterDirectorySync)?;

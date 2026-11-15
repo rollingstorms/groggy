@@ -35,7 +35,7 @@ A partial final record is discarded and its byte count is available in `recovere
 
 ## Full-journal backup
 
-`graph.backup(destination)` writes a separately recoverable copy of the accepted journal, including all retained versions, branches, schema revisions and identity reservations. It copies to a sibling temporary file, syncs and verifies that copy, publishes it without overwriting an existing destination, and syncs the directory. Later source writes do not change the backup. Open the result with `DurableGraph.open`; no special restore loader is needed.
+`graph.backup(destination)` writes a separately recoverable copy of the accepted journal, including all retained versions, branches, schema revisions and identity reservations. It copies to a sibling temporary file, syncs and verifies that copy, publishes it without overwriting an existing destination, and syncs the directory on Unix. Later source writes do not change the backup. Open the result with `DurableGraph.open`; no special restore loader is needed.
 
 Backup requires a healthy open store and an existing destination directory. The source writer stays exclusively borrowed while the copy is made. A copy/verification failure leaves no destination and removes the temporary file. A directory-sync failure after publication can leave a complete destination; inspect/reopen it before retrying. Never replace a live journal by copying a backup over it. Backup copies the full log and verifies it through replay, so time and disk cost grow with history. It is not a compact checkpoint. It includes persisted frozen group revisions; it does not import unrecorded raw pool contents.
 
@@ -65,3 +65,19 @@ Active JSON export and arbitrary raw pool transfer remain separate contracts.
 For explicit orphan entity/group/name reclamation, see
 [retained-storage purge](retained-purge.md). It uses verified atomic baseline
 replacement and preserves the monotonic lifetime ID counters.
+
+## Host filesystem mechanisms
+
+```python
+from groggy import storage_capabilities
+capabilities = storage_capabilities()
+assert set(capabilities) == {"file_sync", "directory_sync", "checked_replacement"}
+assert capabilities["file_sync"] is True
+```
+
+These flags report implemented mechanisms. Unix creation/backup also syncs the
+parent directory. Windows uses synchronized file contents but has no directory
+sync guarantee here; process-reopen evidence is distinct from sudden-power-loss
+namespace durability. Inode-checked physical replacement/checkpoint/purge remains
+Unix-only and rejects before replacement on other hosts. Filesystem/device
+behavior can impose further limits. Inspection does not change graph history.

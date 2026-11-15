@@ -3,8 +3,18 @@
 `Graph.save_archive(path)` writes a versioned, checksummed binary CBOR archive.
 `Graph.load_archive(path)` restores an independent embedded graph. The destination
 must be new; save validates and encodes first, syncs a sibling temporary, publishes
-without replacing an existing file, and syncs the directory. A directory-sync
+without replacing an existing file, and syncs the directory on Unix. A directory-sync
 failure can leave a complete destination: inspect it before retrying.
+
+`groggy.storage_capabilities()` reports host implementation mechanisms. Unix
+supports directory sync and inode-checked replacement. Windows archive/journal
+creation and backup acknowledge synchronized file contents, without a directory
+sync or a guarantee that a newly created name survives sudden power loss.
+Inode-checked maintenance remains explicitly unsupported on Windows. This is an
+implementation boundary, not a certification of an arbitrary filesystem/device.
+The Win32 [file flushing API](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers)
+requires a writable file handle; a normal read-only directory handle does not
+supply the Unix directory-sync mechanism.
 
 ```python
 from groggy import Graph

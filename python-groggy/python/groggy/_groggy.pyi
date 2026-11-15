@@ -11186,3 +11186,8 @@ class GraphView:
         Owned scalar feature matrix using the graph API's shared conversion policy.
         """
         ...
+
+
+def storage_capabilities() -> dict[str, bool]:
+    """Report file sync, directory sync and checked replacement support."""
+    ...

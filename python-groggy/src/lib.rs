@@ -431,10 +431,22 @@ fn int_array_factory(values: Vec<i64>) -> PyNumArray {
     PyNumArray::new_int64(values)
 }
 
+/// Report actual filesystem mechanisms, separate from device-level guarantees.
+#[pyfunction]
+fn storage_capabilities(py: Python<'_>) -> PyResult<PyObject> {
+    let native = groggy::storage::filesystem::capabilities();
+    let result = pyo3::types::PyDict::new(py);
+    result.set_item("file_sync", native.file_sync)?;
+    result.set_item("directory_sync", native.directory_sync)?;
+    result.set_item("checked_replacement", native.checked_replacement)?;
+    Ok(result.into())
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add_function(wrap_pyfunction!(storage_capabilities, m)?)?;
     // Register core graph components
     m.add_class::<PyGraph>()?;
     m.add_class::<ffi::api::write_coordinate::PyWriteCoordinate>()?;
