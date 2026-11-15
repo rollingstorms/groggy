@@ -38,7 +38,7 @@ access. Detached immutable GraphView remains the supported worker read interface
 See [Python owner lifetimes](docs/api/python-owner-lifetimes.md) for explicit
 native Rust handle migration and the 34 Python/5 native ownership regressions.
 
-Graphiti remains future external plugin work. Core retrieval expansion,
+Core retrieval expansion,
 multi-client services, arbitrary old-format migration, universal power-loss
 claims and broad numerical/scale conformance remain outside this bounded release.
 They retain their existing roadmap boundaries.

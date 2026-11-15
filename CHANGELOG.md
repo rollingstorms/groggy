@@ -37,8 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This is an unreleased development version. See [0.6.0 scope and migration
 notes](RELEASE_NOTES_0.6.0.md) and [release qualification](RELEASE_STATUS.md).
 The writable-owner cyclic finalization defect is fixed within the documented
-thread-access boundary. Graphiti is planned as a separate plugin, outside the
-core release.
+thread-access boundary.
 
 ## [0.5.2] - 2024-12-04
 

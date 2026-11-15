@@ -69,8 +69,6 @@ qualification; it is not implied by a successful local 3.9 build.
   retained files can be migrated, or claim power-loss safety on every platform.
 - Exact vector retrieval, lexical ranking and hybrid retrieval remain planned.
   Storing a vector property does not imply an implemented search engine.
-- Graphiti adapters/drivers belong in a future external plugin repository.
-  They are not part of the core package or a 0.6.0 release requirement.
 - Supported implementation is not a promise of numerical/graph parity across
   every operation, workload size or external library.
 

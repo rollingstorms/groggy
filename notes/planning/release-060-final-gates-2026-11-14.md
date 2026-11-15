@@ -1,8 +1,8 @@
 # 0.6.0 application, baseline and final gates — 2026-11-14
 
 Scope: finish the owner's three remaining bounded release-preparation items.
-This is an embedded library release candidate. Graphiti remains a future external
-plugin; the wider roadmap remains **215 checked / 53 open / 268 total**. No
+This is an embedded library release candidate. The wider roadmap remains
+**215 checked / 53 open / 268 total**. No
 publication, tag, upload, push or CI dispatch is part of this slice.
 
 ## Application acceptance
