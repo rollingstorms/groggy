@@ -417,3 +417,7 @@ harness = false
 
 [target.'cfg(windows)'.dependencies]
 same-file = "1.0" # Safe handle identity for non-repairing Windows journal verification
+
+[[bench]]
+name = "pending_frame_allocations"
+harness = false

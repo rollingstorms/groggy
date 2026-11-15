@@ -9,11 +9,22 @@ use crate::{
 use crate::{subgraphs::Subgraph, traits::SubgraphOperations};
 use anyhow::{anyhow, Result};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
+
+type TopologyStamp = (usize, usize, usize, usize, usize);
+#[derive(Debug)]
+struct PendingTopology {
+    nodes: HashSet<NodeId>,
+    edges: HashMap<EdgeId, (NodeId, NodeId)>,
+}
 
 #[derive(Debug)]
 pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
     root: Option<Subgraph>,
+    topology_cache: Option<(TopologyStamp, Arc<PendingTopology>)>,
+    validated_topology: Option<TopologyStamp>,
+    dirty_targets: HashSet<(bool, usize)>,
     read_revision: u64,
     captures: HashMap<usize, (u64, crate::state::read_state::WeakReadCapture)>,
     capture_sweep_at: usize,
@@ -64,44 +75,69 @@ impl PropertyBatch {
         self.capture_scoped(subgraph, false)
     }
 
-    /// Refresh values against the original batch root, then project an exact
-    /// child frame. Sibling writes and global provisional IDs belong to the root.
+    /// Refresh exactly one execution selection. The accepted base and pending
+    /// topology are shared; only this frame's property values are copied.
     pub(crate) fn capture_scoped(
         &mut self,
         subgraph: &Subgraph,
         fixed: bool,
     ) -> GraphResult<crate::GraphView> {
         let root = self.root.as_ref().unwrap_or(subgraph).clone();
-        if !std::sync::Arc::ptr_eq(&root.graph(), &subgraph.graph()) {
+        let binding = root.graph();
+        if !Arc::ptr_eq(&binding, &subgraph.graph()) {
             return Err(crate::GraphError::InvalidInput(
                 "Execution frame has a different graph owner".into(),
             ));
         }
-        let view = self.materialize(&root)?;
-        if fixed {
+        let graph = binding.borrow();
+        graph.validate_write_coordinate(&self.coordinate)?;
+        let base = if let Some(view) = root.frozen_view() {
+            view.clone()
+        } else {
+            let owner = graph.read_view()?;
             crate::GraphView::from_membership(
-                view.read_state().clone(),
-                subgraph.nodes().clone(),
-                subgraph.edges().clone(),
-            )
-        } else if self.root.is_some() {
+                owner.read_state().clone(),
+                root.nodes().clone(),
+                root.edges().clone(),
+            )?
+        };
+        // Keep one accepted source for this run, avoiding repeated owner captures.
+        if self.root.is_some() && root.frozen_view().is_none() {
+            self.root = Some(root.bound_selection(base.clone(), "atomic execution root".into()));
+        }
+        drop(graph);
+        let topology = self.pending_topology(&base)?;
+        let (nodes, edges) = if fixed {
+            for id in subgraph.nodes() {
+                if !topology.nodes.contains(id) {
+                    return Err(crate::GraphError::InvalidInput(format!(
+                        "Execution frame node {id} is outside the pending selection"
+                    )));
+                }
+            }
+            for id in subgraph.edges() {
+                let &(source, target) = topology.edges.get(id).ok_or_else(|| {
+                    crate::GraphError::InvalidInput(format!(
+                        "Execution frame edge {id} is outside the pending selection"
+                    ))
+                })?;
+                if !subgraph.nodes().contains(&source) || !subgraph.nodes().contains(&target) {
+                    return Err(crate::GraphError::InvalidInput(format!(
+                        "Execution frame edge {id} endpoint is outside its node selection"
+                    )));
+                }
+            }
+            (subgraph.nodes().clone(), subgraph.edges().clone())
+        } else {
             let (added_nodes, added_edges) = self.added_ids();
-            let is_added_node = |id: usize| {
-                self.allocation_base
-                    .is_some_and(|(base, _)| id >= base && id - base < self.add_nodes)
-            };
-            let is_added_edge = |id: usize| {
-                self.allocation_base
-                    .is_some_and(|(_, base)| id >= base && id - base < self.add_edges.len())
-            };
             if subgraph
                 .nodes()
                 .iter()
-                .any(|id| !root.nodes().contains(id) && !is_added_node(*id))
+                .any(|id| !root.nodes().contains(id) && !self.is_added_node(*id))
                 || subgraph
                     .edges()
                     .iter()
-                    .any(|id| !root.edges().contains(id) && !is_added_edge(*id))
+                    .any(|id| !root.edges().contains(id) && !self.is_added_edge(*id))
             {
                 return Err(crate::GraphError::InvalidInput(
                     "Execution selection expands outside its original batch root".into(),
@@ -112,85 +148,33 @@ impl PropertyBatch {
                 .iter()
                 .copied()
                 .chain(added_nodes)
-                .filter(|id| view.contains_node(*id))
+                .filter(|id| topology.nodes.contains(id))
                 .collect();
-            let mut edges = HashSet::new();
-            for id in subgraph.edges().iter().copied().chain(added_edges) {
-                if view.contains_edge(id) {
-                    let (source, target) = view.edge_endpoints(id)?;
-                    if nodes.contains(&source) && nodes.contains(&target) {
-                        edges.insert(id);
-                    }
-                }
-            }
-            crate::GraphView::from_membership(view.read_state().clone(), nodes, edges)
-        } else {
-            Ok(view)
-        }
-    }
-
-    fn materialize(&mut self, subgraph: &Subgraph) -> GraphResult<crate::GraphView> {
-        subgraph
-            .graph()
-            .borrow()
-            .validate_write_coordinate(&self.coordinate)?;
-        let base = subgraph.pin_view()?;
-        let mut revisions = HashMap::with_capacity(self.edge_endpoints.len());
-        for &(edge, source, target) in &self.edge_endpoints {
-            let (BatchNodeRef::Existing(source), BatchNodeRef::Existing(target)) = (source, target)
-            else {
-                return Err(crate::GraphError::InvalidInput(
-                    "Unsupported staged added endpoint".into(),
-                ));
-            };
-            if revisions.insert(edge, (source, target)).is_some() {
-                return Err(crate::GraphError::InvalidInput(format!(
-                    "Duplicate staged endpoint revision for edge {edge}"
-                )));
-            }
-        }
-        let mut removed_nodes = HashSet::with_capacity(self.remove_nodes.len());
-        for reference in &self.remove_nodes {
-            let BatchNodeRef::Existing(id) = reference else {
-                return Err(crate::GraphError::InvalidInput(
-                    "Unsupported staged added node removal".into(),
-                ));
-            };
-            removed_nodes.insert(*id);
-        }
-        let mut removed_edges = HashSet::with_capacity(self.remove_edges.len());
-        for reference in &self.remove_edges {
-            let BatchEdgeRef::Existing(id) = reference else {
-                return Err(crate::GraphError::InvalidInput(
-                    "Unsupported staged added edge removal".into(),
-                ));
-            };
-            removed_edges.insert(*id);
-        }
-        let (added_nodes, added_edges) = self.added_ids();
-        let nodes: HashSet<_> = base
-            .nodes()
-            .iter()
-            .copied()
-            .chain(added_nodes.iter().copied())
-            .filter(|id| !removed_nodes.contains(id))
-            .collect();
-        // Revisions precede node cascades in the canonical batch model. An edge
-        // moved off a removed endpoint must survive in this provisional value.
+            let edges = subgraph
+                .edges()
+                .iter()
+                .copied()
+                .chain(added_edges)
+                .filter(|id| {
+                    topology.edges.get(id).is_some_and(|(source, target)| {
+                        nodes.contains(source) && nodes.contains(target)
+                    })
+                })
+                .collect();
+            (nodes, edges)
+        };
         let original = base.read_state().snapshot();
         let mut snapshot = crate::state::state::GraphSnapshot::empty_with_type(
             original.state_id,
             original.graph_type,
         );
-        snapshot.active_nodes = nodes.iter().copied().collect();
+        snapshot.active_nodes = nodes.into_iter().collect();
         snapshot.active_nodes.sort_unstable();
-        for id in &snapshot.active_nodes {
-            if let Some(attrs) = original.node_attributes.get(id) {
-                snapshot.node_attributes.insert(*id, attrs.clone());
+        for &id in &snapshot.active_nodes {
+            if let Some(attrs) = original.node_attributes.get(&id) {
+                snapshot.node_attributes.insert(id, attrs.clone());
             }
-        }
-        for &id in &added_nodes {
-            if nodes.contains(&id) {
+            if self.is_added_node(id) {
                 snapshot
                     .node_attributes
                     .entry(id)
@@ -198,64 +182,188 @@ impl PropertyBatch {
                     .insert("entity_type".into(), AttrValue::Text("base".into()));
             }
         }
-        for (&id, &(source, target)) in added_edges.iter().zip(&self.add_edges) {
-            let resolve = |reference| match reference {
-                BatchNodeRef::Existing(id) => id,
-                BatchNodeRef::Added(position) => added_nodes[position],
-            };
-            let (source, target) = (resolve(source), resolve(target));
-            if !removed_edges.contains(&id) && nodes.contains(&source) && nodes.contains(&target) {
-                snapshot.edges.insert(id, (source, target));
+        for id in edges {
+            let endpoints = topology.edges.get(&id).ok_or_else(|| {
+                crate::GraphError::InvalidInput("Missing prepared frame endpoints".into())
+            })?;
+            snapshot.edges.insert(id, *endpoints);
+            if let Some(attrs) = original.edge_attributes.get(&id) {
+                snapshot.edge_attributes.insert(id, attrs.clone());
             }
         }
-        for &id in base.edges() {
-            let (source, target) = revisions
-                .get(&id)
-                .copied()
-                .map(Ok)
-                .unwrap_or_else(|| base.edge_endpoints(id))?;
-            if !removed_edges.contains(&id)
-                && !removed_nodes.contains(&source)
-                && !removed_nodes.contains(&target)
-            {
-                snapshot.edges.insert(id, (source, target));
-                if let Some(attrs) = original.edge_attributes.get(&id) {
-                    snapshot.edge_attributes.insert(id, attrs.clone());
+        // Column-first staged storage remains authoritative. Read only selected
+        // rows, rather than cloning every sibling's accumulated values.
+        for (name, column) in &self.nodes {
+            for &id in &snapshot.active_nodes {
+                if let Some(value) = column.get(&id) {
+                    snapshot
+                        .node_attributes
+                        .entry(id)
+                        .or_default()
+                        .insert(name.clone(), value.clone());
                 }
             }
         }
-        for (name, rows) in &self.nodes {
-            for (&id, value) in rows {
-                if !nodes.contains(&id) {
-                    return Err(crate::GraphError::InvalidInput(format!(
-                        "Staged node property target {id} is outside the resulting selection"
-                    )));
+        for (name, column) in &self.edges {
+            for &id in snapshot.edges.keys() {
+                if let Some(value) = column.get(&id) {
+                    snapshot
+                        .edge_attributes
+                        .entry(id)
+                        .or_default()
+                        .insert(name.clone(), value.clone());
                 }
-                snapshot
-                    .node_attributes
-                    .entry(id)
-                    .or_default()
-                    .insert(name.clone(), value.clone());
-            }
-        }
-        for (name, rows) in &self.edges {
-            for (&id, value) in rows {
-                if !snapshot.edges.contains_key(&id) {
-                    return Err(crate::GraphError::InvalidInput(format!(
-                        "Staged edge property target {id} is outside the resulting selection"
-                    )));
-                }
-                snapshot
-                    .edge_attributes
-                    .entry(id)
-                    .or_default()
-                    .insert(name.clone(), value.clone());
             }
         }
         let state = crate::state::read_state::PinnedReadState::from_snapshot(snapshot)?
             .with_groups(base.read_state().groups().clone());
-        // Reclaim dead authority metadata with amortized work. Live earlier
-        // captures remain authorized; weak entries must not grow per iteration.
+        self.register_capture(&state);
+        Ok(crate::GraphView::all(state))
+    }
+
+    fn is_added_node(&self, id: NodeId) -> bool {
+        self.allocation_base
+            .is_some_and(|(base, _)| id >= base && id - base < self.add_nodes)
+    }
+    fn is_added_edge(&self, id: EdgeId) -> bool {
+        self.allocation_base
+            .is_some_and(|(_, base)| id >= base && id - base < self.add_edges.len())
+    }
+    // Structural plans append only. Their lengths identify geometry revisions;
+    // property-only assignments do not invalidate prepared membership/endpoints.
+    fn topology_stamp(&self) -> TopologyStamp {
+        (
+            self.add_nodes,
+            self.add_edges.len(),
+            self.remove_nodes.len(),
+            self.remove_edges.len(),
+            self.edge_endpoints.len(),
+        )
+    }
+    fn pending_topology(&mut self, base: &crate::GraphView) -> GraphResult<Arc<PendingTopology>> {
+        let stamp = self.topology_stamp();
+        let cached = self
+            .root
+            .is_some()
+            .then(|| {
+                self.topology_cache
+                    .as_ref()
+                    .filter(|(old, _)| *old == stamp)
+                    .map(|(_, topology)| topology.clone())
+            })
+            .flatten();
+        let topology = if let Some(topology) = cached {
+            topology
+        } else {
+            let mut revisions = HashMap::with_capacity(self.edge_endpoints.len());
+            for &(edge, source, target) in &self.edge_endpoints {
+                let (BatchNodeRef::Existing(source), BatchNodeRef::Existing(target)) =
+                    (source, target)
+                else {
+                    return Err(crate::GraphError::InvalidInput(
+                        "Unsupported staged added endpoint".into(),
+                    ));
+                };
+                if revisions.insert(edge, (source, target)).is_some() {
+                    return Err(crate::GraphError::InvalidInput(format!(
+                        "Duplicate staged endpoint revision for edge {edge}"
+                    )));
+                }
+            }
+            let mut removed_nodes = HashSet::with_capacity(self.remove_nodes.len());
+            for reference in &self.remove_nodes {
+                let BatchNodeRef::Existing(id) = reference else {
+                    return Err(crate::GraphError::InvalidInput(
+                        "Unsupported staged added node removal".into(),
+                    ));
+                };
+                removed_nodes.insert(*id);
+            }
+            let mut removed_edges = HashSet::with_capacity(self.remove_edges.len());
+            for reference in &self.remove_edges {
+                let BatchEdgeRef::Existing(id) = reference else {
+                    return Err(crate::GraphError::InvalidInput(
+                        "Unsupported staged added edge removal".into(),
+                    ));
+                };
+                removed_edges.insert(*id);
+            }
+            let (added_nodes, added_edges) = self.added_ids();
+            let nodes: HashSet<_> = base
+                .nodes()
+                .iter()
+                .copied()
+                .chain(added_nodes.iter().copied())
+                .filter(|id| !removed_nodes.contains(id))
+                .collect();
+            let mut edges = HashMap::new();
+            for (&id, &(source, target)) in added_edges.iter().zip(&self.add_edges) {
+                let resolve = |reference| match reference {
+                    BatchNodeRef::Existing(id) => id,
+                    BatchNodeRef::Added(position) => added_nodes[position],
+                };
+                let (source, target) = (resolve(source), resolve(target));
+                if !removed_edges.contains(&id)
+                    && nodes.contains(&source)
+                    && nodes.contains(&target)
+                {
+                    edges.insert(id, (source, target));
+                }
+            }
+            for &id in base.edges() {
+                let (source, target) = revisions
+                    .get(&id)
+                    .copied()
+                    .map(Ok)
+                    .unwrap_or_else(|| base.edge_endpoints(id))?;
+                if !removed_edges.contains(&id)
+                    && nodes.contains(&source)
+                    && nodes.contains(&target)
+                {
+                    edges.insert(id, (source, target));
+                }
+            }
+            Arc::new(PendingTopology { nodes, edges })
+        };
+        let validate = |node, id| {
+            if if node {
+                topology.nodes.contains(&id)
+            } else {
+                topology.edges.contains_key(&id)
+            } {
+                Ok(())
+            } else {
+                Err(crate::GraphError::InvalidInput(format!(
+                    "Staged {} property target {id} is outside the resulting selection",
+                    if node { "node" } else { "edge" }
+                )))
+            }
+        };
+        if self.root.is_some() && self.validated_topology == Some(stamp) {
+            for &(node, id) in &self.dirty_targets {
+                validate(node, id)?;
+            }
+        } else {
+            for column in self.nodes.values() {
+                for &id in column.keys() {
+                    validate(true, id)?;
+                }
+            }
+            for column in self.edges.values() {
+                for &id in column.keys() {
+                    validate(false, id)?;
+                }
+            }
+        }
+        if self.root.is_some() {
+            self.topology_cache = Some((stamp, topology.clone()));
+            self.validated_topology = Some(stamp);
+            self.dirty_targets.clear();
+        }
+        Ok(topology)
+    }
+
+    fn register_capture(&mut self, state: &crate::state::read_state::PinnedReadState) {
         if self.captures.len() >= self.capture_sweep_at {
             self.captures
                 .retain(|_, (_, capture)| capture.upgrade().is_some());
@@ -269,7 +377,6 @@ impl PropertyBatch {
             state.capture_key(),
             (self.read_revision, state.downgrade_capture()),
         );
-        Ok(crate::GraphView::all(state))
     }
 
     pub(crate) fn for_selection(coordinate: WriteCoordinate, root: &Subgraph) -> Self {
@@ -282,6 +389,9 @@ impl PropertyBatch {
         Self {
             coordinate,
             root: None,
+            topology_cache: None,
+            validated_topology: None,
+            dirty_targets: HashSet::new(),
             read_revision: 0,
             captures: HashMap::new(),
             capture_sweep_at: 64,
@@ -323,6 +433,11 @@ impl PropertyBatch {
         };
         for (name, rows) in attrs {
             if !rows.is_empty() {
+                if self.root.is_some() {
+                    self.dirty_targets
+                        .extend(rows.iter().map(|(id, _)| (node, *id)));
+                }
+
                 if !self.property_times.is_empty() {
                     for (id, _) in &rows {
                         self.property_times.remove(&(node, *id, name.clone()));
@@ -1135,6 +1250,91 @@ mod tests {
             view.node_attr(0, &"score".into()).unwrap(),
             Some(AttrValue::Int(10))
         );
+    }
+
+    #[test]
+    fn projected_capture_revalidates_removed_targets_and_retains_older_views() {
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(3).unwrap();
+        graph.add_edges(&[(0, 1), (1, 2)]).unwrap();
+        let owner = graph.into_shared();
+        let root = Subgraph::new(
+            owner.clone(),
+            [0, 1, 2].into(),
+            [0, 1].into(),
+            "root".into(),
+        );
+        let child = Subgraph::new(owner.clone(), [0].into(), HashSet::new(), "child".into());
+        let mut batch = PropertyBatch::for_selection(owner.borrow().write_coordinate(), &root);
+        batch
+            .stage(
+                true,
+                HashMap::from([("x".into(), vec![(1, AttrValue::Int(7))])]),
+            )
+            .unwrap();
+        let first = batch.capture(&root).unwrap();
+        batch.stage_endpoint_revisions(vec![(0, 0, 2)], None);
+        batch.stage_removals(true, vec![1], None);
+        // A valid sibling write must be rechecked even when this frame excludes it.
+        assert!(batch
+            .capture_scoped(&child, true)
+            .unwrap_err()
+            .to_string()
+            .contains("target 1"));
+        assert_eq!(
+            first.node_attr(1, &"x".into()).unwrap(),
+            Some(AttrValue::Int(7))
+        );
+        assert_eq!(first.edge_endpoints(0).unwrap(), (0, 1));
+    }
+
+    #[test]
+    fn projected_capture_refreshes_topology_and_rejects_new_foreign_targets() {
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(4).unwrap();
+        graph.add_edges(&[(0, 1), (1, 2)]).unwrap();
+        let owner = graph.into_shared();
+        let root = Subgraph::new(
+            owner.clone(),
+            [0, 1, 2].into(),
+            [0, 1].into(),
+            "root".into(),
+        );
+        let child = Subgraph::new(owner.clone(), [0, 2].into(), [0].into(), "child".into());
+        let mut batch = PropertyBatch::for_selection(owner.borrow().write_coordinate(), &root);
+        let before = batch.capture(&root).unwrap();
+        batch.stage_endpoint_revisions(vec![(0, 0, 2)], None);
+        batch.stage_removals(true, vec![1], None);
+        let rescued = batch.capture_scoped(&child, true).unwrap();
+        assert_eq!(rescued.node_ids(), [0, 2]);
+        assert_eq!(rescued.edge_ids(), [0]);
+        assert_eq!(rescued.edge_endpoints(0).unwrap(), (0, 2));
+        assert_eq!(before.edge_endpoints(0).unwrap(), (0, 1));
+        batch
+            .stage(
+                false,
+                HashMap::from([("x".into(), vec![(0, AttrValue::Int(9))])]),
+            )
+            .unwrap();
+        let updated = batch.capture_scoped(&child, true).unwrap();
+        assert_eq!(
+            updated.edge_attr(0, &"x".into()).unwrap(),
+            Some(AttrValue::Int(9))
+        );
+        assert_eq!(rescued.edge_attr(0, &"x".into()).unwrap(), None);
+        // Same topology, newly dirty property target outside even the root.
+        batch
+            .stage(
+                true,
+                HashMap::from([("x".into(), vec![(3, AttrValue::Int(8))])]),
+            )
+            .unwrap();
+        assert!(batch
+            .capture_scoped(&child, true)
+            .unwrap_err()
+            .to_string()
+            .contains("target 3"));
+        assert_eq!(owner.borrow().current_state_id(), 2);
     }
 
     #[test]

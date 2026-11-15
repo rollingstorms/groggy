@@ -118,3 +118,12 @@ root copying as the next performance task.
 5. Full conformance, capability documentation and fresh release qualification.
 
 Tests, failure injection and documentation accompany each implementation chunk.
+
+### Implemented follow-up: projected frame materialization
+
+Pending child captures now retain one accepted source, prepare topology by
+structural revision, validate changed property targets incrementally and copy only
+selected frame values. Topology changes still revalidate every staged target.
+See `projected-frame-materialization-2026-11-15.md` for matched native runtime and
+requested-allocation measurements, regression gates and remaining boundaries.
+This advances existing execution/performance parents without adding rows.

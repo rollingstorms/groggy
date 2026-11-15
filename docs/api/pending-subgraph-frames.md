@@ -88,7 +88,14 @@ attachment bodies require persistent local atomic execution as before.
 ## Cost
 
 Frame setup does not clone a writable graph or create per-child history versions.
-Pending read materialization currently copies selected root values before exact
-projection; repeated child writes can therefore make large runs expensive.
-Use the published native benchmark receipt for the measured fixtures. No constant
-cost, zero-copy property capture or scale guarantee follows from this capability.
+The batch retains one immutable accepted source and prepares root membership and
+endpoints once per structural revision. Property-only writes validate newly changed
+targets; topology changes revalidate all staged targets. Each child snapshot copies
+only its selected values. The source pin and prepared topology live for the atomic
+run; earlier returned snapshots remain independently readable.
+
+This trades a small root topology cache for much less repeated allocation in
+write-heavy child runs. See the matched native allocation/timing evidence in
+`notes/planning/projected-frame-materialization-2026-11-15.md`. Captures still copy
+values and wide child selections still cost more. There is no constant-cost,
+zero-copy property capture or general scale guarantee.

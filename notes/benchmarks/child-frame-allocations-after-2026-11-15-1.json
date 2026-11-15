@@ -1,0 +1,178 @@
+{
+  "cases": [
+    {
+      "allocations": [
+        {
+          "allocation_calls": 5788,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 161920,
+          "requested_bytes": 587477
+        },
+        {
+          "allocation_calls": 5787,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 161920,
+          "requested_bytes": 587445
+        },
+        {
+          "allocation_calls": 5787,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 161920,
+          "requested_bytes": 587445
+        },
+        {
+          "allocation_calls": 5787,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 161920,
+          "requested_bytes": 587445
+        },
+        {
+          "allocation_calls": 5788,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 161920,
+          "requested_bytes": 587509
+        }
+      ],
+      "initial_nodes": 100,
+      "pending_topology": false,
+      "seconds": [
+        0.001225834,
+        0.000589291,
+        0.0004195,
+        0.000416917,
+        0.000414958
+      ]
+    },
+    {
+      "allocations": [
+        {
+          "allocation_calls": 7521,
+          "end_additional_requested_bytes": 7682,
+          "peak_additional_requested_bytes": 181520,
+          "requested_bytes": 772811
+        },
+        {
+          "allocation_calls": 7520,
+          "end_additional_requested_bytes": 7650,
+          "peak_additional_requested_bytes": 181520,
+          "requested_bytes": 772779
+        },
+        {
+          "allocation_calls": 7520,
+          "end_additional_requested_bytes": 7650,
+          "peak_additional_requested_bytes": 181520,
+          "requested_bytes": 772779
+        },
+        {
+          "allocation_calls": 7520,
+          "end_additional_requested_bytes": 7650,
+          "peak_additional_requested_bytes": 181520,
+          "requested_bytes": 772779
+        },
+        {
+          "allocation_calls": 7521,
+          "end_additional_requested_bytes": 7682,
+          "peak_additional_requested_bytes": 181520,
+          "requested_bytes": 772843
+        }
+      ],
+      "initial_nodes": 100,
+      "pending_topology": true,
+      "seconds": [
+        0.000686208,
+        0.000953792,
+        0.001094791,
+        0.0010695,
+        0.001029833
+      ]
+    },
+    {
+      "allocations": [
+        {
+          "allocation_calls": 56676,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1619420,
+          "requested_bytes": 6035425
+        },
+        {
+          "allocation_calls": 56675,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1619420,
+          "requested_bytes": 6035393
+        },
+        {
+          "allocation_calls": 56675,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1619420,
+          "requested_bytes": 6035393
+        },
+        {
+          "allocation_calls": 56675,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1619420,
+          "requested_bytes": 6035393
+        },
+        {
+          "allocation_calls": 56676,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1619420,
+          "requested_bytes": 6035457
+        }
+      ],
+      "initial_nodes": 1000,
+      "pending_topology": false,
+      "seconds": [
+        0.008004167,
+        0.0064515,
+        0.005630917,
+        0.005173125,
+        0.00464
+      ]
+    },
+    {
+      "allocations": [
+        {
+          "allocation_calls": 72808,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1612284,
+          "requested_bytes": 7691619
+        },
+        {
+          "allocation_calls": 72807,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1612284,
+          "requested_bytes": 7691587
+        },
+        {
+          "allocation_calls": 72809,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1615904,
+          "requested_bytes": 7713491
+        },
+        {
+          "allocation_calls": 72807,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1612284,
+          "requested_bytes": 7691587
+        },
+        {
+          "allocation_calls": 72810,
+          "end_additional_requested_bytes": 0,
+          "peak_additional_requested_bytes": 1617700,
+          "requested_bytes": 7713555
+        }
+      ],
+      "initial_nodes": 1000,
+      "pending_topology": true,
+      "seconds": [
+        0.005977292,
+        0.005748625,
+        0.0057085,
+        0.005695459,
+        0.005714958
+      ]
+    }
+  ],
+  "instrumentation": "Process-wide System allocator requested-byte counters; excludes allocator overhead/RSS, includes counter overhead in timing. Same fixture and instrumentation must be used for comparisons.",
+  "scope": "Native release, five observations each. Node-only graph, optional staged node, immutable singleton production and per-child load/increment/attach, one publication. Includes frame setup, pending materialization, validation and execution; excludes fixture/initial capture, compilation, algorithm construction and assertions. Allocation-mode timing includes counter overhead; compare only matched instrumentation. Requested allocations exclude allocator overhead and RSS. No FFI or general scale guarantee."
+}
