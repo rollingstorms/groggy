@@ -39,7 +39,8 @@ def test_compatible_schema_migration_reopens_with_retained_original_values(tmp_p
         batch = GraphBatch()
         for node, value in zip(nodes, ("10", "20")):
             batch.set_node_attr(node, "code", value)
-        migrated = graph.apply_batch(batch, original, "convert codes", "test")["state_id"]
+        result = graph.apply_batch(batch, original, "convert codes", "test")
+        migrated = result["state_id"]
         assert graph.set_schema(policy("text"), migrated, 1) == 2
         assert retained.node_attr(nodes[0], "code").value == 10
         before = path.read_bytes()
@@ -53,6 +54,8 @@ def test_compatible_schema_migration_reopens_with_retained_original_values(tmp_p
         with DurableGraph.open(candidate) as recovered:
             assert recovered.schema_revision == 2
             assert recovered.schema()["node_labels"]["Entity"]["code"]["type"] == "text"
-            assert [recovered.get_node_attr(node, "code") for node in nodes] == ["10", "20"]
-            assert recovered.snapshot_at_commit(original).node_attr(nodes[1], "code").value == 20
+            values = [recovered.get_node_attr(node, "code") for node in nodes]
+            assert values == ["10", "20"]
+            prior = recovered.snapshot_at_commit(original)
+            assert prior.node_attr(nodes[1], "code").value == 20
     assert retained.node_attr(nodes[0], "code").value == 10

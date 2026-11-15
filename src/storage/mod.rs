@@ -12,8 +12,8 @@ pub mod adjacency;
 pub mod advanced_matrix;
 pub mod array; // BaseArray system
 pub mod edge;
-pub mod journal;
 pub mod filesystem;
+pub mod journal;
 pub mod matrix;
 pub mod node;
 pub mod numeric;

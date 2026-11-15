@@ -1600,15 +1600,16 @@ mod empty_bulk_regressions {
     fn empty_bulk_does_not_create_columns_or_underflow_empty_storage() {
         let mut pool = GraphPool::new_with_type(GraphType::Undirected);
         for nodes in [true, false] {
-            let changes = pool.set_bulk_attrs::<usize>([("empty".into(), Vec::new())].into(), nodes);
+            let changes =
+                pool.set_bulk_attrs::<usize>([("empty".into(), Vec::new())].into(), nodes);
             assert!(changes.is_empty());
         }
-        assert_eq!(pool.attribute_names(), (Vec::new(),Vec::new()));
+        assert_eq!(pool.attribute_names(), (Vec::new(), Vec::new()));
         let mut column = AttributeColumn::new();
-        assert_eq!(column.extend_values(Vec::new()), (0,0));
+        assert_eq!(column.extend_values(Vec::new()), (0, 0));
         assert!(column.is_empty());
         column.push(AttrValue::Int(7));
-        assert_eq!(column.extend_values(Vec::new()), (1,0));
-        assert_eq!(column.len(),1);
+        assert_eq!(column.extend_values(Vec::new()), (1, 0));
+        assert_eq!(column.len(), 1);
     }
 }

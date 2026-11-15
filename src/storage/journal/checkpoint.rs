@@ -303,14 +303,18 @@ pub(super) fn check_path(source: &File, path: &Path) -> GraphResult<()> {
 }
 #[cfg(windows)]
 pub(super) fn check_path(source: &File, path: &Path) -> GraphResult<()> {
-    let named = std::fs::symlink_metadata(path)
-        .map_err(|e| io_error(path, "stat_named_journal", e))?;
+    let named =
+        std::fs::symlink_metadata(path).map_err(|e| io_error(path, "stat_named_journal", e))?;
     if named.file_type().is_symlink() {
-        return Err(invalid("journal path is a symbolic link; reopen the actual journal path"));
+        return Err(invalid(
+            "journal path is a symbolic link; reopen the actual journal path",
+        ));
     }
     let reader = File::open(path).map_err(|e| io_error(path, "open_named_journal", e))?;
     if !same_inode(source, &reader)? {
-        return Err(invalid("journal path changed; reopen the actual journal path"));
+        return Err(invalid(
+            "journal path changed; reopen the actual journal path",
+        ));
     }
     Ok(())
 }

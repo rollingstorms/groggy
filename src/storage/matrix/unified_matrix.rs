@@ -595,7 +595,10 @@ impl<T: NumericType> UnifiedMatrix<T> {
             None
         };
         let right = match columns {
-            Some(columns) => { drop(b); columns }
+            Some(columns) => {
+                drop(b);
+                columns
+            }
             None => b,
         };
         let contiguous_columns = self.cols() >= 32 && other.cols() >= 32;
@@ -606,7 +609,9 @@ impl<T: NumericType> UnifiedMatrix<T> {
                 if contiguous_columns {
                     let left = &a[i * self.cols()..(i + 1) * self.cols()];
                     let column = &right[j * self.cols()..(j + 1) * self.cols()];
-                    for (&a, &b) in left.iter().zip(column) { product.add(a, b)?; }
+                    for (&a, &b) in left.iter().zip(column) {
+                        product.add(a, b)?;
+                    }
                 } else {
                     for k in 0..self.cols() {
                         product.add(a[i * self.cols() + k], right[k * other.cols() + j])?;
