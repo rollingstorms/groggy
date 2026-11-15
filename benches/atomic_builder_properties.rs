@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--pending-windows") {
+        return pending_windows_receipt();
+    }
     if std::env::args().any(|arg| arg == "--child-frames") {
         return child_frames_receipt();
     }
@@ -845,5 +848,92 @@ fn child_frames_receipt() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "child_frames.json".into());
     std::fs::write(&path, serde_json::to_vec_pretty(&receipt)?)?;
     println!("Wrote child frame receipt to {path}");
+    Ok(())
+}
+
+fn pending_windows_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [100, 1_000] {
+        for nested in [false, true] {
+            let mut samples = Vec::new();
+            for _ in 0..5 {
+                let mut graph = Graph::new_publishing();
+                graph.insert_nodes(count + 1)?;
+                for value in 1..=5 {
+                    graph.set_node_attrs(std::collections::HashMap::from([(
+                        "score".into(),
+                        (0..=count).map(|id| (id, AttrValue::Int(value))).collect(),
+                    )]))?;
+                }
+                let head = graph.current_state_id();
+                let body = vec![
+                    json!({"id":"temporal.window_aggregate","params":{"attr":"score","function":"sum","start":0,"end":head,"output":"history"}}),
+                    json!({"id":"core.attach_node_attr","params":{"source":"history","attr":"sum"}}),
+                    json!({"id":"temporal.filter","params":{"predicate":"existed_at","commit":head,"output":"alive"}}),
+                    json!({"id":"core.attach_node_attr","params":{"source":"alive","attr":"alive"}}),
+                    json!({"id":"temporal.mark_changed_nodes","params":{"start":head,"end":head,"change_type":"modified","output":"changed"}}),
+                    json!({"id":"core.attach_node_attr","params":{"source":"changed","attr":"changed"}}),
+                    json!({"id":"temporal.window","params":{"start":0,"end":head,"output":"window"}}),
+                    json!({"id":"core.attach_node_attr","params":{"source":"window","attr":"window"}}),
+                ];
+                let mut steps = vec![
+                    json!({"id":"graph.remove_nodes","params":{"ids":[count]}}),
+                    json!({"id":"core.init_nodes","params":{"value":99,"target":"values"}}),
+                    json!({"id":"core.attach_node_attr","params":{"source":"values","attr":"score"}}),
+                ];
+                if nested {
+                    steps.push(json!({"id":"iter.loop","params":{"iterations":3,"body":body}}));
+                } else {
+                    for _ in 0..3 {
+                        steps.extend(body.clone());
+                    }
+                }
+                let mut params = AlgorithmParams::new();
+                params.set_text("steps", json!({"atomic":true,"steps":steps}).to_string());
+                let algorithm = registry.instantiate(&AlgorithmSpec {
+                    id: "builder.step_pipeline".into(),
+                    params,
+                })?;
+                let owner = Arc::new(OwnerCell::new(graph));
+                let selected = Subgraph::from_frozen_view(
+                    owner.clone(),
+                    owner.borrow().read_view()?,
+                    "temporal receipt".into(),
+                );
+                let mut ctx = Context::new();
+                let started = Instant::now();
+                let result = algorithm.execute(&mut ctx, selected)?;
+                samples.push(started.elapsed().as_secs_f64());
+                assert_eq!(result.node_count(), count);
+                assert_eq!(owner.borrow().current_state_id(), head + 1);
+                for node in 0..count {
+                    assert_eq!(
+                        owner.borrow().get_node_attr(node, &"sum".into())?,
+                        Some(AttrValue::Float64(15.0))
+                    );
+                    for name in ["alive", "changed", "window"] {
+                        assert_eq!(
+                            owner.borrow().get_node_attr(node, &name.into())?,
+                            Some(AttrValue::Int(1))
+                        );
+                    }
+                }
+            }
+            cases.push(
+                json!({"surviving_nodes":count,"three_iteration_loop":nested,"seconds":samples}),
+            );
+        }
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "pending_windows.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(
+            &json!({"scope":"Native release; five observations per case. Five accepted score columns, one staged removal, staged score=99, four accepted-history helpers repeated three times, one acceptance. Includes ephemeral retained index construction, pending capture, validation and execution; excludes fixtures, initial capture, algorithm construction, assertions and compilation. No before/after speedup, allocation, RSS, FFI or general scale guarantee.","cases":cases}),
+        )?,
+    )?;
+    println!("Wrote pending window receipt to {path}");
     Ok(())
 }

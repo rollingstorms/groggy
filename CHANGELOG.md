@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the documented storage and platform boundaries.
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
+- Selected retained lifecycle/window helpers now follow surviving pending IDs
+  after topology changes; provisional IDs remain guarded against invented history.
 - Accepted snapshot acquisition and node/edge retained diffs now compose after
   pending topology while keeping unpublished working state separate from history.
 - Fixed child frames validate every node/edge attachment target before staging,

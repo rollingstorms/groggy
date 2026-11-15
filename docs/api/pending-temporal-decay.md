@@ -49,12 +49,10 @@ membership/endpoints. A pure native computation over a retained immutable source
 can inspect a subsequently inactive entity without borrowing the current owner.
 Public graph application still enforces its accepted-source write contract.
 
-This capability is specific to value decay. Retained-history diff/window/filter
-stages keep their existing execution guards after pending topology: an unaccepted
-new entity has no retained creation state. They are not silently interpreted as
-effective-time reads or given fabricated history. Errors/cancellation retain the
-shared atomic rollback behavior.
-
-Follow-up: `temporal.snapshot_at` and node/edge retained diffs now also accept
-pending execution, while continuing to read accepted history. Selected lifecycle/
-window helpers retain their guards; see [temporal primitives](builder-temporal.md).
+Decay reads selected working values. Accepted snapshot/diff readers remain
+independent of those values. Selected lifecycle/window helpers follow surviving
+pending membership while querying accepted lineage; atomic provisional IDs still
+reject until their retained-history treatment is settled. No helper fabricates a
+creation state or silently interprets a state-ID window as effective time.
+Errors/cancellation retain the shared atomic rollback behavior. See
+[temporal primitives](builder-temporal.md) and [selected windows](builder-temporal-windows.md).

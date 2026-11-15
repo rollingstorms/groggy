@@ -176,3 +176,59 @@ construction/reuse and representative benchmarks are documented in the bundle
 receipt. These APIs complete the eight primitives; arbitrary effective-time graph
 reconstruction, broader index lifecycle and pipeline/pin requirements remain their
 existing separate roadmap work.
+
+## Pending topology and selected frames
+
+All four helpers can follow staged removals and endpoint revisions in local or
+outer atomic programs, including loops and fixed for-each frames. Their node IDs
+come from the surviving pending selection; their values and lifecycle come from
+the accepted first-parent lineage. Earlier staged properties are not historical
+change records, and a removed working node is not imported back into the frame.
+
+Atomic provisional nodes still reject as unknown to the retained lineage. The
+owner question about treating these as empty history remains open; this slice
+preserves rejection. Ordinary manual working-node behavior is unchanged. Invalid
+bounds, foreign indexes and late per-child errors preserve atomic rollback and ID
+allocation. Windows remain retained state-ID ranges, not effective-time queries.
+
+```python
+from groggy.builder import step_pipeline
+
+
+def temporal_step(kind, **params):
+    return {"id": kind, "params": params}
+
+
+pending_history = Graph()
+pending_history.add_nodes([{"score": 1}, {"score": 2}, {"score": 3}])
+first = pending_history.current_state_id
+pending_history.add_edges([(0, 1), (1, 2)])
+pending_history.set_node_attr(0, "score", 5)
+head = pending_history.current_state_id
+pending_history.apply(step_pipeline("selected retained history", [
+    temporal_step("graph.set_edge_endpoints", revisions=[[0, 0, 2]]),
+    temporal_step("graph.remove_nodes", ids=[1]),
+    temporal_step("core.init_nodes", value=99, target="values"),
+    temporal_step("core.attach_node_attr", source="values", attr="score"),
+    temporal_step("temporal.window_aggregate", attr="score", function="sum", start=first, end=head, output="sum"),
+    temporal_step("core.attach_node_attr", source="sum", attr="historical_sum"),
+    temporal_step("temporal.filter", predicate="existed_at", commit=first, output="existed"),
+    temporal_step("core.attach_node_attr", source="existed", attr="existed"),
+    temporal_step("temporal.mark_changed_nodes", start=head, end=head, change_type="modified", output="changed"),
+    temporal_step("core.attach_node_attr", source="changed", attr="changed"),
+    temporal_step("temporal.window", start=first, end=head, output="window"),
+    temporal_step("core.attach_node_attr", source="window", attr="window"),
+], atomic=True))
+assert sorted(pending_history.node_ids) == [0, 2]
+assert pending_history.current_state_id == head + 1
+assert [pending_history.get_node_attr(n, "score") for n in [0, 2]] == [99, 99]
+assert [pending_history.get_node_attr(n, "historical_sum") for n in [0, 2]] == [6.0, 3.0]
+assert [pending_history.get_node_attr(n, "changed") for n in [0, 2]] == [1, 0]
+assert [pending_history.get_node_attr(n, "existed") for n in [0, 2]] == [1, 1]
+assert [pending_history.get_node_attr(n, "window") for n in [0, 2]] == [1, 1]
+```
+
+Each helper may construct an ephemeral retained index when none was explicitly
+supplied; repeated child/window queries therefore retain a history-dependent
+cost. This is not a persistent or automatically maintained index. See the native
+workload receipt in `notes/planning/pending-temporal-windows-2026-11-15.md`.

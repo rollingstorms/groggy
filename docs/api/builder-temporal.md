@@ -143,8 +143,8 @@ validators, with whole-run rollback at the owning atomic boundary.
 values and retained snapshots are separate immutable inputs. Historical result
 IDs remain exact IDs: attaching a removed/out-of-frame ID fails rather than
 filtering or mapping it onto a provisional entity. Exact child write restrictions
-also apply to history maps. Selected lifecycle/window helpers retain their pending
-topology guards until the staged-entity history policy is settled.
+also apply to history maps. Selected lifecycle/window helpers now support
+surviving accepted IDs after topology; provisional-node history still rejects.
 
 ```python
 from groggy.builder import step_pipeline

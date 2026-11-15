@@ -365,6 +365,12 @@ impl WindowAggregateStep {
 }
 
 impl Step for WindowAggregateStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        // Membership follows the pending selected frame; values/lifecycle come
+        // only from accepted retained lineage. Unknown provisional IDs reject.
+        super::core::AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -455,6 +461,12 @@ impl TemporalFilterStep {
 }
 
 impl Step for TemporalFilterStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        // Membership follows the pending selected frame; values/lifecycle come
+        // only from accepted retained lineage. Unknown provisional IDs reject.
+        super::core::AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -554,6 +566,12 @@ impl MarkChangedNodesStep {
 }
 
 impl Step for MarkChangedNodesStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        // Membership follows the pending selected frame; values/lifecycle come
+        // only from accepted retained lineage. Unknown provisional IDs reject.
+        super::core::AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -689,6 +707,12 @@ impl TemporalWindowStep {
 }
 
 impl Step for TemporalWindowStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        // Membership follows the pending selected frame; values/lifecycle come
+        // only from accepted retained lineage. Unknown provisional IDs reject.
+        super::core::AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -1571,6 +1595,112 @@ mod tests {
             Some(AttrValue::Int(99))
         );
         assert_eq!(saved.node_attr(0, &"score".into()), Some(AttrValue::Int(2)));
+    }
+
+    #[test]
+    fn selected_temporal_queries_refresh_pending_membership_without_using_pending_values() {
+        use crate::algorithms::{property_batch::PropertyBatch, steps::core::StepExecutor};
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(3).unwrap();
+        graph
+            .set_node_attr(0, "score".into(), AttrValue::Int(1))
+            .unwrap();
+        graph
+            .set_node_attr(2, "score".into(), AttrValue::Int(3))
+            .unwrap();
+        let previous = graph.current_state_id();
+        graph
+            .set_node_attr(0, "score".into(), AttrValue::Int(5))
+            .unwrap();
+        let head = graph.current_state_id();
+        let owner = graph.into_shared();
+        let selected = Subgraph::new(
+            owner.clone(),
+            [0, 1, 2].into(),
+            HashSet::new(),
+            "temporal frame".into(),
+        );
+        let mut batch = PropertyBatch::for_selection(owner.borrow().write_coordinate(), &selected);
+        batch.stage_removals(true, vec![1], None);
+        batch
+            .stage(
+                true,
+                HashMap::from([(
+                    "score".into(),
+                    vec![(0, AttrValue::Int(99)), (2, AttrValue::Int(99))],
+                )]),
+            )
+            .unwrap();
+        let mut ctx = Context::new();
+        ctx.property_batch = Some(batch);
+        let mut vars = StepVariables::default();
+        let mut executor = StepExecutor::new(&selected);
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &WindowAggregateStep::new(
+                    "score",
+                    AggregateFunction::Sum,
+                    "history",
+                    "temporal_index",
+                )
+                .with_window(0, head),
+            )
+            .unwrap();
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &TemporalFilterStep::existed_at(head, "existed"),
+            )
+            .unwrap();
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &MarkChangedNodesStep::modified_only("modified").with_window(previous + 1, head),
+            )
+            .unwrap();
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &TemporalWindowStep::new(0, head, "window"),
+            )
+            .unwrap();
+        assert_eq!(
+            vars.node_map("history").unwrap()[&0],
+            AlgorithmParamValue::Float(6.0)
+        );
+        assert_eq!(
+            vars.node_map("history").unwrap()[&2],
+            AlgorithmParamValue::Float(3.0)
+        );
+        for name in ["history", "existed", "modified", "window"] {
+            let mut nodes = vars
+                .node_map(name)
+                .unwrap()
+                .keys()
+                .copied()
+                .collect::<Vec<_>>();
+            nodes.sort_unstable();
+            assert_eq!(nodes, [0, 2]);
+        }
+        assert_eq!(
+            vars.node_map("modified").unwrap()[&0],
+            AlgorithmParamValue::Int(1)
+        );
+        assert_eq!(
+            vars.node_map("modified").unwrap()[&2],
+            AlgorithmParamValue::Int(0)
+        );
+        assert_eq!(owner.borrow().current_state_id(), head);
+        assert!(owner.borrow().has_node(1));
+        assert_eq!(
+            owner.borrow().get_node_attr(0, &"score".into()).unwrap(),
+            Some(AttrValue::Int(5))
+        );
     }
 
     #[test]

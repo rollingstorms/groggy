@@ -1,0 +1,49 @@
+{
+  "cases": [
+    {
+      "seconds": [
+        0.003967834,
+        0.003513542,
+        0.003404458,
+        0.003461208,
+        0.003433958
+      ],
+      "surviving_nodes": 100,
+      "three_iteration_loop": false
+    },
+    {
+      "seconds": [
+        0.003470875,
+        0.003503625,
+        0.003403125,
+        0.00339875,
+        0.003368792
+      ],
+      "surviving_nodes": 100,
+      "three_iteration_loop": true
+    },
+    {
+      "seconds": [
+        0.03463675,
+        0.037011084,
+        0.0346315,
+        0.034563625,
+        0.03471125
+      ],
+      "surviving_nodes": 1000,
+      "three_iteration_loop": false
+    },
+    {
+      "seconds": [
+        0.033877333,
+        0.034415375,
+        0.033380292,
+        0.033622,
+        0.033830584
+      ],
+      "surviving_nodes": 1000,
+      "three_iteration_loop": true
+    }
+  ],
+  "scope": "Native release; five observations per case. Five accepted score columns, one staged removal, staged score=99, four accepted-history helpers repeated three times, one acceptance. Includes ephemeral retained index construction, pending capture, validation and execution; excludes fixtures, initial capture, algorithm construction, assertions and compilation. No before/after speedup, allocation, RSS, FFI or general scale guarantee."
+}

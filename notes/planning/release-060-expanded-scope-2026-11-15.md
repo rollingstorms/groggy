@@ -144,3 +144,10 @@ separate from pending additions, removals, endpoints and values. Late invalid
 history/attachment inputs retain whole-run rollback. See
 `pending-retained-history-2026-11-15.md`. Selected lifecycle/window readers still
 need the staged-entity history decision; general topology loops remain guarded.
+
+### Implemented follow-up: selected retained temporal windows
+
+All four lifecycle/window primitives now follow surviving pending membership for
+accepted IDs, while reading only retained history. Nested/outer execution, source
+validation and rollback share the common interpreter. Provisional IDs still reject
+while the owner question remains open. See `pending-temporal-windows-2026-11-15.md`.
