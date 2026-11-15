@@ -21,6 +21,8 @@ Implemented capabilities, within their documented boundaries:
   and expanded graph and numerical algorithms.
 - Retained archives and journaled durable storage with explicit recovery,
   checkpoint, compaction and purge operations.
+- Temporal value decay now accepts pending selected nodes/edges and ordered
+  columns, preserving explicit input identity and one atomic acceptance.
 - Flow-map update/residual primitives now use checked integer/finite arithmetic
   and compose with pending topology without rebinding explicit map IDs.
 - Filters/order, numerical maps, fused/community primitives and sampling masks

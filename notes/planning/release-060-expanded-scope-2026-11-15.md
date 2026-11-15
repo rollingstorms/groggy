@@ -87,6 +87,13 @@ The two existing flow primitives now consume explicit edge maps after pending
 topology and reuse checked expression arithmetic. Overflow/nonfinite/domain
 failures preserve the full atomic prefix. See `checked-flow-compute-2026-11-15.md`.
 
+### Implemented follow-up: pending temporal decay
+
+Value decay now respects selected pending IDs/endpoints and retained immutable
+sources for node maps, ordered columns and edge maps. See
+`pending-temporal-decay-2026-11-15.md`; retained-history temporal stages retain
+their explicit guards. The note specifies the next root/child frame boundary.
+
 ### Next chunks
 
 1. Subgraph-producing sampling/for-each and general topology-mutating execution, public

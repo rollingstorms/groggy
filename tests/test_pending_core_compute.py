@@ -184,3 +184,51 @@ def test_late_numeric_failure_discards_topology_and_prior_staged_properties():
     assert graph.get_node_attr(0, "prefix") is None
     assert sorted(graph.node_ids) == [0, 2, 4, 5, 6]
     assert graph.add_node() == 7
+
+
+@pytest.mark.parametrize("layout", ["nodes", "column", "edges"])
+@pytest.mark.parametrize("outer", [False, True])
+def test_temporal_decay_keeps_pending_entity_kind_and_in_place_loop_inputs(layout, outer):
+    graph = fixture(True)
+    head = graph.current_state_id
+    if layout == "column":
+        load = step("core.community_seed", strategy="singleton", target="values")
+    elif layout == "edges":
+        load = step("core.init_edges", value=8, target="values")
+    else:
+        load = step("core.load_node_attr", attr="node_id", target="values")
+    operations = [load, step("iter.loop", iterations=2, body=[
+        step("temporal.decay", attr="values", output="values", half_life=2.0, time_delta=2.0)]),
+        attach("values", edges=layout == "edges")]
+    run(graph, operations, outer=outer)
+    if layout == "edges":
+        assert [graph.get_edge_attr(e, "answer") for e in [0, 3, 5, 6]] == [2.0] * 4
+    else:
+        assert [graph.get_node_attr(n, "answer") for n in [0, 4, 7]] == [0.0, 1.0, 1.75]
+        assert graph.get_node_attr(5, "answer") is None
+    assert graph.current_state_id == head + 1
+
+
+@pytest.mark.parametrize("edges", [False, True])
+def test_temporal_decay_rejects_removed_rows_from_explicit_old_maps(edges):
+    graph = fixture()
+    head = graph.current_state_id
+    with pytest.raises(RuntimeError, match="outside the active selection"):
+        graph.induced_subgraph([0, 2, 4]).apply(program(*(
+            [step("core.init_edges" if edges else "core.init_nodes", value=8, target="old")] + topology() +
+            [step("temporal.decay", attr="old", output="result", half_life=2.0, time_delta=1.0)])))
+    assert graph.current_state_id == head
+    assert graph.add_node() == 7
+
+
+@pytest.mark.parametrize("invalid", [True, None, "bad"])
+def test_temporal_decay_domain_failure_discards_prior_pending_assignments(invalid):
+    graph = fixture()
+    head = graph.current_state_id
+    with pytest.raises(RuntimeError, match="finite numeric"):
+        run(graph, [step("core.init_nodes", value=8, target="prefix"), attach("prefix", "prefix"),
+                    step("core.init_nodes", value=invalid, target="values"),
+                    step("temporal.decay", attr="values", output="result", half_life=2.0, time_delta=1.0)])
+    assert graph.current_state_id == head
+    assert graph.get_node_attr(0, "prefix") is None
+    assert graph.add_node() == 7

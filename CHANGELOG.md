@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the documented storage and platform boundaries.
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
+- Temporal value decay now accepts pending selected nodes/edges and ordered
+  columns, preserving explicit input identity and one atomic acceptance.
 - Flow-map update/residual primitives now use checked integer/finite arithmetic
   and compose with pending topology without rebinding explicit map IDs.
 - Filters/order, numerical maps, fused/community primitives and sampling masks

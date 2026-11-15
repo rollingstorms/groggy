@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "initial_edges": 1000,
+      "initial_nodes": 1000,
+      "seconds": [
+        0.002398416,
+        0.004221083,
+        0.00367675,
+        0.003240334,
+        0.00298075
+      ]
+    },
+    {
+      "initial_edges": 10000,
+      "initial_nodes": 10000,
+      "seconds": [
+        0.030866875,
+        0.024247417,
+        0.026952542,
+        0.023245958,
+        0.02951475
+      ]
+    }
+  ],
+  "scope": "Native release, five observations. Directed ring with one staged node and two staged weighted edges; one compute loop with ID load, sum normalization, fused outgoing aggregation, top-k, seeded mask, four attachments and one publication. Includes pending capture/reuse and kernels; fixture, initial capture, compilation, algorithm construction and assertions excluded. No before/after speedup, FFI, memory or scale guarantee.",
+  "workload": "node ID load, temporal decay, one node attachment"
+}

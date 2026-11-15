@@ -14,7 +14,7 @@ Implementation changes toward the expanded target require fresh final gates.
 
 Supported outer atomic topology composition, pending selected readers, explicit
 captured-table attachment, nested compute frames and core compute readers are complete locally:
-1,592 native tests, 2,941 maintained Python tests and 277
+1,593 native tests, 2,952 maintained Python tests and 278
 executable examples pass, plus strict Clippy and Rust formatting.
 See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md)
 [pending property evidence](notes/planning/pending-topology-properties-2026-11-15.md)
@@ -22,7 +22,8 @@ See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md
 [table attachment evidence](notes/planning/captured-table-attachment-2026-11-15.md)
 [nested execution evidence](notes/planning/nested-pending-execution-2026-11-15.md)
 [core compute evidence](notes/planning/pending-core-compute-2026-11-15.md)
-and [checked flow evidence](notes/planning/checked-flow-compute-2026-11-15.md).
+[checked flow evidence](notes/planning/checked-flow-compute-2026-11-15.md)
+and [temporal decay evidence](notes/planning/pending-temporal-decay-2026-11-15.md).
 The 44 broad unchecked release rows retain their remaining exit requirements.
 
 ## Qualified bounded candidate

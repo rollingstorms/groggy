@@ -12,11 +12,14 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--pending-decay") {
+        return pending_core_receipt(PendingCompute::Decay);
+    }
     if std::env::args().any(|arg| arg == "--checked-flow") {
-        return pending_core_receipt(true);
+        return pending_core_receipt(PendingCompute::Flow);
     }
     if std::env::args().any(|arg| arg == "--pending-core") {
-        return pending_core_receipt(false);
+        return pending_core_receipt(PendingCompute::Core);
     }
     if std::env::args().any(|arg| arg == "--nested-pending") {
         return nested_pending_receipt();
@@ -699,8 +702,17 @@ fn nested_pending_receipt() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn pending_core_receipt(flow: bool) -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Clone, Copy)]
+enum PendingCompute {
+    Core,
+    Flow,
+    Decay,
+}
+
+fn pending_core_receipt(workload: PendingCompute) -> Result<(), Box<dyn std::error::Error>> {
     use groggy::{BatchNodeRef as N, GraphBatch};
+    let flow = matches!(workload, PendingCompute::Flow);
+    let decay = matches!(workload, PendingCompute::Decay);
     let registry = Registry::default();
     register_algorithms(&registry)?;
     let mut cases = Vec::new();
@@ -714,6 +726,12 @@ fn pending_core_receipt(flow: bool) -> Result<(), Box<dyn std::error::Error>> {
                 {"id":"core.residual_capacity","params":{"capacity":"capacity","flow":"updated","target":"residual"}},
                 {"id":"core.attach_edge_attr","params":{"source":"updated","attr":"flow"}},
                 {"id":"core.attach_edge_attr","params":{"source":"residual","attr":"residual"}}
+            ])
+        } else if decay {
+            json!([
+                {"id":"core.load_node_attr","params":{"attr":"node_id","target":"values"}},
+                {"id":"temporal.decay","params":{"attr":"values","half_life":2.0,"time_delta":2.0,"output":"result"}},
+                {"id":"core.attach_node_attr","params":{"source":"result","attr":"decayed"}}
             ])
         } else {
             json!([
@@ -771,6 +789,11 @@ fn pending_core_receipt(flow: bool) -> Result<(), Box<dyn std::error::Error>> {
                     graph.borrow().get_edge_attr(count, &"residual".into())?,
                     Some(AttrValue::Int(4))
                 );
+            } else if decay {
+                assert_eq!(
+                    graph.borrow().get_node_attr(count, &"decayed".into())?,
+                    Some(AttrValue::Float64(count as f64 / 2.0))
+                );
             } else {
                 assert_eq!(
                     graph.borrow().get_node_attr(count, &"rank".into())?,
@@ -783,6 +806,8 @@ fn pending_core_receipt(flow: bool) -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE").unwrap_or_else(|_| {
         if flow {
             "checked_flow_compute.json".into()
+        } else if decay {
+            "pending_decay_compute.json".into()
         } else {
             "pending_core_compute.json".into()
         }
@@ -791,7 +816,7 @@ fn pending_core_receipt(flow: bool) -> Result<(), Box<dyn std::error::Error>> {
         &path,
         serde_json::to_vec_pretty(&json!({
             "scope":"Native release, five observations. Directed ring with one staged node and two staged weighted edges; one compute loop with ID load, sum normalization, fused outgoing aggregation, top-k, seeded mask, four attachments and one publication. Includes pending capture/reuse and kernels; fixture, initial capture, compilation, algorithm construction and assertions excluded. No before/after speedup, FFI, memory or scale guarantee.",
-            "workload":if flow {"checked flow update/residual, two edge attachments"} else {"normalization/fused/top-k/sampling, four node attachments"},
+            "workload":if flow {"checked flow update/residual, two edge attachments"} else if decay {"node ID load, temporal decay, one node attachment"} else {"normalization/fused/top-k/sampling, four node attachments"},
             "cases":cases
         }))?,
     )?;

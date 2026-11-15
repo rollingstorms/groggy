@@ -736,6 +736,10 @@ impl DecayStep {
 }
 
 impl Step for DecayStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        super::core::AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -755,6 +759,7 @@ impl Step for DecayStep {
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         check_cancelled(ctx)?;
         validate_decay_controls(self.half_life, self.time_delta)?;
+        scope.subgraph().validate_selected_read()?;
         // Divide before multiplying: LN_2 / a subnormal half-life can overflow,
         // producing NaN for zero elapsed time. A nonnegative ratio may overflow
         // to infinity legitimately, in which case exp(-infinity) is zero.
@@ -841,25 +846,21 @@ fn decay_value(value: &AlgorithmParamValue, factor: f64) -> Result<AlgorithmPara
 
 fn validate_decay_entity(scope: &StepScope<'_>, entity: usize, edges: bool) -> Result<()> {
     let selected = scope.subgraph();
-    let owner = selected.graph();
-    let graph = owner.borrow();
     if edges {
-        if !selected.edge_set().contains(&entity) || !graph.has_edge(entity) {
+        if !selected.edge_set().contains(&entity) {
             return Err(anyhow!(
                 "temporal.decay edge {entity} is outside the active selection"
             ));
         }
-        let (source, target) = graph.edge_endpoints(entity)?;
-        if !selected.node_set().contains(&source)
-            || !selected.node_set().contains(&target)
-            || !graph.has_node(source)
-            || !graph.has_node(target)
-        {
+        // Frozen membership/endpoints are validated at the common read boundary;
+        // an explicit live source is validated before processing any map row.
+        let (source, target) = selected.edge_endpoints(entity)?;
+        if !selected.node_set().contains(&source) || !selected.node_set().contains(&target) {
             return Err(anyhow!(
                 "temporal.decay edge {entity} endpoints are outside the active selection"
             ));
         }
-    } else if !selected.node_set().contains(&entity) || !graph.has_node(entity) {
+    } else if !selected.node_set().contains(&entity) {
         return Err(anyhow!(
             "temporal.decay node {entity} is outside the active selection"
         ));
@@ -1603,5 +1604,50 @@ mod tests {
         let values = vec![];
         let result = AggregateFunction::Count.apply(&values).unwrap();
         assert_eq!(result, AlgorithmParamValue::Int(0));
+    }
+}
+
+#[cfg(test)]
+mod selected_decay_tests {
+    use super::super::core::StepVariables;
+    use super::*;
+    use crate::{ownership::OwnerCell, subgraphs::Subgraph, Graph};
+
+    #[test]
+    fn decay_reads_retained_nodes_and_endpoints_without_borrowing_current_owner() {
+        let mut graph = Graph::new();
+        graph.insert_nodes(2).unwrap();
+        graph.add_edge(0, 1).unwrap();
+        let owner = Arc::new(OwnerCell::new(graph));
+        let selected = Subgraph::from_frozen_view(
+            owner.clone(),
+            owner.borrow().read_view().unwrap(),
+            "retained decay".into(),
+        );
+        owner.borrow_mut().remove_node(1).unwrap();
+        let _writer = owner.borrow_mut();
+        for edges in [false, true] {
+            let mut vars = StepVariables::default();
+            if edges {
+                vars.set_edge_map("values", HashMap::from([(0, AlgorithmParamValue::Int(8))]));
+            } else {
+                vars.set_node_map("values", HashMap::from([(1, AlgorithmParamValue::Int(8))]));
+            }
+            let mut scope = StepScope::new(&selected, &mut vars);
+            DecayStep::new("values", 1.0, "result")
+                .with_time_delta(1.0)
+                .apply(&mut Context::new(), &mut scope)
+                .unwrap();
+            let result = if edges {
+                scope.variables().edge_map("result")
+            } else {
+                scope.variables().node_map("result")
+            }
+            .unwrap();
+            assert_eq!(
+                result.values().cloned().collect::<Vec<_>>(),
+                [AlgorithmParamValue::Float(4.0)]
+            );
+        }
     }
 }
