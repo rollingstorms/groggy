@@ -575,15 +575,42 @@ impl<T: NumericType> UnifiedMatrix<T> {
         }
         let a = self.to_vec()?;
         let b = other.to_vec()?;
-        let mut out = Self::new(self.rows(), other.cols())?;
         if self.rows() == 0 || other.cols() == 0 || self.cols() == 0 {
-            return Ok(out);
+            return Self::new(self.rows(), other.cols());
         }
+        // Contiguous right-hand columns avoid a strided load in every dot.
+        // Keep the exact k order and the shared checked/compensated accumulator;
+        // this does not reassociate sums, skip zeros or narrow integer products.
+        // Drop the original right buffer before allocating the output, bounding
+        // scratch to the same three dense buffers used by the direct path.
+        let columns = if self.cols() >= 32 && other.cols() >= 32 {
+            let mut columns = Vec::with_capacity(b.len());
+            for j in 0..other.cols() {
+                for k in 0..self.cols() {
+                    columns.push(b[k * other.cols() + j]);
+                }
+            }
+            Some(columns)
+        } else {
+            None
+        };
+        let right = match columns {
+            Some(columns) => { drop(b); columns }
+            None => b,
+        };
+        let contiguous_columns = self.cols() >= 32 && other.cols() >= 32;
+        let mut out = Self::new(self.rows(), other.cols())?;
         for i in 0..self.rows() {
             for j in 0..other.cols() {
                 let mut product = super::checked_kernels::Product::<T>::new();
-                for k in 0..self.cols() {
-                    product.add(a[i * self.cols() + k], b[k * other.cols() + j])?;
+                if contiguous_columns {
+                    let left = &a[i * self.cols()..(i + 1) * self.cols()];
+                    let column = &right[j * self.cols()..(j + 1) * self.cols()];
+                    for (&a, &b) in left.iter().zip(column) { product.add(a, b)?; }
+                } else {
+                    for k in 0..self.cols() {
+                        product.add(a[i * self.cols() + k], right[k * other.cols() + j])?;
+                    }
                 }
                 out.set(i, j, product.total()?)?;
             }
