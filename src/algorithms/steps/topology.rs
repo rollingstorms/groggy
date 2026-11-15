@@ -268,5 +268,7 @@ pub(super) fn register(registry: &StepRegistry) -> Result<()> {
             move |spec| instantiate(spec, nodes),
         )?;
     }
+    super::additions::register(registry)?;
+    super::captured_algorithms::register(registry)?;
     Ok(())
 }

@@ -13,6 +13,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 #[derive(Debug)]
 pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
+    allocation_base: Option<(NodeId, EdgeId)>,
+    add_nodes: usize,
+    add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
     nodes: BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
     edges: BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
     remove_nodes: Vec<BatchNodeRef>,
@@ -62,10 +65,12 @@ impl PropertyBatch {
             };
             removed_edges.insert(*id);
         }
+        let (added_nodes, added_edges) = self.added_ids();
         let nodes: HashSet<_> = base
             .nodes()
             .iter()
             .copied()
+            .chain(added_nodes.iter().copied())
             .filter(|id| !removed_nodes.contains(id))
             .collect();
         // Revisions precede node cascades in the canonical batch model. An edge
@@ -80,6 +85,25 @@ impl PropertyBatch {
         for id in &snapshot.active_nodes {
             if let Some(attrs) = original.node_attributes.get(id) {
                 snapshot.node_attributes.insert(*id, attrs.clone());
+            }
+        }
+        for &id in &added_nodes {
+            if nodes.contains(&id) {
+                snapshot
+                    .node_attributes
+                    .entry(id)
+                    .or_default()
+                    .insert("entity_type".into(), AttrValue::Text("base".into()));
+            }
+        }
+        for (&id, &(source, target)) in added_edges.iter().zip(&self.add_edges) {
+            let resolve = |reference| match reference {
+                BatchNodeRef::Existing(id) => id,
+                BatchNodeRef::Added(position) => added_nodes[position],
+            };
+            let (source, target) = (resolve(source), resolve(target));
+            if !removed_edges.contains(&id) && nodes.contains(&source) && nodes.contains(&target) {
+                snapshot.edges.insert(id, (source, target));
             }
         }
         for &id in base.edges() {
@@ -134,6 +158,9 @@ impl PropertyBatch {
     pub fn new(coordinate: WriteCoordinate) -> Self {
         Self {
             coordinate,
+            allocation_base: None,
+            add_nodes: 0,
+            add_edges: Vec::new(),
             nodes: BTreeMap::new(),
             edges: BTreeMap::new(),
             remove_nodes: Vec::new(),
@@ -212,9 +239,128 @@ impl PropertyBatch {
             }
         }
     }
+    fn allocation_base(&mut self, graph: &Graph) -> GraphResult<(NodeId, EdgeId)> {
+        graph.validate_write_coordinate(&self.coordinate)?;
+        let stats = graph.pool().statistics();
+        let current = (stats.node_count, stats.edge_count);
+        if self.allocation_base.is_some_and(|base| base != current) {
+            return Err(crate::GraphError::InvalidInput(
+                "Staged allocation coordinates changed".into(),
+            ));
+        }
+        self.allocation_base = Some(current);
+        Ok(current)
+    }
+
+    pub(crate) fn added_ids(&self) -> (Vec<NodeId>, Vec<EdgeId>) {
+        let Some((nodes, edges)) = self.allocation_base else {
+            return (Vec::new(), Vec::new());
+        };
+        (
+            (nodes..nodes + self.add_nodes).collect(),
+            (edges..edges + self.add_edges.len()).collect(),
+        )
+    }
+
+    pub(crate) fn stage_nodes(
+        &mut self,
+        graph: &Graph,
+        count: usize,
+        attrs: &HashMap<AttrName, AttrValue>,
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<Vec<NodeId>> {
+        let (base, _) = self.allocation_base(graph)?;
+        let total = self
+            .add_nodes
+            .checked_add(count)
+            .filter(|&n| base.checked_add(n).is_some())
+            .ok_or_else(|| crate::GraphError::InvalidInput("Staged node IDs overflow".into()))?;
+        let mut ids = Vec::new();
+        ids.try_reserve_exact(count)
+            .map_err(|e| crate::GraphError::InvalidInput(e.to_string()))?;
+        ids.extend(base + self.add_nodes..base + total);
+        let first = self.add_nodes;
+        self.add_nodes = total;
+        self.stage(
+            true,
+            attrs
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        name.clone(),
+                        ids.iter().map(|&id| (id, value.clone())).collect(),
+                    )
+                })
+                .collect(),
+        )?;
+        if let Some(at) = at {
+            self.change_times
+                .extend((first..total).map(|position| {
+                    (BatchChangeRef::NodeAdded(BatchNodeRef::Added(position)), at)
+                }));
+        }
+        Ok(ids)
+    }
+
+    pub(crate) fn stage_edges(
+        &mut self,
+        graph: &Graph,
+        selected: &Subgraph,
+        edges: &[(BatchNodeRef, BatchNodeRef)],
+        attrs: &HashMap<AttrName, AttrValue>,
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<Vec<EdgeId>> {
+        let (_, base) = self.allocation_base(graph)?;
+        let total = self
+            .add_edges
+            .len()
+            .checked_add(edges.len())
+            .filter(|&n| base.checked_add(n).is_some())
+            .ok_or_else(|| crate::GraphError::InvalidInput("Staged edge IDs overflow".into()))?;
+        for &(source, target) in edges {
+            for reference in [source, target] {
+                let valid = match reference {
+                    BatchNodeRef::Existing(id) => {
+                        selected.nodes().contains(&id) && graph.has_node(id)
+                    }
+                    BatchNodeRef::Added(position) => position < self.add_nodes,
+                };
+                if !valid {
+                    return Err(crate::GraphError::InvalidInput(
+                        "Added edge endpoint is outside the selected or staged nodes".into(),
+                    ));
+                }
+            }
+        }
+        let first = self.add_edges.len();
+        let ids: Vec<_> = (base + first..base + total).collect();
+        self.add_edges.extend_from_slice(edges);
+        self.stage(
+            false,
+            attrs
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        name.clone(),
+                        ids.iter().map(|&id| (id, value.clone())).collect(),
+                    )
+                })
+                .collect(),
+        )?;
+        if let Some(at) = at {
+            self.change_times
+                .extend((first..total).map(|position| {
+                    (BatchChangeRef::EdgeAdded(BatchEdgeRef::Added(position)), at)
+                }));
+        }
+        Ok(ids)
+    }
+
     pub fn accept(self, graph: &mut Graph) -> GraphResult<()> {
         graph.validate_write_coordinate(&self.coordinate)?;
-        if self.nodes.is_empty()
+        if self.add_nodes == 0
+            && self.add_edges.is_empty()
+            && self.nodes.is_empty()
             && self.edges.is_empty()
             && self.remove_nodes.is_empty()
             && self.remove_edges.is_empty()
@@ -223,6 +369,8 @@ impl PropertyBatch {
             return Ok(());
         }
         let batch = GraphBatch {
+            add_nodes: self.add_nodes,
+            add_edges: self.add_edges,
             remove_nodes: self.remove_nodes,
             remove_edges: self.remove_edges,
             change_times: self.change_times,

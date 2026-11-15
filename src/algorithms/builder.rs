@@ -282,10 +282,12 @@ impl Algorithm for StepPipelineAlgorithm {
             }
             Ok(())
         })();
+        let mut additions = (Vec::new(), Vec::new());
         let result = if staged {
             let pending = ctx.property_batch.take();
             result.and_then(|()| {
                 if let Some(pending) = pending {
+                    additions = pending.added_ids();
                     pending.accept(&mut subgraph.graph().borrow_mut())?;
                 }
                 Ok(())
@@ -307,12 +309,14 @@ impl Algorithm for StepPipelineAlgorithm {
                 .nodes()
                 .iter()
                 .copied()
+                .chain(additions.0)
                 .filter(|id| graph.has_node(*id))
                 .collect();
             let edges = subgraph
                 .edges()
                 .iter()
                 .copied()
+                .chain(additions.1)
                 .filter(|id| graph.has_edge(*id))
                 .collect();
             drop(graph);
@@ -473,7 +477,7 @@ fn convert_params(raw: HashMap<String, serde_json::Value>) -> Result<AlgorithmPa
     Ok(params)
 }
 
-fn json_to_param(value: serde_json::Value) -> Result<AlgorithmParamValue> {
+pub(crate) fn json_to_param(value: serde_json::Value) -> Result<AlgorithmParamValue> {
     Ok(match value {
         serde_json::Value::Null => AlgorithmParamValue::None,
         serde_json::Value::Bool(b) => AlgorithmParamValue::Bool(b),

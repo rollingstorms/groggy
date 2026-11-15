@@ -2,7 +2,7 @@
 
 `graph.capture_staged` produces an immutable **selected pending working-state**
 value inside a persistent local atomic builder. It includes properties staged so
-far, endpoint revisions, explicit edge removals and node-removal cascades. Later stages and later
+far, staged node/edge creation, endpoint revisions, explicit edge removals and node-removal cascades. Later stages and later
 owner edits cannot alter the captured value.
 
 ```python
@@ -46,14 +46,16 @@ The native interpreter classifies steps before running them. Existing property
 calculations can precede topology effects. After a topology effect, only these
 certified operations are accepted:
 
-- Further staged removals and existing-edge endpoint revisions.
+- Staged node/edge creation, further removals and existing-edge endpoint revisions.
 - `graph.capture_staged`.
 - The original immutable graph/table read stages, captured `graph.degrees_table`
-  computation and variable `alias`.
+  computation, `graph.algorithm_table` over explicit captures and variable `alias`.
 
 Thus a pending graph can be selected, projected to tables, sliced, and emitted
 before acceptance. Ordinary property/structural calculations, topology loops,
-opaque callbacks and unadapted algorithms still reject in this phase. Existing
+opaque callbacks and unadapted algorithm steps still reject in this phase. The thirteen classic
+kernels are available through the explicit captured algorithm-table stage; see
+[staged creation and algorithms](staged-topology-additions.md). Existing
 property-only nested and outer atomic certification stays conservative.
 
 `atomic=True` on the local builder and `persist=True` are required. Outer

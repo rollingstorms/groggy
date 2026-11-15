@@ -6,9 +6,11 @@
 //! attribute attachment.
 
 // Module declarations
+mod additions;
 mod aggregations;
 mod arithmetic;
 mod attributes;
+mod captured_algorithms;
 mod community;
 pub mod composition;
 mod core;
