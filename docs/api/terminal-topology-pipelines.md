@@ -80,12 +80,12 @@ Python result is frozen at the accepted state. A subsequent ordinary pipeline
 algorithm receives that surviving selection.
 
 Read-after-removal through explicit immutable staged captures is supported.
-Ordinary calculations over an implicit topology overlay, topology loops, additions,
-endpoint revision stages and arbitrary custom effect rollback remain unsupported.
-Outer `Pipeline(..., atomic=True)` remains a property-only boundary and rejects
-these builders before executing any algorithm. A regular outer pipeline may
-execute a local atomic builder; later algorithms then see its accepted topology,
-with the regular outer pipeline's existing per-algorithm failure boundary.
+Ordinary calculations over an implicit topology overlay, topology loops and
+arbitrary custom effect rollback remain unsupported. Additions and endpoint
+revisions now share the same staged execution boundary. Outer
+`Pipeline(..., atomic=True)` can compose certified builders and publish once;
+see [outer atomic topology](outer-atomic-topology.md). A regular outer pipeline
+retains its per-algorithm publication and failure boundary.
 
 The implementation stages touched IDs/properties. Reconstructing the returned
 selection scans selected nodes and edges; this is not constant time in removals.

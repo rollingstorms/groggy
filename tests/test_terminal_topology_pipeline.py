@@ -121,7 +121,6 @@ def test_order_scope_and_persistence_guards_reject_before_effects():
         (step_pipeline("non atomic", prefix() + [remove]), {}),
         (step_pipeline("late read", [remove, stage("core.init_nodes", target="late", value=1)], atomic=True), {}),
         (step_pipeline("transient", prefix() + [remove], atomic=True), {"persist": False}),
-        (step_pipeline("outer", prefix() + [remove], atomic=True), {"atomic": True}),
     ]:
         with pytest.raises(RuntimeError):
             graph.apply(handle, **kwargs)

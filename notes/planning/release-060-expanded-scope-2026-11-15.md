@@ -14,12 +14,12 @@ except group 8 (deferred retrieval and external integration).
 - Open owner policy choices remain open. Performance/scale requirements need
   explicit, measurable exit criteria before broad guarantees can be closed.
 
-## Next chunk: outer atomic topology execution
+## Implemented chunk: outer atomic topology execution
 
-Existing local atomic builders stage additions, removals and endpoint revisions,
-and expose immutable pending captures to 13 existing graph kernels. The outer
-Pipeline coordinator and inherited builder checks still certify property-only
-execution. Finish that boundary using the existing staged mutation machinery.
+Local atomic builders stage additions, removals and endpoint revisions and expose
+immutable pending captures to 13 existing graph kernels. The outer coordinator now
+shares those effects across builders with one acceptance and exact final selection.
+See `outer-atomic-topology-2026-11-15.md` for implementation and verification.
 
 ### Intended outcomes
 
@@ -43,7 +43,7 @@ retain separate exit criteria in their existing parent rows.
 09.4b.2, AR3, 30.1 and AR7.8; evidence also contributes to 05.3 and 01.2.
 Completing this chunk does not automatically close every overlapping parent.
 
-### Following chunks
+### Next chunks
 
 1. Remaining property operations after topology and execution/DSL coverage.
 2. Property/schema/provenance and persistence-boundary completion.

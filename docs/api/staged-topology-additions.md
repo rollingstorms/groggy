@@ -50,7 +50,8 @@ assert graph.read_view_at(25).edge_ids == [0, 1]
   nonempty `output`, optional shared `attributes` and integer `effective_at`.
 - An integer endpoint is an existing active node in the execution selection.
   `{"added": position}` references the zero-based position across all node
-  creation stages earlier in this local program. Forward references reject.
+  creation stages earlier in the shared atomic run (across builders in an outer
+  atomic pipeline). Forward references reject.
 - Outputs are typed node/edge maps keyed by provisional IDs. Parallel edges and
   loops remain distinct instances. Zero-count/empty creation is a no-op.
 - Attribute values use the existing scalar/vector/structured parameter conversion
@@ -107,7 +108,9 @@ from provisional captures retain `write_state_id=None`; they cannot be used as
 accepted-state source writeback even after the enclosing program succeeds.
 Refresh an owner capture for later checked writeback.
 
-This does not add general topology loops, arbitrary callback effects, journal-owner
-pipeline dispatch, opaque extension certification or all high-level DSL lowering.
+Outer atomic pipelines now share these stages across builders; see
+[outer atomic topology](outer-atomic-topology.md). General topology loops,
+arbitrary callback effects, journal-owner pipeline dispatch, opaque extension
+certification and remaining high-level DSL lowering stay open.
 Property calculations/attachments after topology still require explicit supported
 adaptation; these table computations do not enable unadapted old property steps.

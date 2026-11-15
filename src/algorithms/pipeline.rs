@@ -131,9 +131,9 @@ impl Pipeline {
         self.run_steps(ctx, subgraph.execution_scope(ctx.persist_results())?, None)
     }
 
-    /// Stage all certified property algorithms and accept exactly once on success.
-    /// Unsupported effects reject before any execution. Earlier staged properties
-    /// are visible to later algorithms; errors/cancellation discard the outer batch.
+    /// Stage certified mutations and accept exactly once on success. The legacy
+    /// method name is retained for native compatibility. Unsupported effects or
+    /// topology-order requirements reject before any prefix executes.
     pub fn run_atomic_properties(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let subgraph = subgraph.execution_scope(ctx.persist_results())?;
         if ctx.property_batch.is_some() {
@@ -141,13 +141,28 @@ impl Pipeline {
                 "Nested outer atomic pipeline execution is unsupported"
             ));
         }
+        let mut topology_seen = false;
         for (index, step) in self.steps.iter().enumerate() {
-            if !step.algorithm.supports_atomic_properties() {
+            let Some(effects) = step.algorithm.atomic_mutation_effects() else {
                 return Err(anyhow!(
-                    "Pipeline step {index} ({}) does not support atomic property execution",
+                    "Pipeline step {index} ({}) does not support atomic mutation execution",
+                    step.id
+                ));
+            };
+            if (effects.requires_persistence || effects.changes_topology) && !ctx.persist_results()
+            {
+                return Err(anyhow!(
+                    "Pipeline step {index} ({}) requires persist=True",
                     step.id
                 ));
             }
+            if topology_seen && !effects.accepts_staged_topology {
+                return Err(anyhow!(
+                    "Pipeline step {index} ({}) cannot run after staged topology",
+                    step.id
+                ));
+            }
+            topology_seen |= effects.changes_topology;
         }
         let source = subgraph.graph();
         let staged = ctx.persist_results();
@@ -171,7 +186,7 @@ impl Pipeline {
                         .property_batch
                         .take()
                         .ok_or_else(|| anyhow!("Atomic pipeline lost its property batch"))?;
-                    pending.accept(&mut source.borrow_mut())?;
+                    return pending.accept_selection(result).map_err(Into::into);
                 }
                 Ok(result)
             });
@@ -534,5 +549,115 @@ mod atomic_property_tests {
             .run_atomic_properties(&mut ctx, selected)
             .unwrap();
         assert_eq!(graph.borrow().current_state_id(), head + 1);
+    }
+
+    fn topology_builder() -> Box<dyn Algorithm> {
+        crate::algorithms::ensure_algorithms_registered();
+        let mut params = AlgorithmParams::new();
+        params.set_text(
+            "steps",
+            serde_json::json!({"atomic":true,"steps":[{
+                "id":"graph.add_nodes","params":{"count":1,"output":"new"}
+            }]})
+            .to_string(),
+        );
+        crate::algorithms::global_registry()
+            .instantiate(&AlgorithmSpec {
+                id: "builder.step_pipeline".into(),
+                params,
+            })
+            .unwrap()
+    }
+
+    struct Probe(Arc<AtomicBool>);
+    impl Algorithm for Probe {
+        fn id(&self) -> &'static str {
+            "test.probe"
+        }
+        fn supports_atomic_properties(&self) -> bool {
+            true
+        }
+        fn execute(&self, _: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+            self.0.store(true, Ordering::Relaxed);
+            Ok(subgraph)
+        }
+    }
+
+    #[test]
+    fn outer_topology_order_and_persistence_validate_before_any_prefix() {
+        for persistent in [false, true] {
+            let (graph, selected) = fixture();
+            let head = graph.borrow().current_state_id();
+            let called = Arc::new(AtomicBool::new(false));
+            let mut algorithms: Vec<Box<dyn Algorithm>> =
+                vec![Box::new(Probe(called.clone())), topology_builder()];
+            if persistent {
+                algorithms.push(stage("unadapted", false));
+            }
+            let mut context = Context::new();
+            context.set_persist_results(persistent);
+            assert!(pipeline(algorithms)
+                .run_atomic_properties(&mut context, selected)
+                .is_err());
+            assert!(!called.load(Ordering::Relaxed));
+            assert_eq!(graph.borrow().current_state_id(), head);
+            assert_eq!(graph.borrow_mut().add_node().unwrap(), 1);
+        }
+    }
+
+    struct AfterTopology {
+        cancel: Arc<AtomicBool>,
+        foreign_owner: bool,
+    }
+    impl Algorithm for AfterTopology {
+        fn id(&self) -> &'static str {
+            "test.after_topology"
+        }
+        fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+            Some(crate::algorithms::AtomicMutationEffects {
+                accepts_staged_topology: true,
+                ..Default::default()
+            })
+        }
+        fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+            ctx.add_output("temporary", AlgorithmOutput::Histogram(vec![99]));
+            if self.foreign_owner {
+                OtherOwner.execute(ctx, subgraph)
+            } else {
+                self.cancel.store(true, Ordering::Relaxed);
+                Ok(subgraph)
+            }
+        }
+    }
+
+    #[test]
+    fn cancellation_or_foreign_owner_discards_topology_and_reuses_context() {
+        for foreign_owner in [false, true] {
+            let (graph, selected) = fixture();
+            let head = graph.borrow().current_state_id();
+            let cancel = Arc::new(AtomicBool::new(false));
+            let mut context = Context::with_cancel_token(cancel.clone());
+            context.add_output("previous", AlgorithmOutput::Histogram(vec![3]));
+            let run = pipeline(vec![
+                topology_builder(),
+                Box::new(AfterTopology {
+                    cancel: cancel.clone(),
+                    foreign_owner,
+                }),
+            ]);
+            assert!(run
+                .run_atomic_properties(&mut context, selected.clone())
+                .is_err());
+            assert_eq!(graph.borrow().current_state_id(), head);
+            assert!(context.property_batch.is_none() && context.active_step.is_none());
+            assert_eq!(context.outputs.len(), 1);
+            assert!(context.outputs.contains_key("previous"));
+            cancel.store(false, Ordering::Relaxed);
+            let result = pipeline(vec![topology_builder()])
+                .run_atomic_properties(&mut context, selected)
+                .unwrap();
+            assert_eq!(result.nodes().len(), 2);
+            assert_eq!(graph.borrow().current_state_id(), head + 1);
+        }
     }
 }

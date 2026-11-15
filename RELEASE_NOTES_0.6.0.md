@@ -23,8 +23,9 @@ Implemented capabilities, within their documented boundaries:
   checkpoint, compaction and purge operations.
 - Typed pipeline values, atomic property programs and selected topology effects.
   Local atomic programs can stage node/edge additions and run 13 existing
-  algorithms on immutable pending captures. Outer topology programs, unadapted
-  effects and remaining DSL/streaming work retain their checklist boundaries.
+  algorithms on immutable pending captures. Supported outer pipelines now share
+  topology effects and accept once; general topology loops, unadapted effects
+  and remaining DSL/streaming work retain their checklist boundaries.
 
 See the [flat checklist](notes/planning/graph-engine-flat-checklist.md) for exact
 completion boundaries and the [core workflow](docs/api/core-release-workflow.md)

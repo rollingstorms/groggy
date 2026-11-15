@@ -53,6 +53,6 @@ pairs; older captures keep their original pairs.
 A local `atomic=True` builder and `persist=True` are required. Endpoint revisions
 begin the same topology phase as removals: further certified topology stages,
 explicit staged captures and immutable graph/table reads may follow. Ordinary
-unadapted property/structural calculations, outer property-only atomic runs and
-topology loops remain unsupported. There are no new naming/cache policies or
-implicit checkpoints. Additions remain a separate unfinished component.
+unadapted property/structural calculations and topology loops remain unsupported.
+[Outer atomic pipelines](outer-atomic-topology.md) now share the same pending batch. There are no new naming/cache policies or
+implicit checkpoints. Additions are supported through the same canonical pending batch.

@@ -1,6 +1,6 @@
 # Groggy 0.6.0 release qualification
 
-Updated 2026-11-14. **Coordinated priority pass qualified locally and across the platform matrix. Unreleased.**
+Updated 2026-11-15. **Expanded 0.6.0 scope in progress; earlier candidate qualified. Unreleased.**
 
 ## Expanded release target — 2026-11-15
 
@@ -11,6 +11,12 @@ remains unfinished. See [scope and next chunk](notes/planning/release-060-expand
 
 The successful qualification below applies to the earlier bounded candidate.
 Implementation changes toward the expanded target require fresh final gates.
+
+The next implementation chunk, supported outer atomic topology composition, is
+complete locally: 1,579 native tests, 2,775 maintained Python tests and 271
+executable examples pass, plus strict Clippy and Rust formatting.
+See [chunk evidence](notes/planning/outer-atomic-topology-2026-11-15.md).
+The 44 broad unchecked release rows retain their remaining exit requirements.
 
 ## Qualified bounded candidate
 

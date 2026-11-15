@@ -167,7 +167,7 @@ fn map_keys_and_exact_scope_are_validated_before_acceptance() {
 }
 
 #[test]
-fn unsafe_order_controls_and_outer_property_scopes_reject_before_execution() {
+fn unsafe_order_controls_and_nonpersistent_scopes_reject_before_execution() {
     let remove = json!({"id":"graph.remove_nodes","params":{"ids":[1]}});
     assert!(pipeline(json!([remove.clone()]), false).is_err());
     assert!(pipeline(
@@ -190,7 +190,6 @@ fn unsafe_order_controls_and_outer_property_scopes_reject_before_execution() {
     let mut ctx = Context::new();
     ctx.set_persist_results(false);
     assert!(pipe.run(&mut ctx, scope(&graph)).is_err());
-    ctx.set_persist_results(true);
     assert!(pipe.run_atomic_properties(&mut ctx, scope(&graph)).is_err());
     assert_eq!(graph.borrow().current_state_id(), head);
     let cancelled = Arc::new(AtomicBool::new(true));

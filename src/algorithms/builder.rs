@@ -17,7 +17,8 @@ use super::steps::{
     SchemaRegistry, Step, StepScope, StepSpec, StepVariables, ValidationReport,
 };
 use super::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, AlgorithmParams, Context, CostHint,
+    Algorithm, AlgorithmMetadata, AlgorithmParamValue, AlgorithmParams, AtomicMutationEffects,
+    Context, CostHint,
 };
 
 pub const SAMPLE_OUTPUT_VAR: &str = "__sample_output__";
@@ -174,11 +175,27 @@ impl Algorithm for StepPipelineAlgorithm {
             .all(|step| step.supports_atomic_properties())
     }
 
+    fn atomic_mutation_effects(&self) -> Option<AtomicMutationEffects> {
+        let mut effects = AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        };
+        for step in &self.steps {
+            match step.atomic_effect() {
+                AtomicStepEffect::Unsupported => return None,
+                AtomicStepEffect::Properties => effects.accepts_staged_topology = false,
+                AtomicStepEffect::Topology => {
+                    effects.changes_topology = true;
+                    effects.requires_persistence = true;
+                }
+                AtomicStepEffect::StagedCapture => effects.requires_persistence = true,
+                AtomicStepEffect::ImmutableInputs => {}
+            }
+        }
+        Some(effects)
+    }
+
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let topology = self
-            .steps
-            .iter()
-            .any(|step| step.atomic_effect() == AtomicStepEffect::Topology);
         let local_effects = self.steps.iter().any(|step| {
             matches!(
                 step.atomic_effect(),
@@ -196,9 +213,9 @@ impl Algorithm for StepPipelineAlgorithm {
             subgraph
         };
         let inherited = ctx.property_batch.is_some();
-        if inherited && !self.supports_atomic_properties() {
+        if inherited && self.atomic_mutation_effects().is_none() {
             return Err(anyhow!(
-                "Builder contains steps unsupported by the outer atomic property run"
+                "Builder contains steps unsupported by the outer atomic mutation run"
             ));
         }
         let staged = self.atomic && ctx.persist_results() && !inherited;
@@ -282,53 +299,23 @@ impl Algorithm for StepPipelineAlgorithm {
             }
             Ok(())
         })();
-        let mut additions = (Vec::new(), Vec::new());
         let result = if staged {
             let pending = ctx.property_batch.take();
             result.and_then(|()| {
-                if let Some(pending) = pending {
-                    additions = pending.added_ids();
-                    pending.accept(&mut subgraph.graph().borrow_mut())?;
-                }
-                Ok(())
+                pending
+                    .ok_or_else(|| anyhow!("Atomic builder lost its mutation batch"))?
+                    .accept_selection(subgraph)
+                    .map_err(Into::into)
             })
         } else {
-            result
+            // Inherited runs keep the original selection until the outer owner
+            // accepts. Captures use the pending batch, not live-owner liveness.
+            result.map(|()| subgraph)
         };
         if let Some(previous_outputs) = previous_outputs {
             ctx.finish_output_scope(previous_outputs, result.is_ok());
         }
-        result?;
-        if topology {
-            // Publication has succeeded. Return the surviving exact selection,
-            // excluding explicitly removed and cascaded edge IDs. No induced
-            // edge expansion or stale membership is exposed to the next algorithm.
-            let binding = subgraph.graph();
-            let graph = binding.borrow();
-            let nodes = subgraph
-                .nodes()
-                .iter()
-                .copied()
-                .chain(additions.0)
-                .filter(|id| graph.has_node(*id))
-                .collect();
-            let edges = subgraph
-                .edges()
-                .iter()
-                .copied()
-                .chain(additions.1)
-                .filter(|id| graph.has_edge(*id))
-                .collect();
-            drop(graph);
-            Ok(Subgraph::new(
-                binding,
-                nodes,
-                edges,
-                subgraph.subgraph_type().into(),
-            ))
-        } else {
-            Ok(subgraph)
-        }
+        result
     }
 }
 

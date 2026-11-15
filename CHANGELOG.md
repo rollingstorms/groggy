@@ -16,8 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
 - Typed immutable pipeline inputs, staged topology creation/revision/removal and
-  13 captured algorithm-table kernels in local atomic programs. Outer topology
-  programs and unadapted effects remain open.
+  13 captured algorithm-table kernels in local and outer atomic programs. Shared
+  creation IDs, effect-order preflight, exact final selections and late rollback
+  preserve one accepted mutation across builders. General topology loops and
+  unadapted effects remain open.
 - Explicit storage platform capabilities, Windows locked-handle verification,
   compatible schema migration examples and independent finite graph references.
 - Measured archive validation allocation reductions and contiguous dense-product

@@ -848,6 +848,18 @@ pub enum AlgorithmOutput {
     NodeIntegers(Vec<(NodeId, i64)>),
 }
 
+/// Certified use of the shared outer mutation batch. Custom declarations are
+/// trusted contracts, not a sandbox for arbitrary callback effects.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AtomicMutationEffects {
+    /// Changes topology through the pending batch without publishing it.
+    pub changes_topology: bool,
+    /// Every read/effect can operate after earlier pending topology changes.
+    pub accepts_staged_topology: bool,
+    /// Requires a persistent pending batch, including staged graph captures.
+    pub requires_persistence: bool,
+}
+
 /// Trait implemented by all core algorithms.
 pub trait Algorithm: Send + Sync {
     /// Stable identifier used for registry lookup.
@@ -866,6 +878,14 @@ pub trait Algorithm: Send + Sync {
     /// Uncertified implementations reject explicit outer atomic property runs.
     fn supports_atomic_properties(&self) -> bool {
         false
+    }
+
+    /// Certify shared outer mutation execution and topology-order requirements.
+    /// Existing property certification remains valid before topology changes.
+    /// Uncertified implementations reject before the outer pipeline executes.
+    fn atomic_mutation_effects(&self) -> Option<AtomicMutationEffects> {
+        self.supports_atomic_properties()
+            .then_some(AtomicMutationEffects::default())
     }
 
     /// Execute the algorithm, producing a new subgraph or mutating in place.

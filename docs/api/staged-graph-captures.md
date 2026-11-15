@@ -93,5 +93,5 @@ permanent cache, checkpoint, index or version is introduced.
 
 Cancellation is checked before and after materialization; its inner copy/kernel
 is not interruptible. The builder still runs on the owner thread; this change
-does not release the GIL around the whole pipeline. The PyGraph cyclic-GC
-ownership limitation remains separate from these detached values.
+does not release the GIL around the whole pipeline. Live owner access remains creator-bound; detached values support worker reads.
+Outer atomic composition is documented in [outer atomic topology](outer-atomic-topology.md).

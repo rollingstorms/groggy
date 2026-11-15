@@ -30,14 +30,17 @@ assert profile["atomic"]
 ## Certification and shared staging
 
 The core Algorithm trait defaults to uncertified. A builder algorithm certifies
-itself only when every descendant step supports the existing property overlay.
+its supported effects through the shared pending mutation batch. The outer
+coordinator checks topology ordering and persistence before any prefix executes.
 Every outer algorithm is checked before any runs. All 13 built-in classic registry wrappers are certified: PageRank, closeness,
 betweenness, Louvain, Leiden, Girvan–Newman, label propagation, connected
 components, Infomap, A*, BFS, DFS and Dijkstra. Their source markers, weights,
 heuristics, personalization and label seeds read the same outer overlay as
-builder steps. Streaming/topology effects and unsupported custom algorithms or
-builder steps reject explicitly.
-Supported builder children can have either local atomic flag: an outer run owns
+builder steps. These classic property-writing wrappers must precede topology.
+Supported topology builders and immutable captured computations can follow; see
+[outer atomic topology](outer-atomic-topology.md). Streaming and unsupported
+custom algorithms or builder steps reject explicitly.
+Property-only builder children can have either local atomic flag: an outer run owns
 the batch, and children borrow it without accepting intermediate versions. Execution
 uses the supplied compiled step order. Default Python builder compilation now
 preserves interleaved effects and subsequent computations in statement order,
@@ -89,11 +92,10 @@ publication. Existing property indices are reused, and malformed endpoint/value
 mappings reject. An explicit owned temporal capture's `to_graph()` already has
 retained accepted history and needs no such import.
 
-This completes the certified property-only outer pipeline and selected import
-boundaries under 09.4b.2. Native ordinary factories now publish with fallible insertion; raw owner pool/
-space mutation is private. Remaining compound acceptance scope is topology effects
-and unsupported custom implementations. It does not introduce arbitrary topology transactions or
-a durable pipeline executor. Owner-thread graph assembly still holds the GIL.
+The certified property boundary now also composes supported topology builders
+through one acceptance. Native ordinary factories publish with fallible insertion;
+raw owner pool/space mutation is private. General topology loops, unadapted effects
+and durable pipeline dispatch remain open. Owner-thread graph assembly holds the GIL.
 
 ## Classic algorithm composition
 
@@ -117,5 +119,5 @@ assert graph.get_node_attr(0, "rank_copy") == graph.get_node_attr(0, "rank")
 Classic kernels keep their existing graph-direction, weight and output contracts.
 Outside explicit atomic runs they retain per-algorithm publication; persist=False
 keeps existing owned-output behavior. Certification does not add support for
-otherwise unsupported weighted/directed modes or make topology-changing pipelines
-atomic. Property-only composition does not clone the whole graph.
+otherwise unsupported weighted/directed modes. Topology composition follows
+the explicit effect/order rules above. Property-only composition does not clone the whole graph.

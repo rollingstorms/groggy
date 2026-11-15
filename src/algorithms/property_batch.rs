@@ -1,4 +1,4 @@
-//! Property staging and terminal removals for explicitly atomic builder execution.
+//! Shared mutation staging for local and outer atomic algorithm execution.
 use super::Context;
 use crate::{
     api::graph::WriteCoordinate,
@@ -354,6 +354,44 @@ impl PropertyBatch {
                 }));
         }
         Ok(ids)
+    }
+
+    /// Accept and project once at the owning execution boundary. Provisional
+    /// IDs never pass through live-owner filtering before acceptance.
+    pub(crate) fn accept_selection(self, subgraph: Subgraph) -> GraphResult<Subgraph> {
+        let topology = self.add_nodes != 0
+            || !self.add_edges.is_empty()
+            || !self.remove_nodes.is_empty()
+            || !self.remove_edges.is_empty()
+            || !self.edge_endpoints.is_empty();
+        let additions = self.added_ids();
+        let binding = subgraph.graph();
+        self.accept(&mut binding.borrow_mut())?;
+        if !topology {
+            return Ok(subgraph);
+        }
+        let graph = binding.borrow();
+        let nodes = subgraph
+            .nodes()
+            .iter()
+            .copied()
+            .chain(additions.0)
+            .filter(|id| graph.has_node(*id))
+            .collect();
+        let edges = subgraph
+            .edges()
+            .iter()
+            .copied()
+            .chain(additions.1)
+            .filter(|id| graph.has_edge(*id))
+            .collect();
+        drop(graph);
+        Ok(Subgraph::new(
+            binding,
+            nodes,
+            edges,
+            subgraph.subgraph_type().into(),
+        ))
     }
 
     pub fn accept(self, graph: &mut Graph) -> GraphResult<()> {

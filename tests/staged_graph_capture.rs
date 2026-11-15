@@ -158,7 +158,8 @@ fn staged_graph_capture_does_not_enable_unadapted_topology_reads_or_property_eff
     let mut ctx = Context::new();
     ctx.set_persist_results(false);
     assert!(pipe.run(&mut ctx, scope(&graph)).is_err());
-    ctx.set_persist_results(true);
     assert!(pipe.run_atomic_properties(&mut ctx, scope(&graph)).is_err());
+    ctx.set_persist_results(true);
+    pipe.run_atomic_properties(&mut ctx, scope(&graph)).unwrap();
     assert_eq!(graph.borrow().current_state_id(), 1);
 }
