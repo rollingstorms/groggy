@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   creation IDs, effect-order preflight, exact final selections and late rollback
   preserve one accepted mutation across builders. Certified property loads,
   initialization, arithmetic and attachments now use the pending selected state
-  after topology, including provisional IDs and property reloads. General topology loops and
+  after topology, including provisional IDs and property reloads. Structural,
+  neighbor, expression-transform and path readers now share that selected source. General topology loops and
   unadapted effects remain open.
 - Explicit storage platform capabilities, Windows locked-handle verification,
   compatible schema migration examples and independent finite graph references.

@@ -79,8 +79,9 @@ IDs or publishing history.
 
 ## Remaining boundary
 
-Classic property-writing algorithm wrappers and unadapted adjacency-dependent
-primitives (such as `core.node_degree` and neighbor collection) still reject after
-topology. Use explicit `graph.capture_staged` with the supported captured graph
-kernels for those reads. General topology loops, table-result attachment,
+Structural, neighbor, expression-transformation and path primitives now support
+pending topology; see [selected readers](pending-topology-readers.md). Classic
+property-writing algorithm wrappers and unadapted sampling/community primitives
+still reject after topology. Explicit `graph.capture_staged` and supported
+captured graph kernels remain available. General topology loops, table-result attachment,
 remaining execution/DSL lowering and journal-owner dispatch remain open.

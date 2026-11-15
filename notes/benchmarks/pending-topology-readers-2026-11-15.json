@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "initial_edges": 1000,
+      "initial_nodes": 1000,
+      "seconds": [
+        0.006198291,
+        0.004695875,
+        0.004089542,
+        0.003795625,
+        0.003577542
+      ]
+    },
+    {
+      "initial_edges": 10000,
+      "initial_nodes": 10000,
+      "seconds": [
+        0.030737,
+        0.030398875,
+        0.036979667,
+        0.033002209,
+        0.028242125
+      ]
+    }
+  ],
+  "scope": "Native release, five observations. Directed ring with one staged node and two staged weighted edges; initialization, degree, incoming aggregation, weighted shortest paths, property attachment and one publication. Includes pending capture/reuse and kernels; fixture, initial capture, compilation, algorithm construction and assertions excluded. No before/after speedup, FFI, memory or scale guarantee."
+}

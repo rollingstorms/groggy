@@ -50,6 +50,8 @@ certified operations are accepted:
 - `graph.capture_staged`.
 - Certified property loads, initialization, arithmetic and attachments over the
   pending selection; see [pending properties](pending-topology-properties.md).
+- Supported structural, neighbor, expression and path readers; see
+  [selected readers](pending-topology-readers.md).
 - The original immutable graph/table read stages, captured `graph.degrees_table`
   computation, `graph.algorithm_table` over explicit captures and variable `alias`.
 

@@ -479,7 +479,7 @@ impl Subgraph {
     ///
     /// # Returns
     /// Arc to cached or newly built CSR
-    pub(super) fn get_or_build_csr_internal(&self, add_reverse: bool) -> GraphResult<Arc<Csr>> {
+    pub(crate) fn get_or_build_csr_internal(&self, add_reverse: bool) -> GraphResult<Arc<Csr>> {
         if let Some(view) = &self.frozen {
             return Ok(crate::algorithms::AlgorithmRead::with_topology(
                 view.clone(),

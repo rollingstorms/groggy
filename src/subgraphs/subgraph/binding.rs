@@ -1,6 +1,23 @@
 //! Optional immutable read pin paired with the existing explicit write owner.
 use super::*;
 impl Subgraph {
+    /// Validate the selected read source, without confusing retained/provisional
+    /// entities in a frozen binding with current owner liveness.
+    pub(crate) fn validate_selected_read(&self) -> GraphResult<()> {
+        if self.frozen.is_none() {
+            self.validate_query_scope(&self.graph.borrow())?;
+        }
+        Ok(())
+    }
+
+    /// Direction belongs to the selected source when reads are immutable.
+    pub(crate) fn read_is_directed(&self) -> bool {
+        self.frozen.as_ref().map_or_else(
+            || self.graph.borrow().is_directed(),
+            crate::GraphView::is_directed,
+        )
+    }
+
     /// Bind current selected reads to one immutable source without changing the owner.
     /// Default-facing adapters use this; low-level execution scopes remain explicit.
     pub fn freeze(mut self) -> GraphResult<Self> {

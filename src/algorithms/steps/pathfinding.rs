@@ -1,8 +1,9 @@
 //! Checked selected path primitives sharing one staged-weight topology/kernel.
 use super::{
-    core::{Step, StepMetadata, StepScope},
+    core::{AtomicStepEffect, Step, StepMetadata, StepScope},
     transformations::selected_nodes,
 };
+use crate::traits::SubgraphOperations;
 use crate::{
     algorithms::{AlgorithmParamValue, Context, CostHint},
     storage::numeric::scalar::attribute_number,
@@ -44,14 +45,11 @@ impl PathTopology {
     fn prepare(ctx: &Context, scope: &StepScope<'_>, attr: Option<&AttrName>) -> Result<Self> {
         let nodes = selected_nodes(scope.subgraph(), ctx)?;
         let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
-        let owner = scope.subgraph().graph();
-        let graph = owner.borrow();
+        let subgraph = scope.subgraph();
+        let directed = subgraph.read_is_directed();
         for &edge in scope.subgraph().ordered_edges().iter() {
             check(ctx)?;
-            if !graph.has_edge(edge) {
-                bail!("Path edge {edge} is inactive");
-            }
-            let (source, target) = graph.edge_endpoints(edge)?;
+            let (source, target) = subgraph.edge_endpoints(edge)?;
             if !rows.contains_key(&source) || !rows.contains_key(&target) {
                 bail!("Path edge {edge} endpoint is outside selection");
             }
@@ -75,7 +73,7 @@ impl PathTopology {
                     edge,
                     weight,
                 });
-            if graph.is_undirected() && source != target {
+            if !directed && source != target {
                 rows.get_mut(&target)
                     .ok_or_else(|| anyhow!("Missing target"))?
                     .push(ArcStep {
@@ -221,6 +219,10 @@ impl ShortestPathMapStep {
     }
 }
 impl Step for ShortestPathMapStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -390,6 +392,10 @@ impl KShortestPathsStep {
     }
 }
 impl Step for KShortestPathsStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -450,6 +456,10 @@ impl RandomWalkStep {
     }
 }
 impl Step for RandomWalkStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

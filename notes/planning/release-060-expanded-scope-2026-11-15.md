@@ -51,10 +51,17 @@ instances. They reuse canonical validation and the existing one-batch publicatio
 See `pending-topology-properties-2026-11-15.md` for evidence and remaining boundaries.
 Broad parents stay open; the 215 checked / 53 unchecked inventory is unchanged.
 
+### Implemented follow-up: selected structural/neighbor/path reads
+
+The existing structural, neighbor, expression-transformation and path primitives
+now consume the pending selected source. Pure variable reductions are also
+certified. See `pending-topology-readers-2026-11-15.md`. Arbitrary callbacks and
+unadapted families retain their guards; broader parent exit criteria stay open.
+
 ### Next chunks
 
-1. Remaining adjacency-dependent operations after topology, captured-result
-   attachment and execution/DSL coverage.
+1. Captured-result attachment, remaining sampling/community/nested execution
+   after topology, and execution/DSL coverage.
 2. Property/schema/provenance and persistence-boundary completion.
 3. Archive/recovery memory, numerical/algorithm certification and scale targets.
 4. Remaining API/module consolidation and service/concurrency implementation.

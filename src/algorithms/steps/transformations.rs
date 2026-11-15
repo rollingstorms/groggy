@@ -5,11 +5,12 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
+use crate::traits::SubgraphOperations;
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::arithmetic::ModeTieBreak;
-use super::core::{Step, StepInput, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepInput, StepMetadata, StepScope};
 use super::expression::{Expr, ExprContext};
 use super::filtering::compare_values;
 
@@ -21,16 +22,7 @@ pub(super) fn selected_nodes(
         return Err(anyhow!("transformation cancelled"));
     }
     let nodes = subgraph.ordered_nodes().to_vec();
-    let graph = subgraph.graph();
-    let graph = graph.borrow();
-    for &node in &nodes {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("transformation cancelled"));
-        }
-        if !graph.has_node(node) {
-            return Err(anyhow!("Transformation node {} is inactive", node));
-        }
-    }
+    subgraph.validate_selected_read()?;
     Ok(nodes)
 }
 
@@ -42,16 +34,11 @@ pub(super) fn selected_neighbors(
 ) -> Result<(Vec<NodeId>, HashMap<NodeId, Vec<NodeId>>)> {
     let nodes = selected_nodes(subgraph, ctx)?;
     let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
-    let graph = subgraph.graph();
-    let graph = graph.borrow();
     for &edge in subgraph.ordered_edges().iter() {
         if ctx.is_cancelled() {
             return Err(anyhow!("transformation cancelled"));
         }
-        if !graph.has_edge(edge) {
-            return Err(anyhow!("Transformation edge {} is inactive", edge));
-        }
-        let (source, target) = graph.edge_endpoints(edge)?;
+        let (source, target) = subgraph.edge_endpoints(edge)?;
         if !rows.contains_key(&source) || !rows.contains_key(&target) {
             return Err(anyhow!(
                 "Transformation edge {} endpoint is outside selection",
@@ -61,7 +48,7 @@ pub(super) fn selected_neighbors(
         rows.get_mut(&source)
             .ok_or_else(|| anyhow!("Missing selected endpoint"))?
             .push(target);
-        if graph.is_undirected() && source != target {
+        if !subgraph.read_is_directed() && source != target {
             rows.get_mut(&target)
                 .ok_or_else(|| anyhow!("Missing selected endpoint"))?
                 .push(source);
@@ -209,6 +196,10 @@ impl NeighborModeUpdateStep {
 }
 
 impl Step for NeighborModeUpdateStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -385,6 +376,10 @@ impl MapNodesExprStep {
 }
 
 impl Step for MapNodesExprStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -522,6 +517,10 @@ impl UpdateInPlaceStep {
 }
 
 impl Step for UpdateInPlaceStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

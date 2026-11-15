@@ -66,8 +66,9 @@ All algorithms declare their native mutation effects before any prefix executes.
 Certified property loads, initialization, arithmetic and attachments can follow
 staged topology using the pending selection. See [supported property stages](pending-topology-properties.md).
 Subsequent builders may also contain supported topology, explicit pending captures
-and immutable-input computations. Unadapted adjacency-dependent property steps
-and classic property-writing wrappers reject before execution. Use the existing
+and immutable-input computations. Supported structural, neighbor, expression and path readers also use that
+selection; see [selected readers](pending-topology-readers.md). Unadapted
+sampling/community steps and classic property-writing wrappers reject before execution. Use the existing
 `graph.algorithm_table` kernels for computations on captured pending topology.
 This ordering check is conservative, including statically empty topology stages.
 

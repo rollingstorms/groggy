@@ -1597,6 +1597,10 @@ impl CollectNeighborValuesStep {
 }
 
 impl Step for CollectNeighborValuesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -1614,8 +1618,6 @@ impl Step for CollectNeighborValuesStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
-
         if ctx.is_cancelled() {
             return Err(anyhow!("core.collect_neighbor_values cancelled"));
         }
@@ -1624,46 +1626,8 @@ impl Step for CollectNeighborValuesStep {
         let subgraph = scope.subgraph();
         let nodes = subgraph.ordered_nodes();
 
-        // Detect if graph is directed
-        let graph_rc = subgraph.graph();
-        let add_reverse = {
-            let graph = graph_rc.borrow();
-            graph.is_undirected()
-        };
-
-        // Get or build CSR
-        let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
-            cached
-        } else {
-            let mut csr = Csr::default();
-            let edges = subgraph.edges();
-
-            let mut node_to_idx = std::collections::HashMap::new();
-            for (idx, &node_id) in nodes.iter().enumerate() {
-                node_to_idx.insert(node_id, idx);
-            }
-
-            {
-                let graph = graph_rc.borrow();
-                let pool = graph.pool();
-
-                let _build_time = build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid),
-                    CsrOptions {
-                        add_reverse_edges: add_reverse,
-                        sort_neighbors: false,
-                    },
-                );
-            }
-
-            let csr_arc = std::sync::Arc::new(csr);
-            subgraph.csr_cache_store(add_reverse, csr_arc.clone());
-            csr_arc
-        };
+        let add_reverse = !subgraph.read_is_directed();
+        let csr = subgraph.get_or_build_csr_internal(add_reverse)?;
 
         // Get source values
         let source_map = scope.variables().node_map(&self.source)?;

@@ -9,7 +9,7 @@ use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 
 /// Compute node degrees and store them as a node map.
 pub struct NodeDegreeStep {
@@ -27,6 +27,10 @@ impl NodeDegreeStep {
 }
 
 impl Step for NodeDegreeStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -64,11 +68,11 @@ impl Step for NodeDegreeStep {
         } else {
             subgraph.ordered_nodes().to_vec()
         };
-        let graph = subgraph.graph();
-        let graph = graph.borrow();
+        subgraph.validate_selected_read()?;
+        let directed = subgraph.read_is_directed();
         let mut counts = HashMap::with_capacity(nodes.len());
         for node in nodes {
-            if !subgraph.has_node(node) || !graph.has_node(node) {
+            if !subgraph.has_node(node) {
                 return Err(anyhow!(
                     "node_degree source node {} is outside the active selection",
                     node
@@ -83,7 +87,7 @@ impl Step for NodeDegreeStep {
             let (source, target) = subgraph.edge_endpoints(edge)?;
             for endpoint in [
                 Some(source),
-                (!graph.is_directed() && target != source).then_some(target),
+                (!directed && target != source).then_some(target),
             ]
             .into_iter()
             .flatten()
@@ -95,7 +99,6 @@ impl Step for NodeDegreeStep {
                 }
             }
         }
-        drop(graph);
         scope.variables_mut().set_node_map(
             self.target.clone(),
             counts
@@ -123,6 +126,10 @@ impl WeightedDegreeStep {
 }
 
 impl Step for WeightedDegreeStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -164,6 +171,10 @@ impl KCoreMarkStep {
 }
 
 impl Step for KCoreMarkStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -242,6 +253,10 @@ impl TriangleCountStep {
 }
 
 impl Step for TriangleCountStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -288,9 +303,8 @@ fn undirected_topology(ctx: &Context, scope: &StepScope<'_>) -> Result<Undirecte
         return Err(anyhow!("structural topology cancelled"));
     }
     let selection = scope.subgraph();
-    let graph = selection.graph();
-    let graph = graph.borrow();
-    if graph.is_directed() {
+    selection.validate_selected_read()?;
+    if selection.read_is_directed() {
         return Err(anyhow!("Triangle and k-core builder steps require an undirected graph; directed definitions are not implemented"));
     }
     let nodes = selection.ordered_nodes().to_vec();
@@ -299,20 +313,12 @@ fn undirected_topology(ctx: &Context, scope: &StepScope<'_>) -> Result<Undirecte
         .enumerate()
         .map(|(index, &node)| (node, index))
         .collect();
-    for &node in &nodes {
-        if !graph.has_node(node) {
-            return Err(anyhow!("Structural node {} is inactive", node));
-        }
-    }
     let mut neighbors = vec![Vec::new(); nodes.len()];
     for &edge in selection.ordered_edges().iter() {
         if ctx.is_cancelled() {
             return Err(anyhow!("structural topology cancelled"));
         }
-        if !graph.has_edge(edge) {
-            return Err(anyhow!("Structural edge {} is inactive", edge));
-        }
-        let (source, target) = graph.edge_endpoints(edge)?;
+        let (source, target) = selection.edge_endpoints(edge)?;
         let source = *positions
             .get(&source)
             .ok_or_else(|| anyhow!("Edge {} source is outside selection", edge))?;
@@ -349,6 +355,10 @@ impl EdgeWeightSumStep {
 }
 
 impl Step for EdgeWeightSumStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -387,18 +397,9 @@ fn incident_weight_sums(
     }
     let subgraph = scope.subgraph();
     let mut sums = HashMap::with_capacity(subgraph.node_count());
-    {
-        let graph = subgraph.graph();
-        let graph = graph.borrow();
-        for &node in subgraph.ordered_nodes().iter() {
-            if !graph.has_node(node) {
-                return Err(anyhow!(
-                    "incident weight node {} is outside the active graph",
-                    node
-                ));
-            }
-            sums.insert(node, 0.0f64);
-        }
+    subgraph.validate_selected_read()?;
+    for &node in subgraph.ordered_nodes().iter() {
+        sums.insert(node, 0.0f64);
     }
     for &edge in subgraph.ordered_edges().iter() {
         if ctx.is_cancelled() {

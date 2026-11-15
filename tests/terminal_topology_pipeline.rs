@@ -171,7 +171,7 @@ fn unsafe_order_controls_and_nonpersistent_scopes_reject_before_execution() {
     let remove = json!({"id":"graph.remove_nodes","params":{"ids":[1]}});
     assert!(pipeline(json!([remove.clone()]), false).is_err());
     assert!(pipeline(
-        json!([remove.clone(),{"id":"core.node_degree","params":{"target":"late"}}]),
+        json!([remove.clone(),{"id":"core.sample_nodes","params":{"target":"late","count":1}}]),
         true
     )
     .is_err());

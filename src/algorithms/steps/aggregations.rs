@@ -11,10 +11,11 @@ use crate::storage::numeric::{
     dot_product::Dot,
     reductions::{self, Scalar},
 };
+use crate::traits::SubgraphOperations;
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 use super::direction::NeighborDirection;
 
 fn ordered_values(
@@ -164,6 +165,10 @@ impl ReduceNodeValuesStep {
 }
 
 impl Step for ReduceNodeValuesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -206,6 +211,10 @@ impl StdDevStep {
 }
 
 impl Step for StdDevStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -250,6 +259,10 @@ impl MedianStep {
 }
 
 impl Step for MedianStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -300,6 +313,10 @@ impl ModeStep {
 }
 
 impl Step for ModeStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -342,6 +359,10 @@ impl QuantileStep {
 }
 
 impl Step for QuantileStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -392,6 +413,10 @@ impl EntropyStep {
 }
 
 impl Step for EntropyStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -441,6 +466,10 @@ impl HistogramStep {
 }
 
 impl Step for HistogramStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -566,6 +595,10 @@ impl NeighborAggregationStep {
 }
 
 impl Step for NeighborAggregationStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -598,38 +631,28 @@ impl Step for NeighborAggregationStep {
             .collect();
         let edges = subgraph.ordered_edges();
         let mut csr = Csr::default();
-        {
-            let graph = subgraph.graph();
-            let graph = graph.borrow();
-            for &node in nodes.iter() {
-                if !graph.has_node(node) {
-                    return Err(anyhow!("Neighbor source node {} is inactive", node));
+        subgraph.validate_selected_read()?;
+        let mapping = self.direction.edge_mapping();
+        let mut failure = None;
+        build_csr_from_edges_with_scratch(
+            &mut csr,
+            nodes.len(),
+            edges.iter().copied(),
+            |id| positions.get(&id).copied(),
+            |edge| match subgraph.edge_endpoints(edge) {
+                Ok(endpoints) => Some(mapping(endpoints)),
+                Err(error) => {
+                    failure = Some(error);
+                    None
                 }
-            }
-            for &edge in edges.iter() {
-                if ctx.is_cancelled() {
-                    return Err(anyhow!("Neighbor aggregation cancelled"));
-                }
-                if !graph.has_edge(edge) {
-                    return Err(anyhow!("Neighbor edge {} is inactive", edge));
-                }
-                let (u, v) = graph.edge_endpoints(edge)?;
-                if !positions.contains_key(&u) || !positions.contains_key(&v) {
-                    return Err(anyhow!("Neighbor edge escapes selection"));
-                }
-            }
-            let mapping = self.direction.edge_mapping();
-            build_csr_from_edges_with_scratch(
-                &mut csr,
-                nodes.len(),
-                edges.iter().copied(),
-                |id| positions.get(&id).copied(),
-                |edge| graph.pool().get_edge_endpoints(edge).map(mapping),
-                CsrOptions {
-                    add_reverse_edges: self.direction.add_reverse_edges(),
-                    sort_neighbors: true,
-                },
-            );
+            },
+            CsrOptions {
+                add_reverse_edges: self.direction.add_reverse_edges(),
+                sort_neighbors: true,
+            },
+        );
+        if let Some(error) = failure {
+            return Err(error.into());
         }
         let source = scope.variables().node_map(&self.source)?;
         let weights = self

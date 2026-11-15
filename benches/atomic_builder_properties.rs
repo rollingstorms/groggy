@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--pending-readers") {
+        return pending_readers_receipt();
+    }
     if std::env::args().any(|arg| arg == "--pending-properties") {
         return pending_properties_receipt();
     }
@@ -474,5 +477,73 @@ fn pending_properties_receipt() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote pending properties receipt to {path}");
+    Ok(())
+}
+
+fn pending_readers_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::{BatchNodeRef as N, GraphBatch};
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [1_000, 10_000] {
+        let mut params = AlgorithmParams::new();
+        params.set_text("steps", json!({"atomic":true,"steps":[
+            {"id":"graph.add_nodes","params":{"count":1,"output":"new"}},
+            {"id":"graph.add_edges","params":{"edges":[[count-1,{"added":0}],[{"added":0},0]],"output":"new_edges","attributes":{"weight":2.0}}},
+            {"id":"core.init_nodes","params":{"target":"values","value":1}},
+            {"id":"core.node_degree","params":{"target":"degrees"}},
+            {"id":"core.neighbor_agg","params":{"source":"values","target":"neighbors","agg":"sum","direction":"in"}},
+            {"id":"core.init_scalar","params":{"target":"source","value":0}},
+            {"id":"core.shortest_path_map","params":{"source":"source","weight_attr":"weight","output":"paths"}},
+            {"id":"core.attach_node_attr","params":{"source":"paths","attr":"distance"}}
+        ]}).to_string());
+        let algorithm = registry.instantiate(&AlgorithmSpec {
+            id: "builder.step_pipeline".into(),
+            params,
+        })?;
+        let mut samples = Vec::new();
+        for _ in 0..5 {
+            let mut graph = Graph::new_directed();
+            graph.apply_batch(
+                GraphBatch {
+                    add_nodes: count,
+                    add_edges: (0..count)
+                        .map(|node| (N::Added(node), N::Added((node + 1) % count)))
+                        .collect(),
+                    ..Default::default()
+                },
+                0,
+                "fixture".into(),
+                "bench".into(),
+            )?;
+            let graph = Arc::new(OwnerCell::new(graph));
+            let selected = Subgraph::from_frozen_view(
+                graph.clone(),
+                graph.borrow().read_view()?,
+                "bench".into(),
+            );
+            let mut ctx = Context::new();
+            let started = Instant::now();
+            let result = algorithm.execute(&mut ctx, selected)?;
+            samples.push(started.elapsed().as_secs_f64());
+            assert_eq!(result.node_count(), count + 1);
+            assert_eq!(graph.borrow().current_state_id(), 2);
+            assert_eq!(
+                graph.borrow().get_node_attr(count, &"distance".into())?,
+                Some(AttrValue::Float64((count + 1) as f64))
+            );
+        }
+        cases.push(json!({"initial_nodes":count,"initial_edges":count,"seconds":samples}));
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "pending_topology_readers.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release, five observations. Directed ring with one staged node and two staged weighted edges; initialization, degree, incoming aggregation, weighted shortest paths, property attachment and one publication. Includes pending capture/reuse and kernels; fixture, initial capture, compilation, algorithm construction and assertions excluded. No before/after speedup, FFI, memory or scale guarantee.",
+            "cases":cases
+        }))?,
+    )?;
+    println!("Wrote pending reader receipt to {path}");
     Ok(())
 }

@@ -324,3 +324,66 @@ fn stale_property_map_after_removal_rolls_back_and_context_can_be_reused() {
     assert!(graph.borrow().has_node(7));
     assert!(!graph.borrow().has_node(8));
 }
+
+#[test]
+fn structural_neighbor_and_path_primitives_read_one_pending_source() {
+    for directed in [false, true] {
+        let graph = fixture(directed);
+        let head = graph.borrow().current_state_id();
+        let mut context = Context::new();
+        let program = json!([
+            {"id":"graph.add_nodes","params":{"count":1,"output":"created"}},
+            {"id":"graph.add_edges","params":{"edges":[[0,{"added":0}],[{"added":0},4]],"output":"connected","attributes":{"weight":2.5}}},
+            {"id":"graph.set_edge_endpoints","params":{"revisions":[[0,4,0]]}},
+            {"id":"graph.remove_nodes","params":{"ids":[2]}},
+            {"id":"core.node_degree","params":{"target":"degrees"}},
+            {"id":"core.attach_node_attr","params":{"source":"degrees","attr":"degree"}},
+            {"id":"core.weighted_degree","params":{"weight_attr":"weight","target":"weights"}},
+            {"id":"core.attach_node_attr","params":{"source":"weights","attr":"incidence"}},
+            {"id":"core.load_node_attr","params":{"attr":"node_id","target":"ids"}},
+            {"id":"core.neighbor_agg","params":{"source":"ids","target":"incoming","direction":"in","agg":"sum"}},
+            {"id":"core.attach_node_attr","params":{"source":"incoming","attr":"incoming"}},
+            {"id":"core.init_scalar","params":{"target":"start","value":0}},
+            {"id":"core.shortest_path_map","params":{"source":"start","output":"paths","weight_attr":"weight"}},
+            {"id":"core.attach_node_attr","params":{"source":"paths","attr":"distance"}},
+            {"id":"graph.capture_staged","params":{"output":"final"}},
+            {"id":"graph.emit","params":{"source":"final","name":"final"}}
+        ]);
+        pipeline(vec![program])
+            .run_atomic_properties(&mut context, selected(&graph))
+            .unwrap();
+        assert_eq!(graph.borrow().current_state_id(), head + 1);
+        let outputs = context.take_outputs();
+        let AlgorithmOutput::GraphView(view) = &outputs["final"] else {
+            panic!("view")
+        };
+        for (node, degree, weighted, incoming, distance) in [
+            (0, if directed { 1 } else { 2 }, 3.5, 4.0, 0.0),
+            (
+                4,
+                if directed { 2 } else { 3 },
+                5.5,
+                11.0,
+                if directed { 5.0 } else { 1.0 },
+            ),
+            (7, 2 - i64::from(directed), 5.0, 0.0, 2.5),
+        ] {
+            assert_eq!(
+                view.node_attr(node, &"degree".into()).unwrap(),
+                Some(AttrValue::Int(degree))
+            );
+            assert_eq!(
+                view.node_attr(node, &"incidence".into()).unwrap(),
+                Some(AttrValue::Float64(weighted))
+            );
+            assert_eq!(
+                view.node_attr(node, &"incoming".into()).unwrap(),
+                Some(AttrValue::Float64(incoming))
+            );
+            assert_eq!(
+                view.node_attr(node, &"distance".into()).unwrap(),
+                Some(AttrValue::Float64(distance))
+            );
+        }
+    }
+}
