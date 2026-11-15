@@ -125,6 +125,7 @@ impl StepPipelineAlgorithm {
                     AtomicStepEffect::ImmutableInputs
                         | AtomicStepEffect::StagedCapture
                         | AtomicStepEffect::PendingProperties
+                        | AtomicStepEffect::PendingSelections
                         | AtomicStepEffect::StagedProperties
                 )
             {
@@ -194,7 +195,9 @@ impl Algorithm for StepPipelineAlgorithm {
                 AtomicStepEffect::StagedCapture | AtomicStepEffect::StagedProperties => {
                     effects.requires_persistence = true
                 }
-                AtomicStepEffect::ImmutableInputs | AtomicStepEffect::PendingProperties => {}
+                AtomicStepEffect::ImmutableInputs
+                | AtomicStepEffect::PendingProperties
+                | AtomicStepEffect::PendingSelections => {}
             }
         }
         Some(effects)
@@ -229,8 +232,9 @@ impl Algorithm for StepPipelineAlgorithm {
             let graph = binding.borrow();
             let state = graph.current_state_id();
             graph.validate_write_head(state)?;
-            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(
+            ctx.property_batch = Some(super::property_batch::PropertyBatch::for_selection(
                 graph.write_coordinate(),
+                &subgraph,
             ));
         }
         // The outer atomic coordinator already owns its output rollback. A local

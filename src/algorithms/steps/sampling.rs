@@ -20,7 +20,9 @@ use crate::traits::SubgraphOperations;
 use crate::types::{EdgeId, NodeId};
 
 use super::super::{AlgorithmOutput, AlgorithmParamValue, Context, CostHint};
-use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope, StepVariables};
+use super::core::{
+    nested_effect, AtomicStepEffect, Step, StepExecutor, StepMetadata, StepScope, StepVariables,
+};
 
 /// Specification for sampling: either a fraction or absolute count.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,39 +66,6 @@ fn checked_population(ctx: &Context, scope: &StepScope<'_>, edges: bool) -> Resu
     };
     check_cancelled(ctx)?;
     Ok(ids.to_vec())
-}
-
-/// Stable selected IDs, checked against the active owner and endpoint closure.
-fn checked_owner_population(
-    ctx: &Context,
-    scope: &StepScope<'_>,
-    edges: bool,
-) -> Result<Vec<usize>> {
-    check_cancelled(ctx)?;
-    let selection = scope.subgraph();
-    let graph = selection.graph();
-    let graph = graph.borrow();
-    for &node in selection.ordered_nodes().iter() {
-        check_cancelled(ctx)?;
-        if !graph.has_node(node) {
-            bail!("Sampling node {} is inactive", node);
-        }
-    }
-    if !edges {
-        return Ok(selection.ordered_nodes().to_vec());
-    }
-    let ids = selection.ordered_edges().to_vec();
-    for &edge in &ids {
-        check_cancelled(ctx)?;
-        if !graph.has_edge(edge) {
-            bail!("Sampling edge {} is inactive", edge);
-        }
-        let (source, target) = graph.edge_endpoints(edge)?;
-        if !selection.node_set().contains(&source) || !selection.node_set().contains(&target) {
-            bail!("Sampling edge {} endpoint is outside selection", edge);
-        }
-    }
-    Ok(ids)
 }
 
 fn check_cancelled(ctx: &Context) -> Result<()> {
@@ -237,19 +206,18 @@ struct SelectionTopology {
 }
 impl SelectionTopology {
     fn prepare(ctx: &Context, scope: &StepScope<'_>) -> Result<Self> {
-        let edges = checked_owner_population(ctx, scope, true)?;
+        let edges = checked_population(ctx, scope, true)?;
         let nodes = scope.subgraph().ordered_nodes().to_vec();
         let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
         let mut endpoints = HashMap::with_capacity(edges.len());
-        let graph = scope.subgraph().graph();
-        let graph = graph.borrow();
+        let selected = scope.subgraph();
         for &edge in &edges {
             check_cancelled(ctx)?;
-            let (source, target) = graph.edge_endpoints(edge)?;
+            let (source, target) = selected.edge_endpoints(edge)?;
             rows.get_mut(&source)
                 .ok_or_else(|| anyhow::anyhow!("Missing selected source"))?
                 .push((target, edge));
-            if graph.is_undirected() && source != target {
+            if !selected.read_is_directed() && source != target {
                 rows.get_mut(&target)
                     .ok_or_else(|| anyhow::anyhow!("Missing selected target"))?
                     .push((source, edge));
@@ -318,6 +286,21 @@ impl SelectionTopology {
     }
 }
 
+fn selected_output(
+    scope: &StepScope<'_>,
+    nodes: HashSet<NodeId>,
+    edges: HashSet<EdgeId>,
+    name: String,
+) -> Result<Subgraph> {
+    let selected = scope.subgraph();
+    if let Some(source) = selected.frozen_view() {
+        let view = crate::GraphView::from_membership(source.read_state().clone(), nodes, edges)?;
+        Ok(selected.bound_selection(view, name))
+    } else {
+        Ok(Subgraph::new(selected.graph(), nodes, edges, name))
+    }
+}
+
 fn install_subgraphs(
     ctx: &Context,
     scope: &mut StepScope<'_>,
@@ -344,6 +327,10 @@ impl IterateNodesStep {
 }
 
 impl Step for IterateNodesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingSelections
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -362,18 +349,17 @@ impl Step for IterateNodesStep {
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
         let topology = SelectionTopology::prepare(ctx, scope)?;
-        let graph = scope.subgraph().graph();
         let mut outputs = Vec::with_capacity(topology.nodes.len());
         for &node in &topology.nodes {
             check_cancelled(ctx)?;
             let nodes = HashSet::from([node]);
             let edges = topology.induced(ctx, &nodes)?;
-            outputs.push(Subgraph::new(
-                graph.clone(),
+            outputs.push(selected_output(
+                scope,
                 nodes,
                 edges,
                 "sample_iterate_nodes".into(),
-            ));
+            )?);
         }
         install_subgraphs(ctx, scope, &self.target, outputs)
     }
@@ -394,6 +380,10 @@ impl IterateEdgesStep {
 }
 
 impl Step for IterateEdgesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingSelections
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -412,17 +402,16 @@ impl Step for IterateEdgesStep {
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
         let topology = SelectionTopology::prepare(ctx, scope)?;
-        let graph = scope.subgraph().graph();
         let mut outputs = Vec::with_capacity(topology.edges.len());
         for &edge in &topology.edges {
             check_cancelled(ctx)?;
             let (source, target) = topology.endpoints[&edge];
-            outputs.push(Subgraph::new(
-                graph.clone(),
+            outputs.push(selected_output(
+                scope,
                 HashSet::from([source, target]),
                 HashSet::from([edge]),
                 "sample_iterate_edges".into(),
-            ));
+            )?);
         }
         install_subgraphs(ctx, scope, &self.target, outputs)
     }
@@ -447,6 +436,10 @@ impl NeighborsStep {
 }
 
 impl Step for NeighborsStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingSelections
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -497,7 +490,6 @@ impl Step for NeighborsStep {
                 }
                 seeds
             };
-        let graph = scope.subgraph().graph();
         let mut outputs = Vec::with_capacity(seeds.len());
         for mut visited in seeds {
             check_cancelled(ctx)?;
@@ -521,12 +513,12 @@ impl Step for NeighborsStep {
                 frontier = next;
             }
             let edges = topology.induced(ctx, &visited)?;
-            outputs.push(Subgraph::new(
-                graph.clone(),
+            outputs.push(selected_output(
+                scope,
                 visited,
                 edges,
                 format!("sample_neighbors_hops_{}", self.hops),
-            ));
+            )?);
         }
         install_subgraphs(ctx, scope, &self.target, outputs)
     }
@@ -565,6 +557,10 @@ impl EmitSubgraphsStep {
 }
 
 impl Step for EmitSubgraphsStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingSelections
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -583,7 +579,6 @@ impl Step for EmitSubgraphsStep {
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
         let topology = SelectionTopology::prepare(ctx, scope)?;
-        let graph = scope.subgraph().graph();
         let mut selections: Vec<(HashSet<NodeId>, HashSet<EdgeId>)> = Vec::new();
         if let Ok(array) = scope.variables().subgraph_array(&self.source) {
             for selector in array {
@@ -647,12 +642,12 @@ impl Step for EmitSubgraphsStep {
             } else {
                 original_edges
             };
-            outputs.push(Subgraph::new(
-                graph.clone(),
+            outputs.push(selected_output(
+                scope,
                 nodes,
                 edges,
                 "sample_emit_subgraphs".into(),
-            ));
+            )?);
         }
         install_subgraphs(ctx, scope, &self.target, outputs)
     }
@@ -767,6 +762,15 @@ impl ForEachSubgraphStep {
 }
 
 impl Step for ForEachSubgraphStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        match nested_effect(&self.body_steps) {
+            AtomicStepEffect::ImmutableInputs
+            | AtomicStepEffect::PendingProperties
+            | AtomicStepEffect::PendingSelections => AtomicStepEffect::PendingSelections,
+            effect => effect,
+        }
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         self.body_steps
             .iter()
@@ -787,8 +791,12 @@ impl Step for ForEachSubgraphStep {
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
         check_cancelled(ctx)?;
-        if ctx.property_batch.is_some() && !self.supports_atomic_properties() {
-            bail!("for_each body does not support atomic property execution");
+        if ctx.property_batch.as_ref().is_some_and(|batch| {
+            let effect = self.atomic_effect();
+            effect == AtomicStepEffect::Unsupported
+                || (batch.has_topology() && effect == AtomicStepEffect::Properties)
+        }) {
+            bail!("for_each body does not support this atomic execution scope");
         }
         let topology = SelectionTopology::prepare(ctx, scope)?;
         let inputs = scope.variables().subgraph_array(&self.source)?;
@@ -802,11 +810,19 @@ impl Step for ForEachSubgraphStep {
             let mut outputs = Vec::new();
             for (index, selector) in inputs.iter().enumerate() {
                 check_cancelled(ctx)?;
+                // A live execution frame reads through the staged overlay before
+                // topology; the executor binds pending topology when necessary.
+                let frame = Subgraph::new(
+                    selector.graph(),
+                    selector.node_set().clone(),
+                    selector.edge_set().clone(),
+                    "for_each frame".into(),
+                );
                 let mut vars = StepVariables::default();
+                let mut executor = StepExecutor::for_frame(&frame, true);
                 for step in &self.body_steps {
                     check_cancelled(ctx)?;
-                    let mut inner_scope = StepScope::new(selector, &mut vars);
-                    step.apply(ctx, &mut inner_scope)?;
+                    executor.apply(ctx, &mut vars, step.as_ref())?;
                     collected.absorb(&self.target, index, ctx.take_outputs())?;
                 }
                 check_cancelled(ctx)?;

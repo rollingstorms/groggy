@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the documented storage and platform boundaries.
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
+- Pending subgraph producers and certified for-each bodies now use exact child
+  selections, shared nested parsing and execution, and immutable emitted sources.
 - Long atomic runs reclaim expired weak capture metadata and oversized registry
   capacity while preserving live earlier table attachment authority.
 - Temporal value decay now accepts pending selected nodes/edges and ordered

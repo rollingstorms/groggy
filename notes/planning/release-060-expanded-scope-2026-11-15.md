@@ -100,9 +100,17 @@ Expired weak capture metadata/capacity is reclaimed with amortized work during
 long runs, preserving live earlier source-bound tables. See
 `capture-authority-churn-2026-11-15.md`, which also summarizes this priority pass.
 
+### Implemented follow-up: exact subgraph frames
+
+Native root/child selection ownership now supports pending iteration, neighborhoods,
+emission and certified for-each bodies with immutable outputs and one acceptance.
+Nested bodies share parsing and selected execution. See
+`pending-subgraph-frames-2026-11-15.md`; its release benchmark identifies repeated
+root copying as the next performance task.
+
 ### Next chunks
 
-1. Subgraph-producing sampling/for-each and general topology-mutating execution, public
+1. Pending-frame materialization cost, then general topology-mutating execution, public
    facade lowering and execution/DSL coverage.
 2. Property/schema/provenance and persistence-boundary completion.
 3. Archive/recovery memory, numerical/algorithm certification and scale targets.

@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 #[derive(Debug)]
 pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
+    root: Option<Subgraph>,
     read_revision: u64,
     captures: HashMap<usize, (u64, crate::state::read_state::WeakReadCapture)>,
     capture_sweep_at: usize,
@@ -60,6 +61,75 @@ impl PropertyBatch {
     /// read-only value. It has no accepted write provenance or history claim.
     /// This copies selected values, never clones a writable Graph/history/pool.
     pub(crate) fn capture(&mut self, subgraph: &Subgraph) -> GraphResult<crate::GraphView> {
+        self.capture_scoped(subgraph, false)
+    }
+
+    /// Refresh values against the original batch root, then project an exact
+    /// child frame. Sibling writes and global provisional IDs belong to the root.
+    pub(crate) fn capture_scoped(
+        &mut self,
+        subgraph: &Subgraph,
+        fixed: bool,
+    ) -> GraphResult<crate::GraphView> {
+        let root = self.root.as_ref().unwrap_or(subgraph).clone();
+        if !std::sync::Arc::ptr_eq(&root.graph(), &subgraph.graph()) {
+            return Err(crate::GraphError::InvalidInput(
+                "Execution frame has a different graph owner".into(),
+            ));
+        }
+        let view = self.materialize(&root)?;
+        if fixed {
+            crate::GraphView::from_membership(
+                view.read_state().clone(),
+                subgraph.nodes().clone(),
+                subgraph.edges().clone(),
+            )
+        } else if self.root.is_some() {
+            let (added_nodes, added_edges) = self.added_ids();
+            let is_added_node = |id: usize| {
+                self.allocation_base
+                    .is_some_and(|(base, _)| id >= base && id - base < self.add_nodes)
+            };
+            let is_added_edge = |id: usize| {
+                self.allocation_base
+                    .is_some_and(|(_, base)| id >= base && id - base < self.add_edges.len())
+            };
+            if subgraph
+                .nodes()
+                .iter()
+                .any(|id| !root.nodes().contains(id) && !is_added_node(*id))
+                || subgraph
+                    .edges()
+                    .iter()
+                    .any(|id| !root.edges().contains(id) && !is_added_edge(*id))
+            {
+                return Err(crate::GraphError::InvalidInput(
+                    "Execution selection expands outside its original batch root".into(),
+                ));
+            }
+            let nodes: HashSet<_> = subgraph
+                .nodes()
+                .iter()
+                .copied()
+                .chain(added_nodes)
+                .filter(|id| view.contains_node(*id))
+                .collect();
+            let mut edges = HashSet::new();
+            for id in subgraph.edges().iter().copied().chain(added_edges) {
+                if view.contains_edge(id) {
+                    let (source, target) = view.edge_endpoints(id)?;
+                    if nodes.contains(&source) && nodes.contains(&target) {
+                        edges.insert(id);
+                    }
+                }
+            }
+            crate::GraphView::from_membership(view.read_state().clone(), nodes, edges)
+        } else {
+            Ok(view)
+        }
+    }
+
+    fn materialize(&mut self, subgraph: &Subgraph) -> GraphResult<crate::GraphView> {
         subgraph
             .graph()
             .borrow()
@@ -202,9 +272,16 @@ impl PropertyBatch {
         Ok(crate::GraphView::all(state))
     }
 
+    pub(crate) fn for_selection(coordinate: WriteCoordinate, root: &Subgraph) -> Self {
+        let mut result = Self::new(coordinate);
+        result.root = Some(root.clone());
+        result
+    }
+
     pub fn new(coordinate: WriteCoordinate) -> Self {
         Self {
             coordinate,
+            root: None,
             read_revision: 0,
             captures: HashMap::new(),
             capture_sweep_at: 64,
@@ -986,6 +1063,77 @@ mod tests {
         assert_eq!(
             owner.borrow().get_node_attr(1, &"good".into()).unwrap(),
             Some(AttrValue::Int(3))
+        );
+    }
+
+    #[test]
+    fn fixed_capture_reads_root_values_without_importing_provisional_siblings() {
+        use crate::ownership::OwnerCell;
+        use std::sync::Arc;
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(3).unwrap();
+        let owner = Arc::new(OwnerCell::new(graph));
+        let root =
+            Subgraph::from_nodes(owner.clone(), HashSet::from([0, 1]), "root".into()).unwrap();
+        let mut batch = PropertyBatch::for_selection(owner.borrow().write_coordinate(), &root);
+        let added = batch
+            .stage_nodes(&owner.borrow(), 1, &HashMap::new(), None)
+            .unwrap();
+        assert_eq!(added, [3]);
+        batch
+            .stage(
+                true,
+                HashMap::from([(
+                    "score".into(),
+                    vec![
+                        (0, AttrValue::Int(10)),
+                        (1, AttrValue::Int(20)),
+                        (3, AttrValue::Int(30)),
+                    ],
+                )]),
+            )
+            .unwrap();
+        let child = Subgraph::new(
+            owner.clone(),
+            HashSet::from([0]),
+            HashSet::new(),
+            "child".into(),
+        );
+        let dynamic = batch.capture(&child).unwrap();
+        assert_eq!(dynamic.node_ids(), [0, 3]);
+        let view = batch.capture_scoped(&child, true).unwrap();
+        assert_eq!(view.node_ids(), [0]);
+        assert_eq!(
+            view.node_attr(0, &"score".into()).unwrap(),
+            Some(AttrValue::Int(10))
+        );
+        let sibling = Subgraph::new(
+            owner.clone(),
+            HashSet::from([1, 3]),
+            HashSet::new(),
+            "sibling".into(),
+        );
+        let other = batch.capture_scoped(&sibling, true).unwrap();
+        assert_eq!(other.node_ids(), [1, 3]);
+        assert_eq!(
+            other.node_attr(3, &"score".into()).unwrap(),
+            Some(AttrValue::Int(30))
+        );
+        let outside = Subgraph::new(
+            owner.clone(),
+            HashSet::from([2]),
+            HashSet::new(),
+            "outside".into(),
+        );
+        assert!(batch.capture_scoped(&outside, true).is_err());
+        batch.accept(&mut owner.borrow_mut()).unwrap();
+        assert_eq!(
+            owner.borrow().get_node_attr(2, &"score".into()).unwrap(),
+            None
+        );
+        assert_eq!(
+            view.node_attr(0, &"score".into()).unwrap(),
+            Some(AttrValue::Int(10))
         );
     }
 

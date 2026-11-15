@@ -1,0 +1,49 @@
+{
+  "cases": [
+    {
+      "initial_nodes": 100,
+      "pending_topology": false,
+      "seconds": [
+        0.001513666,
+        0.000928875,
+        0.001025958,
+        0.000867,
+        0.00075175
+      ]
+    },
+    {
+      "initial_nodes": 100,
+      "pending_topology": true,
+      "seconds": [
+        0.006579583,
+        0.00553325,
+        0.005296417,
+        0.004766,
+        0.004309166
+      ]
+    },
+    {
+      "initial_nodes": 1000,
+      "pending_topology": false,
+      "seconds": [
+        0.004979416,
+        0.004611209,
+        0.00482525,
+        0.005367959,
+        0.004535792
+      ]
+    },
+    {
+      "initial_nodes": 1000,
+      "pending_topology": true,
+      "seconds": [
+        0.31988025,
+        0.329293708,
+        0.318657875,
+        0.328192417,
+        0.325293167
+      ]
+    }
+  ],
+  "scope": "Native release, five observations each. Node-only graph, optional staged node, immutable singleton production and per-child load/increment/attach, one publication. Includes frame setup, selected pending materialization, validation and execution; excludes fixture/initial capture, compilation, algorithm construction and assertions. No before/after speedup, FFI, RSS or general scale guarantee."
+}

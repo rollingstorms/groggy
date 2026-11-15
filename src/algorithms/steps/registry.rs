@@ -77,34 +77,15 @@ fn optional_temporal_text(
     }
 }
 
-fn json_to_param(value: serde_json::Value) -> Result<AlgorithmParamValue> {
-    Ok(match value {
-        serde_json::Value::Null => AlgorithmParamValue::None,
-        serde_json::Value::Bool(b) => AlgorithmParamValue::Bool(b),
-        serde_json::Value::Number(num) => {
-            if let Some(i) = num.as_i64() {
-                AlgorithmParamValue::Int(i)
-            } else if let Some(f) = num.as_f64() {
-                AlgorithmParamValue::Float(f)
-            } else {
-                return Err(anyhow!("unsupported number format"));
-            }
-        }
-        serde_json::Value::String(s) => AlgorithmParamValue::Text(s),
-        serde_json::Value::Array(items) => {
-            AlgorithmParamValue::Json(serde_json::Value::Array(items))
-        }
-        serde_json::Value::Object(map) => AlgorithmParamValue::Json(serde_json::Value::Object(map)),
-    })
-}
+use crate::algorithms::builder::json_to_param;
 
-fn parse_body_steps(value: &AlgorithmParamValue) -> Result<Vec<super::core::StepSpec>> {
+pub(crate) fn parse_body_steps(value: &AlgorithmParamValue) -> Result<Vec<super::core::StepSpec>> {
     let json_value = match value {
         AlgorithmParamValue::Json(value) => value.clone(),
         AlgorithmParamValue::Text(text) => serde_json::from_str::<serde_json::Value>(text)?,
         other => {
             return Err(anyhow!(
-                "sample.for_each expected JSON for 'body', found {:?}",
+                "step body expected JSON for 'body', found {:?}",
                 other
             ))
         }
@@ -112,43 +93,40 @@ fn parse_body_steps(value: &AlgorithmParamValue) -> Result<Vec<super::core::Step
 
     let array = json_value
         .as_array()
-        .ok_or_else(|| anyhow!("sample.for_each body must be a JSON array"))?;
+        .ok_or_else(|| anyhow!("step body must be a JSON array"))?;
 
     let mut specs = Vec::with_capacity(array.len());
     for item in array {
         let obj = item
             .as_object()
-            .ok_or_else(|| anyhow!("sample.for_each body entries must be objects"))?;
+            .ok_or_else(|| anyhow!("step body entries must be objects"))?;
         let id = obj
             .get("id")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("sample.for_each body step missing id"))?
+            .ok_or_else(|| anyhow!("step body step missing id"))?
             .to_string();
-        let params_obj = obj.get("params").and_then(|v| v.as_object());
+        let params_obj = obj
+            .get("params")
+            .map(|value| {
+                value
+                    .as_object()
+                    .ok_or_else(|| anyhow!("step body params must be an object"))
+            })
+            .transpose()?;
         let mut params = AlgorithmParams::new();
         if let Some(map) = params_obj {
             for (key, value) in map {
                 params.insert(key.to_string(), json_to_param(value.clone())?);
             }
         }
-        let inputs = obj
-            .get("inputs")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_else(Vec::new);
-        let outputs = obj
-            .get("outputs")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_else(Vec::new);
+        let strings = |name: &str| -> Result<Vec<String>> {
+            obj.get(name)
+                .map(|value| serde_json::from_value(value.clone()).map_err(Into::into))
+                .transpose()
+                .map(|value| value.unwrap_or_default())
+        };
+        let inputs = strings("inputs")?;
+        let outputs = strings("outputs")?;
 
         specs.push(super::core::StepSpec {
             id,
@@ -2316,4 +2294,40 @@ pub fn ensure_core_steps_registered() {
     CORE_STEPS_INIT.call_once(|| {
         register_core_steps(global_step_registry()).expect("register core steps");
     });
+}
+
+#[cfg(test)]
+mod nested_body_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn nested_programs_preserve_empty_bodies_typed_literals_and_dependency_names() {
+        let steps=parse_body_steps(&AlgorithmParamValue::Json(json!([
+            {"id":"core.init_nodes","params":{"target":"values","value":[1,2]},"inputs":["left"],"outputs":["right"]},
+            {"id":"sample.for_each","params":{"source":"seeds","target":"mapped","body":[]}}
+        ]))).unwrap();
+        assert_eq!(
+            steps[0].params.get("value"),
+            Some(&AlgorithmParamValue::IntList(vec![1, 2]))
+        );
+        assert_eq!(steps[0].inputs, ["left"]);
+        assert_eq!(steps[0].outputs, ["right"]);
+        assert_eq!(
+            steps[1].params.get("body"),
+            Some(&AlgorithmParamValue::Json(json!([])))
+        );
+    }
+
+    #[test]
+    fn malformed_nested_parameters_and_dependencies_do_not_silently_default() {
+        for body in [
+            json!([{"id":"x","params":3}]),
+            json!([{"id":"x","params":[]}]),
+            json!([{"id":"x","inputs":["valid",3]}]),
+            json!([{"id":"x","outputs":3}]),
+        ] {
+            assert!(parse_body_steps(&AlgorithmParamValue::Json(body)).is_err());
+        }
+    }
 }

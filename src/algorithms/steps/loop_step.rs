@@ -1,7 +1,5 @@
-use super::super::{AlgorithmParams, Context};
-use super::core::{
-    nested_effect, AtomicStepEffect, Step, StepExecutor, StepRegistry, StepScope, StepSpec,
-};
+use super::super::{AlgorithmParamValue, Context};
+use super::core::{nested_effect, AtomicStepEffect, Step, StepExecutor, StepRegistry, StepScope};
 use crate::algorithms::execution::{BatchExecutor, BatchPlan};
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
@@ -173,33 +171,14 @@ impl LoopStep {
                     .ok_or_else(|| anyhow!("iter.loop 'body' must be an array"))?
             };
 
-            let mut steps = Vec::with_capacity(body_array.len());
-            for (idx, step_value) in body_array.iter().enumerate() {
-                // The step is in StepSpec format, but params are raw JSON values
-                // We need to manually construct the StepSpec
-                let step_id = step_value["id"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("iter.loop body[{}] missing 'id' field", idx))?;
-
-                // Extract params as a JSON object
-                let params_obj = step_value
-                    .get("params")
-                    .and_then(|v| v.as_object())
-                    .ok_or_else(|| anyhow!("iter.loop body[{}] has invalid 'params'", idx))?;
-
-                // Convert params from raw JSON to AlgorithmParams
-                let params = AlgorithmParams::from_json_map(params_obj)?;
-
-                let spec = StepSpec {
-                    id: step_id.to_string(),
-                    params,
-                    inputs: Vec::new(),
-                    outputs: Vec::new(),
-                };
-
-                let step = self.registry.instantiate(&spec)?;
-                steps.push(step);
+            let specs = super::registry::parse_body_steps(&AlgorithmParamValue::Json(
+                Value::Array(body_array.clone()),
+            ))?;
+            let mut steps = Vec::with_capacity(specs.len());
+            for spec in specs {
+                steps.push(self.registry.instantiate(&spec)?);
             }
+
             Ok(steps)
         })
     }
@@ -284,7 +263,7 @@ impl Step for LoopStep {
         // Each nested frame refreshes reads after staged writes while sharing
         // variables and the owning batch. Topology mutations remain uncertified.
         let base = scope.subgraph().clone();
-        let mut executor = StepExecutor::new(&base);
+        let mut executor = StepExecutor::for_frame(&base, scope.fixed_selection());
         for iteration in 0..self.iterations {
             if ctx.is_cancelled() {
                 return Err(anyhow!("Loop cancelled before iteration {}", iteration + 1));

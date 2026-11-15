@@ -170,8 +170,9 @@ impl Pipeline {
             let graph = source.borrow();
             let head = graph.current_state_id();
             graph.validate_write_head(head)?;
-            ctx.property_batch = Some(super::property_batch::PropertyBatch::new(
+            ctx.property_batch = Some(super::property_batch::PropertyBatch::for_selection(
                 graph.write_coordinate(),
+                &subgraph,
             ));
         }
         let previous_outputs = ctx.take_outputs();

@@ -26,6 +26,8 @@ pub enum AtomicStepEffect {
     Properties,
     /// Reads/attaches properties through a captured pending selection.
     PendingProperties,
+    /// Produces selected immutable children, including pending property-only values.
+    PendingSelections,
     /// Explicit source-bound property attachment; requires a persistent batch.
     StagedProperties,
     /// Reads only explicit variable inputs, never working topology/properties.
@@ -57,6 +59,14 @@ pub(crate) fn nested_effect(steps: &[Box<dyn Step>]) -> AtomicStepEffect {
                 }
                 result = AtomicStepEffect::StagedProperties;
             }
+            AtomicStepEffect::PendingSelections => {
+                if matches!(
+                    result,
+                    AtomicStepEffect::ImmutableInputs | AtomicStepEffect::PendingProperties
+                ) {
+                    result = AtomicStepEffect::PendingSelections;
+                }
+            }
             AtomicStepEffect::PendingProperties => {
                 if result == AtomicStepEffect::ImmutableInputs {
                     result = AtomicStepEffect::PendingProperties;
@@ -72,15 +82,25 @@ pub(crate) fn nested_effect(steps: &[Box<dyn Step>]) -> AtomicStepEffect {
 /// the same pending-read refresh boundary rather than holding stale loop pins.
 pub(crate) struct StepExecutor<'a> {
     base: &'a Subgraph,
+    fixed: bool,
     pending: Option<(u64, Subgraph)>,
 }
 impl<'a> StepExecutor<'a> {
     pub(crate) fn new(base: &'a Subgraph) -> Self {
         Self {
             base,
+            fixed: false,
             pending: None,
         }
     }
+    pub(crate) fn for_frame(base: &'a Subgraph, fixed: bool) -> Self {
+        Self {
+            base,
+            fixed,
+            pending: None,
+        }
+    }
+
     pub(crate) fn apply(
         &mut self,
         ctx: &mut Context,
@@ -103,13 +123,15 @@ impl<'a> StepExecutor<'a> {
         }
         let source = if matches!(
             effect,
-            AtomicStepEffect::PendingProperties | AtomicStepEffect::StagedProperties
+            AtomicStepEffect::PendingProperties
+                | AtomicStepEffect::PendingSelections
+                | AtomicStepEffect::StagedProperties
         ) {
-            if let Some(batch) = ctx
-                .property_batch
-                .as_mut()
-                .filter(|batch| batch.has_topology())
-            {
+            if let Some(batch) = ctx.property_batch.as_mut().filter(|batch| {
+                batch.has_topology()
+                    || effect == AtomicStepEffect::PendingSelections
+                    || self.base.frozen_view().is_some()
+            }) {
                 if batch.capture_is_current(self.base) {
                     self.base
                 } else {
@@ -119,7 +141,11 @@ impl<'a> StepExecutor<'a> {
                         .as_ref()
                         .is_none_or(|(old, _)| *old != revision)
                     {
-                        let view = batch.capture(self.base)?;
+                        let view = if self.fixed {
+                            batch.capture_scoped(self.base, true)?
+                        } else {
+                            batch.capture(self.base)?
+                        };
                         self.pending = Some((
                             revision,
                             Subgraph::from_frozen_view(
@@ -141,7 +167,7 @@ impl<'a> StepExecutor<'a> {
         } else {
             self.base
         };
-        let mut scope = StepScope::new(source, variables);
+        let mut scope = StepScope::for_frame(source, variables, self.fixed);
         step.apply(ctx, &mut scope)?;
         if ctx.is_cancelled() {
             return Err(anyhow!("step execution cancelled"));
@@ -532,6 +558,7 @@ impl StepVariables {
 pub struct StepScope<'a> {
     subgraph: &'a Subgraph,
     variables: &'a mut StepVariables,
+    fixed: bool,
 }
 
 impl<'a> StepScope<'a> {
@@ -539,7 +566,23 @@ impl<'a> StepScope<'a> {
         Self {
             subgraph,
             variables,
+            fixed: false,
         }
+    }
+
+    pub(crate) fn for_frame(
+        subgraph: &'a Subgraph,
+        variables: &'a mut StepVariables,
+        fixed: bool,
+    ) -> Self {
+        Self {
+            subgraph,
+            variables,
+            fixed,
+        }
+    }
+    pub(crate) fn fixed_selection(&self) -> bool {
+        self.fixed
     }
 
     pub fn subgraph(&self) -> &Subgraph {

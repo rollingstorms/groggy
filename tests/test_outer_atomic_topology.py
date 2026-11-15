@@ -141,7 +141,7 @@ def test_late_failures_preserve_values_history_and_unallocated_ids(failure):
         programs += [builder(stage("graph.remove_edges", ids=[0]))] * 2
     elif failure == "property":
         # This older calculation reads owner topology and must reject at preflight.
-        programs.append(builder(stage("sample.iterate_nodes", target="late")))
+        programs.append(builder(stage("drot.smooth_strokes")))
     with pytest.raises(RuntimeError):
         Pipeline(programs)(graph.view(), atomic=True)
     assert graph.current_state_id == head
