@@ -2,7 +2,17 @@
 
 Updated 2026-11-14. **Coordinated priority pass qualified locally and across the platform matrix. Unreleased.**
 
-## Bounded release checklist
+## Expanded release target — 2026-11-15
+
+The owner now targets all remaining hierarchical groups except group 8:
+**44 unchecked rows in scope; nine retrieval/integration rows deferred**.
+This includes provenance and multi-user/concurrency work. The expanded target
+remains unfinished. See [scope and next chunk](notes/planning/release-060-expanded-scope-2026-11-15.md).
+
+The successful qualification below applies to the earlier bounded candidate.
+Implementation changes toward the expanded target require fresh final gates.
+
+## Qualified bounded candidate
 
 | Component | Status | Evidence |
 | --- | --- | --- |

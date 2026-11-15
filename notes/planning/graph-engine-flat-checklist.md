@@ -45,6 +45,13 @@ are complete; this does not imply that finished repairs are still unimplemented.
 
 ## Execution priority — remaining work
 
+**0.6.0 scope update — 2026-11-15:** the owner includes all remaining hierarchical
+groups except group 8. This targets 44 unchecked rows for 0.6.0 and leaves nine
+retrieval/external-integration rows deferred. Provenance and service/concurrency
+work are included. See [expanded release scope](release-060-expanded-scope-2026-11-15.md)
+for IDs, qualification boundaries and the next outer-topology execution chunk.
+Earlier bounded-release paragraphs below are historical milestones.
+
 Coordinated follow-up: local atomic additions and 13 captured graph kernels,
 measured archive/numerical repairs, platform storage boundaries, empty bulk
 consistency, independent finite references and compatible schema migration are
