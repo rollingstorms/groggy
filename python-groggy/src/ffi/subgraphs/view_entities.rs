@@ -212,7 +212,7 @@ impl PyGraphViewEntities {
             return Ok(Py::new(py, PyGraphView { inner: view })?.to_object(py));
         }
         if let Ok(slice) = key.downcast::<PySlice>() {
-            let length = i64::try_from(self.inner.len()).map_err(|_| {
+            let length = std::os::raw::c_long::try_from(self.inner.len()).map_err(|_| {
                 pyo3::exceptions::PyOverflowError::new_err(
                     "collection is too large for Python slicing",
                 )
@@ -221,8 +221,8 @@ impl PyGraphViewEntities {
             let view = py
                 .allow_threads(|| {
                     self.inner.slice_positions(
-                        indices.start,
-                        indices.step,
+                        indices.start.into(),
+                        indices.step.into(),
                         indices.slicelength as usize,
                     )
                 })

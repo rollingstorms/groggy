@@ -58,7 +58,7 @@ print(json.dumps({"version": version, "exports": len(gr.__all__),
 def verify(wheel_path, tests, release_tag):
     repo = Path(__file__).resolve().parents[2]
     manifest = repo / "python-groggy/Cargo.toml"
-    workflow = Path(__file__).with_name("core_release_workflow.py")
+    workflow = Path(__file__).resolve().with_name("core_release_workflow.py")
     expected = re.search(r'^version = "([^"]+)"', manifest.read_text(), re.M)[1]
     core_version = re.search(r'^version = "([^"]+)"', (repo / "Cargo.toml").read_text(), re.M)[1]
     if core_version != expected:
