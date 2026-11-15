@@ -1,0 +1,911 @@
+{
+  "scope": "Same instrumented workflow after validation-only history restore; three fresh processes per size; requested allocations are not RSS.",
+  "cases": [
+    {
+      "sample": 1,
+      "wall_seconds": 0.36457124999999996,
+      "result": {
+        "phases": [
+          {
+            "allocation_calls": 18,
+            "live_requested_bytes": 97706,
+            "peak_additional_requested_bytes": 97094,
+            "phase": "input",
+            "requested_bytes": 97834,
+            "start_live_requested_bytes": 612
+          },
+          {
+            "allocation_calls": 39543,
+            "live_requested_bytes": 1698869,
+            "peak_additional_requested_bytes": 1785133,
+            "phase": "ingest",
+            "requested_bytes": 6404226,
+            "start_live_requested_bytes": 98584
+          },
+          {
+            "allocation_calls": 7033,
+            "live_requested_bytes": 2510312,
+            "peak_additional_requested_bytes": 877824,
+            "phase": "capture",
+            "requested_bytes": 1110100,
+            "start_live_requested_bytes": 1699620
+          },
+          {
+            "allocation_calls": 26,
+            "live_requested_bytes": 2552474,
+            "peak_additional_requested_bytes": 64780,
+            "phase": "index",
+            "requested_bytes": 106440,
+            "start_live_requested_bytes": 2511064
+          },
+          {
+            "allocation_calls": 7517,
+            "live_requested_bytes": 2553438,
+            "peak_additional_requested_bytes": 24470,
+            "phase": "queries",
+            "requested_bytes": 437062,
+            "start_live_requested_bytes": 2553224
+          },
+          {
+            "allocation_calls": 42,
+            "live_requested_bytes": 2603989,
+            "peak_additional_requested_bytes": 49681,
+            "phase": "update",
+            "requested_bytes": 100201,
+            "start_live_requested_bytes": 2554318
+          },
+          {
+            "allocation_calls": 6,
+            "live_requested_bytes": 2604824,
+            "peak_additional_requested_bytes": 124,
+            "phase": "temporal_prepare",
+            "requested_bytes": 166,
+            "start_live_requested_bytes": 2604740
+          },
+          {
+            "allocation_calls": 12101,
+            "live_requested_bytes": 3645745,
+            "peak_additional_requested_bytes": 1515800,
+            "phase": "temporal_read",
+            "requested_bytes": 3308304,
+            "start_live_requested_bytes": 2605585
+          },
+          {
+            "allocation_calls": 1,
+            "live_requested_bytes": 1983653,
+            "peak_additional_requested_bytes": 6,
+            "phase": "release_reads",
+            "requested_bytes": 6,
+            "start_live_requested_bytes": 3646503
+          },
+          {
+            "allocation_calls": 83494,
+            "live_requested_bytes": 1984844,
+            "peak_additional_requested_bytes": 3923158,
+            "phase": "archive_save",
+            "requested_bytes": 14352763,
+            "start_live_requested_bytes": 1984667
+          },
+          {
+            "allocation_calls": 0,
+            "live_requested_bytes": 9055,
+            "peak_additional_requested_bytes": 0,
+            "phase": "release_owner",
+            "requested_bytes": 0,
+            "start_live_requested_bytes": 1985601
+          },
+          {
+            "allocation_calls": 41682,
+            "live_requested_bytes": 946577,
+            "peak_additional_requested_bytes": 3683871,
+            "phase": "archive_recovery",
+            "requested_bytes": 7893381,
+            "start_live_requested_bytes": 9813
+          },
+          {
+            "allocation_calls": 13204,
+            "live_requested_bytes": 1991502,
+            "peak_additional_requested_bytes": 1519804,
+            "phase": "recovered_reads",
+            "requested_bytes": 3312920,
+            "start_live_requested_bytes": 947338
+          }
+        ],
+        "scope": "Instrumented shared fixture; process-wide requested Rust allocations, not allocator overhead/RSS. Counter overhead affects timing. Compare timings only with the same instrumented binary configuration.",
+        "workflow": {
+          "archive_bytes": 253309,
+          "archive_recovery_seconds": 0.00757475,
+          "archive_save_seconds": 0.028737333,
+          "capture_seconds": 0.000872167,
+          "edges": 1000,
+          "index_build_seconds": 0.000191792,
+          "indexed_page_seconds": [
+            1.445e-06,
+            1.53041e-06,
+            1.2625e-06,
+            1.3129099999999998e-06,
+            1.28084e-06
+          ],
+          "ingest_seconds": 0.005297208,
+          "input_seconds": 6.1166e-05,
+          "matching_rows": 10,
+          "neighborhood_hops": 3,
+          "neighborhood_seconds": [
+            2.20958e-06,
+            2.5924999999999997e-06,
+            2.10167e-06,
+            2.14417e-06,
+            2.17e-06
+          ],
+          "nodes": 1000,
+          "page_rows": 10,
+          "profile": "release",
+          "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+          "scan_page_seconds": 6.6208e-05,
+          "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+          "shape": "directed ring",
+          "temporal_prepare_seconds": 2.209e-06,
+          "temporal_read_seconds": 0.001806,
+          "update_seconds": 5.7958e-05,
+          "versions": 2
+        }
+      },
+      "raw_time": "        0.35 real         0.03 user         0.00 sys\n            17383424  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n                1234  page reclaims\n                   2  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                   9  voluntary context switches\n                  16  involuntary context switches\n           332379790  instructions retired\n            99940676  cycles elapsed\n            11715584  peak memory footprint\n"
+    },
+    {
+      "sample": 2,
+      "wall_seconds": 0.052002207999999994,
+      "result": {
+        "phases": [
+          {
+            "allocation_calls": 18,
+            "live_requested_bytes": 97706,
+            "peak_additional_requested_bytes": 97094,
+            "phase": "input",
+            "requested_bytes": 97834,
+            "start_live_requested_bytes": 612
+          },
+          {
+            "allocation_calls": 39543,
+            "live_requested_bytes": 1698869,
+            "peak_additional_requested_bytes": 1785133,
+            "phase": "ingest",
+            "requested_bytes": 6404226,
+            "start_live_requested_bytes": 98584
+          },
+          {
+            "allocation_calls": 7033,
+            "live_requested_bytes": 2510312,
+            "peak_additional_requested_bytes": 877824,
+            "phase": "capture",
+            "requested_bytes": 1110100,
+            "start_live_requested_bytes": 1699620
+          },
+          {
+            "allocation_calls": 26,
+            "live_requested_bytes": 2552474,
+            "peak_additional_requested_bytes": 64780,
+            "phase": "index",
+            "requested_bytes": 106440,
+            "start_live_requested_bytes": 2511064
+          },
+          {
+            "allocation_calls": 7517,
+            "live_requested_bytes": 2553438,
+            "peak_additional_requested_bytes": 24470,
+            "phase": "queries",
+            "requested_bytes": 437062,
+            "start_live_requested_bytes": 2553224
+          },
+          {
+            "allocation_calls": 42,
+            "live_requested_bytes": 2603989,
+            "peak_additional_requested_bytes": 49681,
+            "phase": "update",
+            "requested_bytes": 100201,
+            "start_live_requested_bytes": 2554318
+          },
+          {
+            "allocation_calls": 6,
+            "live_requested_bytes": 2604824,
+            "peak_additional_requested_bytes": 124,
+            "phase": "temporal_prepare",
+            "requested_bytes": 166,
+            "start_live_requested_bytes": 2604740
+          },
+          {
+            "allocation_calls": 12101,
+            "live_requested_bytes": 3645745,
+            "peak_additional_requested_bytes": 1515800,
+            "phase": "temporal_read",
+            "requested_bytes": 3308304,
+            "start_live_requested_bytes": 2605585
+          },
+          {
+            "allocation_calls": 1,
+            "live_requested_bytes": 1983653,
+            "peak_additional_requested_bytes": 6,
+            "phase": "release_reads",
+            "requested_bytes": 6,
+            "start_live_requested_bytes": 3646503
+          },
+          {
+            "allocation_calls": 83494,
+            "live_requested_bytes": 1984844,
+            "peak_additional_requested_bytes": 3923158,
+            "phase": "archive_save",
+            "requested_bytes": 14352755,
+            "start_live_requested_bytes": 1984667
+          },
+          {
+            "allocation_calls": 0,
+            "live_requested_bytes": 9055,
+            "peak_additional_requested_bytes": 0,
+            "phase": "release_owner",
+            "requested_bytes": 0,
+            "start_live_requested_bytes": 1985601
+          },
+          {
+            "allocation_calls": 41682,
+            "live_requested_bytes": 946577,
+            "peak_additional_requested_bytes": 3683863,
+            "phase": "archive_recovery",
+            "requested_bytes": 7893373,
+            "start_live_requested_bytes": 9813
+          },
+          {
+            "allocation_calls": 13204,
+            "live_requested_bytes": 1991502,
+            "peak_additional_requested_bytes": 1519804,
+            "phase": "recovered_reads",
+            "requested_bytes": 3312920,
+            "start_live_requested_bytes": 947338
+          }
+        ],
+        "scope": "Instrumented shared fixture; process-wide requested Rust allocations, not allocator overhead/RSS. Counter overhead affects timing. Compare timings only with the same instrumented binary configuration.",
+        "workflow": {
+          "archive_bytes": 253301,
+          "archive_recovery_seconds": 0.006852333,
+          "archive_save_seconds": 0.023069416,
+          "capture_seconds": 0.000882542,
+          "edges": 1000,
+          "index_build_seconds": 0.000199792,
+          "indexed_page_seconds": [
+            1.48625e-06,
+            1.42084e-06,
+            1.43e-06,
+            1.4641700000000001e-06,
+            1.46167e-06
+          ],
+          "ingest_seconds": 0.005012833,
+          "input_seconds": 1.6292e-05,
+          "matching_rows": 10,
+          "neighborhood_hops": 3,
+          "neighborhood_seconds": [
+            2.58042e-06,
+            2.5125e-06,
+            2.5137500000000003e-06,
+            2.51125e-06,
+            2.50917e-06
+          ],
+          "nodes": 1000,
+          "page_rows": 10,
+          "profile": "release",
+          "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+          "scan_page_seconds": 6.9667e-05,
+          "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+          "shape": "directed ring",
+          "temporal_prepare_seconds": 2.334e-06,
+          "temporal_read_seconds": 0.001985167,
+          "update_seconds": 1.8083e-05,
+          "versions": 2
+        }
+      },
+      "raw_time": "        0.04 real         0.03 user         0.00 sys\n            18038784  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n                1276  page reclaims\n                   0  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                   8  voluntary context switches\n                  10  involuntary context switches\n           327676132  instructions retired\n            88638279  cycles elapsed\n            12370944  peak memory footprint\n"
+    },
+    {
+      "sample": 3,
+      "wall_seconds": 0.050040792,
+      "result": {
+        "phases": [
+          {
+            "allocation_calls": 18,
+            "live_requested_bytes": 97706,
+            "peak_additional_requested_bytes": 97094,
+            "phase": "input",
+            "requested_bytes": 97834,
+            "start_live_requested_bytes": 612
+          },
+          {
+            "allocation_calls": 39543,
+            "live_requested_bytes": 1698869,
+            "peak_additional_requested_bytes": 1785265,
+            "phase": "ingest",
+            "requested_bytes": 6404226,
+            "start_live_requested_bytes": 98584
+          },
+          {
+            "allocation_calls": 7033,
+            "live_requested_bytes": 2510312,
+            "peak_additional_requested_bytes": 877824,
+            "phase": "capture",
+            "requested_bytes": 1110100,
+            "start_live_requested_bytes": 1699620
+          },
+          {
+            "allocation_calls": 26,
+            "live_requested_bytes": 2552474,
+            "peak_additional_requested_bytes": 64780,
+            "phase": "index",
+            "requested_bytes": 106440,
+            "start_live_requested_bytes": 2511064
+          },
+          {
+            "allocation_calls": 7517,
+            "live_requested_bytes": 2553438,
+            "peak_additional_requested_bytes": 24470,
+            "phase": "queries",
+            "requested_bytes": 437062,
+            "start_live_requested_bytes": 2553224
+          },
+          {
+            "allocation_calls": 42,
+            "live_requested_bytes": 2603989,
+            "peak_additional_requested_bytes": 49681,
+            "phase": "update",
+            "requested_bytes": 100201,
+            "start_live_requested_bytes": 2554318
+          },
+          {
+            "allocation_calls": 6,
+            "live_requested_bytes": 2604824,
+            "peak_additional_requested_bytes": 124,
+            "phase": "temporal_prepare",
+            "requested_bytes": 166,
+            "start_live_requested_bytes": 2604740
+          },
+          {
+            "allocation_calls": 12101,
+            "live_requested_bytes": 3645745,
+            "peak_additional_requested_bytes": 1515800,
+            "phase": "temporal_read",
+            "requested_bytes": 3308304,
+            "start_live_requested_bytes": 2605585
+          },
+          {
+            "allocation_calls": 1,
+            "live_requested_bytes": 1983653,
+            "peak_additional_requested_bytes": 6,
+            "phase": "release_reads",
+            "requested_bytes": 6,
+            "start_live_requested_bytes": 3646503
+          },
+          {
+            "allocation_calls": 83494,
+            "live_requested_bytes": 1984844,
+            "peak_additional_requested_bytes": 3923158,
+            "phase": "archive_save",
+            "requested_bytes": 14352755,
+            "start_live_requested_bytes": 1984667
+          },
+          {
+            "allocation_calls": 0,
+            "live_requested_bytes": 9055,
+            "peak_additional_requested_bytes": 0,
+            "phase": "release_owner",
+            "requested_bytes": 0,
+            "start_live_requested_bytes": 1985601
+          },
+          {
+            "allocation_calls": 41682,
+            "live_requested_bytes": 946577,
+            "peak_additional_requested_bytes": 3683863,
+            "phase": "archive_recovery",
+            "requested_bytes": 7893373,
+            "start_live_requested_bytes": 9813
+          },
+          {
+            "allocation_calls": 13204,
+            "live_requested_bytes": 1991502,
+            "peak_additional_requested_bytes": 1519804,
+            "phase": "recovered_reads",
+            "requested_bytes": 3312920,
+            "start_live_requested_bytes": 947338
+          }
+        ],
+        "scope": "Instrumented shared fixture; process-wide requested Rust allocations, not allocator overhead/RSS. Counter overhead affects timing. Compare timings only with the same instrumented binary configuration.",
+        "workflow": {
+          "archive_bytes": 253301,
+          "archive_recovery_seconds": 0.007040333,
+          "archive_save_seconds": 0.020355584,
+          "capture_seconds": 0.000850041,
+          "edges": 1000,
+          "index_build_seconds": 0.000217833,
+          "indexed_page_seconds": [
+            1.3233299999999999e-06,
+            1.23083e-06,
+            1.20166e-06,
+            1.25625e-06,
+            1.23416e-06
+          ],
+          "ingest_seconds": 0.0044075,
+          "input_seconds": 1.675e-05,
+          "matching_rows": 10,
+          "neighborhood_hops": 3,
+          "neighborhood_seconds": [
+            2.4166699999999997e-06,
+            2.13875e-06,
+            2.18875e-06,
+            2.18042e-06,
+            2.12833e-06
+          ],
+          "nodes": 1000,
+          "page_rows": 10,
+          "profile": "release",
+          "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+          "scan_page_seconds": 6.7708e-05,
+          "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+          "shape": "directed ring",
+          "temporal_prepare_seconds": 3.625e-06,
+          "temporal_read_seconds": 0.001783292,
+          "update_seconds": 5.4333e-05,
+          "versions": 2
+        }
+      },
+      "raw_time": "        0.04 real         0.02 user         0.00 sys\n            18071552  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n                1278  page reclaims\n                   0  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                   8  voluntary context switches\n                  17  involuntary context switches\n           327912222  instructions retired\n            95564542  cycles elapsed\n            12403712  peak memory footprint\n"
+    },
+    {
+      "sample": 1,
+      "wall_seconds": 3.680208209,
+      "result": {
+        "phases": [
+          {
+            "allocation_calls": 18,
+            "live_requested_bytes": 9601706,
+            "peak_additional_requested_bytes": 9601094,
+            "phase": "input",
+            "requested_bytes": 9601836,
+            "start_live_requested_bytes": 612
+          },
+          {
+            "allocation_calls": 3933640,
+            "live_requested_bytes": 164970077,
+            "peak_additional_requested_bytes": 167630565,
+            "phase": "ingest",
+            "requested_bytes": 599087586,
+            "start_live_requested_bytes": 9602584
+          },
+          {
+            "allocation_calls": 700045,
+            "live_requested_bytes": 231975080,
+            "peak_additional_requested_bytes": 71329176,
+            "phase": "capture",
+            "requested_bytes": 88477516,
+            "start_live_requested_bytes": 164970828
+          },
+          {
+            "allocation_calls": 40,
+            "live_requested_bytes": 236474010,
+            "peak_additional_requested_bytes": 7394316,
+            "phase": "index",
+            "requested_bytes": 12389512,
+            "start_live_requested_bytes": 231975832
+          },
+          {
+            "allocation_calls": 8157,
+            "live_requested_bytes": 236538646,
+            "peak_additional_requested_bytes": 2978470,
+            "phase": "queries",
+            "requested_bytes": 5484406,
+            "start_live_requested_bytes": 236474760
+          },
+          {
+            "allocation_calls": 42,
+            "live_requested_bytes": 241341197,
+            "peak_additional_requested_bytes": 4801681,
+            "phase": "update",
+            "requested_bytes": 9604201,
+            "start_live_requested_bytes": 236539526
+          },
+          {
+            "allocation_calls": 6,
+            "live_requested_bytes": 241342032,
+            "peak_additional_requested_bytes": 124,
+            "phase": "temporal_prepare",
+            "requested_bytes": 166,
+            "start_live_requested_bytes": 241341948
+          },
+          {
+            "allocation_calls": 1200151,
+            "live_requested_bytes": 337707265,
+            "peak_additional_requested_bytes": 143100240,
+            "phase": "temporal_read",
+            "requested_bytes": 287570392,
+            "start_live_requested_bytes": 241342793
+          },
+          {
+            "allocation_calls": 1,
+            "live_requested_bytes": 199201285,
+            "peak_additional_requested_bytes": 6,
+            "phase": "release_reads",
+            "requested_bytes": 6,
+            "start_live_requested_bytes": 337708023
+          },
+          {
+            "allocation_calls": 8306690,
+            "live_requested_bytes": 199202476,
+            "peak_additional_requested_bytes": 395970206,
+            "phase": "archive_save",
+            "requested_bytes": 1464591537,
+            "start_live_requested_bytes": 199202299
+          },
+          {
+            "allocation_calls": 0,
+            "live_requested_bytes": 72727,
+            "peak_additional_requested_bytes": 0,
+            "phase": "release_owner",
+            "requested_bytes": 0,
+            "start_live_requested_bytes": 199203233
+          },
+          {
+            "allocation_calls": 4139818,
+            "live_requested_bytes": 101505361,
+            "peak_additional_requested_bytes": 388197485,
+            "phase": "archive_recovery",
+            "requested_bytes": 802072627,
+            "start_live_requested_bytes": 73485
+          },
+          {
+            "allocation_calls": 1300254,
+            "live_requested_bytes": 198270598,
+            "peak_additional_requested_bytes": 143500244,
+            "phase": "recovered_reads",
+            "requested_bytes": 287971008,
+            "start_live_requested_bytes": 101506122
+          }
+        ],
+        "scope": "Instrumented shared fixture; process-wide requested Rust allocations, not allocator overhead/RSS. Counter overhead affects timing. Compare timings only with the same instrumented binary configuration.",
+        "workflow": {
+          "archive_bytes": 26889515,
+          "archive_recovery_seconds": 0.788568791,
+          "archive_save_seconds": 1.377572709,
+          "capture_seconds": 0.153592208,
+          "edges": 100000,
+          "index_build_seconds": 0.050335,
+          "indexed_page_seconds": [
+            2.24542e-06,
+            4.21167e-06,
+            2.0779199999999997e-06,
+            2.16416e-06,
+            2.22459e-06
+          ],
+          "ingest_seconds": 0.594342208,
+          "input_seconds": 0.000950333,
+          "matching_rows": 1000,
+          "neighborhood_hops": 3,
+          "neighborhood_seconds": [
+            2.35042e-06,
+            2.14709e-06,
+            2.1170800000000003e-06,
+            2.1395799999999997e-06,
+            2.17875e-06
+          ],
+          "nodes": 100000,
+          "page_rows": 10,
+          "profile": "release",
+          "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+          "scan_page_seconds": 0.023994041,
+          "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+          "shape": "directed ring",
+          "temporal_prepare_seconds": 2.958e-06,
+          "temporal_read_seconds": 0.252027917,
+          "update_seconds": 0.000123125,
+          "versions": 2
+        }
+      },
+      "raw_time": "        3.67 real         3.27 user         0.32 sys\n           809222144  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n               89168  page reclaims\n                   0  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                  74  voluntary context switches\n                1651  involuntary context switches\n         28713704744  instructions retired\n         10890899178  cycles elapsed\n           627182272  peak memory footprint\n"
+    },
+    {
+      "sample": 2,
+      "wall_seconds": 3.655627,
+      "result": {
+        "phases": [
+          {
+            "allocation_calls": 18,
+            "live_requested_bytes": 9601706,
+            "peak_additional_requested_bytes": 9601094,
+            "phase": "input",
+            "requested_bytes": 9601836,
+            "start_live_requested_bytes": 612
+          },
+          {
+            "allocation_calls": 3933640,
+            "live_requested_bytes": 164970077,
+            "peak_additional_requested_bytes": 167628629,
+            "phase": "ingest",
+            "requested_bytes": 599087586,
+            "start_live_requested_bytes": 9602584
+          },
+          {
+            "allocation_calls": 700045,
+            "live_requested_bytes": 231975080,
+            "peak_additional_requested_bytes": 71329176,
+            "phase": "capture",
+            "requested_bytes": 88477516,
+            "start_live_requested_bytes": 164970828
+          },
+          {
+            "allocation_calls": 40,
+            "live_requested_bytes": 236474010,
+            "peak_additional_requested_bytes": 7394316,
+            "phase": "index",
+            "requested_bytes": 12389512,
+            "start_live_requested_bytes": 231975832
+          },
+          {
+            "allocation_calls": 8043,
+            "live_requested_bytes": 236537862,
+            "peak_additional_requested_bytes": 2974606,
+            "phase": "queries",
+            "requested_bytes": 5479854,
+            "start_live_requested_bytes": 236474760
+          },
+          {
+            "allocation_calls": 42,
+            "live_requested_bytes": 241340413,
+            "peak_additional_requested_bytes": 4801681,
+            "phase": "update",
+            "requested_bytes": 9604201,
+            "start_live_requested_bytes": 236538742
+          },
+          {
+            "allocation_calls": 6,
+            "live_requested_bytes": 241341248,
+            "peak_additional_requested_bytes": 124,
+            "phase": "temporal_prepare",
+            "requested_bytes": 166,
+            "start_live_requested_bytes": 241341164
+          },
+          {
+            "allocation_calls": 1200165,
+            "live_requested_bytes": 337707265,
+            "peak_additional_requested_bytes": 143101024,
+            "phase": "temporal_read",
+            "requested_bytes": 287571176,
+            "start_live_requested_bytes": 241342009
+          },
+          {
+            "allocation_calls": 1,
+            "live_requested_bytes": 199201285,
+            "peak_additional_requested_bytes": 6,
+            "phase": "release_reads",
+            "requested_bytes": 6,
+            "start_live_requested_bytes": 337708023
+          },
+          {
+            "allocation_calls": 8306690,
+            "live_requested_bytes": 199202476,
+            "peak_additional_requested_bytes": 395970206,
+            "phase": "archive_save",
+            "requested_bytes": 1464591537,
+            "start_live_requested_bytes": 199202299
+          },
+          {
+            "allocation_calls": 0,
+            "live_requested_bytes": 72727,
+            "peak_additional_requested_bytes": 0,
+            "phase": "release_owner",
+            "requested_bytes": 0,
+            "start_live_requested_bytes": 199203233
+          },
+          {
+            "allocation_calls": 4139818,
+            "live_requested_bytes": 101505361,
+            "peak_additional_requested_bytes": 388197485,
+            "phase": "archive_recovery",
+            "requested_bytes": 802072627,
+            "start_live_requested_bytes": 73485
+          },
+          {
+            "allocation_calls": 1300254,
+            "live_requested_bytes": 198270598,
+            "peak_additional_requested_bytes": 143500244,
+            "phase": "recovered_reads",
+            "requested_bytes": 287971008,
+            "start_live_requested_bytes": 101506122
+          }
+        ],
+        "scope": "Instrumented shared fixture; process-wide requested Rust allocations, not allocator overhead/RSS. Counter overhead affects timing. Compare timings only with the same instrumented binary configuration.",
+        "workflow": {
+          "archive_bytes": 26889515,
+          "archive_recovery_seconds": 0.779643083,
+          "archive_save_seconds": 1.414951958,
+          "capture_seconds": 0.143728375,
+          "edges": 100000,
+          "index_build_seconds": 0.046144667,
+          "indexed_page_seconds": [
+            2.4041700000000002e-06,
+            2.06666e-06,
+            2.22083e-06,
+            2.25959e-06,
+            2.1725e-06
+          ],
+          "ingest_seconds": 0.594122,
+          "input_seconds": 0.000886084,
+          "matching_rows": 1000,
+          "neighborhood_hops": 3,
+          "neighborhood_seconds": [
+            2.3341599999999998e-06,
+            2.12833e-06,
+            2.18167e-06,
+            2.15834e-06,
+            2.14458e-06
+          ],
+          "nodes": 100000,
+          "page_rows": 10,
+          "profile": "release",
+          "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+          "scan_page_seconds": 0.023374125,
+          "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+          "shape": "directed ring",
+          "temporal_prepare_seconds": 2.917e-06,
+          "temporal_read_seconds": 0.224014125,
+          "update_seconds": 0.000104,
+          "versions": 2
+        }
+      },
+      "raw_time": "        3.65 real         3.24 user         0.31 sys\n           858701824  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n               83796  page reclaims\n                   0  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                  78  voluntary context switches\n                1023  involuntary context switches\n         28649248743  instructions retired\n         10708446294  cycles elapsed\n           623938240  peak memory footprint\n"
+    },
+    {
+      "sample": 3,
+      "wall_seconds": 3.5925059169999995,
+      "result": {
+        "phases": [
+          {
+            "allocation_calls": 18,
+            "live_requested_bytes": 9601706,
+            "peak_additional_requested_bytes": 9601094,
+            "phase": "input",
+            "requested_bytes": 9601836,
+            "start_live_requested_bytes": 612
+          },
+          {
+            "allocation_calls": 3933640,
+            "live_requested_bytes": 164970077,
+            "peak_additional_requested_bytes": 167632545,
+            "phase": "ingest",
+            "requested_bytes": 599087586,
+            "start_live_requested_bytes": 9602584
+          },
+          {
+            "allocation_calls": 700045,
+            "live_requested_bytes": 231975080,
+            "peak_additional_requested_bytes": 71329176,
+            "phase": "capture",
+            "requested_bytes": 88477516,
+            "start_live_requested_bytes": 164970828
+          },
+          {
+            "allocation_calls": 40,
+            "live_requested_bytes": 236474010,
+            "peak_additional_requested_bytes": 7394316,
+            "phase": "index",
+            "requested_bytes": 12389512,
+            "start_live_requested_bytes": 231975832
+          },
+          {
+            "allocation_calls": 8231,
+            "live_requested_bytes": 236538646,
+            "peak_additional_requested_bytes": 2981342,
+            "phase": "queries",
+            "requested_bytes": 5486622,
+            "start_live_requested_bytes": 236474760
+          },
+          {
+            "allocation_calls": 42,
+            "live_requested_bytes": 241341197,
+            "peak_additional_requested_bytes": 4801681,
+            "phase": "update",
+            "requested_bytes": 9604201,
+            "start_live_requested_bytes": 236539526
+          },
+          {
+            "allocation_calls": 6,
+            "live_requested_bytes": 241342032,
+            "peak_additional_requested_bytes": 124,
+            "phase": "temporal_prepare",
+            "requested_bytes": 166,
+            "start_live_requested_bytes": 241341948
+          },
+          {
+            "allocation_calls": 1200151,
+            "live_requested_bytes": 337707265,
+            "peak_additional_requested_bytes": 143100240,
+            "phase": "temporal_read",
+            "requested_bytes": 287570392,
+            "start_live_requested_bytes": 241342793
+          },
+          {
+            "allocation_calls": 1,
+            "live_requested_bytes": 199201285,
+            "peak_additional_requested_bytes": 6,
+            "phase": "release_reads",
+            "requested_bytes": 6,
+            "start_live_requested_bytes": 337708023
+          },
+          {
+            "allocation_calls": 8306690,
+            "live_requested_bytes": 199202476,
+            "peak_additional_requested_bytes": 395970206,
+            "phase": "archive_save",
+            "requested_bytes": 1464591533,
+            "start_live_requested_bytes": 199202299
+          },
+          {
+            "allocation_calls": 0,
+            "live_requested_bytes": 72727,
+            "peak_additional_requested_bytes": 0,
+            "phase": "release_owner",
+            "requested_bytes": 0,
+            "start_live_requested_bytes": 199203233
+          },
+          {
+            "allocation_calls": 4139818,
+            "live_requested_bytes": 101505361,
+            "peak_additional_requested_bytes": 388197481,
+            "phase": "archive_recovery",
+            "requested_bytes": 802072623,
+            "start_live_requested_bytes": 73485
+          },
+          {
+            "allocation_calls": 1300254,
+            "live_requested_bytes": 198270598,
+            "peak_additional_requested_bytes": 143500244,
+            "phase": "recovered_reads",
+            "requested_bytes": 287971008,
+            "start_live_requested_bytes": 101506122
+          }
+        ],
+        "scope": "Instrumented shared fixture; process-wide requested Rust allocations, not allocator overhead/RSS. Counter overhead affects timing. Compare timings only with the same instrumented binary configuration.",
+        "workflow": {
+          "archive_bytes": 26889511,
+          "archive_recovery_seconds": 0.780299833,
+          "archive_save_seconds": 1.367330708,
+          "capture_seconds": 0.145258542,
+          "edges": 100000,
+          "index_build_seconds": 0.042182542,
+          "indexed_page_seconds": [
+            2.18625e-06,
+            2.09125e-06,
+            2.15792e-06,
+            2.1341700000000003e-06,
+            2.2e-06
+          ],
+          "ingest_seconds": 0.564793834,
+          "input_seconds": 0.0008885,
+          "matching_rows": 1000,
+          "neighborhood_hops": 3,
+          "neighborhood_seconds": [
+            2.275e-06,
+            2.17875e-06,
+            2.12791e-06,
+            2.16375e-06,
+            2.15167e-06
+          ],
+          "nodes": 100000,
+          "page_rows": 10,
+          "profile": "release",
+          "properties": "one repeating i64 bucket column plus built-in entity_type; one explicit correction",
+          "scan_page_seconds": 0.029931,
+          "scope": "active owner, explicit transient property index, effective T15 after correction T20; full retained archive recovery, not journal throughput",
+          "shape": "directed ring",
+          "temporal_prepare_seconds": 3.459e-06,
+          "temporal_read_seconds": 0.234221083,
+          "update_seconds": 0.000122541,
+          "versions": 2
+        }
+      },
+      "raw_time": "        3.57 real         3.22 user         0.28 sys\n           861241344  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n               83930  page reclaims\n                  21  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                  81  voluntary context switches\n                 950  involuntary context switches\n         28647234109  instructions retired\n         10608739694  cycles elapsed\n           628902592  peak memory footprint\n"
+    }
+  ]
+}

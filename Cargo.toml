@@ -410,3 +410,7 @@ harness = false
 [[bench]]
 name = "display_rendering"
 harness = false
+
+[[bench]]
+name = "core_workflow_allocations"
+harness = false

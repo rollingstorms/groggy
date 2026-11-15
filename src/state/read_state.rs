@@ -128,13 +128,36 @@ impl PinnedReadState {
         WeakReadData(Arc::downgrade(&self.data))
     }
 
-    pub(crate) fn from_snapshot(snapshot: GraphSnapshot) -> GraphResult<Self> {
+    fn snapshot_nodes(snapshot: &GraphSnapshot) -> GraphResult<HashSet<NodeId>> {
         let nodes: HashSet<_> = snapshot.active_nodes.iter().copied().collect();
         if nodes.len() != snapshot.active_nodes.len() {
             return Err(GraphError::InvalidInput(
                 "Duplicate node in read snapshot".into(),
             ));
         }
+        Ok(nodes)
+    }
+
+    fn validate_endpoints(nodes: &HashSet<NodeId>, source: NodeId, target: NodeId) -> GraphResult<()> {
+        if !nodes.contains(&source) || !nodes.contains(&target) {
+            return Err(GraphError::InvalidInput(
+                "Read snapshot edge has an inactive endpoint".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Validate historical topology without constructing disposable read indexes.
+    pub(crate) fn validate_snapshot(snapshot: &GraphSnapshot) -> GraphResult<()> {
+        let nodes = Self::snapshot_nodes(snapshot)?;
+        for &(source, target) in snapshot.edges.values() {
+            Self::validate_endpoints(&nodes, source, target)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn from_snapshot(snapshot: GraphSnapshot) -> GraphResult<Self> {
+        let nodes = Self::snapshot_nodes(&snapshot)?;
         let edges = snapshot.edges.keys().copied().collect();
         // Bound occupied rows by incidences, avoiding dense empty entries and
         // repeated table growth on connected captures. Saturation is intentional
@@ -148,11 +171,7 @@ impl PinnedReadState {
         let mut adjacency: HashMap<_, Vec<_>> = HashMap::with_capacity(adjacency_bound);
         let mut incident: HashMap<_, Vec<_>> = HashMap::with_capacity(incident_bound);
         for (&edge, &(source, target)) in &snapshot.edges {
-            if !nodes.contains(&source) || !nodes.contains(&target) {
-                return Err(GraphError::InvalidInput(
-                    "Read snapshot edge has an inactive endpoint".into(),
-                ));
-            }
+            Self::validate_endpoints(&nodes, source, target)?;
             incident.entry(source).or_default().push(edge);
             if source != target {
                 incident.entry(target).or_default().push(edge);
@@ -306,5 +325,26 @@ impl PinnedReadState {
                 .contains_node(id)
                 .then_some(&EMPTY_ADJACENCY)
         })
+    }
+}
+
+#[cfg(test)]
+mod validation_only_tests {
+    use super::*;
+
+    #[test]
+    fn validation_only_preserves_capture_topology_rejections() {
+        let mut snapshot = GraphSnapshot::empty_with_type(7, GraphType::Directed);
+        snapshot.active_nodes = vec![10, 20];
+        snapshot.edges.extend([(4, (10, 20)), (8, (10, 20)), (9, (20, 20))]);
+        assert!(PinnedReadState::validate_snapshot(&snapshot).is_ok());
+        assert!(PinnedReadState::from_snapshot(snapshot.clone()).is_ok());
+        for invalid in [vec![10, 10], vec![10]] {
+            snapshot.active_nodes = invalid;
+            let validation = PinnedReadState::validate_snapshot(&snapshot).unwrap_err();
+            let capture = PinnedReadState::from_snapshot(snapshot.clone()).unwrap_err();
+            assert_eq!(validation.to_string(), capture.to_string());
+        }
+        assert!(PinnedReadState::validate_snapshot(&GraphSnapshot::empty(0)).is_ok());
     }
 }

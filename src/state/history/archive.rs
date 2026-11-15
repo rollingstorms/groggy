@@ -300,7 +300,8 @@ impl HistoryDocument {
             .copied()
             .collect();
         for head in heads {
-            crate::state::PinnedReadState::from_snapshot(history.reconstruct_state_at(head)?)?;
+            let snapshot = history.reconstruct_state_at(head)?;
+            crate::state::PinnedReadState::validate_snapshot(&snapshot)?;
         }
         Ok(history)
     }
