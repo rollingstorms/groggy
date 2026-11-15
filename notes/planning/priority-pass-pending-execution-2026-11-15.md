@@ -52,3 +52,13 @@ The six implementation commits are pushed. A separate evidence commit records
 the completed source archive/rebuild gate without changing implementation or
 checklist counts. The staged lifecycle question remains unanswered; rejection is
 preserved. Source qualification finished at approximately 23:00 UTC.
+
+Final review also removes a duplicate native direction convenience method and
+reuses existing Subgraph::read_is_directed. This is a small source consolidation,
+with the full native and fresh-root-wheel gates repeated; the earlier source
+archive receipt retains its explicitly recorded a777e4ec source. Artifact receipts
+and tests remain distinct from qualification of the unfinished expanded release.
+
+The post-cleanup gates completed successfully at approximately 23:10 UTC: 1,604
+native tests, strict Clippy and a fresh root wheel's 3,089 Python tests/283 examples.
+The block ran slightly past the requested window to finish that final qualification.

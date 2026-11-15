@@ -170,7 +170,7 @@ impl AStarPathfinding {
             .binary_search(&goal)
             .map_err(|_| anyhow!("A* goal outside selection"))?;
         let heuristics = self.heuristics_map(ctx, subgraph)?;
-        let add_reverse = !subgraph.selected_is_directed();
+        let add_reverse = !subgraph.read_is_directed();
         let csr = subgraph
             .csr_cache_get(add_reverse)
             .ok_or_else(|| anyhow!("Missing prepared A* topology"))?;
@@ -381,7 +381,7 @@ impl Algorithm for AStarPathfinding {
         ctx.record_call("astar.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = !subgraph.selected_is_directed();
+        let add_reverse = !subgraph.read_is_directed();
         if subgraph.csr_cache_get(add_reverse).is_some() {
             ctx.record_call("astar.csr_cache_hit", std::time::Duration::from_nanos(0));
         } else {

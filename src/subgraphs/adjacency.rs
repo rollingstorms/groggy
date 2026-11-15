@@ -108,7 +108,7 @@ mod endpoint_tests {
             let endpoints = frozen.endpoint_read();
             assert_eq!(endpoints.get(0).unwrap(), (0, 1));
             assert!(endpoints.get(1).is_err());
-            assert!(!frozen.selected_is_directed());
+            assert!(!frozen.read_is_directed());
         }
         assert!(live.endpoint_read().get(0).is_err());
     }

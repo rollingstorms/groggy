@@ -193,7 +193,7 @@ impl Algorithm for DijkstraShortestPath {
         ctx.record_call("dijkstra.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = !subgraph.selected_is_directed();
+        let add_reverse = !subgraph.read_is_directed();
         let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call("dijkstra.csr_cache_hit", std::time::Duration::from_nanos(0));
             cached

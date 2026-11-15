@@ -156,7 +156,7 @@ fn execute_traversal(
         return Err(anyhow!("{prefix} requires exactly one selected node carrying start attribute {start_attr:?}; found {}", sources.len()));
     }
     let source = sources[0];
-    let add_reverse = !subgraph.selected_is_directed();
+    let add_reverse = !subgraph.read_is_directed();
     let csr = if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
         ctx.record_call(format!("{prefix}.csr_cache_hit"), std::time::Duration::ZERO);
         csr

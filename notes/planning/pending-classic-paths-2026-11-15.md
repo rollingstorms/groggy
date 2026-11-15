@@ -87,3 +87,22 @@ plans/lowering; the provisional lifecycle question; release/service/scale work.
 Wide pending captures still copy selected logical properties, so property-heavy
 workloads need their own measurements before a broader performance claim.
 Unrelated owner files remain untouched.
+
+## Final direction authority cleanup
+
+Final review found that the new direction convenience method duplicated existing
+Subgraph::read_is_directed in subgraph/binding.rs. The four path wrappers and
+endpoint regression now reuse that existing method; the duplicate is deleted.
+Both methods had identical captured/live behavior. This adds no API or algorithm
+and keeps direction ownership in its existing authoritative binding module.
+
+The cleanup repeats the full native/Clippy gates and fresh root-wheel maintained
+qualification. Its receipt is `notes/benchmarks/final-direction-wheel-qualification-2026-11-15.json`.
+The earlier source archive/rebuild receipt deliberately retains its exact a777e4ec
+source, rather than being relabeled as a later source artifact.
+
+Post-cleanup gates pass: **1,604 native tests / 54 ignored**, strict all-target
+Clippy and formatting/whitespace checks. The new unpacked root wheel again passes
+**3,089 Python tests / one skipped / 14 established warnings**, **283 executable
+documentation examples**, 105 exports/version agreement and both application
+workflows. No installation or publication occurred.

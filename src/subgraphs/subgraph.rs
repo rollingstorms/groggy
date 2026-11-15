@@ -449,14 +449,6 @@ impl Subgraph {
         }
     }
 
-    /// Direction of this immutable source, or of the current live owner.
-    pub(crate) fn selected_is_directed(&self) -> bool {
-        self.frozen.as_ref().map_or_else(
-            || self.graph.borrow().is_directed(),
-            crate::GraphView::is_directed,
-        )
-    }
-
     /// Retrieve a cached CSR adjacency if the current version matches.
     pub(crate) fn csr_cache_get(&self, add_reverse: bool) -> Option<Arc<Csr>> {
         let version = {

@@ -34,8 +34,10 @@ and [classic path evidence](notes/planning/pending-classic-paths-2026-11-15.md).
 The latest Python/docs gate runs against a fresh unpacked macOS arm64 CPython 3.9
 root wheel. The [priority pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)
 records completed slices and remaining work; older platform evidence is separate.
-The same implementation's fresh source archive rebuilds offline with both lockfiles
+The a777e4ec implementation's fresh source archive rebuilds offline with both lockfiles
 and passes isolated wheel smoke/workflows; see [source artifact receipt](notes/planning/priority-source-qualification-2026-11-15.md).
+Final review reuses the existing native read-direction method instead of a duplicate;
+its fresh-root-wheel receipt is `notes/benchmarks/final-direction-wheel-qualification-2026-11-15.json`.
 The 44 broad unchecked release rows retain their remaining exit requirements.
 
 ## Qualified bounded candidate
