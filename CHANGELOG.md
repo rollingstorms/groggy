@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the documented storage and platform boundaries.
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
+- Fixed child frames validate every node/edge attachment target before staging,
+  publication or transient output, including full-owner history diff maps.
 - Pending child captures share one accepted base and prepared topology, copy only
   frame values and revalidate changed targets, reducing measured repeated allocation.
 - Pending subgraph producers and certified for-each bodies now use exact child

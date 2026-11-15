@@ -127,3 +127,11 @@ selected frame values. Topology changes still revalidate every staged target.
 See `projected-frame-materialization-2026-11-15.md` for matched native runtime and
 requested-allocation measurements, regression gates and remaining boundaries.
 This advances existing execution/performance parents without adding rows.
+
+### Implemented follow-up: fixed child attachments
+
+Fixed for-each execution frames now constrain node/edge attachments, including
+live property-overlay frames, transient results and nested loops. Full-owner
+retained diff maps remain readable but cannot authorize a child to write sibling
+IDs. Existing root explicit owner-ID semantics remain intact. See
+`fixed-child-attachments-2026-11-15.md` for reproduction and qualification.

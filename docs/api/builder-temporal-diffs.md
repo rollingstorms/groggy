@@ -100,7 +100,9 @@ not clip historical entities to the live invocation selection. Removed IDs remai
 readable in result maps even when inactive now. Explicit attachments use the
 existing owner-ID validation boundary: writing removed inactive IDs rejects;
 active owner IDs can be addressed outside the selected view. This is intentional
-full-owner history comparison, rather than a selected-topology traversal.
+full-owner history comparison, rather than a selected-topology traversal. Fixed
+for-each child frames additionally constrain all attachment targets to their exact
+node/edge membership; a full-owner diff is not authority to write another child.
 
 Earlier staged writes do not alter retained snapshots. Diff reads record no new
 history. Persistent attachments share one enclosing acceptance, and transient

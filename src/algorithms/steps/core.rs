@@ -669,6 +669,7 @@ impl<'a> StepScope<'a> {
         name: AttrName,
         values: Vec<(NodeId, AttrValue)>,
     ) -> Result<()> {
+        self.validate_attachment_targets(true, values.iter().map(|(id, _)| *id))?;
         ctx.attach_node_column(self.subgraph, name, values)
     }
     /// Attach node columns through the canonical Context property boundary.
@@ -677,6 +678,7 @@ impl<'a> StepScope<'a> {
         ctx: &mut Context,
         attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> Result<()> {
+        self.validate_attachment_targets(true, attrs.values().flatten().map(|(id, _)| *id))?;
         ctx.attach_node_attrs(self.subgraph, attrs)
     }
     /// Attach edge columns through the canonical Context property boundary.
@@ -685,7 +687,34 @@ impl<'a> StepScope<'a> {
         ctx: &mut Context,
         attrs: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> Result<()> {
+        self.validate_attachment_targets(false, attrs.values().flatten().map(|(id, _)| *id))?;
         ctx.attach_edge_attrs(self.subgraph, attrs)
+    }
+
+    // Root execution keeps its established explicit owner-ID attachment contract.
+    // Fixed children must constrain writes as well as reads, including live
+    // property-overlay frames and transient owned outputs.
+    fn validate_attachment_targets(
+        &self,
+        nodes: bool,
+        targets: impl Iterator<Item = usize>,
+    ) -> Result<()> {
+        if self.fixed {
+            let selected = if nodes {
+                self.subgraph.nodes()
+            } else {
+                self.subgraph.edges()
+            };
+            for id in targets {
+                if !selected.contains(&id) {
+                    return Err(anyhow!(
+                        "{} attachment target {id} is outside the fixed execution frame",
+                        if nodes { "Node" } else { "Edge" }
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn variables(&self) -> &StepVariables {
@@ -819,4 +848,67 @@ static GLOBAL_STEP_REGISTRY: OnceLock<StepRegistry> = OnceLock::new();
 
 pub fn global_step_registry() -> &'static StepRegistry {
     GLOBAL_STEP_REGISTRY.get_or_init(StepRegistry::default)
+}
+
+#[cfg(test)]
+mod fixed_frame_tests {
+    use super::*;
+    use crate::{algorithms::property_batch::PropertyBatch, Graph};
+
+    #[test]
+    fn fixed_frames_reject_whole_foreign_columns_in_every_attachment_mode() {
+        for mode in 0..3 {
+            for kind in 0..3 {
+                let mut graph = Graph::new_publishing();
+                graph.insert_nodes(3).unwrap();
+                graph.add_edges(&[(0, 1), (0, 1)]).unwrap();
+                let head = graph.current_state_id();
+                let owner = graph.into_shared();
+                let selected =
+                    Subgraph::new(owner.clone(), [0, 1].into(), [0].into(), "child".into());
+                let mut variables = StepVariables::default();
+                let scope = StepScope::for_frame(&selected, &mut variables, true);
+                let mut ctx = Context::new();
+                ctx.set_persist_results(mode != 0);
+                if mode == 2 {
+                    ctx.property_batch = Some(PropertyBatch::for_selection(
+                        owner.borrow().write_coordinate(),
+                        &selected,
+                    ));
+                }
+                let result = match kind {
+                    0 => scope.attach_node_column(
+                        &mut ctx,
+                        "x".into(),
+                        vec![(0, AttrValue::Int(1)), (2, AttrValue::Int(2))],
+                    ),
+                    1 => scope.attach_node_attrs(
+                        &mut ctx,
+                        HashMap::from([(
+                            "x".into(),
+                            vec![(0, AttrValue::Int(1)), (2, AttrValue::Int(2))],
+                        )]),
+                    ),
+                    _ => scope.attach_edge_attrs(
+                        &mut ctx,
+                        HashMap::from([(
+                            "x".into(),
+                            vec![(0, AttrValue::Int(1)), (1, AttrValue::Int(2))],
+                        )]),
+                    ),
+                };
+                assert!(result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("outside the fixed execution frame"));
+                assert!(ctx.take_outputs().is_empty());
+                if let Some(batch) = &ctx.property_batch {
+                    assert!(batch.get(kind != 2, 0, &"x".into()).is_none());
+                }
+                assert_eq!(owner.borrow().current_state_id(), head);
+                assert_eq!(owner.borrow().get_node_attr(0, &"x".into()).unwrap(), None);
+                assert_eq!(owner.borrow().get_edge_attr(0, &"x".into()).unwrap(), None);
+            }
+        }
+    }
 }

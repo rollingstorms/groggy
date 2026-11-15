@@ -99,3 +99,42 @@ write-heavy child runs. See the matched native allocation/timing evidence in
 `notes/planning/projected-frame-materialization-2026-11-15.md`. Captures still copy
 values and wide child selections still cost more. There is no constant-cost,
 zero-copy property capture or general scale guarantee.
+
+## Child write boundaries
+
+An explicit retained-history diff can contain IDs outside the current child.
+The diff remains a full-owner immutable result, but child attachments reject an
+out-of-frame target before staging, publishing or installing transient columns.
+Node columns, node maps and edge maps share this check. Exact edge instances
+matter even when a foreign parallel edge has the same endpoints.
+
+This restriction follows fixed child frames through nested loops. Ordinary root
+invocations retain their documented explicit owner-ID attachment behavior.
+
+```python
+from groggy import Graph
+from groggy.builder import step_pipeline
+
+scoped_graph = Graph()
+scoped_graph.add_nodes(2)
+before = scoped_graph.current_state_id
+scoped_graph.set_node_attr(1, "value", 7)
+head = scoped_graph.current_state_id
+body = [
+    stage("temporal.snapshot_at", state_id=before, output="before"),
+    stage("temporal.snapshot_at", state_id=head, output="after"),
+    stage("temporal.diff_nodes", before="before", after="after", output_prefix="diff"),
+    stage("core.attach_node_attr", source="diff_nodes_modified", attr="escaped"),
+]
+try:
+    scoped_graph.apply(step_pipeline("confined history writes", [
+        stage("sample.iterate_nodes", target="seeds"),
+        stage("sample.for_each", source="seeds", target="mapped", body=body),
+    ], atomic=True))
+except RuntimeError as error:
+    assert "outside the fixed execution frame" in str(error)
+else:
+    raise AssertionError("a child must reject another child's target")
+assert scoped_graph.current_state_id == head
+assert scoped_graph.get_node_attr(1, "escaped") is None
+```
