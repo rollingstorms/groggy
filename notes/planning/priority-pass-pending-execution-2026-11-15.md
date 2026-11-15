@@ -10,7 +10,7 @@ one commit each, with existing parent evidence updated and no new checkbox rows.
 | bdcf7055 | Whole-input attachment confinement for fixed child frames, including retained history maps and transient results. |
 | fb97808e | Accepted snapshot/diff reads after pending edits, with retained/working separation and late rollback. |
 | 7530c71e | Four selected lifecycle/window helpers after pending removals/revisions for accepted IDs. |
-| This commit | Four classic path wrappers through shared pending algorithm frames and bulk endpoint authority. |
+| a777e4ec | Four classic path wrappers through shared pending algorithm frames and bulk endpoint authority. |
 
 Final implementation gates: **1,604 native passed / 54 ignored / zero failed**,
 strict all-target Clippy and Rust formatting/whitespace checks. Fresh root CPython
@@ -38,11 +38,17 @@ Small property-only cache allocation costs and wide-frame copying remain explici
    currently address global batch allocation positions, not the latest iteration.
 4. Retained window/index construction and wide property captures retain measured
    history/payload-dependent costs. Broader scale/latency budgets remain open.
-5. Repeat cross-platform/source artifact gates on the new source before release;
-   the older bounded candidate's platform receipt does not qualify these changes.
+5. Source archive rebuilding and its isolated wheel smoke/workflows now pass on
+   a777e4ec; see `priority-source-qualification-2026-11-15.md`. Repeat cross-platform
+   gates before release; the older candidate's platform receipt has a different source.
 
 The fixed checklist remains **268 rows: 215 checked / 53 unchecked**. Expanded
 0.6.0 target: **44 unchecked rows in scope**, nine previously deferred rows.
 These broad rows retain requirements beyond the completed implementation slices;
 no completion claim is made for the unfinished expanded release. No owner policy
 answer was invented. Unrelated development/review/benchmark files are untouched.
+
+The six implementation commits are pushed. A separate evidence commit records
+the completed source archive/rebuild gate without changing implementation or
+checklist counts. The staged lifecycle question remains unanswered; rejection is
+preserved. Source qualification finished at approximately 23:00 UTC.
