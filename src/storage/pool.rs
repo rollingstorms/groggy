@@ -327,7 +327,8 @@ impl AttributeColumn {
     /// Bulk append values using Vec::extend (VECTORIZED - much faster than push loop)
     ///
     /// PERFORMANCE: O(n) but with vectorized operations, single allocation, and memory optimization
-    /// Returns (start_index, end_index) range
+    /// Returns inclusive (start_index, end_index) for nonempty input. Empty input
+    /// appends nothing; its end index is the previous last index, saturating at zero.
     pub fn extend_values(&mut self, values: Vec<AttrValue>) -> (usize, usize) {
         let start_index = self.values.len();
 
@@ -340,7 +341,7 @@ impl AttributeColumn {
                 indices.insert(index, &self.values);
             }
         }
-        let end_index = self.values.len() - 1;
+        let end_index = self.values.len().saturating_sub(1);
         (start_index, end_index)
     }
 
@@ -828,6 +829,9 @@ impl GraphPool {
         let mut all_index_changes = HashMap::new();
 
         for (attr_name, entity_values) in attrs_values {
+            if entity_values.is_empty() {
+                continue;
+            }
             // Get or create column
             let column = if is_node {
                 self.node_attributes
@@ -1586,5 +1590,25 @@ mod prepared_group_batch_tests {
         }
         assert_eq!(pool.subgraph_count(), 1);
         assert_eq!(pool.retained_groups.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod empty_bulk_regressions {
+    use super::*;
+    #[test]
+    fn empty_bulk_does_not_create_columns_or_underflow_empty_storage() {
+        let mut pool = GraphPool::new_with_type(GraphType::Undirected);
+        for nodes in [true, false] {
+            let changes = pool.set_bulk_attrs::<usize>([("empty".into(), Vec::new())].into(), nodes);
+            assert!(changes.is_empty());
+        }
+        assert_eq!(pool.attribute_names(), (Vec::new(),Vec::new()));
+        let mut column = AttributeColumn::new();
+        assert_eq!(column.extend_values(Vec::new()), (0,0));
+        assert!(column.is_empty());
+        column.push(AttrValue::Int(7));
+        assert_eq!(column.extend_values(Vec::new()), (1,0));
+        assert_eq!(column.len(),1);
     }
 }
