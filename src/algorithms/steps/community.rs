@@ -523,9 +523,12 @@ mod tests {
     #[test]
     fn test_modularity_gain_empty_graph() {
         let graph = Graph::new_manual();
-        let subgraph =
-            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), HashSet::new(), "empty".into())
-                .unwrap();
+        let subgraph = Subgraph::from_nodes(
+            Arc::new(OwnerCell::new(graph)),
+            HashSet::new(),
+            "empty".into(),
+        )
+        .unwrap();
 
         let step = ModularityGainStep::new("labels", "gains");
         let mut ctx = Context::new();

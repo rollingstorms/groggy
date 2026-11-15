@@ -1,6 +1,6 @@
 use groggy::storage::{
-    matrix::{MatrixLayout, UnifiedMatrix},
     matrix::{MatrixIndex, MatrixSlice, MatrixSlicing},
+    matrix::{MatrixLayout, UnifiedMatrix},
     GraphMatrix,
 };
 fn labelled() -> GraphMatrix<f64> {

@@ -1,6 +1,6 @@
 use groggy::storage::{
-    matrix::UnifiedMatrix,
     array::numeric_arithmetic::{NumericComparison, NumericInput},
+    matrix::UnifiedMatrix,
     GraphMatrix,
 };
 #[test]

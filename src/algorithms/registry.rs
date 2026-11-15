@@ -150,8 +150,8 @@ mod tests {
         let node = graph.add_node().unwrap();
         let mut nodes = HashSet::new();
         nodes.insert(node);
-        let sg =
-            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".to_string()).unwrap();
+        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".to_string())
+            .unwrap();
 
         let mut ctx = Context::new();
         let result = algo.execute(&mut ctx, sg).unwrap();

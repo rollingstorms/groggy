@@ -662,7 +662,8 @@ mod tests {
         let mut graph = Graph::new_manual();
         let node = graph.add_node().unwrap();
         let nodes: HashSet<_> = [node].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
 
         let mut ctx = Context::new();
         let result = algo.execute(&mut ctx, sg).unwrap();

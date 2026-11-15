@@ -586,8 +586,7 @@ impl<T: NumericType> FusionEngine<T> {
         };
 
         // Apply ReLU in-place
-        *output =
-            crate::storage::matrix::neural::activations::ActivationOps::relu(&with_bias)?;
+        *output = crate::storage::matrix::neural::activations::ActivationOps::relu(&with_bias)?;
 
         Ok(())
     }
@@ -611,8 +610,7 @@ impl<T: NumericType> FusionEngine<T> {
             result
         };
 
-        outputs[0] =
-            crate::storage::matrix::neural::activations::ActivationOps::relu(&result)?;
+        outputs[0] = crate::storage::matrix::neural::activations::ActivationOps::relu(&result)?;
         Ok(())
     }
 
@@ -627,8 +625,7 @@ impl<T: NumericType> FusionEngine<T> {
             ));
         }
 
-        outputs[0] =
-            crate::storage::matrix::neural::activations::ActivationOps::gelu(inputs[0])?;
+        outputs[0] = crate::storage::matrix::neural::activations::ActivationOps::gelu(inputs[0])?;
         Ok(())
     }
 
@@ -643,9 +640,8 @@ impl<T: NumericType> FusionEngine<T> {
             ));
         }
 
-        outputs[0] = crate::storage::matrix::neural::activations::ActivationOps::softmax(
-            inputs[0],
-        )?;
+        outputs[0] =
+            crate::storage::matrix::neural::activations::ActivationOps::softmax(inputs[0])?;
         Ok(())
     }
 

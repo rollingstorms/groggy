@@ -307,7 +307,7 @@ impl BaseArray<AttrValue> {
             self.inner
                 .iter()
                 .zip(mask)
-                .filter_map(|(value, &keep)| if keep {Some(value.clone())} else {None})
+                .filter_map(|(value, &keep)| if keep { Some(value.clone()) } else { None })
                 .collect(),
         ))
     }

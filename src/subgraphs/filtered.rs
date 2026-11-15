@@ -130,7 +130,10 @@ impl FilteredSubgraph {
     ///
     /// # Returns
     /// New FilteredSubgraph with criteria applied to current graph state
-    pub fn from_criteria(graph: Arc<OwnerCell<Graph>>, criteria: FilterCriteria) -> GraphResult<Self> {
+    pub fn from_criteria(
+        graph: Arc<OwnerCell<Graph>>,
+        criteria: FilterCriteria,
+    ) -> GraphResult<Self> {
         let mut filtered_nodes = HashSet::new();
         let mut filtered_edges = HashSet::new();
 

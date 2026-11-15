@@ -138,7 +138,11 @@ impl PinnedReadState {
         Ok(nodes)
     }
 
-    fn validate_endpoints(nodes: &HashSet<NodeId>, source: NodeId, target: NodeId) -> GraphResult<()> {
+    fn validate_endpoints(
+        nodes: &HashSet<NodeId>,
+        source: NodeId,
+        target: NodeId,
+    ) -> GraphResult<()> {
         if !nodes.contains(&source) || !nodes.contains(&target) {
             return Err(GraphError::InvalidInput(
                 "Read snapshot edge has an inactive endpoint".into(),
@@ -336,7 +340,9 @@ mod validation_only_tests {
     fn validation_only_preserves_capture_topology_rejections() {
         let mut snapshot = GraphSnapshot::empty_with_type(7, GraphType::Directed);
         snapshot.active_nodes = vec![10, 20];
-        snapshot.edges.extend([(4, (10, 20)), (8, (10, 20)), (9, (20, 20))]);
+        snapshot
+            .edges
+            .extend([(4, (10, 20)), (8, (10, 20)), (9, (20, 20))]);
         assert!(PinnedReadState::validate_snapshot(&snapshot).is_ok());
         assert!(PinnedReadState::from_snapshot(snapshot.clone()).is_ok());
         for invalid in [vec![10, 10], vec![10]] {

@@ -1,6 +1,4 @@
-use crate::{
-    AttrValue as V, BatchEdgeRef as E, BatchNodeRef as N, Graph, GraphBatch, GraphConfig,
-};
+use crate::{AttrValue as V, BatchEdgeRef as E, BatchNodeRef as N, Graph, GraphBatch, GraphConfig};
 use std::collections::HashMap;
 fn initial(graph: &mut Graph) -> u64 {
     graph

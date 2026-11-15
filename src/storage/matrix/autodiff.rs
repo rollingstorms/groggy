@@ -496,9 +496,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         "ReLU operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::matrix::neural::activations::ActivationOps::relu(
-                    &inputs[0],
-                )
+                crate::storage::matrix::neural::activations::ActivationOps::relu(&inputs[0])
             }
 
             Operation::Sigmoid => {
@@ -508,9 +506,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         "Sigmoid operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::matrix::neural::activations::ActivationOps::sigmoid(
-                    &inputs[0],
-                )
+                crate::storage::matrix::neural::activations::ActivationOps::sigmoid(&inputs[0])
             }
 
             Operation::Tanh => {
@@ -520,9 +516,7 @@ impl<T: NumericType> ComputationGraph<T> {
                         "Tanh operation requires exactly 1 input".to_string(),
                     ));
                 }
-                crate::storage::matrix::neural::activations::ActivationOps::tanh(
-                    &inputs[0],
-                )
+                crate::storage::matrix::neural::activations::ActivationOps::tanh(&inputs[0])
             }
 
             Operation::GELU => {

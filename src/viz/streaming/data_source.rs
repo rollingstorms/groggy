@@ -3,8 +3,8 @@
 //! Provides a common interface for all data structures to support streaming,
 //! virtual scrolling, and real-time updates.
 
-use crate::types::AttrValue;
 use crate::display::render::{ColumnSchema, DataType};
+use crate::types::AttrValue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

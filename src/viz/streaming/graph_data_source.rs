@@ -1,6 +1,6 @@
 use crate::api::graph::Graph;
-use crate::types::{AttrValue, AttrValueType};
 use crate::display::render::{ColumnSchema, DataType};
+use crate::types::{AttrValue, AttrValueType};
 use crate::viz::layouts::{CircularLayout, ForceDirectedLayout, HoneycombLayout, LayoutEngine};
 use crate::viz::streaming::data_source::{
     DataSchema, DataSource, DataWindow, DataWindowMetadata, GraphEdge, GraphMetadata, GraphNode,

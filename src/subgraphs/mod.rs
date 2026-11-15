@@ -9,8 +9,8 @@
 
 mod adjacency;
 pub use adjacency::AdjacencyRead;
-pub(crate) mod sampling;
 mod degrees;
+pub(crate) mod sampling;
 pub use degrees::{DegreeMode, SubgraphDegreeRead};
 
 pub mod component;
@@ -20,14 +20,14 @@ pub mod filtered;
 pub mod hierarchical;
 pub mod neighborhood;
 pub mod subgraph;
-pub mod visualization;
 pub mod view;
 mod view_algebra;
-mod view_traversal;
-mod view_metrics;
 mod view_entities;
+mod view_metrics;
 mod view_projection;
-pub use view_entities::{GraphViewEntity, GraphViewEntities, GraphViewEntityIterator};
+mod view_traversal;
+pub mod visualization;
+pub use view_entities::{GraphViewEntities, GraphViewEntity, GraphViewEntityIterator};
 
 pub use component::*;
 pub use composer::*;

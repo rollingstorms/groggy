@@ -11,12 +11,12 @@
 //! callers needing uncommitted changes must query the owning Graph.
 
 mod integrity;
+use crate::ownership::OwnerCell;
 use crate::state::delta::DeltaObject;
 use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, EdgeId, NodeId, StateId};
 use crate::{GraphError, GraphResult};
 pub(crate) use integrity::CachedTopologyCheck;
-use crate::ownership::OwnerCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;

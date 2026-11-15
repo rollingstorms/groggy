@@ -37,7 +37,8 @@ fn archive_round_trip_retains_branches_columns_clocks_inactive_ids_and_checkpoin
     let mut config = GraphConfig::performance_optimized();
     config.graph_type = groggy::types::GraphType::Directed;
     config.query_timeout_ms = 123;
-    let mut graph = Graph::with_config_manual(config.clone()).unwrap()
+    let mut graph = Graph::with_config_manual(config.clone())
+        .unwrap()
         .into_publishing()
         .unwrap();
     let root = seed(&mut graph);

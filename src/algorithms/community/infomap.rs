@@ -274,9 +274,12 @@ mod tests {
     #[test]
     fn test_infomap_empty() {
         let graph = Graph::new_manual();
-        let subgraph =
-            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), HashSet::new(), "empty".into())
-                .unwrap();
+        let subgraph = Subgraph::from_nodes(
+            Arc::new(OwnerCell::new(graph)),
+            HashSet::new(),
+            "empty".into(),
+        )
+        .unwrap();
         let algo = Infomap::new(0.15, 5, 50, Some(42), "community".to_string()).unwrap();
         let mut ctx = Context::default();
 

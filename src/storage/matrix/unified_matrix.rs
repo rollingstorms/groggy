@@ -488,27 +488,45 @@ impl<T: NumericType> UnifiedMatrix<T> {
     pub fn fill(&mut self, value: T) -> MatrixResult<()> {
         match &self.storage {
             MatrixStorage::Dense(buffer) => {
-                let count=self.rows().checked_mul(self.cols()).ok_or_else(||MatrixError::InvalidInput("Matrix shape overflow".into()))?;
-                if count==0 { return Ok(()); }
-                let last=(self.rows()-1).checked_mul(self.strides.row_stride)
-                    .and_then(|row|(self.cols()-1).checked_mul(self.strides.col_stride).and_then(|col|row.checked_add(col)))
-                    .ok_or_else(||MatrixError::InvalidInput("Matrix stride overflow".into()))?;
-                let mut data=buffer.data_mut()?;
-                let cells=data.as_slice_mut();
-                if last>=cells.len() { return Err(MatrixError::InvalidInput("Matrix strides exceed storage".into())); }
-                if (self.strides.row_stride==self.cols() && self.strides.col_stride==1)
-                    || (self.strides.row_stride==1 && self.strides.col_stride==self.rows()) {
+                let count = self
+                    .rows()
+                    .checked_mul(self.cols())
+                    .ok_or_else(|| MatrixError::InvalidInput("Matrix shape overflow".into()))?;
+                if count == 0 {
+                    return Ok(());
+                }
+                let last = (self.rows() - 1)
+                    .checked_mul(self.strides.row_stride)
+                    .and_then(|row| {
+                        (self.cols() - 1)
+                            .checked_mul(self.strides.col_stride)
+                            .and_then(|col| row.checked_add(col))
+                    })
+                    .ok_or_else(|| MatrixError::InvalidInput("Matrix stride overflow".into()))?;
+                let mut data = buffer.data_mut()?;
+                let cells = data.as_slice_mut();
+                if last >= cells.len() {
+                    return Err(MatrixError::InvalidInput(
+                        "Matrix strides exceed storage".into(),
+                    ));
+                }
+                if (self.strides.row_stride == self.cols() && self.strides.col_stride == 1)
+                    || (self.strides.row_stride == 1 && self.strides.col_stride == self.rows())
+                {
                     cells[..count].fill(value);
                 } else {
-                    for row in 0..self.rows() { for col in 0..self.cols() {
-                        cells[row*self.strides.row_stride+col*self.strides.col_stride]=value;
-                    } }
+                    for row in 0..self.rows() {
+                        for col in 0..self.cols() {
+                            cells[row * self.strides.row_stride + col * self.strides.col_stride] =
+                                value;
+                        }
+                    }
                 }
                 Ok(())
             }
             _ => {
-                let result=self.try_map_into(|_|Ok(value))?;
-                *self=result;
+                let result = self.try_map_into(|_| Ok(value))?;
+                *self = result;
                 Ok(())
             }
         }

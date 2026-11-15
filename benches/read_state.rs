@@ -339,49 +339,153 @@ fn read_state(c: &mut Criterion) {
         );
         for (name, values) in [
             ("profile_f64", predicate_values.clone()),
-            ("profile_high_integer", (0..count).map(|i| AttrValue::Int(i64::MAX - count as i64 + i as i64)).collect()),
+            (
+                "profile_high_integer",
+                (0..count)
+                    .map(|i| AttrValue::Int(i64::MAX - count as i64 + i as i64))
+                    .collect(),
+            ),
         ] {
-            let table = groggy::storage::table::BaseTable::from_columns(
-                std::collections::HashMap::from([("x".into(), groggy::storage::array::BaseArray::new(values))]),
-            ).unwrap();
+            let table =
+                groggy::storage::table::BaseTable::from_columns(std::collections::HashMap::from([
+                    ("x".into(), groggy::storage::array::BaseArray::new(values)),
+                ]))
+                .unwrap();
             let result = table.profile().unwrap();
-            assert!(matches!(result.column("mean").unwrap().data()[0], AttrValue::Float64(v) if v.is_finite()));
+            assert!(
+                matches!(result.column("mean").unwrap().data()[0], AttrValue::Float64(v) if v.is_finite())
+            );
             group.bench_with_input(BenchmarkId::new(name, count), &table, |b, table| {
                 b.iter(|| black_box(table.profile().unwrap()));
             });
         }
         let materialized = groggy::storage::array::NumArray::new(
-            (0..count).map(|i| 1.0 + i as f64 * 2f64.powi(-40)).collect(),
+            (0..count)
+                .map(|i| 1.0 + i as f64 * 2f64.powi(-40))
+                .collect(),
         );
-        assert!(matches!(materialized.to_attributes().unwrap()[count - 1], AttrValue::Float64(v) if v == 1.0 + (count - 1) as f64 * 2f64.powi(-40)));
+        assert!(
+            matches!(materialized.to_attributes().unwrap()[count - 1], AttrValue::Float64(v) if v == 1.0 + (count - 1) as f64 * 2f64.powi(-40))
+        );
         group.bench_with_input(
-            BenchmarkId::new("materialize_f64_properties", count), &materialized,
+            BenchmarkId::new("materialize_f64_properties", count),
+            &materialized,
             |b, array| b.iter(|| black_box(array.to_attributes().unwrap())),
         );
-        let grouped_source = groggy::storage::table::BaseTable::from_columns(
-            std::collections::HashMap::from([
-                ("key".into(), groggy::storage::array::BaseArray::new((0..count).map(|i| AttrValue::Float64(1.0 + (i % 17) as f64 * 2f64.powi(-40))).collect())),
-                ("value".into(), groggy::storage::array::BaseArray::new(vec![AttrValue::Int(1); count])),
-            ]),
-        ).unwrap();
+        let grouped_source =
+            groggy::storage::table::BaseTable::from_columns(std::collections::HashMap::from([
+                (
+                    "key".into(),
+                    groggy::storage::array::BaseArray::new(
+                        (0..count)
+                            .map(|i| AttrValue::Float64(1.0 + (i % 17) as f64 * 2f64.powi(-40)))
+                            .collect(),
+                    ),
+                ),
+                (
+                    "value".into(),
+                    groggy::storage::array::BaseArray::new(vec![AttrValue::Int(1); count]),
+                ),
+            ]))
+            .unwrap();
         let keys = vec!["key".to_string()];
         let specs = std::collections::HashMap::from([("value".into(), "sum".into())]);
-        assert_eq!(grouped_source.group_by_agg(&keys, specs.clone()).unwrap().column("key").unwrap().len(), 17);
-        group.bench_with_input(BenchmarkId::new("group_f64_keys", count), &grouped_source, |b, table| {
-            b.iter(|| black_box(table.group_by_agg(&keys, specs.clone()).unwrap()));
-        });
+        assert_eq!(
+            grouped_source
+                .group_by_agg(&keys, specs.clone())
+                .unwrap()
+                .column("key")
+                .unwrap()
+                .len(),
+            17
+        );
+        group.bench_with_input(
+            BenchmarkId::new("group_f64_keys", count),
+            &grouped_source,
+            |b, table| {
+                b.iter(|| black_box(table.group_by_agg(&keys, specs.clone()).unwrap()));
+            },
+        );
         for (name, values) in [
-            ("outliers_f64", (0..count).map(|i| AttrValue::Float64(if i == 0 { -1e300 } else { 1.0 + i as f64 * 2f64.powi(-40) })).collect()),
-            ("outliers_high_integer", (0..count).map(|i| AttrValue::Int(i64::MAX - if i == 0 { count as i64 * 100 } else { count as i64 - i as i64 })).collect()),
+            (
+                "outliers_f64",
+                (0..count)
+                    .map(|i| {
+                        AttrValue::Float64(if i == 0 {
+                            -1e300
+                        } else {
+                            1.0 + i as f64 * 2f64.powi(-40)
+                        })
+                    })
+                    .collect(),
+            ),
+            (
+                "outliers_high_integer",
+                (0..count)
+                    .map(|i| {
+                        AttrValue::Int(
+                            i64::MAX
+                                - if i == 0 {
+                                    count as i64 * 100
+                                } else {
+                                    count as i64 - i as i64
+                                },
+                        )
+                    })
+                    .collect(),
+            ),
         ] {
-            let table = groggy::storage::table::BaseTable::from_columns(std::collections::HashMap::from([("x".into(), groggy::storage::array::BaseArray::new(values))])).unwrap();
-            assert_eq!(table.check_outliers("x", None).unwrap().data().iter().filter(|v| matches!(v, AttrValue::Bool(true))).count(), 1);
-            group.bench_with_input(BenchmarkId::new(name, count), &table, |b, table| b.iter(|| black_box(table.check_outliers("x", None).unwrap())));
+            let table =
+                groggy::storage::table::BaseTable::from_columns(std::collections::HashMap::from([
+                    ("x".into(), groggy::storage::array::BaseArray::new(values)),
+                ]))
+                .unwrap();
+            assert_eq!(
+                table
+                    .check_outliers("x", None)
+                    .unwrap()
+                    .data()
+                    .iter()
+                    .filter(|v| matches!(v, AttrValue::Bool(true)))
+                    .count(),
+                1
+            );
+            group.bench_with_input(BenchmarkId::new(name, count), &table, |b, table| {
+                b.iter(|| black_box(table.check_outliers("x", None).unwrap()))
+            });
         }
-        let compare_column = groggy::storage::array::BaseArray::new((0..count).map(|i| AttrValue::Float64(1.0 + i as f64 * 2f64.powi(-40))).collect());
-        assert_eq!(compare_column.compare_scalar(&AttrValue::Float64(1.0), ">").unwrap().iter().filter(|&&v| v).count(), count - 1);
-        group.bench_with_input(BenchmarkId::new("compare_f64_scalar", count), &compare_column, |b, column| b.iter(|| black_box(column.compare_scalar(&AttrValue::Float64(1.0), ">").unwrap())));
-        group.bench_with_input(BenchmarkId::new("sort_f64_indices", count), &compare_column, |b, column| b.iter(|| black_box(column.sort_indices(false))));
+        let compare_column = groggy::storage::array::BaseArray::new(
+            (0..count)
+                .map(|i| AttrValue::Float64(1.0 + i as f64 * 2f64.powi(-40)))
+                .collect(),
+        );
+        assert_eq!(
+            compare_column
+                .compare_scalar(&AttrValue::Float64(1.0), ">")
+                .unwrap()
+                .iter()
+                .filter(|&&v| v)
+                .count(),
+            count - 1
+        );
+        group.bench_with_input(
+            BenchmarkId::new("compare_f64_scalar", count),
+            &compare_column,
+            |b, column| {
+                b.iter(|| {
+                    black_box(
+                        column
+                            .compare_scalar(&AttrValue::Float64(1.0), ">")
+                            .unwrap(),
+                    )
+                })
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("sort_f64_indices", count),
+            &compare_column,
+            |b, column| b.iter(|| black_box(column.sort_indices(false))),
+        );
         let selected = groggy::GraphView::all(pin.clone())
             .select_nodes(&nodes[..count / 2])
             .unwrap();

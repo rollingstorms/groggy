@@ -2,9 +2,9 @@
 //! Extracts subgraph data into thread-safe structures for visualization
 
 use crate::core::{StreamingDataSchema, StreamingDataWindow};
+use crate::display::render::{ColumnSchema, DataType};
 use crate::subgraphs::Subgraph;
 use crate::types::{AttrValue, EdgeId, NodeId};
-use crate::display::render::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
     DataSource, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm, NodePosition, Position,
 };

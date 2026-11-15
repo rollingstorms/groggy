@@ -1,7 +1,7 @@
 use groggy::{
     storage::{
-        matrix::DType,
         array::numeric_arithmetic::{attribute_inputs, integer_indices, ConversionPolicy},
+        matrix::DType,
         NumArray,
     },
     AttrValue,

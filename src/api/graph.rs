@@ -39,13 +39,13 @@ pub(crate) mod retention;
 mod schema;
 mod snapshot_publication;
 pub use restore::{StateRestoreMode, StateRestoreOutcome, StateRestorePlan};
+mod current_view;
 pub(crate) mod snapshot;
 #[cfg(test)]
 mod storage_boundary_tests;
 mod tables;
-mod view_updates;
 mod view_materialization;
-mod current_view;
+mod view_updates;
 pub use current_view::ViewRevision;
 mod write_coordinate;
 use identity::ExternalIdentityIndex;

@@ -255,7 +255,9 @@ impl<T: NumericType> GraphMatrix<T> {
 
         let (column_names, row_labels) = if let Some(node_ids) = nodes {
             if node_ids.len() != rows {
-                return Err(GraphError::InvalidInput("Row IDs must match matrix rows".into()));
+                return Err(GraphError::InvalidInput(
+                    "Row IDs must match matrix rows".into(),
+                ));
             }
             let col_names = if rows == cols {
                 node_ids.iter().map(|id| format!("node_{}", id)).collect()
@@ -734,9 +736,8 @@ impl<T: NumericType> GraphMatrix<T> {
         let storage = self
             .storage
             .try_map_into(|value| {
-                convert::<U>(from_scalar(value), policy).map_err(|e| {
-                    crate::storage::matrix::MatrixError::InvalidInput(e.to_string())
-                })
+                convert::<U>(from_scalar(value), policy)
+                    .map_err(|e| crate::storage::matrix::MatrixError::InvalidInput(e.to_string()))
             })
             .map_err(|e| GraphError::InvalidInput(e.to_string()))?;
         let mut result = GraphMatrix::<U>::from_storage(storage);
@@ -997,9 +998,7 @@ impl<T: NumericType> GraphMatrix<T> {
         self.storage
             .reduce_axis(matches!(axis, Axis::Columns), |values, count| {
                 operation(values, count).map_err(|e| {
-                    crate::storage::matrix::unified_matrix::MatrixError::InvalidInput(
-                        e.to_string(),
-                    )
+                    crate::storage::matrix::unified_matrix::MatrixError::InvalidInput(e.to_string())
                 })
             })
             .map_err(|e| GraphError::InvalidInput(e.to_string()))
@@ -2226,7 +2225,9 @@ impl<T: NumericType> GraphMatrix<T> {
     fn decomposition_input(&self) -> GraphResult<Vec<f64>> {
         use crate::storage::matrix::DType;
         if !matches!(T::DTYPE, DType::Float32 | DType::Float64) {
-            return Err(GraphError::InvalidInput("Decomposition requires floating-point matrix elements".into()));
+            return Err(GraphError::InvalidInput(
+                "Decomposition requires floating-point matrix elements".into(),
+            ));
         }
         let (rows, cols) = self.shape();
         let count = rows
@@ -2384,30 +2385,26 @@ impl<T: NumericType> GraphMatrix<T> {
     }
     /// Entrywise absolute value with exact checked integer semantics.
     pub fn abs(&self) -> GraphResult<Self> {
-        let result = self.numerical_result(crate::storage::matrix::MathFunctions::abs(
-            &self.storage,
-        ))?;
+        let result =
+            self.numerical_result(crate::storage::matrix::MathFunctions::abs(&self.storage))?;
         self.track_factor(result, Operation::Abs)
     }
     /// Entrywise exponential, with IEEE floating outputs and checked conversion.
     pub fn exp(&self) -> GraphResult<Self> {
-        let result = self.numerical_result(crate::storage::matrix::MathFunctions::exp(
-            &self.storage,
-        ))?;
+        let result =
+            self.numerical_result(crate::storage::matrix::MathFunctions::exp(&self.storage))?;
         self.track_factor(result, Operation::Exp)
     }
     /// Entrywise natural log; floating zero/negative inputs yield -inf/NaN.
     pub fn log(&self) -> GraphResult<Self> {
-        let result = self.numerical_result(crate::storage::matrix::MathFunctions::ln(
-            &self.storage,
-        ))?;
+        let result =
+            self.numerical_result(crate::storage::matrix::MathFunctions::ln(&self.storage))?;
         self.track_factor(result, Operation::Log)
     }
     /// Entrywise square root; negative floating inputs yield NaN.
     pub fn sqrt(&self) -> GraphResult<Self> {
-        let result = self.numerical_result(
-            crate::storage::matrix::MathFunctions::sqrt(&self.storage),
-        )?;
+        let result =
+            self.numerical_result(crate::storage::matrix::MathFunctions::sqrt(&self.storage))?;
         self.track_factor(result, Operation::Sqrt)
     }
     fn numerical_result(
@@ -2577,9 +2574,8 @@ impl<T: NumericType> GraphMatrix<T> {
     // Arithmetic results own storage and retain positional labels.
     fn map_checked_arithmetic(&self, operation: impl Fn(T) -> GraphResult<T>) -> GraphResult<Self> {
         self.numerical_result(self.storage.try_map_elementwise(|value| {
-            operation(value).map_err(|e| {
-                crate::storage::matrix::MatrixError::InvalidInput(e.to_string())
-            })
+            operation(value)
+                .map_err(|e| crate::storage::matrix::MatrixError::InvalidInput(e.to_string()))
         }))
     }
     fn arithmetic_scalar(scalar: f64) -> GraphResult<T> {

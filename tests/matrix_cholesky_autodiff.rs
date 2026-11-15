@@ -1,7 +1,5 @@
 use groggy::storage::{
-    matrix::{
-        neural::autodiff::Operation, unified_matrix::Shape, ComputationGraph, UnifiedMatrix,
-    },
+    matrix::{neural::autodiff::Operation, unified_matrix::Shape, ComputationGraph, UnifiedMatrix},
     GraphMatrix,
 };
 fn matrix(a: Vec<f64>, n: usize) -> GraphMatrix<f64> {

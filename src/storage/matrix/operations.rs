@@ -8,7 +8,7 @@ use crate::storage::matrix::{
 };
 
 use super::checked_kernels::NumericValue;
-use crate::storage::numeric::{scalar as numeric_arithmetic,reductions};
+use crate::storage::numeric::{reductions, scalar as numeric_arithmetic};
 use std::borrow::Cow;
 
 impl<T: NumericType> UnifiedMatrix<T> {

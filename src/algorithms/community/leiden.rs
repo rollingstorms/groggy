@@ -361,9 +361,12 @@ mod tests {
     #[test]
     fn test_leiden_empty_graph() {
         let graph = Graph::new_manual();
-        let subgraph =
-            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), HashSet::new(), "empty".into())
-                .unwrap();
+        let subgraph = Subgraph::from_nodes(
+            Arc::new(OwnerCell::new(graph)),
+            HashSet::new(),
+            "empty".into(),
+        )
+        .unwrap();
 
         let leiden = Leiden::new(20, 10, 1.0, None, "community".into()).unwrap();
         let mut ctx = Context::new();

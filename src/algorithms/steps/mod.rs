@@ -166,7 +166,8 @@ mod tests {
             .set_node_attr(b, "score".into(), AttrValue::Float(1.5))
             .unwrap();
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = LoadNodeAttrStep::new(
@@ -186,7 +187,8 @@ mod tests {
         let a = graph.add_node().unwrap();
         let b = graph.add_node().unwrap();
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = LoadNodeAttrStep::new(
@@ -457,7 +459,8 @@ mod tests {
         graph.add_edge(a, b).unwrap();
         graph.add_edge(b, c).unwrap();
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = NodeDegreeStep::new("degree", None);
@@ -588,7 +591,8 @@ mod tests {
             .unwrap();
 
         let nodes: HashSet<NodeId> = [a, b, c].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = WeightedDegreeStep::new(AttrName::from("weight".to_string()), "weighted_deg");
@@ -615,7 +619,8 @@ mod tests {
         graph.add_edge(d, a).unwrap(); // d only connected to a
 
         let nodes: HashSet<NodeId> = [a, b, c, d].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
 
@@ -646,7 +651,8 @@ mod tests {
         graph.add_edge(d, a).unwrap();
 
         let nodes: HashSet<NodeId> = [a, b, c, d].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
         let step = TriangleCountStep::new("triangles");
@@ -669,7 +675,8 @@ mod tests {
         let e2 = graph.add_edge(b, a).unwrap();
 
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
 
         // Create edge map with values 3.0 and 7.0 (sum = 10.0)
@@ -1023,7 +1030,8 @@ mod tests {
             .unwrap();
 
         let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
-        let sg = Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
+        let sg =
+            Subgraph::from_nodes(Arc::new(OwnerCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
 

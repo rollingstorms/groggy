@@ -3,10 +3,10 @@
 use super::base::BaseTable;
 use super::base::InteractiveConfig;
 use super::traits::Table;
+use crate::display::render::{ColumnSchema, DataType};
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::array::BaseArray;
 use crate::types::{AttrValue, NodeId};
-use crate::display::render::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
     DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm,
     NodePosition, Position,
