@@ -81,6 +81,12 @@ sampling step types now compose after pending topology. Shared source validation
 and selected CSR replace owner-only reads. See `pending-core-compute-2026-11-15.md`
 for gates, benchmark and remaining subgraph-frame boundaries.
 
+### Implemented follow-up: checked flow maps
+
+The two existing flow primitives now consume explicit edge maps after pending
+topology and reuse checked expression arithmetic. Overflow/nonfinite/domain
+failures preserve the full atomic prefix. See `checked-flow-compute-2026-11-15.md`.
+
 ### Next chunks
 
 1. Subgraph-producing sampling/for-each and general topology-mutating execution, public

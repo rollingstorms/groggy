@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the documented storage and platform boundaries.
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
+- Flow-map update/residual primitives now use checked integer/finite arithmetic
+  and compose with pending topology without rebinding explicit map IDs.
+- Filters/order, numerical maps, fused/community primitives and sampling masks
+  now compose after pending topology through shared selected readers.
 - Typed immutable pipeline inputs, staged topology creation/revision/removal and
   13 captured algorithm-table kernels in local and outer atomic programs. Shared
   creation IDs, effect-order preflight, exact final selections and late rollback

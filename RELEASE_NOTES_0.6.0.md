@@ -21,6 +21,10 @@ Implemented capabilities, within their documented boundaries:
   and expanded graph and numerical algorithms.
 - Retained archives and journaled durable storage with explicit recovery,
   checkpoint, compaction and purge operations.
+- Flow-map update/residual primitives now use checked integer/finite arithmetic
+  and compose with pending topology without rebinding explicit map IDs.
+- Filters/order, numerical maps, fused/community primitives and sampling masks
+  now compose after pending topology through shared selected readers.
 - Typed pipeline values, atomic property programs and selected topology effects.
   Certified loads, initialization, arithmetic and attachments can follow staged
   topology using pending selected IDs and the same one-delta acceptance.

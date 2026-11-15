@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 
 /// Update flow values along a path or set of edges.
 ///
@@ -41,6 +41,10 @@ impl FlowUpdateStep {
 }
 
 impl Step for FlowUpdateStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -74,6 +78,8 @@ impl Step for FlowUpdateStep {
             let delta_map = scope.variables().edge_map(&self.delta)?;
             // Element-wise update: flow[e] += delta[e]
             for (&edge, flow_val) in flow_map.iter() {
+                check_cancelled(ctx)?;
+                validate_flow_value(flow_val, &self.flow)?;
                 let delta_val = delta_map.get(&edge);
                 let new_flow = if let Some(delta) = delta_val {
                     add_flow_values(flow_val, delta, &self.flow, &self.delta)?
@@ -86,6 +92,8 @@ impl Step for FlowUpdateStep {
 
             // Add any edges in delta that weren't in flow (treat original flow as 0)
             for (&edge, delta_val) in delta_map.iter() {
+                check_cancelled(ctx)?;
+                validate_flow_value(delta_val, &self.delta)?;
                 if !flow_map.contains_key(&edge) {
                     result.insert(edge, delta_val.clone());
                 }
@@ -93,13 +101,17 @@ impl Step for FlowUpdateStep {
         } else {
             // Try as scalar
             let delta_scalar = scope.variables().scalar(&self.delta)?;
+            validate_flow_value(delta_scalar, &self.delta)?;
             // Uniform update: flow[e] += delta for all edges
             for (&edge, flow_val) in flow_map.iter() {
+                check_cancelled(ctx)?;
+                validate_flow_value(flow_val, &self.flow)?;
                 let new_flow = add_flow_values(flow_val, delta_scalar, &self.flow, &self.delta)?;
                 result.insert(edge, new_flow);
             }
         }
 
+        check_cancelled(ctx)?;
         scope
             .variables_mut()
             .set_edge_map(self.target.clone(), result);
@@ -120,8 +132,9 @@ impl Step for FlowUpdateStep {
 ///
 /// # Output
 /// Creates an edge map where each edge's value is the residual capacity.
-/// For undirected graphs or when backward edges exist, this handles both
-/// forward and reverse directions.
+/// Capacity keys produce positive forward residuals. Flow-only keys produce
+/// positive backward residual amounts under their supplied IDs. This map-only
+/// primitive does not create or traverse reverse edges.
 pub struct ResidualCapacityStep {
     capacity: String,
     flow: String,
@@ -143,6 +156,10 @@ impl ResidualCapacityStep {
 }
 
 impl Step for ResidualCapacityStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -171,6 +188,7 @@ impl Step for ResidualCapacityStep {
 
         // Compute residual capacity: residual[e] = capacity[e] - flow[e]
         for (&edge, cap_val) in capacity_map.iter() {
+            check_cancelled(ctx)?;
             let flow_val = flow_map.get(&edge).unwrap_or(&AlgorithmParamValue::Int(0));
 
             let residual_val = subtract_flow_values(cap_val, flow_val, &self.capacity, &self.flow)?;
@@ -184,11 +202,14 @@ impl Step for ResidualCapacityStep {
         // For edges with flow but no explicit capacity entry,
         // backward residual equals the flow (can push back)
         for (&edge, flow_val) in flow_map.iter() {
+            check_cancelled(ctx)?;
+            validate_flow_value(flow_val, &self.flow)?;
             if !capacity_map.contains_key(&edge) && is_positive(flow_val)? {
                 residual.insert(edge, flow_val.clone());
             }
         }
 
+        check_cancelled(ctx)?;
         scope
             .variables_mut()
             .set_edge_map(self.target.clone(), residual);
@@ -196,7 +217,23 @@ impl Step for ResidualCapacityStep {
     }
 }
 
-// Helper functions for flow arithmetic
+// Reuse the expression evaluator's checked integer and finite f64 arithmetic.
+fn check_cancelled(ctx: &Context) -> Result<()> {
+    if ctx.is_cancelled() {
+        return Err(anyhow!("flow computation cancelled"));
+    }
+    Ok(())
+}
+
+fn validate_flow_value(value: &AlgorithmParamValue, name: &str) -> Result<()> {
+    if !matches!(
+        value,
+        AlgorithmParamValue::Int(_) | AlgorithmParamValue::Float(_)
+    ) {
+        return Err(anyhow!("flow value '{name}' must be numeric"));
+    }
+    super::expression::validate_value(value)
+}
 
 fn add_flow_values(
     lhs: &AlgorithmParamValue,
@@ -204,25 +241,9 @@ fn add_flow_values(
     lhs_name: &str,
     rhs_name: &str,
 ) -> Result<AlgorithmParamValue> {
-    match (lhs, rhs) {
-        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Int(b)) => {
-            Ok(AlgorithmParamValue::Int(a + b))
-        }
-        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Float(b)) => {
-            Ok(AlgorithmParamValue::Float(a + b))
-        }
-        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Float(b)) => {
-            Ok(AlgorithmParamValue::Float(*a as f64 + b))
-        }
-        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Int(b)) => {
-            Ok(AlgorithmParamValue::Float(a + *b as f64))
-        }
-        _ => Err(anyhow!(
-            "cannot add flow values: '{}' and '{}' have incompatible types",
-            lhs_name,
-            rhs_name
-        )),
-    }
+    validate_flow_value(lhs, lhs_name)?;
+    validate_flow_value(rhs, rhs_name)?;
+    super::expression::eval_binary_op(super::expression::BinaryOp::Add, lhs, rhs)
 }
 
 fn subtract_flow_values(
@@ -231,28 +252,13 @@ fn subtract_flow_values(
     lhs_name: &str,
     rhs_name: &str,
 ) -> Result<AlgorithmParamValue> {
-    match (lhs, rhs) {
-        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Int(b)) => {
-            Ok(AlgorithmParamValue::Int(a - b))
-        }
-        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Float(b)) => {
-            Ok(AlgorithmParamValue::Float(a - b))
-        }
-        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Float(b)) => {
-            Ok(AlgorithmParamValue::Float(*a as f64 - b))
-        }
-        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Int(b)) => {
-            Ok(AlgorithmParamValue::Float(a - *b as f64))
-        }
-        _ => Err(anyhow!(
-            "cannot subtract flow values: '{}' and '{}' have incompatible types",
-            lhs_name,
-            rhs_name
-        )),
-    }
+    validate_flow_value(lhs, lhs_name)?;
+    validate_flow_value(rhs, rhs_name)?;
+    super::expression::eval_binary_op(super::expression::BinaryOp::Sub, lhs, rhs)
 }
 
 fn is_positive(val: &AlgorithmParamValue) -> Result<bool> {
+    validate_flow_value(val, "residual")?;
     match val {
         AlgorithmParamValue::Int(x) => Ok(*x > 0),
         AlgorithmParamValue::Float(x) => Ok(*x > 0.0),
@@ -403,5 +409,130 @@ impl Step for AliasStep {
         scope.variables_mut().set_value(&self.target, value);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod checked_flow_tests {
+    use super::super::core::StepVariables;
+    use super::*;
+    use crate::{ownership::OwnerCell, subgraphs::Subgraph, Graph};
+    use std::{
+        collections::HashSet,
+        sync::{atomic::AtomicBool, Arc},
+    };
+
+    fn selection() -> Subgraph {
+        Subgraph::new(
+            Arc::new(OwnerCell::new(Graph::new_manual())),
+            HashSet::new(),
+            HashSet::new(),
+            "flow values".into(),
+        )
+    }
+
+    #[test]
+    fn flow_arithmetic_checks_overflow_and_nonfinite_values_without_rounding_integers() {
+        use AlgorithmParamValue::{Float, Int};
+        assert_eq!(
+            add_flow_values(&Int((1i64 << 53) + 1), &Int(2), "f", "d").unwrap(),
+            Int((1i64 << 53) + 3)
+        );
+        assert_eq!(
+            subtract_flow_values(&Int((1i64 << 53) + 1), &Int(2), "c", "f").unwrap(),
+            Int((1i64 << 53) - 1)
+        );
+        assert!(add_flow_values(&Int(i64::MAX), &Int(1), "f", "d").is_err());
+        assert!(subtract_flow_values(&Int(i64::MIN), &Int(1), "c", "f").is_err());
+        assert!(add_flow_values(&Float(f64::MAX), &Float(f64::MAX), "f", "d").is_err());
+        assert!(subtract_flow_values(&Float(-f64::MAX), &Float(f64::MAX), "c", "f").is_err());
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(add_flow_values(&Float(value), &Int(0), "f", "d").is_err());
+            assert!(subtract_flow_values(&Int(0), &Float(value), "c", "f").is_err());
+            assert!(is_positive(&Float(value)).is_err());
+        }
+        assert!(is_positive(&Float(f64::from_bits(1))).unwrap());
+        assert!(!is_positive(&Float(-0.0)).unwrap());
+    }
+
+    #[test]
+    fn invalid_passthrough_rows_and_empty_scalar_updates_preserve_prior_outputs() {
+        use AlgorithmParamValue as V;
+        let selected = selection();
+        for invalid in [
+            V::Text("bad".into()),
+            V::Bool(true),
+            V::None,
+            V::Float(f64::NAN),
+        ] {
+            for branch in 0..4 {
+                let mut vars = StepVariables::default();
+                let old = HashMap::from([(8, V::Int(99))]);
+                vars.set_edge_map("result", old.clone());
+                vars.set_edge_map(
+                    "flow",
+                    if branch == 0 || branch == 3 {
+                        HashMap::from([(7, invalid.clone())])
+                    } else {
+                        HashMap::new()
+                    },
+                );
+                vars.set_edge_map(
+                    "delta",
+                    if branch == 1 {
+                        HashMap::from([(7, invalid.clone())])
+                    } else {
+                        HashMap::new()
+                    },
+                );
+                vars.set_scalar("scalar", invalid.clone());
+                vars.set_edge_map("capacity", HashMap::new());
+                let mut scope = StepScope::new(&selected, &mut vars);
+                let result = match branch {
+                    0 | 1 => FlowUpdateStep::new("flow", "delta", "result")
+                        .apply(&mut Context::new(), &mut scope),
+                    2 => FlowUpdateStep::new("flow", "scalar", "result")
+                        .apply(&mut Context::new(), &mut scope),
+                    _ => ResidualCapacityStep::new("capacity", "flow", "result")
+                        .apply(&mut Context::new(), &mut scope),
+                };
+                assert!(result.is_err(), "branch {branch}");
+                assert_eq!(scope.variables().edge_map("result").unwrap(), &old);
+            }
+        }
+    }
+
+    #[test]
+    fn union_updates_and_positive_residuals_keep_sparse_edge_identity() {
+        use AlgorithmParamValue as V;
+        let selected = selection();
+        let mut vars = StepVariables::default();
+        vars.set_edge_map("flow", HashMap::from([(2, V::Int(3)), (7, V::Int(0))]));
+        vars.set_edge_map("delta", HashMap::from([(2, V::Int(4)), (9, V::Float(1.5))]));
+        vars.set_edge_map("capacity", HashMap::from([(2, V::Int(10)), (7, V::Int(0))]));
+        let mut scope = StepScope::new(&selected, &mut vars);
+        FlowUpdateStep::new("flow", "delta", "updated")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        assert_eq!(
+            scope.variables().edge_map("updated").unwrap(),
+            &HashMap::from([(2, V::Int(7)), (7, V::Int(0)), (9, V::Float(1.5))])
+        );
+        ResidualCapacityStep::new("capacity", "updated", "result")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        assert_eq!(
+            scope.variables().edge_map("result").unwrap(),
+            &HashMap::from([(2, V::Int(3)), (9, V::Float(1.5))])
+        );
+        let original = scope.variables().edge_map("result").unwrap().clone();
+        let mut cancelled = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+        assert!(FlowUpdateStep::new("flow", "delta", "result")
+            .apply(&mut cancelled, &mut scope)
+            .is_err());
+        assert!(ResidualCapacityStep::new("capacity", "updated", "result")
+            .apply(&mut cancelled, &mut scope)
+            .is_err());
+        assert_eq!(scope.variables().edge_map("result").unwrap(), &original);
     }
 }
