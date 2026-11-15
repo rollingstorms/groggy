@@ -134,19 +134,21 @@ fn execute_traversal(
     output_attr: &AttrName,
     kind: TraversalKind,
 ) -> Result<Subgraph> {
+    let frame = crate::algorithms::read::AlgorithmFrame::new(ctx, subgraph)?;
+    let subgraph = frame.scope();
     let start = Instant::now();
     let prefix = kind.prefix();
     if ctx.is_cancelled() {
         return Err(anyhow!("{prefix} cancelled"));
     }
-    checked_dijkstra_weights(ctx, &subgraph, None)?;
+    checked_dijkstra_weights(ctx, subgraph, None)?;
     let collect_start = Instant::now();
     let nodes = subgraph.ordered_nodes();
     ctx.record_call(format!("{prefix}.collect_nodes"), collect_start.elapsed());
     ctx.record_stat(format!("{prefix}.count.input_nodes"), nodes.len() as f64);
     let mut sources = Vec::new();
     for (index, &node) in nodes.iter().enumerate() {
-        if ctx.node_attribute(&subgraph, node, start_attr)?.is_some() {
+        if ctx.node_attribute(subgraph, node, start_attr)?.is_some() {
             sources.push(index);
         }
     }
@@ -154,7 +156,7 @@ fn execute_traversal(
         return Err(anyhow!("{prefix} requires exactly one selected node carrying start attribute {start_attr:?}; found {}", sources.len()));
     }
     let source = sources[0];
-    let add_reverse = subgraph.graph().borrow().is_undirected();
+    let add_reverse = !subgraph.selected_is_directed();
     let csr = if let Some(csr) = subgraph.csr_cache_get(add_reverse) {
         ctx.record_call(format!("{prefix}.csr_cache_hit"), std::time::Duration::ZERO);
         csr
@@ -167,8 +169,7 @@ fn execute_traversal(
             .collect();
         ctx.record_call(format!("{prefix}.build_indexer"), index_start.elapsed());
         let edges = subgraph.ordered_edges();
-        let graph = subgraph.graph();
-        let graph = graph.borrow();
+        let endpoints = subgraph.endpoint_read();
         let mut csr = Csr::default();
         let build_start = Instant::now();
         let endpoints_time = build_csr_from_edges_with_scratch(
@@ -176,7 +177,7 @@ fn execute_traversal(
             nodes.len(),
             edges.iter().copied(),
             |node| index.get(&node).copied(),
-            |edge| graph.edge_endpoints(edge).ok(),
+            |edge| endpoints.get(edge).ok(),
             CsrOptions {
                 add_reverse_edges: add_reverse,
                 sort_neighbors: false,
@@ -210,7 +211,7 @@ fn execute_traversal(
             .collect();
         {
             let started = Instant::now();
-            let result = ctx.attach_node_column(&subgraph, output_attr.clone(), values);
+            let result = ctx.attach_node_column(subgraph, output_attr.clone(), values);
             ctx.record_call(format!("{prefix}.write_attributes"), started.elapsed());
             result
         }
@@ -219,7 +220,7 @@ fn execute_traversal(
         ctx.add_output(kind.output_key(), AlgorithmOutput::NodeIntegers(rows));
     }
     ctx.record_duration(format!("{prefix}.total_execution"), start.elapsed());
-    Ok(subgraph)
+    Ok(frame.finish())
 }
 
 #[derive(Clone, Debug)]
@@ -266,6 +267,13 @@ impl BfsTraversal {
 }
 
 impl Algorithm for BfsTraversal {
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -277,11 +285,6 @@ impl Algorithm for BfsTraversal {
         Self::metadata_template()
     }
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
         execute_traversal(
             ctx,
             subgraph,
@@ -336,6 +339,13 @@ impl DfsTraversal {
 }
 
 impl Algorithm for DfsTraversal {
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -347,11 +357,6 @@ impl Algorithm for DfsTraversal {
         Self::metadata_template()
     }
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
         execute_traversal(
             ctx,
             subgraph,

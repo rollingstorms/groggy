@@ -109,6 +109,24 @@ impl AStarPathfinding {
         let Some(attr) = &self.heuristic_attr else {
             return Ok(HashMap::new());
         };
+        if let Some(view) = subgraph.frozen_view() {
+            return Ok(crate::query::weights::checked_heuristics(
+                &subgraph.ordered_nodes(),
+                |node| {
+                    Ok(ctx
+                        .property_batch
+                        .as_ref()
+                        .and_then(|batch| batch.get(true, node, attr))
+                        .or_else(|| {
+                            view.read_state()
+                                .snapshot()
+                                .node_attributes
+                                .get(&node)
+                                .and_then(|attrs| attrs.get(attr))
+                        }))
+                },
+            )?);
+        }
         let reference = subgraph.graph();
         let graph = reference.borrow();
         let pool = graph.pool();
@@ -152,7 +170,7 @@ impl AStarPathfinding {
             .binary_search(&goal)
             .map_err(|_| anyhow!("A* goal outside selection"))?;
         let heuristics = self.heuristics_map(ctx, subgraph)?;
-        let add_reverse = subgraph.graph().borrow().is_undirected();
+        let add_reverse = !subgraph.selected_is_directed();
         let csr = subgraph
             .csr_cache_get(add_reverse)
             .ok_or_else(|| anyhow!("Missing prepared A* topology"))?;
@@ -319,6 +337,13 @@ pub(crate) fn search(
 }
 
 impl Algorithm for AStarPathfinding {
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -332,16 +357,13 @@ impl Algorithm for AStarPathfinding {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = crate::algorithms::read::AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let t0 = Instant::now();
         if ctx.is_cancelled() {
             return Err(anyhow!("astar cancelled"));
         }
-        let weights = checked_dijkstra_weights(ctx, &subgraph, self.weight_attr.as_ref())?;
+        let weights = checked_dijkstra_weights(ctx, subgraph, self.weight_attr.as_ref())?;
 
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
@@ -359,15 +381,14 @@ impl Algorithm for AStarPathfinding {
         ctx.record_call("astar.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = subgraph.graph().borrow().is_undirected();
+        let add_reverse = !subgraph.selected_is_directed();
         if subgraph.csr_cache_get(add_reverse).is_some() {
             ctx.record_call("astar.csr_cache_hit", std::time::Duration::from_nanos(0));
         } else {
             let csr_start = Instant::now();
 
             let edges = subgraph.ordered_edges();
-            let graph_ref = subgraph.graph();
-            let graph_borrow = graph_ref.borrow();
+            let endpoints = subgraph.endpoint_read();
 
             let mut csr = Csr::default();
             let csr_time = build_csr_from_edges_with_scratch(
@@ -375,7 +396,7 @@ impl Algorithm for AStarPathfinding {
                 nodes.len(),
                 edges.iter().copied(),
                 |nid| node_to_index.get(&nid).copied(),
-                |eid| graph_borrow.edge_endpoints(eid).ok(),
+                |eid| endpoints.get(eid).ok(),
                 CsrOptions {
                     add_reverse_edges: add_reverse,
                     sort_neighbors: false,
@@ -387,7 +408,7 @@ impl Algorithm for AStarPathfinding {
         }
 
         // Phase 3: Execute A* (will use cached CSR automatically)
-        let path = self.run(ctx, &subgraph, &weights)?;
+        let path = self.run(ctx, subgraph, &weights)?;
         ctx.record_stat("astar.count.path_nodes", path.len() as f64);
         if ctx.is_cancelled() {
             return Err(anyhow!("astar cancelled"));
@@ -403,7 +424,7 @@ impl Algorithm for AStarPathfinding {
             {
                 let started = Instant::now();
                 let result =
-                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                    ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values);
                 ctx.record_call("astar.write_attributes", started.elapsed());
                 result
             }
@@ -416,7 +437,7 @@ impl Algorithm for AStarPathfinding {
         }
 
         ctx.record_duration("astar.total_execution", t0.elapsed());
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 

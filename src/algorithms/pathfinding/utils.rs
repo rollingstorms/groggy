@@ -241,6 +241,27 @@ pub(crate) fn checked_dijkstra_weights(
     subgraph: &Subgraph,
     attr: Option<&AttrName>,
 ) -> crate::GraphResult<HashMap<(NodeId, NodeId), f64>> {
+    if let Some(view) = subgraph.frozen_view() {
+        return crate::query::weights::checked_pairs(
+            &subgraph.ordered_edges(),
+            view.is_directed(),
+            |edge| view.edge_endpoints(edge),
+            |edge| {
+                Ok(attr.and_then(|name| {
+                    ctx.property_batch
+                        .as_ref()
+                        .and_then(|batch| batch.get(false, edge, name))
+                        .or_else(|| {
+                            view.read_state()
+                                .snapshot()
+                                .edge_attributes
+                                .get(&edge)
+                                .and_then(|attrs| attrs.get(name))
+                        })
+                }))
+            },
+        );
+    }
     let reference = subgraph.graph();
     let graph = reference.borrow();
     for &node in subgraph.node_set() {

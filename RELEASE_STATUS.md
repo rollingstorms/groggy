@@ -14,7 +14,7 @@ Implementation changes toward the expanded target require fresh final gates.
 
 Supported atomic topology composition, selected computation, captured-table
 attachment and nested execution are qualified locally:
-1,602 native tests, 3,065 maintained Python tests and 282
+1,604 native tests, 3,089 maintained Python tests and 283
 executable examples pass, plus strict Clippy and Rust formatting.
 See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md)
 [pending property evidence](notes/planning/pending-topology-properties-2026-11-15.md)
@@ -29,7 +29,11 @@ See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md
 [projected materialization evidence](notes/planning/projected-frame-materialization-2026-11-15.md)
 [child attachment evidence](notes/planning/fixed-child-attachments-2026-11-15.md)
 [pending retained-history evidence](notes/planning/pending-retained-history-2026-11-15.md)
-and [selected temporal-window evidence](notes/planning/pending-temporal-windows-2026-11-15.md).
+[selected temporal-window evidence](notes/planning/pending-temporal-windows-2026-11-15.md)
+and [classic path evidence](notes/planning/pending-classic-paths-2026-11-15.md).
+The latest Python/docs gate runs against a fresh unpacked macOS arm64 CPython 3.9
+root wheel. The [priority pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)
+records completed slices and remaining work; older platform evidence is separate.
 The 44 broad unchecked release rows retain their remaining exit requirements.
 
 ## Qualified bounded candidate

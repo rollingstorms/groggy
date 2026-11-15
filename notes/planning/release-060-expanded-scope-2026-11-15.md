@@ -151,3 +151,11 @@ All four lifecycle/window primitives now follow surviving pending membership for
 accepted IDs, while reading only retained history. Nested/outer execution, source
 validation and rollback share the common interpreter. Provisional IDs still reject
 while the owner question remains open. See `pending-temporal-windows-2026-11-15.md`.
+
+### Implemented follow-up: classic path wrappers
+
+The four classic BFS/DFS/Dijkstra/A* handles now consume pending selected topology
+and values through a shared native AlgorithmFrame. Private read pins stay separate
+from the live continuation, and bulk endpoint reads share one authority/owner
+borrow. Later builders see staged results and the coordinator publishes once.
+Other nine classic wrappers retain their guards. See `pending-classic-paths-2026-11-15.md`.

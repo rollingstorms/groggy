@@ -148,6 +148,13 @@ pub(crate) fn distances(
 }
 
 impl Algorithm for DijkstraShortestPath {
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -161,23 +168,20 @@ impl Algorithm for DijkstraShortestPath {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = crate::algorithms::read::AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let t0 = Instant::now();
         if ctx.is_cancelled() {
             return Err(anyhow!("dijkstra cancelled"));
         }
-        let weights = checked_dijkstra_weights(ctx, &subgraph, self.weight_attr.as_ref())?;
+        let weights = checked_dijkstra_weights(ctx, subgraph, self.weight_attr.as_ref())?;
 
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
         let nodes = subgraph.ordered_nodes();
         ctx.record_call("dijkstra.collect_nodes", nodes_start.elapsed());
         ctx.record_stat("dijkstra.count.input_nodes", nodes.len() as f64);
-        let source = self.resolve_source(ctx, &subgraph, &nodes)?;
+        let source = self.resolve_source(ctx, subgraph, &nodes)?;
 
         // Phase 2: Build indexer
         let idx_start = Instant::now();
@@ -189,7 +193,7 @@ impl Algorithm for DijkstraShortestPath {
         ctx.record_call("dijkstra.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = subgraph.graph().borrow().is_undirected();
+        let add_reverse = !subgraph.selected_is_directed();
         let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call("dijkstra.csr_cache_hit", std::time::Duration::from_nanos(0));
             cached
@@ -197,8 +201,7 @@ impl Algorithm for DijkstraShortestPath {
             let csr_start = Instant::now();
 
             let edges = subgraph.ordered_edges();
-            let graph_ref = subgraph.graph();
-            let graph_borrow = graph_ref.borrow();
+            let endpoints = subgraph.endpoint_read();
 
             let mut csr = Csr::default();
             let csr_time = build_csr_from_edges_with_scratch(
@@ -206,7 +209,7 @@ impl Algorithm for DijkstraShortestPath {
                 nodes.len(),
                 edges.iter().copied(),
                 |nid| node_to_index.get(&nid).copied(),
-                |eid| graph_borrow.edge_endpoints(eid).ok(),
+                |eid| endpoints.get(eid).ok(),
                 CsrOptions {
                     add_reverse_edges: add_reverse,
                     sort_neighbors: false,
@@ -246,7 +249,7 @@ impl Algorithm for DijkstraShortestPath {
             {
                 let started = Instant::now();
                 let result =
-                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                    ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values);
                 ctx.record_call("dijkstra.write_attributes", started.elapsed());
                 result
             }
@@ -259,7 +262,7 @@ impl Algorithm for DijkstraShortestPath {
         }
 
         ctx.record_duration("dijkstra.total_execution", t0.elapsed());
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 

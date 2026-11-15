@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--classic-pending-paths") {
+        return classic_pending_paths_receipt();
+    }
     if std::env::args().any(|arg| arg == "--pending-windows") {
         return pending_windows_receipt();
     }
@@ -935,5 +938,90 @@ fn pending_windows_receipt() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
     println!("Wrote pending window receipt to {path}");
+    Ok(())
+}
+
+fn classic_pending_paths_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::algorithms::pipeline::PipelineBuilder;
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    groggy::algorithms::pathfinding::register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [100, 1_000] {
+        for topology in [false, true] {
+            for kind in ["bfs", "dfs", "dijkstra", "astar"] {
+                let mut samples = Vec::new();
+                for _ in 0..5 {
+                    let mut graph = Graph::new_directed();
+                    graph.insert_nodes(count + 1)?;
+                    graph
+                        .add_edges(&(0..count).map(|node| (node, node + 1)).collect::<Vec<_>>())?;
+                    graph.set_node_attr(0, "start".into(), AttrValue::Bool(false))?;
+                    if !topology {
+                        graph.set_node_attr(count, "goal".into(), AttrValue::Bool(true))?;
+                    }
+                    let head = graph.current_state_id();
+                    let mut steps = Vec::new();
+                    if topology {
+                        steps.extend([
+                            json!({"id":"graph.add_nodes","params":{"count":1,"attributes":{"goal":true},"output":"new"}}),
+                            json!({"id":"graph.add_edges","params":{"edges":[[0,{"added":0}]],"output":"edge"}}),
+                            json!({"id":"graph.set_edge_endpoints","params":{"revisions":[[count-1,count-1,0]]}}),
+                            json!({"id":"graph.remove_nodes","params":{"ids":[count]}})
+                        ]);
+                    }
+                    steps.extend([
+                        json!({"id":"core.init_edges","params":{"value":2,"target":"weights"}}),
+                        json!({"id":"core.attach_edge_attr","params":{"source":"weights","attr":"weight"}})
+                    ]);
+                    let pipeline = PipelineBuilder::new()
+                        .with_algorithm("builder.step_pipeline", |p| {
+                            p.set_text("steps", json!({"atomic":true,"steps":steps}).to_string())
+                        })
+                        .with_algorithm(format!("pathfinding.{kind}"), |p| {
+                            p.set_text("start_attr", "start");
+                            p.set_text("goal_attr", "goal");
+                            p.set_text("weight_attr", "weight");
+                            p.set_text("output_attr", "result");
+                        })
+                        .build(&registry)?;
+                    let owner = Arc::new(OwnerCell::new(graph));
+                    let selected = Subgraph::from_frozen_view(
+                        owner.clone(),
+                        owner.borrow().read_view()?,
+                        "classic path receipt".into(),
+                    );
+                    let mut ctx = Context::new();
+                    let started = Instant::now();
+                    let result = pipeline.run_atomic_properties(&mut ctx, selected)?;
+                    samples.push(started.elapsed().as_secs_f64());
+                    let goal = count + usize::from(topology);
+                    let expected = match kind {
+                        "dijkstra" => {
+                            AttrValue::Float64(if topology { 2.0 } else { 2.0 * count as f64 })
+                        }
+                        "dfs" => AttrValue::Int(count as i64),
+                        _ => AttrValue::Int(if topology { 1 } else { count as i64 }),
+                    };
+                    assert_eq!(owner.borrow().current_state_id(), head + 1);
+                    assert_eq!(result.node_count(), count + 1);
+                    assert_eq!(
+                        owner.borrow().get_node_attr(goal, &"result".into())?,
+                        Some(expected)
+                    );
+                }
+                cases.push(json!({"chain_edges":count,"pending_topology":topology,"algorithm":kind,"seconds":samples}));
+            }
+        }
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "classic_pending_paths.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(
+            &json!({"scope":"Native release, five observations per case. Directed chain with count+1 nodes, staged weight=2, classic path handle, one acceptance. Topology cases replace the last node with a provisional goal reached from node0 and rescue the last edge to form a ring; property-only cases retain the full chain. Different graph shapes/answers: not matched before/after performance. Includes preflight, pending preparation, computation and publication; excludes fixtures, initial capture, algorithm construction, assertions and compilation. No allocation/RSS, FFI or general scale guarantee.","cases":cases}),
+        )?,
+    )?;
+    println!("Wrote classic path receipt to {path}");
     Ok(())
 }

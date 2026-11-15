@@ -226,3 +226,64 @@ fn staged_markers_personalization_heuristics_and_label_seeds_are_visible() {
         );
     }
 }
+
+#[test]
+fn classic_paths_consume_pending_topology_and_leave_one_live_continuation() {
+    for id in [
+        "pathfinding.bfs",
+        "pathfinding.dfs",
+        "pathfinding.dijkstra",
+        "pathfinding.astar",
+    ] {
+        let (owner, selected) = fixture();
+        selected.adjacency_read().unwrap(); // Warm the old live CSR before pending revisions.
+        let head = owner.borrow().current_state_id();
+        let pipe = PipelineBuilder::new()
+            .with_algorithm("builder.step_pipeline", |p| definition(p, serde_json::json!([
+                {"id":"graph.add_nodes","params":{"count":1,"output":"new"}},
+                {"id":"graph.add_edges","params":{"edges":[[0,{"added":0}],[{"added":0},2]],"output":"edges"}},
+                {"id":"graph.set_edge_endpoints","params":{"revisions":[[0,2,0]]}},
+                {"id":"graph.remove_nodes","params":{"ids":[1]}},
+                {"id":"core.init_edges","params":{"value":2,"target":"weights"}},
+                {"id":"core.attach_edge_attr","params":{"source":"weights","attr":"weight"}}
+            ])))
+            .with_algorithm(id, |p| {configure(p);p.set_text("weight_attr", "weight");})
+            .with_algorithm("builder.step_pipeline", |p| definition(p, serde_json::json!([
+                {"id":"core.load_node_attr","params":{"attr":"result","target":"loaded","default":-1}},
+                {"id":"core.attach_node_attr","params":{"source":"loaded","attr":"copy"}}
+            ])))
+            .build(global_registry()).unwrap();
+        let result = pipe
+            .run_atomic_properties(&mut Context::new(), selected)
+            .unwrap_or_else(|e| panic!("{id}: {e}"));
+        assert_eq!(result.node_count(), 3);
+        assert_eq!(owner.borrow().current_state_id(), head + 1);
+        let graph = owner.borrow();
+        assert!(!graph.has_node(1));
+        assert!(graph.has_node(4));
+        assert_eq!(graph.edge_endpoints(0).unwrap(), (2, 0));
+        assert_eq!(graph.get_node_attr(3, &"result".into()).unwrap(), None);
+        let expected = if id == "pathfinding.dijkstra" {
+            AttrValue::Float64(2.0)
+        } else {
+            AttrValue::Int(1)
+        };
+        assert_eq!(
+            graph.get_node_attr(2, &"result".into()).unwrap(),
+            Some(expected.clone())
+        );
+        assert_eq!(
+            graph.get_node_attr(2, &"copy".into()).unwrap(),
+            Some(expected)
+        );
+        assert_eq!(
+            graph.get_node_attr(4, &"copy".into()).unwrap(),
+            Some(match id {
+                "pathfinding.bfs" => AttrValue::Int(1),
+                "pathfinding.dfs" => AttrValue::Int(2),
+                "pathfinding.dijkstra" => AttrValue::Float64(2.0),
+                _ => AttrValue::Int(-1),
+            })
+        );
+    }
+}

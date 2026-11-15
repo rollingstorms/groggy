@@ -21,6 +21,8 @@ Implemented capabilities, within their documented boundaries:
   and expanded graph and numerical algorithms.
 - Retained archives and journaled durable storage with explicit recovery,
   checkpoint, compaction and purge operations.
+- Classic BFS, DFS, Dijkstra and A* now consume pending selected topology and
+  values through shared native read frames, preserving one outer acceptance.
 - Selected retained lifecycle/window helpers now follow surviving pending IDs
   after topology changes; provisional IDs remain guarded against invented history.
 - Accepted snapshot acquisition and node/edge retained diffs now compose after

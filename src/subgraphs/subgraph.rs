@@ -441,6 +441,22 @@ impl Subgraph {
         graph.adjacency_from_entities(&nodes, &edges, sparse, weight_attr)
     }
 
+    /// Borrow the selected endpoint source once for bulk algorithm preparation.
+    pub(crate) fn endpoint_read(&self) -> super::adjacency::EndpointRead<'_> {
+        match &self.frozen {
+            Some(view) => super::adjacency::EndpointRead::Frozen(view),
+            None => super::adjacency::EndpointRead::Live(self.graph.borrow()),
+        }
+    }
+
+    /// Direction of this immutable source, or of the current live owner.
+    pub(crate) fn selected_is_directed(&self) -> bool {
+        self.frozen.as_ref().map_or_else(
+            || self.graph.borrow().is_directed(),
+            crate::GraphView::is_directed,
+        )
+    }
+
     /// Retrieve a cached CSR adjacency if the current version matches.
     pub(crate) fn csr_cache_get(&self, add_reverse: bool) -> Option<Arc<Csr>> {
         let version = {

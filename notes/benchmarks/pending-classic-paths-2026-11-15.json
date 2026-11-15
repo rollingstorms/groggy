@@ -1,0 +1,197 @@
+{
+  "cases": [
+    {
+      "algorithm": "bfs",
+      "chain_edges": 100,
+      "pending_topology": false,
+      "seconds": [
+        0.001097083,
+        0.000685459,
+        0.000540958,
+        0.000492709,
+        0.000479792
+      ]
+    },
+    {
+      "algorithm": "dfs",
+      "chain_edges": 100,
+      "pending_topology": false,
+      "seconds": [
+        0.000484167,
+        0.000483584,
+        0.0004875,
+        0.000430667,
+        0.000414417
+      ]
+    },
+    {
+      "algorithm": "dijkstra",
+      "chain_edges": 100,
+      "pending_topology": false,
+      "seconds": [
+        0.000457417,
+        0.000428583,
+        0.000420208,
+        0.000426875,
+        0.000479041
+      ]
+    },
+    {
+      "algorithm": "astar",
+      "chain_edges": 100,
+      "pending_topology": false,
+      "seconds": [
+        0.000512958,
+        0.0004445,
+        0.00039425,
+        0.000398708,
+        0.000396833
+      ]
+    },
+    {
+      "algorithm": "bfs",
+      "chain_edges": 100,
+      "pending_topology": true,
+      "seconds": [
+        0.000829125,
+        0.000712917,
+        0.00076275,
+        0.0006535,
+        0.000645458
+      ]
+    },
+    {
+      "algorithm": "dfs",
+      "chain_edges": 100,
+      "pending_topology": true,
+      "seconds": [
+        0.000665708,
+        0.000634042,
+        0.000632042,
+        0.000630375,
+        0.0008185
+      ]
+    },
+    {
+      "algorithm": "dijkstra",
+      "chain_edges": 100,
+      "pending_topology": true,
+      "seconds": [
+        0.000655375,
+        0.000597666,
+        0.000606542,
+        0.000598,
+        0.000605041
+      ]
+    },
+    {
+      "algorithm": "astar",
+      "chain_edges": 100,
+      "pending_topology": true,
+      "seconds": [
+        0.000462917,
+        0.000436667,
+        0.000448833,
+        0.000450125,
+        0.000527708
+      ]
+    },
+    {
+      "algorithm": "bfs",
+      "chain_edges": 1000,
+      "pending_topology": false,
+      "seconds": [
+        0.003270084,
+        0.003018667,
+        0.002897625,
+        0.002889375,
+        0.002795333
+      ]
+    },
+    {
+      "algorithm": "dfs",
+      "chain_edges": 1000,
+      "pending_topology": false,
+      "seconds": [
+        0.002863708,
+        0.002441959,
+        0.002474208,
+        0.002456,
+        0.002445042
+      ]
+    },
+    {
+      "algorithm": "dijkstra",
+      "chain_edges": 1000,
+      "pending_topology": false,
+      "seconds": [
+        0.002504708,
+        0.002569333,
+        0.002535834,
+        0.002508917,
+        0.002503833
+      ]
+    },
+    {
+      "algorithm": "astar",
+      "chain_edges": 1000,
+      "pending_topology": false,
+      "seconds": [
+        0.002998,
+        0.00301825,
+        0.002910333,
+        0.002911333,
+        0.00303475
+      ]
+    },
+    {
+      "algorithm": "bfs",
+      "chain_edges": 1000,
+      "pending_topology": true,
+      "seconds": [
+        0.005503292,
+        0.005345583,
+        0.005433833,
+        0.005409167,
+        0.006466375
+      ]
+    },
+    {
+      "algorithm": "dfs",
+      "chain_edges": 1000,
+      "pending_topology": true,
+      "seconds": [
+        0.00556725,
+        0.005316875,
+        0.004813167,
+        0.00457125,
+        0.004755833
+      ]
+    },
+    {
+      "algorithm": "dijkstra",
+      "chain_edges": 1000,
+      "pending_topology": true,
+      "seconds": [
+        0.00484675,
+        0.004845959,
+        0.004659375,
+        0.0054995,
+        0.00533825
+      ]
+    },
+    {
+      "algorithm": "astar",
+      "chain_edges": 1000,
+      "pending_topology": true,
+      "seconds": [
+        0.0050325,
+        0.00426425,
+        0.004329,
+        0.004275375,
+        0.003539375
+      ]
+    }
+  ],
+  "scope": "Native release, five observations per case. Directed chain with count+1 nodes, staged weight=2, classic path handle, one acceptance. Topology cases replace the last node with a provisional goal reached from node0 and rescue the last edge to form a ring; property-only cases retain the full chain. Different graph shapes/answers: not matched before/after performance. Includes preflight, pending preparation, computation and publication; excludes fixtures, initial capture, algorithm construction, assertions and compilation. No allocation/RSS, FFI or general scale guarantee."
+}

@@ -10,6 +10,49 @@ use std::sync::{
     Arc,
 };
 
+/// One classic-algorithm invocation keeps its continuation separate from its
+/// private pending read pin, just like the native step executor.
+pub(crate) struct AlgorithmFrame {
+    original: crate::subgraphs::Subgraph,
+    pending: Option<crate::subgraphs::Subgraph>,
+}
+impl AlgorithmFrame {
+    pub(crate) fn new(
+        ctx: &mut super::Context,
+        original: crate::subgraphs::Subgraph,
+    ) -> anyhow::Result<Self> {
+        if ctx.is_cancelled() {
+            return Err(anyhow::anyhow!("algorithm input preparation cancelled"));
+        }
+        let original = if original.frozen_view().is_some() {
+            original.execution_scope(ctx.persist_results())?
+        } else {
+            original
+        };
+        let pending = if let Some(batch) = ctx
+            .property_batch
+            .as_mut()
+            .filter(|batch| batch.has_topology())
+        {
+            let view = batch.capture(&original)?;
+            Some(crate::subgraphs::Subgraph::from_frozen_view(
+                original.graph(),
+                view,
+                "pending algorithm input".into(),
+            ))
+        } else {
+            None
+        };
+        Ok(Self { original, pending })
+    }
+    pub(crate) fn scope(&self) -> &crate::subgraphs::Subgraph {
+        self.pending.as_ref().unwrap_or(&self.original)
+    }
+    pub(crate) fn finish(self) -> crate::subgraphs::Subgraph {
+        self.original
+    }
+}
+
 /// Prepared immutable algorithm input. Clones share state, row identity and CSR.
 /// Construction does not publish a mutation or create a checkpoint.
 #[derive(Debug, Clone)]
