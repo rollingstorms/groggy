@@ -13,9 +13,9 @@ pub struct StorageIntegrityReport {
     /// Verified retained graph/current schema, reconstructed from the file.
     pub graph: crate::IntegrityReport,
 }
-/// Detached verification input. Holds the original inode lock and a separate
-/// read cursor (a duplicated locked file object on Windows). Always finish the
-/// outcome on the original owner.
+/// Detached verification input. Holds the original inode lock. Unix uses a
+/// separate read cursor; Windows duplicates the locked file object and shares
+/// its cursor. Always finish the outcome on the original owner.
 pub struct StorageVerificationPlan {
     source: File,
     reader: File,
@@ -55,7 +55,9 @@ impl DurableGraph {
         // Windows mandatory byte-range locks require reads through the owned
         // file object. Cloning shares its cursor; append always seeks to EOF.
         #[cfg(windows)]
-        let reader = self.file.try_clone()
+        let reader = self
+            .file
+            .try_clone()
             .map_err(|e| io_error(&self.path, "clone_verification_reader", e))?;
         if !same_inode(&self.file, &reader)? {
             self.poisoned = true;
@@ -122,6 +124,9 @@ impl StorageVerificationPlan {
         {
             return Err(invalid("verification source changed before reading"));
         }
+        self.reader
+            .seek(SeekFrom::Start(0))
+            .map_err(|e| io_error(&self.path, "rewind_verification_reader", e))?;
         let decoded = read_journal(&mut self.reader, &self.path)?;
         if decoded.position != decoded.length {
             return Err(invalid(format!(
@@ -153,5 +158,40 @@ impl StorageVerificationPlan {
             logical_records: decoded.sequence,
             graph,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duplicated_reader_rewinds_shared_cursor_and_allows_subsequent_writes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("shared-cursor.ggj");
+        let mut store = DurableGraph::create(&path, Default::default(), None).unwrap();
+        let mut plan = store.prepare_storage_verification().unwrap();
+        // Reproduce Windows' duplicated file object on every host, including
+        // the cursor at EOF left by the preceding successful journal append.
+        plan.reader = plan.source.try_clone().unwrap();
+        plan.reader.seek(SeekFrom::End(0)).unwrap();
+        let length = plan.length;
+        let verified = store.finish_storage_verification(plan.execute()).unwrap();
+        assert_eq!(verified.file_bytes, length);
+        store
+            .apply_batch(
+                GraphBatch {
+                    add_nodes: 1,
+                    ..Default::default()
+                },
+                0,
+                "after verification".into(),
+                "test".into(),
+            )
+            .unwrap();
+        store.verify_storage().unwrap();
+        drop(store);
+        let recovered = DurableGraph::open(&path).unwrap();
+        assert_eq!(recovered.graph().unwrap().node_count(), 1);
     }
 }
