@@ -63,6 +63,9 @@ missing variables, invalid source IDs and final canonical validation failures
 roll back topology, properties and outputs together. Retained outputs stay
 immutable. [Property attachment rules](pending-topology-properties.md) still apply.
 
+Explicit [captured table attachment](captured-table-attachment.md) can stage
+selected result columns through retained row identity, including optional effective times.
+
 Classic property-writing algorithm wrappers, unadapted sampling/community steps,
 general topology loops and opaque callback effects retain explicit guards after
 topology. This slice does not certify those families by association. Journal-owner

@@ -106,7 +106,8 @@ The new stages require local `atomic=True` and `persist=True` for creation.
 Algorithm tables are pure read stages and publish no score properties. Tables
 from provisional captures retain `write_state_id=None`; they cannot be used as
 accepted-state source writeback even after the enclosing program succeeds.
-Refresh an owner capture for later checked writeback.
+Use explicit [captured table attachment](captured-table-attachment.md) inside the
+atomic run, or refresh an owner capture for later checked writeback.
 
 Outer atomic pipelines now share these stages across builders; see
 [outer atomic topology](outer-atomic-topology.md). General topology loops,

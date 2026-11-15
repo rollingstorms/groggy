@@ -387,3 +387,73 @@ fn structural_neighbor_and_path_primitives_read_one_pending_source() {
         }
     }
 }
+
+#[test]
+fn captured_computation_columns_attach_with_explicit_times_and_survive_recovery() {
+    use groggy::state::publication::ChangeKey;
+    let graph = fixture(false);
+    let head = graph.borrow().current_state_id();
+    let mut context = Context::new();
+    let result = pipeline(vec![create_nodes(), json!([
+        {"id":"graph.capture_staged","params":{"output":"pending"}},
+        {"id":"graph.degrees_table","params":{"source":"pending","output":"degrees"}},
+        {"id":"table.attach","params":{"source":"degrees","columns":{"degree":"computed_degree"},"effective_at":30}},
+        {"id":"table.emit","params":{"source":"degrees","name":"degrees"}}
+    ])]).run_atomic_properties(&mut context, selected(&graph)).unwrap();
+    assert_eq!(result.node_count(), 4);
+    assert_eq!(graph.borrow().current_state_id(), head + 1);
+    assert_eq!(
+        graph
+            .borrow()
+            .get_node_attr(7, &"computed_degree".into())
+            .unwrap(),
+        Some(AttrValue::Int(0))
+    );
+    let metadata = graph
+        .borrow()
+        .publication_metadata(head + 1)
+        .unwrap()
+        .unwrap();
+    for node in [0, 2, 4, 7] {
+        assert_eq!(
+            metadata.change_times[&ChangeKey::NodeAttribute(node, "computed_degree".into())],
+            30
+        );
+    }
+    let outputs = context.take_outputs();
+    let AlgorithmOutput::Table(table) = &outputs["degrees"] else {
+        panic!("table")
+    };
+    assert_eq!(
+        table.source_views()[0]
+            .node_attr(7, &"computed_degree".into())
+            .unwrap(),
+        None
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("captured-properties.archive");
+    graph.borrow().save_archive(&path).unwrap();
+    let recovered = Graph::load_archive(&path).unwrap();
+    assert_eq!(
+        recovered
+            .get_node_attr(7, &"computed_degree".into())
+            .unwrap(),
+        Some(AttrValue::Int(0))
+    );
+    assert_eq!(
+        recovered
+            .read_view_at(29, None)
+            .unwrap()
+            .node_attr(7, &"computed_degree".into())
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        recovered
+            .read_view_at(30, None)
+            .unwrap()
+            .node_attr(7, &"computed_degree".into())
+            .unwrap(),
+        Some(AttrValue::Int(0))
+    );
+}

@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "initial_edges": 1000,
+      "initial_nodes": 1000,
+      "seconds": [
+        0.009725667,
+        0.008512041,
+        0.006365709,
+        0.0060375,
+        0.005414333
+      ]
+    },
+    {
+      "initial_edges": 10000,
+      "initial_nodes": 10000,
+      "seconds": [
+        0.049599583,
+        0.067911,
+        0.070768334,
+        0.057489541,
+        0.078474833
+      ]
+    }
+  ],
+  "scope": "Native release, five observations. Directed ring with one staged node/two edges, explicit pending capture, owned degree table, aliased attachment of two row-bound columns and one publication. Includes source authority, current pending selection materialization, canonical validation and result projection; fixture, initial capture, compilation, algorithm construction and assertions excluded. No before/after speedup, FFI, allocation/RSS or scale guarantee."
+}

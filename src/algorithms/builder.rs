@@ -110,12 +110,12 @@ impl StepPipelineAlgorithm {
             let effect = step.atomic_effect();
             if matches!(
                 effect,
-                AtomicStepEffect::Topology | AtomicStepEffect::StagedCapture
+                AtomicStepEffect::Topology
+                    | AtomicStepEffect::StagedCapture
+                    | AtomicStepEffect::StagedProperties
             ) && !definition.atomic
             {
-                return Err(anyhow!(
-                    "Topology/staged capture stages require atomic=True"
-                ));
+                return Err(anyhow!("Staged graph/table effects require atomic=True"));
             }
             if effect == AtomicStepEffect::Topology {
                 topology_suffix = true;
@@ -125,6 +125,7 @@ impl StepPipelineAlgorithm {
                     AtomicStepEffect::ImmutableInputs
                         | AtomicStepEffect::StagedCapture
                         | AtomicStepEffect::PendingProperties
+                        | AtomicStepEffect::StagedProperties
                 )
             {
                 return Err(anyhow!(
@@ -190,7 +191,9 @@ impl Algorithm for StepPipelineAlgorithm {
                     effects.changes_topology = true;
                     effects.requires_persistence = true;
                 }
-                AtomicStepEffect::StagedCapture => effects.requires_persistence = true,
+                AtomicStepEffect::StagedCapture | AtomicStepEffect::StagedProperties => {
+                    effects.requires_persistence = true
+                }
                 AtomicStepEffect::ImmutableInputs | AtomicStepEffect::PendingProperties => {}
             }
         }
@@ -201,13 +204,13 @@ impl Algorithm for StepPipelineAlgorithm {
         let local_effects = self.steps.iter().any(|step| {
             matches!(
                 step.atomic_effect(),
-                AtomicStepEffect::Topology | AtomicStepEffect::StagedCapture
+                AtomicStepEffect::Topology
+                    | AtomicStepEffect::StagedCapture
+                    | AtomicStepEffect::StagedProperties
             )
         });
         if local_effects && !ctx.persist_results() {
-            return Err(anyhow!(
-                "Topology/staged capture stages require persist=True"
-            ));
+            return Err(anyhow!("Staged graph/table effects require persist=True"));
         }
         let subgraph = if subgraph.frozen_view().is_some() {
             subgraph.execution_scope(ctx.persist_results())?
@@ -274,11 +277,13 @@ impl Algorithm for StepPipelineAlgorithm {
                 let result = (|| {
                     // Materialize once per pending revision, never per row.
                     // Preserve original selection for acceptance and cascade rescue.
-                    let scope_graph = if step.atomic_effect() == AtomicStepEffect::PendingProperties
-                    {
+                    let scope_graph = if matches!(
+                        step.atomic_effect(),
+                        AtomicStepEffect::PendingProperties | AtomicStepEffect::StagedProperties
+                    ) {
                         if let Some(batch) = ctx
                             .property_batch
-                            .as_ref()
+                            .as_mut()
                             .filter(|batch| batch.has_topology())
                         {
                             let revision = batch.read_revision();

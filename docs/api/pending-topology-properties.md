@@ -83,5 +83,6 @@ Structural, neighbor, expression-transformation and path primitives now support
 pending topology; see [selected readers](pending-topology-readers.md). Classic
 property-writing algorithm wrappers and unadapted sampling/community primitives
 still reject after topology. Explicit `graph.capture_staged` and supported
-captured graph kernels remain available. General topology loops, table-result attachment,
+captured graph kernels remain available. Explicit [captured table attachment](captured-table-attachment.md)
+now stages selected result columns with retained identity. General topology loops,
 remaining execution/DSL lowering and journal-owner dispatch remain open.

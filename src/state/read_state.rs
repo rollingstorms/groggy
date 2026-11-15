@@ -270,6 +270,11 @@ impl PinnedReadState {
             .filter(|origin| origin.clean)
             .map(|origin| origin.state)
     }
+    /// Process-local logical capture key. Weak authority records keep the token
+    /// allocation alive, so a live record cannot be confused by pointer reuse.
+    pub(crate) fn capture_key(&self) -> usize {
+        Arc::as_ptr(&self.capture) as usize
+    }
     pub(crate) fn shares_capture(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.capture, &other.capture)
     }

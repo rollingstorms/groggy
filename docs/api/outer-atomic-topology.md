@@ -86,6 +86,10 @@ trusted contracts; arbitrary callbacks do not acquire rollback safety by default
 
 ## Boundaries
 
+Explicit [captured table attachment](captured-table-attachment.md) writes
+selected row-bound result columns through the same batch. No numeric-ID-only
+provenance inference is added.
+
 Ordinary outer execution retains per-algorithm publication. Empty shared plans
 publish no version. Captured outputs retain provisional provenance even after a
 successful acceptance; refresh an owner capture for accepted-state writeback.

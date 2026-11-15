@@ -58,10 +58,18 @@ now consume the pending selected source. Pure variable reductions are also
 certified. See `pending-topology-readers-2026-11-15.md`. Arbitrary callbacks and
 unadapted families retain their guards; broader parent exit criteria stay open.
 
+### Implemented follow-up: captured table attachment
+
+`table.attach` now stages explicitly selected/aliased result columns from captures
+issued by the same atomic run. It reuses source table identity checks, weak capture
+authority, canonical property validation and optional per-property effective times.
+See `captured-table-attachment-2026-11-15.md`. Historical/imported tables are not
+implicitly authorized by matching numeric IDs.
+
 ### Next chunks
 
-1. Captured-result attachment, remaining sampling/community/nested execution
-   after topology, and execution/DSL coverage.
+1. Remaining sampling/community/nested execution after topology, public facade
+   lowering and execution/DSL coverage.
 2. Property/schema/provenance and persistence-boundary completion.
 3. Archive/recovery memory, numerical/algorithm certification and scale targets.
 4. Remaining API/module consolidation and service/concurrency implementation.

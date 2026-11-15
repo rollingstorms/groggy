@@ -108,7 +108,7 @@ impl Step for CaptureStagedStep {
         if ctx.is_cancelled() {
             bail!("staged graph capture cancelled");
         }
-        let pending = ctx.property_batch.as_ref().ok_or_else(|| {
+        let pending = ctx.property_batch.as_mut().ok_or_else(|| {
             anyhow!("graph.capture_staged requires a persistent local atomic builder")
         })?;
         let view = pending.capture(scope.subgraph())?;

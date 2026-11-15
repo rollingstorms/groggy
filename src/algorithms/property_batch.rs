@@ -14,6 +14,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
     read_revision: u64,
+    captures: HashMap<usize, crate::state::read_state::WeakReadCapture>,
+    property_times: BTreeMap<(bool, usize, AttrName), crate::TimestampMicros>,
     allocation_base: Option<(NodeId, EdgeId)>,
     add_nodes: usize,
     add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
@@ -40,7 +42,7 @@ impl PropertyBatch {
     /// Materialize exactly the selected pending working state as a detached,
     /// read-only value. It has no accepted write provenance or history claim.
     /// This copies selected values, never clones a writable Graph/history/pool.
-    pub(crate) fn capture(&self, subgraph: &Subgraph) -> GraphResult<crate::GraphView> {
+    pub(crate) fn capture(&mut self, subgraph: &Subgraph) -> GraphResult<crate::GraphView> {
         subgraph
             .graph()
             .borrow()
@@ -165,6 +167,8 @@ impl PropertyBatch {
         }
         let state = crate::state::read_state::PinnedReadState::from_snapshot(snapshot)?
             .with_groups(base.read_state().groups().clone());
+        self.captures
+            .insert(state.capture_key(), state.downgrade_capture());
         Ok(crate::GraphView::all(state))
     }
 
@@ -172,6 +176,8 @@ impl PropertyBatch {
         Self {
             coordinate,
             read_revision: 0,
+            captures: HashMap::new(),
+            property_times: BTreeMap::new(),
             allocation_base: None,
             add_nodes: 0,
             add_edges: Vec::new(),
@@ -209,11 +215,119 @@ impl PropertyBatch {
         };
         for (name, rows) in attrs {
             if !rows.is_empty() {
+                if !self.property_times.is_empty() {
+                    for (id, _) in &rows {
+                        self.property_times.remove(&(node, *id, name.clone()));
+                    }
+                }
                 columns.entry(name).or_default().extend(rows);
             }
         }
         Ok(())
     }
+
+    /// One final accepted assignment per key. A later unstamped assignment
+    /// replaces an earlier explicit timestamp along with its pending value.
+    pub(crate) fn stage_at(
+        &mut self,
+        node: bool,
+        attrs: HashMap<AttrName, Vec<(usize, AttrValue)>>,
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<()> {
+        let targets: Vec<_> = if at.is_some() {
+            attrs
+                .iter()
+                .flat_map(|(name, rows)| rows.iter().map(|(id, _)| (node, *id, name.clone())))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        self.stage(node, attrs)?;
+        if let Some(at) = at {
+            self.property_times
+                .extend(targets.into_iter().map(|target| (target, at)));
+        }
+        Ok(())
+    }
+
+    /// Attach only row-bound columns from a capture issued by this atomic run.
+    /// Historical/unrelated tables with matching numeric IDs are insufficient.
+    pub(crate) fn attach_table(
+        &mut self,
+        subgraph: &Subgraph,
+        table: &crate::storage::table::BaseTable,
+        columns: &[(AttrName, AttrName)],
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<()> {
+        let binding = subgraph.graph();
+        let graph = binding.borrow();
+        graph.validate_write_coordinate(&self.coordinate)?;
+        let (source, prepared) = table.source_batch_mapped(columns, at)?;
+        if !self
+            .captures
+            .get(&source.read_state().capture_key())
+            .and_then(crate::state::read_state::WeakReadCapture::upgrade)
+            .is_some_and(|issued| issued.shares_capture(source.read_state()))
+        {
+            return Err(crate::GraphError::InvalidInput(
+                "table.attach requires a source capture issued by this atomic run".into(),
+            ));
+        }
+        let nodes = table.source_entity_kind() == Some("node");
+        let attrs: HashMap<_, Vec<_>> = if nodes {
+            prepared
+                .node_attrs
+                .into_iter()
+                .map(|(name, rows)| {
+                    let rows = rows
+                        .into_iter()
+                        .map(|(reference, value)| match reference {
+                            BatchNodeRef::Existing(id) => Ok((id, value)),
+                            _ => Err(crate::GraphError::InvalidInput(
+                                "Unexpected relative table node identity".into(),
+                            )),
+                        })
+                        .collect::<GraphResult<Vec<_>>>()?;
+                    Ok((name, rows))
+                })
+                .collect::<GraphResult<_>>()?
+        } else {
+            prepared
+                .edge_attrs
+                .into_iter()
+                .map(|(name, rows)| {
+                    let rows = rows
+                        .into_iter()
+                        .map(|(reference, value)| match reference {
+                            BatchEdgeRef::Existing(id) => Ok((id, value)),
+                            _ => Err(crate::GraphError::InvalidInput(
+                                "Unexpected relative table edge identity".into(),
+                            )),
+                        })
+                        .collect::<GraphResult<Vec<_>>>()?;
+                    Ok((name, rows))
+                })
+                .collect::<GraphResult<_>>()?
+        };
+        for rows in attrs.values() {
+            for (id, _) in rows {
+                let selected = if nodes {
+                    subgraph.nodes().contains(id)
+                } else {
+                    subgraph.edges().contains(id)
+                };
+                if !selected {
+                    return Err(crate::GraphError::InvalidInput(format!(
+                        "table attachment target {id} is outside the pending selection"
+                    )));
+                }
+            }
+        }
+        graph.validate_scoped_bulk_attrs(&attrs, nodes, subgraph.frozen_view())?;
+        drop(graph);
+        self.stage_at(nodes, attrs, at)
+    }
+
     pub(crate) fn stage_removals(
         &mut self,
         nodes: bool,
@@ -419,12 +533,25 @@ impl PropertyBatch {
         {
             return Ok(());
         }
+        let mut change_times = self.change_times;
+        change_times.extend(
+            self.property_times
+                .into_iter()
+                .map(|((node, id, name), at)| {
+                    let target = if node {
+                        BatchChangeRef::NodeAttribute(BatchNodeRef::Existing(id), name)
+                    } else {
+                        BatchChangeRef::EdgeAttribute(BatchEdgeRef::Existing(id), name)
+                    };
+                    (target, at)
+                }),
+        );
         let batch = GraphBatch {
             add_nodes: self.add_nodes,
             add_edges: self.add_edges,
             remove_nodes: self.remove_nodes,
             remove_edges: self.remove_edges,
-            change_times: self.change_times,
+            change_times,
             edge_endpoints: self.edge_endpoints,
             node_attrs: self
                 .nodes
@@ -828,6 +955,151 @@ mod tests {
         assert_eq!(
             owner.borrow().get_node_attr(1, &"good".into()).unwrap(),
             Some(AttrValue::Int(3))
+        );
+    }
+
+    #[test]
+    fn issued_capture_authority_is_weak_and_does_not_pin_payloads() {
+        use crate::ownership::OwnerCell;
+        use std::sync::Arc;
+        let mut graph = Graph::new_publishing();
+        graph.add_node().unwrap();
+        let mut batch = PropertyBatch::new(graph.write_coordinate());
+        let owner = Arc::new(OwnerCell::new(graph));
+        let selected = Subgraph::from_nodes(owner, HashSet::from([0]), "scope".into()).unwrap();
+        let captured = batch.capture(&selected).unwrap();
+        let weak = captured.read_state().downgrade_capture();
+        drop(captured);
+        assert!(weak.upgrade().is_none());
+        assert_eq!(batch.captures.len(), 1);
+    }
+
+    #[test]
+    fn table_attachment_reuses_identity_validation_and_rejects_unissued_sources() {
+        use crate::ownership::OwnerCell;
+        use std::sync::Arc;
+        let mut graph = Graph::new_publishing();
+        graph
+            .apply_batch(
+                GraphBatch {
+                    add_nodes: 2,
+                    node_attrs: HashMap::from([(
+                        "value".into(),
+                        vec![
+                            (BatchNodeRef::Added(0), AttrValue::Int(1)),
+                            (BatchNodeRef::Added(1), AttrValue::Int(2)),
+                        ],
+                    )]),
+                    effective_at: Some(0),
+                    ..Default::default()
+                },
+                0,
+                "fixture".into(),
+                "test".into(),
+            )
+            .unwrap();
+        let mut batch = PropertyBatch::new(graph.write_coordinate());
+        let owner = Arc::new(OwnerCell::new(graph));
+        let selected =
+            Subgraph::from_nodes(owner.clone(), HashSet::from([0, 1]), "scope".into()).unwrap();
+        let unrelated = owner
+            .borrow()
+            .read_view()
+            .unwrap()
+            .node_table_data()
+            .unwrap()
+            .into_base_table()
+            .unwrap();
+        let columns = vec![("value".into(), "copy".into())];
+        assert!(batch
+            .attach_table(&selected, &unrelated, &columns, Some(30))
+            .unwrap_err()
+            .to_string()
+            .contains("issued by this atomic run"));
+        let captured = batch.capture(&selected).unwrap();
+        let table = captured
+            .node_table_data()
+            .unwrap()
+            .into_base_table()
+            .unwrap();
+        let duplicate = table.select_rows(&[0, 0]).unwrap();
+        assert!(batch
+            .attach_table(&selected, &duplicate, &columns, Some(30))
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate source entity rows"));
+        let mut edited = table.clone();
+        edited
+            .set_column("node_id", vec![AttrValue::Int(1), AttrValue::Int(0)])
+            .unwrap();
+        assert!(batch
+            .attach_table(&selected, &edited, &columns, Some(30))
+            .unwrap_err()
+            .to_string()
+            .contains("Edited structural IDs"));
+        assert!(batch.get(true, 0, &"copy".into()).is_none());
+        batch
+            .attach_table(&selected, &table, &columns, Some(30))
+            .unwrap();
+        batch.accept(&mut owner.borrow_mut()).unwrap();
+        assert_eq!(
+            owner.borrow().get_node_attr(0, &"copy".into()).unwrap(),
+            Some(AttrValue::Int(1))
+        );
+        assert_eq!(
+            owner
+                .borrow()
+                .publication_metadata(2)
+                .unwrap()
+                .unwrap()
+                .change_times
+                [&crate::state::publication::ChangeKey::NodeAttribute(0, "copy".into())],
+            30
+        );
+    }
+
+    #[test]
+    fn replacing_one_pending_property_resets_only_its_timestamp() {
+        use crate::state::publication::ChangeKey;
+        let mut graph = Graph::new_publishing();
+        graph
+            .apply_batch(
+                GraphBatch {
+                    add_nodes: 2,
+                    effective_at: Some(0),
+                    ..Default::default()
+                },
+                0,
+                "fixture".into(),
+                "test".into(),
+            )
+            .unwrap();
+        let mut batch = PropertyBatch::new(graph.write_coordinate());
+        batch
+            .stage_at(
+                true,
+                HashMap::from([(
+                    "value".into(),
+                    vec![(0, AttrValue::Int(1)), (1, AttrValue::Int(2))],
+                )]),
+                Some(30),
+            )
+            .unwrap();
+        batch
+            .stage(
+                true,
+                HashMap::from([("value".into(), vec![(1, AttrValue::Int(3))])]),
+            )
+            .unwrap();
+        batch.accept(&mut graph).unwrap();
+        let metadata = graph.publication_metadata(2).unwrap().unwrap();
+        assert_eq!(
+            metadata.change_times[&ChangeKey::NodeAttribute(0, "value".into())],
+            30
+        );
+        assert_eq!(
+            metadata.change_times[&ChangeKey::NodeAttribute(1, "value".into())],
+            metadata.recorded_at
         );
     }
 }

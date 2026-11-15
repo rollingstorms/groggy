@@ -8,7 +8,7 @@ use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope};
 
 /// Load an existing node attribute into a step variable.
 pub struct LoadNodeAttrStep {
@@ -333,4 +333,104 @@ impl Step for EdgeWeightScaleStep {
         scope.variables_mut().set_edge_map(self.target.clone(), map);
         Ok(())
     }
+}
+
+struct AttachTableStep {
+    source: String,
+    columns: Vec<(AttrName, AttrName)>,
+    effective_at: Option<crate::TimestampMicros>,
+}
+
+impl Step for AttachTableStep {
+    fn id(&self) -> &'static str {
+        "table.attach"
+    }
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::StagedProperties
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("table attachment cancelled"));
+        }
+        let table = scope.variables().table(&self.source)?;
+        let pending = ctx
+            .property_batch
+            .as_mut()
+            .ok_or_else(|| anyhow!("table.attach requires a persistent atomic builder"))?;
+        pending.attach_table(scope.subgraph(), table, &self.columns, self.effective_at)?;
+        Ok(())
+    }
+}
+
+pub(super) fn register_table_attachment(registry: &StepRegistry) -> Result<()> {
+    registry.register(
+        "table.attach",
+        StepMetadata {
+            id: "table.attach".into(),
+            description: "Attach explicitly selected row-bound columns from this atomic run".into(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            for (key, _) in spec.params.iter() {
+                if !matches!(key.as_str(), "source" | "columns" | "effective_at") {
+                    return Err(anyhow!("table.attach does not support parameter '{key}'"));
+                }
+            }
+            let source = spec.params.expect_text("source")?.to_string();
+            if source.trim().is_empty() {
+                return Err(anyhow!("table.attach requires a nonempty source"));
+            }
+            let columns = match spec.params.get("columns") {
+                Some(AlgorithmParamValue::TextList(names)) => names
+                    .iter()
+                    .map(|name| (name.clone(), name.clone()))
+                    .collect(),
+                Some(AlgorithmParamValue::IntList(names)) if names.is_empty() => Vec::new(),
+                Some(AlgorithmParamValue::Json(serde_json::Value::Array(names))) => names
+                    .iter()
+                    .map(|name| {
+                        let name = name
+                            .as_str()
+                            .ok_or_else(|| anyhow!("table.attach columns must be strings"))?
+                            .to_owned();
+                        Ok((name.clone(), name))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                Some(AlgorithmParamValue::Json(serde_json::Value::Object(names))) => names
+                    .iter()
+                    .map(|(name, target)| {
+                        Ok((
+                            name.clone(),
+                            target
+                                .as_str()
+                                .ok_or_else(|| {
+                                    anyhow!("table.attach column targets must be strings")
+                                })?
+                                .to_owned(),
+                        ))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                _ => {
+                    return Err(anyhow!(
+                    "table.attach requires explicit columns: names or a source-to-property mapping"
+                ))
+                }
+            };
+            let effective_at = match spec.params.get("effective_at") {
+                None => None,
+                Some(AlgorithmParamValue::Int(at)) => Some(*at),
+                _ => {
+                    return Err(anyhow!(
+                        "effective_at must be signed integer Unix microseconds"
+                    ))
+                }
+            };
+            Ok(Box::new(AttachTableStep {
+                source,
+                columns,
+                effective_at,
+            }))
+        },
+    )?;
+    Ok(())
 }

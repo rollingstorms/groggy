@@ -163,6 +163,56 @@ impl BaseTable {
         self.provenance.as_ref()?.sources.first()?.write_state_id()
     }
 
+    /// Prepare explicit property aliases while retaining the canonical row,
+    /// structural-column and source validation used by ordinary source writeback.
+    pub(crate) fn source_batch_mapped(
+        &self,
+        columns: &[(AttrName, AttrName)],
+        at: Option<TimestampMicros>,
+    ) -> GraphResult<(GraphView, GraphBatch)> {
+        let names: Vec<_> = columns.iter().map(|(source, _)| source.clone()).collect();
+        let (pin, mut batch) = self.source_batch(&names, at)?;
+        let nodes = self.source_entity_kind() == Some("node");
+        let reserved = if nodes {
+            &["node_id", "entity_type", "contains_subgraph", "external_id"][..]
+        } else {
+            &["edge_id", "source", "target", "external_id"][..]
+        };
+        let mut targets = HashSet::new();
+        for (_, target) in columns {
+            if target.trim().is_empty() || reserved.contains(&target.as_str()) {
+                return Err(invalid(format!(
+                    "{target}: invalid structural/system attachment target"
+                )));
+            }
+            if !targets.insert(target) {
+                return Err(invalid(format!("Duplicate attachment target {target}")));
+            }
+        }
+        if nodes {
+            let mut values = std::mem::take(&mut batch.node_attrs);
+            for (source, target) in columns {
+                batch.node_attrs.insert(
+                    target.clone(),
+                    values
+                        .remove(source)
+                        .ok_or_else(|| invalid("Missing prepared node column"))?,
+                );
+            }
+        } else {
+            let mut values = std::mem::take(&mut batch.edge_attrs);
+            for (source, target) in columns {
+                batch.edge_attrs.insert(
+                    target.clone(),
+                    values
+                        .remove(source)
+                        .ok_or_else(|| invalid("Missing prepared edge column"))?,
+                );
+            }
+        }
+        Ok((pin, batch))
+    }
+
     fn source_batch(
         &self,
         columns: &[AttrName],

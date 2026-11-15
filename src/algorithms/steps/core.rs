@@ -26,6 +26,8 @@ pub enum AtomicStepEffect {
     Properties,
     /// Reads/attaches properties through a captured pending selection.
     PendingProperties,
+    /// Explicit source-bound property attachment; requires a persistent batch.
+    StagedProperties,
     /// Reads only explicit variable inputs, never working topology/properties.
     ImmutableInputs,
     /// Creates an independent read-only value from the local pending batch.
