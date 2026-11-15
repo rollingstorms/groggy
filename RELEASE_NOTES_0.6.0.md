@@ -27,7 +27,8 @@ Implemented capabilities, within their documented boundaries:
   Structural, neighbor, expression-transform and path primitives now read that
   pending source, including staged weights and revised endpoints. Explicit
   captured-table result attachments preserve source row identity and optional
-  per-property effective times in that same atomic run.
+  per-property effective times in that same atomic run. Certified nested compute
+  loops and message-passing blocks share pending reads and typed bindings.
   Local atomic programs can stage node/edge additions and run 13 existing
   algorithms on immutable pending captures. Supported outer pipelines now share
   topology effects and accept once; general topology loops, unadapted effects

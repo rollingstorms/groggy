@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
     read_revision: u64,
-    captures: HashMap<usize, crate::state::read_state::WeakReadCapture>,
+    captures: HashMap<usize, (u64, crate::state::read_state::WeakReadCapture)>,
     property_times: BTreeMap<(bool, usize, AttrName), crate::TimestampMicros>,
     allocation_base: Option<(NodeId, EdgeId)>,
     add_nodes: usize,
@@ -29,6 +29,22 @@ pub(crate) struct PropertyBatch {
 impl PropertyBatch {
     pub(crate) fn read_revision(&self) -> u64 {
         self.read_revision
+    }
+
+    /// A parent execution frame can lend its already-current pin to children.
+    /// Authority for attachment permits older captures; read reuse additionally
+    /// requires this exact pending revision.
+    pub(crate) fn capture_is_current(&self, subgraph: &Subgraph) -> bool {
+        subgraph.frozen_view().is_some_and(|view| {
+            self.captures
+                .get(&view.read_state().capture_key())
+                .is_some_and(|(revision, weak)| {
+                    *revision == self.read_revision
+                        && weak
+                            .upgrade()
+                            .is_some_and(|issued| issued.shares_capture(view.read_state()))
+                })
+        })
     }
 
     pub(crate) fn has_topology(&self) -> bool {
@@ -167,8 +183,10 @@ impl PropertyBatch {
         }
         let state = crate::state::read_state::PinnedReadState::from_snapshot(snapshot)?
             .with_groups(base.read_state().groups().clone());
-        self.captures
-            .insert(state.capture_key(), state.downgrade_capture());
+        self.captures.insert(
+            state.capture_key(),
+            (self.read_revision, state.downgrade_capture()),
+        );
         Ok(crate::GraphView::all(state))
     }
 
@@ -266,7 +284,7 @@ impl PropertyBatch {
         if !self
             .captures
             .get(&source.read_state().capture_key())
-            .and_then(crate::state::read_state::WeakReadCapture::upgrade)
+            .and_then(|(_, capture)| capture.upgrade())
             .is_some_and(|issued| issued.shares_capture(source.read_state()))
         {
             return Err(crate::GraphError::InvalidInput(

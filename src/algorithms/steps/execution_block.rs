@@ -10,12 +10,11 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context};
 use super::arithmetic::{condition_is_true, CompareOp};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 use super::direction::NeighborDirection;
 
 /// Execution mode for the block.
@@ -164,31 +163,10 @@ impl ExecutionBlockStep {
             ));
         }
 
-        // Build the selected topology once, respecting direction and edge multiplicity.
-        let selected_nodes = scope.subgraph().ordered_nodes();
-        let positions: HashMap<_, _> = selected_nodes
-            .iter()
-            .enumerate()
-            .map(|(index, &node)| (node, index))
-            .collect();
-        let mut csr = Csr::default();
-        {
-            let graph = scope.subgraph().graph();
-            let graph = graph.borrow();
-            let pool = graph.pool();
-            let mapping = direction.edge_mapping();
-            build_csr_from_edges_with_scratch(
-                &mut csr,
-                selected_nodes.len(),
-                scope.subgraph().edges().iter().copied(),
-                |node| positions.get(&node).copied(),
-                |edge| pool.get_edge_endpoints(edge).map(mapping),
-                CsrOptions {
-                    add_reverse_edges: direction.add_reverse_edges(),
-                    sort_neighbors: true,
-                },
-            );
-        }
+        let topology = scope.selected_csr(ctx, direction)?;
+        let selected_nodes = &topology.nodes;
+        let positions = &topology.positions;
+        let csr = &topology.csr;
 
         // Synchronous outputs stay separate so every node reads the original
         // column. Ordered mode updates the local column after each node.
@@ -556,6 +534,14 @@ impl ExecutionBlockStep {
 }
 
 impl Step for ExecutionBlockStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        if self.supports_atomic_properties() {
+            AtomicStepEffect::PendingProperties
+        } else {
+            AtomicStepEffect::Unsupported
+        }
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         matches!(self.mode, ExecutionMode::MessagePass)
             && self

@@ -88,7 +88,8 @@ trusted contracts; arbitrary callbacks do not acquire rollback safety by default
 
 Explicit [captured table attachment](captured-table-attachment.md) writes
 selected row-bound result columns through the same batch. No numeric-ID-only
-provenance inference is added.
+provenance inference is added. Certified [compute loops/message blocks](nested-pending-execution.md)
+now share the pending read boundary; general topology loops remain open.
 
 Ordinary outer execution retains per-algorithm publication. Empty shared plans
 publish no version. Captured outputs retain provisional provenance even after a

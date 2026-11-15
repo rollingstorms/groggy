@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--nested-pending") {
+        return nested_pending_receipt();
+    }
     if std::env::args().any(|arg| arg == "--captured-attachment") {
         return captured_attachment_receipt();
     }
@@ -617,5 +620,75 @@ fn captured_attachment_receipt() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote captured attachment receipt to {path}");
+    Ok(())
+}
+
+fn nested_pending_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let increment = vec![
+        json!({"id":"core.load_node_attr","params":{"attr":"counter","target":"counter","default":0}}),
+        json!({"id":"core.init_scalar","params":{"target":"one","value":1}}),
+        json!({"id":"core.add","params":{"left":"counter","right":"one","target":"next"}}),
+        json!({"id":"core.attach_node_attr","params":{"source":"next","attr":"counter"}}),
+    ];
+    let mut cases = Vec::new();
+    for count in [1_000, 10_000] {
+        for mode in ["flat", "loop", "nested"] {
+            let mut steps =
+                vec![json!({"id":"graph.add_nodes","params":{"count":1,"output":"new"}})];
+            match mode {
+                "flat" => {
+                    for _ in 0..3 {
+                        steps.extend(increment.clone());
+                    }
+                }
+                "loop" => {
+                    steps.push(json!({"id":"iter.loop","params":{"iterations":3,"body":increment}}))
+                }
+                _ => steps.push(json!({"id":"iter.loop","params":{"iterations":3,"body":[
+                    {"id":"iter.loop","params":{"iterations":1,"body":increment}}
+                ]}})),
+            }
+            let mut params = AlgorithmParams::new();
+            params.set_text("steps", json!({"atomic":true,"steps":steps}).to_string());
+            let algorithm = registry.instantiate(&AlgorithmSpec {
+                id: "builder.step_pipeline".into(),
+                params,
+            })?;
+            let mut samples = Vec::new();
+            for _ in 0..5 {
+                let mut graph = Graph::new_publishing();
+                graph.insert_nodes(count)?;
+                let graph = Arc::new(OwnerCell::new(graph));
+                let selected = Subgraph::from_frozen_view(
+                    graph.clone(),
+                    graph.borrow().read_view()?,
+                    "bench".into(),
+                );
+                let mut ctx = Context::new();
+                let started = Instant::now();
+                let result = algorithm.execute(&mut ctx, selected)?;
+                samples.push(started.elapsed().as_secs_f64());
+                assert_eq!(result.node_count(), count + 1);
+                assert_eq!(graph.borrow().current_state_id(), 2);
+                assert_eq!(
+                    graph.borrow().get_node_attr(count, &"counter".into())?,
+                    Some(AttrValue::Int(3))
+                );
+            }
+            cases.push(json!({"initial_nodes":count,"mode":mode,"seconds":samples}));
+        }
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "nested_pending_execution.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release, five observations each. Node-only graph, one staged new node, three identical load/increment/attach operations, either flat, one loop or nested loops; one final publication. Includes pending revision capture/reuse and execution frames. Fixture, initial capture, algorithm construction, compilation and assertions excluded. Compares equivalent execution shapes, not a before/after engine version. No memory, FFI or general overhead guarantee.",
+            "cases":cases
+        }))?,
+    )?;
+    println!("Wrote nested pending receipt to {path}");
     Ok(())
 }

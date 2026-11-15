@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after topology, including provisional IDs and property reloads. Structural,
   neighbor, expression-transform and path readers now share that selected source.
   Explicit captured-table attachments preserve row identity, optional effective
-  times and one acceptance, with weak capture authority and strict alias checks. General topology loops and
+  times and one acceptance, with weak capture authority and strict alias checks.
+  Certified compute loops and message-passing blocks refresh pending reads and
+  retain typed loop bindings through the shared native executor. General topology loops and
   unadapted effects remain open.
 - Explicit storage platform capabilities, Windows locked-handle verification,
   compatible schema migration examples and independent finite graph references.

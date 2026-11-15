@@ -14,7 +14,7 @@ use super::pipeline::AlgorithmSpec;
 use super::registry::Registry;
 use super::steps::{
     ensure_core_steps_registered, global_step_registry, AtomicStepEffect, PipelineValidator,
-    SchemaRegistry, Step, StepScope, StepSpec, StepVariables, ValidationReport,
+    SchemaRegistry, Step, StepExecutor, StepScope, StepSpec, StepVariables, ValidationReport,
 };
 use super::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, AlgorithmParams, AtomicMutationEffects,
@@ -248,7 +248,7 @@ impl Algorithm for StepPipelineAlgorithm {
             }
 
             let mut variables = StepVariables::default();
-            let mut pending_scope: Option<(u64, Subgraph)> = None;
+            let mut executor = StepExecutor::new(&subgraph);
 
             if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
                 eprintln!(
@@ -274,46 +274,7 @@ impl Algorithm for StepPipelineAlgorithm {
                 }
 
                 ctx.begin_step(index, step.id());
-                let result = (|| {
-                    // Materialize once per pending revision, never per row.
-                    // Preserve original selection for acceptance and cascade rescue.
-                    let scope_graph = if matches!(
-                        step.atomic_effect(),
-                        AtomicStepEffect::PendingProperties | AtomicStepEffect::StagedProperties
-                    ) {
-                        if let Some(batch) = ctx
-                            .property_batch
-                            .as_mut()
-                            .filter(|batch| batch.has_topology())
-                        {
-                            let revision = batch.read_revision();
-                            if pending_scope
-                                .as_ref()
-                                .is_none_or(|(old, _)| *old != revision)
-                            {
-                                let view = batch.capture(&subgraph)?;
-                                pending_scope = Some((
-                                    revision,
-                                    Subgraph::from_frozen_view(
-                                        subgraph.graph(),
-                                        view,
-                                        "pending properties".into(),
-                                    ),
-                                ));
-                            }
-                            &pending_scope
-                                .as_ref()
-                                .ok_or_else(|| anyhow!("pending property scope was not installed"))?
-                                .1
-                        } else {
-                            &subgraph
-                        }
-                    } else {
-                        &subgraph
-                    };
-                    let mut scope = StepScope::new(scope_graph, &mut variables);
-                    step.apply(ctx, &mut scope)
-                })();
+                let result = executor.apply(ctx, &mut variables, step.as_ref());
                 ctx.finish_step();
                 result?;
 

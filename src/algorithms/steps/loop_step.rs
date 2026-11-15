@@ -1,5 +1,7 @@
 use super::super::{AlgorithmParams, Context};
-use super::core::{Step, StepRegistry, StepScope, StepSpec};
+use super::core::{
+    nested_effect, AtomicStepEffect, Step, StepExecutor, StepRegistry, StepScope, StepSpec,
+};
 use crate::algorithms::execution::{BatchExecutor, BatchPlan};
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
@@ -204,6 +206,14 @@ impl LoopStep {
 }
 
 impl Step for LoopStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        if self.body_json.get("batch_plan").is_some() {
+            return AtomicStepEffect::Unsupported;
+        }
+        self.body_steps()
+            .map_or(AtomicStepEffect::Unsupported, |steps| nested_effect(steps))
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         // Batch plans execute outside StepScope's property overlay. Reject them
         // even for zero iterations rather than certifying an alternate program.
@@ -219,7 +229,11 @@ impl Step for LoopStep {
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let body_steps = self.body_steps()?;
-        if ctx.property_batch.is_some() && !self.supports_atomic_properties() {
+        if ctx.property_batch.as_ref().is_some_and(|batch| {
+            let effect = self.atomic_effect();
+            effect == AtomicStepEffect::Unsupported
+                || (batch.has_topology() && effect == AtomicStepEffect::Properties)
+        }) {
             return Err(anyhow!(
                 "iter.loop does not support this atomic property body"
             ));
@@ -230,46 +244,14 @@ impl Step for LoopStep {
         // e.g., [("nodes_0", "ranks")] means: create alias ranks = nodes_0
         if let Some(loop_vars) = &self.loop_vars {
             for (initial_var, loop_var) in loop_vars {
-                // Use AliasStep logic to copy the variable
-                let value = {
-                    let vars = scope.variables();
-
-                    if let Ok(map) = vars.node_map(initial_var) {
-                        super::core::StepValue::NodeMap(map.clone())
-                    } else if let Ok(col) = vars.node_column(initial_var) {
-                        super::core::StepValue::NodeColumn(col.clone())
-                    } else if let Ok(map) = vars.edge_map(initial_var) {
-                        super::core::StepValue::EdgeMap(map.clone())
-                    } else if let Ok(val) = vars.scalar(initial_var) {
-                        super::core::StepValue::Scalar(val.clone())
-                    } else if let Ok(array) = vars.subgraph_array(initial_var) {
-                        super::core::StepValue::SubgraphArray(array.clone())
-                    } else {
-                        return Err(anyhow!(
-                            "Loop variable initialization: '{}' not found",
-                            initial_var
-                        ));
-                    }
-                };
-
-                let vars_mut = scope.variables_mut();
-                match value {
-                    super::core::StepValue::NodeMap(map) => vars_mut.set_node_map(loop_var, map),
-                    super::core::StepValue::NodeColumn(col) => {
-                        vars_mut.set_node_column(loop_var, col)
-                    }
-                    super::core::StepValue::EdgeMap(map) => vars_mut.set_edge_map(loop_var, map),
-                    super::core::StepValue::Scalar(val) => vars_mut.set_scalar(loop_var, val),
-                    super::core::StepValue::SubgraphArray(array) => {
-                        vars_mut.set_subgraph_array(loop_var, array)
-                    }
-                    _ => {
-                        return Err(anyhow!(
-                            "Loop variable '{}' has unsupported type",
-                            initial_var
-                        ))
-                    }
-                }
+                let value = scope
+                    .variables()
+                    .value(initial_var)
+                    .cloned()
+                    .ok_or_else(|| {
+                        anyhow!("Loop variable initialization: '{}' not found", initial_var)
+                    })?;
+                scope.variables_mut().set_value(loop_var, value);
             }
         }
 
@@ -299,7 +281,10 @@ impl Step for LoopStep {
                 .map_err(|e| anyhow!("Batch execution failed: {}", e));
         }
 
-        // Fallback: Execute the loop body for the specified number of iterations
+        // Each nested frame refreshes reads after staged writes while sharing
+        // variables and the owning batch. Topology mutations remain uncertified.
+        let base = scope.subgraph().clone();
+        let mut executor = StepExecutor::new(&base);
         for iteration in 0..self.iterations {
             if ctx.is_cancelled() {
                 return Err(anyhow!("Loop cancelled before iteration {}", iteration + 1));
@@ -309,17 +294,19 @@ impl Step for LoopStep {
                 if ctx.is_cancelled() {
                     return Err(anyhow!("Loop cancelled before step {}", step_idx + 1));
                 }
-                step.apply(ctx, scope).map_err(|e| {
-                    anyhow!(
-                        "Loop iteration {}/{}, step {}/{} ({}) failed: {}",
-                        iteration + 1,
-                        self.iterations,
-                        step_idx + 1,
-                        body_steps.len(),
-                        step.id(),
-                        e
-                    )
-                })?;
+                executor
+                    .apply(ctx, scope.variables_mut(), step.as_ref())
+                    .map_err(|e| {
+                        anyhow!(
+                            "Loop iteration {}/{}, step {}/{} ({}) failed: {}",
+                            iteration + 1,
+                            self.iterations,
+                            step_idx + 1,
+                            body_steps.len(),
+                            step.id(),
+                            e
+                        )
+                    })?;
             }
         }
 

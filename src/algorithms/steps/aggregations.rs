@@ -5,13 +5,11 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
-use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::storage::numeric::{
     attributes::{self, Value},
     dot_product::Dot,
     reductions::{self, Scalar},
 };
-use crate::traits::SubgraphOperations;
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
@@ -622,38 +620,9 @@ impl Step for NeighborAggregationStep {
         if self.weights.is_some() && !matches!(self.agg_type, NeighborAggType::Sum) {
             return Err(anyhow!("Neighbor weights are supported only for sum"));
         }
-        let subgraph = scope.subgraph();
-        let nodes = subgraph.ordered_nodes();
-        let positions: HashMap<_, _> = nodes
-            .iter()
-            .enumerate()
-            .map(|(index, &node)| (node, index))
-            .collect();
-        let edges = subgraph.ordered_edges();
-        let mut csr = Csr::default();
-        subgraph.validate_selected_read()?;
-        let mapping = self.direction.edge_mapping();
-        let mut failure = None;
-        build_csr_from_edges_with_scratch(
-            &mut csr,
-            nodes.len(),
-            edges.iter().copied(),
-            |id| positions.get(&id).copied(),
-            |edge| match subgraph.edge_endpoints(edge) {
-                Ok(endpoints) => Some(mapping(endpoints)),
-                Err(error) => {
-                    failure = Some(error);
-                    None
-                }
-            },
-            CsrOptions {
-                add_reverse_edges: self.direction.add_reverse_edges(),
-                sort_neighbors: true,
-            },
-        );
-        if let Some(error) = failure {
-            return Err(error.into());
-        }
+        let topology = scope.selected_csr(ctx, self.direction)?;
+        let nodes = &topology.nodes;
+        let csr = &topology.csr;
         let source = scope.variables().node_map(&self.source)?;
         let weights = self
             .weights

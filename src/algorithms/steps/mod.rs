@@ -35,6 +35,8 @@ mod transformations;
 mod typed_values;
 pub mod validation;
 
+pub(crate) use core::StepExecutor;
+
 // Re-export core types
 pub use core::{
     global_step_registry, AtomicStepEffect, NodeColumn, Step, StepEdgeInput, StepInput,

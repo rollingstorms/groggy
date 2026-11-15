@@ -34,6 +34,7 @@ pub(super) fn selected_neighbors(
 ) -> Result<(Vec<NodeId>, HashMap<NodeId, Vec<NodeId>>)> {
     let nodes = selected_nodes(subgraph, ctx)?;
     let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
+    let directed = subgraph.read_is_directed();
     for &edge in subgraph.ordered_edges().iter() {
         if ctx.is_cancelled() {
             return Err(anyhow!("transformation cancelled"));
@@ -48,7 +49,7 @@ pub(super) fn selected_neighbors(
         rows.get_mut(&source)
             .ok_or_else(|| anyhow!("Missing selected endpoint"))?
             .push(target);
-        if !subgraph.read_is_directed() && source != target {
+        if !directed && source != target {
             rows.get_mut(&target)
                 .ok_or_else(|| anyhow!("Missing selected endpoint"))?
                 .push(source);

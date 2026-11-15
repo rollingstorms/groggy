@@ -47,7 +47,9 @@ assert metrics.source_views()[0].node_attr(1, "distance") is None
 
 A local `atomic=True` builder and `persist=True` are required, including inside
 an outer atomic pipeline. The source table variable remains local to its builder.
-Use `table.emit` for owned read results without attachment.
+Use `table.emit` for owned read results without attachment. Certified
+[nested compute bodies](nested-pending-execution.md) can also capture and attach,
+with the same persistence and source-authority rules.
 
 ## Identity and validation
 

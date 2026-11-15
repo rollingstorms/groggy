@@ -66,10 +66,18 @@ authority, canonical property validation and optional per-property effective tim
 See `captured-table-attachment-2026-11-15.md`. Historical/imported tables are not
 implicitly authorized by matching numeric IDs.
 
+### Implemented follow-up: nested pending computation
+
+Certified compute loops and message-passing blocks now use the shared native step
+executor and selected CSR boundary. Staged property reloads, nested frames and
+typed graph/table/snapshot bindings retain source identity. Current parent pins
+can be borrowed by children without an extra copy. See
+`nested-pending-execution-2026-11-15.md` for evidence and remaining guards.
+
 ### Next chunks
 
-1. Remaining sampling/community/nested execution after topology, public facade
-   lowering and execution/DSL coverage.
+1. Remaining sampling/community and general topology-mutating execution, public
+   facade lowering and execution/DSL coverage.
 2. Property/schema/provenance and persistence-boundary completion.
 3. Archive/recovery memory, numerical/algorithm certification and scale targets.
 4. Remaining API/module consolidation and service/concurrency implementation.

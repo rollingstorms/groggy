@@ -12,13 +12,15 @@ remains unfinished. See [scope and next chunk](notes/planning/release-060-expand
 The successful qualification below applies to the earlier bounded candidate.
 Implementation changes toward the expanded target require fresh final gates.
 
-Supported outer atomic topology composition, pending selected readers and explicit
-captured-table attachments are complete locally: 1,587 native tests, 2,862 maintained Python tests and 274
+Supported outer atomic topology composition, pending selected readers, explicit
+captured-table attachment and nested compute frames are complete locally:
+1,588 native tests, 2,883 maintained Python tests and 275
 executable examples pass, plus strict Clippy and Rust formatting.
 See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md)
 [pending property evidence](notes/planning/pending-topology-properties-2026-11-15.md)
 [selected reader evidence](notes/planning/pending-topology-readers-2026-11-15.md)
-and [table attachment evidence](notes/planning/captured-table-attachment-2026-11-15.md).
+[table attachment evidence](notes/planning/captured-table-attachment-2026-11-15.md)
+and [nested execution evidence](notes/planning/nested-pending-execution-2026-11-15.md).
 The 44 broad unchecked release rows retain their remaining exit requirements.
 
 ## Qualified bounded candidate

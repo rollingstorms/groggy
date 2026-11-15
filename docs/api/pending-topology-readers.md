@@ -66,7 +66,9 @@ immutable. [Property attachment rules](pending-topology-properties.md) still app
 Explicit [captured table attachment](captured-table-attachment.md) can stage
 selected result columns through retained row identity, including optional effective times.
 
-Classic property-writing algorithm wrappers, unadapted sampling/community steps,
-general topology loops and opaque callback effects retain explicit guards after
+Certified compute loops and message-passing blocks now share these reads;
+see [nested execution](nested-pending-execution.md). Classic property-writing
+algorithm wrappers, unadapted sampling/community steps, general topology loops
+and opaque callback effects retain explicit guards after
 topology. This slice does not certify those families by association. Journal-owner
 dispatch and remaining DSL execution/lowering are separate open work.

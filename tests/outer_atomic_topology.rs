@@ -457,3 +457,50 @@ fn captured_computation_columns_attach_with_explicit_times_and_survive_recovery(
         Some(AttrValue::Int(0))
     );
 }
+
+#[test]
+fn nested_loops_refresh_pending_properties_and_keep_typed_capture_authority() {
+    let graph = fixture(false);
+    let head = graph.borrow().current_state_id();
+    let mut context = Context::new();
+    let increment = json!([
+        {"id":"core.load_node_attr","params":{"target":"counter","attr":"counter","default":0}},
+        {"id":"core.init_scalar","params":{"target":"one","value":1}},
+        {"id":"core.add","params":{"left":"counter","right":"one","target":"next"}},
+        {"id":"core.attach_node_attr","params":{"source":"next","attr":"counter"}},
+        {"id":"core.load_node_attr","params":{"target":"reload","attr":"counter"}},
+        {"id":"core.attach_node_attr","params":{"source":"reload","attr":"mirror"}}
+    ]);
+    pipeline(vec![create_nodes(), json!([
+        {"id":"iter.loop","params":{"iterations":2,"body":[{"id":"iter.loop","params":{"iterations":3,"body":increment}}]}},
+        {"id":"graph.capture_staged","params":{"output":"seed"}},
+        {"id":"iter.loop","params":{"iterations":2,"loop_vars":[["seed","local"]],"body":[
+            {"id":"graph.degrees_table","params":{"source":"local","output":"metrics"}},
+            {"id":"table.attach","params":{"source":"metrics","columns":{"degree":"loop_degree"},"effective_at":30}}
+        ]}}
+    ])]).run_atomic_properties(&mut context, selected(&graph)).unwrap();
+    assert_eq!(graph.borrow().current_state_id(), head + 1);
+    for node in [0, 2, 4, 7] {
+        assert_eq!(
+            graph
+                .borrow()
+                .get_node_attr(node, &"counter".into())
+                .unwrap(),
+            Some(AttrValue::Int(6))
+        );
+        assert_eq!(
+            graph
+                .borrow()
+                .get_node_attr(node, &"mirror".into())
+                .unwrap(),
+            Some(AttrValue::Int(6))
+        );
+    }
+    assert_eq!(
+        graph
+            .borrow()
+            .get_node_attr(7, &"loop_degree".into())
+            .unwrap(),
+        Some(AttrValue::Int(0))
+    );
+}

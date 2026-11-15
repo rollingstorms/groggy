@@ -36,6 +36,127 @@ pub enum AtomicStepEffect {
     Topology,
 }
 
+/// Conservative composition for read/property loop bodies. General topology
+/// mutations and alternate execution plans need their own execution contract.
+pub(crate) fn nested_effect(steps: &[Box<dyn Step>]) -> AtomicStepEffect {
+    let mut result = AtomicStepEffect::ImmutableInputs;
+    for step in steps {
+        match step.atomic_effect() {
+            AtomicStepEffect::Unsupported | AtomicStepEffect::Topology => {
+                return AtomicStepEffect::Unsupported
+            }
+            AtomicStepEffect::Properties => {
+                if result == AtomicStepEffect::StagedProperties {
+                    return AtomicStepEffect::Unsupported;
+                }
+                result = AtomicStepEffect::Properties;
+            }
+            AtomicStepEffect::StagedCapture | AtomicStepEffect::StagedProperties => {
+                if result == AtomicStepEffect::Properties {
+                    return AtomicStepEffect::Unsupported;
+                }
+                result = AtomicStepEffect::StagedProperties;
+            }
+            AtomicStepEffect::PendingProperties => {
+                if result == AtomicStepEffect::ImmutableInputs {
+                    result = AtomicStepEffect::PendingProperties;
+                }
+            }
+            AtomicStepEffect::ImmutableInputs => {}
+        }
+    }
+    result
+}
+
+/// One fixed selected execution frame. All levels of the step interpreter use
+/// the same pending-read refresh boundary rather than holding stale loop pins.
+pub(crate) struct StepExecutor<'a> {
+    base: &'a Subgraph,
+    pending: Option<(u64, Subgraph)>,
+}
+impl<'a> StepExecutor<'a> {
+    pub(crate) fn new(base: &'a Subgraph) -> Self {
+        Self {
+            base,
+            pending: None,
+        }
+    }
+    pub(crate) fn apply(
+        &mut self,
+        ctx: &mut Context,
+        variables: &mut StepVariables,
+        step: &dyn Step,
+    ) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("step execution cancelled"));
+        }
+        let effect = step.atomic_effect();
+        if let Some(batch) = ctx.property_batch.as_ref() {
+            if effect == AtomicStepEffect::Unsupported
+                || (batch.has_topology() && effect == AtomicStepEffect::Properties)
+            {
+                return Err(anyhow!(
+                    "Step '{}' does not support the current atomic scope",
+                    step.id()
+                ));
+            }
+        }
+        let source = if matches!(
+            effect,
+            AtomicStepEffect::PendingProperties | AtomicStepEffect::StagedProperties
+        ) {
+            if let Some(batch) = ctx
+                .property_batch
+                .as_mut()
+                .filter(|batch| batch.has_topology())
+            {
+                if batch.capture_is_current(self.base) {
+                    self.base
+                } else {
+                    let revision = batch.read_revision();
+                    if self
+                        .pending
+                        .as_ref()
+                        .is_none_or(|(old, _)| *old != revision)
+                    {
+                        let view = batch.capture(self.base)?;
+                        self.pending = Some((
+                            revision,
+                            Subgraph::from_frozen_view(
+                                self.base.graph(),
+                                view,
+                                "pending execution".into(),
+                            ),
+                        ));
+                    }
+                    &self
+                        .pending
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("pending execution scope was not installed"))?
+                        .1
+                }
+            } else {
+                self.base
+            }
+        } else {
+            self.base
+        };
+        let mut scope = StepScope::new(source, variables);
+        step.apply(ctx, &mut scope)?;
+        if ctx.is_cancelled() {
+            return Err(anyhow!("step execution cancelled"));
+        }
+        Ok(())
+    }
+}
+
+/// Ordered checked adjacency for selected directional step reads.
+pub(crate) struct SelectedCsr {
+    pub nodes: Arc<[NodeId]>,
+    pub positions: HashMap<NodeId, usize>,
+    pub csr: crate::state::topology::Csr,
+}
+
 /// Trait implemented by all step primitives.
 pub trait Step: Send + Sync {
     /// Effect classification for local atomic execution. Existing property
@@ -423,6 +544,61 @@ impl<'a> StepScope<'a> {
 
     pub fn subgraph(&self) -> &Subgraph {
         self.subgraph
+    }
+
+    /// Build checked adjacency from the selected source, never retained owner
+    /// pool endpoints when a frozen source supplies topology.
+    pub(crate) fn selected_csr(
+        &self,
+        ctx: &Context,
+        direction: super::direction::NeighborDirection,
+    ) -> Result<SelectedCsr> {
+        use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
+        if ctx.is_cancelled() {
+            return Err(anyhow!("selected topology cancelled"));
+        }
+        self.subgraph.validate_selected_read()?;
+        let nodes = self.subgraph.ordered_nodes();
+        let positions: HashMap<_, _> = nodes
+            .iter()
+            .enumerate()
+            .map(|(row, &node)| (node, row))
+            .collect();
+        let edges = self.subgraph.ordered_edges();
+        let mapping = direction.edge_mapping();
+        let mut failure = None;
+        let mut csr = Csr::default();
+        build_csr_from_edges_with_scratch(
+            &mut csr,
+            nodes.len(),
+            edges.iter().copied(),
+            |node| positions.get(&node).copied(),
+            |edge| {
+                if ctx.is_cancelled() {
+                    failure = Some(anyhow!("selected topology cancelled"));
+                    return None;
+                }
+                match self.subgraph.edge_endpoints(edge) {
+                    Ok(pair) => Some(mapping(pair)),
+                    Err(error) => {
+                        failure = Some(error.into());
+                        None
+                    }
+                }
+            },
+            CsrOptions {
+                add_reverse_edges: direction.add_reverse_edges(),
+                sort_neighbors: true,
+            },
+        );
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok(SelectedCsr {
+            nodes,
+            positions,
+            csr,
+        })
     }
 
     /// Read through the shared staged node-property overlay.
