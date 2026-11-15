@@ -56,7 +56,6 @@ Qualify these frames before permitting topology-mutating descendants. Existing
 owner, selection closure, deterministic ordering, rollback and custom-effect guards
 remain required; a capability annotation alone cannot implement this boundary.
 
-Another bounded maintenance concern is expired weak capture-authority metadata in
-very long atomic runs. Weak records retain no payload, but expired entries should
-be reclaimed with amortized work while preserving live earlier table authority.
-This stays under existing execution/memory requirements rather than a new row.
+Follow-up maintenance now reclaims expired weak capture-authority metadata with
+amortized work, preserving earlier live table authority. See
+`capture-authority-churn-2026-11-15.md`; no new checklist row was added.

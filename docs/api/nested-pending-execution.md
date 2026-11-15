@@ -75,7 +75,9 @@ unsupported.
 
 A nested frame can borrow a parent's capture only when its capture token and
 pending revision still match. After staging changes, the next selected read
-refreshes. The capture authority registry is weak and retains no graph payload.
+refreshes. The capture authority registry is weak and retains no graph payload. Expired
+authority entries are reclaimed with amortized sweeps; live earlier captures
+remain authorized, and oversized dead registry capacity can be released.
 This avoids copying a current source merely to enter another frame; it does not
 make materialization O(1) or introduce a global result cache.
 

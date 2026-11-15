@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "initial_nodes": 10,
+      "iterations": 1000,
+      "mode": "flat",
+      "seconds": [
+        0.011647583,
+        0.010732708,
+        0.009841625,
+        0.01064875,
+        0.00955125
+      ]
+    },
+    {
+      "initial_nodes": 10,
+      "iterations": 1000,
+      "mode": "loop",
+      "seconds": [
+        0.007542667,
+        0.008637917,
+        0.010244292,
+        0.00762225,
+        0.00841275
+      ]
+    },
+    {
+      "initial_nodes": 10,
+      "iterations": 1000,
+      "mode": "nested",
+      "seconds": [
+        0.007893,
+        0.007897834,
+        0.007772459,
+        0.007444083,
+        0.007586709
+      ]
+    },
+    {
+      "initial_nodes": 100,
+      "iterations": 1000,
+      "mode": "flat",
+      "seconds": [
+        0.071714917,
+        0.064409292,
+        0.095188375,
+        0.083588167,
+        0.070018833
+      ]
+    },
+    {
+      "initial_nodes": 100,
+      "iterations": 1000,
+      "mode": "loop",
+      "seconds": [
+        0.066772708,
+        0.064981458,
+        0.063995333,
+        0.058734958,
+        0.067127666
+      ]
+    },
+    {
+      "initial_nodes": 100,
+      "iterations": 1000,
+      "mode": "nested",
+      "seconds": [
+        0.059433042,
+        0.067190958,
+        0.0621015,
+        0.058166791,
+        0.057937125
+      ]
+    }
+  ],
+  "scope": "Native release, five observations each. Node-only graph, one staged new node, three identical load/increment/attach operations, either flat, one loop or nested loops; one final publication. Includes pending revision capture/reuse and execution frames. Fixture, initial capture, algorithm construction, compilation and assertions excluded. Compares equivalent execution shapes, not a before/after engine version. No memory, FFI or general overhead guarantee."
+}

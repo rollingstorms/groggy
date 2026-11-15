@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the documented storage and platform boundaries.
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
+- Long atomic runs reclaim expired weak capture metadata and oversized registry
+  capacity while preserving live earlier table attachment authority.
 - Temporal value decay now accepts pending selected nodes/edges and ordered
   columns, preserving explicit input identity and one atomic acceptance.
 - Flow-map update/residual primitives now use checked integer/finite arithmetic

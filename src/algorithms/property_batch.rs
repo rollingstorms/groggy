@@ -15,6 +15,7 @@ pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
     read_revision: u64,
     captures: HashMap<usize, (u64, crate::state::read_state::WeakReadCapture)>,
+    capture_sweep_at: usize,
     property_times: BTreeMap<(bool, usize, AttrName), crate::TimestampMicros>,
     allocation_base: Option<(NodeId, EdgeId)>,
     add_nodes: usize,
@@ -183,6 +184,17 @@ impl PropertyBatch {
         }
         let state = crate::state::read_state::PinnedReadState::from_snapshot(snapshot)?
             .with_groups(base.read_state().groups().clone());
+        // Reclaim dead authority metadata with amortized work. Live earlier
+        // captures remain authorized; weak entries must not grow per iteration.
+        if self.captures.len() >= self.capture_sweep_at {
+            self.captures
+                .retain(|_, (_, capture)| capture.upgrade().is_some());
+            let retained = self.captures.len().saturating_mul(2).max(64);
+            if self.captures.capacity() > retained.saturating_mul(2) {
+                self.captures.shrink_to(retained);
+            }
+            self.capture_sweep_at = retained;
+        }
         self.captures.insert(
             state.capture_key(),
             (self.read_revision, state.downgrade_capture()),
@@ -195,6 +207,7 @@ impl PropertyBatch {
             coordinate,
             read_revision: 0,
             captures: HashMap::new(),
+            capture_sweep_at: 64,
             property_times: BTreeMap::new(),
             allocation_base: None,
             add_nodes: 0,
@@ -990,6 +1003,57 @@ mod tests {
         drop(captured);
         assert!(weak.upgrade().is_none());
         assert_eq!(batch.captures.len(), 1);
+        for _ in 0..4096 {
+            drop(batch.capture(&selected).unwrap());
+        }
+        assert!(
+            batch.captures.len() <= 128,
+            "expired metadata grew per capture"
+        );
+        assert!(weak.upgrade().is_none());
+    }
+
+    #[test]
+    fn capture_metadata_sweeps_preserve_earlier_live_table_authority() {
+        use crate::ownership::OwnerCell;
+        use std::sync::Arc;
+        let mut graph = Graph::new_publishing();
+        graph.add_node().unwrap();
+        graph
+            .set_node_attr(0, "value".into(), AttrValue::Int(7))
+            .unwrap();
+        let head = graph.current_state_id();
+        let mut batch = PropertyBatch::new(graph.write_coordinate());
+        let owner = Arc::new(OwnerCell::new(graph));
+        let selected =
+            Subgraph::from_nodes(owner.clone(), HashSet::from([0]), "scope".into()).unwrap();
+        let captured = batch.capture(&selected).unwrap();
+        let table = captured
+            .node_table_data()
+            .unwrap()
+            .into_base_table()
+            .unwrap();
+        drop(captured);
+        // Retained captures may grow the authority map; after they are dropped,
+        // later churn must reclaim both expired entries and oversized capacity.
+        let retained: Vec<_> = (0..256)
+            .map(|_| batch.capture(&selected).unwrap())
+            .collect();
+        drop(retained);
+        for _ in 0..4096 {
+            drop(batch.capture(&selected).unwrap());
+        }
+        assert!(batch.captures.len() <= 128);
+        assert!(batch.captures.capacity() <= 512);
+        batch
+            .attach_table(&selected, &table, &[("value".into(), "copy".into())], None)
+            .unwrap();
+        batch.accept(&mut owner.borrow_mut()).unwrap();
+        assert_eq!(owner.borrow().current_state_id(), head + 1);
+        assert_eq!(
+            owner.borrow().get_node_attr(0, &"copy".into()).unwrap(),
+            Some(AttrValue::Int(7))
+        );
     }
 
     #[test]

@@ -94,6 +94,12 @@ sources for node maps, ordered columns and edge maps. See
 `pending-temporal-decay-2026-11-15.md`; retained-history temporal stages retain
 their explicit guards. The note specifies the next root/child frame boundary.
 
+### Implemented follow-up: capture authority lifecycle
+
+Expired weak capture metadata/capacity is reclaimed with amortized work during
+long runs, preserving live earlier source-bound tables. See
+`capture-authority-churn-2026-11-15.md`, which also summarizes this priority pass.
+
 ### Next chunks
 
 1. Subgraph-producing sampling/for-each and general topology-mutating execution, public

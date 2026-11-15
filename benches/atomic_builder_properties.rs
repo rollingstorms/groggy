@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().any(|arg| arg == "--pending-core") {
         return pending_core_receipt(PendingCompute::Core);
     }
-    if std::env::args().any(|arg| arg == "--nested-pending") {
+    if std::env::args().any(|arg| arg == "--nested-pending" || arg == "--capture-churn") {
         return nested_pending_receipt();
     }
     if std::env::args().any(|arg| arg == "--captured-attachment") {
@@ -633,6 +633,9 @@ fn captured_attachment_receipt() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn nested_pending_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    let churn = std::env::args().any(|arg| arg == "--capture-churn");
+    let iterations = if churn { 1000 } else { 3 };
+    let sizes = if churn { [10, 100] } else { [1000, 10000] };
     let registry = Registry::default();
     register_algorithms(&registry)?;
     let increment = vec![
@@ -642,22 +645,24 @@ fn nested_pending_receipt() -> Result<(), Box<dyn std::error::Error>> {
         json!({"id":"core.attach_node_attr","params":{"source":"next","attr":"counter"}}),
     ];
     let mut cases = Vec::new();
-    for count in [1_000, 10_000] {
+    for count in sizes {
         for mode in ["flat", "loop", "nested"] {
             let mut steps =
                 vec![json!({"id":"graph.add_nodes","params":{"count":1,"output":"new"}})];
             match mode {
                 "flat" => {
-                    for _ in 0..3 {
+                    for _ in 0..iterations {
                         steps.extend(increment.clone());
                     }
                 }
-                "loop" => {
-                    steps.push(json!({"id":"iter.loop","params":{"iterations":3,"body":increment}}))
-                }
-                _ => steps.push(json!({"id":"iter.loop","params":{"iterations":3,"body":[
-                    {"id":"iter.loop","params":{"iterations":1,"body":increment}}
-                ]}})),
+                "loop" => steps.push(
+                    json!({"id":"iter.loop","params":{"iterations":iterations,"body":increment}}),
+                ),
+                _ => steps.push(
+                    json!({"id":"iter.loop","params":{"iterations":iterations,"body":[
+                        {"id":"iter.loop","params":{"iterations":1,"body":increment}}
+                    ]}}),
+                ),
             }
             let mut params = AlgorithmParams::new();
             params.set_text("steps", json!({"atomic":true,"steps":steps}).to_string());
@@ -683,14 +688,19 @@ fn nested_pending_receipt() -> Result<(), Box<dyn std::error::Error>> {
                 assert_eq!(graph.borrow().current_state_id(), 2);
                 assert_eq!(
                     graph.borrow().get_node_attr(count, &"counter".into())?,
-                    Some(AttrValue::Int(3))
+                    Some(AttrValue::Int(iterations as i64))
                 );
             }
-            cases.push(json!({"initial_nodes":count,"mode":mode,"seconds":samples}));
+            cases.push(json!({"initial_nodes":count,"mode":mode,"iterations":iterations,"seconds":samples}));
         }
     }
-    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
-        .unwrap_or_else(|_| "nested_pending_execution.json".into());
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE").unwrap_or_else(|_| {
+        if churn {
+            "capture_churn.json".into()
+        } else {
+            "nested_pending_execution.json".into()
+        }
+    });
     std::fs::write(
         &path,
         serde_json::to_vec_pretty(&json!({
