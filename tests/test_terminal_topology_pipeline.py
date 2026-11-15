@@ -119,7 +119,7 @@ def test_order_scope_and_persistence_guards_reject_before_effects():
     remove = stage("graph.remove_nodes", ids=[1])
     for handle, kwargs in [
         (step_pipeline("non atomic", prefix() + [remove]), {}),
-        (step_pipeline("late read", [remove, stage("core.sample_nodes", target="late", count=1)], atomic=True), {}),
+        (step_pipeline("late read", [remove, stage("sample.iterate_nodes", target="late")], atomic=True), {}),
         (step_pipeline("transient", prefix() + [remove], atomic=True), {"persist": False}),
     ]:
         with pytest.raises(RuntimeError):

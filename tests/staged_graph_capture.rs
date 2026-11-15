@@ -141,8 +141,8 @@ fn late_capture_or_projection_errors_restore_old_outputs_and_discard_effects() {
 #[test]
 fn staged_graph_capture_does_not_enable_unadapted_topology_reads_or_property_effects() {
     for late in [
-        json!({"id":"core.sample_edges","params":{"target":"neighbors","count":1}}),
-        json!({"id":"core.sample_nodes","params":{"target":"degree","count":1}}),
+        json!({"id":"sample.iterate_edges","params":{"target":"neighbors"}}),
+        json!({"id":"sample.iterate_nodes","params":{"target":"degree"}}),
     ] {
         assert!(pipeline(json!([
             {"id":"graph.remove_nodes","params":{"ids":[]}},

@@ -74,9 +74,16 @@ typed graph/table/snapshot bindings retain source identity. Current parent pins
 can be borrowed by children without an extra copy. See
 `nested-pending-execution-2026-11-15.md` for evidence and remaining guards.
 
+### Implemented follow-up: core compute readers
+
+Seventeen existing filtering/ordering, numerical map, fused, community and mask
+sampling step types now compose after pending topology. Shared source validation
+and selected CSR replace owner-only reads. See `pending-core-compute-2026-11-15.md`
+for gates, benchmark and remaining subgraph-frame boundaries.
+
 ### Next chunks
 
-1. Remaining sampling/community and general topology-mutating execution, public
+1. Subgraph-producing sampling/for-each and general topology-mutating execution, public
    facade lowering and execution/DSL coverage.
 2. Property/schema/provenance and persistence-boundary completion.
 3. Archive/recovery memory, numerical/algorithm certification and scale targets.

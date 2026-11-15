@@ -13,14 +13,15 @@ The successful qualification below applies to the earlier bounded candidate.
 Implementation changes toward the expanded target require fresh final gates.
 
 Supported outer atomic topology composition, pending selected readers, explicit
-captured-table attachment and nested compute frames are complete locally:
-1,588 native tests, 2,883 maintained Python tests and 275
+captured-table attachment, nested compute frames and core compute readers are complete locally:
+1,589 native tests, 2,918 maintained Python tests and 276
 executable examples pass, plus strict Clippy and Rust formatting.
 See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md)
 [pending property evidence](notes/planning/pending-topology-properties-2026-11-15.md)
 [selected reader evidence](notes/planning/pending-topology-readers-2026-11-15.md)
 [table attachment evidence](notes/planning/captured-table-attachment-2026-11-15.md)
-and [nested execution evidence](notes/planning/nested-pending-execution-2026-11-15.md).
+[nested execution evidence](notes/planning/nested-pending-execution-2026-11-15.md)
+and [core compute evidence](notes/planning/pending-core-compute-2026-11-15.md).
 The 44 broad unchecked release rows retain their remaining exit requirements.
 
 ## Qualified bounded candidate

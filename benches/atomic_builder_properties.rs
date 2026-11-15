@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--pending-core") {
+        return pending_core_receipt();
+    }
     if std::env::args().any(|arg| arg == "--nested-pending") {
         return nested_pending_receipt();
     }
@@ -690,5 +693,79 @@ fn nested_pending_receipt() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote nested pending receipt to {path}");
+    Ok(())
+}
+
+fn pending_core_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::{BatchNodeRef as N, GraphBatch};
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [1_000, 10_000] {
+        let mut params = AlgorithmParams::new();
+        params.set_text("steps", json!({"atomic":true,"steps":[
+            {"id":"graph.add_nodes","params":{"count":1,"output":"new"}},
+            {"id":"graph.add_edges","params":{"edges":[[count-1,{"added":0}],[{"added":0},0]],"output":"new_edges","attributes":{"weight":2.0}}},
+            {"id":"iter.loop","params":{"iterations":1,"body":[
+                {"id":"core.load_node_attr","params":{"attr":"node_id","target":"ids"}},
+                {"id":"core.normalize_values","params":{"source":"ids","target":"normalized","method":"sum"}},
+                {"id":"core.init_nodes","params":{"target":"two","value":2}},
+                {"id":"graph.fused_neighbor_mul_agg","params":{"values":"normalized","scalars":"two","target":"fused","direction":"out"}},
+                {"id":"core.top_k","params":{"source":"ids","target":"top","k":10,"order":"desc"}},
+                {"id":"core.sample_nodes","params":{"target":"sample","count":10,"seed":43}},
+                {"id":"core.attach_node_attr","params":{"source":"normalized","attr":"normalized"}},
+                {"id":"core.attach_node_attr","params":{"source":"fused","attr":"fused"}},
+                {"id":"core.attach_node_attr","params":{"source":"top","attr":"rank"}},
+                {"id":"core.attach_node_attr","params":{"source":"sample","attr":"sample"}}
+            ]}}
+        ]}).to_string());
+        let algorithm = registry.instantiate(&AlgorithmSpec {
+            id: "builder.step_pipeline".into(),
+            params,
+        })?;
+        let mut samples = Vec::new();
+        for _ in 0..5 {
+            let mut graph = Graph::new_directed();
+            graph.apply_batch(
+                GraphBatch {
+                    add_nodes: count,
+                    add_edges: (0..count)
+                        .map(|node| (N::Added(node), N::Added((node + 1) % count)))
+                        .collect(),
+                    ..Default::default()
+                },
+                0,
+                "fixture".into(),
+                "bench".into(),
+            )?;
+            let graph = Arc::new(OwnerCell::new(graph));
+            let selected = Subgraph::from_frozen_view(
+                graph.clone(),
+                graph.borrow().read_view()?,
+                "bench".into(),
+            );
+            let mut ctx = Context::new();
+            let started = Instant::now();
+            let result = algorithm.execute(&mut ctx, selected)?;
+            samples.push(started.elapsed().as_secs_f64());
+            assert_eq!(result.node_count(), count + 1);
+            assert_eq!(graph.borrow().current_state_id(), 2);
+            assert_eq!(
+                graph.borrow().get_node_attr(count, &"rank".into())?,
+                Some(AttrValue::Int(0))
+            );
+        }
+        cases.push(json!({"initial_nodes":count,"initial_edges":count,"seconds":samples}));
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "pending_core_compute.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release, five observations. Directed ring with one staged node and two staged weighted edges; one compute loop with ID load, sum normalization, fused outgoing aggregation, top-k, seeded mask, four attachments and one publication. Includes pending capture/reuse and kernels; fixture, initial capture, compilation, algorithm construction and assertions excluded. No before/after speedup, FFI, memory or scale guarantee.",
+            "cases":cases
+        }))?,
+    )?;
+    println!("Wrote pending core receipt to {path}");
     Ok(())
 }

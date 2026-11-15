@@ -20,7 +20,7 @@ use crate::traits::SubgraphOperations;
 use crate::types::{EdgeId, NodeId};
 
 use super::super::{AlgorithmOutput, AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope, StepVariables};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope, StepVariables};
 
 /// Specification for sampling: either a fraction or absolute count.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,8 +52,26 @@ impl SampleSpec {
     }
 }
 
-/// Stable selected IDs, checked against the active owner and endpoint closure.
+/// Stable IDs from the validated selected source, including immutable pending reads.
 fn checked_population(ctx: &Context, scope: &StepScope<'_>, edges: bool) -> Result<Vec<usize>> {
+    check_cancelled(ctx)?;
+    let selection = scope.subgraph();
+    selection.validate_selected_read()?;
+    let ids = if edges {
+        selection.ordered_edges()
+    } else {
+        selection.ordered_nodes()
+    };
+    check_cancelled(ctx)?;
+    Ok(ids.to_vec())
+}
+
+/// Stable selected IDs, checked against the active owner and endpoint closure.
+fn checked_owner_population(
+    ctx: &Context,
+    scope: &StepScope<'_>,
+    edges: bool,
+) -> Result<Vec<usize>> {
     check_cancelled(ctx)?;
     let selection = scope.subgraph();
     let graph = selection.graph();
@@ -129,6 +147,10 @@ impl SampleNodesStep {
 }
 
 impl Step for SampleNodesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -176,6 +198,10 @@ impl SampleEdgesStep {
 }
 
 impl Step for SampleEdgesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -211,7 +237,7 @@ struct SelectionTopology {
 }
 impl SelectionTopology {
     fn prepare(ctx: &Context, scope: &StepScope<'_>) -> Result<Self> {
-        let edges = checked_population(ctx, scope, true)?;
+        let edges = checked_owner_population(ctx, scope, true)?;
         let nodes = scope.subgraph().ordered_nodes().to_vec();
         let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
         let mut endpoints = HashMap::with_capacity(edges.len());
@@ -878,6 +904,10 @@ impl ReservoirSampleStep {
 }
 
 impl Step for ReservoirSampleStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

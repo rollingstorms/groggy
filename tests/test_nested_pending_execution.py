@@ -113,7 +113,7 @@ def test_unsupported_nested_effects_reject_before_any_prefix(iterations, unsuppo
     if unsupported == "topology":
         body = [stage("graph.add_nodes", count=1, output="extra")]
     elif unsupported == "sampling":
-        body = [stage("core.sample_nodes", count=1, target="sample")]
+        body = [stage("sample.iterate_nodes", target="sample")]
     elif unsupported == "streaming":
         body = [stage("core.execution_block", mode="streaming", target="values", options={}, body={"nodes": []})]
     else:

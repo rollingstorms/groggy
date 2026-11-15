@@ -504,3 +504,65 @@ fn nested_loops_refresh_pending_properties_and_keep_typed_capture_authority() {
         Some(AttrValue::Int(0))
     );
 }
+
+#[test]
+fn pending_filters_fused_kernels_and_masks_share_one_selected_acceptance() {
+    let graph = fixture(true);
+    let head = graph.borrow().current_state_id();
+    let old = graph.borrow().read_view().unwrap();
+    pipeline(vec![create_nodes(), json!([
+        {"id":"graph.add_edges","params":{"edges":[[0,{"added":0}],[{"added":0},4]],"output":"new_edges"}},
+        {"id":"graph.set_edge_endpoints","params":{"revisions":[[0,4,0]]}},
+        {"id":"graph.remove_nodes","params":{"ids":[2]}},
+        {"id":"iter.loop","params":{"iterations":1,"body":[
+            {"id":"core.load_node_attr","params":{"attr":"node_id","target":"ids"}},
+            {"id":"core.init_nodes","params":{"target":"two","value":2}},
+            {"id":"graph.fused_neighbor_mul_agg","params":{"values":"ids","scalars":"two","target":"fused","direction":"out"}},
+            {"id":"core.attach_node_attr","params":{"source":"fused","attr":"neighbor_sum"}},
+            {"id":"core.normalize_values","params":{"source":"ids","target":"normalized","method":"sum"}},
+            {"id":"core.attach_node_attr","params":{"source":"normalized","attr":"normalized"}},
+            {"id":"core.top_k","params":{"source":"ids","target":"top","k":2,"order":"desc"}},
+            {"id":"core.attach_node_attr","params":{"source":"top","attr":"rank"}},
+            {"id":"core.sample_nodes","params":{"target":"all","fraction":1.0,"seed":43}},
+            {"id":"core.reservoir_sample","params":{"source":"all","target":"sample","k":2,"seed":43}},
+            {"id":"core.attach_node_attr","params":{"source":"sample","attr":"sample"}},
+            {"id":"core.community_seed","params":{"strategy":"singleton","target":"labels"}},
+            {"id":"core.label_propagate_step","params":{"labels":"labels","target":"propagated"}},
+            {"id":"core.attach_node_attr","params":{"source":"propagated","attr":"label"}}
+        ]}}
+    ])]).run_atomic_properties(&mut Context::new(), selected(&graph)).unwrap();
+    let graph = graph.borrow();
+    assert_eq!(graph.current_state_id(), head + 1);
+    let mut sampled = 0;
+    for (node, sum, label) in [(0, 14.0, 0), (4, 8.0, 4), (7, 8.0, 4)] {
+        assert_eq!(
+            graph.get_node_attr(node, &"neighbor_sum".into()).unwrap(),
+            Some(AttrValue::Float64(sum))
+        );
+        assert_eq!(
+            graph.get_node_attr(node, &"label".into()).unwrap(),
+            Some(AttrValue::Int(label))
+        );
+        assert_eq!(
+            graph.get_node_attr(node, &"normalized".into()).unwrap(),
+            Some(AttrValue::Float64(node as f64 / 11.0))
+        );
+        sampled += usize::from(
+            graph
+                .get_node_attr(node, &"sample".into())
+                .unwrap()
+                .is_some(),
+        );
+    }
+    assert_eq!(sampled, 2);
+    assert_eq!(
+        graph.get_node_attr(7, &"rank".into()).unwrap(),
+        Some(AttrValue::Int(0))
+    );
+    assert_eq!(
+        graph.get_node_attr(5, &"neighbor_sum".into()).unwrap(),
+        None
+    );
+    assert_eq!(old.edge_endpoints(0).unwrap(), (0, 2));
+    assert_eq!(old.node_attr(4, &"neighbor_sum".into()).unwrap(), None);
+}

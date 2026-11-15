@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 
 /// Normalization methods.
 #[derive(Clone, Copy, Debug)]
@@ -51,6 +51,10 @@ impl NormalizeValuesStep {
 }
 
 impl Step for NormalizeValuesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -204,6 +208,10 @@ impl NormalizeNodeValuesStep {
 }
 
 impl Step for NormalizeNodeValuesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -243,6 +251,10 @@ impl StandardizeStep {
 }
 
 impl Step for StandardizeStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -352,6 +364,10 @@ impl ClipValuesStep {
 }
 
 impl Step for ClipValuesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

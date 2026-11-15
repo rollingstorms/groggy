@@ -7,10 +7,8 @@
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
-use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
-
 use super::super::{Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope, StepSpec};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope, StepSpec};
 use super::direction::NeighborDirection;
 
 /// Fused neighbor aggregation with element-wise multiplication.
@@ -87,6 +85,10 @@ impl FusedNeighborMulAgg {
 }
 
 impl Step for FusedNeighborMulAgg {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         // Inputs and outputs are run variables; graph access is topology-only.
         true
@@ -109,24 +111,21 @@ impl Step for FusedNeighborMulAgg {
             return Err(anyhow!("FusedNeighborMulAgg cancelled"));
         }
 
-        let subgraph = scope.subgraph();
-        let nodes = subgraph.ordered_nodes();
+        let selected = scope.selected_csr(ctx, self.direction)?;
+        let nodes = &selected.nodes;
+        let csr = &selected.csr;
 
-        // Get input node maps
         let values_map = scope.variables().node_map(&self.values)?;
         let scalars_map = scope.variables().node_map(&self.scalars)?;
-
-        // Build node -> index mapping for fast lookup
-        let mut node_to_idx = std::collections::HashMap::with_capacity(nodes.len());
-        for (idx, &node) in nodes.iter().enumerate() {
-            node_to_idx.insert(node, idx);
-        }
 
         // Convert to f64 arrays for fast indexing
         let mut values_arr = vec![0.0; nodes.len()];
         let mut scalars_arr = vec![0.0; nodes.len()];
 
         for (idx, &node) in nodes.iter().enumerate() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Fused operation cancelled"));
+            }
             if let Some(v) = values_map.get(&node) {
                 values_arr[idx] = match v {
                     crate::algorithms::AlgorithmParamValue::Float(f) => *f,
@@ -143,59 +142,14 @@ impl Step for FusedNeighborMulAgg {
             }
         }
 
-        // Build CSR with specified direction
-        let mut csr = Csr::default();
-        {
-            let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            let pool = graph_ref.pool();
-            let edges = subgraph.edges();
-
-            let _build_time = match self.direction {
-                NeighborDirection::In => build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| {
-                        pool.get_edge_endpoints(eid)
-                            .map(|(source, target)| (target, source))
-                    },
-                    CsrOptions {
-                        add_reverse_edges: false,
-                        sort_neighbors: false,
-                    },
-                ),
-                NeighborDirection::Out => build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid),
-                    CsrOptions {
-                        add_reverse_edges: false,
-                        sort_neighbors: false,
-                    },
-                ),
-                NeighborDirection::Undirected => build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid),
-                    CsrOptions {
-                        add_reverse_edges: true,
-                        sort_neighbors: false,
-                    },
-                ),
-            };
-        }
-
         // Allocate result map
         let mut result = HashMap::with_capacity(nodes.len());
 
         // Fused kernel: aggregate neighbors with multiplication in single pass
         for (idx, &node) in nodes.iter().enumerate() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Fused operation cancelled"));
+            }
             let mut sum = 0.0;
 
             // Iterate over CSR neighbors and accumulate weighted sum
@@ -281,6 +235,10 @@ impl FusedAXPY {
 }
 
 impl Step for FusedAXPY {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         // Inputs and outputs are run variables; graph access is topology-only.
         true
@@ -304,6 +262,7 @@ impl Step for FusedAXPY {
         }
 
         let subgraph = scope.subgraph();
+        subgraph.validate_selected_read()?;
         let nodes = subgraph.ordered_nodes();
 
         // Try to get each variable as node map or scalar
@@ -344,6 +303,9 @@ impl Step for FusedAXPY {
         let mut result = std::collections::HashMap::with_capacity(nodes.len());
 
         for &node in nodes.iter() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Fused operation cancelled"));
+            }
             let x_val = match x_map.get(&node) {
                 Some(crate::algorithms::AlgorithmParamValue::Float(f)) => *f,
                 Some(crate::algorithms::AlgorithmParamValue::Int(i)) => *i as f64,
@@ -444,6 +406,10 @@ impl FusedMADD {
 }
 
 impl Step for FusedMADD {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         // Inputs and outputs are run variables; graph access is topology-only.
         true
@@ -467,6 +433,7 @@ impl Step for FusedMADD {
         }
 
         let subgraph = scope.subgraph();
+        subgraph.validate_selected_read()?;
         let nodes = subgraph.ordered_nodes();
 
         let a_map = scope.variables().node_map(&self.a)?;
@@ -476,6 +443,9 @@ impl Step for FusedMADD {
         let mut result = std::collections::HashMap::with_capacity(nodes.len());
 
         for &node in nodes.iter() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Fused operation cancelled"));
+            }
             let a_val = match a_map.get(&node) {
                 Some(crate::algorithms::AlgorithmParamValue::Float(f)) => *f,
                 Some(crate::algorithms::AlgorithmParamValue::Int(i)) => *i as f64,

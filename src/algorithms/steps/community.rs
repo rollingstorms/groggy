@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{NodeColumn, Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, NodeColumn, Step, StepMetadata, StepScope};
 use super::transformations::{selected_neighbors, selected_nodes};
 
 fn check_cancelled(ctx: &Context) -> Result<()> {
@@ -129,6 +129,10 @@ impl CommunitySeedStep {
 }
 
 impl Step for CommunitySeedStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -225,6 +229,10 @@ impl ModularityGainStep {
 }
 
 impl Step for ModularityGainStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -254,7 +262,7 @@ impl Step for ModularityGainStep {
             };
             labels.insert(node, label);
         }
-        let directed = scope.subgraph().graph().borrow().is_directed();
+        let directed = scope.subgraph().read_is_directed();
         let m = scope.subgraph().edges().len() as f64;
         let mut incoming: HashMap<NodeId, Vec<NodeId>> =
             selected.iter().map(|&node| (node, Vec::new())).collect();
@@ -361,6 +369,10 @@ impl LabelPropagateStep {
 }
 
 impl Step for LabelPropagateStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

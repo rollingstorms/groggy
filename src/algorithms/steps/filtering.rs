@@ -15,7 +15,7 @@ use crate::storage::numeric::{scalar::compare_inputs, NumericInput};
 use crate::types::{AttrName, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 
 /// Predicate for filtering operations.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -193,6 +193,10 @@ impl SortNodesByAttrStep {
 }
 
 impl Step for SortNodesByAttrStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -274,6 +278,10 @@ impl FilterNodesByAttrStep {
 }
 
 impl Step for FilterNodesByAttrStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -343,6 +351,10 @@ impl FilterEdgesByAttrStep {
 }
 
 impl Step for FilterEdgesByAttrStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -419,6 +431,10 @@ impl TopKStep {
 }
 
 impl Step for TopKStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -443,18 +459,15 @@ impl Step for TopKStep {
         let source_map = scope.variables().node_map(&self.source)?;
 
         let mut items = Vec::with_capacity(source_map.len());
-        {
-            let graph = scope.subgraph().graph();
-            let graph = graph.borrow();
-            for (&node, value) in source_map {
-                if !scope.subgraph().has_node(node) || !graph.has_node(node) {
-                    return Err(anyhow!(
-                        "top_k source node {} is outside active selection",
-                        node
-                    ));
-                }
-                items.push((node, Some(value.clone())));
+        scope.subgraph().validate_selected_read()?;
+        for (&node, value) in source_map {
+            if !scope.subgraph().has_node(node) {
+                return Err(anyhow!(
+                    "top_k source node {} is outside active selection",
+                    node
+                ));
             }
+            items.push((node, Some(value.clone())));
         }
         sort_checked(ctx, &mut items, self.order)?;
 
