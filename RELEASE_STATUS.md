@@ -1,6 +1,6 @@
 # Groggy 0.6.0 release qualification
 
-Updated 2026-11-14. **Coordinated priority pass and local artifacts qualified; platform CI finishing. Unreleased.**
+Updated 2026-11-14. **Coordinated priority pass qualified locally and across the platform matrix. Unreleased.**
 
 ## Bounded release checklist
 
@@ -11,7 +11,7 @@ Updated 2026-11-14. **Coordinated priority pass and local artifacts qualified; p
 | Scope, migration and release docs | Complete for this candidate | [Release notes](RELEASE_NOTES_0.6.0.md), [application workflow](docs/api/core-release-workflow.md), [qualification runbook](docs/api/release-qualification.md). |
 | Package qualification | Complete locally | Fresh root, nested and extracted-source wheels; versions, 105 declared exports, typing assets and both storage workflows pass. |
 | Native and artifact-backed regression gates | Passed locally | 1,573 Rust tests; serial checkpoint recovery; strict Clippy; 2,751 Python tests; 270 executable docs examples from the fresh unpacked root wheel. |
-| Cross-platform qualification | Running | Real 19-combination workflow dispatched; Python 3.8/Windows failures repaired, compiler pinned to Rust 1.96.1. Final results remain required. |
+| Cross-platform qualification | Passed | All 19 wheel combinations, native gates and extracted-source rebuild pass on native implementation `9aadfee5`, using Rust 1.96.1. Receipts include every wheel hash. |
 
 Committed work has been pushed and the platform workflow dispatched. No tag or
 package publication occurred. Manual qualification cannot publish; a published
@@ -29,7 +29,7 @@ retained archive/journal recovery within documented boundaries. See the
 
 Both package entry points declare CPython `>=3.8,<3.13`, matching the current
 PyO3 0.20.3 build limit. CI targets Linux/Windows x86_64 and macOS Intel 3.8–3.12;
-macOS arm64 3.9–3.12. Only macOS arm64 CPython 3.9 has been executed locally here.
+macOS arm64 3.9–3.12. Local execution uses macOS arm64 CPython 3.9; all 19 listed combinations have now passed CI.
 Newer interpreters and PyPy have no qualification claim in this release receipt.
 
 Creator-checked Arc/OwnerCell handles fix foreign-thread cyclic-GC finalization
@@ -72,6 +72,14 @@ reporting and independent finite graph references. Archive validation avoids
 peaks; larger dense products improve about 8–10% in the recorded corpus. See
 [graph memory](notes/planning/priority-memory-2026-11-14.md) and
 [numerical measurements](notes/planning/priority-numerical-2026-11-14.md).
+
+Current source, artifact hashes and all platform receipts:
+
+- [Coordinated pass](notes/planning/priority-pass-2026-11-14.md) and
+  [machine-readable results](notes/planning/priority-pass-final-gates-2026-11-14.json).
+- [Successful platform run](https://github.com/rollingstorms/groggy/actions/runs/43668885370).
+  All 21 required jobs passed; publication was skipped for manual qualification.
+  Later changes and an actual release tag must run the configured gates again.
 
 Earlier baseline evidence, artifact/lock hashes and reproducible commands:
 

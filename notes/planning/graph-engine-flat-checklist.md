@@ -55,7 +55,7 @@ completed components and gates. No new rows or broad parent checkmarks were adde
 Current bounded release slice: prioritize 0.6.0 package/version/export
 qualification, a supported core acceptance workflow, existing workload baselines
 and release/migration documentation. Package, workflow and native finalization
-components are complete; cross-platform qualification remains open. The ownership
+components are complete; cross-platform qualification now passes all 19 wheel combinations plus native/source gates (`priority-pass-2026-11-14.md`). The ownership
 follow-up is `python-owner-lifetime-2026-11-14.md`; broad 19.2 remains partial.
 See `release-060-qualification-2026-11-14.md`. This adds no checklist rows or broad
 parent checkmarks; the full-engine dependency order below remains future work.

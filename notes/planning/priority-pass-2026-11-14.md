@@ -9,7 +9,7 @@ parents and deferred work make this a scope inventory, not a release percentage.
 
 | Priority | Implementation and evidence | Remaining boundary |
 | --- | --- | --- |
-| Release qualification | Executed the real platform workflow; repaired Python 3.8 verifier paths, Windows slice-width conversion, file/directory sync capability reporting and Windows locked-handle journal identity. Pinned the qualified compiler to Rust 1.96.1. | Final platform outcome is recorded below; no release publication. Newer compiler warning cleanliness is not certified. |
+| Release qualification | Executed the real platform workflow; repaired Python 3.8 verifier paths, Windows slice-width conversion, file/directory sync capability reporting and Windows locked-handle journal identity. Pinned the qualified compiler to Rust 1.96.1. | All 19 wheel jobs plus native and extracted-source gates passed; no release publication. Newer compiler warning cleanliness is not certified. |
 | Memory/recovery | Shared scale/allocation fixtures, three fresh processes per size, and validation without disposable read indexes. Each 100k archive save/recovery avoids 400,009 allocations. | Peak requested archive memory is unchanged; larger/deeper histories and recovery budgets remain open. |
 | Staged execution | Local atomic node/edge additions, stable added-node references and 13 existing algorithm kernels over immutable pending captures. Late failure rolls back all stages without consuming IDs; acceptance remains one checked batch. | Outer topology programs, unadapted effects, remaining DSL, streaming and alternate plans remain open. |
 | Numerical costs | Reused the 55-workload release corpus and measured allocation/throughput before and after contiguous dense-product access. Larger fixtures improve about 8–10%, with unchanged requested peaks and checked arithmetic. | Scalar performance, broad budgets and further acceleration remain open; no external-backend parity claim. |
@@ -74,7 +74,7 @@ Qualification receipts identify the exact exported source and artifact hashes.
 2. Unadapted topology/compound execution and remaining native facade parity.
 3. Scalar numerical throughput and unchosen workload budgets.
 4. Schema/ontology evolution policy and future storage-version migration.
-5. Platform-specific filesystem limits and any uncompleted qualification jobs.
+5. Platform-specific filesystem limits; later release tags must repeat qualification.
 
 These remain existing checklist work. The bounded release candidate does not
 require completing every deferred engine feature, but it does require accurate
@@ -92,3 +92,24 @@ include both resolved Cargo lockfiles, the source archive, each wheel, test tota
 and the platform-run snapshot. Artifact qualification precedes the behavior-free
 Rust formatting follow-ups; subsequent documentation edits do not change the
 native implementation. Earlier preview artifacts are superseded by this receipt.
+
+## Final platform outcome
+
+[Run 43668885370](https://github.com/rollingstorms/groggy/actions/runs/43668885370)
+completed successfully on native implementation `9aadfee5`: **21 required jobs
+passed**, covering **19 wheel combinations**, the native test/serial-recovery/
+Clippy gate and extracted-source rebuild. Publication was skipped by the manual
+qualification condition. All wheel receipts report version 0.6.0, 105 exports
+and successful archive/journal workflows. Linux CPython 3.12 also runs the
+maintained Python/docs suite; the other wheel jobs run workflow/ownership tests.
+
+The matrix covers Linux and Windows x86_64 plus macOS Intel on CPython 3.8–3.12,
+and macOS arm64 on 3.9–3.12. Full OS/interpreter details and hashes for all 19
+wheels plus the source rebuild are retained in the machine-readable receipt.
+These are successful tests on the reported runners, not certification of every
+filesystem, older OS, compiler or machine.
+
+The six selected components have completed this coordinated pass. Their broader
+remaining boundaries stay in the existing checklist. Documentation and formatting
+follow-ups do not change native behavior; a future published release tag still
+has to pass its configured gates. No tag or package release was created.
