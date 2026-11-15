@@ -22,8 +22,9 @@ Implemented capabilities, within their documented boundaries:
 - Retained archives and journaled durable storage with explicit recovery,
   checkpoint, compaction and purge operations.
 - Typed pipeline values, atomic property programs and selected topology effects.
-  General staged additions and algorithms over arbitrary pending topology remain
-  unfinished; ordinary graph APIs already support additions.
+  Local atomic programs can stage node/edge additions and run 13 existing
+  algorithms on immutable pending captures. Outer topology programs, unadapted
+  effects and remaining DSL/streaming work retain their checklist boundaries.
 
 See the [flat checklist](notes/planning/graph-engine-flat-checklist.md) for exact
 completion boundaries and the [core workflow](docs/api/core-release-workflow.md)

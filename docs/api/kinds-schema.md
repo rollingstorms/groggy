@@ -76,8 +76,16 @@ Validation combines staged properties with unchanged live values, applies label/
 
 Every schema finding is reported before allocation or property/history writes. Rejection preserves current state, history, dirty tracking and allocation counters; success publishes one state using the existing batch coordinator. Proposed entity IDs shown in errors are prospective IDs and have not been reserved. Existing stale-state and uncommitted-legacy-write guards still apply. Schema checking uses an overlay of staged assignments and reads existing columns, rather than cloning/reconstructing the graph. It scans the proposed graph; it is not an indexed incremental check. Existing constraints on required, nullable and logical property types are identical to explicit auditing.
 
-## Remaining enforcement work
+## Installed durable policies and remaining work
 
-Schema validation via `validate_schema` is an explicit audit; schema-controlled batches enforce policy only for the call. Installing a graph-wide enforced schema still requires every direct writer to join the checked publication boundary in item 9. Existing infallible Rust creation methods cannot report required-field errors; they need a compatible checked path or an explicit policy restriction. This slice does not silently impose required fields on those methods.
+`Graph` schema arguments remain explicit per-call validation. `DurableGraph`
+installs and persists a global policy with a checked schema revision; session
+schemas can add constraints but cannot bypass that installed policy. See the
+[compatible migration workflow](schema-migration.md) for explicit policy/data/policy
+stages, failure atomicity, backup and retained historical reads.
 
-Schema policy versioning/persistence, ontology migrations, relationship endpoint constraints, uniqueness constraints beyond managed external IDs, and indexed label/type selection remain open. Existing files using incompatible values in `labels` or `relationship_type` now fail checked loading explicitly; callers must migrate those properties. Graphiti-specific label mapping remains the adapter's responsibility.
+Branch-specific policy history, automatic ontology migration, relationship
+endpoint constraints, uniqueness beyond managed external IDs and indexed
+label/type selection remain open. Existing files with incompatible `labels` or
+`relationship_type` values fail checked loading explicitly; callers must migrate
+those properties.

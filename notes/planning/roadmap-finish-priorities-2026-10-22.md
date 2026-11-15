@@ -8,6 +8,14 @@ AR7 tracks consolidation. Pending workbook suggestions are not accepted decision
 
 ## Current execution checkpoint
 
+### Coordinated priority pass — 2026-11-14
+
+Local atomic topology creation and 13 captured algorithm kernels are implemented;
+archive/numerical allocation evidence, empty bulk consistency, platform storage
+capabilities, Windows locked-handle verification and explicit schema migration
+are recorded in `priority-pass-2026-11-14.md`. Broader parent rows stay open.
+The qualification paragraphs below are historical baselines.
+
 ### Proposed bounded 0.6.0 qualification — 2026-11-14
 
 Application/baseline/release follow-up: the complete workflow now runs through

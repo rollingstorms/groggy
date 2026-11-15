@@ -1,0 +1,260 @@
+{
+  "source_commit": "9aadfee5",
+  "formatting_followup": [
+    "6886a4f6",
+    "b4634542"
+  ],
+  "observed_at_utc": "2026-11-15T02:47:37.126325+00:00",
+  "artifacts": {
+    "root": {
+      "python": "3.9.6 (default, Mar 12 2025, 20:22:46) \n[Clang 17.0.0 (clang-1700.0.13.3)]",
+      "platform": "macOS-26.3.1-arm64-arm-64bit",
+      "artifacts": [
+        {
+          "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+          "sha256": "f40f70051f97a6077b9f5422ab1d5bc57e85baa69eff84d3fa4a2d68506c82eb",
+          "smoke": {
+            "version": "0.6.0",
+            "exports": 105,
+            "package": "/private/var/folders/jy/34vkbxz97tbgm78bc07fmx380000gn/T/groggy-wheel-check-tqehm_99/groggy/__init__.py",
+            "workflows": [
+              {
+                "storage": "archive",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              },
+              {
+                "storage": "journal",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              }
+            ]
+          },
+          "tests": "maintained"
+        }
+      ]
+    },
+    "nested": {
+      "python": "3.9.6 (default, Mar 12 2025, 20:22:46) \n[Clang 17.0.0 (clang-1700.0.13.3)]",
+      "platform": "macOS-26.3.1-arm64-arm-64bit",
+      "artifacts": [
+        {
+          "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+          "sha256": "5232c4577c8d7b1c02736387c808b2390f287f4d94937a56e76a75026091a6cf",
+          "smoke": {
+            "version": "0.6.0",
+            "exports": 105,
+            "package": "/private/var/folders/jy/34vkbxz97tbgm78bc07fmx380000gn/T/groggy-wheel-check-poz3n_z_/groggy/__init__.py",
+            "workflows": [
+              {
+                "storage": "archive",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              },
+              {
+                "storage": "journal",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              }
+            ]
+          },
+          "tests": "ownership"
+        }
+      ]
+    },
+    "source": {
+      "python": "3.9.6 (default, Mar 12 2025, 20:22:46) \n[Clang 17.0.0 (clang-1700.0.13.3)]",
+      "platform": "macOS-26.3.1-arm64-arm-64bit",
+      "artifacts": [
+        {
+          "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+          "sha256": "e67717ebb314527907d3f9382c1305a264429a5941f1b31ff03b4958fbd82c98",
+          "smoke": {
+            "version": "0.6.0",
+            "exports": 105,
+            "package": "/private/var/folders/jy/34vkbxz97tbgm78bc07fmx380000gn/T/groggy-wheel-check-g1acflk7/groggy/__init__.py",
+            "workflows": [
+              {
+                "storage": "archive",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              },
+              {
+                "storage": "journal",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              }
+            ]
+          },
+          "tests": "none"
+        }
+      ]
+    }
+  },
+  "source_distribution_sha256": "6ecf1822c07c76a0926b9c514b272bb5a0453f1f38a319a96101a3f8f73bb607",
+  "cargo_locks": {
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c"
+  },
+  "native": {
+    "suites": 222,
+    "passed": 1573,
+    "failed": 0,
+    "ignored": 54
+  },
+  "gates": {
+    "python_passed": 2751,
+    "python_skipped": 1,
+    "python_warnings": 14,
+    "documentation_examples": 270,
+    "nested_ownership_tests": 36,
+    "clippy_all_targets": "passed with Rust 1.96.1",
+    "serial_checkpoint_recovery": "passed",
+    "format_all_check": "passed",
+    "black_isort_precommit": "unavailable; not installed"
+  },
+  "ci": {
+    "conclusion": "",
+    "headSha": "9aadfee5d5a9ae41cf05c51aa1fa6e15aca9f95b",
+    "jobs": [
+      {
+        "name": "native-gates",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280000"
+      },
+      {
+        "name": "build-sdist",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280249"
+      },
+      {
+        "name": "Qualify CPython 3.9 (x86_64-unknown-linux-gnu)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280253"
+      },
+      {
+        "name": "Qualify CPython 3.10 (x86_64-unknown-linux-gnu)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280258"
+      },
+      {
+        "name": "Qualify CPython 3.8 (x86_64-unknown-linux-gnu)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280264"
+      },
+      {
+        "name": "Qualify CPython 3.11 (x86_64-unknown-linux-gnu)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280283"
+      },
+      {
+        "name": "Qualify CPython 3.9 (x86_64-pc-windows-msvc)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280290"
+      },
+      {
+        "name": "Qualify CPython 3.9 (aarch64-apple-darwin)",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280292"
+      },
+      {
+        "name": "Qualify CPython 3.8 (x86_64-pc-windows-msvc)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280293"
+      },
+      {
+        "name": "Qualify CPython 3.10 (x86_64-apple-darwin)",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280318"
+      },
+      {
+        "name": "Qualify CPython 3.9 (x86_64-apple-darwin)",
+        "status": "queued",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280330"
+      },
+      {
+        "name": "Qualify CPython 3.10 (aarch64-apple-darwin)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280334"
+      },
+      {
+        "name": "Qualify CPython 3.12 (aarch64-apple-darwin)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280335"
+      },
+      {
+        "name": "Qualify CPython 3.10 (x86_64-pc-windows-msvc)",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280383"
+      },
+      {
+        "name": "Qualify CPython 3.11 (x86_64-apple-darwin)",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280384"
+      },
+      {
+        "name": "Qualify CPython 3.11 (aarch64-apple-darwin)",
+        "status": "queued",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280394"
+      },
+      {
+        "name": "Qualify CPython 3.12 (x86_64-apple-darwin)",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280399"
+      },
+      {
+        "name": "Qualify CPython 3.8 (x86_64-apple-darwin)",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280417"
+      },
+      {
+        "name": "Qualify CPython 3.12 (x86_64-unknown-linux-gnu)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280470"
+      },
+      {
+        "name": "Qualify CPython 3.11 (x86_64-pc-windows-msvc)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280478"
+      },
+      {
+        "name": "Qualify CPython 3.12 (x86_64-pc-windows-msvc)",
+        "status": "in_progress",
+        "conclusion": "",
+        "url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370/job/132674280490"
+      }
+    ],
+    "status": "queued"
+  },
+  "ci_url": "https://github.com/rollingstorms/groggy/actions/runs/43668885370",
+  "unresolved_owner_decisions": [
+    "A07.1 global versus branch-specific installed schema policy"
+  ],
+  "published": false
+}

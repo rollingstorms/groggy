@@ -1,6 +1,6 @@
 # Groggy 0.6.0 release qualification
 
-Updated 2026-11-14. **Local preparation complete; platform CI pending. Unreleased.**
+Updated 2026-11-14. **Coordinated priority pass and local artifacts qualified; platform CI finishing. Unreleased.**
 
 ## Bounded release checklist
 
@@ -9,15 +9,15 @@ Updated 2026-11-14. **Local preparation complete; platform CI pending. Unrelease
 | One complete application workflow | Complete locally | Checked ingestion → immutable graph/table analysis → temporal correction/restore → archive/journal recovery, from unpacked wheels. |
 | Performance baseline | Complete for the documented fixtures | Current ownership implementation: three fresh native processes per size, plus matched public-Python access measurements. |
 | Scope, migration and release docs | Complete for this candidate | [Release notes](RELEASE_NOTES_0.6.0.md), [application workflow](docs/api/core-release-workflow.md), [qualification runbook](docs/api/release-qualification.md). |
-| Package qualification | Complete locally | Fresh root, nested and extracted-source wheels; versions, 104 declared exports, typing assets and both storage workflows pass. |
-| Native and artifact-backed regression gates | Passed locally | 1,566 Rust tests; serial checkpoint recovery; strict Clippy; 2,718 Python tests; 267 executable docs examples. |
-| Cross-platform qualification | Pending execution | CI gates are configured for 19 CPython/platform combinations. A configuration change is not a successful CI run. |
+| Package qualification | Complete locally | Fresh root, nested and extracted-source wheels; versions, 105 declared exports, typing assets and both storage workflows pass. |
+| Native and artifact-backed regression gates | Passed locally | 1,573 Rust tests; serial checkpoint recovery; strict Clippy; 2,751 Python tests; 270 executable docs examples from the fresh unpacked root wheel. |
+| Cross-platform qualification | Running | Real 19-combination workflow dispatched; Python 3.8/Windows failures repaired, compiler pinned to Rust 1.96.1. Final results remain required. |
 
-No tag, upload, publication, push or CI dispatch occurred in this preparation
-slice. Before publication, run and review the platform workflow and final artifact
-hashes/scope. Manual qualification cannot publish; a published tag release must
-pass native, wheel and extracted-source gates before reaching the existing PyPI
-environment boundary.
+Committed work has been pushed and the platform workflow dispatched. No tag or
+package publication occurred. Manual qualification cannot publish; a published
+tag release must pass native, wheel and extracted-source gates before reaching
+the existing PyPI environment boundary. See the [coordinated pass receipt](notes/planning/priority-pass-2026-11-14.md)
+for precise source, platform and fresh artifact results.
 
 ## Supported scope and migration
 
@@ -50,12 +50,12 @@ application workflow with site-packages disabled. The maintained Python/docs gat
 also runs against the root unpacked artifact, not an installed/source extension.
 No wheel was installed during qualification.
 
-- Maintained Python: **2,718 passed / 1 skipped / 14 established builder warnings**.
-- Executable documentation: **267 examples passed**.
+- Maintained Python: **2,751 passed / 1 skipped / 14 established builder warnings**.
+- Executable documentation: **270 examples passed**.
 - Nested artifact workflow/ownership gate: **36 passed**.
-- Rust: **1,566 passed / 54 ignored / zero failed**; the explicit serial checkpoint
+- Rust: **1,573 passed / 54 ignored / zero failed**; the explicit serial checkpoint
   process-recovery gate additionally passes its one test.
-- Strict all-target Clippy and `git diff --check`: **passed**.
+- Strict all-target Clippy, Rust formatting and `git diff --check`: **passed**.
 
 At 100k nodes and edges, the existing native directed-ring baseline has median
 batch acceptance **0.582 s**, cold capture **0.142 s**, effective read **0.252 s**,
@@ -65,7 +65,15 @@ The matched Python access fixture shows small read variation and about **2.6%**
 overhead for a checked 1,000-property batch after the ownership fix. Archive/memory
 scale work remains open.
 
-Current evidence, artifact/lock hashes and reproducible commands:
+The coordinated follow-up adds staged node/edge creation and 13 captured
+algorithm-table kernels, explicit compatible schema migration, storage mechanism
+reporting and independent finite graph references. Archive validation avoids
+400,009 allocations per 100k save/recovery without reducing the measured requested
+peaks; larger dense products improve about 8–10% in the recorded corpus. See
+[graph memory](notes/planning/priority-memory-2026-11-14.md) and
+[numerical measurements](notes/planning/priority-numerical-2026-11-14.md).
+
+Earlier baseline evidence, artifact/lock hashes and reproducible commands:
 
 - [Final local gate receipt](notes/planning/release-060-final-gates-2026-11-14.md)
   and [machine-readable hashes/results](notes/planning/release-060-final-gates-2026-11-14.json).

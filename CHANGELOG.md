@@ -15,8 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the documented storage and platform boundaries.
 - Consolidated matrix/numeric foundations, f64 property defaults and expanded
   graph/numerical algorithms; broader conformance and scale work remains open.
-- Typed immutable pipeline inputs and selected atomic topology effects; general
-  staged additions and wider pending-topology execution remain unfinished.
+- Typed immutable pipeline inputs, staged topology creation/revision/removal and
+  13 captured algorithm-table kernels in local atomic programs. Outer topology
+  programs and unadapted effects remain open.
+- Explicit storage platform capabilities, Windows locked-handle verification,
+  compatible schema migration examples and independent finite graph references.
+- Measured archive validation allocation reductions and contiguous dense-product
+  access with preserved checked arithmetic; broad memory/throughput targets remain open.
 - Cargo-derived distribution/runtime version, standard Maturin builds without
   build-time extension introspection, packaged stubs/typing marker, and working
   public native display helper exports.
