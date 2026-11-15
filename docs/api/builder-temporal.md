@@ -105,8 +105,8 @@ assert graph.snapshot_at_commit(retained).node_attr(0, "score").value == 12
 ```
 
 This timestamp selector retains the existing acceptance-history behavior. It does
-not reconstruct arbitrary per-property effective time; that roadmap work remains
-open. Retained snapshot reconstruction cost depends on history, graph size and
+not reconstruct per-property effective time; use `Graph.read_view_at` for that
+separate reconstruction API. Retained snapshot reconstruction cost depends on history, graph size and
 checkpoint layout. Cancellation checks surround reconstruction; reconstruction
 itself has no bounded cancellation latency promise.
 
@@ -128,3 +128,55 @@ Decay is O(source rows) time and output storage; ordered columns also use an
 O(rows) duplicate-ID set. It does not clone the owner/history or build indexes.
 Cancellation checks cover each decay row and pre-installation; allocation and
 snapshot reconstruction do not promise bounded interrupt latency.
+
+## Accepted history reads after pending edits
+
+`temporal.snapshot_at`, `temporal.diff_nodes` and `temporal.diff_edges` may follow
+pending topology in local or outer atomic programs and nested compute frames.
+They read accepted retained history, including explicit sibling-branch state IDs;
+they never give provisional entities an accepted creation state. Earlier staged
+values, endpoint revisions, additions and removals do not alter these inputs.
+Missing, purged or foreign-history sources still reject through the existing
+validators, with whole-run rollback at the owning atomic boundary.
+
+`graph.capture_staged` remains the explicit read of pending working state. Its
+values and retained snapshots are separate immutable inputs. Historical result
+IDs remain exact IDs: attaching a removed/out-of-frame ID fails rather than
+filtering or mapping it onto a provisional entity. Exact child write restrictions
+also apply to history maps. Selected lifecycle/window helpers retain their pending
+topology guards until the staged-entity history policy is settled.
+
+```python
+from groggy.builder import step_pipeline
+
+
+def history_step(kind, **params):
+    return {"id": kind, "params": params}
+
+
+history_graph = Graph()
+history_graph.add_nodes(2)
+before = history_graph.current_state_id
+history_graph.set_node_attr(0, "score", 3)
+accepted = history_graph.current_state_id
+_, profile = history_graph.apply(step_pipeline("accepted versus pending", [
+    history_step("graph.add_nodes", count=1, output="new"),
+    history_step("core.init_nodes", value=99, target="values"),
+    history_step("core.attach_node_attr", source="values", attr="score"),
+    history_step("temporal.snapshot_at", state_id=before, output="before"),
+    history_step("temporal.snapshot_at", state_id=accepted, output="after"),
+    history_step("temporal.diff_nodes", before="before", after="after", output_prefix="diff"),
+    history_step("core.attach_node_attr", source="diff_nodes_modified", attr="accepted_change"),
+    history_step("graph.from_snapshot", source="after", output="old"),
+    history_step("graph.emit", source="old", name="history"),
+    history_step("graph.capture_staged", output="pending"),
+    history_step("graph.emit", source="pending", name="working"),
+], atomic=True), return_profile=True)
+assert history_graph.current_state_id == accepted + 1
+assert sorted(profile["outputs"]["history"].node_ids) == [0, 1]
+assert profile["outputs"]["history"].node_attr(0, "score") == 3
+assert sorted(profile["outputs"]["working"].node_ids) == [0, 1, 2]
+assert profile["outputs"]["working"].node_attr(0, "score") == 99
+assert history_graph.get_node_attr(0, "accepted_change") == 1
+assert history_graph.get_node_attr(2, "accepted_change") is None
+```

@@ -21,6 +21,8 @@ Implemented capabilities, within their documented boundaries:
   and expanded graph and numerical algorithms.
 - Retained archives and journaled durable storage with explicit recovery,
   checkpoint, compaction and purge operations.
+- Accepted snapshot acquisition and node/edge retained diffs now compose after
+  pending topology while keeping unpublished working state separate from history.
 - Fixed child frames validate every node/edge attachment target before staging,
   publication or transient output, including full-owner history diff maps.
 - Pending child captures share one accepted base and prepared topology, copy only

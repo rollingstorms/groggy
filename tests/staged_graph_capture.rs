@@ -141,7 +141,7 @@ fn late_capture_or_projection_errors_restore_old_outputs_and_discard_effects() {
 #[test]
 fn staged_graph_capture_does_not_enable_unadapted_topology_reads_or_property_effects() {
     for late in [
-        json!({"id":"temporal.snapshot_at","params":{"state_id":0,"output":"neighbors"}}),
+        json!({"id":"temporal.window","params":{"start":0,"end":0,"output":"neighbors"}}),
         json!({"id":"drot.smooth_strokes","params":{}}),
     ] {
         assert!(pipeline(json!([

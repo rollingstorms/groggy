@@ -55,6 +55,12 @@ impl DiffNodesStep {
 }
 
 impl Step for DiffNodesStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        // Retained owner history is immutable during pending publication. These
+        // reads never infer a creation state or timestamp for provisional IDs.
+        super::core::AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -121,7 +127,7 @@ impl Step for DiffNodesStep {
 
 /// Compute full-owner edge membership/property masks between retained states.
 /// Outputs `<prefix>_edges_added`, `_edges_removed` and `_edges_modified`.
-/// Common-edge endpoint changes reject until the delta format supports them.
+/// Endpoint revisions on surviving edges also appear in the modified mask.
 pub struct DiffEdgesStep {
     before_var: Option<String>,
     after_var: Option<String>,
@@ -143,6 +149,12 @@ impl DiffEdgesStep {
 }
 
 impl Step for DiffEdgesStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        // Retained owner history is immutable during pending publication. These
+        // reads never infer a creation state or timestamp for provisional IDs.
+        super::core::AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -618,6 +630,12 @@ impl SnapshotAtStep {
 }
 
 impl Step for SnapshotAtStep {
+    fn atomic_effect(&self) -> super::core::AtomicStepEffect {
+        // Retained owner history is immutable during pending publication. These
+        // reads never infer a creation state or timestamp for provisional IDs.
+        super::core::AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -1464,6 +1482,95 @@ mod tests {
         assert!(DecayStep::new("values", 1.0, "result")
             .apply(&mut Context::new(), &mut scope)
             .is_err());
+    }
+
+    #[test]
+    fn retained_snapshot_and_diff_reads_ignore_pending_entity_creation_and_values() {
+        use crate::algorithms::{property_batch::PropertyBatch, steps::core::StepExecutor};
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(2).unwrap();
+        graph
+            .set_node_attr(0, "score".into(), AttrValue::Int(1))
+            .unwrap();
+        let before = graph.current_state_id();
+        graph
+            .set_node_attr(0, "score".into(), AttrValue::Int(2))
+            .unwrap();
+        let after = graph.current_state_id();
+        let owner = graph.into_shared();
+        let selected = Subgraph::new(
+            owner.clone(),
+            [0, 1].into(),
+            HashSet::new(),
+            "retained inputs".into(),
+        );
+        let mut batch = PropertyBatch::for_selection(owner.borrow().write_coordinate(), &selected);
+        batch
+            .stage_nodes(&owner.borrow(), 1, &HashMap::new(), None)
+            .unwrap();
+        batch
+            .stage(
+                true,
+                HashMap::from([("score".into(), vec![(0, AttrValue::Int(99))])]),
+            )
+            .unwrap();
+        let mut ctx = Context::new();
+        ctx.property_batch = Some(batch);
+        let mut vars = StepVariables::default();
+        let mut executor = StepExecutor::new(&selected);
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &SnapshotAtStep::new_at_commit(before, "before"),
+            )
+            .unwrap();
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &SnapshotAtStep::new_at_commit(after, "after"),
+            )
+            .unwrap();
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &DiffNodesStep::new(Some("before".into()), Some("after".into()), "delta"),
+            )
+            .unwrap();
+        let saved = vars.snapshot("after").unwrap().clone();
+        assert!(!saved.node_exists(2));
+        assert_eq!(saved.node_attr(0, &"score".into()), Some(AttrValue::Int(2)));
+        assert_eq!(
+            vars.node_map("delta_nodes_modified")
+                .unwrap()
+                .keys()
+                .copied()
+                .collect::<Vec<_>>(),
+            [0]
+        );
+        assert!(vars.node_map("delta_nodes_added").unwrap().is_empty());
+        executor
+            .apply(
+                &mut ctx,
+                &mut vars,
+                &SnapshotAtStep::new_at_timestamp(saved.lineage().timestamp, "by_time"),
+            )
+            .unwrap();
+        assert_eq!(vars.snapshot("by_time").unwrap().lineage().commit_id, after);
+        ctx.property_batch
+            .take()
+            .unwrap()
+            .accept(&mut owner.borrow_mut())
+            .unwrap();
+        assert_eq!(owner.borrow().current_state_id(), after + 1);
+        assert!(owner.borrow().has_node(2));
+        assert_eq!(
+            owner.borrow().get_node_attr(0, &"score".into()).unwrap(),
+            Some(AttrValue::Int(99))
+        );
+        assert_eq!(saved.node_attr(0, &"score".into()), Some(AttrValue::Int(2)));
     }
 
     #[test]

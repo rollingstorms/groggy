@@ -135,3 +135,12 @@ live property-overlay frames, transient results and nested loops. Full-owner
 retained diff maps remain readable but cannot authorize a child to write sibling
 IDs. Existing root explicit owner-ID semantics remain intact. See
 `fixed-child-attachments-2026-11-15.md` for reproduction and qualification.
+
+### Implemented follow-up: retained history inside pending programs
+
+Explicit retained snapshots and node/edge diffs now compose after pending topology
+through the shared immutable-input execution capability. Accepted history remains
+separate from pending additions, removals, endpoints and values. Late invalid
+history/attachment inputs retain whole-run rollback. See
+`pending-retained-history-2026-11-15.md`. Selected lifecycle/window readers still
+need the staged-entity history decision; general topology loops remain guarded.

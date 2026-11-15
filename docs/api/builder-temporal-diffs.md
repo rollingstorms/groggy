@@ -126,3 +126,8 @@ records. Costs scale with compared entities, properties, changed payloads and
 sorting. Each node/edge mask helper currently computes the full logical delta;
 calling both repeats that work. No cache, source pin migration, whole-engine
 performance improvement or certification of window/index helpers is implied.
+
+Snapshot acquisition and both diffs can also follow pending topology inside local
+or outer atomic programs. Their sources remain accepted history; pending new
+entities do not appear in retained added/removed/modified masks. See the executable
+[accepted-versus-pending example](builder-temporal.md#accepted-history-reads-after-pending-edits).

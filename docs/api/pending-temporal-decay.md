@@ -54,3 +54,7 @@ stages keep their existing execution guards after pending topology: an unaccepte
 new entity has no retained creation state. They are not silently interpreted as
 effective-time reads or given fabricated history. Errors/cancellation retain the
 shared atomic rollback behavior.
+
+Follow-up: `temporal.snapshot_at` and node/edge retained diffs now also accept
+pending execution, while continuing to read accepted history. Selected lifecycle/
+window helpers retain their guards; see [temporal primitives](builder-temporal.md).
