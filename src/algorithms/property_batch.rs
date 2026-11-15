@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 #[derive(Debug)]
 pub(crate) struct PropertyBatch {
     coordinate: WriteCoordinate,
+    read_revision: u64,
     allocation_base: Option<(NodeId, EdgeId)>,
     add_nodes: usize,
     add_edges: Vec<(BatchNodeRef, BatchNodeRef)>,
@@ -24,6 +25,18 @@ pub(crate) struct PropertyBatch {
     change_times: Vec<(BatchChangeRef, crate::TimestampMicros)>,
 }
 impl PropertyBatch {
+    pub(crate) fn read_revision(&self) -> u64 {
+        self.read_revision
+    }
+
+    pub(crate) fn has_topology(&self) -> bool {
+        self.add_nodes != 0
+            || !self.add_edges.is_empty()
+            || !self.remove_nodes.is_empty()
+            || !self.remove_edges.is_empty()
+            || !self.edge_endpoints.is_empty()
+    }
+
     /// Materialize exactly the selected pending working state as a detached,
     /// read-only value. It has no accepted write provenance or history claim.
     /// This copies selected values, never clones a writable Graph/history/pool.
@@ -158,6 +171,7 @@ impl PropertyBatch {
     pub fn new(coordinate: WriteCoordinate) -> Self {
         Self {
             coordinate,
+            read_revision: 0,
             allocation_base: None,
             add_nodes: 0,
             add_edges: Vec::new(),
@@ -187,6 +201,7 @@ impl PropertyBatch {
                 kinds::normalize_kind_property_in_place(name, value, node)?;
             }
         }
+        self.read_revision = self.read_revision.wrapping_add(1);
         let columns = if node {
             &mut self.nodes
         } else {
@@ -205,6 +220,7 @@ impl PropertyBatch {
         ids: Vec<usize>,
         effective_at: Option<crate::TimestampMicros>,
     ) {
+        self.read_revision = self.read_revision.wrapping_add(1);
         for id in ids {
             let target = if nodes {
                 let reference = BatchNodeRef::Existing(id);
@@ -225,6 +241,7 @@ impl PropertyBatch {
         rows: Vec<(EdgeId, NodeId, NodeId)>,
         effective_at: Option<crate::TimestampMicros>,
     ) {
+        self.read_revision = self.read_revision.wrapping_add(1);
         for (edge, source, target) in rows {
             self.edge_endpoints.push((
                 edge,
@@ -359,11 +376,7 @@ impl PropertyBatch {
     /// Accept and project once at the owning execution boundary. Provisional
     /// IDs never pass through live-owner filtering before acceptance.
     pub(crate) fn accept_selection(self, subgraph: Subgraph) -> GraphResult<Subgraph> {
-        let topology = self.add_nodes != 0
-            || !self.add_edges.is_empty()
-            || !self.remove_nodes.is_empty()
-            || !self.remove_edges.is_empty()
-            || !self.edge_endpoints.is_empty();
+        let topology = self.has_topology();
         let additions = self.added_ids();
         let binding = subgraph.graph();
         self.accept(&mut binding.borrow_mut())?;
@@ -450,13 +463,16 @@ impl PropertyBatch {
 }
 
 impl Context {
-    /// Read a node property, including prior accepted attachments in this run.
+    /// Read a node property from a pending pin or the shared staged overlay.
     pub(crate) fn node_attribute(
         &self,
         subgraph: &Subgraph,
         id: NodeId,
         name: &AttrName,
     ) -> crate::GraphResult<Option<AttrValue>> {
+        if let Some(view) = subgraph.frozen_view() {
+            return view.node_attr(id, name);
+        }
         if !subgraph.contains_node(id) {
             return Err(crate::GraphError::InvalidInput(format!(
                 "Node {id} is outside the subgraph selection"
@@ -476,13 +492,16 @@ impl Context {
         }
         subgraph.get_node_attribute(id, name)
     }
-    /// Read an edge property through the same property-only overlay.
+    /// Read an edge property from a pending pin or the shared staged overlay.
     pub(crate) fn edge_attribute(
         &self,
         subgraph: &Subgraph,
         id: EdgeId,
         name: &AttrName,
     ) -> crate::GraphResult<Option<AttrValue>> {
+        if let Some(view) = subgraph.frozen_view() {
+            return view.edge_attr(id, name);
+        }
         if !subgraph.contains_edge(id) {
             return Err(crate::GraphError::InvalidInput(format!(
                 "Edge {id} is outside the subgraph selection"
@@ -534,10 +553,11 @@ impl Context {
         if self.persist_results() && self.property_batch.is_none() {
             return subgraph.set_node_attrs(attrs).map_err(|err| anyhow!(err));
         }
-        subgraph
-            .graph()
-            .borrow()
-            .validate_node_attrs(&attrs, None)?;
+        subgraph.graph().borrow().validate_scoped_bulk_attrs(
+            &attrs,
+            true,
+            subgraph.frozen_view(),
+        )?;
         if let Some(batch) = self.property_batch.as_mut() {
             return batch.stage(true, attrs).map_err(|err| anyhow!(err));
         }
@@ -563,10 +583,11 @@ impl Context {
         if self.persist_results() && self.property_batch.is_none() {
             return subgraph.set_edge_attrs(attrs).map_err(|err| anyhow!(err));
         }
-        subgraph
-            .graph()
-            .borrow()
-            .validate_edge_attrs(&attrs, None)?;
+        subgraph.graph().borrow().validate_scoped_bulk_attrs(
+            &attrs,
+            false,
+            subgraph.frozen_view(),
+        )?;
         if let Some(batch) = self.property_batch.as_mut() {
             return batch.stage(false, attrs).map_err(|err| anyhow!(err));
         }
@@ -749,5 +770,64 @@ mod tests {
             assert_eq!(graph.get_node_attr(0, &"x".into()).expect("x"), None);
             assert_eq!(graph.add_node().expect("no consumed IDs"), 1);
         }
+    }
+    #[test]
+    fn pending_bulk_validation_rejects_duplicates_before_staging_any_column() {
+        use crate::ownership::OwnerCell;
+        use std::sync::Arc;
+        let mut graph = Graph::new_publishing();
+        graph.add_node().unwrap();
+        let head = graph.current_state_id();
+        let mut batch = PropertyBatch::new(graph.write_coordinate());
+        batch.stage_nodes(&graph, 1, &HashMap::new(), None).unwrap();
+        let owner = Arc::new(OwnerCell::new(graph));
+        let selected = Subgraph::new(
+            owner.clone(),
+            HashSet::from([0]),
+            HashSet::new(),
+            "scope".into(),
+        );
+        let pending = Subgraph::from_frozen_view(
+            owner.clone(),
+            batch.capture(&selected).unwrap(),
+            "pending".into(),
+        );
+        let mut ctx = Context::new();
+        ctx.property_batch = Some(batch);
+        let error = ctx
+            .attach_node_attrs(
+                &pending,
+                HashMap::from([
+                    ("good".into(), vec![(1, AttrValue::Int(3))]),
+                    (
+                        "duplicate".into(),
+                        vec![(1, AttrValue::Int(1)), (1, AttrValue::Int(2))],
+                    ),
+                ]),
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("duplicate node 1"));
+        assert!(ctx
+            .property_batch
+            .as_ref()
+            .unwrap()
+            .get(true, 1, &"good".into())
+            .is_none());
+        ctx.attach_node_attrs(
+            &pending,
+            HashMap::from([("good".into(), vec![(1, AttrValue::Int(3))])]),
+        )
+        .unwrap();
+        assert_eq!(owner.borrow().current_state_id(), head);
+        ctx.property_batch
+            .take()
+            .unwrap()
+            .accept(&mut owner.borrow_mut())
+            .unwrap();
+        assert_eq!(owner.borrow().current_state_id(), head + 1);
+        assert_eq!(
+            owner.borrow().get_node_attr(1, &"good".into()).unwrap(),
+            Some(AttrValue::Int(3))
+        );
     }
 }

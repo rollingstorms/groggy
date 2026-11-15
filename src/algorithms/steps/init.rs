@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 
 /// Initialize a node variable with a constant value for all nodes.
 pub struct InitNodesStep {
@@ -23,6 +23,10 @@ impl InitNodesStep {
 }
 
 impl Step for InitNodesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -65,6 +69,10 @@ impl InitNodesWithIndexStep {
 }
 
 impl Step for InitNodesWithIndexStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -110,6 +118,10 @@ impl InitScalarStep {
 }
 
 impl Step for InitScalarStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -150,6 +162,10 @@ impl InitEdgesStep {
 }
 
 impl Step for InitEdgesStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -190,6 +206,10 @@ impl GraphNodeCountStep {
 }
 
 impl Step for GraphNodeCountStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -229,6 +249,10 @@ impl GraphEdgeCountStep {
 }
 
 impl Step for GraphEdgeCountStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

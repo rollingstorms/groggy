@@ -137,7 +137,7 @@ def test_new_capture_controls_do_not_enable_unsupported_execution_modes_or_reads
         (step_pipeline("non atomic", [capture]), {}),
         (step_pipeline("transient", [capture], atomic=True), {"persist": False}),
         (step_pipeline("late property read", [stage("graph.remove_nodes", ids=[]), capture,
-             stage("core.init_nodes", target="old", value=1)], atomic=True), {}),
+             stage("core.node_degree", target="old")], atomic=True), {}),
         (step_pipeline("unknown control", [stage("graph.capture_staged", output="x", live=True)], atomic=True), {}),
     ]
     for handle, kwargs in cases:

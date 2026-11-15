@@ -112,5 +112,7 @@ Outer atomic pipelines now share these stages across builders; see
 [outer atomic topology](outer-atomic-topology.md). General topology loops,
 arbitrary callback effects, journal-owner pipeline dispatch, opaque extension
 certification and remaining high-level DSL lowering stay open.
-Property calculations/attachments after topology still require explicit supported
+Certified property loads, initialization, arithmetic and attachments can now
+follow topology; see [pending properties](pending-topology-properties.md).
+Other calculations after topology still require explicit supported
 adaptation; these table computations do not enable unadapted old property steps.

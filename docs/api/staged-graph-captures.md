@@ -48,19 +48,21 @@ certified operations are accepted:
 
 - Staged node/edge creation, further removals and existing-edge endpoint revisions.
 - `graph.capture_staged`.
+- Certified property loads, initialization, arithmetic and attachments over the
+  pending selection; see [pending properties](pending-topology-properties.md).
 - The original immutable graph/table read stages, captured `graph.degrees_table`
   computation, `graph.algorithm_table` over explicit captures and variable `alias`.
 
 Thus a pending graph can be selected, projected to tables, sliced, and emitted
-before acceptance. Ordinary property/structural calculations, topology loops,
+before acceptance. Unadapted adjacency-dependent calculations, topology loops,
 opaque callbacks and unadapted algorithm steps still reject in this phase. The thirteen classic
 kernels are available through the explicit captured algorithm-table stage; see
 [staged creation and algorithms](staged-topology-additions.md). Existing
 property-only nested and outer atomic certification stays conservative.
 
 `atomic=True` on the local builder and `persist=True` are required. Outer
-`Pipeline(..., atomic=True)` still rejects staged captures/removals before any
-algorithm executes. Explicit names do not decide generated naming, caching or
+`Pipeline(..., atomic=True)` shares supported stages and one acceptance across
+builders; see [outer atomic topology](outer-atomic-topology.md). Explicit names do not decide generated naming, caching or
 high-level DSL policy. Native extensions' capability declarations remain trusted.
 
 ## Pending versus accepted state

@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--pending-properties") {
+        return pending_properties_receipt();
+    }
     if std::env::args().any(|arg| arg == "--captured-degrees") {
         return captured_degrees_receipt();
     }
@@ -415,5 +418,61 @@ fn captured_degrees_receipt() -> Result<(), Box<dyn std::error::Error>> {
         }))?,
     )?;
     println!("Wrote captured degree receipt to {path}");
+    Ok(())
+}
+
+fn pending_properties_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [1_000, 10_000] {
+        for pending_topology in [false, true] {
+            let steps = json!([
+                {"id":"graph.add_nodes","params":{"count":usize::from(pending_topology),"output":"new"}},
+                {"id":"core.init_nodes","params":{"target":"values","value":0.125}},
+                {"id":"core.graph_node_count","params":{"target":"count"}},
+                {"id":"core.init_nodes_with_index","params":{"target":"positions"}},
+                {"id":"core.attach_node_attr","params":{"source":"values","attr":"value"}},
+                {"id":"core.load_node_attr","params":{"target":"copy","attr":"value"}},
+                {"id":"core.attach_node_attr","params":{"source":"copy","attr":"mirror"}}
+            ]);
+            let mut params = AlgorithmParams::new();
+            params.set_text("steps", json!({"atomic":true,"steps":steps}).to_string());
+            let algorithm = registry.instantiate(&AlgorithmSpec {
+                id: "builder.step_pipeline".into(),
+                params,
+            })?;
+            let mut samples = Vec::new();
+            for _ in 0..5 {
+                let mut graph = Graph::new_publishing();
+                graph.insert_nodes(count)?;
+                let graph = Arc::new(OwnerCell::new(graph));
+                let view = graph.borrow().read_view()?;
+                let selected = Subgraph::from_frozen_view(graph.clone(), view, "bench".into());
+                let mut ctx = Context::new();
+                let started = Instant::now();
+                let result = algorithm.execute(&mut ctx, selected)?;
+                samples.push(started.elapsed().as_secs_f64());
+                let total = count + usize::from(pending_topology);
+                assert_eq!(result.node_count(), total);
+                assert_eq!(graph.borrow().current_state_id(), 2);
+                assert_eq!(
+                    graph.borrow().get_node_attr(total - 1, &"mirror".into())?,
+                    Some(AttrValue::Float64(0.125))
+                );
+            }
+            cases.push(json!({"initial_nodes":count,"pending_topology":pending_topology,"seconds":samples}));
+        }
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "pending_topology_properties.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release, five samples per case. Initialization/count/index reads, one property attachment, reload and second attachment, with zero or one staged new node. Includes scope resolution, pending materialization/reuse, validation and one publication. Excludes fixture/initial capture/algorithm construction, compilation and assertions. No before/after optimization, FFI, allocation/RSS or throughput guarantee. The topology case has one extra final node and a canonical creation operation; these are bounded operation-cost observations.",
+            "cases":cases
+        }))?,
+    )?;
+    println!("Wrote pending properties receipt to {path}");
     Ok(())
 }

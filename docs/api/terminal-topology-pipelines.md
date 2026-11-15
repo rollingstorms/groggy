@@ -65,7 +65,9 @@ assert sorted(graph.node_ids) == [1]
 ## Execution boundary
 
 Removal stages begin the **topology phase** of a local `atomic=True` builder.
-All ordinary property calculations and attachments must precede that phase.
+Certified property loads, initialization, arithmetic and attachments can also
+follow that phase; see [pending properties](pending-topology-properties.md).
+Unadapted adjacency-dependent calculations must precede topology.
 Further removals, explicit `graph.capture_staged`, immutable graph/table stages
 and variable aliases may follow; see [staged graph captures](staged-graph-captures.md). `persist=True` is required. A certified prefix and all
 removals share one checked publication; any target, duplicate, property/time

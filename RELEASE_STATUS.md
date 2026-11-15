@@ -12,10 +12,11 @@ remains unfinished. See [scope and next chunk](notes/planning/release-060-expand
 The successful qualification below applies to the earlier bounded candidate.
 Implementation changes toward the expanded target require fresh final gates.
 
-The next implementation chunk, supported outer atomic topology composition, is
-complete locally: 1,579 native tests, 2,775 maintained Python tests and 271
+Supported outer atomic topology composition and its pending-property follow-up
+are complete locally: 1,582 native tests, 2,791 maintained Python tests and 272
 executable examples pass, plus strict Clippy and Rust formatting.
-See [chunk evidence](notes/planning/outer-atomic-topology-2026-11-15.md).
+See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md)
+and [pending property evidence](notes/planning/pending-topology-properties-2026-11-15.md).
 The 44 broad unchecked release rows retain their remaining exit requirements.
 
 ## Qualified bounded candidate

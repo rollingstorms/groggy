@@ -244,3 +244,83 @@ fn outer_projection_does_not_induce_omitted_parallel_edges_or_loops() {
     assert_eq!(view.edge_ids(), vec![1]);
     assert!(graph.borrow().has_edge(2) && graph.borrow().has_edge(3));
 }
+
+#[test]
+fn pending_properties_include_added_ids_and_exclude_cascaded_entities() {
+    for directed in [false, true] {
+        let graph = fixture(directed);
+        let head = graph.borrow().current_state_id();
+        let mut context = Context::new();
+        let computations = json!([
+            {"id":"graph.remove_nodes","params":{"ids":[2]}},
+            {"id":"core.load_node_attr","params":{"target":"scores","attr":"score","default":2}},
+            {"id":"core.init_scalar","params":{"target":"two","value":2}},
+            {"id":"core.mul","params":{"left":"scores","right":"two","target":"scaled"}},
+            {"id":"core.attach_node_attr","params":{"source":"scaled","attr":"scaled"}},
+            {"id":"core.load_node_attr","params":{"target":"reload","attr":"scaled"}},
+            {"id":"core.attach_node_attr","params":{"source":"reload","attr":"copied"}},
+            {"id":"core.init_edges","params":{"target":"weights","value":5}},
+            {"id":"core.attach_edge_attr","params":{"source":"weights","attr":"weight"}},
+            {"id":"graph.capture_staged","params":{"output":"final"}},
+            {"id":"graph.emit","params":{"source":"final","name":"final"}}
+        ]);
+        let result = pipeline(vec![create_nodes(), computations])
+            .run_atomic_properties(&mut context, selected(&graph))
+            .unwrap();
+        assert_eq!(graph.borrow().current_state_id(), head + 1);
+        assert_eq!(
+            result
+                .nodes()
+                .iter()
+                .copied()
+                .collect::<std::collections::HashSet<_>>(),
+            [0, 4, 7].into()
+        );
+        let outputs = context.take_outputs();
+        let AlgorithmOutput::GraphView(view) = &outputs["final"] else {
+            panic!("view")
+        };
+        assert_eq!(
+            view.node_attr(7, &"scaled".into()).unwrap(),
+            Some(AttrValue::Float64(2.0000000000000004))
+        );
+        assert_eq!(
+            view.node_attr(7, &"copied".into()).unwrap(),
+            view.node_attr(7, &"scaled".into()).unwrap()
+        );
+        assert_eq!(
+            view.node_attr(0, &"scaled".into()).unwrap(),
+            Some(AttrValue::Int(4))
+        );
+        assert_eq!(
+            view.edge_attr(3, &"weight".into()).unwrap(),
+            Some(AttrValue::Int(5))
+        );
+        assert!(!view.contains_node(2));
+        assert!(!view.contains_edge(0));
+    }
+}
+
+#[test]
+fn stale_property_map_after_removal_rolls_back_and_context_can_be_reused() {
+    let graph = fixture(false);
+    let head = graph.borrow().current_state_id();
+    let mut context = Context::new();
+    let program = pipeline(vec![json!([
+        {"id":"core.init_nodes","params":{"target":"old","value":7}},
+        {"id":"graph.add_nodes","params":{"count":1,"output":"new"}},
+        {"id":"graph.remove_nodes","params":{"ids":[2]}},
+        {"id":"core.attach_node_attr","params":{"source":"old","attr":"stale"}}
+    ])]);
+    assert!(program
+        .run_atomic_properties(&mut context, selected(&graph))
+        .is_err());
+    assert_eq!(graph.borrow().current_state_id(), head);
+    assert!(graph.borrow().has_node(2));
+    assert!(context.take_outputs().is_empty());
+    pipeline(vec![create_nodes()])
+        .run_atomic_properties(&mut context, selected(&graph))
+        .unwrap();
+    assert!(graph.borrow().has_node(7));
+    assert!(!graph.borrow().has_node(8));
+}

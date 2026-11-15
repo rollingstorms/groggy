@@ -1,0 +1,49 @@
+{
+  "cases": [
+    {
+      "initial_nodes": 1000,
+      "pending_topology": false,
+      "seconds": [
+        0.0051705,
+        0.004146209,
+        0.003595166,
+        0.003202125,
+        0.003306375
+      ]
+    },
+    {
+      "initial_nodes": 1000,
+      "pending_topology": true,
+      "seconds": [
+        0.004066333,
+        0.003783416,
+        0.003524583,
+        0.0035155,
+        0.003229791
+      ]
+    },
+    {
+      "initial_nodes": 10000,
+      "pending_topology": false,
+      "seconds": [
+        0.029279875,
+        0.027822583,
+        0.025134041,
+        0.026851917,
+        0.027307959
+      ]
+    },
+    {
+      "initial_nodes": 10000,
+      "pending_topology": true,
+      "seconds": [
+        0.035981292,
+        0.037131834,
+        0.044297,
+        0.045336834,
+        0.033676792
+      ]
+    }
+  ],
+  "scope": "Native release, five samples per case. Initialization/count/index reads, one property attachment, reload and second attachment, with zero or one staged new node. Includes scope resolution, pending materialization/reuse, validation and one publication. Excludes fixture/initial capture/algorithm construction, compilation and assertions. No before/after optimization, FFI, allocation/RSS or throughput guarantee. The topology case has one extra final node and a canonical creation operation; these are bounded operation-cost observations."
+}

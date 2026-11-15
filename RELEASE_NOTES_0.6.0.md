@@ -22,6 +22,8 @@ Implemented capabilities, within their documented boundaries:
 - Retained archives and journaled durable storage with explicit recovery,
   checkpoint, compaction and purge operations.
 - Typed pipeline values, atomic property programs and selected topology effects.
+  Certified loads, initialization, arithmetic and attachments can follow staged
+  topology using pending selected IDs and the same one-delta acceptance.
   Local atomic programs can stage node/edge additions and run 13 existing
   algorithms on immutable pending captures. Supported outer pipelines now share
   topology effects and accept once; general topology loops, unadapted effects

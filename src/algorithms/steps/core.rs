@@ -24,6 +24,8 @@ pub enum AtomicStepEffect {
     Unsupported,
     /// Existing property-overlay calculations/attachments; reads base topology.
     Properties,
+    /// Reads/attaches properties through a captured pending selection.
+    PendingProperties,
     /// Reads only explicit variable inputs, never working topology/properties.
     ImmutableInputs,
     /// Creates an independent read-only value from the local pending batch.

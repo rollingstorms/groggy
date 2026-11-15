@@ -43,9 +43,18 @@ retain separate exit criteria in their existing parent rows.
 09.4b.2, AR3, 30.1 and AR7.8; evidence also contributes to 05.3 and 01.2.
 Completing this chunk does not automatically close every overlapping parent.
 
+### Implemented follow-up: pending topology properties
+
+Certified property loads, initialization, arithmetic and attachments now execute
+against the pending selected state, including provisional IDs and surviving edge
+instances. They reuse canonical validation and the existing one-batch publication.
+See `pending-topology-properties-2026-11-15.md` for evidence and remaining boundaries.
+Broad parents stay open; the 215 checked / 53 unchecked inventory is unchanged.
+
 ### Next chunks
 
-1. Remaining property operations after topology and execution/DSL coverage.
+1. Remaining adjacency-dependent operations after topology, captured-result
+   attachment and execution/DSL coverage.
 2. Property/schema/provenance and persistence-boundary completion.
 3. Archive/recovery memory, numerical/algorithm certification and scale targets.
 4. Remaining API/module consolidation and service/concurrency implementation.

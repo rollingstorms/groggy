@@ -8,7 +8,7 @@ use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 
 /// Load an existing node attribute into a step variable.
 pub struct LoadNodeAttrStep {
@@ -28,6 +28,10 @@ impl LoadNodeAttrStep {
 }
 
 impl Step for LoadNodeAttrStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -80,6 +84,10 @@ impl AttachNodeAttrStep {
 }
 
 impl Step for AttachNodeAttrStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -165,6 +173,10 @@ impl LoadEdgeAttrStep {
 }
 
 impl Step for LoadEdgeAttrStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -211,6 +223,10 @@ impl AttachEdgeAttrStep {
 }
 
 impl Step for AttachEdgeAttrStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -272,6 +288,10 @@ impl EdgeWeightScaleStep {
 }
 
 impl Step for EdgeWeightScaleStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::PendingProperties
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

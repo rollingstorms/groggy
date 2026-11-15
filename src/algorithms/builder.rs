@@ -122,11 +122,13 @@ impl StepPipelineAlgorithm {
             } else if topology_suffix
                 && !matches!(
                     effect,
-                    AtomicStepEffect::ImmutableInputs | AtomicStepEffect::StagedCapture
+                    AtomicStepEffect::ImmutableInputs
+                        | AtomicStepEffect::StagedCapture
+                        | AtomicStepEffect::PendingProperties
                 )
             {
                 return Err(anyhow!(
-                    "Step '{}' cannot run after staged topology; only staged captures, immutable inputs and topology effects may follow",
+                    "Step '{}' cannot run after staged topology; only pending-safe property stages, staged captures, immutable inputs and topology effects may follow",
                     step.id()
                 ));
             }
@@ -189,7 +191,7 @@ impl Algorithm for StepPipelineAlgorithm {
                     effects.requires_persistence = true;
                 }
                 AtomicStepEffect::StagedCapture => effects.requires_persistence = true,
-                AtomicStepEffect::ImmutableInputs => {}
+                AtomicStepEffect::ImmutableInputs | AtomicStepEffect::PendingProperties => {}
             }
         }
         Some(effects)
@@ -243,6 +245,7 @@ impl Algorithm for StepPipelineAlgorithm {
             }
 
             let mut variables = StepVariables::default();
+            let mut pending_scope: Option<(u64, Subgraph)> = None;
 
             if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
                 eprintln!(
@@ -268,10 +271,44 @@ impl Algorithm for StepPipelineAlgorithm {
                 }
 
                 ctx.begin_step(index, step.id());
-                let result = {
-                    let mut scope = StepScope::new(&subgraph, &mut variables);
+                let result = (|| {
+                    // Materialize once per pending revision, never per row.
+                    // Preserve original selection for acceptance and cascade rescue.
+                    let scope_graph = if step.atomic_effect() == AtomicStepEffect::PendingProperties
+                    {
+                        if let Some(batch) = ctx
+                            .property_batch
+                            .as_ref()
+                            .filter(|batch| batch.has_topology())
+                        {
+                            let revision = batch.read_revision();
+                            if pending_scope
+                                .as_ref()
+                                .is_none_or(|(old, _)| *old != revision)
+                            {
+                                let view = batch.capture(&subgraph)?;
+                                pending_scope = Some((
+                                    revision,
+                                    Subgraph::from_frozen_view(
+                                        subgraph.graph(),
+                                        view,
+                                        "pending properties".into(),
+                                    ),
+                                ));
+                            }
+                            &pending_scope
+                                .as_ref()
+                                .ok_or_else(|| anyhow!("pending property scope was not installed"))?
+                                .1
+                        } else {
+                            &subgraph
+                        }
+                    } else {
+                        &subgraph
+                    };
+                    let mut scope = StepScope::new(scope_graph, &mut variables);
                     step.apply(ctx, &mut scope)
-                };
+                })();
                 ctx.finish_step();
                 result?;
 

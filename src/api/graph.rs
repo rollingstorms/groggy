@@ -2596,6 +2596,7 @@ impl Graph {
         values: &[(usize, AttrValue)],
         is_node: bool,
         positions: Option<&[usize]>,
+        pending_view: Option<&crate::GraphView>,
         errors: &mut Vec<String>,
     ) {
         let kind = if is_node { "node" } else { "edge" };
@@ -2609,7 +2610,13 @@ impl Graph {
             if let Err(error) = kinds::validate_property(attr_name, value, is_node) {
                 errors.push(format!("{attr_name}[{position}]: {error}"));
             }
-            let exists = if is_node {
+            let exists = if let Some(view) = pending_view {
+                if is_node {
+                    view.contains_node(id)
+                } else {
+                    view.contains_edge(id)
+                }
+            } else if is_node {
                 self.space.contains_node(id)
             } else {
                 self.space.contains_edge(id)
@@ -2637,6 +2644,27 @@ impl Graph {
         is_node: bool,
         positions: Option<&HashMap<AttrName, Vec<usize>>>,
     ) -> GraphResult<()> {
+        self.validate_bulk_attr_targets_in_view(attrs_values, is_node, positions, None)
+    }
+
+    /// Validate pending property targets with the ordinary bulk kind, duplicate
+    /// and reserved-key rules. Only the liveness source differs.
+    pub(crate) fn validate_scoped_bulk_attrs(
+        &self,
+        attrs_values: &HashMap<AttrName, Vec<(usize, AttrValue)>>,
+        is_node: bool,
+        pending_view: Option<&crate::GraphView>,
+    ) -> GraphResult<()> {
+        self.validate_bulk_attr_targets_in_view(attrs_values, is_node, None, pending_view)
+    }
+
+    fn validate_bulk_attr_targets_in_view(
+        &self,
+        attrs_values: &HashMap<AttrName, Vec<(usize, AttrValue)>>,
+        is_node: bool,
+        positions: Option<&HashMap<AttrName, Vec<usize>>>,
+        pending_view: Option<&crate::GraphView>,
+    ) -> GraphResult<()> {
         let mut attrs: Vec<_> = attrs_values.iter().collect();
         attrs.sort_unstable_by_key(|(name, _)| *name);
         let mut errors = Vec::new();
@@ -2656,6 +2684,7 @@ impl Graph {
                 values,
                 is_node,
                 column_positions,
+                pending_view,
                 &mut errors,
             );
         }
@@ -2781,7 +2810,7 @@ impl Graph {
         if attr_name == EXTERNAL_ID {
             errors.push("external_id: system-managed attribute; use set_node_external_id".into());
         }
-        self.collect_invalid_attr_targets(&attr_name, &node_values, true, None, &mut errors);
+        self.collect_invalid_attr_targets(&attr_name, &node_values, true, None, None, &mut errors);
         if !errors.is_empty() {
             return Err(GraphError::InvalidInput(format!(
                 "Invalid bulk attribute assignments: {}",

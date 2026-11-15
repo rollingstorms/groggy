@@ -9,7 +9,7 @@ use anyhow::{anyhow, bail, Result};
 use crate::types::{EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope, StepSpec};
+use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope, StepSpec};
 
 /// Binary arithmetic operations over scalar/node/edge values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,6 +101,10 @@ impl BinaryArithmeticStep {
 }
 
 impl Step for BinaryArithmeticStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -263,6 +267,10 @@ impl UnaryMathStep {
     }
 }
 impl Step for UnaryMathStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn id(&self) -> &'static str {
         self.id
     }
@@ -574,6 +582,10 @@ impl RecipStep {
 }
 
 impl Step for RecipStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -746,6 +758,10 @@ impl CompareStep {
 }
 
 impl Step for CompareStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -937,6 +953,10 @@ impl WhereStep {
 }
 
 impl Step for WhereStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -1147,6 +1167,10 @@ impl ReduceScalarStep {
 }
 
 impl Step for ReduceScalarStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -1240,6 +1264,10 @@ impl BroadcastScalarStep {
 }
 
 impl Step for BroadcastScalarStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }
@@ -1392,6 +1420,10 @@ impl ModeListStep {
 }
 
 impl Step for ModeListStep {
+    fn atomic_effect(&self) -> AtomicStepEffect {
+        AtomicStepEffect::ImmutableInputs
+    }
+
     fn supports_atomic_properties(&self) -> bool {
         true
     }

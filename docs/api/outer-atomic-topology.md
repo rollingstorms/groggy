@@ -63,10 +63,11 @@ through subsequent stages and after the owner changes or closes.
 ## Preflight and failure
 
 All algorithms declare their native mutation effects before any prefix executes.
-Existing property calculations and attachments must precede the first topology
-algorithm. Subsequent builders may contain supported topology, explicit pending
-captures and immutable-input computations. A later property-prefix builder or
-classic property-writing wrapper rejects before execution. Use the existing
+Certified property loads, initialization, arithmetic and attachments can follow
+staged topology using the pending selection. See [supported property stages](pending-topology-properties.md).
+Subsequent builders may also contain supported topology, explicit pending captures
+and immutable-input computations. Unadapted adjacency-dependent property steps
+and classic property-writing wrappers reject before execution. Use the existing
 `graph.algorithm_table` kernels for computations on captured pending topology.
 This ordering check is conservative, including statically empty topology stages.
 
@@ -88,7 +89,7 @@ Ordinary outer execution retains per-algorithm publication. Empty shared plans
 publish no version. Captured outputs retain provisional provenance even after a
 successful acceptance; refresh an owner capture for accepted-state writeback.
 
-General topology loops, pending-topology adaptation of old property calculations,
+General topology loops, remaining adjacency-dependent property adaptation,
 journal-owner pipeline dispatch, arbitrary callback certification, remaining DSL
 lowering and pipeline-history policy remain separate open work. The existing
 owner-thread/GIL boundary is unchanged.
