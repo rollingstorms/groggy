@@ -278,7 +278,13 @@ pub(super) fn same_inode(a: &File, b: &File) -> GraphResult<bool> {
     let b = b.metadata().map_err(invalid)?;
     Ok(a.dev() == b.dev() && a.ino() == b.ino())
 }
-#[cfg(not(unix))]
+#[cfg(windows)]
+pub(super) fn same_inode(a: &File, b: &File) -> GraphResult<bool> {
+    let a = same_file::Handle::from_file(a.try_clone().map_err(invalid)?).map_err(invalid)?;
+    let b = same_file::Handle::from_file(b.try_clone().map_err(invalid)?).map_err(invalid)?;
+    Ok(a == b)
+}
+#[cfg(not(any(unix, windows)))]
 pub(super) fn same_inode(_a: &File, _b: &File) -> GraphResult<bool> {
     Ok(false)
 }
@@ -295,7 +301,20 @@ pub(super) fn check_path(source: &File, path: &Path) -> GraphResult<()> {
     }
     Ok(())
 }
-#[cfg(not(unix))]
+#[cfg(windows)]
+pub(super) fn check_path(source: &File, path: &Path) -> GraphResult<()> {
+    let named = std::fs::symlink_metadata(path)
+        .map_err(|e| io_error(path, "stat_named_journal", e))?;
+    if named.file_type().is_symlink() {
+        return Err(invalid("journal path is a symbolic link; reopen the actual journal path"));
+    }
+    let reader = File::open(path).map_err(|e| io_error(path, "open_named_journal", e))?;
+    if !same_inode(source, &reader)? {
+        return Err(invalid("journal path changed; reopen the actual journal path"));
+    }
+    Ok(())
+}
+#[cfg(not(any(unix, windows)))]
 pub(super) fn check_path(_source: &File, _path: &Path) -> GraphResult<()> {
     Err(invalid(
         "inode-checked storage maintenance currently requires Unix",

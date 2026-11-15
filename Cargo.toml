@@ -414,3 +414,6 @@ harness = false
 [[bench]]
 name = "core_workflow_allocations"
 harness = false
+
+[target.'cfg(windows)'.dependencies]
+same-file = "1.0" # Safe handle identity for non-repairing Windows journal verification

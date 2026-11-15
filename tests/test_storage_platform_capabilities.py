@@ -25,6 +25,7 @@ def test_archive_and_journal_backup_reopen_and_preserve_historical_values(tmp_pa
         state = durable.current_state_id
         durable.backup(backup)
         durable.writer().set_node_attr(0, "score", 2.5)
+        durable.verify_storage()
         if not storage_capabilities()["checked_replacement"]:
             head = durable.current_state_id
             with pytest.raises((ValueError, RuntimeError), match="Unix"):
@@ -32,6 +33,7 @@ def test_archive_and_journal_backup_reopen_and_preserve_historical_values(tmp_pa
             assert durable.current_state_id == head
     with DurableGraph.open(journal) as reopened:
         assert reopened.get_node_attr(0, "score") == 2.5
+        reopened.verify_storage()
     with DurableGraph.open(backup) as reopened:
         assert reopened.current_state_id == state
         assert reopened.get_node_attr(0, "score") == 1.25

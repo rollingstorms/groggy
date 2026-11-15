@@ -14,7 +14,8 @@ pub struct StorageIntegrityReport {
     pub graph: crate::IntegrityReport,
 }
 /// Detached verification input. Holds the original inode lock and a separate
-/// read-only file cursor. Always finish the outcome on the original owner.
+/// read cursor (a duplicated locked file object on Windows). Always finish the
+/// outcome on the original owner.
 pub struct StorageVerificationPlan {
     source: File,
     reader: File,
@@ -48,8 +49,14 @@ impl DurableGraph {
             self.poisoned = true;
             return Err(error);
         }
+        #[cfg(not(windows))]
         let reader = File::open(&self.path)
             .map_err(|e| io_error(&self.path, "open_verification_reader", e))?;
+        // Windows mandatory byte-range locks require reads through the owned
+        // file object. Cloning shares its cursor; append always seeks to EOF.
+        #[cfg(windows)]
+        let reader = self.file.try_clone()
+            .map_err(|e| io_error(&self.path, "clone_verification_reader", e))?;
         if !same_inode(&self.file, &reader)? {
             self.poisoned = true;
             return Err(invalid("journal path changed before verification"));
