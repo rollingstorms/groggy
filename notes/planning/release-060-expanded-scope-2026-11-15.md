@@ -173,3 +173,15 @@ timestamp gap and its follow-up scope.
 Direct core node/column/edge attachments now support strict explicit effective
 timestamps through the canonical atomic staging boundary. Unknown parameters no
 longer disappear silently. See `builder-attachment-times-2026-11-16.md`.
+
+
+### Implemented follow-up: owned effects, immutable reads and numerical ownership
+
+The next five slices separate pending payload preparation from acceptance and
+selected materialization from live-owner lookup; avoid redundant overwritten-value
+copies; share explicit new-node endpoint references for existing-edge revisions;
+and repair numerical backend snapshot/transfer and custom-zero initialization
+safety. See `priority-slices-2026-11-16.md` for scoped commits, fresh qualification,
+allocation evidence and exact remaining durable/alternate-execution boundaries.
+The fixed inventory stays 215 checked / 53 unchecked; no broad parent is closed
+by these bounded implementations.

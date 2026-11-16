@@ -52,3 +52,38 @@ numerical_completion --backend-views, with existing process-wide allocator count
 The defects were identified by direct source inspection. The unsafe previous
 slice implementation was not exercised with a racy baseline; no undefined-behavior
 run is used as a correctness or performance comparison.
+
+
+## Final measured ownership costs
+
+At runtime e517e639, three fresh release processes after local builds/tests stop,
+seven observations each after warmup. The existing System allocator counters
+include output creation/drop and small endpoint checksums; fixture construction,
+builds and full-output comparison are outside timing. All twelve cases per
+process include empty, 1k, 100k and 1m f64 buffers. This measures ownership choices,
+not a matched speedup or a universal numerical performance budget.
+
+| Values | Operation | Median microseconds | Requested bytes | Allocations |
+| ---: | --- | ---: | ---: | ---: |
+| 1,000 | Live read guard | 0.041 | 0 | 0 |
+| 1,000 | Owned backend snapshot | 0.250 | 8,024 | 2 |
+| 1,000 | Same-size explicit refresh | 0.125 | 0 | 0 |
+| 100,000 | Live read guard | 0.042 | 0 | 0 |
+| 100,000 | Owned backend snapshot | 22.709 | 800,024 | 2 |
+| 100,000 | Same-size explicit refresh | 17.500 | 0 | 0 |
+| 1,000,000 | Live read guard | 0.042 | 0 | 0 |
+| 1,000,000 | Owned backend snapshot | 300.084 | 8,000,024 | 2 |
+| 1,000,000 | Same-size explicit refresh | 245.500 | 0 | 0 |
+
+Peak additional requested bytes equal the owned snapshot's requested bytes in
+these fixtures. Guard/refresh cases request no allocation. Empty snapshots request
+only the 24-byte boxed view. All **252 observations** have the expected exact
+allocation volume. These are requested Rust bytes, not process RSS or allocator
+overhead. Raw receipts preserve runtime and source hashes:
+`../benchmarks/numerical-memory-views-2026-11-16-{1,2,3}.json`.
+
+Final local gates at e517e639: **1,629 native passed / 54 ignored**, separate serial
+process recovery, strict all-target Clippy, **3,305 maintained Python tests / one
+skipped / 14 established warnings** and **289 executable Python examples** against
+a fresh unpacked wheel. The public native memory example also passes as a Rust
+doctest. See `priority-slices-2026-11-16.md` and its artifact receipts.

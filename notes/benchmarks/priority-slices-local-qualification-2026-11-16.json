@@ -1,0 +1,57 @@
+{
+  "runtime_commit": "e517e6391e6e0e21140f3329c396891006ce4596",
+  "branch": "groggy-roadmap-2026-10-20",
+  "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)",
+  "python": "3.9.6",
+  "platform": "macOS-26.3.1-arm64-arm-64bit",
+  "native": {
+    "command": "CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=python-groggy/target cargo test --offline --locked",
+    "suites": 225,
+    "passed": 1629,
+    "ignored": 54,
+    "failed": 0,
+    "log_sha256": "7b3c901a42620ab78929a1b2607ac1d43b9ad4e4d2fcc040b55ecb70f2ed66ac"
+  },
+  "process_recovery": {
+    "command": "cargo test --offline --locked --lib killed_checkpoint_process -- --ignored --test-threads=1",
+    "passed": 1,
+    "scope": "macOS serial process-kill checkpoints, separate from ordinary suite"
+  },
+  "clippy": {
+    "command": "cargo clippy --offline --locked --all-targets -- -D warnings",
+    "result": "passed"
+  },
+  "formatting": {
+    "cargo_fmt": "passed",
+    "git_diff_check": "passed",
+    "black": "unavailable",
+    "isort": "unavailable",
+    "pre_commit": "unavailable"
+  },
+  "root_wheel": {
+    "sha256": "c6f812da41857d96ad5ee1c5975b191e2b1c49889b50200e6efac55df75ecb68",
+    "isolated_imports_and_exports": 105,
+    "storage_workflows": [
+      "archive",
+      "journal"
+    ],
+    "maintained_python_passed": 3305,
+    "maintained_python_skipped": 1,
+    "pytest_warnings": 14,
+    "executable_python_docs": 289,
+    "receipt": "priority-slices-wheel-qualification-2026-11-16.json"
+  },
+  "nested_wheel": {
+    "sha256": "19fb1a388baf76e8ec5d0b0412092107228c0e0633b3d63210a893d09d19da1c",
+    "ownership_workflow_tests_passed": 36,
+    "identical_python_stub_files": 61,
+    "identical_native_module_sha256": "dff07f13602008c8f2e2978458774616db558063298587eee889c8d30fda3e51",
+    "receipt": "priority-slices-nested-wheel-qualification-2026-11-16.json"
+  },
+  "limits": [
+    "No wheel or dependency installation",
+    "No package/tag publication",
+    "Cross-platform qualification recorded separately at the pinned runtime source",
+    "268 checklist rows remain 215 checked and 53 unchecked; 44 release rows open and nine deferred"
+  ]
+}

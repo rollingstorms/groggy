@@ -12,11 +12,12 @@ persistence boundary. This does not add a checklist row or claim implementation.
   and source binding, creates one PropertyBatch, runs steps against one Graph
   owner, then calls accept_selection. Output restoration and Context cleanup cover
   execution/publication failure. The returned continuation belongs to that owner.
-- `src/algorithms/property_batch.rs::PropertyBatch::accept_selection` immediately
-  accepts, then projects original and added IDs against the accepted owner.
-  `accept` validates the WriteCoordinate, moves staged values/clocks/topology into
-  one GraphBatch, and calls Graph::apply_batch. Batch conversion and backend
-  dispatch currently share this function.
+- `PropertyBatch::prepare` now moves values/clocks/topology into owned effects
+  independently of acceptance (`property_batch/prepared.rs`). Acceptance validates
+  the complete coordinate and dispatches to Graph::apply_batch, then projects
+  original survivors and global added ranges. Selected read materialization now
+  lives in `property_batch/capture.rs`, independent of Graph/Subgraph access.
+  capture_scoped retains the checked live-owner adapter.
 - `src/storage/journal.rs::DurableGraph` owns a Graph directly. graph() exposes
   checked shared reads only. apply_batch_with_schema encodes the stored batch,
   prepares canonical publication with installed/additional policy, and executes
@@ -27,8 +28,8 @@ persistence boundary. This does not add a checklist row or claim implementation.
 
 ## Completed first implementation step
 
-Extract the existing owned PropertyBatch-to-GraphBatch conversion from backend
-acceptance. An internal prepared-effects value should retain:
+The completed PropertyBatch-to-GraphBatch extraction separates conversion from
+backend acceptance. Its internal prepared-effects value retains:
 
 1. The expected WriteCoordinate, including owner/branch/head binding.
 2. The owned canonical batch payload with explicit property/topology clock choices.
@@ -82,3 +83,70 @@ explicit. Return immutable result views/owned results after durable acceptance.
 
 These exits restate existing contracts. Service concurrency, new durability levels,
 checkpoint scheduling and retained pipeline-run history are not decided here.
+
+## Next coherent implementation boundary (design, not implemented)
+
+The remaining coupling is invocation, not snapshot copying. Public
+Algorithm::execute takes/returns an owner-bound Subgraph; Step::apply receives
+StepScope, whose subgraph() and property/adjacency helpers are also owner-bound.
+StepValue::SubgraphArray retains that ownership even though GraphView/table outputs
+are detached. Both registries currently instantiate those public trait objects.
+Atomic effect certification proves staging/pending-read behavior, not portability
+to an owner-free durable invocation. Do not treat its existing flags as proof that
+a callback cannot reach a mutable owner.
+
+| Responsibility | Existing authority | Required next adaptation |
+| --- | --- | --- |
+| Source identity/selection | execution_scope, write coordinates, bound source validation | Capture a checked immutable source, complete coordinate and allocation high-water authority at entry. Recheck at acceptance. |
+| Selected pending values/geometry | PropertyBatch capture kernel | Feed explicit frame membership and the accepted pin directly; retain dynamic-root/fixed-child rules and issued-capture authority. |
+| Core step invocation | StepExecutor + public StepScope adapter | Introduce an internal read-oriented frame used by certified kernels. Keep public owner-bound adapters for compatibility; no dummy owner or panicking “subgraph unavailable” fallback. |
+| Registered/custom effects | Step/Algorithm registries and effect preflight | Bind portable kernel capability explicitly in internal registration. Legacy/custom callbacks remain memory-only unless migrated; reject unsupported durable programs before a prefix executes. |
+| Computation | AlgorithmRead, selected CSR, existing scalar/table kernels | Reuse these kernels; migrate leaf invocation, not arithmetic/algorithm definitions into a second interpreter. |
+| Retained-history reads | Existing recorded/effective read plans | Lend retained read authority independently from the pending snapshot; do not invent history for provisional entities. |
+| Acceptance | Owned effects + canonical durable journal coordinator | Check installed/additional schema, coordinate/allocation authority and complete output preparation before persist/sync/publication. |
+| Output/lifetime | Immutable GraphView, table and owned result variants | Durable results retain no writable Subgraph; older captures remain immutable through later writes, reopen and pruning. |
+
+Keep one executor for sequencing, refresh, cancellation and outputs. An internal
+registered-kernel adapter can preserve public Step/Algorithm interfaces while
+migrating built-ins incrementally. Merely duplicating the JSON step dispatch in
+DurableGraph would create another execution engine. Merely adding an optional
+owner to StepScope while leaving subgraph() callable would preserve the escape or
+introduce runtime panics. Neither solves this boundary.
+
+### First complete durable program target
+
+A bounded end-to-end target can combine node/edge creation, explicit batch-global
+references, scalar property initialization/attachment with effective clocks, an
+immutable pending capture, one existing captured AlgorithmRead computation and
+owned table/graph outputs. Run the identical program through memory and durable
+adapters, including late failure, cancellation, installed schema, append failure,
+reopen and allocation checks. Extend supported kernels only after that whole
+program passes. Fixed child topology, legacy callbacks, alternate batch plans and
+unported retained-history helpers keep explicit preflight guards; do not infer
+support from matching IDs or a successful pure computation.
+
+### Preserve the existing cascade distinction
+
+DurableGraph::apply_view_batch_with_schema already offers checked view writes and
+prepares its returned immutable view before journaling. Its strict view scope can
+reject removal cascades outside the view. Existing selected atomic **pipelines**
+permit a selected node's canonical owner-wide incident-edge cascade, even when an
+incident edge is outside their output selection. The new selected endpoint fixture
+in tests/test_staged_revision_endpoints.py exercises this: removing node 1 also
+removes its owner edge to unselected node 3, while a revised selected edge is
+rescued to new nodes. Returned membership remains selected.
+
+A durable pipeline cannot silently substitute the strict view-writer policy and
+reject that valid program. Reuse canonical batch preparation/publication and its
+schema checks, with a separately checked invocation selection and prepared output
+projection; do not add a generic “skip validation” switch. This is preservation of
+current behavior, not a new cascade rule. Output materialization must finish before
+journal acceptance so a fallible capture cannot turn an accepted write into a
+reported execution failure.
+
+The first adapter need not promise GIL release. Detached execution may release it
+only after its complete input/context/output types carry no live owner and satisfy
+compiler-checked thread/lifetime constraints. Existing typed values include both
+detached outputs and owner-bound subgraph arrays, so qualifying one read kernel
+alone does not qualify the entire invocation. Service scheduling, pipeline-run
+history and new checkpoint/durability policies remain separate existing scope.

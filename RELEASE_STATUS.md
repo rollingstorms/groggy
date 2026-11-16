@@ -9,46 +9,49 @@ The owner now targets all remaining hierarchical groups except group 8:
 This includes provenance and multi-user/concurrency work. The expanded target
 remains unfinished. See [scope and next chunk](notes/planning/release-060-expanded-scope-2026-11-15.md).
 
-Latest completed local implementation: **be6512d1**. All thirteen classic wrappers
-now consume selected pending topology/properties. Sequential root loops share the
-same executor/batch, and direct attachments accept strict explicit property clocks.
-Fixed child topology, alternate execution plans and broader parent requirements
-remain open.
+Latest completed local runtime: **e517e639**. Five priority slices separate owned
+pipeline preparation and immutable pending materialization from owner adapters,
+avoid redundant property-value copies, add explicit new-node endpoints for existing
+edge revisions, and repair native numerical-buffer snapshot/initialization safety.
+All thirteen classic wrappers and root sequential topology loops remain supported.
+Durable invocation, fixed child/provisional topology, alternate plans and broader
+parent requirements remain open.
 
-Local gates: **1,610 native passed / 54 ignored**, separate serial checkpoint-crash
+Local gates: **1,629 native passed / 54 ignored**, separate serial checkpoint-crash
 recovery, strict all-target Clippy and Rust formatting. A fresh unpacked macOS arm64
 CPython 3.9 wheel passes isolated smoke, 105 exports/version agreement, archive and
-journal application workflows, **3,273 maintained Python tests / one skipped /
-14 established warnings**, and **288 executable documentation examples**.
+journal application workflows, **3,305 maintained Python tests / one skipped /
+14 established warnings**, and **289 executable documentation examples**.
+The clean nested wheel passes 36 ownership/workflow tests; its extension and all
+61 Python/stub files match the fully tested root artifact.
 
-- [Priority-hour summary and measurements](notes/planning/priority-hour-pending-execution-2026-11-16.md).
-- [Atomic capability map](docs/api/atomic-pipeline-capabilities.md), including all thirteen classic wrappers in one publication.
-- [Centrality](notes/planning/pending-classic-centrality-2026-11-15.md),
-  [community](notes/planning/pending-classic-communities-2026-11-16.md),
-  [root loops](notes/planning/root-topology-loops-2026-11-16.md),
-  [attachment clocks](notes/planning/builder-attachment-times-2026-11-16.md).
-- [Fresh local wheel receipt](notes/benchmarks/priority-hour-final-wheel-qualification-2026-11-16.json).
-- [Current platform run](https://github.com/rollingstorms/groggy/actions/runs/43780585321):
-  **all 21 required jobs passed**, including **19 wheels**, native/serial-recovery/
-  Clippy and source rebuild at be6512d1. Publication was skipped. The
-  [platform receipt](notes/benchmarks/priority-hour-platform-qualification-2026-11-16.json)
-  retains all hashes, job conclusions and explicit qualification limits.
+- [Five-slice summary, measurements and remaining work](notes/planning/priority-slices-2026-11-16.md).
+- [Local qualification receipt](notes/benchmarks/priority-slices-local-qualification-2026-11-16.json).
+- [Root wheel](notes/benchmarks/priority-slices-wheel-qualification-2026-11-16.json) and
+  [nested wheel](notes/benchmarks/priority-slices-nested-wheel-qualification-2026-11-16.json) receipts.
+- [Atomic capability map](docs/api/atomic-pipeline-capabilities.md) and
+  [staged endpoint references](docs/api/pipeline-endpoint-revisions.md).
+- [Native numerical ownership correction](docs/api/matrix-memory-ownership.md):
+  backend snapshots are owned; live zero-copy reads retain lock guards; unsupported
+  transfers reject; custom numeric allocation uses valid typed zeros.
+- [Current platform run](https://github.com/rollingstorms/groggy/actions/runs/43792347879),
+  pinned to e517e639: native/source gates passed; remaining wheels are completing.
+  No package publication runs on manual dispatch. The final receipt is pending.
 
-Alternate-entry packaging checks found and removed local Finder metadata from
-wheel payloads. Both clean entry points pass isolated import/storage workflows
-and 36 ownership/workflow tests; their 61 Python/stub files match the fully tested
-root wheel. The updated gate rejects the contaminated artifact. See
-[clean root receipt](notes/benchmarks/priority-hour-clean-root-wheel-qualification-2026-11-16.json)
-and [clean nested receipt](notes/benchmarks/priority-hour-clean-nested-wheel-qualification-2026-11-16.json).
-This packaging-only follow-up is locally qualified after the platform run; its
-results remain distinct from that run's source/hashes.
+The earlier be6512d1 platform run passed all 21 required jobs and 19 wheels;
+[its receipt](notes/benchmarks/priority-hour-platform-qualification-2026-11-16.json)
+remains explicitly tied to that earlier source. Its local packaging follow-up
+excluded Finder metadata; the exclusion is included in the current source. See
+[previous hour](notes/planning/priority-hour-pending-execution-2026-11-16.md) for
+that source's exact hashes and completed classic/root-loop/clock evidence.
 
-Matched root-loop versus unrolled fixtures show similar observed execution costs
-(1,000 initial nodes / 100 growth iterations: 87.2 ms versus 86.8 ms median).
-These bounded measurements do not establish production memory or latency limits.
-The earlier [November 15 pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)
-retains its individual slice/artifact receipts. The 44 broad unchecked release rows
-retain their remaining exit criteria. No release/tag/package publication occurred.
+Matched replacement fixtures reduce requested allocation volume by about 45% for
+node columns and 43% for edge columns when two large vector columns are replaced;
+unchanged controls request exactly the same bytes. These are bounded allocation
+measurements, not RSS/latency guarantees. Explicit numerical backend snapshots
+copy values; live guards and same-size snapshot refresh allocate nothing in the
+recorded fixtures. The 44 broad unchecked release rows retain their exit criteria.
+No release/tag/package publication occurred.
 
 ## Earlier bounded candidate (9aadfee5)
 

@@ -51,7 +51,10 @@ edges in this fixture. The unchanged controls show substantial timing variation
 with identical allocation counts: do not attribute the timing ratios entirely to
 the implementation or infer a general speedup/latency budget. Wide captures still
 copy every selected final logical value and prepare validated adjacency; this
-repair avoids redundant copies rather than claiming zero-copy snapshots.
+repair avoids redundant copies rather than claiming zero-copy snapshots. When
+staged columns exist, each accepted key additionally looks up its column/row in
+the BTree overlay; very wide scalar-column workloads are not measured here. The
+empty-overlay fast path avoids those lookups.
 
 Raw receipts: `../benchmarks/pending-overwrites-{before,after}-2026-11-16-{1,2,3}.json`.
 Reproduce with `cargo bench --offline --locked --bench pending_frame_allocations
