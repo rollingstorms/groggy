@@ -1,0 +1,1287 @@
+{
+  "cases": [
+    {
+      "entities": 100,
+      "entity": "node",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 55822,
+            "peak_additional_requested_bytes": 59688,
+            "requested_bytes": 70964
+          },
+          "seconds": 0.000139167
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 55822,
+            "peak_additional_requested_bytes": 59688,
+            "requested_bytes": 70964
+          },
+          "seconds": 4.0791e-05
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 55822,
+            "peak_additional_requested_bytes": 59688,
+            "requested_bytes": 70964
+          },
+          "seconds": 4.0416e-05
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 55822,
+            "peak_additional_requested_bytes": 59688,
+            "requested_bytes": 70964
+          },
+          "seconds": 3.7875e-05
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 55822,
+            "peak_additional_requested_bytes": 59688,
+            "requested_bytes": 70964
+          },
+          "seconds": 3.8458e-05
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 100,
+      "entity": "node",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 89858,
+            "peak_additional_requested_bytes": 100485,
+            "requested_bytes": 231099
+          },
+          "seconds": 0.000263
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 89858,
+            "peak_additional_requested_bytes": 100485,
+            "requested_bytes": 231099
+          },
+          "seconds": 0.000164125
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 89858,
+            "peak_additional_requested_bytes": 100485,
+            "requested_bytes": 231099
+          },
+          "seconds": 0.000164958
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 89858,
+            "peak_additional_requested_bytes": 100485,
+            "requested_bytes": 231099
+          },
+          "seconds": 0.000162791
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 89858,
+            "peak_additional_requested_bytes": 100485,
+            "requested_bytes": 231099
+          },
+          "seconds": 0.000161
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 100,
+      "entity": "node",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 122142,
+            "peak_additional_requested_bytes": 143809,
+            "requested_bytes": 389510
+          },
+          "seconds": 0.00029025
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 122142,
+            "peak_additional_requested_bytes": 143809,
+            "requested_bytes": 389510
+          },
+          "seconds": 0.0003095
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 122142,
+            "peak_additional_requested_bytes": 143809,
+            "requested_bytes": 389510
+          },
+          "seconds": 0.000292916
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 122142,
+            "peak_additional_requested_bytes": 143809,
+            "requested_bytes": 389510
+          },
+          "seconds": 0.000305334
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 122142,
+            "peak_additional_requested_bytes": 143809,
+            "requested_bytes": 389510
+          },
+          "seconds": 0.000285834
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 100,
+      "entity": "node",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 1681422,
+            "peak_additional_requested_bytes": 1685288,
+            "requested_bytes": 1696564
+          },
+          "seconds": 0.00022125
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 1681422,
+            "peak_additional_requested_bytes": 1685288,
+            "requested_bytes": 1696564
+          },
+          "seconds": 0.000101875
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 1681422,
+            "peak_additional_requested_bytes": 1685288,
+            "requested_bytes": 1696564
+          },
+          "seconds": 9.0834e-05
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 1681422,
+            "peak_additional_requested_bytes": 1685288,
+            "requested_bytes": 1696564
+          },
+          "seconds": 8.6042e-05
+        },
+        {
+          "allocations": {
+            "allocation_calls": 659,
+            "end_additional_requested_bytes": 1681422,
+            "peak_additional_requested_bytes": 1685288,
+            "requested_bytes": 1696564
+          },
+          "seconds": 0.00010975
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 100,
+      "entity": "node",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 1715458,
+            "peak_additional_requested_bytes": 1726085,
+            "requested_bytes": 1856699
+          },
+          "seconds": 0.000874083
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 1715458,
+            "peak_additional_requested_bytes": 1726085,
+            "requested_bytes": 1856699
+          },
+          "seconds": 0.000885375
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 1715458,
+            "peak_additional_requested_bytes": 1726085,
+            "requested_bytes": 1856699
+          },
+          "seconds": 0.0008785
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 1715458,
+            "peak_additional_requested_bytes": 1726085,
+            "requested_bytes": 1856699
+          },
+          "seconds": 0.000939917
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1983,
+            "end_additional_requested_bytes": 1715458,
+            "peak_additional_requested_bytes": 1726085,
+            "requested_bytes": 1856699
+          },
+          "seconds": 0.000944167
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 100,
+      "entity": "node",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 1747742,
+            "peak_additional_requested_bytes": 1769409,
+            "requested_bytes": 2015110
+          },
+          "seconds": 0.001783625
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 1747742,
+            "peak_additional_requested_bytes": 1769409,
+            "requested_bytes": 2015110
+          },
+          "seconds": 0.001663959
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 1747742,
+            "peak_additional_requested_bytes": 1769409,
+            "requested_bytes": 2015110
+          },
+          "seconds": 0.001860459
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 1747742,
+            "peak_additional_requested_bytes": 1769409,
+            "requested_bytes": 2015110
+          },
+          "seconds": 0.001641791
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3275,
+            "end_additional_requested_bytes": 1747742,
+            "peak_additional_requested_bytes": 1769409,
+            "requested_bytes": 2015110
+          },
+          "seconds": 0.001784208
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 1000,
+      "entity": "node",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 599242,
+            "peak_additional_requested_bytes": 637668,
+            "requested_bytes": 810320
+          },
+          "seconds": 0.000522042
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 599242,
+            "peak_additional_requested_bytes": 637668,
+            "requested_bytes": 810320
+          },
+          "seconds": 0.000463042
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 599242,
+            "peak_additional_requested_bytes": 637668,
+            "requested_bytes": 810320
+          },
+          "seconds": 0.000452792
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 599242,
+            "peak_additional_requested_bytes": 637668,
+            "requested_bytes": 810320
+          },
+          "seconds": 0.00043825
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 599242,
+            "peak_additional_requested_bytes": 637668,
+            "requested_bytes": 810320
+          },
+          "seconds": 0.000446167
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 1000,
+      "entity": "node",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 896382,
+            "peak_additional_requested_bytes": 1029593,
+            "requested_bytes": 2532967
+          },
+          "seconds": 0.001706875
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 896382,
+            "peak_additional_requested_bytes": 1029593,
+            "requested_bytes": 2532967
+          },
+          "seconds": 0.001656291
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 896382,
+            "peak_additional_requested_bytes": 1029593,
+            "requested_bytes": 2532967
+          },
+          "seconds": 0.001651708
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 896382,
+            "peak_additional_requested_bytes": 1029593,
+            "requested_bytes": 2532967
+          },
+          "seconds": 0.001630375
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 896382,
+            "peak_additional_requested_bytes": 1029593,
+            "requested_bytes": 2532967
+          },
+          "seconds": 0.001615833
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 1000,
+      "entity": "node",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 1184666,
+            "peak_additional_requested_bytes": 1451509,
+            "requested_bytes": 4202650
+          },
+          "seconds": 0.003031333
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 1184666,
+            "peak_additional_requested_bytes": 1451509,
+            "requested_bytes": 4202650
+          },
+          "seconds": 0.002932
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 1184666,
+            "peak_additional_requested_bytes": 1451509,
+            "requested_bytes": 4202650
+          },
+          "seconds": 0.003357125
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 1184666,
+            "peak_additional_requested_bytes": 1451509,
+            "requested_bytes": 4202650
+          },
+          "seconds": 0.00343025
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 1184666,
+            "peak_additional_requested_bytes": 1451509,
+            "requested_bytes": 4202650
+          },
+          "seconds": 0.003414208
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 1000,
+      "entity": "node",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 16855242,
+            "peak_additional_requested_bytes": 16893668,
+            "requested_bytes": 17066320
+          },
+          "seconds": 0.002768083
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 16855242,
+            "peak_additional_requested_bytes": 16893668,
+            "requested_bytes": 17066320
+          },
+          "seconds": 0.001528833
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 16855242,
+            "peak_additional_requested_bytes": 16893668,
+            "requested_bytes": 17066320
+          },
+          "seconds": 0.002175708
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 16855242,
+            "peak_additional_requested_bytes": 16893668,
+            "requested_bytes": 17066320
+          },
+          "seconds": 0.001676375
+        },
+        {
+          "allocations": {
+            "allocation_calls": 6071,
+            "end_additional_requested_bytes": 16855242,
+            "peak_additional_requested_bytes": 16893668,
+            "requested_bytes": 17066320
+          },
+          "seconds": 0.001517875
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 1000,
+      "entity": "node",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 17152382,
+            "peak_additional_requested_bytes": 17261025,
+            "requested_bytes": 18788967
+          },
+          "seconds": 0.009261917
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 17152382,
+            "peak_additional_requested_bytes": 17261025,
+            "requested_bytes": 18788967
+          },
+          "seconds": 0.008170667
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 17152382,
+            "peak_additional_requested_bytes": 17261025,
+            "requested_bytes": 18788967
+          },
+          "seconds": 0.008328666
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 17152382,
+            "peak_additional_requested_bytes": 17261025,
+            "requested_bytes": 18788967
+          },
+          "seconds": 0.009033333
+        },
+        {
+          "allocations": {
+            "allocation_calls": 18664,
+            "end_additional_requested_bytes": 17152382,
+            "peak_additional_requested_bytes": 17261025,
+            "requested_bytes": 18788967
+          },
+          "seconds": 0.008051375
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 1000,
+      "entity": "node",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 17440666,
+            "peak_additional_requested_bytes": 17658461,
+            "requested_bytes": 20458650
+          },
+          "seconds": 0.016084875
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 17440666,
+            "peak_additional_requested_bytes": 17658461,
+            "requested_bytes": 20458650
+          },
+          "seconds": 0.015329042
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 17440666,
+            "peak_additional_requested_bytes": 17658461,
+            "requested_bytes": 20458650
+          },
+          "seconds": 0.015011084
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 17440666,
+            "peak_additional_requested_bytes": 17658461,
+            "requested_bytes": 20458650
+          },
+          "seconds": 0.016220584
+        },
+        {
+          "allocations": {
+            "allocation_calls": 31217,
+            "end_additional_requested_bytes": 17440666,
+            "peak_additional_requested_bytes": 17658461,
+            "requested_bytes": 20458650
+          },
+          "seconds": 0.014973917
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 100,
+      "entity": "edge",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 119045,
+            "peak_additional_requested_bytes": 129618,
+            "requested_bytes": 164955
+          },
+          "seconds": 0.000132792
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 119045,
+            "peak_additional_requested_bytes": 129618,
+            "requested_bytes": 164955
+          },
+          "seconds": 0.000101334
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 119045,
+            "peak_additional_requested_bytes": 129618,
+            "requested_bytes": 164955
+          },
+          "seconds": 0.000100667
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 119045,
+            "peak_additional_requested_bytes": 129618,
+            "requested_bytes": 164955
+          },
+          "seconds": 0.000101416
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 119045,
+            "peak_additional_requested_bytes": 129618,
+            "requested_bytes": 164955
+          },
+          "seconds": 0.000101083
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 100,
+      "entity": "edge",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 152265,
+            "peak_additional_requested_bytes": 162892,
+            "requested_bytes": 328434
+          },
+          "seconds": 0.00024
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 152265,
+            "peak_additional_requested_bytes": 162892,
+            "requested_bytes": 328434
+          },
+          "seconds": 0.00023925
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 152265,
+            "peak_additional_requested_bytes": 162892,
+            "requested_bytes": 328434
+          },
+          "seconds": 0.000255042
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 152265,
+            "peak_additional_requested_bytes": 162892,
+            "requested_bytes": 328434
+          },
+          "seconds": 0.000244
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 152265,
+            "peak_additional_requested_bytes": 162892,
+            "requested_bytes": 328434
+          },
+          "seconds": 0.000255875
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 100,
+      "entity": "edge",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 184549,
+            "peak_additional_requested_bytes": 206216,
+            "requested_bytes": 486681
+          },
+          "seconds": 0.000384917
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 184549,
+            "peak_additional_requested_bytes": 206216,
+            "requested_bytes": 486681
+          },
+          "seconds": 0.000387167
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 184549,
+            "peak_additional_requested_bytes": 206216,
+            "requested_bytes": 486681
+          },
+          "seconds": 0.000404333
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 184549,
+            "peak_additional_requested_bytes": 206216,
+            "requested_bytes": 486681
+          },
+          "seconds": 0.000392708
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 184549,
+            "peak_additional_requested_bytes": 206216,
+            "requested_bytes": 486681
+          },
+          "seconds": 0.000394333
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 100,
+      "entity": "edge",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 1744645,
+            "peak_additional_requested_bytes": 1755218,
+            "requested_bytes": 1790555
+          },
+          "seconds": 0.000238417
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 1744645,
+            "peak_additional_requested_bytes": 1755218,
+            "requested_bytes": 1790555
+          },
+          "seconds": 0.000216833
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 1744645,
+            "peak_additional_requested_bytes": 1755218,
+            "requested_bytes": 1790555
+          },
+          "seconds": 0.000229333
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 1744645,
+            "peak_additional_requested_bytes": 1755218,
+            "requested_bytes": 1790555
+          },
+          "seconds": 0.000221958
+        },
+        {
+          "allocations": {
+            "allocation_calls": 1194,
+            "end_additional_requested_bytes": 1744645,
+            "peak_additional_requested_bytes": 1755218,
+            "requested_bytes": 1790555
+          },
+          "seconds": 0.000253458
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 100,
+      "entity": "edge",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 1777865,
+            "peak_additional_requested_bytes": 1788492,
+            "requested_bytes": 1954034
+          },
+          "seconds": 0.000986667
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 1777865,
+            "peak_additional_requested_bytes": 1788492,
+            "requested_bytes": 1954034
+          },
+          "seconds": 0.000973875
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 1777865,
+            "peak_additional_requested_bytes": 1788492,
+            "requested_bytes": 1954034
+          },
+          "seconds": 0.000966708
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 1777865,
+            "peak_additional_requested_bytes": 1788492,
+            "requested_bytes": 1954034
+          },
+          "seconds": 0.001006042
+        },
+        {
+          "allocations": {
+            "allocation_calls": 2519,
+            "end_additional_requested_bytes": 1777865,
+            "peak_additional_requested_bytes": 1788492,
+            "requested_bytes": 1954034
+          },
+          "seconds": 0.000970958
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 100,
+      "entity": "edge",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 1810149,
+            "peak_additional_requested_bytes": 1831816,
+            "requested_bytes": 2112281
+          },
+          "seconds": 0.001536292
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 1810149,
+            "peak_additional_requested_bytes": 1831816,
+            "requested_bytes": 2112281
+          },
+          "seconds": 0.001475792
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 1810149,
+            "peak_additional_requested_bytes": 1831816,
+            "requested_bytes": 2112281
+          },
+          "seconds": 0.001460125
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 1810149,
+            "peak_additional_requested_bytes": 1831816,
+            "requested_bytes": 2112281
+          },
+          "seconds": 0.001456875
+        },
+        {
+          "allocations": {
+            "allocation_calls": 3809,
+            "end_additional_requested_bytes": 1810149,
+            "peak_additional_requested_bytes": 1831816,
+            "requested_bytes": 2112281
+          },
+          "seconds": 0.001455083
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 1000,
+      "entity": "edge",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 1366385,
+            "peak_additional_requested_bytes": 1540158,
+            "requested_bytes": 2034599
+          },
+          "seconds": 0.001163208
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 1366385,
+            "peak_additional_requested_bytes": 1540158,
+            "requested_bytes": 2034599
+          },
+          "seconds": 0.001046333
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 1366385,
+            "peak_additional_requested_bytes": 1540158,
+            "requested_bytes": 2034599
+          },
+          "seconds": 0.001036334
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 1366385,
+            "peak_additional_requested_bytes": 1540158,
+            "requested_bytes": 2034599
+          },
+          "seconds": 0.001126708
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 1366385,
+            "peak_additional_requested_bytes": 1540158,
+            "requested_bytes": 2034599
+          },
+          "seconds": 0.001413959
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 1000,
+      "entity": "edge",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 1655509,
+            "peak_additional_requested_bytes": 1788720,
+            "requested_bytes": 3824942
+          },
+          "seconds": 0.003017875
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 1655509,
+            "peak_additional_requested_bytes": 1788720,
+            "requested_bytes": 3824942
+          },
+          "seconds": 0.003113792
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 1655509,
+            "peak_additional_requested_bytes": 1788720,
+            "requested_bytes": 3824942
+          },
+          "seconds": 0.002931334
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 1655509,
+            "peak_additional_requested_bytes": 1788720,
+            "requested_bytes": 3824942
+          },
+          "seconds": 0.002437834
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 1655509,
+            "peak_additional_requested_bytes": 1788720,
+            "requested_bytes": 3824942
+          },
+          "seconds": 0.002371208
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 1000,
+      "entity": "edge",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 1943793,
+            "peak_additional_requested_bytes": 2210636,
+            "requested_bytes": 5494461
+          },
+          "seconds": 0.003750333
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 1943793,
+            "peak_additional_requested_bytes": 2210636,
+            "requested_bytes": 5494461
+          },
+          "seconds": 0.003766625
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 1943793,
+            "peak_additional_requested_bytes": 2210636,
+            "requested_bytes": 5494461
+          },
+          "seconds": 0.003732666
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 1943793,
+            "peak_additional_requested_bytes": 2210636,
+            "requested_bytes": 5494461
+          },
+          "seconds": 0.004406459
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 1943793,
+            "peak_additional_requested_bytes": 2210636,
+            "requested_bytes": 5494461
+          },
+          "seconds": 0.00470875
+        }
+      ],
+      "vector_width": 8
+    },
+    {
+      "entities": 1000,
+      "entity": "edge",
+      "replaced_columns": 0,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 17622385,
+            "peak_additional_requested_bytes": 17796158,
+            "requested_bytes": 18290599
+          },
+          "seconds": 0.0022935
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 17622385,
+            "peak_additional_requested_bytes": 17796158,
+            "requested_bytes": 18290599
+          },
+          "seconds": 0.002363541
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 17622385,
+            "peak_additional_requested_bytes": 17796158,
+            "requested_bytes": 18290599
+          },
+          "seconds": 0.003113958
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 17622385,
+            "peak_additional_requested_bytes": 17796158,
+            "requested_bytes": 18290599
+          },
+          "seconds": 0.002384791
+        },
+        {
+          "allocations": {
+            "allocation_calls": 11122,
+            "end_additional_requested_bytes": 17622385,
+            "peak_additional_requested_bytes": 17796158,
+            "requested_bytes": 18290599
+          },
+          "seconds": 0.002236125
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 1000,
+      "entity": "edge",
+      "replaced_columns": 1,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 17911509,
+            "peak_additional_requested_bytes": 18020152,
+            "requested_bytes": 20080942
+          },
+          "seconds": 0.008760375
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 17911509,
+            "peak_additional_requested_bytes": 18020152,
+            "requested_bytes": 20080942
+          },
+          "seconds": 0.010373167
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 17911509,
+            "peak_additional_requested_bytes": 18020152,
+            "requested_bytes": 20080942
+          },
+          "seconds": 0.010744583
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 17911509,
+            "peak_additional_requested_bytes": 18020152,
+            "requested_bytes": 20080942
+          },
+          "seconds": 0.0092065
+        },
+        {
+          "allocations": {
+            "allocation_calls": 23720,
+            "end_additional_requested_bytes": 17911509,
+            "peak_additional_requested_bytes": 18020152,
+            "requested_bytes": 20080942
+          },
+          "seconds": 0.008868125
+        }
+      ],
+      "vector_width": 1024
+    },
+    {
+      "entities": 1000,
+      "entity": "edge",
+      "replaced_columns": 2,
+      "samples": [
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 18199793,
+            "peak_additional_requested_bytes": 18417588,
+            "requested_bytes": 21750461
+          },
+          "seconds": 0.01816475
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 18199793,
+            "peak_additional_requested_bytes": 18417588,
+            "requested_bytes": 21750461
+          },
+          "seconds": 0.016151667
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 18199793,
+            "peak_additional_requested_bytes": 18417588,
+            "requested_bytes": 21750461
+          },
+          "seconds": 0.016503542
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 18199793,
+            "peak_additional_requested_bytes": 18417588,
+            "requested_bytes": 21750461
+          },
+          "seconds": 0.015710791
+        },
+        {
+          "allocations": {
+            "allocation_calls": 36271,
+            "end_additional_requested_bytes": 18199793,
+            "peak_additional_requested_bytes": 18417588,
+            "requested_bytes": 21750461
+          },
+          "seconds": 0.015738875
+        }
+      ],
+      "vector_width": 1024
+    }
+  ],
+  "instrumentation": "Process-wide System allocator requested-byte counters; excludes allocator overhead/RSS, includes counter overhead in timing. Same fixture and instrumentation must be used for comparisons.",
+  "scope": "Matched native release pending graph capture and zero/one/two scalar replacements of two f64 vector columns. Five observations per case. Includes effect staging, selected immutable capture, emission and zero/one publication; excludes fixture, initial accepted pin, algorithm construction, assertions, destruction and compilation. Every entity/value and immutable prior input is checked. Compare identical cases before/after in fresh processes; allocator requested bytes are not RSS or a production scale budget.",
+  "source": {
+    "base_commit": "6523a66a",
+    "property_batch_sha256": "085fb7f4348fa0ff76afc4ddefa99711d9e24983689b28bdf6bb36d82b185c13",
+    "workload_sha256": "d14353b6d72ca188fd111bfdbb4b4ede3bfa8f732ba590045d236e15d9b0d5ff",
+    "allocator_harness_sha256": "56c7884e5797a4f5c0752a78b148bdbd5f587a68cd5251ac4723b88174c1e5ff",
+    "mode": "after",
+    "fresh_process": 1,
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)"
+  }
+}

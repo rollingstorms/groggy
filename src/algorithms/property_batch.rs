@@ -174,7 +174,9 @@ impl PropertyBatch {
         snapshot.active_nodes.sort_unstable();
         for &id in &snapshot.active_nodes {
             if let Some(attrs) = original.node_attributes.get(&id) {
-                snapshot.node_attributes.insert(id, attrs.clone());
+                snapshot
+                    .node_attributes
+                    .insert(id, copy_unstaged_attributes(id, attrs, &self.nodes));
             }
             if self.is_added_node(id) {
                 snapshot
@@ -190,7 +192,9 @@ impl PropertyBatch {
             })?;
             snapshot.edges.insert(id, *endpoints);
             if let Some(attrs) = original.edge_attributes.get(&id) {
-                snapshot.edge_attributes.insert(id, attrs.clone());
+                snapshot
+                    .edge_attributes
+                    .insert(id, copy_unstaged_attributes(id, attrs, &self.edges));
             }
         }
         // Column-first staged storage remains authoritative. Read only selected
@@ -723,6 +727,29 @@ impl PropertyBatch {
     }
 }
 
+/// Copy accepted values only when the pending column has no replacement for
+/// this row. The overlay below copies the final assignment exactly once, including
+/// explicit Null; unrelated rows of a staged column retain their accepted values.
+fn copy_unstaged_attributes(
+    id: usize,
+    attrs: &HashMap<AttrName, AttrValue>,
+    staged: &BTreeMap<AttrName, BTreeMap<usize, AttrValue>>,
+) -> HashMap<AttrName, AttrValue> {
+    if staged.is_empty() {
+        return attrs.clone();
+    }
+    let mut result = HashMap::with_capacity(attrs.len());
+    for (name, value) in attrs {
+        if !staged
+            .get(name)
+            .is_some_and(|column| column.contains_key(&id))
+        {
+            result.insert(name.clone(), value.clone());
+        }
+    }
+    result
+}
+
 impl Context {
     /// Read a node property from a pending pin or the shared staged overlay.
     pub(crate) fn node_attribute(
@@ -894,6 +921,116 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pending_captures_replace_values_without_losing_unstaged_rows_or_immutable_inputs() {
+        let mut graph = Graph::new_publishing();
+        graph.insert_nodes(3).unwrap();
+        graph.add_edges(&[(0, 1), (1, 2)]).unwrap();
+        let types = [
+            AttrValue::Null,
+            AttrValue::Bool(true),
+            AttrValue::Float64(-0.0),
+            AttrValue::Float64(1.0000000001),
+            AttrValue::Text("retained".into()),
+            AttrValue::Bytes(vec![0, 128, 255]),
+            AttrValue::Float64Vec(vec![1.0, 1.0000000001, -0.0]),
+            AttrValue::Json("{\"key\":[1,null]}".into()),
+        ];
+        for (index, value) in types.iter().enumerate() {
+            let name: AttrName = format!("value{index}").into();
+            graph.set_node_attr(0, name.clone(), value.clone()).unwrap();
+            graph.set_node_attr(1, name.clone(), value.clone()).unwrap();
+            graph.set_edge_attr(0, name.clone(), value.clone()).unwrap();
+            graph.set_edge_attr(1, name, value.clone()).unwrap();
+        }
+        let owner = graph.into_shared();
+        let root = Subgraph::new(
+            owner.clone(),
+            [0, 1, 2].into(),
+            [0, 1].into(),
+            "root".into(),
+        );
+        let original = owner.borrow().read_view().unwrap();
+        let mut batch = PropertyBatch::for_selection(owner.borrow().write_coordinate(), &root);
+        let before = batch.capture(&root).unwrap();
+        for index in 0..types.len() {
+            let name: AttrName = format!("value{index}").into();
+            batch
+                .stage(true, HashMap::from([(name, vec![(0, AttrValue::Null)])]))
+                .unwrap();
+            batch
+                .stage(
+                    false,
+                    HashMap::from([(
+                        format!("value{index}").into(),
+                        vec![(0, AttrValue::Bool(false))],
+                    )]),
+                )
+                .unwrap();
+        }
+        batch
+            .stage(
+                true,
+                HashMap::from([("new".into(), vec![(2, AttrValue::Int(9))])]),
+            )
+            .unwrap();
+        let after = batch.capture(&root).unwrap();
+        for (index, value) in types.iter().enumerate() {
+            let name: AttrName = format!("value{index}").into();
+            assert_eq!(after.node_attr(0, &name).unwrap(), Some(AttrValue::Null));
+            assert_eq!(
+                after.edge_attr(0, &name).unwrap(),
+                Some(AttrValue::Bool(false))
+            );
+            for view in [&original, &before] {
+                assert!(crate::state::change::same_value(
+                    &view.node_attr(0, &name).unwrap().unwrap(),
+                    value
+                )
+                .unwrap());
+                assert!(crate::state::change::same_value(
+                    &view.edge_attr(0, &name).unwrap().unwrap(),
+                    value
+                )
+                .unwrap());
+            }
+            assert!(crate::state::change::same_value(
+                &after.node_attr(1, &name).unwrap().unwrap(),
+                value
+            )
+            .unwrap());
+            assert!(crate::state::change::same_value(
+                &after.edge_attr(1, &name).unwrap().unwrap(),
+                value
+            )
+            .unwrap());
+        }
+        assert_eq!(
+            after.node_attr(2, &"new".into()).unwrap(),
+            Some(AttrValue::Int(9))
+        );
+        batch
+            .stage(
+                true,
+                HashMap::from([("value0".into(), vec![(0, AttrValue::Int(11))])]),
+            )
+            .unwrap();
+        let refreshed = batch.capture(&root).unwrap();
+        assert_eq!(
+            refreshed.node_attr(0, &"value0".into()).unwrap(),
+            Some(AttrValue::Int(11))
+        );
+        assert_eq!(
+            after.node_attr(0, &"value0".into()).unwrap(),
+            Some(AttrValue::Null)
+        );
+        batch.accept(&mut owner.borrow_mut()).unwrap();
+        assert_eq!(
+            after.node_attr(0, &"value0".into()).unwrap(),
+            Some(AttrValue::Null)
+        );
+    }
+
     #[test]
     fn overlay_reads_cannot_escape_selection_or_serve_deactivated_entities() {
         let mut graph = Graph::new();
