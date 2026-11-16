@@ -1,0 +1,1216 @@
+{
+  "scope": "Completed manual artifact qualification at the pinned native implementation. Later commits contain only benchmark/docs/evidence changes. The expanded 0.6.0 roadmap remains unfinished. No publication.",
+  "native_source_commit": "be6512d104d60bf19785ba0886b0ce8c5c7d208e",
+  "run": {
+    "conclusion": "success",
+    "head_sha": "be6512d104d60bf19785ba0886b0ce8c5c7d208e",
+    "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321",
+    "id": 43780585321,
+    "run_started_at": "2026-11-16T00:28:37Z",
+    "status": "completed",
+    "updated_at": "2026-11-16T00:44:44Z"
+  },
+  "jobs": [
+    {
+      "completed_at": "2026-11-16T00:31:33Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016634611",
+      "id": 133016634611,
+      "name": "build-sdist",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:33:56Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016634873",
+      "id": 133016634873,
+      "name": "Qualify CPython 3.12 (x86_64-pc-windows-msvc)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:35:46Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016634912",
+      "id": 133016634912,
+      "name": "native-gates",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:36:33Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016634974",
+      "id": 133016634974,
+      "name": "Qualify CPython 3.8 (x86_64-apple-darwin)",
+      "started_at": "2026-11-16T00:28:42Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:38:20Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635135",
+      "id": 133016635135,
+      "name": "Qualify CPython 3.9 (x86_64-apple-darwin)",
+      "started_at": "2026-11-16T00:28:42Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:34:25Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635175",
+      "id": 133016635175,
+      "name": "Qualify CPython 3.12 (aarch64-apple-darwin)",
+      "started_at": "2026-11-16T00:28:42Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:33:50Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635192",
+      "id": 133016635192,
+      "name": "Qualify CPython 3.11 (x86_64-unknown-linux-gnu)",
+      "started_at": "2026-11-16T00:28:42Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:33:16Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635193",
+      "id": 133016635193,
+      "name": "Qualify CPython 3.8 (x86_64-unknown-linux-gnu)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:35:18Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635198",
+      "id": 133016635198,
+      "name": "Qualify CPython 3.12 (x86_64-apple-darwin)",
+      "started_at": "2026-11-16T00:28:42Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:34:11Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635204",
+      "id": 133016635204,
+      "name": "Qualify CPython 3.10 (x86_64-unknown-linux-gnu)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:37:10Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635205",
+      "id": 133016635205,
+      "name": "Qualify CPython 3.11 (x86_64-apple-darwin)",
+      "started_at": "2026-11-16T00:28:44Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:37:16Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635212",
+      "id": 133016635212,
+      "name": "Qualify CPython 3.9 (x86_64-pc-windows-msvc)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:33:10Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635234",
+      "id": 133016635234,
+      "name": "Qualify CPython 3.9 (x86_64-unknown-linux-gnu)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:40:55Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635247",
+      "id": 133016635247,
+      "name": "Qualify CPython 3.11 (aarch64-apple-darwin)",
+      "started_at": "2026-11-16T00:35:20Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:34:19Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635259",
+      "id": 133016635259,
+      "name": "Qualify CPython 3.12 (x86_64-unknown-linux-gnu)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:36:03Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635274",
+      "id": 133016635274,
+      "name": "Qualify CPython 3.8 (x86_64-pc-windows-msvc)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:44:44Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635309",
+      "id": 133016635309,
+      "name": "Qualify CPython 3.10 (x86_64-apple-darwin)",
+      "started_at": "2026-11-16T00:34:29Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:36:36Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635343",
+      "id": 133016635343,
+      "name": "Qualify CPython 3.10 (x86_64-pc-windows-msvc)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:40:20Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635344",
+      "id": 133016635344,
+      "name": "Qualify CPython 3.9 (aarch64-apple-darwin)",
+      "started_at": "2026-11-16T00:36:35Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:34:40Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635346",
+      "id": 133016635346,
+      "name": "Qualify CPython 3.11 (x86_64-pc-windows-msvc)",
+      "started_at": "2026-11-16T00:28:41Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:41:17Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133016635568",
+      "id": 133016635568,
+      "name": "Qualify CPython 3.10 (aarch64-apple-darwin)",
+      "started_at": "2026-11-16T00:37:12Z",
+      "status": "completed"
+    },
+    {
+      "completed_at": "2026-11-16T00:44:44Z",
+      "conclusion": "skipped",
+      "html_url": "https://github.com/rollingstorms/groggy/actions/runs/43780585321/job/133021639660",
+      "id": 133021639660,
+      "name": "publish",
+      "started_at": "2026-11-16T00:44:44Z",
+      "status": "completed"
+    }
+  ],
+  "artifact_uploads": [
+    {
+      "digest": "sha256:d34e15cc6e44b0c544205d1050b3b046c715f508e5d99ab39e3b6e0e7249e844",
+      "expired": false,
+      "id": 14188905636,
+      "name": "qualification-x86_64-apple-darwin-cp3.10",
+      "size_in_bytes": 601
+    },
+    {
+      "digest": "sha256:a9d15d1f81dd83495a2ba0d04dd7c3968a85ea5e9163f6f315dac498f137440e",
+      "expired": false,
+      "id": 14188840563,
+      "name": "qualification-x86_64-pc-windows-msvc-cp3.10",
+      "size_in_bytes": 604
+    },
+    {
+      "digest": "sha256:57449c2042aa69219744b91a3b5fdecd082dd1adb01d01aec3d3bbd9e295e191",
+      "expired": false,
+      "id": 14188840074,
+      "name": "qualification-x86_64-unknown-linux-gnu-cp3.11",
+      "size_in_bytes": 568
+    },
+    {
+      "digest": "sha256:04126e24ccfc3ca857933555626c11683beb1be07390b298356cf00ae9786bb5",
+      "expired": false,
+      "id": 14188815664,
+      "name": "wheels-x86_64-pc-windows-msvc-cp3.11",
+      "size_in_bytes": 7359165
+    },
+    {
+      "digest": "sha256:78ef36a12bd00de744430fc5d93921b5c2a724397adfa50f02235b1726c5f2e6",
+      "expired": false,
+      "id": 14188810629,
+      "name": "qualification-x86_64-pc-windows-msvc-cp3.9",
+      "size_in_bytes": 603
+    },
+    {
+      "digest": "sha256:e06902cd6339ceeb5048311d8bdca94ec660d8063e4363b24b3b43770f0c9a60",
+      "expired": false,
+      "id": 14188810167,
+      "name": "wheels-x86_64-pc-windows-msvc-cp3.12",
+      "size_in_bytes": 7359462
+    },
+    {
+      "digest": "sha256:62d3a014c96964f2945a0d6d5f2f7738546a10cb8612413f2ea9a85928c54bfb",
+      "expired": false,
+      "id": 14188787055,
+      "name": "wheels-aarch64-apple-darwin-cp3.11",
+      "size_in_bytes": 7133847
+    },
+    {
+      "digest": "sha256:b28333b4ff67f9155c92b62b8ba4201b711d58ecfd47bee5a928623a0616bee1",
+      "expired": false,
+      "id": 14188721087,
+      "name": "wheels-x86_64-unknown-linux-gnu-cp3.8",
+      "size_in_bytes": 8069337
+    },
+    {
+      "digest": "sha256:1dc477fffa0798fefa82bd8ab2a7929061073e21036c25d3588387529148e887",
+      "expired": false,
+      "id": 14188716032,
+      "name": "wheels-x86_64-pc-windows-msvc-cp3.9",
+      "size_in_bytes": 7360313
+    },
+    {
+      "digest": "sha256:abee9221822b33b2705705b6c372bb742135e1dc008e3b1e0dcd4c15d82f602d",
+      "expired": false,
+      "id": 14188701480,
+      "name": "wheels-aarch64-apple-darwin-cp3.12",
+      "size_in_bytes": 7135146
+    },
+    {
+      "digest": "sha256:5db383e0bb90fb302c9c7effc850cd2260250a2ad2f94b18da6a75f84ff0b0f8",
+      "expired": false,
+      "id": 14188582605,
+      "name": "qualification-x86_64-apple-darwin-cp3.9",
+      "size_in_bytes": 601
+    },
+    {
+      "digest": "sha256:c2392baa4dcd542278c8e9a68b46e95d8b4c0676fa35376e3a1aa1b590ec1af5",
+      "expired": false,
+      "id": 14188582285,
+      "name": "qualification-x86_64-apple-darwin-cp3.8",
+      "size_in_bytes": 604
+    },
+    {
+      "digest": "sha256:5d2993750dee6cb4003133e298fa4ae7e5afd9f7a6df81ed9b6704af4918c0e1",
+      "expired": false,
+      "id": 14188556442,
+      "name": "qualification-source",
+      "size_in_bytes": 560
+    },
+    {
+      "digest": "sha256:3469d91920ef1bcfffbf8d0fd2510377c12d5c232272974e7dd710ff7469e2bd",
+      "expired": false,
+      "id": 14188547287,
+      "name": "wheels-x86_64-pc-windows-msvc-cp3.8",
+      "size_in_bytes": 7358887
+    },
+    {
+      "digest": "sha256:863513388925c5ed27ceac30fc051470ea3003fbd1bdd1825b4cc5a0c9ff7c67",
+      "expired": false,
+      "id": 14188522078,
+      "name": "qualification-aarch64-apple-darwin-cp3.12",
+      "size_in_bytes": 606
+    },
+    {
+      "digest": "sha256:a6151b3e7c8697eb001ec720b6320d9d90f020c470868ab8c56fcf1b3c835efd",
+      "expired": false,
+      "id": 14188517564,
+      "name": "wheels-x86_64-apple-darwin-cp3.11",
+      "size_in_bytes": 7749668
+    },
+    {
+      "digest": "sha256:4fa83c05168dd3c563e45410de87ce2d6a8c0a56ae41f3ad881d046ef87d3650",
+      "expired": false,
+      "id": 14188517356,
+      "name": "qualification-x86_64-pc-windows-msvc-cp3.8",
+      "size_in_bytes": 603
+    },
+    {
+      "digest": "sha256:a727861707e7befdd1a5b3d8f2dd548357988179834a2d00f7bc29e0cf92f0e4",
+      "expired": false,
+      "id": 14188507087,
+      "name": "wheels-x86_64-unknown-linux-gnu-cp3.11",
+      "size_in_bytes": 8070128
+    },
+    {
+      "digest": "sha256:5dffcf56f655031cb0782dbb99b5653a61c3274a4abdb84b8cebd937d46b5ad7",
+      "expired": false,
+      "id": 14188502044,
+      "name": "qualification-x86_64-pc-windows-msvc-cp3.11",
+      "size_in_bytes": 605
+    },
+    {
+      "digest": "sha256:d401b4c2aa448e307b84d636a90241fd838de2534e57be52b011a9ecdfb97db3",
+      "expired": false,
+      "id": 14188468509,
+      "name": "qualification-aarch64-apple-darwin-cp3.10",
+      "size_in_bytes": 605
+    },
+    {
+      "digest": "sha256:8dc7ab00a83be332f36a030e74aad2c21b84cf86198e3b9cbb889f0cf697c706",
+      "expired": false,
+      "id": 14188386298,
+      "name": "qualification-x86_64-unknown-linux-gnu-cp3.9",
+      "size_in_bytes": 569
+    },
+    {
+      "digest": "sha256:e84b9fcb1db6e45c8f205c9049faed762a7ee77b38f7fded1251b1a6c97888ab",
+      "expired": false,
+      "id": 14188323944,
+      "name": "wheels-aarch64-apple-darwin-cp3.10",
+      "size_in_bytes": 7133630
+    },
+    {
+      "digest": "sha256:0b2ecd8c44fef818ce05950b74779fceb4c0823f7608892442686331886f8977",
+      "expired": false,
+      "id": 14188262857,
+      "name": "wheels-x86_64-unknown-linux-gnu-cp3.12",
+      "size_in_bytes": 8078894
+    },
+    {
+      "digest": "sha256:068455d1e798d00ed08b8b93f946ec698ef1079ab774c1a268fbae551a1ae1ee",
+      "expired": false,
+      "id": 14188257888,
+      "name": "qualification-x86_64-unknown-linux-gnu-cp3.12",
+      "size_in_bytes": 567
+    },
+    {
+      "digest": "sha256:5023f594f9f9e67ed63a015990da5c338c24201b094e162306d76dd87e447cc8",
+      "expired": false,
+      "id": 14188174036,
+      "name": "wheels-x86_64-apple-darwin-cp3.9",
+      "size_in_bytes": 7748493
+    },
+    {
+      "digest": "sha256:f6897ccfde6339aa9fb9fc179262de1bf1fa3521597dd7e4c803f702353fcca6",
+      "expired": false,
+      "id": 14188128790,
+      "name": "qualification-x86_64-apple-darwin-cp3.11",
+      "size_in_bytes": 610
+    },
+    {
+      "digest": "sha256:26c7ff870ac765a381e626572cbb100139b0472ff2f4c5f9abe8a68e6785ec3a",
+      "expired": false,
+      "id": 14188104670,
+      "name": "qualification-aarch64-apple-darwin-cp3.11",
+      "size_in_bytes": 605
+    },
+    {
+      "digest": "sha256:264fa744e709f8289e6aeefdbd598de7ae98c8eb5c045fc4388de6ee1c8fd7e5",
+      "expired": false,
+      "id": 14188093696,
+      "name": "wheels-x86_64-pc-windows-msvc-cp3.10",
+      "size_in_bytes": 7359534
+    },
+    {
+      "digest": "sha256:b4aeed56c18831fee3c608101c62340be9e5764005db01204e6867e875f0c558",
+      "expired": false,
+      "id": 14188068769,
+      "name": "wheels-x86_64-apple-darwin-cp3.12",
+      "size_in_bytes": 7743591
+    },
+    {
+      "digest": "sha256:21002b55dd235cac7009050c9def9e6c9a3472e0bdc637c3758c509d89b20889",
+      "expired": false,
+      "id": 14188037357,
+      "name": "wheels-x86_64-unknown-linux-gnu-cp3.9",
+      "size_in_bytes": 8070174
+    },
+    {
+      "digest": "sha256:cdd84730682521a575a632bc792af26dfe5453ba96c5765ab3905018fb4da1ef",
+      "expired": false,
+      "id": 14188027428,
+      "name": "wheels-x86_64-unknown-linux-gnu-cp3.10",
+      "size_in_bytes": 8070015
+    },
+    {
+      "digest": "sha256:bd1d16c0c4aaa85ffa3bf52e330a8feab37716247d38f645166de4e66e7b7ff5",
+      "expired": false,
+      "id": 14187979228,
+      "name": "wheels-x86_64-apple-darwin-cp3.8",
+      "size_in_bytes": 7748541
+    },
+    {
+      "digest": "sha256:74d5dee59304703e440b338ca61f2ba8bdbfdf652503f3af435f5e52b425718b",
+      "expired": false,
+      "id": 14187979029,
+      "name": "qualification-x86_64-apple-darwin-cp3.12",
+      "size_in_bytes": 611
+    },
+    {
+      "digest": "sha256:82405f3f2d5bde57b79361b5dca4f693d51684361b232d23f3df3f2c69a469b6",
+      "expired": false,
+      "id": 14187968994,
+      "name": "wheels-x86_64-apple-darwin-cp3.10",
+      "size_in_bytes": 7749232
+    },
+    {
+      "digest": "sha256:e97d63e08c5a45830095000261af1f138666c005ba1ffd360f6c630a038201b1",
+      "expired": false,
+      "id": 14187947622,
+      "name": "qualification-x86_64-pc-windows-msvc-cp3.12",
+      "size_in_bytes": 611
+    },
+    {
+      "digest": "sha256:a4ddbfc623126255f3fb22019694b1dc66253aa67443788c9004effb56c530fc",
+      "expired": false,
+      "id": 14187918841,
+      "name": "qualification-x86_64-unknown-linux-gnu-cp3.8",
+      "size_in_bytes": 570
+    },
+    {
+      "digest": "sha256:04374a3da691f33e425aff3533604674ae848014529c762fa82b36e26d76e52d",
+      "expired": false,
+      "id": 14187869081,
+      "name": "sdist",
+      "size_in_bytes": 5205710
+    },
+    {
+      "digest": "sha256:f81b55d3a7d61a41d304f4ce2e97ddf5a050fcb4f87a28531f9eaf838a43a3c8",
+      "expired": false,
+      "id": 14187828902,
+      "name": "qualification-aarch64-apple-darwin-cp3.9",
+      "size_in_bytes": 605
+    },
+    {
+      "digest": "sha256:7e64c284a4d770621905e65438cc834a9fa5a5bf646276b33d338cff27d34a29",
+      "expired": false,
+      "id": 14187738440,
+      "name": "qualification-x86_64-unknown-linux-gnu-cp3.10",
+      "size_in_bytes": 566
+    },
+    {
+      "digest": "sha256:d065507b29481e34dbc95b611e5bc5984aeec66844e5103c9a4c29c01506f178",
+      "expired": false,
+      "id": 14187694388,
+      "name": "wheels-aarch64-apple-darwin-cp3.9",
+      "size_in_bytes": 7133889
+    }
+  ],
+  "validation": {
+    "required_jobs_passed": 21,
+    "wheel_combinations": 19,
+    "publish": "skipped",
+    "source_rebuild": "passed",
+    "production_source_aggregate_sha256": "62579be3027efc4e2545a66ec5bf7fc994374dad4d3ab8ee1decc56fc069f7f3",
+    "tracked_rust_python_stub_files_matched_to_committed_archive": 493
+  },
+  "source_distribution": {
+    "filename": "groggy-0.6.0.tar.gz",
+    "bytes": 5207224,
+    "sha256": "bcb5a9cbfb989dcf81a078a2e030181f8af5eb5ddbc15754f7b4e9a978c8af77",
+    "lockfile_sha256": {
+      "Cargo.lock": "46fb9aac1464bb867be94d14819c2f3ef63fd350253867b2934855330eb538c9",
+      "python-groggy/Cargo.lock": "4c17069f568ce65e2eef3a9bc9980f958dd8e5451581c036a768e7402b9dccb0"
+    },
+    "rebuilt_wheel_receipt": {
+      "python": "3.12.16 (main, Oct 26 2026, 02:48:01) [GCC 11.4.0]",
+      "platform": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+      "artifacts": [
+        {
+          "wheel": "groggy-0.6.0-cp312-cp312-manylinux_2_35_x86_64.whl",
+          "sha256": "487ba9b698af35ada16cef9c24aa60ef4b317fd76c51b7105eb986aa9883f3be",
+          "smoke": {
+            "version": "0.6.0",
+            "exports": 105,
+            "package": "/tmp/groggy-wheel-check-5gcz8sv0/groggy/__init__.py",
+            "workflows": [
+              {
+                "storage": "archive",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              },
+              {
+                "storage": "journal",
+                "initial": 1,
+                "edited": 2,
+                "restored": 3
+              }
+            ]
+          },
+          "tests": "none"
+        }
+      ]
+    }
+  },
+  "wheel_qualification_receipts": [
+    {
+      "python_version": "3.10",
+      "target": "aarch64-apple-darwin",
+      "receipt": {
+        "python": "3.10.11 (v3.10.11:7d4cc5aa85, Apr  4 2023, 19:05:19) [Clang 13.0.0 (clang-1300.0.29.30)]",
+        "platform": "macOS-15.8.2-arm64-arm-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp310-cp310-macosx_11_0_arm64.whl",
+            "sha256": "4aad2a9d4c551a2b52b920bfc477d3764ea107f8a7a42ee9079c3c3a99078583",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/2s/vty41l455yv698g4xkgfv7z00000gn/T/groggy-wheel-check-ptazeiqg/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.10",
+      "target": "x86_64-apple-darwin",
+      "receipt": {
+        "python": "3.10.21 (main, Aug 13 2026, 02:42:10) [Clang 17.0.0 (clang-1700.0.13.5)]",
+        "platform": "macOS-15.7.9-x86_64-i386-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp310-cp310-macosx_10_12_x86_64.whl",
+            "sha256": "3b60abc9d2e1ca0cea85c597bcf361af60c3e45cfdfc5c2bb61a1a3b02510021",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/groggy-wheel-check-v0r3zdtl/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.10",
+      "target": "x86_64-pc-windows-msvc",
+      "receipt": {
+        "python": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+        "platform": "Windows-10-10.0.20348-SP0",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp310-cp310-win_amd64.whl",
+            "sha256": "83eed6665e1c459a6cd68a45a0317a33d251f6b66b9e95ba60082d96eeecbb49",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\groggy-wheel-check-lm87al46\\groggy\\__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.10",
+      "target": "x86_64-unknown-linux-gnu",
+      "receipt": {
+        "python": "3.10.22 (main, Oct  1 2026, 14:31:30) [GCC 11.4.0]",
+        "platform": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "sha256": "3f1311cb0d9a201df2b965d3f285560e460bb5dd13c34e24b15bb0aedcba1cf5",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/tmp/groggy-wheel-check-1ashm3w0/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.11",
+      "target": "aarch64-apple-darwin",
+      "receipt": {
+        "python": "3.11.9 (v3.11.9:de54cf5be3, Apr  2 2024, 07:12:50) [Clang 13.0.0 (clang-1300.0.29.30)]",
+        "platform": "macOS-15.8.2-arm64-arm-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp311-cp311-macosx_11_0_arm64.whl",
+            "sha256": "f4c23adcf9a9fd3bca4865737e3659dd125685afb8a495f1fb105e62d39cfeff",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/2s/vty41l455yv698g4xkgfv7z00000gn/T/groggy-wheel-check-47z0q7qd/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.11",
+      "target": "x86_64-apple-darwin",
+      "receipt": {
+        "python": "3.11.9 (v3.11.9:de54cf5be3, Apr  2 2024, 07:12:50) [Clang 13.0.0 (clang-1300.0.29.30)]",
+        "platform": "macOS-15.7.9-x86_64-i386-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp311-cp311-macosx_10_12_x86_64.whl",
+            "sha256": "04545e06236f0eaf9fd5ba0bf6b6179729ede45a73ed72ee7272afbff5e4856d",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/groggy-wheel-check-0fo9qm7u/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.11",
+      "target": "x86_64-pc-windows-msvc",
+      "receipt": {
+        "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+        "platform": "Windows-10-10.0.20348-SP0",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp311-cp311-win_amd64.whl",
+            "sha256": "290705dc4900acf04e8f0de09462adc3e2c59b8536ba4a19dbce7e95250381f3",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\groggy-wheel-check-y2j1o7lz\\groggy\\__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.11",
+      "target": "x86_64-unknown-linux-gnu",
+      "receipt": {
+        "python": "3.11.18 (main, Oct 26 2026, 02:48:47) [GCC 11.4.0]",
+        "platform": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "sha256": "192accf346d34c9465b24ddce9442f6bb4eb8693e12b2f3832586fbe034bc418",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/tmp/groggy-wheel-check-xcof5ae6/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.12",
+      "target": "aarch64-apple-darwin",
+      "receipt": {
+        "python": "3.12.10 (v3.12.10:0cc81280367, Apr  8 2025, 08:46:59) [Clang 13.0.0 (clang-1300.0.29.30)]",
+        "platform": "macOS-15.8.2-arm64-arm-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp312-cp312-macosx_11_0_arm64.whl",
+            "sha256": "7f36d2314db31e3f1dc7bb5115babab66fd7ad159e3703a9f8014e93c4541217",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/2s/vty41l455yv698g4xkgfv7z00000gn/T/groggy-wheel-check-o_b7ty01/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.12",
+      "target": "x86_64-apple-darwin",
+      "receipt": {
+        "python": "3.12.10 (v3.12.10:0cc81280367, Apr  8 2025, 08:47:00) [Clang 13.0.0 (clang-1300.0.29.30)]",
+        "platform": "macOS-15.7.9-x86_64-i386-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp312-cp312-macosx_10_12_x86_64.whl",
+            "sha256": "4053e7b9c91659ed8d3041b4f0442897173766424cd2b1dae6a53f1571969e9a",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/groggy-wheel-check-w6cjfyrf/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.12",
+      "target": "x86_64-pc-windows-msvc",
+      "receipt": {
+        "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+        "platform": "Windows-2022Server-10.0.20348-SP0",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp312-cp312-win_amd64.whl",
+            "sha256": "fb59467f97acc05814f33cdcae918c5cf76815f9771988667afc96f7cc6b2a92",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\groggy-wheel-check-ole0z6nm\\groggy\\__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.12",
+      "target": "x86_64-unknown-linux-gnu",
+      "receipt": {
+        "python": "3.12.16 (main, Oct 26 2026, 02:48:01) [GCC 11.4.0]",
+        "platform": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "sha256": "d3b1d06a61520ea0a057939132eae9f90a6b6c07e1a20763d7f54060f528743e",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/tmp/groggy-wheel-check-7vl4foi0/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "maintained"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.8",
+      "target": "x86_64-apple-darwin",
+      "receipt": {
+        "python": "3.8.18 (default, Dec 12 2024, 19:15:06) \n[Clang 15.0.0 (clang-1500.1.0.2.5)]",
+        "platform": "macOS-15.7.9-x86_64-i386-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp38-cp38-macosx_10_12_x86_64.whl",
+            "sha256": "311fc7176bca630e55ec30f5de84171e6f3a3dcba3955092851ab0bd1e797823",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/groggy-wheel-check-7fole9qn/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.8",
+      "target": "x86_64-pc-windows-msvc",
+      "receipt": {
+        "python": "3.8.10 (tags/v3.8.10:3d8993a, May  3 2021, 11:48:03) [MSC v.1928 64 bit (AMD64)]",
+        "platform": "Windows-10-10.0.20348-SP0",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp38-cp38-win_amd64.whl",
+            "sha256": "46e5b934143fdfb71caf289e0bc576474364ab33c666c8deee73af462bb65aaa",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\groggy-wheel-check-snpjgo59\\groggy\\__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.8",
+      "target": "x86_64-unknown-linux-gnu",
+      "receipt": {
+        "python": "3.8.18 (default, Dec 12 2024, 19:15:02) \n[GCC 11.4.0]",
+        "platform": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.34",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "sha256": "d9a68b2f8d46376bd58c88e5575c48797505782c39c46fb866fe9c46e2c77765",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/tmp/groggy-wheel-check-i4gwqofq/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.9",
+      "target": "aarch64-apple-darwin",
+      "receipt": {
+        "python": "3.9.13 (v3.9.13:6de2ca5339, May 17 2022, 11:37:23) \n[Clang 13.0.0 (clang-1300.0.29.30)]",
+        "platform": "macOS-15.8.2-arm64-arm-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+            "sha256": "2f082ed99f8b11593b1bee7baeacd3fa5f44ca4e6e8d715ba7f46a8f7a735a76",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/2s/vty41l455yv698g4xkgfv7z00000gn/T/groggy-wheel-check-0kc013jj/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.9",
+      "target": "x86_64-apple-darwin",
+      "receipt": {
+        "python": "3.9.25 (main, Nov  3 2025, 15:14:26) \n[Clang 15.0.0 (clang-1500.1.0.2.5)]",
+        "platform": "macOS-15.7.9-x86_64-i386-64bit",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp39-cp39-macosx_10_12_x86_64.whl",
+            "sha256": "3a207678f4b5d6a9c296bbfae182221205f495f961b5b71e26e8a2ece14f683f",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/private/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/groggy-wheel-check-05tr0edc/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.9",
+      "target": "x86_64-pc-windows-msvc",
+      "receipt": {
+        "python": "3.9.13 (tags/v3.9.13:6de2ca5, May 17 2022, 16:36:42) [MSC v.1929 64 bit (AMD64)]",
+        "platform": "Windows-10-10.0.20348-SP0",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp39-cp39-win_amd64.whl",
+            "sha256": "de99f3aa52214156bb361ffb1afd8ea3a9e456c709819029e60fc9669366b7db",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\groggy-wheel-check-8jwhn6js\\groggy\\__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    },
+    {
+      "python_version": "3.9",
+      "target": "x86_64-unknown-linux-gnu",
+      "receipt": {
+        "python": "3.9.25 (main, Nov  3 2025, 15:14:54) \n[GCC 11.4.0]",
+        "platform": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+        "artifacts": [
+          {
+            "wheel": "groggy-0.6.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "sha256": "b678895c94be90c2ec8241dadde1d28b56871e067b01b60bb4ed9ece5869e757",
+            "smoke": {
+              "version": "0.6.0",
+              "exports": 105,
+              "package": "/tmp/groggy-wheel-check-xrqxiloc/groggy/__init__.py",
+              "workflows": [
+                {
+                  "storage": "archive",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                },
+                {
+                  "storage": "journal",
+                  "initial": 1,
+                  "edited": 2,
+                  "restored": 3
+                }
+              ]
+            },
+            "tests": "ownership"
+          }
+        ]
+      }
+    }
+  ],
+  "local_additional_gate": {
+    "native_passed": 1610,
+    "native_ignored": 54,
+    "serial_killed_checkpoint_process": "passed",
+    "python_passed": 3273,
+    "python_skipped": 1,
+    "established_python_warnings": 14,
+    "documentation_examples": 288,
+    "receipt": "priority-hour-final-wheel-qualification-2026-11-16.json"
+  },
+  "limits": [
+    "Matrix Linux 3.12 runs the full maintained tests/docs from be6512d1; other wheels run ownership/workflow gates.",
+    "Extracted-source wheel runs isolated smoke/workflows, not the maintained suite.",
+    "The final additional capability guide is locally verified; CI source includes 287 examples.",
+    "Source lockfiles are retained and hashed; this is not a bit-for-bit build reproducibility claim across independent dependency resolution.",
+    "No universal production concurrency, durability, memory, latency or scale guarantee.",
+    "The 493-file byte comparison covers tracked .rs/.py/.pyi files under src, python-groggy/src and python-groggy/python/groggy. Other archive contents are covered by the complete source hash and rebuild gate."
+  ],
+  "local_packaging_follow_up": {
+    "change": "Exclude Finder .DS_Store metadata at both packaging entry points and reject it in the artifact gate. Discovered using the alternate local entry point after CI.",
+    "qualified_source": "Native runtime remains be6512d1; the metadata exclusion and artifact verifier follow-up are verified locally, not a repeat of the full platform matrix.",
+    "python_stub_files_byte_identical_to_qualified_root_wheel": 61,
+    "old_metadata_contaminated_artifact_rejected_without_success_receipt": true,
+    "root_receipt": "priority-hour-clean-root-wheel-qualification-2026-11-16.json",
+    "nested_receipt": "priority-hour-clean-nested-wheel-qualification-2026-11-16.json"
+  }
+}

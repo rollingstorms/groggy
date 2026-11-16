@@ -56,6 +56,7 @@ Repository = "https://github.com/rollingstorms/groggy"
 Documentation = "https://groggy.readthedocs.io"
 
 [tool.maturin]
+exclude = ["**/.DS_Store"]
 python-source = "python-groggy/python"
 module-name = "groggy._groggy"
 bindings = "pyo3"

@@ -44,7 +44,7 @@ directory. This checks the alternate packaging entry point. The source verifier
 extracts to a temporary directory, refuses escaping/link members, requires both
 lockfiles, builds with `--locked`, and runs the same isolated wheel smoke.
 
-The wheel gate verifies metadata/runtime/native version agreement, all declared
+The wheel gate rejects Finder .DS_Store payloads and verifies metadata/runtime/native version agreement, all declared
 exports, typing assets, immutable/f64/numerical smoke and the complete
 [archive/journal application workflow](core-release-workflow.md). `--tests
 maintained` additionally runs the maintained Python suite and curated executable

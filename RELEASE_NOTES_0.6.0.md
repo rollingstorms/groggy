@@ -9,6 +9,9 @@ Groggy combines a Rust graph engine, immutable graph/table analysis, temporal
 history and numerical operations behind a Python API. This release consolidates
 the implemented core and changes several defaults from the 0.5 series.
 
+Both packaging entry points exclude macOS Finder metadata, and the artifact gate
+rejects contaminated payloads.
+
 Implemented capabilities, within their documented boundaries:
 
 - Checked bulk mutations and automatic Python mutation publication, with one

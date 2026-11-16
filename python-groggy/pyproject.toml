@@ -27,6 +27,7 @@ Repository = "https://github.com/rollingstorms/groggy"
 Changelog = "https://github.com/rollingstorms/groggy/releases"
 
 [tool.maturin]
+exclude = ["**/.DS_Store"]
 python-source = "python"
 module-name = "groggy._groggy"
 bindings = "pyo3"

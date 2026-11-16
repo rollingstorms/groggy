@@ -82,12 +82,27 @@ https://github.com/rollingstorms/groggy/actions/runs/43780585321
 The configured matrix builds 19 wheels: Python 3.8–3.12 on Linux/Windows/macOS
 Intel and 3.9–3.12 on macOS arm64. It also runs native/serial-recovery/Clippy and
 extracted-source rebuild gates. Its publish job is excluded for manual runs.
-Status/results are updated separately when completion is confirmed; workflow
-configuration or partial success is not proof that all jobs passed.
+Completed successfully at **00:44:44 UTC**: **all 21 required jobs passed**,
+including all 19 wheels, native/serial-recovery/Clippy and source rebuild. The
+publish job was skipped. Full job conclusions, 40 upload identities/digests, 19
+wheel smoke/hash/test-mode receipts and the rebuilt-source wheel receipt are
+retained in `../benchmarks/priority-hour-platform-qualification-2026-11-16.json`.
+
+The source archive is 5,207,224 bytes, SHA256
+bcb5a9cbfb989dcf81a078a2e030181f8af5eb5ddbc15754f7b4e9a978c8af77.
+Both retained Cargo lockfile hashes are recorded. All **493 tracked .rs/.py/.pyi
+files** under the three production source directories match the committed native
+source byte-for-byte in that archive. Production files remain unchanged after
+be6512d1. The source wheel runs isolated smoke/workflows; Linux 3.12 additionally
+runs the full maintained CI gate (287 examples at that commit). The final added
+capability example is verified locally against the same implementation (288).
+This qualifies the recorded artifacts, not the unfinished expanded release.
 
 ## Open work retained from the checklist
 
-1. Remaining execution/coordination scope: fixed child/provisional topology,
+1. [Durable preparation context](durable-pipeline-boundary-2026-11-16.md) records
+   the next bounded extraction and the read-owner boundary without implementing
+   a second executor or claiming durable dispatch. Remaining execution/coordination scope: fixed child/provisional topology,
    alternate batch plans and facade lowering, streaming/unsupported custom effects,
    and durable owner dispatch. Root sequential loops and all thirteen classic
    wrappers are complete within documented canonical policies.
@@ -102,3 +117,25 @@ Emerging direct-attachment clock handling was found by a concrete loop regressio
 and fixed in be6512d1. Outside-lifetime property behavior follows the pre-existing
 canonical contract; no new policy was introduced. Owner development/benchmark and
 untracked review/notebook files remain untouched.
+
+## Final packaging follow-up
+
+The alternate python-groggy/ entry point passed import/workflow/ownership checks,
+but archive comparison found two local .DS_Store files. Both Maturin entry points
+now explicitly exclude Finder metadata; the artifact verifier rejects it before
+extraction. The earlier contaminated wheel is an executable negative fixture: the
+updated gate rejects it and writes no success receipt.
+
+Fresh clean root and nested wheels each pass isolated smoke, 105 exports/version
+agreement, both storage workflows and **36 ownership/workflow tests**. All **61
+packaged Python/stub files** match the fully tested root wheel byte-for-byte. See
+`../benchmarks/priority-hour-clean-root-wheel-qualification-2026-11-16.json` and
+`../benchmarks/priority-hour-clean-nested-wheel-qualification-2026-11-16.json`.
+The incomplete earlier nested receipt was removed before commit; no stale success
+receipt is retained for the contaminated artifact.
+
+This packaging exclusion/verifier follow-up is after the completed platform run:
+its local artifact gates are recorded separately. Native runtime source remains
+be6512d1; the 19-platform qualification is not relabeled as a rerun of the metadata
+filter. No wheel or dependency was installed, no tag or package was published.
+The source archive and per-wheel CI receipts retain their exact source/hashes.

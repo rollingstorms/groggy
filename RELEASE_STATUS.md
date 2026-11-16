@@ -29,8 +29,19 @@ journal application workflows, **3,273 maintained Python tests / one skipped /
   [attachment clocks](notes/planning/builder-attachment-times-2026-11-16.md).
 - [Fresh local wheel receipt](notes/benchmarks/priority-hour-final-wheel-qualification-2026-11-16.json).
 - [Current platform run](https://github.com/rollingstorms/groggy/actions/runs/43780585321):
-  manual qualification at be6512d1 is in progress; configuration/partial success
-  does not establish full qualification. Source rebuilding has passed.
+  **all 21 required jobs passed**, including **19 wheels**, native/serial-recovery/
+  Clippy and source rebuild at be6512d1. Publication was skipped. The
+  [platform receipt](notes/benchmarks/priority-hour-platform-qualification-2026-11-16.json)
+  retains all hashes, job conclusions and explicit qualification limits.
+
+Alternate-entry packaging checks found and removed local Finder metadata from
+wheel payloads. Both clean entry points pass isolated import/storage workflows
+and 36 ownership/workflow tests; their 61 Python/stub files match the fully tested
+root wheel. The updated gate rejects the contaminated artifact. See
+[clean root receipt](notes/benchmarks/priority-hour-clean-root-wheel-qualification-2026-11-16.json)
+and [clean nested receipt](notes/benchmarks/priority-hour-clean-nested-wheel-qualification-2026-11-16.json).
+This packaging-only follow-up is locally qualified after the platform run; its
+results remain distinct from that run's source/hashes.
 
 Matched root-loop versus unrolled fixtures show similar observed execution costs
 (1,000 initial nodes / 100 growth iterations: 87.2 ms versus 86.8 ms median).
@@ -39,7 +50,7 @@ The earlier [November 15 pass](notes/planning/priority-pass-pending-execution-20
 retains its individual slice/artifact receipts. The 44 broad unchecked release rows
 retain their remaining exit criteria. No release/tag/package publication occurred.
 
-## Qualified bounded candidate
+## Earlier bounded candidate (9aadfee5)
 
 | Component | Status | Evidence |
 | --- | --- | --- |
@@ -110,7 +121,7 @@ peaks; larger dense products improve about 8–10% in the recorded corpus. See
 [graph memory](notes/planning/priority-memory-2026-11-14.md) and
 [numerical measurements](notes/planning/priority-numerical-2026-11-14.md).
 
-Current source, artifact hashes and all platform receipts:
+Earlier bounded-candidate source, artifact hashes and platform receipts:
 
 - [Coordinated pass](notes/planning/priority-pass-2026-11-14.md) and
   [machine-readable results](notes/planning/priority-pass-final-gates-2026-11-14.json).

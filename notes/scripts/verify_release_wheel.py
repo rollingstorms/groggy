@@ -78,6 +78,8 @@ def verify(wheel_path, tests, release_tag):
             assert "groggy/py.typed" in wheel.namelist()
             assert "groggy/_groggy.pyi" in wheel.namelist()
             for name in wheel.namelist():
+                if name.rsplit("/", 1)[-1] == ".DS_Store":
+                    raise ValueError("Wheel contains macOS Finder metadata: " + name)
                 destination = (root / name).resolve()
                 if root.resolve() not in destination.parents:
                     raise ValueError("Wheel member escapes extraction directory: " + name)
