@@ -167,3 +167,9 @@ through the shared executor/batch, preserving global allocation positions and on
 publication. Fixed child topology and alternate plans remain guarded. See
 `root-topology-loops-2026-11-16.md`, including the discovered direct attachment
 timestamp gap and its follow-up scope.
+
+### Implemented follow-up: direct attachment clocks
+
+Direct core node/column/edge attachments now support strict explicit effective
+timestamps through the canonical atomic staging boundary. Unknown parameters no
+longer disappear silently. See `builder-attachment-times-2026-11-16.md`.

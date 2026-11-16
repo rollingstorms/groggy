@@ -921,6 +921,34 @@ impl Context {
         Ok(())
     }
 
+    /// Explicit clocks require the shared atomic coordinator rather than a separate write path.
+    pub(crate) fn attach_attrs_at(
+        &mut self,
+        subgraph: &Subgraph,
+        nodes: bool,
+        attrs: HashMap<AttrName, Vec<(usize, AttrValue)>>,
+        at: crate::TimestampMicros,
+    ) -> Result<()> {
+        if self.is_cancelled() {
+            return Err(anyhow!("attribute attachment cancelled"));
+        }
+        if !self.persist_results() || self.property_batch.is_none() {
+            return Err(anyhow!(
+                "explicit attachment time requires persistent atomic execution"
+            ));
+        }
+        subgraph.graph().borrow().validate_scoped_bulk_attrs(
+            &attrs,
+            nodes,
+            subgraph.frozen_view(),
+        )?;
+        self.property_batch
+            .as_mut()
+            .ok_or_else(|| anyhow!("missing atomic attachment scope"))?
+            .stage_at(nodes, attrs, Some(at))
+            .map_err(|err| anyhow!(err))
+    }
+
     /// Attach edge columns or expose owned results without changing graph state.
     pub(crate) fn attach_edge_attrs(
         &mut self,

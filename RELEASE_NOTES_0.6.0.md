@@ -29,6 +29,8 @@ Implemented capabilities, within their documented boundaries:
   preserving component modes, seeded labels and existing graph-type restrictions.
 - Sequential root loops now stage supported topology with refreshed selected reads,
   global allocation positions and one acceptance; fixed child topology stays guarded.
+- Direct node/map/column and edge builder attachments now accept explicit effective
+  timestamps in atomic persistent runs and reject unsupported parameters.
 - Selected retained lifecycle/window helpers now follow surviving pending IDs
   after topology changes; provisional IDs remain guarded against invented history.
 - Accepted snapshot acquisition and node/edge retained diffs now compose after

@@ -56,3 +56,6 @@ Advances 09.4b.2, 30.1 and AR7.8 and conformance 01.2/19.2. Broad rows remain op
 for child/provisional topology semantics, alternate plans/lowering, streaming,
 durable dispatch and their other exit criteria. Fixed inventory remains
 **215 checked / 53 unchecked**, including **44 open release rows** and nine deferred.
+
+Follow-up complete: `builder-attachment-times-2026-11-16.md` implements explicit
+direct attachment clocks and strict parameter checks through the same coordinator.

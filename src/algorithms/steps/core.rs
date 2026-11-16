@@ -708,6 +708,18 @@ impl<'a> StepScope<'a> {
         ctx.attach_edge_attrs(self.subgraph, attrs)
     }
 
+    /// Attach explicitly timed columns through the same fixed-frame validation.
+    pub(crate) fn attach_attrs_at(
+        &self,
+        ctx: &mut Context,
+        nodes: bool,
+        attrs: HashMap<AttrName, Vec<(usize, AttrValue)>>,
+        at: crate::TimestampMicros,
+    ) -> Result<()> {
+        self.validate_attachment_targets(nodes, attrs.values().flatten().map(|(id, _)| *id))?;
+        ctx.attach_attrs_at(self.subgraph, nodes, attrs, at)
+    }
+
     // Root execution keeps its established explicit owner-ID attachment contract.
     // Fixed children must constrain writes as well as reads, including live
     // property-overlay frames and transient owned outputs.

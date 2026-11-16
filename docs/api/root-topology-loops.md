@@ -52,8 +52,8 @@ entity deletion or revision syntax.
 
 The loop remains one mutation batch: final assignments, per-property effective
 times and one publication are retained. Intermediate iterations are not separate
-history states or checkpoints. Existing explicit topology clocks and table-attach
-property clocks retain their normal behavior. Captures are immutable values; a
+history states or checkpoints. Existing explicit topology clocks, table writeback and
+[direct attachment clocks](builder-attachment-times.md) retain their normal behavior. Captures are immutable values; a
 new capture is needed to read later iterations.
 
 Property-only child `for_each` frames may execute within a growing root loop and

@@ -72,6 +72,7 @@ impl Step for LoadNodeAttrStep {
 pub struct AttachNodeAttrStep {
     source: String,
     attr: AttrName,
+    effective_at: Option<crate::TimestampMicros>,
 }
 
 impl AttachNodeAttrStep {
@@ -79,13 +80,24 @@ impl AttachNodeAttrStep {
         Self {
             source: source.into(),
             attr,
+            effective_at: None,
         }
+    }
+
+    /// Set an explicit effective time; requires persistent atomic execution.
+    pub fn with_effective_at(mut self, at: Option<crate::TimestampMicros>) -> Self {
+        self.effective_at = at;
+        self
     }
 }
 
 impl Step for AttachNodeAttrStep {
     fn atomic_effect(&self) -> AtomicStepEffect {
-        AtomicStepEffect::PendingProperties
+        if self.effective_at.is_some() {
+            AtomicStepEffect::StagedProperties
+        } else {
+            AtomicStepEffect::PendingProperties
+        }
     }
 
     fn supports_atomic_properties(&self) -> bool {
@@ -121,6 +133,14 @@ impl Step for AttachNodeAttrStep {
                 }
             }
 
+            if let Some(at) = self.effective_at {
+                return scope.attach_attrs_at(
+                    ctx,
+                    true,
+                    HashMap::from([(self.attr.clone(), values)]),
+                    at,
+                );
+            }
             return scope
                 .attach_node_column(ctx, self.attr.clone(), values)
                 .map_err(|err| anyhow!("failed to set node attributes: {err}"));
@@ -148,6 +168,9 @@ impl Step for AttachNodeAttrStep {
 
         let mut attrs = HashMap::new();
         attrs.insert(self.attr.clone(), values);
+        if let Some(at) = self.effective_at {
+            return scope.attach_attrs_at(ctx, true, attrs, at);
+        }
         scope
             .attach_node_attrs(ctx, attrs)
             .map_err(|err| anyhow!("failed to set node attributes: {err}"))?;
@@ -211,6 +234,7 @@ impl Step for LoadEdgeAttrStep {
 pub struct AttachEdgeAttrStep {
     source: String,
     attr: AttrName,
+    effective_at: Option<crate::TimestampMicros>,
 }
 
 impl AttachEdgeAttrStep {
@@ -218,13 +242,24 @@ impl AttachEdgeAttrStep {
         Self {
             source: source.into(),
             attr,
+            effective_at: None,
         }
+    }
+
+    /// Set an explicit effective time; requires persistent atomic execution.
+    pub fn with_effective_at(mut self, at: Option<crate::TimestampMicros>) -> Self {
+        self.effective_at = at;
+        self
     }
 }
 
 impl Step for AttachEdgeAttrStep {
     fn atomic_effect(&self) -> AtomicStepEffect {
-        AtomicStepEffect::PendingProperties
+        if self.effective_at.is_some() {
+            AtomicStepEffect::StagedProperties
+        } else {
+            AtomicStepEffect::PendingProperties
+        }
     }
 
     fn supports_atomic_properties(&self) -> bool {
@@ -263,6 +298,9 @@ impl Step for AttachEdgeAttrStep {
         }
 
         attrs.insert(self.attr.clone(), values);
+        if let Some(at) = self.effective_at {
+            return scope.attach_attrs_at(ctx, false, attrs, at);
+        }
         scope
             .attach_edge_attrs(ctx, attrs)
             .map_err(|err| anyhow!("failed to set edge attributes: {err}"))?;

@@ -16,7 +16,7 @@ use super::attributes::{
     AttachEdgeAttrStep, AttachNodeAttrStep, EdgeWeightScaleStep, LoadEdgeAttrStep, LoadNodeAttrStep,
 };
 use super::community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
-use super::core::{global_step_registry, StepMetadata, StepRegistry};
+use super::core::{global_step_registry, StepMetadata, StepRegistry, StepSpec};
 use super::drawing::SmoothStrokeAttrsStep;
 use super::execution_block::{BlockBody, BlockOptions, ExecutionBlockStep, ExecutionMode};
 use super::expression::Expr;
@@ -40,6 +40,21 @@ use super::temporal::{
     TemporalWindowStep, WindowAggregateStep,
 };
 use super::transformations::MapNodesExprStep;
+
+fn attachment_time(spec: &StepSpec) -> Result<Option<crate::TimestampMicros>> {
+    for (key, _) in spec.params.iter() {
+        if !matches!(key.as_str(), "source" | "attr" | "effective_at") {
+            return Err(anyhow!("{} does not support parameter '{key}'", spec.id));
+        }
+    }
+    match spec.params.get("effective_at") {
+        None => Ok(None),
+        Some(AlgorithmParamValue::Int(at)) => Ok(Some(*at)),
+        _ => Err(anyhow!(
+            "effective_at must be signed integer Unix microseconds"
+        )),
+    }
+}
 
 fn temporal_coordinate(params: &AlgorithmParams, name: &str) -> Result<u64> {
     match params.get(name) {
@@ -336,10 +351,10 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .params
                 .get_text("attr")
                 .ok_or_else(|| anyhow!("core.attach_node_attr requires 'attr' param"))?;
-            Ok(Box::new(AttachNodeAttrStep::new(
-                source.to_string(),
-                AttrName::from(attr_name.to_string()),
-            )))
+            Ok(Box::new(
+                AttachNodeAttrStep::new(source.to_string(), AttrName::from(attr_name.to_string()))
+                    .with_effective_at(attachment_time(spec)?),
+            ))
         },
     )?;
 
@@ -1131,10 +1146,10 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let attr = spec.params.expect_text("attr")?.to_string();
-            Ok(Box::new(AttachEdgeAttrStep::new(
-                source,
-                AttrName::from(attr),
-            )))
+            Ok(Box::new(
+                AttachEdgeAttrStep::new(source, AttrName::from(attr))
+                    .with_effective_at(attachment_time(spec)?),
+            ))
         },
     )?;
 
