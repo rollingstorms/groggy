@@ -119,3 +119,14 @@ gates. Local qualification does not certify the full platform matrix. No release
 tag, upload or publication is implied by changing the development version.
 Use the [release runbook](docs/api/release-qualification.md) for artifact-backed
 tests, source rebuilds and the publication boundary.
+
+
+### Native numerical buffer ownership correction
+
+Native `SharedBuffer::view_for_backend(Native)` now returns an owned read snapshot;
+its slices remain stable after source writes/drop. Use `data()`/`data_mut()` lock
+guards for live zero-copy access. Explicit same-size snapshot refresh copies values;
+snapshot writeback and unavailable backend transfers reject. Custom numeric buffer
+allocation initializes valid typed zeros rather than assuming all-zero bytes are
+valid. See [memory ownership](docs/api/matrix-memory-ownership.md) for native
+compatibility details. Python APIs and graph storage formats are unchanged.

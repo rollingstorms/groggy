@@ -34,3 +34,7 @@ allocations and release throughput remain explicit performance work. Native
 fixtures cover physical layouts, cancellation, integer limits, CSR consumers,
 invalid metadata and raw slice/type safety. Rebuilt Python regressions exercise
 all existing numerical GraphMatrix behavior.
+
+[Native memory ownership](matrix-memory-ownership.md) documents guarded live
+buffers and stable owned backend snapshots. Unsupported transfers reject; no
+backend-residency metadata is updated as a substitute for moving data.

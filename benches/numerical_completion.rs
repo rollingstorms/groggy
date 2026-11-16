@@ -110,6 +110,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cfg!(debug_assertions) {
         return Err("Run this corpus with cargo bench --bench numerical_completion".into());
     }
+    if std::env::args().any(|arg| arg == "--backend-views") {
+        return backend_view_corpus();
+    }
     if std::env::args().any(|arg| arg == "--lazy-arrays") {
         return lazy_array_corpus();
     }
@@ -511,5 +514,61 @@ fn lazy_array_corpus() -> Result<(), Box<dyn std::error::Error>> {
             "cases":cases,
         }))?
     );
+    Ok(())
+}
+
+fn backend_view_corpus() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::storage::matrix::{memory::BackendId, SharedBuffer};
+    let memory_error = |error: groggy::storage::matrix::MemoryError| {
+        groggy::GraphError::InvalidInput(error.to_string())
+    };
+    let mut cases = Vec::new();
+    for count in [0, 1_000, 100_000, 1_000_000] {
+        let values = (0..count)
+            .map(|index| index as f64 + 0.125)
+            .collect::<Vec<_>>();
+        let buffer = SharedBuffer::from_data(values.clone(), (1, count), MatrixLayout::RowMajor)?;
+        let checksum = |data: &[f64]| {
+            data.first().copied().unwrap_or(0.0) + data.last().copied().unwrap_or(0.0)
+        };
+        let expected = checksum(&values);
+        cases.push(measure("live_read_guard", &[1, count], || {
+            let guard = buffer.data().map_err(memory_error)?;
+            let result = checksum(guard.as_slice());
+            assert_eq!(result, expected);
+            Ok(result)
+        })?);
+        cases.push(measure(
+            "owned_native_backend_snapshot",
+            &[1, count],
+            || {
+                let view = buffer
+                    .view_for_backend(BackendId::Native)
+                    .map_err(memory_error)?;
+                let result = checksum(view.data());
+                assert_eq!(result, expected);
+                Ok(result)
+            },
+        )?);
+        let mut view = buffer.view_for_backend(BackendId::Native)?;
+        cases.push(measure(
+            "explicit_native_snapshot_refresh",
+            &[1, count],
+            || {
+                view.sync_from_main(&values).map_err(memory_error)?;
+                let result = checksum(view.data());
+                assert_eq!(result, expected);
+                Ok(result)
+            },
+        )?);
+        assert_eq!(buffer.to_vec()?, values);
+    }
+    let report = json!({"profile":"release","arch":std::env::consts::ARCH,"os":std::env::consts::OS,"samples_per_case":7,
+        "scope":"Native f64 live read guards, owned backend read snapshots and explicit same-size snapshot refresh. Seven observations after one warmup. Includes creation/read/drop or refresh and small endpoint checksum assertions; excludes source fixtures, compilation and full output comparison. Different ownership semantics, not a before/after performance comparison or zero-copy claim for snapshots. Public graph/matrix operations do not use backend view creation implicitly.",
+        "allocation_scope":"Process-wide System requested allocation/reallocation bytes and peak additional requested live bytes during the operation, not RSS or allocator overhead. Source fixture and retained refresh view excluded.","cases":cases});
+    let output = std::env::var("GROGGY_NUMERICAL_PROFILE")
+        .unwrap_or_else(|_| "/tmp/groggy-backend-view-profile.json".into());
+    std::fs::write(&output, serde_json::to_string_pretty(&report)?)?;
+    println!("Wrote native backend view receipt to {output}");
     Ok(())
 }

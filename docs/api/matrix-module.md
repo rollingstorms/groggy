@@ -24,3 +24,7 @@ Maintained native/FFI callers use canonical matrix paths. Compatibility tests
 exercise legacy imports and type identity, alongside the existing native and
 rebuilt Python regression suites. The numerical release receipt is compared
 before and after the move. Shared array/scalar foundation work follows in AR7.3.
+
+Native aligned buffers retain guarded live access and explicit owned backend read
+snapshots; see [numerical memory ownership](matrix-memory-ownership.md) for the
+safety correction, refresh/writeback behavior and custom numeric initialization.

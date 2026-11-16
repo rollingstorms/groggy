@@ -1,10 +1,9 @@
-//! Advanced Memory Management System
-//!
-//! This module implements sophisticated memory management for the advanced matrix system,
-//! including shared buffers, memory pools, and zero-copy operations across backends.
+//! Aligned numerical storage, guarded live buffers and owned backend read snapshots.
+#![doc = include_str!("../../../docs/api/matrix-memory-ownership.md")]
 
 use crate::storage::matrix::numeric_type::NumericType;
-use std::alloc::{alloc_zeroed, dealloc, Layout};
+use std::alloc::{alloc, alloc_zeroed, dealloc, Layout};
+use std::any::TypeId;
 use std::collections::HashMap;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -93,6 +92,9 @@ impl<T: NumericType> AlignedBuffer<T> {
     fn new(capacity: usize) -> MemoryResult<Self> {
         // Keep a valid SIMD-aligned allocation even for a logically empty
         // buffer. Its exposed slices still have length zero.
+        if std::mem::size_of::<T>() == 0 {
+            return Err(MemoryError::InvalidSize);
+        }
         let size = capacity
             .max(1)
             .checked_mul(std::mem::size_of::<T>())
@@ -102,14 +104,38 @@ impl<T: NumericType> AlignedBuffer<T> {
         let layout =
             Layout::from_size_align(size, align).map_err(|_| MemoryError::InvalidAlignment)?;
 
-        let ptr = unsafe { alloc_zeroed(layout) as *mut T };
-
-        if ptr.is_null() {
-            return Err(MemoryError::AllocationFailed);
+        // NumericType is a safe, externally implementable trait: its zero need
+        // not have an all-zero representation (and all-zero bits may be invalid).
+        // Keep calloc for the concrete built-ins whose representations are known.
+        let builtin_zero = [
+            TypeId::of::<f64>(),
+            TypeId::of::<f32>(),
+            TypeId::of::<i64>(),
+            TypeId::of::<i32>(),
+            TypeId::of::<i128>(),
+            TypeId::of::<bool>(),
+        ]
+        .contains(&TypeId::of::<T>());
+        let zero = (!builtin_zero && capacity != 0).then(T::zero);
+        let ptr = unsafe {
+            if builtin_zero {
+                alloc_zeroed(layout)
+            } else {
+                alloc(layout)
+            }
+        } as *mut T;
+        let ptr = NonNull::new(ptr).ok_or(MemoryError::AllocationFailed)?;
+        if let Some(zero) = zero {
+            for index in 0..capacity {
+                // Each logical element is initialized before any slice exists.
+                unsafe {
+                    ptr.as_ptr().add(index).write(zero);
+                }
+            }
         }
 
         Ok(Self {
-            ptr: NonNull::new(ptr).unwrap(),
+            ptr,
             layout,
             capacity,
         })
@@ -123,17 +149,6 @@ impl<T: NumericType> AlignedBuffer<T> {
     /// Get a mutable slice to the allocated memory
     pub fn as_slice_mut(&mut self) -> &mut [T] {
         unsafe { std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.capacity) }
-    }
-
-    /// Get raw pointer
-    fn as_ptr(&self) -> *const T {
-        self.ptr.as_ptr()
-    }
-
-    /// Get mutable raw pointer
-    #[allow(dead_code)]
-    fn as_mut_ptr(&mut self) -> *mut T {
-        self.ptr.as_ptr()
     }
 }
 
@@ -153,7 +168,8 @@ pub trait BackendView<T: NumericType>: Send + Sync {
     /// Get backend identifier
     fn backend_id(&self) -> BackendId;
 
-    /// Get read-only access to data
+    /// Borrow stable read data. Implementations must retain a lock or owned
+    /// snapshot for the complete returned lifetime; a released lock is insufficient.
     fn data(&self) -> &[T];
 
     /// Get mutable access to data (if supported)
@@ -166,9 +182,10 @@ pub trait BackendView<T: NumericType>: Send + Sync {
     fn sync_from_main(&mut self, data: &[T]) -> MemoryResult<()>;
 }
 
-/// Native backend view - direct memory access
+/// Owned native read snapshot. Live zero-copy access uses SharedBuffer::data's
+/// read guard; the object-safe BackendView slice cannot carry that guard.
 pub struct NativeView<T: NumericType> {
-    data: Arc<RwLock<AlignedBuffer<T>>>,
+    data: Vec<T>,
 }
 
 impl<T: NumericType> BackendView<T> for NativeView<T> {
@@ -177,26 +194,24 @@ impl<T: NumericType> BackendView<T> for NativeView<T> {
     }
 
     fn data(&self) -> &[T] {
-        // This is a simplified implementation - in practice we'd need
-        // more sophisticated lifetime management
-        unsafe {
-            let buffer = self.data.read().unwrap();
-            std::slice::from_raw_parts(buffer.as_ptr(), buffer.capacity)
-        }
+        &self.data
     }
 
     fn data_mut(&mut self) -> Option<&mut [T]> {
-        // This is a simplified implementation
         None
     }
 
     fn sync_to_main(&self) -> MemoryResult<()> {
-        // Native view is already in main memory
-        Ok(())
+        Err(MemoryError::BackendSyncFailed(
+            "Native read snapshots have no writeback source; use SharedBuffer::data_mut".into(),
+        ))
     }
 
-    fn sync_from_main(&mut self, _data: &[T]) -> MemoryResult<()> {
-        // Native view is already in main memory
+    fn sync_from_main(&mut self, data: &[T]) -> MemoryResult<()> {
+        if data.len() != self.data.len() {
+            return Err(MemoryError::InvalidSize);
+        }
+        self.data.copy_from_slice(data);
         Ok(())
     }
 }
@@ -206,9 +221,6 @@ pub struct SharedBuffer<T: NumericType> {
     buffer: Arc<RwLock<AlignedBuffer<T>>>,
     layout: MatrixLayout,
     shape: (usize, usize),
-    last_backend: Arc<RwLock<BackendId>>,
-    #[allow(dead_code)]
-    backend_views: Arc<Mutex<HashMap<BackendId, Box<dyn BackendView<T>>>>>,
     modification_count: Arc<AtomicUsize>,
 }
 
@@ -224,7 +236,6 @@ impl<T: NumericType> std::fmt::Debug for SharedBuffer<T> {
                     .load(std::sync::atomic::Ordering::Relaxed),
             )
             .field("buffer", &"<shared buffer>")
-            .field("backend_views", &"<backend views>")
             .finish()
     }
 }
@@ -241,8 +252,6 @@ impl<T: NumericType> SharedBuffer<T> {
             buffer: Arc::new(RwLock::new(buffer)),
             layout,
             shape,
-            last_backend: Arc::new(RwLock::new(BackendId::Native)),
-            backend_views: Arc::new(Mutex::new(HashMap::new())),
             modification_count: Arc::new(AtomicUsize::new(0)),
         })
     }
@@ -301,16 +310,23 @@ impl<T: NumericType> SharedBuffer<T> {
 
     /// Get mutable access to the data
     pub fn data_mut(&self) -> MemoryResult<std::sync::RwLockWriteGuard<'_, AlignedBuffer<T>>> {
+        let guard = self.buffer.write().map_err(|_| MemoryError::BufferInUse)?;
         self.mark_modified();
-        self.buffer.write().map_err(|_| MemoryError::BufferInUse)
+        Ok(guard)
     }
 
-    /// Create a view for a specific backend
+    /// Capture an owned native read snapshot. Other backends reject explicitly.
+    /// Use data()/data_mut() guards for live access without copying.
     pub fn view_for_backend(&self, backend: BackendId) -> MemoryResult<Box<dyn BackendView<T>>> {
         match backend {
-            BackendId::Native => Ok(Box::new(NativeView {
-                data: Arc::clone(&self.buffer),
-            })),
+            BackendId::Native => {
+                let source = self.data()?;
+                let mut data = Vec::new();
+                data.try_reserve_exact(source.as_slice().len())
+                    .map_err(|_| MemoryError::AllocationFailed)?;
+                data.extend_from_slice(source.as_slice());
+                Ok(Box::new(NativeView { data }))
+            }
             _ => {
                 // TODO: Implement views for other backends
                 Err(MemoryError::BackendSyncFailed(format!(
@@ -321,16 +337,15 @@ impl<T: NumericType> SharedBuffer<T> {
         }
     }
 
-    /// Synchronize data from the specified backend
+    /// Validate native residency. No external backend owns a buffer in this
+    /// implementation; unavailable synchronization must not report success.
     pub fn sync_from_backend(&self, source: BackendId) -> MemoryResult<()> {
-        let last_backend = *self.last_backend.read().unwrap();
-
-        // Only sync if backend has changed
-        if last_backend != source {
-            // TODO: Implement actual synchronization between backends
-            *self.last_backend.write().unwrap() = source;
+        if source != BackendId::Native {
+            return Err(MemoryError::BackendSyncFailed(format!(
+                "Backend {source:?} synchronization is unavailable"
+            )));
         }
-
+        drop(self.data()?);
         Ok(())
     }
 
@@ -585,12 +600,233 @@ mod tests {
     use super::*;
 
     #[test]
+    fn native_backend_slices_remain_stable_during_concurrent_source_writes() {
+        let buffer = Arc::new(
+            SharedBuffer::from_data(vec![1.0, 2.0], (1, 2), MatrixLayout::RowMajor).unwrap(),
+        );
+        let view = buffer.view_for_backend(BackendId::Native).unwrap();
+        let slice = view.data();
+        let writer = buffer.clone();
+        std::thread::spawn(move || {
+            for value in 0..128 {
+                writer.data_mut().unwrap().as_slice_mut().fill(value as f64);
+            }
+        })
+        .join()
+        .unwrap();
+        assert_eq!(slice, [1.0, 2.0]);
+        assert_eq!(buffer.to_vec().unwrap(), [127.0, 127.0]);
+        drop(buffer);
+        let values = std::thread::spawn(move || view.data().to_vec())
+            .join()
+            .unwrap();
+        assert_eq!(values, [1.0, 2.0]);
+    }
+
+    #[test]
+    fn native_snapshot_refresh_is_explicit_exact_sized_and_has_no_implicit_writeback() {
+        let values = [f64::from_bits(0x7ff8_0000_0000_1234), -0.0, 1.0000000001];
+        let buffer =
+            SharedBuffer::from_data(values.to_vec(), (1, 3), MatrixLayout::ColumnMajor).unwrap();
+        let count = buffer.modification_count();
+        let mut view = buffer.view_for_backend(BackendId::Native).unwrap();
+        assert_eq!(view.backend_id(), BackendId::Native);
+        assert_eq!(
+            view.data().iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+            values.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+        );
+        assert!(view.data_mut().is_none());
+        assert!(matches!(
+            view.sync_from_main(&[4.0]),
+            Err(MemoryError::InvalidSize)
+        ));
+        assert_eq!(view.data()[2], values[2]);
+        view.sync_from_main(&[4.0, 5.0, 6.0]).unwrap();
+        assert_eq!(view.data(), [4.0, 5.0, 6.0]);
+        assert!(matches!(
+            view.sync_to_main(),
+            Err(MemoryError::BackendSyncFailed(_))
+        ));
+        assert_eq!(buffer.modification_count(), count);
+        assert_eq!(
+            buffer
+                .to_vec()
+                .unwrap()
+                .iter()
+                .map(|v| v.to_bits())
+                .collect::<Vec<_>>(),
+            values.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn unavailable_backend_views_and_synchronization_reject_without_mutation() {
+        let buffer =
+            SharedBuffer::from_data(vec![3_i128, i128::MAX], (2, 1), MatrixLayout::RowMajor)
+                .unwrap();
+        let count = buffer.modification_count();
+        for backend in [
+            BackendId::NumPy,
+            BackendId::BLAS,
+            BackendId::CUDA,
+            BackendId::OpenCL,
+        ] {
+            for _ in 0..2 {
+                assert!(matches!(
+                    buffer.view_for_backend(backend),
+                    Err(MemoryError::BackendSyncFailed(_))
+                ));
+                assert!(matches!(
+                    buffer.sync_from_backend(backend),
+                    Err(MemoryError::BackendSyncFailed(_))
+                ));
+            }
+        }
+        buffer.sync_from_backend(BackendId::Native).unwrap();
+        assert_eq!(buffer.modification_count(), count);
+        assert_eq!(buffer.to_vec().unwrap(), [3, i128::MAX]);
+    }
+
+    #[test]
+    fn poisoned_live_storage_rejects_views_and_does_not_advance_failed_write_generation() {
+        let buffer = Arc::new(SharedBuffer::<f64>::new((1, 1), MatrixLayout::RowMajor).unwrap());
+        let writer = buffer.clone();
+        assert!(std::thread::spawn(move || {
+            let _guard = writer.data_mut().unwrap();
+            panic!("deliberate poison");
+        })
+        .join()
+        .is_err());
+        let count = buffer.modification_count();
+        assert!(matches!(buffer.data_mut(), Err(MemoryError::BufferInUse)));
+        assert!(matches!(
+            buffer.view_for_backend(BackendId::Native),
+            Err(MemoryError::BufferInUse)
+        ));
+        assert!(matches!(
+            buffer.sync_from_backend(BackendId::Native),
+            Err(MemoryError::BufferInUse)
+        ));
+        assert_eq!(buffer.modification_count(), count);
+    }
+
+    #[test]
+    fn empty_native_snapshots_and_builtin_zeros_retain_exact_logical_lengths() {
+        fn check<T: NumericType>() {
+            for shape in [(0, 3), (3, 0), (2, 3)] {
+                let buffer = SharedBuffer::<T>::new(shape, MatrixLayout::RowMajor).unwrap();
+                let mut view = buffer.view_for_backend(BackendId::Native).unwrap();
+                assert_eq!(view.data().len(), shape.0 * shape.1);
+                assert!(view.data().iter().all(|v| *v == T::zero()));
+                let values = vec![T::one(); shape.0 * shape.1];
+                view.sync_from_main(&values).unwrap();
+                assert_eq!(view.data(), values);
+                assert!(buffer.to_vec().unwrap().iter().all(|v| *v == T::zero()));
+            }
+        }
+        check::<f64>();
+        check::<f32>();
+        check::<i64>();
+        check::<i32>();
+        check::<i128>();
+        check::<bool>();
+    }
+
+    // A valid safe NumericType whose mathematical zero has a nonzero bit pattern.
+    #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+    struct EncodedZero<const N: usize>([std::num::NonZeroU8; N]);
+    impl<const N: usize> NumericType for EncodedZero<N> {
+        type Accumulator = Self;
+        type Wide = Self;
+        const DTYPE: crate::storage::numeric::types::DType =
+            crate::storage::numeric::types::DType::Int8;
+        const BYTE_SIZE: usize = N;
+        fn zero() -> Self {
+            Self([std::num::NonZeroU8::new(1).unwrap(); N])
+        }
+        fn one() -> Self {
+            Self([std::num::NonZeroU8::new(2).unwrap(); N])
+        }
+        fn from_f64(value: f64) -> Option<Self> {
+            (value.is_finite() && (0.0..=254.0).contains(&value) && value.fract() == 0.0)
+                .then(|| Self([std::num::NonZeroU8::new(value as u8 + 1).unwrap(); N]))
+        }
+        fn to_f64(self) -> f64 {
+            self.0
+                .first()
+                .map_or(0.0, |value| f64::from(value.get() - 1))
+        }
+        fn is_finite(self) -> bool {
+            true
+        }
+        fn abs(self) -> Self {
+            self
+        }
+        fn add(self, other: Self) -> Self {
+            Self::from_f64(self.to_f64() + other.to_f64()).unwrap()
+        }
+        fn sub(self, other: Self) -> Self {
+            Self::from_f64(self.to_f64() - other.to_f64()).unwrap()
+        }
+        fn mul(self, other: Self) -> Self {
+            Self::from_f64(self.to_f64() * other.to_f64()).unwrap()
+        }
+        fn div(self, other: Self) -> Self {
+            Self::from_f64(self.to_f64() / other.to_f64()).unwrap()
+        }
+        fn simd_reduce_sum(values: &[Self]) -> Self {
+            values.iter().copied().fold(Self::zero(), Self::add)
+        }
+        fn simd_reduce_max(values: &[Self]) -> Self {
+            values
+                .iter()
+                .copied()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap_or_else(Self::zero)
+        }
+        fn simd_reduce_min(values: &[Self]) -> Self {
+            values
+                .iter()
+                .copied()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap_or_else(Self::zero)
+        }
+    }
+
+    #[test]
+    fn safe_custom_numeric_types_are_initialized_with_their_own_valid_zero() {
+        let buffer = SharedBuffer::<EncodedZero<1>>::new((2, 3), MatrixLayout::RowMajor).unwrap();
+        assert!(buffer
+            .data()
+            .unwrap()
+            .as_slice()
+            .iter()
+            .all(|v| *v == EncodedZero::<1>::zero()));
+        let view = buffer.view_for_backend(BackendId::Native).unwrap();
+        assert_eq!(view.data(), [EncodedZero::<1>::zero(); 6]);
+        let copied = buffer.clone();
+        assert_eq!(copied.to_vec().unwrap(), [EncodedZero::<1>::zero(); 6]);
+    }
+
+    #[test]
+    fn zero_sized_custom_numeric_types_reject_before_requesting_allocator_storage() {
+        assert!(matches!(
+            SharedBuffer::<EncodedZero<0>>::new((2, 3), MatrixLayout::RowMajor),
+            Err(MemoryError::InvalidSize)
+        ));
+        assert!(matches!(
+            SharedBuffer::<EncodedZero<0>>::new((0, 0), MatrixLayout::RowMajor),
+            Err(MemoryError::InvalidSize)
+        ));
+    }
+
+    #[test]
     fn test_aligned_buffer_allocation() {
         let buffer = AlignedBuffer::<f64>::new(100).unwrap();
         assert_eq!(buffer.capacity, 100);
 
         // Check alignment
-        let ptr = buffer.as_ptr() as usize;
+        let ptr = buffer.as_slice().as_ptr() as usize;
         assert_eq!(ptr % get_simd_alignment::<f64>(), 0);
     }
 
