@@ -152,3 +152,103 @@ fn malformed_controls_and_unselected_new_endpoints_reject() {
         .unwrap();
     assert_eq!(g.borrow().current_state_id(), head);
 }
+
+#[test]
+fn existing_edge_revisions_use_batch_global_new_node_refs_and_recover_exactly() {
+    for directed in [false, true] {
+        for removal_first in [false, true] {
+            let g = fixture(directed);
+            g.borrow_mut().remove_node(2).unwrap();
+            let before = g.borrow().read_view().unwrap();
+            let head = g.borrow().current_state_id();
+            let mut edits = vec![
+                json!({"id":"graph.add_nodes","params":{"count":1,"output":"first","effective_at":10}}),
+                json!({"id":"graph.add_nodes","params":{"count":1,"output":"second","effective_at":15}}),
+            ];
+            let revision = json!({"id":"graph.set_edge_endpoints","params":{"revisions":[[0,{"added":0},{"added":1}]],"effective_at":20}});
+            let removal = json!({"id":"graph.remove_nodes","params":{"ids":[1],"effective_at":30}});
+            edits.extend(if removal_first {
+                [removal, revision]
+            } else {
+                [revision, removal]
+            });
+            edits.extend([
+                json!({"id":"graph.capture_staged","params":{"output":"pending"}}),
+                json!({"id":"graph.emit","params":{"source":"pending","name":"pending"}}),
+            ]);
+            let mut ctx = Context::new();
+            let result = pipeline(json!(edits))
+                .unwrap()
+                .run(&mut ctx, selected(&g))
+                .unwrap();
+            assert_eq!(result.nodes(), &[0, 3, 4, 5].into());
+            assert_eq!(result.edges(), &[0].into());
+            let AlgorithmOutput::GraphView(pending) = ctx.take_outputs().remove("pending").unwrap()
+            else {
+                panic!("missing capture");
+            };
+            assert_eq!(pending.edge_endpoints(0).unwrap(), (4, 5));
+            assert_eq!(
+                pending.edge_attr(0, &"w".into()).unwrap(),
+                Some(AttrValue::Int(7))
+            );
+            assert_eq!(g.borrow().current_state_id(), head + 1);
+            assert_eq!(before.edge_endpoints(0).unwrap(), (0, 1));
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("new-endpoints.gga");
+            g.borrow().save_archive(&path).unwrap();
+            let restored = Graph::load_archive(&path).unwrap();
+            assert_eq!(restored.edge_endpoints(0).unwrap(), (4, 5));
+            assert_eq!(
+                restored
+                    .read_view_at(19, None)
+                    .unwrap()
+                    .edge_endpoints(0)
+                    .unwrap(),
+                (0, 1)
+            );
+            assert_eq!(
+                restored
+                    .read_view_at(20, None)
+                    .unwrap()
+                    .edge_endpoints(0)
+                    .unwrap(),
+                (4, 5)
+            );
+            assert_eq!(
+                restored
+                    .publication_metadata(head + 1)
+                    .unwrap()
+                    .unwrap()
+                    .change_times[&groggy::state::publication::ChangeKey::EdgeEndpoints(0)],
+                20
+            );
+        }
+    }
+}
+
+#[test]
+fn new_endpoint_reference_failures_retain_outputs_and_consume_no_ids() {
+    for (row, at) in [
+        (json!([0, 0, {"added":1}]), 20),
+        (json!([0, 0, {"added":0}]), 5),
+        (json!([0, 0, 4]), 20),
+    ] {
+        let g = fixture(false);
+        let head = g.borrow().current_state_id();
+        let mut ctx = Context::new();
+        ctx.add_output("retained", AlgorithmOutput::Histogram(vec![9]));
+        let plan = pipeline(json!([
+            {"id":"graph.add_nodes","params":{"count":1,"output":"new","effective_at":10}},
+            {"id":"graph.set_edge_endpoints","params":{"revisions":[row],"effective_at":at}}
+        ]))
+        .unwrap();
+        assert!(plan.run(&mut ctx, selected(&g)).is_err());
+        assert_eq!(g.borrow().current_state_id(), head);
+        assert_eq!(g.borrow().edge_endpoints(0).unwrap(), (0, 1));
+        assert!(
+            matches!(&ctx.take_outputs()["retained"], AlgorithmOutput::Histogram(v) if v == &vec![9])
+        );
+        assert_eq!(g.borrow_mut().add_node().unwrap(), 4);
+    }
+}

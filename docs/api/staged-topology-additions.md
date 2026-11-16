@@ -52,6 +52,8 @@ assert graph.read_view_at(25).edge_ids == [0, 1]
   `{"added": position}` references the zero-based position across all node
   creation stages earlier in the shared atomic run (across builders in an outer
   atomic pipeline). Forward references reject.
+- Existing-edge revisions accept the same explicit new-node references for
+  their endpoints; see [endpoint revisions](pipeline-endpoint-revisions.md).
 - Outputs are typed node/edge maps keyed by provisional IDs. Parallel edges and
   loops remain distinct instances. Zero-count/empty creation is a no-op.
 - Attribute values use the existing scalar/vector/structured parameter conversion

@@ -71,7 +71,7 @@ impl Step for AddStep {
         Ok(())
     }
 }
-fn endpoint(value: &serde_json::Value) -> Result<BatchNodeRef> {
+pub(super) fn endpoint(value: &serde_json::Value) -> Result<BatchNodeRef> {
     if let Some(id) = value.as_u64().and_then(|id| usize::try_from(id).ok()) {
         return Ok(BatchNodeRef::Existing(id));
     }

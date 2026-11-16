@@ -1,4 +1,4 @@
-//! Terminal topology effects: prepare removals, publish through one checked batch.
+//! Checked topology effects, published through one canonical mixed batch.
 use super::core::{
     AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue,
 };
@@ -22,7 +22,7 @@ struct CaptureStagedStep {
 }
 
 struct ReviseEndpointsStep {
-    rows: Vec<(usize, usize, usize)>,
+    rows: Vec<(usize, crate::BatchNodeRef, crate::BatchNodeRef)>,
     effective_at: Option<crate::TimestampMicros>,
 }
 
@@ -39,18 +39,21 @@ impl Step for ReviseEndpointsStep {
         }
         let binding = scope.subgraph().graph();
         let graph = binding.borrow();
+        let pending = ctx
+            .property_batch
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing atomic effect scope"))?;
+        let mut rows = Vec::with_capacity(self.rows.len());
         for &(edge, source, target) in &self.rows {
             if ctx.is_cancelled() {
                 bail!("endpoint revision cancelled");
             }
-            if !scope.subgraph().edges().contains(&edge)
-                || !graph.has_edge(edge)
-                || [source, target]
-                    .iter()
-                    .any(|id| !scope.subgraph().nodes().contains(id) || !graph.has_node(*id))
-            {
-                bail!("endpoint revision ({edge}, {source}, {target}) is outside the active execution selection");
+            if !scope.subgraph().edges().contains(&edge) || !graph.has_edge(edge) {
+                bail!("endpoint revision edge {edge} is outside the active execution selection");
             }
+            let source = pending.resolve_selected_node(&graph, scope.subgraph(), source)?;
+            let target = pending.resolve_selected_node(&graph, scope.subgraph(), target)?;
+            rows.push((edge, source, target));
         }
         if ctx.is_cancelled() {
             bail!("endpoint revision cancelled");
@@ -59,7 +62,7 @@ impl Step for ReviseEndpointsStep {
         ctx.property_batch
             .as_mut()
             .ok_or_else(|| anyhow!("missing atomic effect scope"))?
-            .stage_endpoint_revisions(self.rows.clone(), self.effective_at);
+            .stage_endpoint_revisions(rows, self.effective_at);
         Ok(())
     }
 }
@@ -72,18 +75,21 @@ fn effective_time(spec: &StepSpec) -> Result<Option<crate::TimestampMicros>> {
     }
 }
 
-fn endpoint_rows(spec: &StepSpec) -> Result<Vec<(usize, usize, usize)>> {
+fn endpoint_rows(
+    spec: &StepSpec,
+) -> Result<Vec<(usize, crate::BatchNodeRef, crate::BatchNodeRef)>> {
     let rows = match spec.params.get("revisions") {
         Some(AlgorithmParamValue::Json(serde_json::Value::Array(rows))) => rows,
         Some(AlgorithmParamValue::IntList(rows)) if rows.is_empty() => return Ok(Vec::new()),
-        _ => bail!("revisions must be an array of [edge_id, source_id, target_id] rows"),
+        _ => bail!("revisions must be an array of [edge_id, source, target] rows"),
     };
     rows.iter()
         .map(|row| {
-            let row = row
-                .as_array()
-                .filter(|row| row.len() == 3)
-                .ok_or_else(|| anyhow!("each endpoint revision must contain exactly three IDs"))?;
+            let row = row.as_array().filter(|row| row.len() == 3).ok_or_else(|| {
+                anyhow!(
+                    "each endpoint revision must contain an edge ID and two endpoint references"
+                )
+            })?;
             let id = |value: &serde_json::Value| {
                 value
                     .as_u64()
@@ -92,7 +98,11 @@ fn endpoint_rows(spec: &StepSpec) -> Result<Vec<(usize, usize, usize)>> {
                         anyhow!("endpoint revision IDs must be nonnegative integers fitting usize")
                     })
             };
-            Ok((id(&row[0])?, id(&row[1])?, id(&row[2])?))
+            Ok((
+                id(&row[0])?,
+                super::additions::endpoint(&row[1])?,
+                super::additions::endpoint(&row[2])?,
+            ))
         })
         .collect()
 }

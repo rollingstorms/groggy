@@ -46,9 +46,11 @@ and are overwritten when the same output name is assigned again.
 
 Computed removal maps can select a different surviving entity each iteration.
 Literal removals/revisions retain canonical duplicate validation: repeating the
-same mutation is not silently treated as a no-op. Removals/revisions still target
-accepted owner entities in the invocation selection; this adds no provisional
-entity deletion or revision syntax.
+same mutation is not silently treated as a no-op. Removal targets and revised edges still belong to the accepted invocation
+selection. Revised endpoints may use explicit `{"added": position}` node references
+from earlier creation; [endpoint revision rules](pipeline-endpoint-revisions.md)
+still apply. Provisional entity deletion and revision of newly created edges
+remain unsupported.
 
 The loop remains one mutation batch: final assignments, per-property effective
 times and one publication are retained. Intermediate iterations are not separate

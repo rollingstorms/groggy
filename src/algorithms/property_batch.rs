@@ -662,6 +662,31 @@ impl PropertyBatch {
         Ok(ids)
     }
 
+    /// Shared endpoint authority for creation and revisions. Explicit Added
+    /// positions refer to the whole atomic batch; numeric IDs remain accepted
+    /// selected entities rather than guesses at provisional allocations.
+    pub(crate) fn resolve_selected_node(
+        &self,
+        graph: &Graph,
+        selected: &Subgraph,
+        reference: BatchNodeRef,
+    ) -> GraphResult<NodeId> {
+        let resolved = match reference {
+            BatchNodeRef::Existing(id) if selected.nodes().contains(&id) && graph.has_node(id) => {
+                Some(id)
+            }
+            BatchNodeRef::Added(position) if position < self.add_nodes => self
+                .allocation_base
+                .and_then(|(base, _)| base.checked_add(position)),
+            _ => None,
+        };
+        resolved.ok_or_else(|| {
+            crate::GraphError::InvalidInput(
+                "Edge endpoint is outside the selected or staged nodes".into(),
+            )
+        })
+    }
+
     pub(crate) fn stage_edges(
         &mut self,
         graph: &Graph,
@@ -679,17 +704,7 @@ impl PropertyBatch {
             .ok_or_else(|| crate::GraphError::InvalidInput("Staged edge IDs overflow".into()))?;
         for &(source, target) in edges {
             for reference in [source, target] {
-                let valid = match reference {
-                    BatchNodeRef::Existing(id) => {
-                        selected.nodes().contains(&id) && graph.has_node(id)
-                    }
-                    BatchNodeRef::Added(position) => position < self.add_nodes,
-                };
-                if !valid {
-                    return Err(crate::GraphError::InvalidInput(
-                        "Added edge endpoint is outside the selected or staged nodes".into(),
-                    ));
-                }
+                self.resolve_selected_node(graph, selected, reference)?;
             }
         }
         let first = self.add_edges.len();
