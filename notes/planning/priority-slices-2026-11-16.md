@@ -75,11 +75,25 @@ Raw receipts: `../benchmarks/numerical-memory-views-2026-11-16-{1,2,3}.json`.
 Manual run, pinned to e517e639:
 https://github.com/rollingstorms/groggy/actions/runs/43792347879
 
-Started at 02:28 UTC. Native gates and extracted-source rebuild have passed;
-19 configured wheel combinations are still completing. The publish job cannot
-run for this manual dispatch. Final conclusions and artifact hashes will be
-recorded separately when available; the older be6512d1 platform receipt remains
-an earlier qualification rather than being relabeled as this source.
+Started at 02:28 UTC and completed at **02:49:08 UTC**. **All 21 required jobs
+passed**, including all **19 configured wheel combinations**, native/serial-recovery/
+Clippy and extracted-source rebuild. The publish job was skipped. The
+`../benchmarks/priority-slices-platform-qualification-2026-11-16.json` receipt
+retains all 22 job conclusions, 40 upload identities/digests and 20 qualification
+reports, including every inner wheel SHA256 and its executed test mode.
+
+The source archive is **5,257,840 bytes**, SHA256
+fedbe9cb2b4bdcdc0f351930a8a24e536ef311a155ef0175bc29f54ebaa2fd43.
+All **495 tracked production .rs/.py/.pyi files** match e517e639 byte-for-byte;
+the native memory documentation include is present and Finder metadata is absent.
+Both source Cargo lockfile hashes are retained. Current production sources remain
+unchanged after that runtime commit; later commits update evidence/planning only.
+
+The full maintained CI gate runs on the Linux 3.12 wheel; the other wheels run
+isolated smoke/storage workflows and ownership tests. The extracted-source wheel
+runs isolated smoke/exports/storage workflows, with tests=none; it is not credited
+with the maintained suite. The older be6512d1 receipt remains historical. These
+results qualify recorded artifacts, not the unfinished expanded release.
 
 ## Remaining priority work
 

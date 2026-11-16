@@ -35,8 +35,10 @@ The clean nested wheel passes 36 ownership/workflow tests; its extension and all
   backend snapshots are owned; live zero-copy reads retain lock guards; unsupported
   transfers reject; custom numeric allocation uses valid typed zeros.
 - [Current platform run](https://github.com/rollingstorms/groggy/actions/runs/43792347879),
-  pinned to e517e639: native/source gates passed; remaining wheels are completing.
-  No package publication runs on manual dispatch. The final receipt is pending.
+  pinned to e517e639: **all 21 required jobs and all 19 wheels passed**; source
+  rebuild passed and publication was skipped. The
+  [platform receipt](notes/benchmarks/priority-slices-platform-qualification-2026-11-16.json)
+  retains 20 qualification reports, 40 upload identities/digests and source hashes.
 
 The earlier be6512d1 platform run passed all 21 required jobs and 19 wheels;
 [its receipt](notes/benchmarks/priority-hour-platform-qualification-2026-11-16.json)
