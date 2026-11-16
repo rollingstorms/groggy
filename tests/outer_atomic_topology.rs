@@ -192,6 +192,26 @@ fn late_execution_and_final_timeline_errors_restore_outputs_and_ids() {
 
 #[test]
 fn unadapted_algorithm_after_topology_rejects_before_all_prefixes() {
+    struct PropertyOnly;
+    impl groggy::algorithms::Algorithm for PropertyOnly {
+        fn id(&self) -> &'static str {
+            "test.property_only"
+        }
+        fn metadata(&self) -> groggy::algorithms::AlgorithmMetadata {
+            Default::default()
+        }
+        fn supports_atomic_properties(&self) -> bool {
+            true
+        }
+        fn execute(&self, _: &mut Context, _: Subgraph) -> anyhow::Result<Subgraph> {
+            panic!("uncertified algorithm must be rejected during preflight")
+        }
+    }
+    let registry = groggy::algorithms::registry::Registry::default();
+    groggy::algorithms::builder::register_algorithms(&registry).unwrap();
+    registry
+        .register_factory("test.property_only", |_| Ok(Box::new(PropertyOnly)))
+        .unwrap();
     let graph = fixture(false);
     let head = graph.borrow().current_state_id();
     let mut builder = PipelineBuilder::new().with_algorithm("builder.step_pipeline", |params| {
@@ -200,9 +220,9 @@ fn unadapted_algorithm_after_topology_rejects_before_all_prefixes() {
             json!({"atomic":true,"steps":create_nodes()}).to_string(),
         );
     });
-    builder = builder.with_algorithm("centrality.pagerank", |_| {});
+    builder = builder.with_algorithm("test.property_only", |_| {});
     let error = builder
-        .build(global_registry())
+        .build(&registry)
         .unwrap()
         .run_atomic_properties(&mut Context::new(), selected(&graph))
         .unwrap_err();

@@ -23,6 +23,8 @@ Implemented capabilities, within their documented boundaries:
   checkpoint, compaction and purge operations.
 - Classic BFS, DFS, Dijkstra and A* now consume pending selected topology and
   values through shared native read frames, preserving one outer acceptance.
+- Classic PageRank, closeness and betweenness also share the pending input
+  boundary, including staged weights/personalization and directed closeness.
 - Selected retained lifecycle/window helpers now follow surviving pending IDs
   after topology changes; provisional IDs remain guarded against invented history.
 - Accepted snapshot acquisition and node/edge retained diffs now compose after

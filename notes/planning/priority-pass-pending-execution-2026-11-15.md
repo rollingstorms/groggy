@@ -28,7 +28,7 @@ Small property-only cache allocation costs and wide-frame copying remain explici
 
 ## Open work and next priorities
 
-1. Certify the other nine classic centrality/community wrappers against pending
+1. Centrality certification is complete (`pending-classic-centrality-2026-11-15.md`); certify the remaining six classic community wrappers against pending
    selected adjacency and values. Reuse the shared read/continuation boundary;
    retain guards until their existing option/domain/ownership tests pass.
 2. Resolve staged-node retained lifecycle: empty accepted history until publication

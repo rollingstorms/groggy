@@ -31,6 +31,10 @@ See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md
 [pending retained-history evidence](notes/planning/pending-retained-history-2026-11-15.md)
 [selected temporal-window evidence](notes/planning/pending-temporal-windows-2026-11-15.md)
 and [classic path evidence](notes/planning/pending-classic-paths-2026-11-15.md).
+The subsequent three-wrapper centrality slice passes 1,604 native tests, strict
+Clippy, 3,131 maintained Python tests and 284 docs examples against the rebuilt
+in-tree release extension; see [centrality evidence](notes/planning/pending-classic-centrality-2026-11-15.md).
+The artifact receipts below retain their separately qualified source versions.
 The latest Python/docs gate runs against a fresh unpacked macOS arm64 CPython 3.9
 root wheel. The [priority pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)
 records completed slices and remaining work; older platform evidence is separate.

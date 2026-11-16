@@ -67,8 +67,9 @@ rows are not implicitly cleared. Marker values are ignored: presence selects the
 source/goal, including explicit false or null, with the existing uniqueness rules.
 
 Ordinary standalone/property-only paths retain their live execution path. The
-other nine classic centrality/community wrappers retain their pending-topology
-preflight guards; their captured-table APIs remain available. General topology
+six classic community wrappers retain their pending-topology
+preflight guards; [centrality wrappers](pending-classic-centrality.md) now share
+the pending input boundary; their captured-table APIs remain available. General topology
 loops, uncertified callbacks and alternate lowering remain separate checklist work.
 
 The current native path workload receipt is documented in

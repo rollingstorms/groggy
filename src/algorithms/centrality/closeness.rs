@@ -10,6 +10,7 @@ use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
 use crate::algorithms::pathfinding::utils::{checked_dijkstra_weights, DijkstraState};
+use crate::algorithms::read::AlgorithmFrame;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
@@ -347,6 +348,13 @@ impl Algorithm for ClosenessCentrality {
         true
     }
 
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn id(&self) -> &'static str {
         "centrality.closeness"
     }
@@ -356,16 +364,13 @@ impl Algorithm for ClosenessCentrality {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let t0 = Instant::now();
         if ctx.is_cancelled() {
             return Err(anyhow!("closeness cancelled"));
         }
-        let weights = checked_dijkstra_weights(ctx, &subgraph, self.weight_attr.as_ref())?;
+        let weights = checked_dijkstra_weights(ctx, subgraph, self.weight_attr.as_ref())?;
         if weights.values().any(|&weight| weight <= 0.0) {
             return Err(anyhow!("closeness edge lengths must be strictly positive"));
         }
@@ -384,7 +389,7 @@ impl Algorithm for ClosenessCentrality {
                     AlgorithmOutput::NodeScores(Vec::new()),
                 );
             }
-            return Ok(subgraph);
+            return Ok(frame.finish());
         }
 
         // Phase 2: Build indexer
@@ -393,7 +398,7 @@ impl Algorithm for ClosenessCentrality {
         ctx.record_call("closeness.build_indexer", idx_start.elapsed());
 
         // Phase 3: Build or retrieve CSR
-        let add_reverse = subgraph.graph().borrow().is_undirected();
+        let add_reverse = !subgraph.read_is_directed();
         let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call(
                 "closeness.csr_cache_hit",
@@ -404,8 +409,7 @@ impl Algorithm for ClosenessCentrality {
             let csr_start = Instant::now();
 
             let edges = subgraph.ordered_edges();
-            let graph_ref = subgraph.graph();
-            let graph_borrow = graph_ref.borrow();
+            let endpoints = subgraph.endpoint_read();
 
             let mut csr_new = Csr::default();
             let csr_time = build_csr_from_edges_with_scratch(
@@ -413,7 +417,7 @@ impl Algorithm for ClosenessCentrality {
                 nodes.len(),
                 edges.iter().copied(),
                 |nid| indexer.get(nid),
-                |eid| graph_borrow.edge_endpoints(eid).ok(),
+                |eid| endpoints.get(eid).ok(),
                 CsrOptions {
                     add_reverse_edges: add_reverse,
                     sort_neighbors: false,
@@ -465,7 +469,7 @@ impl Algorithm for ClosenessCentrality {
             {
                 let started = Instant::now();
                 let result =
-                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                    ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values);
                 ctx.record_call("closeness.write_attributes", started.elapsed());
                 result
             }
@@ -478,7 +482,7 @@ impl Algorithm for ClosenessCentrality {
         }
 
         ctx.record_duration("closeness.total_execution", t0.elapsed());
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 

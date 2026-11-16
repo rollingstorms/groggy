@@ -228,12 +228,15 @@ fn staged_markers_personalization_heuristics_and_label_seeds_are_visible() {
 }
 
 #[test]
-fn classic_paths_consume_pending_topology_and_leave_one_live_continuation() {
+fn classic_paths_and_centrality_consume_pending_topology_and_leave_one_live_continuation() {
     for id in [
         "pathfinding.bfs",
         "pathfinding.dfs",
         "pathfinding.dijkstra",
         "pathfinding.astar",
+        "centrality.pagerank",
+        "centrality.closeness",
+        "centrality.betweenness",
     ] {
         let (owner, selected) = fixture();
         selected.adjacency_read().unwrap(); // Warm the old live CSR before pending revisions.
@@ -263,6 +266,22 @@ fn classic_paths_consume_pending_topology_and_leave_one_live_continuation() {
         assert!(graph.has_node(4));
         assert_eq!(graph.edge_endpoints(0).unwrap(), (2, 0));
         assert_eq!(graph.get_node_attr(3, &"result".into()).unwrap(), None);
+        if id.starts_with("centrality.") {
+            let expected = match id {
+                "centrality.pagerank" => 1.0 / 3.0,
+                "centrality.closeness" => 1.0,
+                _ => 0.0,
+            };
+            for node in [0, 2, 4] {
+                let value = graph.get_node_attr(node, &"result".into()).unwrap();
+                assert!(
+                    matches!(value, Some(AttrValue::Float64(v)) if (v - expected).abs() < 1e-6),
+                    "{id}: {value:?}"
+                );
+                assert_eq!(value, graph.get_node_attr(node, &"copy".into()).unwrap());
+            }
+            continue;
+        }
         let expected = if id == "pathfinding.dijkstra" {
             AttrValue::Float64(2.0)
         } else {

@@ -158,4 +158,4 @@ The four classic BFS/DFS/Dijkstra/A* handles now consume pending selected topolo
 and values through a shared native AlgorithmFrame. Private read pins stay separate
 from the live continuation, and bulk endpoint reads share one authority/owner
 borrow. Later builders see staged results and the coordinator publishes once.
-Other nine classic wrappers retain their guards. See `pending-classic-paths-2026-11-15.md`.
+The three centrality wrappers now also share the pending input boundary; see `pending-classic-centrality-2026-11-15.md`. The remaining six community wrappers retain their guards. See `pending-classic-paths-2026-11-15.md`.
