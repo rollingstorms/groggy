@@ -4,6 +4,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Result};
 
 use crate::algorithms::community::modularity_levels::Level;
+use crate::algorithms::read::AlgorithmFrame;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -91,6 +92,13 @@ impl Algorithm for Louvain {
         true
     }
 
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn id(&self) -> &'static str {
         "community.louvain"
     }
@@ -100,19 +108,16 @@ impl Algorithm for Louvain {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let start_time = Instant::now();
         if ctx.is_cancelled() {
             return Err(anyhow!("community detection cancelled"));
         }
-        if subgraph.graph().borrow().is_directed() {
+        if subgraph.read_is_directed() {
             return Err(anyhow!("louvain currently requires an undirected graph"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, subgraph, None)?;
 
         let nodes = subgraph.ordered_nodes();
         let index: HashMap<_, _> = nodes
@@ -122,10 +127,9 @@ impl Algorithm for Louvain {
             .collect();
         let mut edges = Vec::new();
         {
-            let graph = subgraph.graph();
-            let graph = graph.borrow();
+            let endpoints = subgraph.endpoint_read();
             for &edge in subgraph.ordered_edges().iter() {
-                let (u, v) = graph.edge_endpoints(edge)?;
+                let (u, v) = endpoints.get(edge)?;
                 edges.push((index[&u], index[&v], 1));
             }
         }
@@ -134,7 +138,8 @@ impl Algorithm for Louvain {
         if ctx.is_cancelled() {
             return Err(anyhow!("louvain cancelled"));
         }
-        self.persist_partition(ctx, subgraph, partition, start_time)
+        self.persist_partition(ctx, subgraph, partition, start_time)?;
+        Ok(frame.finish())
     }
 }
 
@@ -206,10 +211,10 @@ impl Louvain {
     fn persist_partition(
         &self,
         ctx: &mut Context,
-        subgraph: Subgraph,
+        subgraph: &Subgraph,
         partition: HashMap<NodeId, usize>,
         start_time: Instant,
-    ) -> Result<Subgraph> {
+    ) -> Result<()> {
         if ctx.persist_results() {
             let write_start = Instant::now();
             let attr_values: Vec<(NodeId, AttrValue)> = partition
@@ -217,7 +222,7 @@ impl Louvain {
                 .map(|(&node, &community)| (node, AttrValue::Int(community as i64)))
                 .collect();
 
-            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist Louvain communities: {err}"))?;
 
             ctx.record_call("louvain.write_attributes", write_start.elapsed());
@@ -228,7 +233,7 @@ impl Louvain {
 
         ctx.record_call("louvain.total_execution", start_time.elapsed());
 
-        Ok(subgraph)
+        Ok(())
     }
 }
 

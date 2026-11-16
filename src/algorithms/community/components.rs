@@ -25,6 +25,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
+use crate::algorithms::read::AlgorithmFrame;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
@@ -510,9 +511,7 @@ impl ConnectedComponents {
         } else {
             ctx.record_call("cc.csr_cache_miss", std::time::Duration::from_nanos(0));
 
-            let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            let pool_ref = graph_ref.pool();
+            let endpoints = subgraph.endpoint_read();
 
             let mut csr = Csr::default();
             let build_start = Instant::now();
@@ -521,7 +520,7 @@ impl ConnectedComponents {
                 nodes.len(),
                 edges.iter().copied(),
                 |node_id| index_by_node.get(node_id),
-                |edge_id| pool_ref.get_edge_endpoints(edge_id),
+                |edge_id| endpoints.get(edge_id).ok(),
                 CsrOptions {
                     add_reverse_edges: add_reverse,
                     sort_neighbors: false,
@@ -531,9 +530,6 @@ impl ConnectedComponents {
             let core_build = total_build.saturating_sub(endpoint_duration);
             ctx.record_call("cc.build_csr", core_build);
             ctx.record_call("cc.collect_edge_endpoints", endpoint_duration);
-
-            drop(pool_ref);
-            drop(graph_ref);
 
             let arc = Arc::new(csr);
             subgraph.csr_cache_store(add_reverse, arc.clone());
@@ -570,13 +566,11 @@ impl ConnectedComponents {
             let mut lists: Vec<Vec<EdgeId>> = vec![Vec::new(); component_nodes.len()];
             let mut edges_processed = 0usize;
 
-            let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            let pool_ref = graph_ref.pool();
+            let endpoints = subgraph.endpoint_read();
 
             for &edge_id in edges.iter() {
                 edges_processed += 1;
-                if let Some((source, target)) = pool_ref.get_edge_endpoints(edge_id) {
+                if let Ok((source, target)) = endpoints.get(edge_id) {
                     if let (Some(src_idx), Some(tgt_idx)) =
                         (index_by_node.get(source), index_by_node.get(target))
                     {
@@ -588,9 +582,6 @@ impl ConnectedComponents {
                     }
                 }
             }
-
-            drop(pool_ref);
-            drop(graph_ref);
 
             ctx.record_call("cc.assign_edges", start.elapsed());
             ctx.record_stat("cc.count.edges_processed", edges_processed as f64);
@@ -700,7 +691,7 @@ impl ConnectedComponents {
         let edges_timer = Instant::now();
         let edges = subgraph.ordered_edges();
         ctx.record_call("cc.strong.collect_edges", edges_timer.elapsed());
-        let add_reverse = subgraph.graph().borrow().is_undirected();
+        let add_reverse = !subgraph.read_is_directed();
         let csr_arc = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
             ctx.record_call(
                 "cc.strong.csr_cache_hit",
@@ -713,9 +704,7 @@ impl ConnectedComponents {
                 std::time::Duration::from_nanos(0),
             );
 
-            let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            let pool_ref = graph_ref.pool();
+            let endpoints = subgraph.endpoint_read();
 
             let mut csr = Csr::default();
             let build_start = Instant::now();
@@ -725,7 +714,7 @@ impl ConnectedComponents {
                 nodes.len(),
                 edges.iter().copied(),
                 |node_id| index_by_node.get(node_id),
-                |edge_id| pool_ref.get_edge_endpoints(edge_id),
+                |edge_id| endpoints.get(edge_id).ok(),
                 CsrOptions {
                     add_reverse_edges: add_reverse,
                     sort_neighbors: false,
@@ -735,9 +724,6 @@ impl ConnectedComponents {
             let core_build = total_build.saturating_sub(endpoint_duration);
             ctx.record_call("cc.strong.build_csr", core_build);
             ctx.record_call("cc.strong.collect_edge_endpoints", endpoint_duration);
-
-            drop(pool_ref);
-            drop(graph_ref);
 
             let arc = Arc::new(csr);
             subgraph.csr_cache_store(add_reverse, arc.clone());
@@ -781,13 +767,11 @@ impl ConnectedComponents {
             let mut lists: Vec<Vec<EdgeId>> = vec![Vec::new(); components.len()];
             let mut edges_processed = 0usize;
 
-            let graph = subgraph.graph();
-            let graph_ref = graph.borrow();
-            let pool_ref = graph_ref.pool();
+            let endpoints = subgraph.endpoint_read();
 
             for &edge_id in edges.iter() {
                 edges_processed += 1;
-                if let Some((source, target)) = pool_ref.get_edge_endpoints(edge_id) {
+                if let Ok((source, target)) = endpoints.get(edge_id) {
                     if let (Some(src_idx), Some(tgt_idx)) =
                         (index_by_node.get(source), index_by_node.get(target))
                     {
@@ -802,8 +786,6 @@ impl ConnectedComponents {
             ctx.record_call("cc.strong.assign_edges", start.elapsed());
             ctx.record_stat("cc.count.strong_edges_processed", edges_processed as f64);
 
-            drop(pool_ref);
-            drop(graph_ref);
             Some(lists)
         } else {
             ctx.record_call(
@@ -851,6 +833,13 @@ impl Algorithm for ConnectedComponents {
         true
     }
 
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn id(&self) -> &'static str {
         "community.connected_components"
     }
@@ -860,16 +849,13 @@ impl Algorithm for ConnectedComponents {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let start_overall = Instant::now();
         if ctx.is_cancelled() {
             return Err(anyhow!("connected components cancelled"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, subgraph, None)?;
         if subgraph.node_set().len() >= u32::MAX as usize {
             return Err(anyhow!(
                 "connected components requires fewer than u32::MAX nodes"
@@ -883,9 +869,9 @@ impl Algorithm for ConnectedComponents {
         // Compute components based on mode - returns assignments and component membership
         let computation = match self.mode {
             ComponentMode::Undirected | ComponentMode::Weak => {
-                self.compute_undirected_or_weak(ctx, &subgraph, nodes_slice)?
+                self.compute_undirected_or_weak(ctx, subgraph, nodes_slice)?
             }
-            ComponentMode::Strong => self.compute_strong(ctx, &subgraph, nodes_slice)?,
+            ComponentMode::Strong => self.compute_strong(ctx, subgraph, nodes_slice)?,
         };
 
         if ctx.is_cancelled() {
@@ -907,7 +893,7 @@ impl Algorithm for ConnectedComponents {
 
             // Write results in bulk
             let start = Instant::now();
-            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)?;
+            ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values)?;
             ctx.record_call("cc.write_attributes", start.elapsed());
         } else {
             let start = Instant::now();
@@ -926,7 +912,7 @@ impl Algorithm for ConnectedComponents {
             ctx.print_profiling_report("Connected Components");
         }
 
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 

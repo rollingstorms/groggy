@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 
 use crate::algorithms::community::leiden_levels::{fast_moves, inherited_partition, refine};
 use crate::algorithms::community::modularity_levels::Level;
+use crate::algorithms::read::AlgorithmFrame;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -200,6 +201,13 @@ impl Algorithm for Leiden {
         true
     }
 
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn id(&self) -> &'static str {
         "community.leiden"
     }
@@ -209,18 +217,15 @@ impl Algorithm for Leiden {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         if ctx.is_cancelled() {
             return Err(anyhow!("community detection cancelled"));
         }
-        if subgraph.graph().borrow().is_directed() {
+        if subgraph.read_is_directed() {
             return Err(anyhow!("leiden currently requires an undirected graph"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, subgraph, None)?;
 
         let nodes = subgraph.ordered_nodes();
         let index: HashMap<_, _> = nodes
@@ -230,10 +235,9 @@ impl Algorithm for Leiden {
             .collect();
         let mut edges = Vec::new();
         {
-            let graph = subgraph.graph();
-            let graph = graph.borrow();
+            let endpoints = subgraph.endpoint_read();
             for &edge in subgraph.ordered_edges().iter() {
-                let (u, v) = graph.edge_endpoints(edge)?;
+                let (u, v) = endpoints.get(edge)?;
                 edges.push((index[&u], index[&v], 1));
             }
         }
@@ -249,13 +253,13 @@ impl Algorithm for Leiden {
             {
                 let started = std::time::Instant::now();
                 let result =
-                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                    ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values);
                 ctx.record_call("community.leiden.write_attrs", started.elapsed());
                 result
             }?;
         }
 
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 

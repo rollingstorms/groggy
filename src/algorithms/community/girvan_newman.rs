@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use crate::algorithms::community::girvan_newman_paths::{Edge, Topology};
 use crate::algorithms::community::modularity::ModularityData;
 use crate::algorithms::pathfinding::utils::checked_dijkstra_weights;
+use crate::algorithms::read::AlgorithmFrame;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata, ParameterType,
@@ -210,7 +211,7 @@ impl GirvanNewman {
             return Err(anyhow!("Girvan-Newman cancelled"));
         }
         let threshold = self.checked_threshold()?;
-        if subgraph.graph().borrow().is_directed() {
+        if subgraph.read_is_directed() {
             return Err(anyhow!(
                 "Girvan-Newman currently requires an undirected graph"
             ));
@@ -230,10 +231,9 @@ impl GirvanNewman {
         let mut edges = Vec::new();
         let mut original_edges = Vec::new();
         {
-            let graph = subgraph.graph();
-            let graph = graph.borrow();
+            let endpoints = subgraph.endpoint_read();
             for &id in subgraph.ordered_edges().iter() {
-                let (u, v) = graph.edge_endpoints(id)?;
+                let (u, v) = endpoints.get(id)?;
                 let value = self
                     .weight_attr
                     .as_ref()
@@ -260,6 +260,13 @@ impl Algorithm for GirvanNewman {
         true
     }
 
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn id(&self) -> &'static str {
         "community.girvan_newman"
     }
@@ -269,14 +276,11 @@ impl Algorithm for GirvanNewman {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let t0 = Instant::now();
 
-        let communities = self.compute(ctx, &subgraph)?;
+        let communities = self.compute(ctx, subgraph)?;
 
         if ctx.persist_results() {
             let attr_values: Vec<(NodeId, AttrValue)> = communities
@@ -287,7 +291,7 @@ impl Algorithm for GirvanNewman {
             {
                 let started = Instant::now();
                 let result =
-                    ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values);
+                    ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values);
                 ctx.record_call("girvan_newman.write_attributes", started.elapsed());
                 result
             }
@@ -295,7 +299,7 @@ impl Algorithm for GirvanNewman {
         }
 
         ctx.record_duration("girvan_newman.total_execution", t0.elapsed());
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 

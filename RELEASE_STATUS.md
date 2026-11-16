@@ -34,6 +34,10 @@ and [classic path evidence](notes/planning/pending-classic-paths-2026-11-15.md).
 The subsequent three-wrapper centrality slice passes 1,604 native tests, strict
 Clippy, 3,131 maintained Python tests and 284 docs examples against the rebuilt
 in-tree release extension; see [centrality evidence](notes/planning/pending-classic-centrality-2026-11-15.md).
+The subsequent six-wrapper community slice passes 1,604 native tests, strict
+Clippy, 3,183 maintained Python tests and 285 docs examples against the rebuilt
+in-tree release extension; see [community evidence](notes/planning/pending-classic-communities-2026-11-16.md).
+All thirteen classic wrappers now share the pending input boundary.
 The artifact receipts below retain their separately qualified source versions.
 The latest Python/docs gate runs against a fresh unpacked macOS arm64 CPython 3.9
 root wheel. The [priority pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)

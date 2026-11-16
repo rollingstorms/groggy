@@ -51,7 +51,7 @@ later pipeline operations. Frozen input direction and endpoints are authoritativ
 ordinary live/property-only calls retain their live path and CSR cache behavior.
 Errors discard the whole atomic run. Earlier immutable views remain unchanged.
 
-The six community wrappers remain guarded against pending topology until their
-separate adaptation and qualification. General topology-mutating loops and
+The [six community wrappers](pending-classic-communities.md) also share the
+pending input boundary. General topology-mutating loops and
 alternate lowering remain open. This slice does not close broader checklist rows
 or establish a new performance/scale guarantee.

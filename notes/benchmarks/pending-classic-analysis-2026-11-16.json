@@ -1,0 +1,545 @@
+{
+  "cases": [
+    {
+      "algorithm": "centrality.pagerank",
+      "chain_edges": 100,
+      "checksums": [
+        1.0000000000000002,
+        1.0,
+        0.9999999999999999
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.00041375,
+        0.000237083,
+        0.000240375
+      ]
+    },
+    {
+      "algorithm": "centrality.closeness",
+      "chain_edges": 100,
+      "checksums": [
+        423.92512928160164,
+        423.92512928160164,
+        423.9251292816016
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.000785459,
+        0.00083325,
+        0.000789417
+      ]
+    },
+    {
+      "algorithm": "centrality.betweenness",
+      "chain_edges": 100,
+      "checksums": [
+        33.66666666666665,
+        33.666666666666664,
+        33.66666666666667
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.000936625,
+        0.001058083,
+        0.000997042
+      ]
+    },
+    {
+      "algorithm": "community.lpa",
+      "chain_edges": 100,
+      "checksums": [
+        4948.0,
+        4948.0,
+        4948.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.000319958,
+        0.000258125,
+        0.000263375
+      ]
+    },
+    {
+      "algorithm": "community.infomap",
+      "chain_edges": 100,
+      "checksums": [
+        2184.0,
+        2184.0,
+        2184.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.003584791,
+        0.003739458,
+        0.003740334
+      ]
+    },
+    {
+      "algorithm": "community.connected_components",
+      "chain_edges": 100,
+      "checksums": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.000303875,
+        0.000270625,
+        0.000256084
+      ]
+    },
+    {
+      "algorithm": "community.louvain",
+      "chain_edges": 100,
+      "checksums": [
+        579.0,
+        579.0,
+        579.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.000310875,
+        0.000322333,
+        0.000327875
+      ]
+    },
+    {
+      "algorithm": "community.leiden",
+      "chain_edges": 100,
+      "checksums": [
+        489.0,
+        489.0,
+        489.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.000341125,
+        0.000340583,
+        0.000321209
+      ]
+    },
+    {
+      "algorithm": "community.girvan_newman",
+      "chain_edges": 100,
+      "checksums": [
+        51.0,
+        51.0,
+        51.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.000494291,
+        0.000473959,
+        0.000448042
+      ]
+    },
+    {
+      "algorithm": "centrality.pagerank",
+      "chain_edges": 100,
+      "checksums": [
+        1.0000000000000002,
+        1.0000000000000004,
+        1.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.00097975,
+        0.000503125,
+        0.000488125
+      ]
+    },
+    {
+      "algorithm": "centrality.closeness",
+      "chain_edges": 100,
+      "checksums": [
+        456.93855235273867,
+        456.9385523527386,
+        456.93855235273844
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.001031041,
+        0.000966625,
+        0.001007125
+      ]
+    },
+    {
+      "algorithm": "centrality.betweenness",
+      "chain_edges": 100,
+      "checksums": [
+        24.757575757575754,
+        24.757575757575765,
+        24.757575757575758
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.001187291,
+        0.001181334,
+        0.001251042
+      ]
+    },
+    {
+      "algorithm": "community.lpa",
+      "chain_edges": 100,
+      "checksums": [
+        4559.0,
+        4559.0,
+        4559.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.000512708,
+        0.000511125,
+        0.000493334
+      ]
+    },
+    {
+      "algorithm": "community.infomap",
+      "chain_edges": 100,
+      "checksums": [
+        2267.0,
+        2267.0,
+        2267.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.004296625,
+        0.004076209,
+        0.003955083
+      ]
+    },
+    {
+      "algorithm": "community.connected_components",
+      "chain_edges": 100,
+      "checksums": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.000435167,
+        0.000439,
+        0.000415833
+      ]
+    },
+    {
+      "algorithm": "community.louvain",
+      "chain_edges": 100,
+      "checksums": [
+        532.0,
+        532.0,
+        532.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.000477208,
+        0.000482167,
+        0.000461541
+      ]
+    },
+    {
+      "algorithm": "community.leiden",
+      "chain_edges": 100,
+      "checksums": [
+        484.0,
+        484.0,
+        484.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.000523709,
+        0.000505334,
+        0.000542042
+      ]
+    },
+    {
+      "algorithm": "community.girvan_newman",
+      "chain_edges": 100,
+      "checksums": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.000617917,
+        0.000614708,
+        0.000614667
+      ]
+    },
+    {
+      "algorithm": "centrality.pagerank",
+      "chain_edges": 1000,
+      "checksums": [
+        0.9999999999999929,
+        0.9999999999999927,
+        0.9999999999999928
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.002598041,
+        0.002488042,
+        0.002485875
+      ]
+    },
+    {
+      "algorithm": "centrality.closeness",
+      "chain_edges": 1000,
+      "checksums": [
+        6492.956331410901,
+        6492.956331410892,
+        6492.956331410899
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.051744125,
+        0.056722958,
+        0.053244166
+      ]
+    },
+    {
+      "algorithm": "centrality.betweenness",
+      "chain_edges": 1000,
+      "checksums": [
+        333.6666666666665,
+        333.6666666666667,
+        333.66666666666663
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.076974417,
+        0.063059125,
+        0.068878458
+      ]
+    },
+    {
+      "algorithm": "community.lpa",
+      "chain_edges": 1000,
+      "checksums": [
+        499496.0,
+        499496.0,
+        499496.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.003405458,
+        0.002605125,
+        0.002676458
+      ]
+    },
+    {
+      "algorithm": "community.infomap",
+      "chain_edges": 1000,
+      "checksums": [
+        222890.0,
+        222890.0,
+        222890.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.264502167,
+        0.26723675,
+        0.267132208
+      ]
+    },
+    {
+      "algorithm": "community.connected_components",
+      "chain_edges": 1000,
+      "checksums": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.002881958,
+        0.00301025,
+        0.002934
+      ]
+    },
+    {
+      "algorithm": "community.louvain",
+      "chain_edges": 1000,
+      "checksums": [
+        14812.0,
+        14812.0,
+        14812.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.003519333,
+        0.003498583,
+        0.003548083
+      ]
+    },
+    {
+      "algorithm": "community.leiden",
+      "chain_edges": 1000,
+      "checksums": [
+        15450.0,
+        15450.0,
+        15450.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.004003625,
+        0.003576083,
+        0.003494625
+      ]
+    },
+    {
+      "algorithm": "community.girvan_newman",
+      "chain_edges": 1000,
+      "checksums": [
+        501.0,
+        501.0,
+        501.0
+      ],
+      "pending_topology": false,
+      "seconds": [
+        0.020689375,
+        0.021957125,
+        0.023414583
+      ]
+    },
+    {
+      "algorithm": "centrality.pagerank",
+      "chain_edges": 1000,
+      "checksums": [
+        0.9999999999999929,
+        0.9999999999999928,
+        0.999999999999993
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.005731,
+        0.005087208,
+        0.004793542
+      ]
+    },
+    {
+      "algorithm": "centrality.closeness",
+      "chain_edges": 1000,
+      "checksums": [
+        6804.411072858491,
+        6804.411072858479,
+        6804.4110728584865
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.054419708,
+        0.053509542,
+        0.049476958
+      ]
+    },
+    {
+      "algorithm": "centrality.betweenness",
+      "chain_edges": 1000,
+      "checksums": [
+        249.75075075075065,
+        249.75075075075077,
+        249.75075075075102
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.067675209,
+        0.061023709,
+        0.068912417
+      ]
+    },
+    {
+      "algorithm": "community.lpa",
+      "chain_edges": 1000,
+      "checksums": [
+        496501.0,
+        496501.0,
+        496501.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.004780625,
+        0.004737917,
+        0.004735917
+      ]
+    },
+    {
+      "algorithm": "community.infomap",
+      "chain_edges": 1000,
+      "checksums": [
+        222366.0,
+        222366.0,
+        222366.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.287805625,
+        0.281201458,
+        0.2842605
+      ]
+    },
+    {
+      "algorithm": "community.connected_components",
+      "chain_edges": 1000,
+      "checksums": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.005713708,
+        0.006343417,
+        0.005517167
+      ]
+    },
+    {
+      "algorithm": "community.louvain",
+      "chain_edges": 1000,
+      "checksums": [
+        14880.0,
+        14880.0,
+        14880.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.005588167,
+        0.005480166,
+        0.005298166
+      ]
+    },
+    {
+      "algorithm": "community.leiden",
+      "chain_edges": 1000,
+      "checksums": [
+        16657.0,
+        16657.0,
+        16657.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.005740292,
+        0.005519333,
+        0.006204083
+      ]
+    },
+    {
+      "algorithm": "community.girvan_newman",
+      "chain_edges": 1000,
+      "checksums": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pending_topology": true,
+      "seconds": [
+        0.01999925,
+        0.019966,
+        0.022013833
+      ]
+    }
+  ],
+  "scope": "Native release; three observations per case. Undirected chain with count+1 nodes, staged weight=2, one classic centrality/community handle, one publication. Pending cases replace the last node with a provisional neighbor of 0 and revise the last edge into a ring. Property-only cases retain the chain: different graph shapes, not a matched before/after comparison. max_iter=10, seed=7, Infomap num_trials=2, Girvan-Newman num_levels=1; other defaults retained. Includes preflight, preparation, computation and publication; excludes fixture/capture/build/assertions. Finite output checksums are diagnostics, not correctness references. No allocation/RSS/FFI or general scale guarantee."
+}

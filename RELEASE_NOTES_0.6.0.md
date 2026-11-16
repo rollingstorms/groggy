@@ -25,6 +25,8 @@ Implemented capabilities, within their documented boundaries:
   values through shared native read frames, preserving one outer acceptance.
 - Classic PageRank, closeness and betweenness also share the pending input
   boundary, including staged weights/personalization and directed closeness.
+- All six classic community wrappers now use the same selected pending boundary,
+  preserving component modes, seeded labels and existing graph-type restrictions.
 - Selected retained lifecycle/window helpers now follow surviving pending IDs
   after topology changes; provisional IDs remain guarded against invented history.
 - Accepted snapshot acquisition and node/edge retained diffs now compose after

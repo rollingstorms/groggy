@@ -4,6 +4,7 @@ use super::map_equation::Walk;
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
+use crate::algorithms::read::AlgorithmFrame;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata, ParameterType,
@@ -151,6 +152,13 @@ impl Algorithm for Infomap {
         true
     }
 
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn id(&self) -> &'static str {
         "community.infomap"
     }
@@ -160,26 +168,22 @@ impl Algorithm for Infomap {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let t0 = Instant::now();
 
         if ctx.is_cancelled() {
             return Err(anyhow!("Infomap cancelled"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, subgraph, None)?;
         let nodes = subgraph.ordered_nodes();
         let index: HashMap<_, _> = nodes.iter().enumerate().map(|(i, &n)| (n, i)).collect();
         let mut edges = Vec::new();
-        let directed = subgraph.graph().borrow().is_directed();
+        let directed = subgraph.read_is_directed();
         {
-            let graph = subgraph.graph();
-            let graph = graph.borrow();
+            let endpoints = subgraph.endpoint_read();
             for &edge in subgraph.ordered_edges().iter() {
-                let (u, v) = graph.edge_endpoints(edge)?;
+                let (u, v) = endpoints.get(edge)?;
                 edges.push((index[&u], index[&v]));
             }
         }
@@ -194,14 +198,14 @@ impl Algorithm for Infomap {
                 .map(|(idx, &node)| (node, AttrValue::Int(partition[idx] as i64)))
                 .collect();
 
-            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist communities: {err}"))?;
 
             ctx.record_call("infomap.write_attributes", write_start.elapsed());
         }
 
         ctx.record_call("infomap.total_execution", t0.elapsed());
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 

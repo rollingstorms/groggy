@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--classic-pending-analysis") {
+        return classic_pending_analysis_receipt();
+    }
     if std::env::args().any(|arg| arg == "--classic-pending-paths") {
         return classic_pending_paths_receipt();
     }
@@ -1023,5 +1026,105 @@ fn classic_pending_paths_receipt() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
     println!("Wrote classic path receipt to {path}");
+    Ok(())
+}
+
+fn classic_pending_analysis_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    use groggy::algorithms::pipeline::PipelineBuilder;
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    groggy::algorithms::centrality::register_algorithms(&registry)?;
+    groggy::algorithms::community::register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [100, 1_000] {
+        for topology in [false, true] {
+            for id in [
+                "centrality.pagerank",
+                "centrality.closeness",
+                "centrality.betweenness",
+                "community.lpa",
+                "community.infomap",
+                "community.connected_components",
+                "community.louvain",
+                "community.leiden",
+                "community.girvan_newman",
+            ] {
+                let mut samples = Vec::new();
+                let mut checksums = Vec::new();
+                for _ in 0..3 {
+                    let mut graph = Graph::new();
+                    graph.add_nodes(count + 1)?;
+                    graph
+                        .add_edges(&(0..count).map(|node| (node, node + 1)).collect::<Vec<_>>())?;
+                    let head = graph.current_state_id();
+                    let mut steps = Vec::new();
+                    if topology {
+                        steps.extend([
+                            json!({"id":"graph.add_nodes","params":{"count":1,"output":"new"}}),
+                            json!({"id":"graph.add_edges","params":{"edges":[[0,{"added":0}]],"output":"edge"}}),
+                            json!({"id":"graph.set_edge_endpoints","params":{"revisions":[[count-1,count-1,0]]}}),
+                            json!({"id":"graph.remove_nodes","params":{"ids":[count]}}),
+                        ]);
+                    }
+                    steps.extend([
+                        json!({"id":"core.init_edges","params":{"value":2,"target":"weights"}}),
+                        json!({"id":"core.attach_edge_attr","params":{"source":"weights","attr":"weight"}}),
+                    ]);
+                    let pipeline = PipelineBuilder::new()
+                        .with_algorithm("builder.step_pipeline", |p| {
+                            p.set_text("steps", json!({"atomic":true,"steps":steps}).to_string());
+                        })
+                        .with_algorithm(id, |p| {
+                            p.set_text("output_attr", "result");
+                            p.set_text("weight_attr", "weight");
+                            p.set_int("seed", 7);
+                            p.set_int("max_iter", 10);
+                            p.set_int("num_trials", 2);
+                            p.set_int("num_levels", 1);
+                        })
+                        .build(&registry)?;
+                    let owner = Arc::new(OwnerCell::new(graph));
+                    let selected = Subgraph::from_frozen_view(
+                        owner.clone(),
+                        owner.borrow().read_view()?,
+                        "analysis receipt".into(),
+                    );
+                    let mut ctx = Context::new();
+                    let started = Instant::now();
+                    let result = pipeline.run_atomic_properties(&mut ctx, selected)?;
+                    samples.push(started.elapsed().as_secs_f64());
+                    assert_eq!(owner.borrow().current_state_id(), head + 1);
+                    assert_eq!(result.node_count(), count + 1);
+                    let graph = owner.borrow();
+                    let mut checksum = 0.0;
+                    for node in result.nodes() {
+                        let value = match graph.get_node_attr(*node, &"result".into())? {
+                            Some(AttrValue::Float64(v)) => v,
+                            Some(AttrValue::Int(v)) => v as f64,
+                            Some(AttrValue::SmallInt(v)) => v as f64,
+                            other => {
+                                return Err(format!("{id}: missing/invalid output {other:?}").into())
+                            }
+                        };
+                        assert!(value.is_finite());
+                        checksum += value;
+                    }
+                    assert!(checksum.is_finite());
+                    checksums.push(checksum);
+                }
+                cases.push(json!({"chain_edges":count,"pending_topology":topology,"algorithm":id,"seconds":samples,"checksums":checksums}));
+            }
+        }
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "classic_pending_analysis.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Native release; three observations per case. Undirected chain with count+1 nodes, staged weight=2, one classic centrality/community handle, one publication. Pending cases replace the last node with a provisional neighbor of 0 and revise the last edge into a ring. Property-only cases retain the chain: different graph shapes, not a matched before/after comparison. max_iter=10, seed=7, Infomap num_trials=2, Girvan-Newman num_levels=1; other defaults retained. Includes preflight, preparation, computation and publication; excludes fixture/capture/build/assertions. Finite output checksums are diagnostics, not correctness references. No allocation/RSS/FFI or general scale guarantee.",
+            "cases": cases,
+        }))?,
+    )?;
+    println!("Wrote classic analysis receipt to {path}");
     Ok(())
 }

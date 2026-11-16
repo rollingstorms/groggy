@@ -4,6 +4,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
+use crate::algorithms::read::AlgorithmFrame;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
@@ -364,6 +365,13 @@ impl Algorithm for LabelPropagation {
         true
     }
 
+    fn atomic_mutation_effects(&self) -> Option<crate::algorithms::AtomicMutationEffects> {
+        Some(crate::algorithms::AtomicMutationEffects {
+            accepts_staged_topology: true,
+            ..Default::default()
+        })
+    }
+
     fn id(&self) -> &'static str {
         "community.lpa"
     }
@@ -373,16 +381,13 @@ impl Algorithm for LabelPropagation {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let subgraph = if subgraph.frozen_view().is_some() {
-            subgraph.execution_scope(ctx.persist_results())?
-        } else {
-            subgraph
-        };
+        let frame = AlgorithmFrame::new(ctx, subgraph)?;
+        let subgraph = frame.scope();
         let start_time = Instant::now();
         if ctx.is_cancelled() {
             return Err(anyhow!("label propagation cancelled"));
         }
-        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, &subgraph, None)?;
+        crate::algorithms::pathfinding::utils::checked_dijkstra_weights(ctx, subgraph, None)?;
 
         // === PHASE 1: Collect Nodes ===
         let collect_start = Instant::now();
@@ -397,7 +402,7 @@ impl Algorithm for LabelPropagation {
                     AlgorithmOutput::Components(Vec::new()),
                 );
             }
-            return Ok(subgraph);
+            return Ok(frame.finish());
         }
 
         // === PHASE 2: Build Indexer ===
@@ -412,7 +417,7 @@ impl Algorithm for LabelPropagation {
         ctx.record_stat("lpa.count.input_edges", edges.len() as f64);
 
         // === PHASE 4: Build or Get CSR ===
-        let is_directed = subgraph.graph().borrow().is_directed();
+        let is_directed = subgraph.read_is_directed();
         let add_reverse = !is_directed; // LPA needs bidirectional for undirected graphs
 
         let csr = match subgraph.csr_cache_get(add_reverse) {
@@ -423,9 +428,7 @@ impl Algorithm for LabelPropagation {
             None => {
                 let cache_miss_start = Instant::now();
 
-                let graph = subgraph.graph();
-                let graph_ref = graph.borrow();
-                let pool_ref = graph_ref.pool();
+                let endpoints = subgraph.endpoint_read();
 
                 let mut csr = Csr::default();
                 let build_start = Instant::now();
@@ -434,7 +437,7 @@ impl Algorithm for LabelPropagation {
                     nodes.len(),
                     edges.iter().copied(),
                     |nid| indexer.get(nid),
-                    |eid| pool_ref.get_edge_endpoints(eid),
+                    |eid| endpoints.get(eid).ok(),
                     CsrOptions {
                         add_reverse_edges: add_reverse,
                         sort_neighbors: false,
@@ -458,7 +461,7 @@ impl Algorithm for LabelPropagation {
 
         // === PHASE 5: Initialize Labels ===
         let init_start = Instant::now();
-        let state = self.initialise_labels(ctx, &nodes, &subgraph)?;
+        let state = self.initialise_labels(ctx, &nodes, subgraph)?;
         ctx.record_call("lpa.initialize_labels", init_start.elapsed());
 
         // === PHASE 6: Run Iterations ===
@@ -473,7 +476,7 @@ impl Algorithm for LabelPropagation {
         if ctx.persist_results() {
             let write_start = Instant::now();
             let attr_values = state.into_pairs();
-            ctx.attach_node_column(&subgraph, self.output_attr.clone(), attr_values)
+            ctx.attach_node_column(subgraph, self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist labels: {err}"))?;
             ctx.record_call("lpa.write_attributes", write_start.elapsed());
         } else {
@@ -493,7 +496,7 @@ impl Algorithm for LabelPropagation {
 
         ctx.record_call("lpa.total_execution", start_time.elapsed());
 
-        Ok(subgraph)
+        Ok(frame.finish())
     }
 }
 
