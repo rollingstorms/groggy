@@ -1,6 +1,8 @@
 # Next execution slice: durable pipeline preparation boundary
 
-Design/context only, 2026-11-16. Existing scope: 09.4b.2, 30.1, AR3/AR7.8 and the
+Context, 2026-11-16. The first extraction below is now implemented; see
+[owned pipeline effects](owned-pipeline-effects-2026-11-16.md). Durable dispatch
+and its read adapter remain open. Existing scope: 09.4b.2, 30.1, AR3/AR7.8 and the
 persistence boundary. This does not add a checklist row or claim implementation.
 
 ## Current source boundaries
@@ -22,7 +24,7 @@ persistence boundary. This does not add a checklist row or claim implementation.
 - `python-groggy/src/ffi/api/durable.rs` marshals native batch/view operations.
   It is not the place for an algorithm executor or an alternate mutation policy.
 
-## Small first implementation step
+## Completed first implementation step
 
 Extract the existing owned PropertyBatch-to-GraphBatch conversion from backend
 acceptance. An internal prepared-effects value should retain:

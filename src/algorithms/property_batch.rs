@@ -11,6 +11,8 @@ use anyhow::{anyhow, Result};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
+mod prepared;
+
 type TopologyStamp = (usize, usize, usize, usize, usize);
 #[derive(Debug)]
 struct PendingTopology {
@@ -710,105 +712,14 @@ impl PropertyBatch {
         Ok(ids)
     }
 
-    /// Accept and project once at the owning execution boundary. Provisional
-    /// IDs never pass through live-owner filtering before acceptance.
+    /// Prepare owned effects, then accept and project once at the owning boundary.
     pub(crate) fn accept_selection(self, subgraph: Subgraph) -> GraphResult<Subgraph> {
-        let topology = self.has_topology();
-        let additions = self.added_ids();
-        let binding = subgraph.graph();
-        self.accept(&mut binding.borrow_mut())?;
-        if !topology {
-            return Ok(subgraph);
-        }
-        let graph = binding.borrow();
-        let nodes = subgraph
-            .nodes()
-            .iter()
-            .copied()
-            .chain(additions.0)
-            .filter(|id| graph.has_node(*id))
-            .collect();
-        let edges = subgraph
-            .edges()
-            .iter()
-            .copied()
-            .chain(additions.1)
-            .filter(|id| graph.has_edge(*id))
-            .collect();
-        drop(graph);
-        Ok(Subgraph::new(
-            binding,
-            nodes,
-            edges,
-            subgraph.subgraph_type().into(),
-        ))
+        self.prepare().accept_selection(subgraph)
     }
 
-    pub fn accept(self, graph: &mut Graph) -> GraphResult<()> {
-        graph.validate_write_coordinate(&self.coordinate)?;
-        if self.add_nodes == 0
-            && self.add_edges.is_empty()
-            && self.nodes.is_empty()
-            && self.edges.is_empty()
-            && self.remove_nodes.is_empty()
-            && self.remove_edges.is_empty()
-            && self.edge_endpoints.is_empty()
-        {
-            return Ok(());
-        }
-        let mut change_times = self.change_times;
-        change_times.extend(
-            self.property_times
-                .into_iter()
-                .map(|((node, id, name), at)| {
-                    let target = if node {
-                        BatchChangeRef::NodeAttribute(BatchNodeRef::Existing(id), name)
-                    } else {
-                        BatchChangeRef::EdgeAttribute(BatchEdgeRef::Existing(id), name)
-                    };
-                    (target, at)
-                }),
-        );
-        let batch = GraphBatch {
-            add_nodes: self.add_nodes,
-            add_edges: self.add_edges,
-            remove_nodes: self.remove_nodes,
-            remove_edges: self.remove_edges,
-            change_times,
-            edge_endpoints: self.edge_endpoints,
-            node_attrs: self
-                .nodes
-                .into_iter()
-                .map(|(name, rows)| {
-                    (
-                        name,
-                        rows.into_iter()
-                            .map(|(id, value)| (BatchNodeRef::Existing(id), value))
-                            .collect(),
-                    )
-                })
-                .collect(),
-            edge_attrs: self
-                .edges
-                .into_iter()
-                .map(|(name, rows)| {
-                    (
-                        name,
-                        rows.into_iter()
-                            .map(|(id, value)| (BatchEdgeRef::Existing(id), value))
-                            .collect(),
-                    )
-                })
-                .collect(),
-            ..Default::default()
-        };
-        graph.apply_batch(
-            batch,
-            self.coordinate.state_id(),
-            "atomic builder effects".into(),
-            "groggy".into(),
-        )?;
-        Ok(())
+    #[cfg(test)]
+    pub(crate) fn accept(self, graph: &mut Graph) -> GraphResult<()> {
+        self.prepare().accept(graph).map(|_| ())
     }
 }
 
