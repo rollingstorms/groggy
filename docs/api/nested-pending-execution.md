@@ -44,7 +44,7 @@ attachments. Capture/attachment bodies require a local `atomic=True` builder and
 and output scope. They do not publish a delta per iteration.
 
 Body capabilities are checked recursively before a prefix executes. General
-topology mutations inside loops, streaming blocks, alternate batch plans and
+topology mutations inside fixed child frames, streaming blocks, alternate batch plans and
 opaque callbacks remain uncertified. Legacy owner-based property readers remain
 restricted to execution before pending topology. A mixed body cannot silently
 upgrade an unadapted descendant's read contract.
@@ -87,3 +87,6 @@ pending graph mutation and restore outputs. Cancellation is checked before and
 after each executed child. Snapshot-copy cancellation remains bounded by the
 existing materialization implementation. See [pending properties](pending-topology-properties.md)
 and [table attachment](captured-table-attachment.md) for clocks and provenance.
+
+[Sequential root topology loops](root-topology-loops.md) also share this executor
+and pending batch; global added references and duplicate validation are explicit.

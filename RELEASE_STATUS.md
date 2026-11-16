@@ -37,7 +37,9 @@ in-tree release extension; see [centrality evidence](notes/planning/pending-clas
 The subsequent six-wrapper community slice passes 1,604 native tests, strict
 Clippy, 3,183 maintained Python tests and 285 docs examples against the rebuilt
 in-tree release extension; see [community evidence](notes/planning/pending-classic-communities-2026-11-16.md).
-All thirteen classic wrappers now share the pending input boundary.
+All thirteen classic wrappers now share the pending input boundary. The next
+root topology-loop slice passes 1,608 native tests, strict Clippy, 3,218 maintained
+Python tests and 286 docs examples; see [root loop evidence](notes/planning/root-topology-loops-2026-11-16.md).
 The artifact receipts below retain their separately qualified source versions.
 The latest Python/docs gate runs against a fresh unpacked macOS arm64 CPython 3.9
 root wheel. The [priority pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)

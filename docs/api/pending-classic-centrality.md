@@ -52,6 +52,6 @@ ordinary live/property-only calls retain their live path and CSR cache behavior.
 Errors discard the whole atomic run. Earlier immutable views remain unchanged.
 
 The [six community wrappers](pending-classic-communities.md) also share the
-pending input boundary. General topology-mutating loops and
-alternate lowering remain open. This slice does not close broader checklist rows
+pending input boundary. [Sequential root topology loops](root-topology-loops.md) are supported; fixed
+child topology and alternate lowering remain open. This slice does not close broader checklist rows
 or establish a new performance/scale guarantee.

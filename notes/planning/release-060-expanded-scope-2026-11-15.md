@@ -159,3 +159,11 @@ and values through a shared native AlgorithmFrame. Private read pins stay separa
 from the live continuation, and bulk endpoint reads share one authority/owner
 borrow. Later builders see staged results and the coordinator publishes once.
 The three centrality wrappers now also share the pending input boundary; see `pending-classic-centrality-2026-11-15.md`. The remaining six community wrappers are now adapted as well; see `pending-classic-communities-2026-11-16.md`. All thirteen classic wrappers share pending input and one acceptance; broader execution/lowering requirements remain open. See `pending-classic-paths-2026-11-15.md`.
+
+### Implemented follow-up: sequential root topology loops
+
+Certified root and nested root loops now stage topology and refreshed properties
+through the shared executor/batch, preserving global allocation positions and one
+publication. Fixed child topology and alternate plans remain guarded. See
+`root-topology-loops-2026-11-16.md`, including the discovered direct attachment
+timestamp gap and its follow-up scope.

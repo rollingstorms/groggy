@@ -58,8 +58,9 @@ become an accepted write source. Ordinary live/property-only calls retain their
 existing execution and cache path.
 
 Together with the path and centrality families, all thirteen classic wrappers now
-share pending selected input semantics. Unsupported custom effects, general
-creation/removal loops and alternate batch-plan lowering remain guarded. Retained
+share pending selected input semantics. [Sequential root topology loops](root-topology-loops.md) are supported.
+Unsupported custom effects, fixed child topology and alternate batch-plan lowering
+remain guarded. Retained
 lifecycle queries for provisional nodes remain a separate pending policy question.
 No new storage schema, automatic index lifecycle or general scale guarantee is
 introduced by this adaptation.

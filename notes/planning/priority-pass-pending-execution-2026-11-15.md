@@ -34,7 +34,8 @@ Small property-only cache allocation costs and wide-frame copying remain explici
    pending input/continuation boundary. Continue general execution/lowering work.
 2. Resolve staged-node retained lifecycle: empty accepted history until publication
    versus explicit rejection. The owner question is pending; rejection is preserved.
-3. General topology-mutating loops still need creation/removal/reference semantics;
+3. Sequential root topology loops are complete in `root-topology-loops-2026-11-16.md`.
+   Fixed child/provisional topology still needs creation/removal/reference semantics;
    alternate batch plans/DSL lowering remain guarded. Literal added references
    currently address global batch allocation positions, not the latest iteration.
 4. Retained window/index construction and wide property captures retain measured

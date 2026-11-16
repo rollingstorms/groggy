@@ -1,5 +1,5 @@
 use super::super::{AlgorithmParamValue, Context};
-use super::core::{nested_effect, AtomicStepEffect, Step, StepExecutor, StepRegistry, StepScope};
+use super::core::{loop_effect, AtomicStepEffect, Step, StepExecutor, StepRegistry, StepScope};
 use crate::algorithms::execution::{BatchExecutor, BatchPlan};
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
@@ -190,7 +190,7 @@ impl Step for LoopStep {
             return AtomicStepEffect::Unsupported;
         }
         self.body_steps()
-            .map_or(AtomicStepEffect::Unsupported, |steps| nested_effect(steps))
+            .map_or(AtomicStepEffect::Unsupported, |steps| loop_effect(steps))
     }
 
     fn supports_atomic_properties(&self) -> bool {
@@ -261,7 +261,7 @@ impl Step for LoopStep {
         }
 
         // Each nested frame refreshes reads after staged writes while sharing
-        // variables and the owning batch. Topology mutations remain uncertified.
+        // variables and the owning batch. Certified root topology uses this same path.
         let base = scope.subgraph().clone();
         let mut executor = StepExecutor::for_frame(&base, scope.fixed_selection());
         for iteration in 0..self.iterations {

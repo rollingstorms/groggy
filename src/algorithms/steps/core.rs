@@ -38,17 +38,32 @@ pub enum AtomicStepEffect {
     Topology,
 }
 
-/// Conservative composition for read/property loop bodies. General topology
-/// mutations and alternate execution plans need their own execution contract.
+/// Conservative composition for fixed child frames: topology stays outside them.
 pub(crate) fn nested_effect(steps: &[Box<dyn Step>]) -> AtomicStepEffect {
+    composed_effect(steps, false)
+}
+
+/// Root sequential loops may stage topology when every repeated read is pending-safe.
+pub(crate) fn loop_effect(steps: &[Box<dyn Step>]) -> AtomicStepEffect {
+    composed_effect(steps, true)
+}
+
+fn composed_effect(steps: &[Box<dyn Step>], topology: bool) -> AtomicStepEffect {
     let mut result = AtomicStepEffect::ImmutableInputs;
     for step in steps {
         match step.atomic_effect() {
-            AtomicStepEffect::Unsupported | AtomicStepEffect::Topology => {
-                return AtomicStepEffect::Unsupported
+            AtomicStepEffect::Unsupported => return AtomicStepEffect::Unsupported,
+            AtomicStepEffect::Topology => {
+                if !topology || result == AtomicStepEffect::Properties {
+                    return AtomicStepEffect::Unsupported;
+                }
+                result = AtomicStepEffect::Topology;
             }
             AtomicStepEffect::Properties => {
-                if result == AtomicStepEffect::StagedProperties {
+                if matches!(
+                    result,
+                    AtomicStepEffect::StagedProperties | AtomicStepEffect::Topology
+                ) {
                     return AtomicStepEffect::Unsupported;
                 }
                 result = AtomicStepEffect::Properties;
@@ -57,7 +72,9 @@ pub(crate) fn nested_effect(steps: &[Box<dyn Step>]) -> AtomicStepEffect {
                 if result == AtomicStepEffect::Properties {
                     return AtomicStepEffect::Unsupported;
                 }
-                result = AtomicStepEffect::StagedProperties;
+                if result != AtomicStepEffect::Topology {
+                    result = AtomicStepEffect::StagedProperties;
+                }
             }
             AtomicStepEffect::PendingSelections => {
                 if matches!(

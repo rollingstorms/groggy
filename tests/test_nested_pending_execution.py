@@ -106,13 +106,11 @@ def test_message_passing_uses_pending_endpoints_for_both_visibility_modes(ordere
 
 
 @pytest.mark.parametrize("iterations", [0, 2])
-@pytest.mark.parametrize("unsupported", ["topology", "legacy", "streaming", "batch_plan"])
+@pytest.mark.parametrize("unsupported", ["legacy", "streaming", "batch_plan"])
 def test_unsupported_nested_effects_reject_before_any_prefix(iterations, unsupported):
     graph = fixture()
     head = graph.current_state_id
-    if unsupported == "topology":
-        body = [stage("graph.add_nodes", count=1, output="extra")]
-    elif unsupported == "legacy":
+    if unsupported == "legacy":
         body = [stage("drot.smooth_strokes")]
     elif unsupported == "streaming":
         body = [stage("core.execution_block", mode="streaming", target="values", options={}, body={"nodes": []})]

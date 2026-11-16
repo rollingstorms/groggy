@@ -27,6 +27,8 @@ Implemented capabilities, within their documented boundaries:
   boundary, including staged weights/personalization and directed closeness.
 - All six classic community wrappers now use the same selected pending boundary,
   preserving component modes, seeded labels and existing graph-type restrictions.
+- Sequential root loops now stage supported topology with refreshed selected reads,
+  global allocation positions and one acceptance; fixed child topology stays guarded.
 - Selected retained lifecycle/window helpers now follow surviving pending IDs
   after topology changes; provisional IDs remain guarded against invented history.
 - Accepted snapshot acquisition and node/edge retained diffs now compose after
