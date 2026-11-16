@@ -2,7 +2,8 @@
 
 Context, 2026-11-16. The first extraction below is now implemented; see
 [owned pipeline effects](owned-pipeline-effects-2026-11-16.md). Durable dispatch
-and its read adapter remain open. Existing scope: 09.4b.2, 30.1, AR3/AR7.8 and the
+and its invocation adapter remain open. Selected materialization is now also
+extracted; see [immutable pending reads](immutable-pending-materialization-2026-11-16.md). Existing scope: 09.4b.2, 30.1, AR3/AR7.8 and the
 persistence boundary. This does not add a checklist row or claim implementation.
 
 ## Current source boundaries
