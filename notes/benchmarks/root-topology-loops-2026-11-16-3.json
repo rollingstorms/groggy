@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "initial_nodes": 100,
+      "iterations": 10,
+      "loop_seconds": [
+        0.001078458,
+        0.001147333,
+        0.000987417,
+        0.000982709,
+        0.001020708
+      ],
+      "unrolled_seconds": [
+        0.001253125,
+        0.001079833,
+        0.000990416,
+        0.000990834,
+        0.000995875
+      ]
+    },
+    {
+      "initial_nodes": 100,
+      "iterations": 100,
+      "loop_seconds": [
+        0.011532417,
+        0.012343708,
+        0.012785666,
+        0.011636917,
+        0.011440209
+      ],
+      "unrolled_seconds": [
+        0.012156667,
+        0.011903792,
+        0.011678833,
+        0.01172125,
+        0.012141833
+      ]
+    },
+    {
+      "initial_nodes": 1000,
+      "iterations": 10,
+      "loop_seconds": [
+        0.01014975,
+        0.01067475,
+        0.009834541,
+        0.009934208,
+        0.009796708
+      ],
+      "unrolled_seconds": [
+        0.009700334,
+        0.009950708,
+        0.010563042,
+        0.009805708,
+        0.009885458
+      ]
+    },
+    {
+      "initial_nodes": 1000,
+      "iterations": 100,
+      "loop_seconds": [
+        0.096505958,
+        0.09356875,
+        0.083592041,
+        0.083467416,
+        0.087240125
+      ],
+      "unrolled_seconds": [
+        0.097826416,
+        0.075535125,
+        0.090257167,
+        0.087177,
+        0.086754167
+      ]
+    }
+  ],
+  "scope": "Matched native release root-loop versus unrolled builder programs. Each iteration adds one node and increments all currently selected counters; identical IDs, final per-row values, immutable prior input and one publication are asserted. 100/1000 initial isolated nodes, 10/100 iterations, five observations with alternating mode order. Includes execution/preflight/capture/staging/publication; excludes fixture, initial capture, definition/algorithm construction, assertions and compilation. No allocation/RSS/FFI/convergence/production-scale claim. Run in fresh processes and retain raw receipts."
+}

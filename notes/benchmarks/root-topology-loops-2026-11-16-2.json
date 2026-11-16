@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "initial_nodes": 100,
+      "iterations": 10,
+      "loop_seconds": [
+        0.001117167,
+        0.001123708,
+        0.000954708,
+        0.000944791,
+        0.000992
+      ],
+      "unrolled_seconds": [
+        0.001242666,
+        0.00111525,
+        0.00102625,
+        0.000962833,
+        0.000983042
+      ]
+    },
+    {
+      "initial_nodes": 100,
+      "iterations": 100,
+      "loop_seconds": [
+        0.011463208,
+        0.012246042,
+        0.011370084,
+        0.01154825,
+        0.011466459
+      ],
+      "unrolled_seconds": [
+        0.012135875,
+        0.011874625,
+        0.011856166,
+        0.011686125,
+        0.011884917
+      ]
+    },
+    {
+      "initial_nodes": 1000,
+      "iterations": 10,
+      "loop_seconds": [
+        0.009799209,
+        0.00968025,
+        0.009911958,
+        0.009149708,
+        0.00984425
+      ],
+      "unrolled_seconds": [
+        0.0098805,
+        0.00978625,
+        0.009655458,
+        0.0098515,
+        0.009772541
+      ]
+    },
+    {
+      "initial_nodes": 1000,
+      "iterations": 100,
+      "loop_seconds": [
+        0.091983208,
+        0.093239208,
+        0.084203875,
+        0.087165083,
+        0.085623875
+      ],
+      "unrolled_seconds": [
+        0.093037959,
+        0.08996875,
+        0.085572334,
+        0.080157917,
+        0.091656167
+      ]
+    }
+  ],
+  "scope": "Matched native release root-loop versus unrolled builder programs. Each iteration adds one node and increments all currently selected counters; identical IDs, final per-row values, immutable prior input and one publication are asserted. 100/1000 initial isolated nodes, 10/100 iterations, five observations with alternating mode order. Includes execution/preflight/capture/staging/publication; excludes fixture, initial capture, definition/algorithm construction, assertions and compilation. No allocation/RSS/FFI/convergence/production-scale claim. Run in fresh processes and retain raw receipts."
+}

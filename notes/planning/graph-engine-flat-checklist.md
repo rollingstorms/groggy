@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-11-15 on `groggy-roadmap-2026-10-20`.
+Updated 2026-11-16 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -25,6 +25,11 @@ or batch clock default. It does not mean computing a read records new history.
 An explicit snapshot/checkpoint and a reconstructed effective-time view are
 separate operations. Default graph selections now use the accepted pinned-state model; explicit
 connected compatibility remains available.
+
+Latest implemented execution slice: [priority-hour evidence](priority-hour-pending-execution-2026-11-16.md)
+and [capability map](../../docs/api/atomic-pipeline-capabilities.md). All thirteen
+classic wrappers, sequential root topology loops and direct explicit attachment
+clocks are qualified locally. Broad parent rows retain their separate requirements.
 
 Current execution overview: [finish priorities](roadmap-finish-priorities-2026-10-22.md).
 The [earlier status record](roadmap-status-2026-10-24.md) is retained with a current checkpoint header.

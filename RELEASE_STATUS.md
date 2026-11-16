@@ -1,6 +1,6 @@
 # Groggy 0.6.0 release qualification
 
-Updated 2026-11-15. **Expanded 0.6.0 scope in progress; earlier candidate qualified. Unreleased.**
+Updated 2026-11-16. **Expanded 0.6.0 scope in progress; earlier candidate qualified. Unreleased.**
 
 ## Expanded release target — 2026-11-15
 
@@ -9,48 +9,35 @@ The owner now targets all remaining hierarchical groups except group 8:
 This includes provenance and multi-user/concurrency work. The expanded target
 remains unfinished. See [scope and next chunk](notes/planning/release-060-expanded-scope-2026-11-15.md).
 
-The successful qualification below applies to the earlier bounded candidate.
-Implementation changes toward the expanded target require fresh final gates.
+Latest completed local implementation: **be6512d1**. All thirteen classic wrappers
+now consume selected pending topology/properties. Sequential root loops share the
+same executor/batch, and direct attachments accept strict explicit property clocks.
+Fixed child topology, alternate execution plans and broader parent requirements
+remain open.
 
-Supported atomic topology composition, selected computation, captured-table
-attachment and nested execution are qualified locally:
-1,604 native tests, 3,089 maintained Python tests and 283
-executable examples pass, plus strict Clippy and Rust formatting.
-See [outer topology evidence](notes/planning/outer-atomic-topology-2026-11-15.md)
-[pending property evidence](notes/planning/pending-topology-properties-2026-11-15.md)
-[selected reader evidence](notes/planning/pending-topology-readers-2026-11-15.md)
-[table attachment evidence](notes/planning/captured-table-attachment-2026-11-15.md)
-[nested execution evidence](notes/planning/nested-pending-execution-2026-11-15.md)
-[core compute evidence](notes/planning/pending-core-compute-2026-11-15.md)
-[checked flow evidence](notes/planning/checked-flow-compute-2026-11-15.md)
-[temporal decay evidence](notes/planning/pending-temporal-decay-2026-11-15.md)
-[capture lifecycle/pass summary](notes/planning/capture-authority-churn-2026-11-15.md)
-[subgraph frame evidence](notes/planning/pending-subgraph-frames-2026-11-15.md)
-[projected materialization evidence](notes/planning/projected-frame-materialization-2026-11-15.md)
-[child attachment evidence](notes/planning/fixed-child-attachments-2026-11-15.md)
-[pending retained-history evidence](notes/planning/pending-retained-history-2026-11-15.md)
-[selected temporal-window evidence](notes/planning/pending-temporal-windows-2026-11-15.md)
-and [classic path evidence](notes/planning/pending-classic-paths-2026-11-15.md).
-The subsequent three-wrapper centrality slice passes 1,604 native tests, strict
-Clippy, 3,131 maintained Python tests and 284 docs examples against the rebuilt
-in-tree release extension; see [centrality evidence](notes/planning/pending-classic-centrality-2026-11-15.md).
-The subsequent six-wrapper community slice passes 1,604 native tests, strict
-Clippy, 3,183 maintained Python tests and 285 docs examples against the rebuilt
-in-tree release extension; see [community evidence](notes/planning/pending-classic-communities-2026-11-16.md).
-All thirteen classic wrappers now share the pending input boundary. The next
-root topology-loop slice passes 1,608 native tests, strict Clippy, 3,218 maintained
-Python tests and 286 docs examples; see [root loop evidence](notes/planning/root-topology-loops-2026-11-16.md).
-The direct attachment-clock fix passes 1,610 native tests, strict Clippy, 3,273
-maintained Python tests and 287 docs examples; see [attachment-clock evidence](notes/planning/builder-attachment-times-2026-11-16.md).
-The artifact receipts below retain their separately qualified source versions.
-The latest Python/docs gate runs against a fresh unpacked macOS arm64 CPython 3.9
-root wheel. The [priority pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)
-records completed slices and remaining work; older platform evidence is separate.
-The a777e4ec implementation's fresh source archive rebuilds offline with both lockfiles
-and passes isolated wheel smoke/workflows; see [source artifact receipt](notes/planning/priority-source-qualification-2026-11-15.md).
-Final review reuses the existing native read-direction method instead of a duplicate;
-its fresh-root-wheel receipt is `notes/benchmarks/final-direction-wheel-qualification-2026-11-15.json`.
-The 44 broad unchecked release rows retain their remaining exit requirements.
+Local gates: **1,610 native passed / 54 ignored**, separate serial checkpoint-crash
+recovery, strict all-target Clippy and Rust formatting. A fresh unpacked macOS arm64
+CPython 3.9 wheel passes isolated smoke, 105 exports/version agreement, archive and
+journal application workflows, **3,273 maintained Python tests / one skipped /
+14 established warnings**, and **288 executable documentation examples**.
+
+- [Priority-hour summary and measurements](notes/planning/priority-hour-pending-execution-2026-11-16.md).
+- [Atomic capability map](docs/api/atomic-pipeline-capabilities.md), including all thirteen classic wrappers in one publication.
+- [Centrality](notes/planning/pending-classic-centrality-2026-11-15.md),
+  [community](notes/planning/pending-classic-communities-2026-11-16.md),
+  [root loops](notes/planning/root-topology-loops-2026-11-16.md),
+  [attachment clocks](notes/planning/builder-attachment-times-2026-11-16.md).
+- [Fresh local wheel receipt](notes/benchmarks/priority-hour-final-wheel-qualification-2026-11-16.json).
+- [Current platform run](https://github.com/rollingstorms/groggy/actions/runs/43780585321):
+  manual qualification at be6512d1 is in progress; configuration/partial success
+  does not establish full qualification. Source rebuilding has passed.
+
+Matched root-loop versus unrolled fixtures show similar observed execution costs
+(1,000 initial nodes / 100 growth iterations: 87.2 ms versus 86.8 ms median).
+These bounded measurements do not establish production memory or latency limits.
+The earlier [November 15 pass](notes/planning/priority-pass-pending-execution-2026-11-15.md)
+retains its individual slice/artifact receipts. The 44 broad unchecked release rows
+retain their remaining exit criteria. No release/tag/package publication occurred.
 
 ## Qualified bounded candidate
 

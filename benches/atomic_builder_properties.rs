@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().any(|arg| arg == "--root-topology-loops") {
+        return root_topology_loops_receipt();
+    }
     if std::env::args().any(|arg| arg == "--classic-pending-analysis") {
         return classic_pending_analysis_receipt();
     }
@@ -1126,5 +1129,87 @@ fn classic_pending_analysis_receipt() -> Result<(), Box<dyn std::error::Error>> 
         }))?,
     )?;
     println!("Wrote classic analysis receipt to {path}");
+    Ok(())
+}
+
+fn root_topology_loops_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    let registry = Registry::default();
+    register_algorithms(&registry)?;
+    let mut cases = Vec::new();
+    for count in [100, 1_000] {
+        for iterations in [10, 100] {
+            let body = vec![
+                json!({"id":"graph.add_nodes","params":{"count":1,"output":"new"}}),
+                json!({"id":"core.load_node_attr","params":{"attr":"counter","default":0,"target":"old"}}),
+                json!({"id":"core.init_scalar","params":{"value":1,"target":"one"}}),
+                json!({"id":"core.add","params":{"left":"old","right":"one","target":"next"}}),
+                json!({"id":"core.attach_node_attr","params":{"source":"next","attr":"counter"}}),
+            ];
+            let mut algorithms = Vec::new();
+            for looped in [false, true] {
+                let steps: Vec<_> = if looped {
+                    vec![json!({"id":"iter.loop","params":{"iterations":iterations,"body":body}})]
+                } else {
+                    (0..iterations).flat_map(|_| body.clone()).collect()
+                };
+                let mut params = AlgorithmParams::new();
+                params.set_text("steps", json!({"atomic":true,"steps":steps}).to_string());
+                algorithms.push(registry.instantiate(&AlgorithmSpec {
+                    id: "builder.step_pipeline".into(),
+                    params,
+                })?);
+            }
+            let mut samples = [Vec::new(), Vec::new()];
+            for sample in 0..5 {
+                // Alternate order to reduce consistent first/second-run cache bias.
+                for mode in if sample % 2 == 0 { [0, 1] } else { [1, 0] } {
+                    let mut graph = Graph::new();
+                    graph.add_nodes(count)?;
+                    let head = graph.current_state_id();
+                    let owner = Arc::new(OwnerCell::new(graph));
+                    let selected = Subgraph::from_frozen_view(
+                        owner.clone(),
+                        owner.borrow().read_view()?,
+                        "root loop receipt".into(),
+                    );
+                    let before = owner.borrow().read_view()?;
+                    let mut ctx = Context::new();
+                    let started = Instant::now();
+                    let result = algorithms[mode].execute(&mut ctx, selected)?;
+                    samples[mode].push(started.elapsed().as_secs_f64());
+                    let graph = owner.borrow();
+                    assert_eq!(graph.current_state_id(), head + 1);
+                    assert_eq!(result.node_count(), count + iterations);
+                    for node in 0..count + iterations {
+                        let expected = if node < count {
+                            iterations
+                        } else {
+                            count + iterations - node
+                        };
+                        assert_eq!(
+                            graph
+                                .get_node_attr(node, &"counter".into())?
+                                .as_ref()
+                                .and_then(AttrValue::as_int),
+                            Some(expected as i64)
+                        );
+                    }
+                    assert_eq!(before.node_count(), count);
+                    assert_eq!(before.node_attr(0, &"counter".into())?, None);
+                }
+            }
+            cases.push(json!({"initial_nodes":count,"iterations":iterations,"unrolled_seconds":samples[0],"loop_seconds":samples[1]}));
+        }
+    }
+    let path = std::env::var("GROGGY_ATOMIC_BUILDER_PROFILE")
+        .unwrap_or_else(|_| "root_topology_loops.json".into());
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&json!({
+            "scope":"Matched native release root-loop versus unrolled builder programs. Each iteration adds one node and increments all currently selected counters; identical IDs, final per-row values, immutable prior input and one publication are asserted. 100/1000 initial isolated nodes, 10/100 iterations, five observations with alternating mode order. Includes execution/preflight/capture/staging/publication; excludes fixture, initial capture, definition/algorithm construction, assertions and compilation. No allocation/RSS/FFI/convergence/production-scale claim. Run in fresh processes and retain raw receipts.",
+            "cases":cases,
+        }))?,
+    )?;
+    println!("Wrote root loop receipt to {path}");
     Ok(())
 }
