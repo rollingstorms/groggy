@@ -1,6 +1,6 @@
 # Groggy implementation checklist
 
-Updated 2026-11-16 on `groggy-roadmap-2026-10-20`.
+Updated 2026-11-18 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
 [roadmap](graph-engine-implementation-roadmap.md). Suffixes divide an item into
@@ -33,8 +33,8 @@ clocks are qualified locally. Broad parent rows retain their separate requiremen
 
 Current execution overview: [finish priorities](roadmap-finish-priorities-2026-10-22.md).
 The [earlier status record](roadmap-status-2026-10-24.md) is retained with a current checkpoint header.
-The checklist has **215 checked / 53 unchecked entries**, including overlapping
-parents and repair slices; this is not a completion percentage. The old 158 count
+The checklist has **216 checked / 52 unchecked entries**, including overlapping
+parents and repair slices; this is not a completion percentage. AR7.6 closes one existing row in this pass. The old 158 count
 was stale. Recent repair work added checked evidence beneath still-open parents,
 so the unchanged open total did not measure remaining concrete work.
 
@@ -51,7 +51,7 @@ are complete; this does not imply that finished repairs are still unimplemented.
 ## Execution priority — remaining work
 
 **0.6.0 scope update — 2026-11-15:** the owner includes all remaining hierarchical
-groups except group 8. This targets 44 unchecked rows for 0.6.0 and leaves nine
+groups except group 8. After AR7.6 closeout this targets 43 unchecked rows for 0.6.0 and leaves nine
 retrieval/external-integration rows deferred. Provenance and service/concurrency
 work are included. See [expanded release scope](release-060-expanded-scope-2026-11-15.md)
 for IDs, qualification boundaries and the next outer-topology execution chunk.
@@ -358,7 +358,7 @@ Opening-time baseline work does not close checkpoint/lifecycle or scale gates.
 - [x] **AR7.5j — Frozen PageRank and convergence status.** Captured AlgorithmRead/GraphView reads share scalar personalization validation and one power-iteration kernel with the live wrapper. Owned f64 scores expose convergence, iteration count and last maximum update; Python releases the GIL and writes no properties/deltas/checkpoints. Evidence: `frozen-pagerank-contract-2026-10-22.md`; closeness/betweenness/remaining migration stays open.
 - [x] **AR7.5k — Frozen classic/harmonic closeness.** Captured/live readers share distance scoring and one compact incoming CSR transpose; preserve direction, normalization, positive selected weights and minimum parallel lengths. Owned f64 rows and GIL release publish no state changes. Evidence: `frozen-closeness-contract-2026-10-22.md`; betweenness/remaining migration stays open.
 - [x] **AR7.5l — Frozen Brandes betweenness and transient output.** Captured/live readers share shortest paths, dependency accumulation and normalization. Preserve minimum parallel instances and isolates; owned f64 rows/GIL release write no state. Fix dropped live nonpersistent outputs, inner cancellation and unchecked ID-span arithmetic. Evidence: `frozen-betweenness-contract-2026-10-23.md`; remaining registry/pipeline/algorithm migration stays open.
-- [ ] **AR7.6 — One display foundation.** Consolidate display/viz-display configuration, data formatting and truncation; use thin Python/interactive adapters. Preserve intentional presentation differences and examples. Native typed display/theme/config/DataWindow ownership now lives under display::render, storage/graph callers use it directly, and core/viz::display retain type-identical aliases. Shared bounded UTF-8 clipping, full-domain integer HTML and zero-budget repairs have regressions; preserved ASCII fingerprints and mixed render timings are recorded in `display-foundation-2026-11-11.md`. Historical Python formatter adapters and the remaining shared scalar/compatibility/performance inventory stay open.
+- [x] **AR7.6 — One display foundation.** Native display/render owns typed windows/config/themes and historical dictionary layouts, shared selection/clipping/dtype/text policies, with thin Python object/color/configuration adapters and retained core/viz aliases. Historical public imports and intentional presentation/default differences remain. Tiny-budget source indices, literal omission handling, tail dtype headers, date ellipses, UTF-8/native row limits and dictionary bool/nonfinite/numeric-protocol translation are repaired. Effective Python defaults validate atomically; owned native layouts release the GIL and Python tables format only visible cells. Exit: 61 captured Python layouts, 12 unchanged native output hashes, semantic native/Python regressions, fresh artifact-backed full gates and matched timing/Python traced-allocation evidence, including the small-call cost and native/RSS limits. See `display-closeout-2026-11-18.md`; broader API/solver/production gates retain their existing rows.
 - [ ] **AR7.7 — Shared expression/query semantics.** Inventory array filters, graph query parsing and builder expressions; share supported scalar predicate/value semantics and explicit lowering. Preserve distinct graph traversal planning and documented language features; test current APIs before retiring parallel parsing paths. Array query compilation now shares graph tokenization, numeric literal policy and boolean grammar through typed adaptation, retiring raw substring parsing and silent pass-through. Intentional scalar domain differences and remaining expression lowering are explicit in `lazy-scalar-arrays-2026-11-05.md`.
 - [ ] **AR7.8 — Coherent algorithm execution boundary.** Map algorithm pipelines, native steps, Python IR and batch plans to one validation/lowering/execution contract while preserving their distinct composition levels and compatibility APIs. Certified native execution now shares pending selected reads, immutable typed values, cancellation, staged writes, one coordinator acceptance and output restoration; root topology loops and thirteen classic wrappers are complete in that boundary. Payload preparation and immutable materialization no longer require the same owner-coupled function. Remaining: migrate alternate plans/facade lowering and durable invocation, fixed child/provisional topology, streaming and unsupported custom routes; resolve A14 before changing naming/history/cache policy. Do not retire an overlapping path without parity and state/cancellation evidence. Ledger: `release-060-expanded-scope-2026-11-15.md`, `priority-hour-pending-execution-2026-11-16.md`, `priority-slices-2026-11-16.md`.
 - [x] **AR7.9 — Canonical state/change records.** AttributeChange, EntityType and ChangeSet have one native owner with legacy aliases. Snapshot/history/merge/restore comparisons, archive checks and exact delta collision checks share typed payload semantics. Pending physical references use a borrowed IndexChangeView and complete indexed DeltaObject instead of fabricated values or empty projections; logical extraction requires explicit pool resolution. Delta conversion moves owned buffers. Existing history/archive/journal encodings remain unchanged. Native API fallibility/strategy migrations and bounded matched release results are documented in `canonical-change-records-exit-2026-10-27.md`. Selected space, retained lineage, effective clocks and physical indices remain distinct responsibilities.

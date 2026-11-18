@@ -55,7 +55,7 @@ impl MatrixDisplayFormatter {
         };
 
         // Show truncated data
-        for (_i, row) in data.iter().enumerate() {
+        for row in data.iter().take(max_display_rows) {
             let row_values: Vec<String> = row
                 .iter()
                 .take(max_display_cols)
@@ -131,13 +131,7 @@ impl MatrixDisplayFormatter {
                     n.to_string()
                 }
             }
-            serde_json::Value::String(s) => {
-                if s.len() > 8 {
-                    format!("{}{}", &s[..7], Symbols::ELLIPSIS)
-                } else {
-                    s.clone()
-                }
-            }
+            serde_json::Value::String(s) => super::truncation::truncate_string(s, 8),
             serde_json::Value::Bool(b) => b.to_string(),
             _ => value.to_string().trim_matches('"').to_string(),
         }

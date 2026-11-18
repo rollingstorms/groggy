@@ -130,3 +130,32 @@ snapshot writeback and unavailable backend transfers reject. Custom numeric buff
 allocation initializes valid typed zeros rather than assuming all-zero bytes are
 valid. See [memory ownership](docs/api/matrix-memory-ownership.md) for native
 compatibility details. Python APIs and graph storage formats are unchanged.
+
+
+## Dictionary display consolidation
+
+Historical `groggy.display` array/matrix/table classes and functions now use native
+layout, selection, width, clipping and dtype policies. Python retains its object
+spelling, significant/fixed float formatting, booleans and terminal detection;
+existing typed `core`/`viz::display` aliases and themes stay compatible.
+
+`configure_display` now affects newly created dictionary formatters. Explicit
+arguments win and existing instances retain settings. Normal defaults are
+preserved; `None` requests the default. Invalid settings reject before publishing
+new defaults. This configuration does not reconfigure independent typed/HTML
+displays. `max_width` is not a hard line-width ceiling.
+
+Corrected behavior: tiny-prefix source indices, real versus synthetic ellipses,
+truncated tail dtype headers, a single bounded date ellipsis, native UTF-8 clipping
+and matrix row limits. Native dictionary translation preserves boolean/numeric
+categories and does not turn nonfinite values into zero. Visible Python table
+cells alone are formatted, so hidden objects' `str` callbacks are no longer run.
+Native workers own their text/configuration and release the GIL; Python callbacks
+retain it. Unpaired surrogate text rejects instead of being silently replaced.
+Private old Python row/border builders are removed; public imports remain.
+
+Costs are measured rather than assumed: small inputs can retain bridge overhead
+and higher Python traced peaks, while the large-table fixture avoids whole-input
+stringification. These are bounded display measurements, not graph-query/RSS or
+production guarantees. See [display contract](docs/api/display-foundation.md) and
+[closeout evidence](notes/planning/display-closeout-2026-11-18.md).

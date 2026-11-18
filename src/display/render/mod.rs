@@ -40,3 +40,6 @@ impl Default for TruncationStrategy {
         Self::TypeAware
     }
 }
+
+/// Historical Python presentation layouts with shared native selection and text policies.
+pub mod interactive;

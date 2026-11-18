@@ -7,6 +7,7 @@ using Unicode box-drawing characters and smart truncation.
 Based on display_draft.txt requirements.
 """
 
+from . import _presentation
 from .array_display import ArrayDisplayFormatter
 from .formatters import format_array, format_matrix, format_table
 from .matrix_display import MatrixDisplayFormatter
@@ -29,14 +30,27 @@ DEFAULT_PRECISION = 2
 
 
 def configure_display(max_rows=None, max_cols=None, max_width=None, precision=None):
-    """Configure global display settings for all data structures."""
+    """Set defaults for subsequently created dictionary display formatters.
+
+    Explicit per-formatter arguments take precedence. Existing instances and the
+    independent native typed table/HTML configuration retain their settings.
+    """
     global DEFAULT_MAX_ROWS, DEFAULT_MAX_COLS, DEFAULT_MAX_WIDTH, DEFAULT_PRECISION
 
-    if max_rows is not None:
-        DEFAULT_MAX_ROWS = max_rows
-    if max_cols is not None:
-        DEFAULT_MAX_COLS = max_cols
-    if max_width is not None:
-        DEFAULT_MAX_WIDTH = max_width
-    if precision is not None:
-        DEFAULT_PRECISION = precision
+    supplied = {
+        "max_rows": max_rows,
+        "max_cols": max_cols,
+        "max_width": max_width,
+        "precision": precision,
+    }
+    # Validate everything before publishing any new defaults.
+    updates = {
+        key: _presentation._resolve_option(key, value, 0)
+        for key, value in supplied.items()
+        if value is not None
+    }
+    _presentation._DISPLAY_OVERRIDES.update(updates)
+    DEFAULT_MAX_ROWS = updates.get("max_rows", DEFAULT_MAX_ROWS)
+    DEFAULT_MAX_COLS = updates.get("max_cols", DEFAULT_MAX_COLS)
+    DEFAULT_MAX_WIDTH = updates.get("max_width", DEFAULT_MAX_WIDTH)
+    DEFAULT_PRECISION = updates.get("precision", DEFAULT_PRECISION)

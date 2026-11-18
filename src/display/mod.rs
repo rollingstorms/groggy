@@ -4,7 +4,8 @@ Native display formatting and rendering for arrays, matrices, tables and graph v
 `render` owns typed DataWindow/schema, render configuration, themes and Unicode/HTML
 engines. Legacy JSON-dictionary formatters retain their distinct public input/config
 contracts here. Python adapters and compatibility imports delegate to these native
-owners; the separate historical Python formatter classes still await migration.
+owners. Historical Python classes marshal scalar spellings into the native
+`render::interactive` layout policies.
 */
 
 /// Native typed rendering, theme/configuration and DataWindow ownership.
@@ -53,24 +54,24 @@ impl Default for DisplayConfig {
 
 /// Auto-detect data structure type from display data
 pub fn detect_display_type(data: &HashMap<String, serde_json::Value>) -> &'static str {
-    if data.contains_key("columns") && data.contains_key("dtypes") {
+    let rows = data.get("data").and_then(|v| v.as_array());
+    detect_display_shape(
+        data.contains_key("columns") && data.contains_key("dtypes"),
+        data.contains_key("data"),
+        rows.and_then(|r| r.first()).is_some_and(|r| r.is_array()),
+    )
+}
+
+/// Classify already-marshalled structure flags without traversing hidden cells.
+pub fn detect_display_shape(table: bool, sequence: bool, nested: bool) -> &'static str {
+    if table {
         "table"
-    } else if data.contains_key("data") {
-        if let Some(data_array) = data.get("data").and_then(|v| v.as_array()) {
-            if let Some(first_item) = data_array.first() {
-                if first_item.is_array() {
-                    "matrix"
-                } else {
-                    "array"
-                }
-            } else {
-                "array"
-            }
-        } else {
-            "array"
-        }
+    } else if sequence && nested {
+        "matrix"
+    } else if sequence {
+        "array"
     } else {
-        "table" // Default fallback
+        "table"
     }
 }
 
@@ -87,5 +88,25 @@ pub fn format_data_structure(
         "matrix" => format_matrix(data, config),
         "array" => format_array(data, config),
         _ => format!("Unknown data type: {}", detected_type),
+    }
+}
+
+/// Historical dictionary dtype spellings; size hints are a presentation policy.
+pub fn format_dtype(dtype: &str, size_hints: bool) -> String {
+    let base = match dtype {
+        "string" => "str",
+        "category" if size_hints => "cat",
+        "int64" => "i64",
+        "int32" => "i32",
+        "float64" => "f64",
+        "float32" => "f32",
+        "datetime" if size_hints => "date",
+        "object" => "obj",
+        _ => dtype,
+    };
+    match dtype {
+        "string" | "str" if size_hints => format!("{base}[8]"),
+        "category" | "cat" if size_hints => format!("{base}(12)"),
+        _ => base.into(),
     }
 }

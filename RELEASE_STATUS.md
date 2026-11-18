@@ -1,15 +1,30 @@
 # Groggy 0.6.0 release qualification
 
-Updated 2026-11-16. **Expanded 0.6.0 scope in progress; earlier candidate qualified. Unreleased.**
+Updated 2026-11-18. **Expanded 0.6.0 scope in progress; earlier candidate qualified. Unreleased.**
 
 ## Expanded release target — 2026-11-15
 
 The owner now targets all remaining hierarchical groups except group 8:
-**44 unchecked rows in scope; nine retrieval/integration rows deferred**.
+**43 unchecked rows in scope; nine retrieval/integration rows deferred**.
 This includes provenance and multi-user/concurrency work. The expanded target
 remains unfinished. See [scope and next chunk](notes/planning/release-060-expanded-scope-2026-11-15.md).
 
-Latest completed local runtime: **e517e639**. Five priority slices separate owned
+Latest completed checklist item: **AR7.6 — one display foundation**. Historical
+Python array/matrix/table formatters now use native layouts and shared text/
+selection/dtype policies; Python retains scalar spelling and terminal adapters.
+One existing row closed; no rows added: **216 checked / 52 open**, with **43 open
+expanded-release rows and nine deferred**. See
+[display closeout](notes/planning/display-closeout-2026-11-18.md).
+
+Fresh local gates: **1,633 native passed / 54 ignored**, separate serial crash
+recovery, strict Clippy/formatting; unpacked wheel **3,385 maintained Python passed /
+one skipped / 14 established warnings**, **290 executable docs**. Matched display
+costs retain small-call variation and native-allocation/RSS limits. Local
+[wheel receipt](notes/benchmarks/display-closeout-wheel-qualification-2026-11-18.json).
+Cross-platform qualification for this new runtime is recorded separately; the
+previous platform run below qualifies its own pinned source only.
+
+Previous platform-qualified runtime: **e517e639**. Five priority slices separate owned
 pipeline preparation and immutable pending materialization from owner adapters,
 avoid redundant property-value copies, add explicit new-node endpoints for existing
 edge revisions, and repair native numerical-buffer snapshot/initialization safety.
@@ -34,7 +49,7 @@ The clean nested wheel passes 36 ownership/workflow tests; its extension and all
 - [Native numerical ownership correction](docs/api/matrix-memory-ownership.md):
   backend snapshots are owned; live zero-copy reads retain lock guards; unsupported
   transfers reject; custom numeric allocation uses valid typed zeros.
-- [Current platform run](https://github.com/rollingstorms/groggy/actions/runs/43792347879),
+- [Previous platform run](https://github.com/rollingstorms/groggy/actions/runs/43792347879),
   pinned to e517e639: **all 21 required jobs and all 19 wheels passed**; source
   rebuild passed and publication was skipped. The
   [platform receipt](notes/benchmarks/priority-slices-platform-qualification-2026-11-16.json)
@@ -52,7 +67,7 @@ node columns and 43% for edge columns when two large vector columns are replaced
 unchanged controls request exactly the same bytes. These are bounded allocation
 measurements, not RSS/latency guarantees. Explicit numerical backend snapshots
 copy values; live guards and same-size snapshot refresh allocate nothing in the
-recorded fixtures. The 44 broad unchecked release rows retain their exit criteria.
+recorded fixtures. The 43 remaining broad unchecked release rows retain their exit criteria.
 No release/tag/package publication occurred.
 
 ## Earlier bounded candidate (9aadfee5)
@@ -142,7 +157,7 @@ Earlier baseline evidence, artifact/lock hashes and reproducible commands:
 - [Ownership implementation and performance comparison](notes/planning/python-owner-lifetime-2026-11-14.md).
 - [Initial qualification receipt](notes/planning/release-060-qualification-2026-11-14.md), retained historically.
 
-The broader flat checklist remains **215 checked / 53 open / 268 total**; its
+The broader flat checklist now has **216 checked / 52 open / 268 total**; its
 parent rows overlap and include deferred scope. This release preparation does not
 mark them all complete. Historical [0.5.2 status](notes/planning/release-052-status-historical.md)
 is archived separately.

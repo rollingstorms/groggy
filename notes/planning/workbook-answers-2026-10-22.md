@@ -1257,3 +1257,18 @@ filter reapplication explicitly returns a new current capture. No new workbook
 answer is required for this implementation of AR4/26.1/AR7.5. Contract and receipt:
 `../../docs/api/default-immutable-views.md` and
 `default-immutable-views-2026-10-30.md`.
+
+
+## 2026-11-18 — Display consolidation implemented (AR7.6)
+
+The agreed module-consolidation requirement now includes historical Python display
+adapters: layouts/selection/widths/clipping/dtypes are native, while Python keeps
+its object spelling, terminal detection and ordered summaries. Intentional
+presentation/configuration differences and public names remain. No owner answer
+or unfinished solver/API/scale requirement is inferred from this completion.
+
+AR7.6 is checked off after captured-output/semantic regressions, full native and
+fresh-wheel Python/docs gates, and matched costs. Configuration now works for new
+formatters, selected cells alone are formatted, and small-call
+variation and higher small-input Python traced peaks remain explicit. Evidence: `display-closeout-2026-11-18.md`.
+Inventory: **216 checked / 52 unchecked**, no added rows; **43 release rows remain**.

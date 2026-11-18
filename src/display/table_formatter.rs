@@ -59,7 +59,11 @@ impl TableDisplayFormatter {
 
         // Add row indices to data
         let mut indexed_data = Vec::new();
-        for (i, row) in data.iter().enumerate() {
+        for i in super::render::interactive::positions(data.len(), self.max_rows)
+            .into_iter()
+            .flatten()
+        {
+            let row = &data[i];
             let mut indexed_row = vec![i.to_string()];
             for (j, val) in row.iter().enumerate() {
                 let col_dtype = if j < columns.len() {
@@ -79,10 +83,10 @@ impl TableDisplayFormatter {
         let (truncated_data, _rows_truncated) = truncate_rows(indexed_data, self.max_rows);
         let (truncated_headers, truncated_data, _cols_truncated) =
             truncate_columns(headers, truncated_data, self.max_cols);
-        let truncated_type_headers: Vec<String> = type_headers
-            .into_iter()
-            .take(truncated_headers.len())
-            .collect();
+        // Legacy dictionary layout omits marker columns, but types must follow
+        // the same original positions as their headers.
+        let (truncated_type_headers, _, _) =
+            truncate_columns(type_headers, Vec::<Vec<String>>::new(), self.max_cols);
 
         // Calculate column widths
         let col_widths =
@@ -138,30 +142,7 @@ impl TableDisplayFormatter {
     }
 
     fn format_dtype(&self, dtype: &str) -> String {
-        let dtype_map = [
-            ("string", "str"),
-            ("category", "cat"),
-            ("int64", "i64"),
-            ("int32", "i32"),
-            ("float64", "f64"),
-            ("float32", "f32"),
-            ("bool", "bool"),
-            ("datetime", "date"),
-            ("object", "obj"),
-        ];
-
-        let base_type = dtype_map
-            .iter()
-            .find(|(k, _)| *k == dtype)
-            .map(|(_, v)| *v)
-            .unwrap_or(dtype);
-
-        // Add size hints for string/category types
-        match dtype {
-            "string" | "str" => format!("{}[8]", base_type),
-            "category" | "cat" => format!("{}(12)", base_type),
-            _ => base_type.to_string(),
-        }
+        super::format_dtype(dtype, true)
     }
 
     fn format_value(&self, value: &serde_json::Value, dtype: &str) -> String {
@@ -287,22 +268,12 @@ enum LineStyle {
 
 impl TableDisplayFormatter {
     fn build_border_line(&self, col_widths: &[usize], position: BorderPosition) -> String {
-        let (left, right, sep) = match position {
-            BorderPosition::Top => (BoxChars::TOP_LEFT, BoxChars::TOP_RIGHT, BoxChars::T_TOP),
-            BorderPosition::Middle => (BoxChars::T_LEFT, BoxChars::T_RIGHT, BoxChars::CROSS),
-            BorderPosition::Bottom => (
-                BoxChars::BOTTOM_LEFT,
-                BoxChars::BOTTOM_RIGHT,
-                BoxChars::T_BOTTOM,
-            ),
+        let position = match position {
+            BorderPosition::Top => 0,
+            BorderPosition::Middle => 1,
+            BorderPosition::Bottom => 2,
         };
-
-        let segments: Vec<String> = col_widths
-            .iter()
-            .map(|&width| BoxChars::HORIZONTAL.repeat(width + 2)) // +2 for padding
-            .collect();
-
-        format!("{}{}{}", left, segments.join(sep), right)
+        super::render::interactive::border(col_widths, position)
     }
 
     fn build_data_line(
@@ -311,39 +282,18 @@ impl TableDisplayFormatter {
         col_widths: &[usize],
         style: LineStyle,
     ) -> String {
-        let cells: Vec<String> = row_data
-            .iter()
-            .zip(col_widths.iter())
-            .enumerate()
-            .map(|(i, (value, &width))| {
-                // Truncate if value is too long
-                let display_value = truncate_string(value, width);
-
-                // Pad to column width (left-align for most, right-align for numbers in index)
-                let padded = if i == 0 {
-                    // Index column - right align
-                    format!("{:>width$}", display_value, width = width)
-                } else {
-                    // Data columns - left align
-                    format!("{:<width$}", display_value, width = width)
-                };
-
-                // Apply formatting
-                let formatted = match style {
-                    LineStyle::Bold => bold(&padded, self.use_color),
-                    LineStyle::Dim => dim(&padded, self.use_color),
-                    LineStyle::Normal => padded,
-                };
-
-                format!(" {} ", formatted) // Add padding around content
-            })
-            .collect();
-
-        format!(
-            "{}{}{}",
-            BoxChars::VERTICAL,
-            cells.join(BoxChars::VERTICAL),
-            BoxChars::VERTICAL
+        let style = match style {
+            LineStyle::Normal => 0,
+            LineStyle::Bold => 1,
+            LineStyle::Dim => 2,
+        };
+        super::render::interactive::row(
+            row_data,
+            col_widths,
+            |i, _| if i == 0 { 1 } else { 0 },
+            true,
+            style,
+            self.use_color,
         )
     }
 }

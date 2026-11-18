@@ -185,3 +185,17 @@ safety. See `priority-slices-2026-11-16.md` for scoped commits, fresh qualificat
 allocation evidence and exact remaining durable/alternate-execution boundaries.
 The fixed inventory stays 215 checked / 53 unchecked; no broad parent is closed
 by these bounded implementations.
+
+
+### Completed existing checkbox: display foundation — 2026-11-18
+
+**AR7.6 is complete**, including the previously unfinished Python adapters and
+its bounded scalar/compatibility/performance inventory. Native ownership,
+corrected omission/type/UTF-8/configuration behavior, public compatibility,
+61 captured layouts, 12 matching native hashes and measured costs pass fresh
+artifact-backed tests. See `display-closeout-2026-11-18.md`.
+
+Current fixed inventory: **216 checked / 52 unchecked / 268 total**;
+**43 unchecked expanded-release rows, nine deferred**. One existing parent closed,
+zero rows added. Other broad parents and unanswered owner policies retain their
+requirements. The preceding unchanged counts describe their dated passes.

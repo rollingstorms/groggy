@@ -4,6 +4,8 @@ Main formatters module providing high-level formatting functions.
 
 from typing import Any, Dict
 
+from .._groggy import _display_kind
+
 from .array_display import ArrayDisplayFormatter, format_array
 from .matrix_display import MatrixDisplayFormatter, format_matrix
 from .table_display import TableDisplayFormatter, format_table
@@ -49,14 +51,9 @@ def format_data_structure(
 
 def _detect_data_type(data: Dict[str, Any]) -> str:
     """Auto-detect the data structure type based on contents."""
-    if "columns" in data and "dtypes" in data:
-        return "table"
-    elif "data" in data and isinstance(data.get("data"), list):
-        first_item = data["data"][0] if data["data"] else None
-        if isinstance(first_item, list):
-            return "matrix"
-        else:
-            return "array"
-    else:
-        # Default fallback
-        return "table"
+    rows = data.get("data")
+    return _display_kind(
+        "columns" in data and "dtypes" in data,
+        isinstance(rows, list),
+        isinstance(rows, list) and bool(rows) and isinstance(rows[0], list),
+    )

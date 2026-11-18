@@ -59,65 +59,45 @@ pub(crate) fn character_width_up_to(text: &str, limit: usize) -> usize {
 
 /// Truncate rows to maximum display count
 pub fn truncate_rows<T: Clone>(data: Vec<T>, max_rows: usize) -> (Vec<T>, bool) {
-    if data.len() <= max_rows {
-        (data, false)
-    } else {
-        let show_first = max_rows / 2;
-        let show_last = max_rows.saturating_sub(show_first + 1); // reserve ellipsis row
-
-        let mut result = Vec::new();
-
-        // Add first rows
-        result.extend(data.iter().take(show_first).cloned());
-
-        // Add ellipsis placeholder (represented as special marker)
-        // We'll handle this in the calling code
-
-        // Add last rows
-        if show_last > 0 {
-            result.extend(data.iter().skip(data.len() - show_last).cloned());
-        }
-
-        (result, true)
+    let truncated = data.len() > max_rows;
+    if !truncated {
+        return (data, false);
     }
+    // This public compatibility utility historically omits marker slots.
+    let result = super::render::interactive::positions(data.len(), max_rows)
+        .into_iter()
+        .flatten()
+        .map(|i| data[i].clone())
+        .collect();
+    (result, true)
 }
 
-/// Truncate columns to maximum display count
+/// Select matching header/data positions, omitting historical marker slots.
 pub fn truncate_columns<T: Clone>(
     headers: Vec<T>,
     data: Vec<Vec<T>>,
     max_cols: usize,
 ) -> (Vec<T>, Vec<Vec<T>>, bool) {
     if headers.len() <= max_cols {
-        (headers, data, false)
-    } else {
-        let show_first = max_cols / 2;
-        let show_last = max_cols.saturating_sub(show_first + 1); // reserve ellipsis column
-
-        // Truncate headers
-        let mut truncated_headers = Vec::new();
-        truncated_headers.extend(headers.iter().take(show_first).cloned());
-        // Ellipsis header will be added by calling code
-        if show_last > 0 {
-            truncated_headers.extend(headers.iter().skip(headers.len() - show_last).cloned());
-        }
-
-        // Truncate data rows
-        let truncated_data: Vec<Vec<T>> = data
-            .into_iter()
-            .map(|row| {
-                let mut truncated_row = Vec::new();
-                truncated_row.extend(row.iter().take(show_first).cloned());
-                // Ellipsis cell will be added by calling code
-                if show_last > 0 {
-                    truncated_row.extend(row.iter().skip(row.len() - show_last).cloned());
-                }
-                truncated_row
-            })
-            .collect();
-
-        (truncated_headers, truncated_data, true)
+        return (headers, data, false);
     }
+    let positions = super::render::interactive::positions(headers.len(), max_cols);
+    let selected = positions
+        .iter()
+        .flatten()
+        .map(|&i| headers[i].clone())
+        .collect();
+    let rows = data
+        .into_iter()
+        .map(|row| {
+            positions
+                .iter()
+                .flatten()
+                .filter_map(|&i| row.get(i).cloned())
+                .collect()
+        })
+        .collect();
+    (selected, rows, true)
 }
 
 /// Calculate optimal column widths for display

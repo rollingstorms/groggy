@@ -1,0 +1,217 @@
+{
+  "cases": [
+    {
+      "ascii_output_hash": "dc084747850b2701",
+      "mode": "compact",
+      "output_bytes": 323,
+      "rows": 0,
+      "seconds_per_render": [
+        1.71791e-06,
+        1.43625e-06,
+        1.43084e-06,
+        1.50375e-06,
+        1.4645899999999999e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "dc084747850b2701",
+      "mode": "full",
+      "output_bytes": 323,
+      "rows": 0,
+      "seconds_per_render": [
+        1.3658299999999999e-06,
+        1.3495799999999998e-06,
+        1.38292e-06,
+        1.41791e-06,
+        1.38417e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "98960f0d7fb22aef",
+      "mode": "html",
+      "output_bytes": 5624,
+      "rows": 0,
+      "seconds_per_render": [
+        3.3145800000000003e-06,
+        3.04708e-06,
+        2.94208e-06,
+        2.85584e-06,
+        2.81084e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "71894943c7fe54f2",
+      "mode": "compact",
+      "output_bytes": 442,
+      "rows": 1,
+      "seconds_per_render": [
+        2.00875e-06,
+        1.9620799999999997e-06,
+        1.9716699999999997e-06,
+        1.96875e-06,
+        1.96625e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "71894943c7fe54f2",
+      "mode": "full",
+      "output_bytes": 442,
+      "rows": 1,
+      "seconds_per_render": [
+        1.97083e-06,
+        1.96167e-06,
+        1.96292e-06,
+        1.9716699999999997e-06,
+        1.97541e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "7a2c2f4d9667a7b2",
+      "mode": "html",
+      "output_bytes": 6049,
+      "rows": 1,
+      "seconds_per_render": [
+        7.15375e-06,
+        7.07375e-06,
+        7.14958e-06,
+        7.0970899999999995e-06,
+        7.151669999999999e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "68a8b19351d913fa",
+      "mode": "compact",
+      "output_bytes": 883,
+      "rows": 10,
+      "seconds_per_render": [
+        7.297910000000001e-06,
+        7.282499999999999e-06,
+        7.2720800000000005e-06,
+        7.2704200000000004e-06,
+        7.069999999999999e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "68a8b19351d913fa",
+      "mode": "full",
+      "output_bytes": 883,
+      "rows": 10,
+      "seconds_per_render": [
+        7.093340000000001e-06,
+        7.02417e-06,
+        6.98042e-06,
+        6.98875e-06,
+        7.0120899999999995e-06
+      ]
+    },
+    {
+      "ascii_output_hash": "25b7e3bc699b72cb",
+      "mode": "html",
+      "output_bytes": 9874,
+      "rows": 10,
+      "seconds_per_render": [
+        4.631084e-05,
+        4.5101250000000005e-05,
+        4.5576660000000004e-05,
+        4.510041e-05,
+        4.6655000000000006e-05
+      ]
+    },
+    {
+      "ascii_output_hash": "84c5e01d66594097",
+      "mode": "compact",
+      "output_bytes": 5513,
+      "rows": 100,
+      "seconds_per_render": [
+        5.780416e-05,
+        5.783416000000001e-05,
+        5.786833e-05,
+        5.81425e-05,
+        5.879625e-05
+      ]
+    },
+    {
+      "ascii_output_hash": "84c5e01d66594097",
+      "mode": "full",
+      "output_bytes": 5513,
+      "rows": 100,
+      "seconds_per_render": [
+        5.904375e-05,
+        5.791583e-05,
+        5.883166e-05,
+        5.810333e-05,
+        5.807e-05
+      ]
+    },
+    {
+      "ascii_output_hash": "47e143bf7abac2e5",
+      "mode": "html",
+      "output_bytes": 48394,
+      "rows": 100,
+      "seconds_per_render": [
+        0.0004632,
+        0.00047684999999999996,
+        0.00044135124999999996,
+        0.00043435291,
+        0.0005183166699999999
+      ]
+    }
+  ],
+  "scope": "Native release ASCII display corpus: compact/full Unicode and themed semantic HTML. Five samples of 100 renders; fixture/config construction excluded, rendering allocations included but not counted. Fingerprints use DefaultHasher only for a same-toolchain matched refactor comparison, not a stable external hash. Text-prefix cases compare the prior safe helper from 97705924 against the bounded helper in the same binary; budget 20; construction excluded and outputs validated outside timing. Whole HTML still escapes full tooltip content. No allocation/RSS/GIL/production claim.",
+  "text_prefix": [
+    {
+      "bounded_prefix_seconds": [
+        1.475e-07,
+        2.8417e-07,
+        1.2917e-07,
+        1.275e-07,
+        1.2708e-07
+      ],
+      "budget_characters": 20,
+      "input_characters": 1000,
+      "prior_count_all_seconds": [
+        6.0875e-07,
+        1.0391599999999999e-06,
+        4.0584000000000004e-07,
+        4.0375e-07,
+        4.0500000000000004e-07
+      ]
+    },
+    {
+      "bounded_prefix_seconds": [
+        1.4375e-07,
+        1.3125000000000001e-07,
+        1.2625e-07,
+        1.3334e-07,
+        1.3e-07
+      ],
+      "budget_characters": 20,
+      "input_characters": 1000000,
+      "prior_count_all_seconds": [
+        0.00015562291,
+        0.0001427225,
+        0.0001445625,
+        0.00015215917000000002,
+        0.00015233291
+      ]
+    }
+  ],
+  "runtime_source_sha256": {
+    "src/display/array_formatter.rs": "0d1d95b0c5f7c925c2954d413a26e80b69ad2bdaf268cb650b88b44a0c1e5791",
+    "src/display/matrix_formatter.rs": "a8588db042c0865a86d8fa0242c5bde82dfaf6cf41a1c57d6f9aaaab9ca8f117",
+    "src/display/mod.rs": "471096e3b7de38b633bfe8b939225c4a2668d94c76e05b7152939de160d12a20",
+    "src/display/render/compact.rs": "6bf6cb91637896c7083adce9a4a0a89b01d72db5d284a18566c493bb7dc3e4ae",
+    "src/display/render/data.rs": "ed2a2485529deb41b675c1af54a96edfc2a4ff4a6e6cb4e6a8e1d7f2381c5b89",
+    "src/display/render/engine.rs": "28305d10800df473b015f986014ee921a9fb33e4f0b7c2e0d665721abdc73dd5",
+    "src/display/render/html.rs": "469af450be6d9537242fbf52fb5c6cca039e85745b196573a2937e411147f714",
+    "src/display/render/interactive.rs": "be5ebba474ae05b7df047f88f46959ac61e98460ef7f5c7ea96ca41db865acc7",
+    "src/display/render/mod.rs": "4d4d1ffcdf67cf0cb51b65ae571e135d5504e1c0228a17a1862ba1e43cdd73fa",
+    "src/display/render/theme.rs": "d00d84ef1a5e001b12b3416e81070d7e699f7f73b7c9b0ff06615c771239d201",
+    "src/display/table_formatter.rs": "c0d78025ae58363fb6b7006d2f7671f88f7954819475dfc03de591192491eaf4",
+    "src/display/truncation.rs": "edea27c496ca65ae8e05fbd6cc4240aeea6c6da08c8f7e315b7907c74c2278a8",
+    "src/display/unicode_chars.rs": "2dc818134915998a82c3661b4c139ad25de4d1a55fc1964b9faaeceb09d22a4f"
+  },
+  "harness_sha256": "ac89761dbf965697ec48e716cd533d2746339c1e12d2b1af0f65b7220309a40b",
+  "toolchain": "rustc 1.96.1",
+  "measurement": "Fresh quiet process after native builds/tests stopped; no local qualification or other benchmark running."
+}

@@ -1,0 +1,93 @@
+{
+  "scope": "AR7.6 local closeout; one existing row closed, no new rows. This is not expanded-release completion or a cross-platform/publication claim.",
+  "date": "2026-11-18",
+  "production_source_file_count": 497,
+  "production_source_tree_sha256": "d711516bbd3412904e0ba3c9415fef0d685c14d0432b31a41a5726b858591374",
+  "production_source_hash_recipe": "Sorted relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "changed_native_display_sha256": {
+    "src/display/array_formatter.rs": "0d1d95b0c5f7c925c2954d413a26e80b69ad2bdaf268cb650b88b44a0c1e5791",
+    "src/display/matrix_formatter.rs": "a8588db042c0865a86d8fa0242c5bde82dfaf6cf41a1c57d6f9aaaab9ca8f117",
+    "src/display/mod.rs": "471096e3b7de38b633bfe8b939225c4a2668d94c76e05b7152939de160d12a20",
+    "src/display/render/compact.rs": "6bf6cb91637896c7083adce9a4a0a89b01d72db5d284a18566c493bb7dc3e4ae",
+    "src/display/render/data.rs": "ed2a2485529deb41b675c1af54a96edfc2a4ff4a6e6cb4e6a8e1d7f2381c5b89",
+    "src/display/render/engine.rs": "28305d10800df473b015f986014ee921a9fb33e4f0b7c2e0d665721abdc73dd5",
+    "src/display/render/html.rs": "469af450be6d9537242fbf52fb5c6cca039e85745b196573a2937e411147f714",
+    "src/display/render/interactive.rs": "be5ebba474ae05b7df047f88f46959ac61e98460ef7f5c7ea96ca41db865acc7",
+    "src/display/render/mod.rs": "4d4d1ffcdf67cf0cb51b65ae571e135d5504e1c0228a17a1862ba1e43cdd73fa",
+    "src/display/render/theme.rs": "d00d84ef1a5e001b12b3416e81070d7e699f7f73b7c9b0ff06615c771239d201",
+    "src/display/table_formatter.rs": "c0d78025ae58363fb6b7006d2f7671f88f7954819475dfc03de591192491eaf4",
+    "src/display/truncation.rs": "edea27c496ca65ae8e05fbd6cc4240aeea6c6da08c8f7e315b7907c74c2278a8",
+    "src/display/unicode_chars.rs": "2dc818134915998a82c3661b4c139ad25de4d1a55fc1964b9faaeceb09d22a4f"
+  },
+  "ffi_display_sha256": "c82896ec3e252648479463fd00542c05d09cfd972297db865f1542e62b61a47c",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "f315dc68dff56037e5a6447201ad7f9953166304128a13fb51d0cf58393acc0a",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "native": {
+    "passed": 1633,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 225,
+    "doctests_passed": 10,
+    "serial_checkpoint_recovery_passed": 1,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed",
+    "changed_ffi_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3385,
+    "skipped": 1,
+    "established_warnings": 14,
+    "documentation_examples": 290,
+    "additional_readme_blocks": 6,
+    "example_modules": 3,
+    "new_display_test_cases": 80,
+    "ruff_changed_python_format_and_F_E402": "passed",
+    "black_isort_pre_commit": "unavailable; not credited"
+  },
+  "artifact": {
+    "filename": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "ec806a315509f01c17bfa31aecb0ac6b5034e04fdcfb4aee6eaa353cd2a21274",
+    "bytes": 7130630,
+    "native_module_sha256": "f02ba252452a2a73ef376b1a514029ed08fdc3cc642fe3a158431cf862522f29",
+    "python_and_stub_files_match_source": 62,
+    "receipt": "display-closeout-wheel-qualification-2026-11-18.json",
+    "receipt_sha256": "bd5c7e760958655984ab6368317f0fa293badd3c91023ad67c5fee54804536a2",
+    "installed": false
+  },
+  "benchmark_receipts_sha256": {
+    "display-closeout-native-2026-11-18-1.json": "b43a9606a2b59e66de18dfee7b39034e148f41b7abd168b7cbc7cee889f258e2",
+    "display-closeout-native-2026-11-18-2.json": "dc182b834585a019d12d95ce1138161b6ccda6a33c548bde062b93bcd8ec6941",
+    "display-closeout-native-2026-11-18-3.json": "c9ab7bb2eb8a21cb65c44aa10fda06a1f70d5a4fd0c2e20760b9e53e75fd8016",
+    "display-closeout-python-2026-11-18-1.json": "f743bc6e4ae4cd91382987bb5d53ccdea6576b4903081f4e9a628d6691201554",
+    "display-closeout-python-2026-11-18-2.json": "282ae6d3d14930c65a07b4961984847de792e71ab42c6d01558035c7fd473355",
+    "display-closeout-python-2026-11-18-3.json": "89c000427bdd28fb3736208c9644378cad1ba386cec193646ad4c50273a57caf",
+    "display-closeout-python-initial-2026-11-18-1.json": "0d302708037b0a18e7c0bbc5eaae4d895f3577a2d39997ea3eb1c99924f6637f",
+    "display-closeout-python-initial-2026-11-18-2.json": "a350501359d6d36cbafc0636c77bedc2a790df9b8a377d71a705f609fa97b738",
+    "display-closeout-python-initial-2026-11-18-3.json": "b61418d1bbdce4c5aab7670d5cf82fcabaa9f2f80d24dc24ba673f76376e5bfa"
+  },
+  "checklist": {
+    "total": 268,
+    "checked": 216,
+    "unchecked": 52,
+    "unchecked_release": 43,
+    "deferred": 9,
+    "closed": [
+      "AR7.6"
+    ],
+    "added": []
+  },
+  "limits": [
+    "Python traced allocations exclude native allocation and RSS.",
+    "Small timings vary; no production latency/memory guarantee.",
+    "Other graph API, geometry/solver, numerical, service and expanded-release rows retain their scope.",
+    "Previous platform receipts qualify earlier sources; new platform qualification is separate."
+  ]
+}

@@ -199,34 +199,14 @@ impl ArrayDisplayFormatter {
                     n.to_string()
                 }
             }
-            serde_json::Value::String(s) => {
-                if s.len() > 12 {
-                    format!("{}{}", &s[..11], Symbols::ELLIPSIS)
-                } else {
-                    s.clone()
-                }
-            }
+            serde_json::Value::String(s) => super::truncation::truncate_string(s, 12),
             serde_json::Value::Bool(b) => b.to_string(),
             _ => value.to_string().trim_matches('"').to_string(),
         }
     }
 
     fn format_dtype(&self, dtype: &str) -> String {
-        let dtype_map = [
-            ("string", "str"),
-            ("int64", "i64"),
-            ("int32", "i32"),
-            ("float64", "f64"),
-            ("float32", "f32"),
-            ("bool", "bool"),
-            ("object", "obj"),
-        ];
-
-        dtype_map
-            .iter()
-            .find(|(k, _)| *k == dtype)
-            .map(|(_, v)| v.to_string())
-            .unwrap_or_else(|| dtype.to_string())
+        super::format_dtype(dtype, false)
     }
 
     fn extract_data(&self, data: &HashMap<String, serde_json::Value>) -> Vec<serde_json::Value> {

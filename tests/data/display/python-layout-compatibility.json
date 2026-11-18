@@ -1,0 +1,2241 @@
+[
+  {
+    "kind": "array",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 0
+    },
+    "expected": "⊖⊖ gr.array (empty) • shape: (0,) • dtype: f64"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 1
+    },
+    "expected": "⊖⊖ gr.array (empty) • shape: (0,) • dtype: f64"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 2
+    },
+    "expected": "⊖⊖ gr.array (empty) • shape: (0,) • dtype: f64"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 3
+    },
+    "expected": "⊖⊖ gr.array (empty) • shape: (0,) • dtype: f64"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 4
+    },
+    "expected": "⊖⊖ gr.array (empty) • shape: (0,) • dtype: f64"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 10
+    },
+    "expected": "⊖⊖ gr.array (empty) • shape: (0,) • dtype: f64"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null
+      ],
+      "dtype": "f64",
+      "shape": [
+        1
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 0
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬────────╮\n│ # │ values │\n│   │ f64    │\n├───┼────────┤\n╰───┴────────╯\nshape: (1,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null
+      ],
+      "dtype": "f64",
+      "shape": [
+        1
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 1
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬────────╮\n│ # │ values │\n│   │ f64    │\n├───┼────────┤\n│ 0 │ NaN    │\n╰───┴────────╯\nshape: (1,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null
+      ],
+      "dtype": "f64",
+      "shape": [
+        1
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 2
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬────────╮\n│ # │ values │\n│   │ f64    │\n├───┼────────┤\n│ 0 │ NaN    │\n╰───┴────────╯\nshape: (1,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null
+      ],
+      "dtype": "f64",
+      "shape": [
+        1
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 3
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬────────╮\n│ # │ values │\n│   │ f64    │\n├───┼────────┤\n│ 0 │ NaN    │\n╰───┴────────╯\nshape: (1,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null
+      ],
+      "dtype": "f64",
+      "shape": [
+        1
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 4
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬────────╮\n│ # │ values │\n│   │ f64    │\n├───┼────────┤\n│ 0 │ NaN    │\n╰───┴────────╯\nshape: (1,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null
+      ],
+      "dtype": "f64",
+      "shape": [
+        1
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 10
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬────────╮\n│ # │ values │\n│   │ f64    │\n├───┼────────┤\n│ 0 │ NaN    │\n╰───┴────────╯\nshape: (1,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null,
+        true,
+        false,
+        -9223372036854775808
+      ],
+      "dtype": "f64",
+      "shape": [
+        4
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 0
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬────────╮\n│ # │ values │\n│   │ f64    │\n├───┼────────┤\n╰───┴────────╯\nshape: (4,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null,
+        true,
+        false,
+        -9223372036854775808
+      ],
+      "dtype": "f64",
+      "shape": [
+        4
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 4
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬──────────────────────╮\n│ # │ values               │\n│   │ f64                  │\n├───┼──────────────────────┤\n│ 0 │ NaN                  │\n│ 1 │                 True │\n│ 2 │                False │\n│ 3 │ -9223372036854775808 │\n╰───┴──────────────────────╯\nshape: (4,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null,
+        true,
+        false,
+        -9223372036854775808
+      ],
+      "dtype": "f64",
+      "shape": [
+        4
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 10
+    },
+    "expected": "⊖⊖ gr.array\n\n╭───┬──────────────────────╮\n│ # │ values               │\n│   │ f64                  │\n├───┼──────────────────────┤\n│ 0 │ NaN                  │\n│ 1 │                 True │\n│ 2 │                False │\n│ 3 │ -9223372036854775808 │\n╰───┴──────────────────────╯\nshape: (4,)"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        null,
+        true,
+        false,
+        -9223372036854775808,
+        1208925819614629174706176,
+        -0.0,
+        1.23456789,
+        1e-12,
+        "猫😺<&éabcdefghijk",
+        {
+          "key": 1
+        },
+        "…",
+        "⋯"
+      ],
+      "dtype": "f64",
+      "shape": [
+        12
+      ],
+      "name": "values"
+    },
+    "options": {
+      "max_rows": 0
+    },
+    "expected": "⊖⊖ gr.array\n\n╭────┬────────╮\n│ #  │ values │\n│    │ f64    │\n├────┼────────┤\n╰────┴────────╯\nshape: (12,)"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 0,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix (empty) • shape: (0, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 1,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix (empty) • shape: (0, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 2,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix (empty) • shape: (0, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 3,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix (empty) • shape: (0, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 4,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix (empty) • shape: (0, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [],
+      "dtype": "f64",
+      "shape": [
+        0,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 10,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix (empty) • shape: (0, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 0,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭╮\n╰╯\nshape: (1, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 1,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (1, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 2,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (1, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 3,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (1, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 4,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (1, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 10,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (1, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        4,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 0,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭╮\n╰╯\nshape: (4, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        4,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 1,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (4, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        4,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 2,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n│   True │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (4, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        4,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 3,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭──────────────┬────────┬────────╮\n│          NaN │   ⋯    │  False │\n│      ⋯       │   ⋯    │   ⋯    │\n│ -9223372036854775808 │   ⋯    │  False │\n╰──────────────┴────────┴────────╯\nshape: (4, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        4,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 4,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭──────────────┬────────┬────────╮\n│          NaN │   ⋯    │  False │\n│         True │   ⋯    │  False │\n│        False │   ⋯    │  False │\n│ -9223372036854775808 │   ⋯    │  False │\n╰──────────────┴────────┴────────╯\nshape: (4, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        4,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 10,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭──────────────┬────────┬────────╮\n│          NaN │   ⋯    │  False │\n│         True │   ⋯    │  False │\n│        False │   ⋯    │  False │\n│ -9223372036854775808 │   ⋯    │  False │\n╰──────────────┴────────┴────────╯\nshape: (4, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1208925819614629174706176,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -0.0,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1.23456789,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1e-12,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "猫😺<&éabcdefghijk",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          {
+            "key": 1
+          },
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "…",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "⋯",
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        12,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 0,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭╮\n╰╯\nshape: (12, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1208925819614629174706176,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -0.0,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1.23456789,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1e-12,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "猫😺<&éabcdefghijk",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          {
+            "key": 1
+          },
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "…",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "⋯",
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        12,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 1,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (12, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1208925819614629174706176,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -0.0,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1.23456789,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1e-12,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "猫😺<&éabcdefghijk",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          {
+            "key": 1
+          },
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "…",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "⋯",
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        12,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 2,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n│   True │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (12, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1208925819614629174706176,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -0.0,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1.23456789,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1e-12,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "猫😺<&éabcdefghijk",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          {
+            "key": 1
+          },
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "…",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "⋯",
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        12,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 3,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n│   ⋯    │   ⋯    │   ⋯    │\n│   ⋯    │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (12, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1208925819614629174706176,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -0.0,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1.23456789,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1e-12,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "猫😺<&éabcdefghijk",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          {
+            "key": 1
+          },
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "…",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "⋯",
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        12,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 4,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────╮\n│    NaN │   ⋯    │  False │\n│   True │   ⋯    │  False │\n│   ⋯    │   ⋯    │   ⋯    │\n│   ⋯    │   ⋯    │  False │\n╰────────┴────────┴────────╯\nshape: (12, 4) • dtype: f64"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          null,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          true,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          false,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -9223372036854775808,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1208925819614629174706176,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          -0.0,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1.23456789,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          1e-12,
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "猫😺<&éabcdefghijk",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          {
+            "key": 1
+          },
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "…",
+          1.25,
+          "short",
+          false
+        ],
+        [
+          "⋯",
+          1.25,
+          "short",
+          false
+        ]
+      ],
+      "dtype": "f64",
+      "shape": [
+        12,
+        4
+      ]
+    },
+    "options": {
+      "max_rows": 10,
+      "max_cols": 3
+    },
+    "expected": "⊖⊖ gr.matrix\n╭──────────────┬────────┬────────╮\n│          NaN │   ⋯    │  False │\n│         True │   ⋯    │  False │\n│        False │   ⋯    │  False │\n│ -9223372036854775808 │   ⋯    │  False │\n│ 1208925819614629174706176 │   ⋯    │  False │\n│      ⋯       │   ⋯    │   ⋯    │\n│ 猫😺<&éabcdefghijk │   ⋯    │  False │\n│   {'key': 1} │   ⋯    │  False │\n│            … │   ⋯    │  False │\n│      ⋯       │   ⋯    │  False │\n╰──────────────┴────────┴────────╯\nshape: (12, 4) • dtype: f64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "value",
+        "float",
+        "text",
+        "bool"
+      ],
+      "dtypes": {
+        "value": "object",
+        "float": "float64",
+        "text": "string",
+        "bool": "bool"
+      },
+      "data": [],
+      "shape": [
+        0,
+        4
+      ],
+      "nulls": {
+        "value": 1
+      },
+      "index_type": "int64"
+    },
+    "options": {
+      "max_rows": 0,
+      "max_cols": 4
+    },
+    "expected": "⊖⊖ gr.table (empty)"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "value",
+        "float",
+        "text",
+        "bool"
+      ],
+      "dtypes": {
+        "value": "object",
+        "float": "float64",
+        "text": "string",
+        "bool": "bool"
+      },
+      "data": [],
+      "shape": [
+        0,
+        4
+      ],
+      "nulls": {
+        "value": 1
+      },
+      "index_type": "int64"
+    },
+    "options": {
+      "max_rows": 1,
+      "max_cols": 4
+    },
+    "expected": "⊖⊖ gr.table (empty)"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "value",
+        "float",
+        "text",
+        "bool"
+      ],
+      "dtypes": {
+        "value": "object",
+        "float": "float64",
+        "text": "string",
+        "bool": "bool"
+      },
+      "data": [],
+      "shape": [
+        0,
+        4
+      ],
+      "nulls": {
+        "value": 1
+      },
+      "index_type": "int64"
+    },
+    "options": {
+      "max_rows": 2,
+      "max_cols": 4
+    },
+    "expected": "⊖⊖ gr.table (empty)"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "value",
+        "float",
+        "text",
+        "bool"
+      ],
+      "dtypes": {
+        "value": "object",
+        "float": "float64",
+        "text": "string",
+        "bool": "bool"
+      },
+      "data": [],
+      "shape": [
+        0,
+        4
+      ],
+      "nulls": {
+        "value": 1
+      },
+      "index_type": "int64"
+    },
+    "options": {
+      "max_rows": 3,
+      "max_cols": 4
+    },
+    "expected": "⊖⊖ gr.table (empty)"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "value",
+        "float",
+        "text",
+        "bool"
+      ],
+      "dtypes": {
+        "value": "object",
+        "float": "float64",
+        "text": "string",
+        "bool": "bool"
+      },
+      "data": [],
+      "shape": [
+        0,
+        4
+      ],
+      "nulls": {
+        "value": 1
+      },
+      "index_type": "int64"
+    },
+    "options": {
+      "max_rows": 4,
+      "max_cols": 4
+    },
+    "expected": "⊖⊖ gr.table (empty)"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "value",
+        "float",
+        "text",
+        "bool"
+      ],
+      "dtypes": {
+        "value": "object",
+        "float": "float64",
+        "text": "string",
+        "bool": "bool"
+      },
+      "data": [],
+      "shape": [
+        0,
+        4
+      ],
+      "nulls": {
+        "value": 1
+      },
+      "index_type": "int64"
+    },
+    "options": {
+      "max_rows": 10,
+      "max_cols": 4
+    },
+    "expected": "⊖⊖ gr.table (empty)"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        1,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 0
+    },
+    "expected": "⊖⊖ gr.table\n╭─────┬─────┬─────┬─────╮\n│   # │ na… │ sc… │ va… │\n│     │ st… │ f64 │ obj │\n├─────┼─────┼─────┼─────┤\n│   0 │ 猫😺… │ -0… │ 12… │\n╰─────┴─────┴─────┴─────╯\nrows: 1 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        4,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 0
+    },
+    "expected": "⊖⊖ gr.table\n╭─────┬─────┬─────┬─────╮\n│   # │ na… │ sc… │ va… │\n│     │ st… │ f64 │ obj │\n├─────┼─────┼─────┼─────┤\n│   0 │ 猫😺… │ -0… │ 12… │\n│   1 │ 猫😺… │ -0… │ 12… │\n│   2 │ 猫😺… │ -0… │ 12… │\n│   3 │ 猫😺… │ -0… │ 12… │\n╰─────┴─────┴─────┴─────╯\nrows: 4 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        12,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 0
+    },
+    "expected": "⊖⊖ gr.table\n╭─────┬─────┬─────┬─────╮\n│   # │ na… │ sc… │ va… │\n│     │ st… │ f64 │ obj │\n├─────┼─────┼─────┼─────┤\n│   0 │ 猫😺… │ -0… │ 12… │\n│   1 │ 猫😺… │ -0… │ 12… │\n│   2 │ 猫😺… │ -0… │ 12… │\n│   3 │ 猫😺… │ -0… │ 12… │\n│   4 │ 猫😺… │ -0… │ 12… │\n│   … │ …   │ …   │ …   │\n│   8 │ 猫😺… │ -0… │ 12… │\n│   9 │ 猫😺… │ -0… │ 12… │\n│  10 │ 猫😺… │ -0… │ 12… │\n│  11 │ 猫😺… │ -0… │ 12… │\n╰─────┴─────┴─────┴─────╯\nrows: 12 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        1,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 20
+    },
+    "expected": "⊖⊖ gr.table\n╭─────┬─────┬─────┬─────╮\n│   # │ na… │ sc… │ va… │\n│     │ st… │ f64 │ obj │\n├─────┼─────┼─────┼─────┤\n│   0 │ 猫😺… │ -0… │ 12… │\n╰─────┴─────┴─────┴─────╯\nrows: 1 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        4,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 20
+    },
+    "expected": "⊖⊖ gr.table\n╭─────┬─────┬─────┬─────╮\n│   # │ na… │ sc… │ va… │\n│     │ st… │ f64 │ obj │\n├─────┼─────┼─────┼─────┤\n│   0 │ 猫😺… │ -0… │ 12… │\n│   1 │ 猫😺… │ -0… │ 12… │\n│   2 │ 猫😺… │ -0… │ 12… │\n│   3 │ 猫😺… │ -0… │ 12… │\n╰─────┴─────┴─────┴─────╯\nrows: 4 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        12,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 20
+    },
+    "expected": "⊖⊖ gr.table\n╭─────┬─────┬─────┬─────╮\n│   # │ na… │ sc… │ va… │\n│     │ st… │ f64 │ obj │\n├─────┼─────┼─────┼─────┤\n│   0 │ 猫😺… │ -0… │ 12… │\n│   1 │ 猫😺… │ -0… │ 12… │\n│   2 │ 猫😺… │ -0… │ 12… │\n│   3 │ 猫😺… │ -0… │ 12… │\n│   4 │ 猫😺… │ -0… │ 12… │\n│   … │ …   │ …   │ …   │\n│   8 │ 猫😺… │ -0… │ 12… │\n│   9 │ 猫😺… │ -0… │ 12… │\n│  10 │ 猫😺… │ -0… │ 12… │\n│  11 │ 猫😺… │ -0… │ 12… │\n╰─────┴─────┴─────┴─────╯\nrows: 12 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        1,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 60
+    },
+    "expected": "⊖⊖ gr.table\n╭──────┬──────────────┬───────┬───────────────────────────╮\n│    # │ name         │ score │ value                     │\n│      │ str[8]       │ f64   │ obj                       │\n├──────┼──────────────┼───────┼───────────────────────────┤\n│    0 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n╰──────┴──────────────┴───────┴───────────────────────────╯\nrows: 1 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        4,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 60
+    },
+    "expected": "⊖⊖ gr.table\n╭──────┬──────────────┬───────┬───────────────────────────╮\n│    # │ name         │ score │ value                     │\n│      │ str[8]       │ f64   │ obj                       │\n├──────┼──────────────┼───────┼───────────────────────────┤\n│    0 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    1 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    2 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    3 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n╰──────┴──────────────┴───────┴───────────────────────────╯\nrows: 4 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        12,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 60
+    },
+    "expected": "⊖⊖ gr.table\n╭──────┬──────────────┬───────┬───────────────────────────╮\n│    # │ name         │ score │ value                     │\n│      │ str[8]       │ f64   │ obj                       │\n├──────┼──────────────┼───────┼───────────────────────────┤\n│    0 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    1 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    2 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    3 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    4 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    … │ …            │ …     │ …                         │\n│    8 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    9 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│   10 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│   11 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n╰──────┴──────────────┴───────┴───────────────────────────╯\nrows: 12 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        1,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 120
+    },
+    "expected": "⊖⊖ gr.table\n╭──────┬──────────────┬───────┬───────────────────────────╮\n│    # │ name         │ score │ value                     │\n│      │ str[8]       │ f64   │ obj                       │\n├──────┼──────────────┼───────┼───────────────────────────┤\n│    0 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n╰──────┴──────────────┴───────┴───────────────────────────╯\nrows: 1 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        4,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 120
+    },
+    "expected": "⊖⊖ gr.table\n╭──────┬──────────────┬───────┬───────────────────────────╮\n│    # │ name         │ score │ value                     │\n│      │ str[8]       │ f64   │ obj                       │\n├──────┼──────────────┼───────┼───────────────────────────┤\n│    0 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    1 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    2 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    3 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n╰──────┴──────────────┴───────┴───────────────────────────╯\nrows: 4 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "name",
+        "score",
+        "value"
+      ],
+      "dtypes": {
+        "name": "string",
+        "score": "float64",
+        "value": "object"
+      },
+      "data": [
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ],
+        [
+          "猫😺abcdefghijk",
+          -0.0,
+          1208925819614629174706176
+        ]
+      ],
+      "shape": [
+        12,
+        3
+      ],
+      "nulls": {},
+      "index_type": "int64"
+    },
+    "options": {
+      "max_width": 120
+    },
+    "expected": "⊖⊖ gr.table\n╭──────┬──────────────┬───────┬───────────────────────────╮\n│    # │ name         │ score │ value                     │\n│      │ str[8]       │ f64   │ obj                       │\n├──────┼──────────────┼───────┼───────────────────────────┤\n│    0 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    1 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    2 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    3 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    4 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    … │ …            │ …     │ …                         │\n│    8 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│    9 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│   10 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n│   11 │ 猫😺abcdefghi… │ -0.00 │ 1208925819614629174706176 │\n╰──────┴──────────────┴───────┴───────────────────────────╯\nrows: 12 • cols: 3 • index: int64"
+  },
+  {
+    "kind": "array",
+    "data": {
+      "data": [
+        {
+          "__float__": "nan"
+        },
+        {
+          "__float__": "inf"
+        },
+        {
+          "__float__": "-inf"
+        },
+        -0.0
+      ],
+      "shape": [
+        4
+      ],
+      "dtype": "f64"
+    },
+    "options": {},
+    "expected": "⊖⊖ gr.array\n\n╭───┬──────╮\n│ # │ col1 │\n│   │ f64  │\n├───┼──────┤\n│ 0 │ NaN  │\n│ 1 │ NaN  │\n│ 2 │ NaN  │\n│ 3 │   -0 │\n╰───┴──────╯\nshape: (4,)"
+  },
+  {
+    "kind": "matrix",
+    "data": {
+      "data": [
+        [
+          {
+            "__float__": "nan"
+          },
+          {
+            "__float__": "inf"
+          },
+          {
+            "__float__": "-inf"
+          },
+          -0.0
+        ]
+      ],
+      "shape": [
+        1,
+        4
+      ],
+      "dtype": "f64"
+    },
+    "options": {},
+    "expected": "⊖⊖ gr.matrix\n╭────────┬────────┬────────┬────────╮\n│    NaN │    NaN │    NaN │  -0.00 │\n╰────────┴────────┴────────┴────────╯\nshape: (1, 4) • dtype: f64"
+  },
+  {
+    "kind": "table",
+    "data": {
+      "columns": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "dtypes": {},
+      "data": [
+        [
+          {
+            "__float__": "nan"
+          },
+          {
+            "__float__": "inf"
+          },
+          {
+            "__float__": "-inf"
+          },
+          -0.0
+        ]
+      ],
+      "shape": [
+        1,
+        4
+      ]
+    },
+    "options": {},
+    "expected": "⊖⊖ gr.table\n╭──────┬──────┬──────┬──────┬──────╮\n│    # │ a    │ b    │ c    │ d    │\n│      │ obj  │ obj  │ obj  │ obj  │\n├──────┼──────┼──────┼──────┼──────┤\n│    0 │ NaN  │ NaN  │ NaN  │ -0.0 │\n╰──────┴──────┴──────┴──────┴──────╯\nrows: 1 • cols: 4 • index: int64"
+  }
+]

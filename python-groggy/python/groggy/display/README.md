@@ -150,11 +150,11 @@ groggy/display/
 ### GraphTable Data Format
 ```python
 {
-    'columns': ['col1', 'col2', ...],           # Column names
+    'columns': ['col1', 'col2'],           # Column names
     'dtypes': {'col1': 'int64', 'col2': 'f32'}, # Column data types
-    'data': [[val1, val2], [val3, val4], ...], # Row data
-    'shape': (rows, cols),                      # Dimensions
-    'nulls': {'col1': null_count},              # Null counts per column
+    'data': [[1, 2.0], [3, 4.0]], # Row data
+    'shape': (2, 2),                      # Dimensions
+    'nulls': {'col1': 0},              # Null counts per column
     'index_type': 'int64'                       # Index data type
 }
 ```
@@ -163,7 +163,7 @@ groggy/display/
 ```python
 {
     'data': [[1, 2], [3, 4]],    # 2D matrix data
-    'shape': (rows, cols),       # Dimensions
+    'shape': (2, 2),       # Dimensions
     'dtype': 'f32'               # Element data type
 }
 ```
@@ -173,7 +173,7 @@ groggy/display/
 {
     'data': [1, 2, 3, 4],    # 1D array data
     'dtype': 'f32',          # Element data type
-    'shape': (length,),      # Dimensions
+    'shape': (4,),      # Dimensions
     'name': 'column_name'    # Optional column name
 }
 ```
@@ -181,16 +181,37 @@ groggy/display/
 ## Implementation Notes
 
 - **Performance**: Display formatting is optimized for interactive use with reasonable defaults
-- **Fallbacks**: All formatting includes graceful error handling with simple fallback representations
+- **Validation**: Invalid configuration and unrepresentable text raise explicit errors; callers choose their own fallback.
 - **Terminal Support**: Automatically detects color support and adjusts formatting accordingly
 - **Unicode Safety**: Uses standard Unicode box-drawing characters supported by modern terminals
-- **Memory Efficient**: Smart truncation prevents memory issues with large datasets
+- **Visible cells**: Dictionary adapters select rows/columns before invoking Python scalar formatting. Native rendering owns no Python objects. This does not cap memory already held by the input.
 
 ## Running the Demo
 
 ```bash
 cd python-groggy/python
-python groggy/display/demo.py
+python -m groggy.display.demo
 ```
 
 This will show example outputs for all three data structure types with various sizes and content types.
+
+
+## Native ownership and compatibility
+
+Layouts, row/column plans, text clipping and dtype spellings are owned by
+`groggy::display` / `display::render` in Rust. The Python modules retain object
+projection, Python scalar spellings, ordered summaries and terminal detection.
+The public imports and normal default layouts remain available.
+
+`configure_display` now affects new dictionary formatters; explicit options win
+and existing formatter instances retain their settings. It does not reconfigure
+the separate typed graph/table HTML renderer. Zero limits are valid; negative or
+noninteger configuration rejects before changing defaults. `max_width` is a table
+allocation hint, not a hard terminal width promise. Array/matrix retain that
+setting without assigning it new semantics.
+
+The migration corrects tiny-budget indices, literal ellipsis handling, truncated
+type headers, duplicate date ellipses and native UTF-8/row-limit defects. Full
+policies and executable examples: `docs/api/display-foundation.md` in the source
+repository. Performance observations distinguish Python traced memory from native
+allocation and RSS; no production timing guarantee is implied.

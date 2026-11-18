@@ -2,11 +2,12 @@
 Rich display formatter for GraphTable structures.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
-from .truncation import (calculate_column_widths, truncate_columns,
-                         truncate_rows, truncate_string)
-from .unicode_chars import BoxChars, Colors, Symbols, colorize
+from .._groggy import _display_dtype, _display_positions, _display_table
+from ._presentation import _python_scalar, _resolve_option
+
+from .unicode_chars import Symbols, has_color_support
 
 
 class TableDisplayFormatter:
@@ -14,218 +15,89 @@ class TableDisplayFormatter:
 
     def __init__(
         self,
-        max_rows: int = 10,
-        max_cols: int = 20,
-        max_width: int = 120,
-        precision: int = 2,
+        max_rows: Optional[int] = None,
+        max_cols: Optional[int] = None,
+        max_width: Optional[int] = None,
+        precision: Optional[int] = None,
     ):
-        self.max_rows = max_rows
-        self.max_cols = max_cols
-        self.max_width = max_width
-        self.precision = precision
+        self.max_rows = _resolve_option("max_rows", max_rows, 10)
+        self.max_cols = _resolve_option("max_cols", max_cols, 20)
+        self.max_width = _resolve_option("max_width", max_width, 120)
+        self.precision = _resolve_option("precision", precision, 2)
 
     def format(self, table_data: Dict[str, Any]) -> str:
-        """
-        Format a GraphTable for rich display.
-
-        Expected table_data structure:
-        {
-            'columns': ['name', 'city', 'age', 'score', 'joined'],
-            'dtypes': {'name': 'str', 'city': 'category', 'age': 'int', 'score': 'float', 'joined': 'date'},
-            'data': [
-                ['Alice', 'NYC', 25, 91.5, '2024-02-15'],
-                ['Bob', 'Paris', 30, 87.0, '2023-11-20'],
-                ...
-            ],
-            'shape': (1000, 5),
-            'nulls': {'score': 12},
-            'index_type': 'int64'
-        }
-        """
+        """Marshal only visible cells; native code owns rectangular rendering."""
         columns = table_data.get("columns", [])
         dtypes = table_data.get("dtypes", {})
         data = table_data.get("data", [])
-        shape = table_data.get("shape", (0, 0))
-        nulls = table_data.get("nulls", {})
-        index_type = table_data.get("index_type", "int64")
-
-        if not columns or not data:
-            return self._format_empty_table()
-
-        # Add index column
-        headers = ["#"] + columns
-        type_headers = [""] + [
-            self._format_dtype(dtypes.get(col, "object")) for col in columns
-        ]
-
-        # Add row indices to data
-        indexed_data = []
-        for i, row in enumerate(data):
-            indexed_row = [str(i)] + [
-                self._format_value(val, dtypes.get(columns[j], "object"))
-                for j, val in enumerate(row)
+        headers, types, rows = [], [], []
+        empty = not columns or not data
+        if not empty:
+            positions = _display_positions(len(columns) + 1, self.max_cols)
+            headers = [
+                Symbols.ELLIPSIS
+                if col is None
+                else "#"
+                if col == 0
+                else columns[col - 1]
+                for col in positions
             ]
-            indexed_data.append(indexed_row)
-
-        # Truncate if necessary
-        truncated_data, rows_truncated = truncate_rows(indexed_data, self.max_rows)
-        truncated_headers, truncated_data, cols_truncated = truncate_columns(
-            headers, truncated_data, self.max_cols
-        )
-        truncated_type_headers = type_headers[: len(truncated_headers)]
-
-        # Calculate column widths
-        col_widths = calculate_column_widths(
-            truncated_headers, truncated_data, self.max_width
-        )
-
-        # Build the formatted table
-        lines = []
-
-        # Header with section indicator
-        lines.append(f"{Symbols.HEADER_PREFIX} gr.table")
-
-        # Top border
-        lines.append(self._build_border_line(col_widths, "top"))
-
-        # Column headers
-        lines.append(self._build_data_line(truncated_headers, col_widths, bold=True))
-        lines.append(
-            self._build_data_line(truncated_type_headers, col_widths, dim=True)
-        )
-
-        # Header separator
-        lines.append(self._build_border_line(col_widths, "middle"))
-
-        # Data rows
-        for row in truncated_data:
-            lines.append(self._build_data_line(row, col_widths))
-
-        # Bottom border
-        lines.append(self._build_border_line(col_widths, "bottom"))
-
-        # Summary statistics
-        summary_parts = [
-            f"rows: {shape[0]:,}",
-            f"cols: {shape[1]}",
-        ]
-
+            types = [
+                Symbols.ELLIPSIS
+                if col is None
+                else ""
+                if col == 0
+                else self._format_dtype(dtypes.get(columns[col - 1], "object"))
+                for col in positions
+            ]
+            for index in _display_positions(len(data), self.max_rows):
+                row = []
+                for col in positions:
+                    if index is None:
+                        row.append(Symbols.ELLIPSIS)
+                    elif col is None:
+                        row.append(Symbols.TRUNCATION_INDICATOR)
+                    elif col == 0:
+                        row.append(str(index))
+                    elif col - 1 < len(data[index]):
+                        row.append(
+                            self._format_value(
+                                data[index][col - 1],
+                                dtypes.get(columns[col - 1], "object"),
+                            )
+                        )
+                    else:
+                        row.append("")
+                rows.append(row)
+        shape = table_data.get("shape", (0, 0))
+        summary = [f"rows: {shape[0]:,}", f"cols: {shape[1]}"]
+        nulls = table_data.get("nulls", {})
         if nulls:
-            null_info = ", ".join(f"{col}={count}" for col, count in nulls.items())
-            summary_parts.append(f"nulls: {null_info}")
-
-        summary_parts.append(f"index: {index_type}")
-
-        # Add special info for GraphTable
+            summary.append(
+                "nulls: " + ", ".join(f"{key}={value}" for key, value in nulls.items())
+            )
+        summary.append("index: " + table_data.get("index_type", "int64"))
         if table_data.get("table_type") == "GraphTable":
-            nodes_shape = table_data.get("nodes_shape", (0, 0))
-            edges_shape = table_data.get("edges_shape", (0, 0))
-            summary_parts.append(f"nodes: {nodes_shape[0]:,}×{nodes_shape[1]}")
-            summary_parts.append(f"edges: {edges_shape[0]:,}×{edges_shape[1]}")
-
-        summary = f" {Symbols.DOT_SEPARATOR} ".join(summary_parts)
-        lines.append(summary)
-
-        return "\n".join(lines)
-
-    def _format_empty_table(self) -> str:
-        """Format an empty table."""
-        return f"{Symbols.HEADER_PREFIX} gr.table (empty)"
+            nodes = table_data.get("nodes_shape", (0, 0))
+            edges = table_data.get("edges_shape", (0, 0))
+            summary.extend(
+                [f"nodes: {nodes[0]:,}×{nodes[1]}", f"edges: {edges[0]:,}×{edges[1]}"]
+            )
+        return _display_table(
+            headers,
+            types,
+            rows,
+            empty,
+            f" {Symbols.DOT_SEPARATOR} ".join(summary),
+            self.max_width,
+            has_color_support(),
+        )
 
     def _format_dtype(self, dtype: str) -> str:
-        """Format data type for display."""
-        dtype_map = {
-            "string": "str",
-            "category": "cat",
-            "int64": "i64",
-            "int32": "i32",
-            "float64": "f64",
-            "float32": "f32",
-            "bool": "bool",
-            "datetime": "date",
-            "object": "obj",
-        }
-
-        base_type = dtype_map.get(dtype, dtype)
-
-        # Add size hints for string/category types
-        if dtype in ["string", "str"]:
-            return f"{base_type}[8]"  # Could be dynamic based on max length
-        elif dtype in ["category", "cat"]:
-            return f"{base_type}(12)"  # Could be dynamic based on category count
-        else:
-            return base_type
+        return _display_dtype(dtype, True)
 
     def _format_value(self, value: Any, dtype: str) -> str:
-        """Format a single value for display."""
-        if value is None or (
-            isinstance(value, float) and str(value).lower() in ["nan", "inf", "-inf"]
-        ):
-            return Symbols.NULL_DISPLAY
-
-        if dtype in ["float64", "float32", "float"] and isinstance(value, (int, float)):
-            return f"{float(value):.{self.precision}f}"
-        elif dtype in ["datetime", "date"] and isinstance(value, str):
-            # Truncate dates for display
-            return truncate_string(value, 10) + (
-                Symbols.ELLIPSIS if len(value) > 10 else ""
-            )
-        elif isinstance(value, str):
-            # Truncate long strings
-            return truncate_string(value, 12)
-        else:
-            return str(value)
-
-    def _build_border_line(self, col_widths: List[int], position: str) -> str:
-        """Build a border line (top, middle, bottom)."""
-        if position == "top":
-            left = BoxChars.TOP_LEFT
-            right = BoxChars.TOP_RIGHT
-            sep = BoxChars.T_TOP
-        elif position == "middle":
-            left = BoxChars.T_LEFT
-            right = BoxChars.T_RIGHT
-            sep = BoxChars.CROSS
-        else:  # bottom
-            left = BoxChars.BOTTOM_LEFT
-            right = BoxChars.BOTTOM_RIGHT
-            sep = BoxChars.T_BOTTOM
-
-        segments = []
-        for i, width in enumerate(col_widths):
-            segment = BoxChars.HORIZONTAL * (width + 2)  # +2 for padding
-            segments.append(segment)
-
-        return left + sep.join(segments) + right
-
-    def _build_data_line(
-        self,
-        row_data: List[str],
-        col_widths: List[int],
-        bold: bool = False,
-        dim: bool = False,
-    ) -> str:
-        """Build a data line with proper padding and alignment."""
-        cells = []
-        for i, (value, width) in enumerate(zip(row_data, col_widths)):
-            # Truncate if value is too long
-            display_value = truncate_string(str(value), width)
-
-            # Pad to column width (left-align for most, right-align for numbers in index)
-            if i == 0:  # Index column - right align
-                padded = display_value.rjust(width)
-            else:  # Data columns - left align
-                padded = display_value.ljust(width)
-
-            # Apply formatting
-            if bold:
-                padded = colorize(padded, bold=True)
-            elif dim:
-                padded = colorize(padded, dim=True)
-
-            cells.append(f" {padded} ")  # Add padding around content
-
-        return BoxChars.VERTICAL + BoxChars.VERTICAL.join(cells) + BoxChars.VERTICAL
+        return _python_scalar(value, "table", self.precision, dtype)
 
 
 def format_table(table_data: Dict[str, Any], **kwargs) -> str:
