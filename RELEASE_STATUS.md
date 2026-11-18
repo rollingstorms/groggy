@@ -9,7 +9,8 @@ The owner now targets all remaining hierarchical groups except group 8:
 This includes provenance and multi-user/concurrency work. The expanded target
 remains unfinished. See [scope and next chunk](notes/planning/release-060-expanded-scope-2026-11-15.md).
 
-Latest completed checklist item: **AR7.6 — one display foundation**. Historical
+Completed in this block: **AR7.6 — one display foundation** and
+**34.1 — capability publication**. Historical
 Python array/matrix/table formatters now use native layouts and shared text/
 selection/dtype policies; Python retains scalar spelling and terminal adapters.
 Two existing rows closed; no rows added: **217 checked / 51 open**, with **42 open
@@ -21,8 +22,17 @@ recovery, strict Clippy/formatting; unpacked wheel **3,385 maintained Python pas
 one skipped / 14 established warnings**, **290 executable docs**. Matched display
 costs retain small-call variation and native-allocation/RSS limits. Local
 [wheel receipt](notes/benchmarks/display-closeout-wheel-qualification-2026-11-18.json).
-Cross-platform qualification for this new runtime is recorded separately; the
-previous platform run below qualifies its own pinned source only.
+[Current platform qualification](https://github.com/rollingstorms/groggy/actions/runs/44403061335)
+passed **all 21 required jobs and all 19 wheel combinations**, plus the source
+rebuild; publication was skipped. The
+[platform receipt](notes/benchmarks/display-closeout-platform-qualification-2026-11-18.json)
+retains all 20 qualification reports, 40 upload identities/digests and source
+verification. The source archive's **497 production Rust/Python/stub files match
+current sources byte-for-byte**. CI regenerated lockfiles; their actual hashes
+are retained separately from local dependency locks. Later capability/workflow
+documentation has no production changes and its new validation step was checked
+locally, not credited as part of that earlier run. The older platform results
+below qualify their own pinned sources only.
 
 The [capability matrix](docs/api/capability-matrix.md) is published under completed
 item **34.1**: 50 families classify all 105 declared Python exports and map all 268

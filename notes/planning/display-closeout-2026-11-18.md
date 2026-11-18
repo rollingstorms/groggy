@@ -144,3 +144,23 @@ No known unfinished part of the stated AR7.6 completion boundary is moved to a
 new row. Existing broader engine/API/algorithm/scale/service requirements remain
 open at their original scope. The pending provisional-entity history question,
 schema-history policy and production budgets are unchanged and unanswered.
+
+
+## Successful platform follow-up
+
+Runtime **cfc5628c** passed manual run
+[44403061335](https://github.com/rollingstorms/groggy/actions/runs/44403061335):
+all 21 required jobs, 19 wheel combinations and extracted-source rebuild;
+publication skipped. The platform receipt retains 20 qualification reports and
+40 upload IDs/digests. The downloaded source archive is 5,302,196 bytes, SHA256
+`9f43fa54508510f2ad8133db08aa5a3fccf8f7f862fd67307de9faf3ad8e02f4`;
+all 497 production source files match current bytes and Finder metadata is absent.
+CI-regenerated lockfiles are retained with actual hashes, separately from local
+locks. The source archive precedes later capability/workflow documentation, which
+has no production changes.
+
+Only Linux Python 3.12 executes the maintained gate; the other 18 wheels use
+ownership plus isolated exports/storage workflows. Extracted-source testing uses
+`tests=none` with isolated smoke/storage workflows. These distinct gates are not
+credited as full maintained coverage on every platform. Evidence:
+`notes/benchmarks/display-closeout-platform-qualification-2026-11-18.json`.

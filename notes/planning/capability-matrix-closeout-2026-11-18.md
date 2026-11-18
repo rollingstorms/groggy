@@ -60,3 +60,13 @@ The fixed inventory is **217 checked / 51 unchecked / 268 total**;
 policy decisions, original-feature retirements or production-readiness claims.
 All 497 production source files remain byte-identical to the qualified runtime;
 this slice changes documentation, its validator and validation wiring only.
+
+
+## Qualified runtime platform evidence
+
+The pinned runtime cfc5628c also passes all 21 required CI jobs, all 19 wheels and
+source rebuild in run 44403061335. Production sources remain byte-identical after
+this documentation/validation commit. The newly added matrix workflow step was
+validated locally; it was not present in the earlier runtime CI run and is not
+credited as remotely executed there. Platform receipts/source/archive/lock scope:
+`notes/benchmarks/display-closeout-platform-qualification-2026-11-18.json`.

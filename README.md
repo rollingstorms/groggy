@@ -12,7 +12,7 @@
 [complete application workflow](docs/api/core-release-workflow.md) for current
 mutation, immutable-view, temporal and storage behavior. Package builds target
 CPython 3.8–3.12 (macOS arm64: 3.9–3.12); see
-[qualification status](RELEASE_STATUS.md) for executed checks and pending CI.
+[qualification status](RELEASE_STATUS.md) for executed checks and remaining release work.
 `pip install groggy` installs the published release, which may differ from this
 development branch. Older examples below are not the 0.6.0 acceptance contract.
 

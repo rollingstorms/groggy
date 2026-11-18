@@ -214,3 +214,12 @@ See `capability-matrix-closeout-2026-11-18.md`. Broader documentation work remai
 Current inventory: **217 checked / 51 unchecked**, **42 release rows and nine
 deferred**. AR7.6 and 34.1 are the two closed existing rows in this pass;
 zero new rows. Runtime remains cfc5628c; this follow-up has no production changes.
+
+
+### Platform qualification of the closed-item runtime — 2026-11-18
+
+cfc5628c passes all 21 required jobs and 19 wheel combinations plus source rebuild
+in run 44403061335; publication skipped. All 497 production files match the
+verified downloaded source archive and later documentation-only commits.
+See `display-closeout-platform-qualification-2026-11-18.json` under benchmarks.
+The fixed inventory remains 217 checked / 51 open; 42 release rows remain.
