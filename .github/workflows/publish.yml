@@ -25,6 +25,8 @@ jobs:
       with:
         toolchain: 1.96.1
         components: clippy
+    - name: Validate capability publication
+      run: python3 notes/scripts/build_capability_matrix.py --check
     - run: cargo generate-lockfile
     - run: cargo test --locked
     - run: cargo test --locked --lib killed_checkpoint_process -- --ignored --test-threads=1

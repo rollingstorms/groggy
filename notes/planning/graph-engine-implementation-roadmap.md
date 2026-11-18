@@ -12,7 +12,25 @@ The concrete integration target is [Graphiti](https://github.com/getzep/graphiti
 
 The stages describe related work, with Graphiti-specific integration and retrieval deferred until the Groggy core is finished. Each item may call for verification, repair, completion, or a new capability. Item numbers remain continuous so individual work items are easy to reference. The owner's "number 25" in the later flat list means the Graphiti ingest adapter, numbered 20 here; its "number 27" means lexical search, numbered 22 here. The related Graphiti driver is numbered 25 here.
 
-## Current checkpoint — 2026-10-26
+## Current checkpoint — 2026-11-18
+
+The [capability matrix](../../docs/api/capability-matrix.md) publishes 50 feature
+families, all 105 declared Python exports and coverage of all 268 stable checklist
+rows. Rust/Python availability, applicable persistence, native/Python evidence,
+limits and unfinished scope are separate fields; method existence is not proof.
+
+**217 checked / 51 open**, with **42 open expanded-release rows and nine deferred**.
+AR7.6 (display foundation) and 34.1 (capability publication) close existing rows;
+no original feature is retired and no checklist rows are added. Broader API,
+service, execution, numerical/scale and documentation work remains explicitly open.
+The pinned runtime is cfc5628c; the linked receipt records its qualification.
+
+Earlier checkpoints and publication descriptions below are historical. In
+particular, ordinary mutations now publish by default and explicit restoration
+requires a chosen mode; old manual-default/TODO text is not the current contract.
+Use current matrix/decision/API contracts where dated implementation notes differ.
+
+## Earlier checkpoint — 2026-10-26 (historical)
 
 The flat checklist has **205 checked / 63 open entries**, including overlapping
 parents. Effective reconstruction (16.2), property history/unsets (11.2), exact

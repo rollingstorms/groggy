@@ -1,0 +1,2185 @@
+{
+  "schema_version": 1,
+  "reviewed_runtime": "cfc5628c53fee47b582418d3e4a2bdd395434b37",
+  "updated": "2026-11-18",
+  "scope": "Public feature-family capability matrix, with all stable checklist rows mapped. Bounded means only the stated contract is qualified; it never closes an overlapping parent by implication.",
+  "local_receipt": "notes/benchmarks/display-closeout-local-qualification-2026-11-18.json",
+  "features": [
+    {
+      "id": "graph-model",
+      "feature": "Graph construction, topology and identity",
+      "section": "Graph and properties",
+      "checklist_prefixes": [
+        "01",
+        "02",
+        "03",
+        "04",
+        "AR1",
+        "AR2"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Graph/GraphSpace; stable node/edge IDs",
+        "sources": [
+          "src/api/graph.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Graph; node/edge and immutable-view accessors",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Allocated IDs, accepted membership and endpoint revisions are retained; allocation alone does not mean active membership.",
+      "limits": "Default undirected; explicit directed, parallel instances and loops. Full secondary/legacy liveness and algorithm-specific direction audits remain open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/default-immutable-views.md",
+          "docs/api/endpoint-revisions.md"
+        ],
+        "native_tests": [
+          "tests/engine_contract.rs",
+          "tests/active_state_contract.rs",
+          "tests/batch_identity.rs"
+        ],
+        "python_tests": [
+          "tests/test_engine_contract.py",
+          "tests/test_active_state_contract.py",
+          "tests/test_edge_identity_contract.py"
+        ]
+      },
+      "python_exports": [
+        "Graph",
+        "NodeId",
+        "EdgeId",
+        "AttrName",
+        "StateId",
+        "BranchName"
+      ]
+    },
+    {
+      "id": "checked-writes",
+      "feature": "Checked scalar, bulk and mixed writes",
+      "section": "Graph and properties",
+      "checklist_prefixes": [
+        "05",
+        "09",
+        "AR3"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "GraphBatch, checked writer and write coordinates",
+        "sources": [
+          "src/api/batch.rs",
+          "src/state/publication.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "GraphBatch, writer and supported direct Graph mutations",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "One successful checked batch publishes one typed delta and accepted state; explicit effective times or one acceptance-clock default.",
+      "limits": "Rejected inputs preserve values and issued IDs. Native escapes, every compound/alternate route and service concurrency remain open; no universal transaction claim.",
+      "evidence": {
+        "contracts": [
+          "docs/api/publishing-writes.md",
+          "docs/api/write-coordinates.md",
+          "docs/api/automatic-publication.md"
+        ],
+        "native_tests": [
+          "tests/atomic_batches.rs",
+          "tests/view_batch_complete_ops.rs"
+        ],
+        "python_tests": [
+          "tests/test_mutation_validation.py",
+          "tests/test_automatic_publication.py",
+          "tests/test_view_batch_complete_ops.py"
+        ]
+      },
+      "python_exports": [
+        "GraphBatch",
+        "GraphWriter",
+        "AddedNode",
+        "AddedEdge",
+        "WriteCoordinate"
+      ]
+    },
+    {
+      "id": "external-ids",
+      "feature": "Managed external names and reservations",
+      "section": "Graph and properties",
+      "checklist_prefixes": [
+        "06"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Graph external-identity lifecycle",
+        "sources": [
+          "src/api/graph/identity.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Graph external-ID/upsert/rename interfaces",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Bindings/reservations survive retained branches, archives, recovery and explicit restoration; purge only releases unreferenced names.",
+      "limits": "Global within an owning graph, not a cross-process UUID registry; external adapter normalization is not core support.",
+      "evidence": {
+        "contracts": [
+          "docs/api/external-identity.md",
+          "docs/api/retained-purge.md"
+        ],
+        "native_tests": [
+          "tests/external_identity.rs",
+          "tests/batch_identity.rs"
+        ],
+        "python_tests": [
+          "tests/test_external_identity.py",
+          "tests/test_batch_identity.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "logical-values",
+      "feature": "Logical properties, width and exact value representation",
+      "section": "Graph and properties",
+      "checklist_prefixes": [
+        "07"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "AttrValue, native typed scalar/vector/structured values",
+        "sources": [
+          "src/types.rs",
+          "src/storage/array/mod.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "AttrValue and scalar/bulk/table bridges",
+        "sources": [
+          "python-groggy/src/ffi/types.rs"
+        ]
+      },
+      "persistence": "Versioned codecs retain supported widths, floating bits, null and structured spellings; pooled-reference portability has additional rules.",
+      "limits": "f64 ordinary defaults retain explicit f32 values. Broader numeric-width promises and complete value-change/storage-path coverage remain open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/property-values.md",
+          "docs/api/float64-defaults.md",
+          "docs/api/graph-archives.md"
+        ],
+        "native_tests": [
+          "tests/property_values.rs",
+          "tests/property_float64.rs",
+          "tests/property_persistence.rs"
+        ],
+        "python_tests": [
+          "tests/test_property_values.py",
+          "tests/test_property_float64.py",
+          "tests/test_property_persistence.py"
+        ]
+      },
+      "python_exports": [
+        "AttrValue",
+        "PyAttributeCollection"
+      ]
+    },
+    {
+      "id": "temporal-values",
+      "feature": "UTC instant, date and duration properties",
+      "section": "Graph and properties",
+      "checklist_prefixes": [
+        "07"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "UtcInstant, CalendarDate, FixedDuration",
+        "sources": [
+          "src/types/temporal.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Aware datetime, date, timedelta and explicit AttrValue constructors",
+        "sources": [
+          "python-groggy/src/ffi/temporal.rs"
+        ]
+      },
+      "persistence": "Microsecond-resolution portable values through checked properties, snapshots and versioned storage.",
+      "limits": "Years 1–9999, UTC normalization; naive instants/leap seconds reject. Original timezone names and arbitrary temporal types are not retained.",
+      "evidence": {
+        "contracts": [
+          "docs/api/temporal-properties.md"
+        ],
+        "native_tests": [
+          "tests/temporal_properties.rs"
+        ],
+        "python_tests": [
+          "tests/test_temporal_properties.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "schema",
+      "feature": "Kinds, labels and explicit schema policy migration",
+      "section": "Graph and properties",
+      "checklist_prefixes": [
+        "08"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Graph schema validation and durable policy revisions",
+        "sources": [
+          "src/api/graph/schema.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Graph/DurableGraph schema and checked batches",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Durable policy/revision is persisted; install validates current data and conversion is a separate checked batch.",
+      "limits": "Compatible intermediate-policy workflow exists. Global versus branch schema history and broader ontology migration remain unsettled.",
+      "evidence": {
+        "contracts": [
+          "docs/api/kinds-schema.md",
+          "docs/api/schema-migration.md"
+        ],
+        "native_tests": [
+          "tests/kinds_schema.rs",
+          "tests/batch_schema.rs"
+        ],
+        "python_tests": [
+          "tests/test_kinds_schema.py",
+          "tests/test_batch_schema.py",
+          "tests/test_schema_migration_workflow.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "provenance",
+      "feature": "Meta-node composition and first-class provenance",
+      "section": "Graph and properties",
+      "checklist_prefixes": [
+        "17"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Retained group references, meta nodes and collapse/expand",
+        "sources": [
+          "src/storage/retained_group.rs",
+          "src/subgraphs/subgraph.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Selection collapse/extract/expand and group revision APIs",
+        "sources": [
+          "python-groggy/src/ffi/subgraphs/subgraph.rs"
+        ]
+      },
+      "persistence": "Qualified group revisions pin immutable sources; ordinary node properties can retain raw content.",
+      "limits": "First-class source/episode/fact, repeated-evidence and correction/withdrawal contracts are not complete. Existing meta composition is not a completed domain-ingestion layer.",
+      "evidence": {
+        "contracts": [
+          "docs/api/meta-composition.md",
+          "docs/api/retained-subgraphs.md"
+        ],
+        "native_tests": [
+          "src/api/graph/storage_boundary_tests/retained_subgraphs.rs"
+        ],
+        "python_tests": [
+          "tests/test_retained_subgraphs.py"
+        ]
+      },
+      "python_exports": [
+        "MetaNode",
+        "MetaNodeArray"
+      ]
+    },
+    {
+      "id": "history",
+      "feature": "Typed changes, property history and effective-time reconstruction",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "11",
+        "16"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "State/history, effective reads and property intervals",
+        "sources": [
+          "src/state/change.rs",
+          "src/state/effective_read.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Recorded snapshots/diffs, property history and read_view_at",
+        "sources": [
+          "python-groggy/src/ffi/temporal.rs"
+        ]
+      },
+      "persistence": "Accepted before/after values, identity/lifetime and topology changes are retained. Explicit checkpoints are distinct from automatic deltas.",
+      "limits": "Recorded acceptance and effective time differ; later accepted writes win an exact effective-time tie. Current uses the evaluation clock; reads do not publish changes. Full logical-value/storage coverage remains open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/change-records.md",
+          "docs/api/property-history.md",
+          "docs/api/property-intervals.md",
+          "docs/api/effective-time-reads.md"
+        ],
+        "native_tests": [
+          "tests/effective_time_reads.rs",
+          "tests/restoration_float_bits.rs"
+        ],
+        "python_tests": [
+          "tests/test_effective_time_reads.py",
+          "tests/test_restoration_float_bits.py"
+        ]
+      },
+      "python_exports": [
+        "Commit",
+        "HistoryStatistics",
+        "HistoricalView",
+        "TemporalSnapshot"
+      ]
+    },
+    {
+      "id": "snapshots",
+      "feature": "Immutable state captures and independent owned copies",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "12",
+        "26",
+        "AR4"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "GraphView and owned materialization",
+        "sources": [
+          "src/subgraphs/view.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "read_view, immutable default selections/tables and explicit owned copies",
+        "sources": [
+          "python-groggy/src/ffi/subgraphs/view.rs"
+        ]
+      },
+      "persistence": "Read pins retain their state across owner mutation; transferring a graph/history is explicit rather than serializing a borrowed handle.",
+      "limits": "Execution/connected live scopes remain explicit. Allocation identity is not liveness; matching numeric IDs do not confer write authority.",
+      "evidence": {
+        "contracts": [
+          "docs/api/default-immutable-views.md",
+          "docs/api/owned-snapshots.md",
+          "docs/api/graph-copy.md"
+        ],
+        "native_tests": [
+          "tests/immutable_graph_view.rs",
+          "tests/view_materialization.rs"
+        ],
+        "python_tests": [
+          "tests/test_default_immutable_views.py",
+          "tests/test_view_materialization.py"
+        ]
+      },
+      "python_exports": [
+        "GraphView",
+        "GraphViewEntity",
+        "GraphViewEntities",
+        "Subgraph",
+        "SubgraphArray"
+      ]
+    },
+    {
+      "id": "restore",
+      "feature": "Explicit switch versus tracked restoration",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "13"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Graph/DurableGraph explicit restoration modes",
+        "sources": [
+          "src/api/graph.rs",
+          "src/state/history.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "restore_state with required mode",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "switch retargets the working state; tracked publishes one new delta preserving retained history. An explicit retained target is required.",
+      "limits": "No implicit mode, implicit retained state or history deletion. Expected-coordinate, schema, ID-allocation and clock rules apply.",
+      "evidence": {
+        "contracts": [
+          "docs/api/state-restoration.md"
+        ],
+        "native_tests": [
+          "tests/durable_tracked_state_restore.rs",
+          "tests/durable_state_restore.rs"
+        ],
+        "python_tests": [
+          "tests/test_tracked_state_restore.py",
+          "tests/test_state_restore.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "branches",
+      "feature": "Branches, merge planning and caller resolution",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "14"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Reference manager and snapshot merge planner",
+        "sources": [
+          "src/state/ref_manager.rs",
+          "src/state/merge.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Branch/state APIs and explicit merge planning/resolution",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Retained branch heads, references and merge effects survive full archives/recovery within the documented storage contract.",
+      "limits": "No inferred duplicate-fact resolution; parallel facts and conflict policy must be explicit. A branch deletion is not an automatic whole-pool purge.",
+      "evidence": {
+        "contracts": [
+          "docs/api/branch-state-reads.md",
+          "docs/api/graph-merges.md",
+          "docs/api/snapshot-merge-planning.md"
+        ],
+        "native_tests": [
+          "tests/batch_identity.rs",
+          "tests/branch_lifecycle_reads.rs",
+          "tests/snapshot_merge.rs",
+          "tests/durable_merge.rs"
+        ],
+        "python_tests": [
+          "tests/test_batch_identity.py",
+          "tests/test_branch_lifecycle_reads.py",
+          "tests/test_merge_publication.py"
+        ]
+      },
+      "python_exports": [
+        "MergePlan",
+        "MergeOutcome",
+        "BranchInfo"
+      ]
+    },
+    {
+      "id": "retention",
+      "feature": "Explicit purge and exact pool compaction",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "15"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Retained-graph purge and column slot deduplication",
+        "sources": [
+          "src/api/graph/purge.rs",
+          "src/storage/pool.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "purge/compact_pool/optimize maintenance surfaces",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Only explicit maintenance discards retained data; compaction rewrites exact value-slot locations without creating a graph version.",
+      "limits": "Shared branches/references and immutable pins retain required data. No default grace period/audit pin; raw offsets are not stable. Host-specific durable replacement limits apply.",
+      "evidence": {
+        "contracts": [
+          "docs/api/retained-purge.md",
+          "docs/api/pool-compaction.md",
+          "docs/api/history-retention.md"
+        ],
+        "native_tests": [
+          "tests/retained_purge.rs",
+          "tests/pool_compaction.rs"
+        ],
+        "python_tests": [
+          "tests/test_retained_purge.py",
+          "tests/test_pool_compaction.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "archive",
+      "feature": "Versioned full archives and active interchange",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "10"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Full retained binary archive and typed active interchange",
+        "sources": [
+          "src/api/graph/archive.rs",
+          "src/storage/pool/archive.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "save_archive/load_archive and explicit active exports",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Full archives include retained state/identities/value pools. Active interchange is a separate, narrower contract.",
+      "limits": "New destination required; no arbitrary legacy migration. Host sync/replacement mechanisms and pooled-reference export limitations are explicit.",
+      "evidence": {
+        "contracts": [
+          "docs/api/graph-archives.md",
+          "docs/api/property-values.md"
+        ],
+        "native_tests": [
+          "tests/property_persistence.rs",
+          "tests/graph_archive.rs"
+        ],
+        "python_tests": [
+          "tests/test_property_persistence.py",
+          "tests/test_graph_archive.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "journal",
+      "feature": "Durable journal, recovery, checkpoints and backup",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "10",
+        "AR6"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "DurableGraph journal and checked writer",
+        "sources": [
+          "src/storage/journal.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "DurableGraph context manager, writer and maintenance APIs",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Prepared record append/sync precedes in-memory publication; explicit recovery/backup/checkpoint mechanisms are tested.",
+      "limits": "Not a universal power-loss guarantee. Windows lacks Unix directory-sync/inode-replacement mechanisms; bounded recovery memory, all format upgrades and durable pipeline dispatch remain open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/durable-storage.md",
+          "docs/api/storage-checkpoints.md",
+          "docs/api/storage-verification.md"
+        ],
+        "native_tests": [
+          "tests/durable_journal.rs",
+          "tests/storage_verification.rs"
+        ],
+        "python_tests": [
+          "tests/test_storage_checkpoint.py",
+          "tests/test_storage_verification.py",
+          "tests/test_storage_platform_capabilities.py"
+        ]
+      },
+      "python_exports": [
+        "DurableGraph"
+      ]
+    },
+    {
+      "id": "integrity",
+      "feature": "Explicit retained-state integrity and platform reporting",
+      "section": "State and storage",
+      "checklist_prefixes": [
+        "33"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Retained graph/journal verification",
+        "sources": [
+          "src/state/space/integrity.rs",
+          "src/storage/journal.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "check_integrity and storage_capabilities",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Verification checks retained state/transition closure and reports; it does not repair or create graph history.",
+      "limits": "Broader operational diagnostics, budgets and service observability remain open. Filesystem mechanism reporting is not a hardware guarantee.",
+      "evidence": {
+        "contracts": [
+          "docs/api/retained-integrity.md",
+          "docs/api/storage-verification.md"
+        ],
+        "native_tests": [
+          "tests/retained_integrity.rs",
+          "tests/storage_verification.rs"
+        ],
+        "python_tests": [
+          "tests/test_retained_integrity.py",
+          "tests/test_storage_verification.py"
+        ]
+      },
+      "python_exports": [
+        "storage_capabilities"
+      ]
+    },
+    {
+      "id": "queries",
+      "feature": "Captured filters, ordering, traversal and patterns",
+      "section": "Queries and tables",
+      "checklist_prefixes": [
+        "21",
+        "AR7.7"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Native query/filter/pattern and immutable selection plans",
+        "sources": [
+          "src/query/mod.rs",
+          "src/query/pattern.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "NodeFilter/EdgeFilter, GraphPattern and captured query/view methods",
+        "sources": [
+          "python-groggy/src/ffi/query/mod.rs"
+        ]
+      },
+      "persistence": "Query outputs are transient captures; explicit graph writes alone create deltas.",
+      "limits": "Native finite graph patterns, not a Cypher parser. Broader expression/legacy semantic consolidation remains open; use documented selected direction/edge-instance rules.",
+      "evidence": {
+        "contracts": [
+          "docs/api/graph-patterns.md",
+          "docs/api/graph-query-literals.md",
+          "docs/api/ordered-pinned-queries.md",
+          "docs/api/captured-view-traversal.md"
+        ],
+        "native_tests": [
+          "tests/graph_view_query.rs",
+          "tests/ordered_pinned_queries.rs",
+          "tests/captured_view_traversal.rs"
+        ],
+        "python_tests": [
+          "tests/test_graph_view_query.py",
+          "tests/test_ordered_pinned_queries.py",
+          "tests/test_pinned_graph_patterns.py",
+          "tests/test_captured_view_traversal.py"
+        ]
+      },
+      "python_exports": [
+        "NodeFilter",
+        "EdgeFilter",
+        "AttributeFilter",
+        "GraphPattern",
+        "PatternMatches",
+        "GraphPath",
+        "enhanced_filter_nodes",
+        "enhanced_filter_edges"
+      ]
+    },
+    {
+      "id": "indexes",
+      "feature": "Explicit transient property, membership and temporal indexes",
+      "section": "Queries and tables",
+      "checklist_prefixes": [
+        "18"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Captured immutable read indexes",
+        "sources": [
+          "src/query/index.rs",
+          "src/temporal/index.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "build_index and captured membership/effective-time index APIs",
+        "sources": [
+          "python-groggy/src/ffi/query/index.rs"
+        ]
+      },
+      "persistence": "Transient definitions/data; rebuild explicitly after changes or reopening. No automatic persisted-index lifecycle is claimed.",
+      "limits": "Indexes bind their captured source; stale ones do not silently become live. Global property/time semantics follow documented exact domains.",
+      "evidence": {
+        "contracts": [
+          "docs/api/query-indexes.md",
+          "docs/api/effective-time-indexes.md",
+          "docs/api/group-membership-indexes.md"
+        ],
+        "native_tests": [
+          "tests/effective_time_index.rs"
+        ],
+        "python_tests": [
+          "tests/test_captured_query_indexes.py",
+          "tests/test_effective_time_index.py"
+        ]
+      },
+      "python_exports": [
+        "GraphQueryIndex",
+        "EffectiveTimeIndex",
+        "GroupMembershipIndex",
+        "ExistenceIndex"
+      ]
+    },
+    {
+      "id": "tables",
+      "feature": "Columnar tables, joins, reshape, groups and collections",
+      "section": "Queries and tables",
+      "checklist_prefixes": [
+        "27",
+        "AR7"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "BaseTable/NodesTable/EdgesTable/GraphTable and collections",
+        "sources": [
+          "src/storage/table/graph_table.rs",
+          "src/storage/table/mod.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Typed table APIs, .nodes/.edges, groups and explicit to_graph/to_subgraphs",
+        "sources": [
+          "python-groggy/src/ffi/storage/table.rs"
+        ]
+      },
+      "persistence": "Read-only captures/materializations are transient; table joins do not create graph identity or history.",
+      "limits": "Graph subsets induce internal edges; graph shape has separate components. General analytical layouts differ from identity-bearing graph tables. Legacy/API consolidation remains open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/graph-table-components.md",
+          "docs/api/table-joins.md",
+          "docs/api/table-reshaping.md",
+          "docs/api/table-collection-ownership.md",
+          "docs/api/graph-table-bundles.md"
+        ],
+        "native_tests": [
+          "tests/graph_table_subsets.rs",
+          "tests/table_source_pins.rs",
+          "tests/table_schema_invariants.rs"
+        ],
+        "python_tests": [
+          "tests/test_graph_table_components.py",
+          "tests/test_table_join_contract.py",
+          "tests/test_table_schema_invariants.py",
+          "tests/test_graph_table_bundles.py"
+        ]
+      },
+      "python_exports": [
+        "BaseTable",
+        "NodesTable",
+        "EdgesTable",
+        "GraphTable",
+        "AggregationResult",
+        "GroupedAggregationResult",
+        "AggregationFunction",
+        "table"
+      ]
+    },
+    {
+      "id": "table-writeback",
+      "feature": "Explicit source-bound table property writeback",
+      "section": "Queries and tables",
+      "checklist_prefixes": [
+        "27",
+        "05"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Prepared table property writeback",
+        "sources": [
+          "src/storage/table/writeback.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "GraphTable.update_graph with expected state and explicit mappings/columns",
+        "sources": [
+          "python-groggy/src/ffi/storage/table.rs"
+        ]
+      },
+      "persistence": "One accepted property batch/delta with optional explicit effective time. Old graph/table sources stay immutable.",
+      "limits": "Existing entity properties only; joins/reshape never imply node creation, endpoint changes or automatic writeback. Full source/coordinate authority is checked.",
+      "evidence": {
+        "contracts": [
+          "docs/api/table-writeback.md",
+          "docs/api/table-source-pins.md"
+        ],
+        "native_tests": [
+          "tests/view_batch_complete_ops.rs",
+          "tests/table_source_pins.rs"
+        ],
+        "python_tests": [
+          "tests/test_table_writeback.py",
+          "tests/test_view_batch_complete_ops.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "pipeline",
+      "feature": "Atomic pipeline builder and typed intermediate execution",
+      "section": "Execution and ownership",
+      "checklist_prefixes": [
+        "30",
+        "09",
+        "AR3",
+        "AR5",
+        "AR7.8"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Registry/StepScope, pending batch and prepared effects",
+        "sources": [
+          "src/algorithms/mod.rs",
+          "src/algorithms/property_batch/prepared.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Pipeline and atomic step_pipeline builders; typed captured graph/table/results",
+        "sources": [
+          "python-groggy/python/groggy/builder/algorithm_builder.py",
+          "python-groggy/src/ffi/api/pipeline.rs"
+        ]
+      },
+      "persistence": "Certified local/outer programs accept one delta; transient outputs/captures do not create history.",
+      "limits": "Root sequential topology loops and all 13 classic wrappers work. Fixed-child topology, provisional retained history, alternate plans, public IR, durable invocation, custom/streaming effects and naming/history policy remain open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/atomic-pipeline-capabilities.md",
+          "docs/api/typed-pipeline-values.md",
+          "docs/api/root-topology-loops.md",
+          "docs/api/pipeline-endpoint-revisions.md"
+        ],
+        "native_tests": [
+          "tests/pipeline_endpoint_revisions.rs"
+        ],
+        "python_tests": [
+          "tests/test_staged_revision_endpoints.py",
+          "tests/test_typed_pipeline_values.py",
+          "tests/test_fixed_child_attachments.py"
+        ]
+      },
+      "python_exports": [
+        "Pipeline",
+        "pipeline",
+        "apply",
+        "print_profile",
+        "builder",
+        "AlgorithmBuilder",
+        "VarHandle",
+        "PyResultHandle"
+      ]
+    },
+    {
+      "id": "python-ownership",
+      "feature": "Python native ownership and worker boundaries",
+      "section": "Execution and ownership",
+      "checklist_prefixes": [
+        "19",
+        "AR5",
+        "AR7.11"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Creator-checked owners and detached immutable read plans",
+        "sources": [
+          "src/ownership.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Live handles remain creator-bound; detached immutable reads and certified heavy calls can use workers",
+        "sources": [
+          "python-groggy/src/ffi/mod.rs"
+        ]
+      },
+      "persistence": "Owner finalization releases durable locks; no graph version is created by lifetime handling.",
+      "limits": "Safe foreign-thread finalization is not permission for foreign live access. Full API/error/GIL conformance and compatibility retirement remain open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/python-owner-lifetimes.md",
+          "docs/api/matrix-numerical-threads.md"
+        ],
+        "native_tests": [],
+        "python_tests": [
+          "tests/test_python_owner_lifetime.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-bfs-dfs",
+      "feature": "BFS and DFS",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered BFS and DFS kernels",
+        "sources": [
+          "src/algorithms/pathfinding/bfs_dfs.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/pathfinding.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Selected hop/traversal order; directed/undirected rules explicit. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/bfs-dfs.md",
+          "docs/api/pending-classic-paths.md"
+        ],
+        "native_tests": [
+          "src/algorithms/pathfinding/bfs_dfs.rs"
+        ],
+        "python_tests": [
+          "tests/test_traversal_wrappers.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-dijkstra",
+      "feature": "Dijkstra",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered Dijkstra kernels",
+        "sources": [
+          "src/algorithms/pathfinding/dijkstra.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/pathfinding.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Finite nonnegative lengths; selected minimum parallel edge retains actual identity. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/dijkstra.md",
+          "docs/api/pending-classic-paths.md"
+        ],
+        "native_tests": [
+          "tests/pathfinding_validation.rs"
+        ],
+        "python_tests": [
+          "tests/test_dijkstra_wrapper.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-astar",
+      "feature": "A*",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered A* kernels",
+        "sources": [
+          "src/algorithms/pathfinding/astar.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/pathfinding.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Validated heuristic/goal/length domains; no universal admissibility promise for arbitrary user heuristics. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/pathfinding-validation.md",
+          "docs/api/pending-classic-paths.md"
+        ],
+        "native_tests": [
+          "tests/pathfinding_validation.rs"
+        ],
+        "python_tests": [
+          "tests/test_pathfinding_validation.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-pagerank",
+      "feature": "PageRank",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered PageRank kernels",
+        "sources": [
+          "src/algorithms/centrality/pagerank.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/centrality.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Validated damping/weights/personalization; bounded convergence, explicit nonconvergence. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/pagerank.md",
+          "docs/api/pending-classic-paths.md"
+        ],
+        "native_tests": [
+          "tests/pagerank_validation.rs"
+        ],
+        "python_tests": [
+          "tests/test_pagerank_validation.py"
+        ]
+      },
+      "python_exports": [
+        "PageRankResult",
+        "algorithms"
+      ]
+    },
+    {
+      "id": "algorithm-closeness",
+      "feature": "Closeness centrality",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered Closeness centrality kernels",
+        "sources": [
+          "src/algorithms/centrality/closeness.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/centrality.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Explicit incoming/outgoing directed definitions and checked nonnegative distances. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/closeness.md",
+          "docs/api/pending-classic-paths.md"
+        ],
+        "native_tests": [
+          "tests/closeness_validation.rs"
+        ],
+        "python_tests": [
+          "tests/test_closeness_validation.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-betweenness",
+      "feature": "Betweenness centrality",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered Betweenness centrality kernels",
+        "sources": [
+          "src/algorithms/centrality/betweenness.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/centrality.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Checked shortest-path domains; equal minimum parallel instances preserve multiplicity. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/pathfinding-validation.md",
+          "docs/api/pending-classic-paths.md"
+        ],
+        "native_tests": [
+          "tests/frozen_betweenness.rs"
+        ],
+        "python_tests": [
+          "tests/test_pathfinding_validation.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-components",
+      "feature": "Connected components",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered Connected components kernels",
+        "sources": [
+          "src/algorithms/community/components.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/community.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Weak/strong direction modes are distinct; stable selected identity. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/connected-components.md",
+          "docs/api/pending-classic-communities.md"
+        ],
+        "native_tests": [
+          "tests/components_validation.rs"
+        ],
+        "python_tests": [
+          "tests/test_components_validation.py"
+        ]
+      },
+      "python_exports": [
+        "ComponentsArray"
+      ]
+    },
+    {
+      "id": "algorithm-lpa",
+      "feature": "Label propagation",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered Label propagation kernels",
+        "sources": [
+          "src/algorithms/community/lpa.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/community.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Seeded bounded sweeps; directed/loop/parallel conventions are documented. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/label-propagation.md",
+          "docs/api/pending-classic-communities.md"
+        ],
+        "native_tests": [
+          "tests/lpa_validation.rs"
+        ],
+        "python_tests": [
+          "tests/test_lpa_validation.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-infomap",
+      "feature": "Infomap",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered Infomap kernels",
+        "sources": [
+          "src/algorithms/community/infomap.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/community.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Two-level recorded uniform-node teleportation model only; hierarchical acceleration and external equivalence remain open. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/infomap.md",
+          "docs/api/pending-classic-communities.md"
+        ],
+        "native_tests": [
+          "src/algorithms/community/map_equation.rs"
+        ],
+        "python_tests": [
+          "tests/test_infomap_validation.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "algorithm-modularity",
+      "feature": "Louvain, Leiden and Girvan-Newman",
+      "section": "Graph algorithms",
+      "checklist_prefixes": [
+        "28",
+        "03"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Native registered Louvain, Leiden and Girvan-Newman kernels",
+        "sources": [
+          "src/algorithms/community/louvain.rs",
+          "src/algorithms/community/leiden.rs",
+          "src/algorithms/community/girvan_newman.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Classic algorithms handles and captured-view routes where documented",
+        "sources": [
+          "python-groggy/python/groggy/algorithms/community.py"
+        ]
+      },
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient; automatic durable pipeline invocation is not provided.",
+      "limits": "Undirected input and documented resolution/loop/parallel/weight definitions; no universal external parity. Remaining algorithm-family/secondary-caller certification is separate.",
+      "evidence": {
+        "contracts": [
+          "docs/api/community-modularity.md",
+          "docs/api/pending-classic-communities.md"
+        ],
+        "native_tests": [
+          "tests/community_resolution.rs"
+        ],
+        "python_tests": [
+          "tests/test_community_resolution.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "spectral-pca",
+      "feature": "Spectral, PCA and flat graph/matrix projection",
+      "section": "Advanced computation",
+      "checklist_prefixes": [
+        "28"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Checked native matrix/visualization projection kernels",
+        "sources": [
+          "src/storage/matrix/graph_projection.rs",
+          "src/viz/embeddings/spectral.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Owned matrix projection helpers with row labels",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "Each projection has separate direction, dimension, constant/singleton and sparse-expansion domains; no combined algorithm-quality/scale certification.",
+      "evidence": {
+        "contracts": [
+          "docs/api/pca-projection.md",
+          "docs/api/spectral-embedding.md",
+          "docs/api/flat-embedding.md"
+        ],
+        "native_tests": [
+          "tests/graph_view_matrix.rs"
+        ],
+        "python_tests": [
+          "tests/test_matrix_graph_transforms.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "native-layouts",
+      "feature": "Energy, dense t-SNE and UMAP-inspired layout",
+      "section": "Advanced computation",
+      "checklist_prefixes": [
+        "28"
+      ],
+      "status": "native_only",
+      "rust": {
+        "support": "available",
+        "surface": "Checked native objectives, gradients, finite budgets and seeded output",
+        "sources": [
+          "src/viz/embeddings/energy.rs",
+          "src/viz/projection/tsne.rs",
+          "src/viz/projection/umap.rs"
+        ]
+      },
+      "python": {
+        "support": "not_provided",
+        "surface": "No general standalone Python surface claimed for these native solvers",
+        "sources": []
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "UMAP-inspired is not full UMAP; dense scale, stochastic external parity and Python exposure remain uncertified.",
+      "evidence": {
+        "contracts": [
+          "docs/api/energy-embedding.md",
+          "docs/api/tsne-projection.md",
+          "docs/api/umap-inspired-projection.md"
+        ],
+        "native_tests": [
+          "tests/energy_embedding.rs",
+          "tests/tsne_projection.rs"
+        ],
+        "python_tests": []
+      },
+      "python_exports": []
+    },
+    {
+      "id": "visualization",
+      "feature": "Captured visualization and realtime controls",
+      "section": "Advanced computation",
+      "checklist_prefixes": [
+        "28",
+        "AR7"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Graph/table captured visualization and native realtime controllers",
+        "sources": [
+          "src/viz/mod.rs",
+          "src/storage/table/visualization.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Captured graph/table visualization adapters",
+        "sources": [
+          "python-groggy/src/ffi/storage/table.rs"
+        ]
+      },
+      "persistence": "Read snapshots and coordinates are transient; accepted graph property mutations retain their normal contract.",
+      "limits": "Layout/embedding requests prepare before publication; quality-only recomputation rejects. Other controls, solver/transport errors, seeds and scale remain open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/view-visualization.md",
+          "docs/api/table-visualization.md",
+          "docs/api/realtime-layout-errors.md"
+        ],
+        "native_tests": [
+          "tests/view_visualization.rs",
+          "tests/table_visualization.rs"
+        ],
+        "python_tests": [
+          "tests/test_view_visualization.py",
+          "tests/test_table_visualization.py",
+          "tests/test_viz_snapshot_identity.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "arrays",
+      "feature": "Logical arrays and typed NumArray arithmetic/statistics",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29",
+        "AR7"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Shared logical/typed numeric kernels and array reductions",
+        "sources": [
+          "src/storage/array/mod.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "NumArray/attribute arrays, typed casts and column operations",
+        "sources": [
+          "python-groggy/src/ffi/storage/array.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "Groggy semantics rather than NumPy API parity; null/empty/nonfinite/dtype domains differ by documented operation. Remaining promised routines and broad throughput certification stay open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/array-numeric-foundation.md",
+          "docs/api/numarray-arithmetic.md",
+          "docs/api/numarray-reductions.md",
+          "docs/api/array-reductions.md"
+        ],
+        "native_tests": [
+          "tests/numarray_reductions.rs"
+        ],
+        "python_tests": [
+          "tests/test_numarray_arithmetic.py",
+          "tests/test_numarray_reductions.py"
+        ]
+      },
+      "python_exports": [
+        "BaseArray",
+        "NodesArray",
+        "EdgesArray",
+        "NumArray",
+        "StatsArray",
+        "bool_array",
+        "int_array",
+        "ones_bool",
+        "zeros_bool",
+        "array",
+        "num_array"
+      ]
+    },
+    {
+      "id": "matrix-arithmetic",
+      "feature": "Dense/CSR matrix arithmetic, indexing and reductions",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29",
+        "AR7"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "GraphMatrix/CSR checked arithmetic and logical layout",
+        "sources": [
+          "src/storage/matrix/mod.rs",
+          "src/storage/matrix/csr.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "GraphMatrix/NumMatrix supported operators, selections and reductions",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "Checked integer range/exact floating dots and logical labels are explicit. Sparse-preserving versus bounded dense fallback is operation-specific; lower-level views/lazy/backend scope remains open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/matrix-arithmetic.md",
+          "docs/api/matrix-indexing.md",
+          "docs/api/matrix-dot-products.md",
+          "docs/api/matrix-reductions.md",
+          "docs/api/matrix-csr.md",
+          "docs/api/matrix-sparse-operations.md"
+        ],
+        "native_tests": [
+          "tests/matrix_arithmetic.rs",
+          "tests/matrix_sparse_ops.rs"
+        ],
+        "python_tests": [
+          "tests/test_matrix_indexing.py",
+          "tests/test_matrix_dot_product.py",
+          "tests/test_matrix_reductions.py",
+          "tests/test_matrix_csr.py"
+        ]
+      },
+      "python_exports": [
+        "GraphMatrix",
+        "matrix"
+      ]
+    },
+    {
+      "id": "matrix-solve",
+      "feature": "Dense and sparse solves, LU/Cholesky, QR and least squares",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Checked in-house real factor/solve kernels",
+        "sources": [
+          "src/storage/matrix/mod.rs",
+          "src/storage/matrix/linear_system.rs",
+          "src/storage/matrix/sparse_factorization.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Matrix factor/solve/refinement/rank/condition methods",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "Finite floating domains and pivot/rank/range limits are explicit; no arbitrary integer/complex solve, sparse iterative spectrum or arbitrary fill/conditioning guarantee.",
+      "evidence": {
+        "contracts": [
+          "docs/api/matrix-linear-systems.md",
+          "docs/api/matrix-sparse-factors.md",
+          "docs/api/matrix-qr.md",
+          "docs/api/matrix-least-squares.md",
+          "docs/api/matrix-rank-condition.md"
+        ],
+        "native_tests": [
+          "tests/matrix_least_squares.rs",
+          "tests/matrix_sparse_factors.rs",
+          "tests/matrix_qr.rs"
+        ],
+        "python_tests": [
+          "tests/test_matrix_sparse_factors.py",
+          "tests/test_matrix_rank_condition.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "matrix-spectra",
+      "feature": "SVD, symmetric eigen and real-input complex eigenpairs",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Bounded native economy/full SVD and real-input eigen solvers",
+        "sources": [
+          "src/storage/matrix/mod.rs",
+          "src/storage/matrix/decomposition.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Dedicated real/imaginary eigen result preserves the existing symmetric API",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "Complex eigenvalues from real input do not imply complex matrix storage or complex-input gradients. Spectral degeneracy/convergence and implicit dense expansion limits are explicit.",
+      "evidence": {
+        "contracts": [
+          "docs/api/matrix-economy-svd.md",
+          "docs/api/matrix-complex-eigen.md",
+          "docs/api/matrix-decompositions.md"
+        ],
+        "native_tests": [
+          "tests/matrix_economy_svd.rs",
+          "tests/matrix_complex_eigen.rs"
+        ],
+        "python_tests": [
+          "tests/test_matrix_complex_eigen.py"
+        ]
+      },
+      "python_exports": [
+        "ComplexEigenResult"
+      ]
+    },
+    {
+      "id": "matrix-autodiff",
+      "feature": "Real factor derivatives and arithmetic tape composition",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Checked real JVP/VJP and saved-value factor/arithmetic tape routes",
+        "sources": [
+          "src/storage/matrix/mod.rs",
+          "src/storage/matrix/autodiff.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Documented tracked matrix/factor methods and explicit cotangent seeds",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "No universal autodiff, general complex factor derivatives or arbitrary full null-basis derivatives. Repeated spectra/rank/pivot/chart restrictions and stale bindings reject explicitly.",
+      "evidence": {
+        "contracts": [
+          "docs/api/matrix-arithmetic-autodiff.md",
+          "docs/api/matrix-factor-autodiff.md",
+          "docs/api/matrix-spectral-derivatives.md",
+          "docs/api/matrix-triangular-derivatives.md"
+        ],
+        "native_tests": [
+          "tests/matrix_arithmetic_autodiff.rs",
+          "tests/matrix_spectral_derivatives.rs"
+        ],
+        "python_tests": [
+          "tests/test_matrix_factor_autodiff.py",
+          "tests/test_matrix_spectral_derivatives.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "matrix-helpers",
+      "feature": "Matrix transforms, statistics, activations and dropout",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "Checked supported helpers, graph operators and activation kernels",
+        "sources": [
+          "src/storage/matrix/mod.rs",
+          "src/storage/matrix/neural/activations.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Matrix helpers/feature conversions and supported neural adapters",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "Tracking, sparsity, dtype and row identity are explicit per helper; this does not imply a general ML framework or full neural operator coverage.",
+      "evidence": {
+        "contracts": [
+          "docs/api/matrix-helper-operations.md",
+          "docs/api/matrix-statistics.md",
+          "docs/api/matrix-feature-conversion.md"
+        ],
+        "native_tests": [
+          "tests/matrix_statistics_checked.rs",
+          "tests/matrix_feature_boundaries.rs"
+        ],
+        "python_tests": [
+          "tests/test_matrix_helpers_checked.py",
+          "tests/test_matrix_activation_checked.py",
+          "tests/test_matrix_feature_boundaries.py"
+        ]
+      },
+      "python_exports": [
+        "neural"
+      ]
+    },
+    {
+      "id": "matrix-convolution",
+      "feature": "General convolution integration and unsupported numerical domains",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29"
+      ],
+      "status": "not_implemented",
+      "rust": {
+        "support": "unsupported",
+        "surface": "Lower convolution declarations are not a completed GraphMatrix Conv2D implementation",
+        "sources": [
+          "src/storage/matrix/neural/convolution.rs"
+        ]
+      },
+      "python": {
+        "support": "unsupported",
+        "surface": "No working integrated Conv2D support claimed",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "GraphMatrix integration rejects. General complex-input matrices/derivatives, automatic backend transfers and genuine SIMD acceleration are not certified by exported names.",
+      "evidence": {
+        "contracts": [
+          "docs/api/matrix-decompositions.md",
+          "docs/api/matrix-checked-backend.md"
+        ],
+        "native_tests": [],
+        "python_tests": []
+      },
+      "python_exports": []
+    },
+    {
+      "id": "numeric-ownership",
+      "feature": "Native buffer snapshots and numerical worker ownership",
+      "section": "Numerical core",
+      "checklist_prefixes": [
+        "29",
+        "19"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "SharedBuffer guarded access and owned NativeView snapshots",
+        "sources": [
+          "src/storage/matrix/memory.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Certified heavy untracked numerical calls marshal detached owned inputs",
+        "sources": [
+          "python-groggy/src/ffi/storage/matrix.rs",
+          "python-groggy/src/ffi/storage/matrix_compute.rs"
+        ]
+      },
+      "persistence": "Owned/transient result. No graph delta or saved numerical/tape state unless supported values are explicitly attached to the graph.",
+      "limits": "Native backend view is an O(n) owned read capture, not a live zero-copy pointer. Explicit refresh; no writeback authority or fake external-backend transfer. Tracked calls keep their ownership/GIL boundaries.",
+      "evidence": {
+        "contracts": [
+          "docs/api/matrix-memory-ownership.md",
+          "docs/api/matrix-numerical-threads.md"
+        ],
+        "native_tests": [
+          "src/storage/matrix/memory.rs",
+          "tests/matrix_numerical_transfer.rs"
+        ],
+        "python_tests": [
+          "tests/test_matrix_gil.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "display",
+      "feature": "Consolidated native display and Python presentation adapters",
+      "section": "Presentation and qualification",
+      "checklist_prefixes": [
+        "AR7.6"
+      ],
+      "status": "bounded",
+      "rust": {
+        "support": "available",
+        "surface": "display::render, common Unicode-safe text/selection policies and compatibility aliases",
+        "sources": [
+          "src/display/mod.rs",
+          "src/display/render/interactive.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Array/Matrix/Table display formatters and effective configure_display defaults",
+        "sources": [
+          "python-groggy/python/groggy/display/__init__.py",
+          "python-groggy/src/ffi/display/mod.rs"
+        ]
+      },
+      "persistence": "Presentation only; no graph delta. Historical renderer/configuration differences and Python scalar spelling remain explicit.",
+      "limits": "61 captured Python layouts/12 unchanged native hashes, semantic regression coverage and matched bounded costs. Unicode scalar budgets are not terminal width; no universal latency/RSS claim.",
+      "evidence": {
+        "contracts": [
+          "docs/api/display-foundation.md"
+        ],
+        "native_tests": [
+          "tests/display_rendering_boundaries.rs"
+        ],
+        "python_tests": [
+          "tests/test_display_adapter_consolidation.py",
+          "tests/test_display_rendering_boundaries.py"
+        ]
+      },
+      "python_exports": [
+        "DisplayConfig",
+        "format_array",
+        "format_matrix",
+        "format_table",
+        "format_data_structure",
+        "detect_display_type"
+      ]
+    },
+    {
+      "id": "verification",
+      "feature": "Reference checks, failure injection and measured workload corpus",
+      "section": "Presentation and qualification",
+      "checklist_prefixes": [
+        "01",
+        "31",
+        "32"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Native conformance/failure suites and release benchmarks",
+        "sources": [
+          "src/api/graph.rs",
+          "src/storage/journal.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Artifact-backed maintained tests, reference fixtures and executable docs",
+        "sources": [
+          "notes/scripts/verify_release_wheel.py"
+        ]
+      },
+      "persistence": "Tests cover accepted/rejected/recovered states; benchmark receipts are evidence, not stored graph state.",
+      "limits": "Current local cfc5628c gates pass. Full external engine comparisons, all failure modes, production sizes/latency/memory budgets and broad scale certification remain open.",
+      "evidence": {
+        "contracts": [
+          "docs/api/core-release-workflow.md",
+          "docs/api/release-qualification.md"
+        ],
+        "native_tests": [
+          "tests/engine_contract.rs",
+          "tests/storage_verification.rs"
+        ],
+        "python_tests": [
+          "tests/test_engine_contract.py",
+          "tests/test_storage_verification.py"
+        ]
+      },
+      "python_exports": []
+    },
+    {
+      "id": "release-docs",
+      "feature": "Capability publication, examples and release documentation",
+      "section": "Presentation and qualification",
+      "checklist_prefixes": [
+        "34"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "not_applicable",
+        "surface": "Source contracts and native capability evidence",
+        "sources": [
+          "src/lib.rs"
+        ]
+      },
+      "python": {
+        "support": "not_applicable",
+        "surface": "Artifact/export/ownership and application-workflow qualification",
+        "sources": [
+          "notes/scripts/verify_release_wheel.py"
+        ]
+      },
+      "persistence": "Documentation/capability records have no graph persistence semantics.",
+      "limits": "This matrix publishes bounded capabilities and incomplete work; it is not release approval or completed library-wide documentation. Broader synchronization remains 34.2.",
+      "evidence": {
+        "contracts": [
+          "docs/api/release-qualification.md",
+          "docs/api/core-release-workflow.md"
+        ],
+        "native_tests": [],
+        "python_tests": []
+      },
+      "python_exports": []
+    },
+    {
+      "id": "service",
+      "feature": "Multi-client service and deployment/concurrency guarantees",
+      "section": "Unfinished original vision",
+      "checklist_prefixes": [
+        "09",
+        "33"
+      ],
+      "status": "not_implemented",
+      "rust": {
+        "support": "partial",
+        "surface": "Embedded owners/writers exist; a complete service boundary is not implemented",
+        "sources": [
+          "src/api/graph.rs",
+          "src/storage/journal.rs"
+        ]
+      },
+      "python": {
+        "support": "partial",
+        "surface": "Embedded Graph/DurableGraph APIs are not a multi-client server",
+        "sources": [
+          "python-groggy/src/ffi/api/graph.rs"
+        ]
+      },
+      "persistence": "Embedded durable storage retains its own documented guarantees; service sessions/transactions are not certified.",
+      "limits": "No multi-user service, unbounded concurrent-writer contract, deployment SLA or universal operational metrics claim. These remain in the expanded release scope.",
+      "evidence": {
+        "contracts": [
+          "docs/api/python-owner-lifetimes.md",
+          "docs/api/durable-storage.md"
+        ],
+        "native_tests": [],
+        "python_tests": []
+      },
+      "python_exports": []
+    },
+    {
+      "id": "external-plugin",
+      "feature": "External domain-ingestion and driver plugin",
+      "section": "Deferred scope",
+      "checklist_prefixes": [
+        "20",
+        "25"
+      ],
+      "status": "deferred",
+      "rust": {
+        "support": "not_provided",
+        "surface": "No core plugin/driver implementation claimed",
+        "sources": []
+      },
+      "python": {
+        "support": "not_provided",
+        "surface": "No compatibility target or upstream driver support claimed",
+        "sources": []
+      },
+      "persistence": "No external ingest/driver persistence contract.",
+      "limits": "Deferred to a separate future plugin repository; no repository migration has been performed.",
+      "evidence": {
+        "contracts": [
+          "docs/api/release-qualification.md"
+        ],
+        "native_tests": [],
+        "python_tests": []
+      },
+      "python_exports": []
+    },
+    {
+      "id": "retrieval",
+      "feature": "Lexical, vector/ANN, combined retrieval and its workload gates",
+      "section": "Deferred scope",
+      "checklist_prefixes": [
+        "22",
+        "23",
+        "24",
+        "32.4"
+      ],
+      "status": "deferred",
+      "rust": {
+        "support": "not_provided",
+        "surface": "Vector properties and numerical filtering are distinct from a completed search subsystem",
+        "sources": []
+      },
+      "python": {
+        "support": "not_provided",
+        "surface": "No completed lexical/ANN/hybrid retrieval API claimed",
+        "sources": []
+      },
+      "persistence": "No persisted search-index lifecycle or model-version/relevance guarantee.",
+      "limits": "Core vector/matrix computation remains available; approximate indexing, lexical ranking, score fusion/evaluation and retrieval workloads stay deferred.",
+      "evidence": {
+        "contracts": [
+          "docs/api/release-qualification.md"
+        ],
+        "native_tests": [],
+        "python_tests": []
+      },
+      "python_exports": []
+    },
+    {
+      "id": "python-convenience",
+      "feature": "Importers, graph generators and compatibility conversion",
+      "section": "Execution and ownership",
+      "checklist_prefixes": [
+        "19",
+        "AR5",
+        "AR7.11"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "partial",
+        "surface": "Underlying graph/table APIs; no completed native consolidation for the Python convenience layer",
+        "sources": [
+          "src/api/graph.rs",
+          "src/storage/table/mod.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "from_csv/pandas/numpy/json/parquet/dict, graph generators and networkx_compat",
+        "sources": [
+          "python-groggy/python/groggy/imports.py",
+          "python-groggy/python/groggy/generators.py",
+          "python-groggy/python/groggy/networkx_compat.py"
+        ]
+      },
+      "persistence": "Format conversion is distinct from retained archives; converted graphs must use the ordinary explicit persistence contracts.",
+      "limits": "Public exports are present, but not all parser/optional-dependency/generator/interop contracts are certified. Optional dependencies and bulk/identity semantics are operation-specific; method presence is not evidence of completion.",
+      "evidence": {
+        "contracts": [
+          "docs/api/checked-table-conversions.md",
+          "docs/api/table-interchange.md"
+        ],
+        "native_tests": [
+          "tests/materialized_import_boundary.rs"
+        ],
+        "python_tests": [
+          "tests/test_package_exports.py",
+          "tests/test_checked_table_conversions.py"
+        ]
+      },
+      "python_exports": [
+        "generators",
+        "complete_graph",
+        "erdos_renyi",
+        "barabasi_albert",
+        "watts_strogatz",
+        "cycle_graph",
+        "path_graph",
+        "star_graph",
+        "grid_graph",
+        "tree",
+        "karate_club",
+        "social_network",
+        "networkx_compat",
+        "from_csv",
+        "from_pandas",
+        "from_numpy",
+        "from_json",
+        "from_parquet",
+        "from_dict"
+      ]
+    },
+    {
+      "id": "python-errors",
+      "feature": "Public error classes and cross-language failure contracts",
+      "section": "Execution and ownership",
+      "checklist_prefixes": [
+        "19",
+        "05"
+      ],
+      "status": "partial",
+      "rust": {
+        "support": "available",
+        "surface": "Native graph/domain errors and checked rejection",
+        "sources": [
+          "src/api/batch.rs"
+        ]
+      },
+      "python": {
+        "support": "available",
+        "surface": "Public error classes plus per-operation translated exceptions",
+        "sources": [
+          "python-groggy/python/groggy/errors.py",
+          "python-groggy/src/ffi/mod.rs"
+        ]
+      },
+      "persistence": "Rejected checked mutations retain state/IDs; exceptions alone are not a durability mechanism.",
+      "limits": "Full exception-class/type consistency across legacy aliases, callbacks and every new route remains open. Individual documented validation and rollback domains are qualified separately.",
+      "evidence": {
+        "contracts": [
+          "docs/api/publishing-writes.md",
+          "docs/api/python-owner-lifetimes.md"
+        ],
+        "native_tests": [
+          "tests/atomic_batches.rs"
+        ],
+        "python_tests": [
+          "tests/test_mutation_validation.py",
+          "tests/test_engine_contract.py"
+        ]
+      },
+      "python_exports": [
+        "GroggyError",
+        "NodeNotFoundError",
+        "EdgeNotFoundError",
+        "InvalidInputError",
+        "NotImplementedError"
+      ]
+    }
+  ],
+  "repository_url": "https://github.com/rollingstorms/groggy",
+  "publication_ref": "groggy-roadmap-2026-10-20"
+}

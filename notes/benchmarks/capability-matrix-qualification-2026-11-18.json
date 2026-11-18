@@ -1,0 +1,50 @@
+{
+  "scope": "34.1 capability publication; documentation and validation only, not additional graph functionality or full release completion.",
+  "reviewed_runtime": "cfc5628c53fee47b582418d3e4a2bdd395434b37",
+  "feature_families": 50,
+  "statuses": {
+    "partial": 19,
+    "bounded": 26,
+    "native_only": 1,
+    "not_implemented": 2,
+    "deferred": 2
+  },
+  "declared_exports": 105,
+  "stable_checklist_rows": 268,
+  "checked": 217,
+  "unchecked": 51,
+  "release_unchecked": 42,
+  "deferred_rows": 9,
+  "closed_this_slice": [
+    "34.1"
+  ],
+  "added_rows": [],
+  "production_source_file_count": 497,
+  "production_source_tree_sha256": "d711516bbd3412904e0ba3c9415fef0d685c14d0432b31a41a5726b858591374",
+  "generation_check": "passed",
+  "full_checklist_and_export_coverage": "passed",
+  "source_contract_test_references": "passed",
+  "pinned_runtime_byte_verification": "passed",
+  "negative_validation": {
+    "duplicate feature": "rejected as expected",
+    "unknown public export": "rejected as expected",
+    "missing evidence": "rejected as expected",
+    "unmapped checklist prefix": "rejected as expected",
+    "unsupported marked verified": "rejected as expected",
+    "stale generated output": "rejected as expected"
+  },
+  "workflow_yaml": "both existing native gates contain the validator; locally parsed, not credited as executed in earlier cfc5628c CI",
+  "python_38_syntax": "passed",
+  "files_sha256": {
+    "docs/api/capabilities.json": "2ddfb0bba283c7ee84ec90c1e3d26f0d11f680635e47b319314c71e626070492",
+    "docs/api/capability-matrix.md": "9e6318aff31d3c5a1467a7c2ceedf9db6c93584a2206caebfc23fe6cda1f8fbd",
+    "notes/scripts/build_capability_matrix.py": "d61d2216a57b49cf4f21392d5c332740545f953a7e7e66bac9fb152725916347"
+  },
+  "qualification_source": "display-closeout-local-qualification-2026-11-18.json",
+  "limits": [
+    "Bounded support does not close overlapping parent requirements.",
+    "All method-level APIs/domains must use linked contracts; exports alone prove no behavior.",
+    "Later runtime changes do not inherit the old qualification.",
+    "Library-wide documentation cleanup remains 34.2."
+  ]
+}

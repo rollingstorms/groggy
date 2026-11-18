@@ -159,3 +159,14 @@ and higher Python traced peaks, while the large-table fixture avoids whole-input
 stringification. These are bounded display measurements, not graph-query/RSS or
 production guarantees. See [display contract](docs/api/display-foundation.md) and
 [closeout evidence](notes/planning/display-closeout-2026-11-18.md).
+
+
+## Explicit support and incomplete scope
+
+The [capability matrix](docs/api/capability-matrix.md) publishes Rust/Python
+support, applicable persistence, correctness evidence and limits for 50 feature
+families, all 105 declared Python exports and every stable checklist row.
+Partial, native-only, unsupported and deferred functionality is labeled explicitly;
+exported names and historical method-count reports are not completion evidence.
+The matrix is pinned to its recorded runtime; later source changes do not inherit
+that qualification automatically. Original unfinished scope remains on the roadmap.

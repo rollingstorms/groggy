@@ -5,14 +5,14 @@ Updated 2026-11-18. **Expanded 0.6.0 scope in progress; earlier candidate qualif
 ## Expanded release target — 2026-11-15
 
 The owner now targets all remaining hierarchical groups except group 8:
-**43 unchecked rows in scope; nine retrieval/integration rows deferred**.
+**42 unchecked rows in scope; nine retrieval/integration rows deferred**.
 This includes provenance and multi-user/concurrency work. The expanded target
 remains unfinished. See [scope and next chunk](notes/planning/release-060-expanded-scope-2026-11-15.md).
 
 Latest completed checklist item: **AR7.6 — one display foundation**. Historical
 Python array/matrix/table formatters now use native layouts and shared text/
 selection/dtype policies; Python retains scalar spelling and terminal adapters.
-One existing row closed; no rows added: **216 checked / 52 open**, with **43 open
+Two existing rows closed; no rows added: **217 checked / 51 open**, with **42 open
 expanded-release rows and nine deferred**. See
 [display closeout](notes/planning/display-closeout-2026-11-18.md).
 
@@ -23,6 +23,12 @@ costs retain small-call variation and native-allocation/RSS limits. Local
 [wheel receipt](notes/benchmarks/display-closeout-wheel-qualification-2026-11-18.json).
 Cross-platform qualification for this new runtime is recorded separately; the
 previous platform run below qualifies its own pinned source only.
+
+The [capability matrix](docs/api/capability-matrix.md) is published under completed
+item **34.1**: 50 families classify all 105 declared Python exports and map all 268
+stable checklist rows, with Rust/Python support, persistence, tests and limits.
+Its reproducible validator rejects missing/unclassified evidence; broader doc
+synchronization remains 34.2. Production runtime remains **cfc5628c**.
 
 Previous platform-qualified runtime: **e517e639**. Five priority slices separate owned
 pipeline preparation and immutable pending materialization from owner adapters,
@@ -67,7 +73,7 @@ node columns and 43% for edge columns when two large vector columns are replaced
 unchanged controls request exactly the same bytes. These are bounded allocation
 measurements, not RSS/latency guarantees. Explicit numerical backend snapshots
 copy values; live guards and same-size snapshot refresh allocate nothing in the
-recorded fixtures. The 43 remaining broad unchecked release rows retain their exit criteria.
+recorded fixtures. The 42 remaining broad unchecked release rows retain their exit criteria.
 No release/tag/package publication occurred.
 
 ## Earlier bounded candidate (9aadfee5)
@@ -157,7 +163,7 @@ Earlier baseline evidence, artifact/lock hashes and reproducible commands:
 - [Ownership implementation and performance comparison](notes/planning/python-owner-lifetime-2026-11-14.md).
 - [Initial qualification receipt](notes/planning/release-060-qualification-2026-11-14.md), retained historically.
 
-The broader flat checklist now has **216 checked / 52 open / 268 total**; its
+The broader flat checklist now has **217 checked / 51 open / 268 total**; its
 parent rows overlap and include deferred scope. This release preparation does not
 mark them all complete. Historical [0.5.2 status](notes/planning/release-052-status-historical.md)
 is archived separately.

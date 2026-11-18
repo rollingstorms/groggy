@@ -7,7 +7,8 @@
 ---
 
 **Development version: 0.6.0, unreleased.** Start with the
-[scope and migration guide](RELEASE_NOTES_0.6.0.md) and
+[scope and migration guide](RELEASE_NOTES_0.6.0.md),
+[capability matrix](docs/api/capability-matrix.md), and
 [complete application workflow](docs/api/core-release-workflow.md) for current
 mutation, immutable-view, temporal and storage behavior. Package builds target
 CPython 3.8–3.12 (macOS arm64: 3.9–3.12); see
@@ -31,9 +32,10 @@ pip install groggy
 ## Features
 
 ### High-Performance Algorithms
-11 Rust-native algorithms, exposed via Python:
+13 registered classic Rust algorithms have Python handles;
+[the matrix](docs/api/capability-matrix.md#graph-algorithms) states their tested domains and remaining limits:
 - Centrality: PageRank, Betweenness, Closeness
-- Community: LPA, Louvain, Leiden, Connected Components
+- Community: LPA, Louvain, Leiden, Connected Components, two-level Infomap, Girvan–Newman
 - Pathfinding: BFS, DFS, Dijkstra, A*
 
 ```python
@@ -44,7 +46,11 @@ scores = result.nodes["pagerank"]
 ```
 
 ### Builder DSL — Custom Algorithms with Batch Executor
-Compose algorithms in Python; iterative loops get 10-100x speedup via the Batch Executor.
+Compose supported steps in Python and execute them through native checked kernels.
+Certified atomic root loops share pending reads and one publication; alternate
+batch-plan and other execution routes retain explicit guards. See
+[the execution capability map](docs/api/atomic-pipeline-capabilities.md).
+No fixed speedup applies to every pipeline.
 
 ```python
 import groggy as gr

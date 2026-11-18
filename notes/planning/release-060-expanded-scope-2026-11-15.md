@@ -199,3 +199,18 @@ Current fixed inventory: **216 checked / 52 unchecked / 268 total**;
 **43 unchecked expanded-release rows, nine deferred**. One existing parent closed,
 zero rows added. Other broad parents and unanswered owner policies retain their
 requirements. The preceding unchanged counts describe their dated passes.
+
+
+### Completed existing checkbox: capability publication — 2026-11-18
+
+**34.1 is complete:** the public matrix classifies 50 capability families,
+105 declared Python exports and all 268 stable checklist rows, with explicit
+Rust/Python, persistence, test evidence, limits and incomplete scope. Generation,
+reference/coverage checks and pinned production-source verification pass; a
+standard-library drift check is wired into existing test/release gates.
+See `capability-matrix-closeout-2026-11-18.md`. Broader documentation work remains
+34.2; no feature is retired or promoted from method existence alone.
+
+Current inventory: **217 checked / 51 unchecked**, **42 release rows and nine
+deferred**. AR7.6 and 34.1 are the two closed existing rows in this pass;
+zero new rows. Runtime remains cfc5628c; this follow-up has no production changes.

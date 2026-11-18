@@ -1272,3 +1272,16 @@ fresh-wheel Python/docs gates, and matched costs. Configuration now works for ne
 formatters, selected cells alone are formatted, and small-call
 variation and higher small-input Python traced peaks remain explicit. Evidence: `display-closeout-2026-11-18.md`.
 Inventory: **216 checked / 52 unchecked**, no added rows; **43 release rows remain**.
+
+
+## 2026-11-18 — Capability publication (34.1)
+
+The existing requirement to publish an honest capability matrix is implemented.
+All 105 declared exports and 268 stable checklist rows are classified across 50
+feature families, with Rust/Python, persistence, tests, limits and remaining work.
+Public entry points no longer repeat universal historical speedup/completion
+claims as current support. No owner answer or unimplemented feature is inferred
+from publishing the matrix. Broader documentation synchronization remains 34.2.
+
+Current inventory: **217 checked / 51 unchecked**, **42 expanded-release rows**
+and nine deferred; no added rows. Evidence: `capability-matrix-closeout-2026-11-18.md`.

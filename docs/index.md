@@ -8,6 +8,13 @@
 
 Groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, Groggy lets you seamlessly work with graph data using familiar table-like operations.
 
+## Current support
+
+The [capability matrix](api/capability-matrix.md) separates verified bounded
+features, native-only/partial support, persistence and unimplemented/deferred
+work, with source and correctness evidence. A public method or old completion
+report is not proof that its full contract is implemented.
+
 ## Quick Links
 
 ### :material-clock-fast: Get Started in 5 Minutes
@@ -65,11 +72,11 @@ Groggy takes this further: every node and edge can have attributes stored in an 
 
 - **Rust core** for memory-safe, high-performance operations
 - **Columnar storage** for efficient bulk attribute operations
-- **Explicit trait-backed methods** (v0.5.1+) for 20x faster FFI calls and full IDE support
+- **Explicit trait-backed methods** with discoverable signatures and IDE support
 - **Git-like versioning** for time-travel queries
 
 !!! success "v0.5.1+ Performance & Discoverability"
-    Groggy now uses explicit PyO3 methods backed by Rust traits instead of dynamic delegation, providing 20x faster method calls (~100ns FFI overhead), complete IDE autocomplete support, and clearer stack traces. See [Trait-Backed Delegation](concepts/trait-delegation.md) for details.
+    Groggy uses explicit PyO3 methods backed by Rust traits for discoverable signatures and clearer stack traces. Call cost depends on the operation and ownership/validation work; historical delegation measurements are not a universal current FFI latency guarantee. See [Trait-Backed Delegation](concepts/trait-delegation.md) and the [current capability boundaries](api/capability-matrix.md).
 
 ---
 

@@ -1,5 +1,10 @@
-# API Documentation Completion Report
+# Historical API Documentation Completion Report
 Generated: 2025-10-09 22:56:38
+
+> Historical method-discovery/document inventory, not current implementation or
+> correctness certification. The percentages below do not describe Groggy 0.6.0.
+> Use the [current capability matrix](capability-matrix.md) for Rust/Python
+> support, persistence, tests, limits and remaining work.
 
 ## Summary
 

@@ -39,6 +39,9 @@ jobs:
         path: target
         key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     
+    - name: Validate capability publication
+      run: python3 notes/scripts/build_capability_matrix.py --check
+
     - name: Check formatting
       run: cargo fmt -- --check
     
