@@ -160,3 +160,14 @@ A test-only follow-up moves pipeline setup before starting the GIL peer and
 always releases both synchronization events when readiness fails. The focused
 24-case durable Python suite passed afterward. Production sources remain exactly
 those qualified at `b24e86e0`; this cleanup adds no engine feature or checklist row.
+
+
+## Numeric lowering follow-up — 2026-11-24
+
+The next boundary above now has a completed numeric subset:
+[checked batch lowering and measured cost](checked-batch-lowering-2026-11-24.md).
+Twenty-six instruction forms and shared graph-independent arithmetic/normalization
+are implemented and locally qualified. Ten instruction families, portable ordinary
+composition and the other existing execution requirements remain open. Measured
+register/map-frame overhead belongs to existing row 32.2; it is not a new roadmap
+item or a closed performance guarantee.

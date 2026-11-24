@@ -1,5 +1,13 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Numeric execution follow-up — 2026-11-24:**
+[checked numeric plan lowering](checked-batch-lowering-2026-11-24.md) completes the
+bounded numeric frontend migration and shares graph-independent kernels with
+durable execution. Neighbor/in-place/fused instructions and portable ordinary
+composition remain in the existing execution rows. A14 naming/cache and A15
+production budgets are still unanswered; this implementation makes no new policy
+choice for either.
+
 **Implementation follow-up — 2026-11-24:**
 [computed writeback and accepted topology edits](durable-pipeline-writeback-2026-11-24.md)
 now use the same checked durable boundary. Existing schema, time, identity and

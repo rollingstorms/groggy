@@ -1,5 +1,13 @@
 # Groggy roadmap status — 2026-10-24
 
+**Numeric execution follow-up — 2026-11-24:**
+[checked numeric plan lowering](checked-batch-lowering-2026-11-24.md) completes the
+bounded numeric frontend migration and shares graph-independent kernels with
+durable execution. Neighbor/in-place/fused instructions and portable ordinary
+composition remain in the existing execution rows. A14 naming/cache and A15
+production budgets are still unanswered; this implementation makes no new policy
+choice for either.
+
 **Implementation checkpoint — 2026-11-24:** supported durable step-builder
 execution is complete with shared sealed kernels, detached preparation, one
 journal acceptance and exact recovery. See

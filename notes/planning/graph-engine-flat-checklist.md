@@ -26,7 +26,21 @@ An explicit snapshot/checkpoint and a reconstructed effective-time view are
 separate operations. Default graph selections now use the accepted pinned-state model; explicit
 connected compatibility remains available.
 
-Latest qualification — 2026-11-24: both durable execution slices are complete
+Latest execution component — 2026-11-24: [checked numeric plan lowering](checked-batch-lowering-2026-11-24.md)
+shares arithmetic/normalization kernels across memory and durable runs and lowers
+26 numeric instruction forms through the shared executor. It covers exact loaded
+integers/comparison, staged reads, private registers, simultaneous carries,
+malformed-plan rejection and one durable acceptance. Remaining neighbor/in-place/
+fused forms and ordinary portable composition stay in the existing parent rows.
+The stable inventory remains **217 checked / 51 open**; this finite component has
+its own completion checks and qualification record rather than a new roadmap row.
+Current local gates: 1,654 native tests, 3,432 packaged Python tests and 293
+documentation examples. The benchmark measures 1.30–3.11× lowered-loop overhead
+against equivalent checked native loops; profiling register/map copies remains
+part of existing performance row 32.2. No acceleration or fresh platform-wide
+qualification is claimed for this changed runtime.
+
+Previous platform qualification — 2026-11-24: both durable execution slices are complete
 within their supported inventory. Runtime `b24e86e0` passed 1,645 local native
 tests, 3,409 packaged Python tests and 292 documentation examples, plus all
 nineteen wheel combinations and native/source CI gates. See

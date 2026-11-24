@@ -1,0 +1,52 @@
+{
+  "scope": "Checked native arithmetic/normalization and 26 numeric batch instruction forms; local qualification only. Existing broad execution parents remain open.",
+  "date": "2026-11-24",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "d1ce52d61d7ab6f8eeaaca168ebd952242fcab4e2355b99eb513afe316a91797",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1654,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 227,
+    "doctests_passed": 10,
+    "numeric_integration_tests": 7,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3432,
+    "maintained_skipped": 1,
+    "established_warnings": 14,
+    "documentation_examples": 293,
+    "new_numeric_cases": 23,
+    "packaged_python_source_files_match": 62,
+    "python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "9f0483a2db6d27934d702da490132f036d13c0d2112f75d7af4457373147e8fe",
+    "qualification_receipt": "notes/benchmarks/checked-batch-final-wheel-qualification-2026-11-24.json"
+  },
+  "performance": {
+    "receipt": "notes/benchmarks/checked-batch-2026-11-24-summary.json",
+    "scope": "Same checked recurrence, native step loop versus lowered plan; no earlier vector-interpreter or production SLA comparison."
+  },
+  "platform_boundary": "Earlier cross-platform qualification at runtime b24e86e0 remains historical; no new platform qualification is claimed for this changed runtime.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-checked-batch-qualified-native.log": "9cae6110490e7bedbd8613b3586325997c384223e6586f1e18c64f74981a78a0",
+    "/tmp/groggy-checked-batch-final-qualified-clippy.log": "b3a6c91598a434025413c9dfa91d14afa0e751494074313787d6ffbe3e87b59c",
+    "/tmp/groggy-checked-batch-qualified-wheel-gates.log": "b4dc29befdfbafe24d9e7bdb54c4a3086efd2ffcd3d228345209d86f3aa2ade3"
+  },
+  "runtime": "4fa2be08991b61d4fdaf1b5f0082cf78af39d23d"
+}

@@ -1,0 +1,186 @@
+{
+  "scope": "Same checked f64 recurrence through native step loop versus lowered register-plan frontend. 3 independent processes, 7 observations each, warmed caches, alternating memory order; setup excluded. All checksums match. Median/min/max descriptive only; OS caches, power state and unrelated background activity are uncontrolled. No old vector-interpreter, RSS/native-allocation, production SLA, universal speedup or regression claim.",
+  "runtime": "4fa2be08991b61d4fdaf1b5f0082cf78af39d23d",
+  "profiles": [
+    "notes/benchmarks/checked-batch-2026-11-24-1.json",
+    "notes/benchmarks/checked-batch-2026-11-24-2.json",
+    "notes/benchmarks/checked-batch-2026-11-24-3.json"
+  ],
+  "sha256": {
+    "notes/benchmarks/checked-batch-2026-11-24-1.json": "e364ba48312e0d332496eda1dac17fecc3d40116375bc79fb5d04962d7bd77ee",
+    "notes/benchmarks/checked-batch-2026-11-24-2.json": "0e4b130dee7505f75c1a70786284a89a00cecc080ba56c6996d1bd79c2e9cda0",
+    "notes/benchmarks/checked-batch-2026-11-24-3.json": "b789d1a2471c58d624c1a3d1e360233d99c93f853493c2b8b89b9873af31af1d"
+  },
+  "benchmark_source_sha256": "4996965166c53c756fd4eeeaa39ff5a9cdf0e201844cd9d5b5a12a3e848c6ce4",
+  "benchmark_binary_sha256": "e2d9d8af6b3915339f1753303afb2ac6aa0b2528a49d3e3a96ade6cf1c01a363",
+  "cases": [
+    {
+      "nodes": 1,
+      "iterations": 10,
+      "observations": 21,
+      "metrics": {
+        "native_step_loop_seconds": {
+          "median_ms": 0.018416000000000002,
+          "minimum_ms": 0.014167,
+          "maximum_ms": 0.118417
+        },
+        "lowered_plan_seconds": {
+          "median_ms": 0.023875,
+          "minimum_ms": 0.020291,
+          "maximum_ms": 0.14441700000000002
+        },
+        "durable_prepare_seconds": {
+          "median_ms": 0.022625000000000003,
+          "minimum_ms": 0.018333,
+          "maximum_ms": 0.128625
+        },
+        "durable_accept_seconds": {
+          "median_ms": 4.039542,
+          "minimum_ms": 3.031916,
+          "maximum_ms": 7.9142090000000005
+        }
+      },
+      "lowered_vs_native_median_ratio": 1.2964270199826238
+    },
+    {
+      "nodes": 1000,
+      "iterations": 10,
+      "observations": 21,
+      "metrics": {
+        "native_step_loop_seconds": {
+          "median_ms": 2.135166,
+          "minimum_ms": 1.9545000000000001,
+          "maximum_ms": 5.55675
+        },
+        "lowered_plan_seconds": {
+          "median_ms": 3.9982079999999995,
+          "minimum_ms": 3.688625,
+          "maximum_ms": 7.592625000000001
+        },
+        "durable_prepare_seconds": {
+          "median_ms": 3.6505840000000003,
+          "minimum_ms": 3.4151670000000003,
+          "maximum_ms": 5.716208
+        },
+        "durable_accept_seconds": {
+          "median_ms": 6.748584,
+          "minimum_ms": 5.0705,
+          "maximum_ms": 8.210624999999999
+        }
+      },
+      "lowered_vs_native_median_ratio": 1.8725513613461435
+    },
+    {
+      "nodes": 10000,
+      "iterations": 10,
+      "observations": 21,
+      "metrics": {
+        "native_step_loop_seconds": {
+          "median_ms": 20.736625,
+          "minimum_ms": 20.470417,
+          "maximum_ms": 22.338832999999997
+        },
+        "lowered_plan_seconds": {
+          "median_ms": 37.781584,
+          "minimum_ms": 37.32125,
+          "maximum_ms": 39.873583999999994
+        },
+        "durable_prepare_seconds": {
+          "median_ms": 35.431083,
+          "minimum_ms": 34.68,
+          "maximum_ms": 38.725166
+        },
+        "durable_accept_seconds": {
+          "median_ms": 23.393833,
+          "minimum_ms": 21.6615,
+          "maximum_ms": 29.038958
+        }
+      },
+      "lowered_vs_native_median_ratio": 1.8219736336072048
+    },
+    {
+      "nodes": 1,
+      "iterations": 100,
+      "observations": 21,
+      "metrics": {
+        "native_step_loop_seconds": {
+          "median_ms": 0.06916699999999999,
+          "minimum_ms": 0.056292,
+          "maximum_ms": 0.093708
+        },
+        "lowered_plan_seconds": {
+          "median_ms": 0.115125,
+          "minimum_ms": 0.09320800000000001,
+          "maximum_ms": 0.136709
+        },
+        "durable_prepare_seconds": {
+          "median_ms": 0.12208400000000001,
+          "minimum_ms": 0.098375,
+          "maximum_ms": 0.15912500000000002
+        },
+        "durable_accept_seconds": {
+          "median_ms": 4.858124999999999,
+          "minimum_ms": 3.832375,
+          "maximum_ms": 5.762417
+        }
+      },
+      "lowered_vs_native_median_ratio": 1.6644498098804346
+    },
+    {
+      "nodes": 1000,
+      "iterations": 100,
+      "observations": 21,
+      "metrics": {
+        "native_step_loop_seconds": {
+          "median_ms": 7.914375,
+          "minimum_ms": 7.748875,
+          "maximum_ms": 11.209416999999998
+        },
+        "lowered_plan_seconds": {
+          "median_ms": 24.627333,
+          "minimum_ms": 24.260709,
+          "maximum_ms": 28.717375
+        },
+        "durable_prepare_seconds": {
+          "median_ms": 24.664375,
+          "minimum_ms": 23.880708000000002,
+          "maximum_ms": 25.268167000000002
+        },
+        "durable_accept_seconds": {
+          "median_ms": 6.762875,
+          "minimum_ms": 4.973708,
+          "maximum_ms": 8.213958
+        }
+      },
+      "lowered_vs_native_median_ratio": 3.1117217720919217
+    },
+    {
+      "nodes": 10000,
+      "iterations": 100,
+      "observations": 21,
+      "metrics": {
+        "native_step_loop_seconds": {
+          "median_ms": 85.19954200000001,
+          "minimum_ms": 83.146417,
+          "maximum_ms": 89.461291
+        },
+        "lowered_plan_seconds": {
+          "median_ms": 250.61070800000002,
+          "minimum_ms": 245.799417,
+          "maximum_ms": 261.925042
+        },
+        "durable_prepare_seconds": {
+          "median_ms": 248.523792,
+          "minimum_ms": 243.796375,
+          "maximum_ms": 296.09470799999997
+        },
+        "durable_accept_seconds": {
+          "median_ms": 24.954375000000002,
+          "minimum_ms": 20.799249999999997,
+          "maximum_ms": 41.803791
+        }
+      },
+      "lowered_vs_native_median_ratio": 2.941456046794242
+    }
+  ]
+}

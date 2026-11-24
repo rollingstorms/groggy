@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "reviewed_runtime": "b24e86e028962c7fc1dbc11a3ac82bb27ebdbf8d",
+  "reviewed_runtime": "4fa2be08991b61d4fdaf1b5f0082cf78af39d23d",
   "updated": "2026-11-24",
   "scope": "Public feature-family capability matrix, with all stable checklist rows mapped. Bounded means only the stated contract is qualified; it never closes an overlapping parent by implication.",
-  "local_receipt": "notes/benchmarks/durable-writeback-local-qualification-2026-11-24.json",
+  "local_receipt": "notes/benchmarks/checked-batch-local-qualification-2026-11-24.json",
   "features": [
     {
       "id": "graph-model",
@@ -895,12 +895,13 @@
           "src/algorithms/property_batch/prepared.rs",
           "src/algorithms/pipeline.rs",
           "src/algorithms/steps/read_scope.rs",
-          "src/algorithms/property_batch.rs"
+          "src/algorithms/property_batch.rs",
+          "src/algorithms/steps/checked_batch.rs"
         ]
       },
       "python": {
         "support": "available",
-        "surface": "Pipeline and atomic step_pipeline builders; run_durable with explicit writeback, topology and optional per-call schema; typed immutable results",
+        "surface": "Pipeline and atomic step_pipeline builders; run_durable with checked arithmetic, 26 numeric loop instruction forms, explicit writeback/topology/schema; unoptimized AlgorithmBuilder arithmetic",
         "sources": [
           "python-groggy/python/groggy/builder/algorithm_builder.py",
           "python-groggy/src/ffi/api/pipeline.rs",
@@ -908,7 +909,7 @@
         ]
       },
       "persistence": "Certified memory programs accept one delta; supported durable programs journal one acceptance, including explicitly attached computed columns. Read-only computations/outputs create no history.",
-      "limits": "Memory root sequential topology loops and all 13 classic wrappers work. Durable creation, properties, issued-table writeback and accepted-entity removal/revision use sealed kernels and one coordinator. Unported durable arithmetic/neighbor/history and loops, provisional removal/revision/history, fixed-child topology, alternate plans/public IR, custom/streaming effects and naming/history policy remain open.",
+      "limits": "Memory root sequential topology loops and all 13 classic wrappers work. Durable creation, properties, computed writeback, accepted topology edits, shared arithmetic/normalization and 26 numeric loop instruction forms use sealed kernels. Unported neighbor/history steps, ordinary portable loop bodies, provisional removal/revision/history, fixed-child topology, remaining alternate plans/public IR, custom/streaming effects and naming/history policy remain open. Checked register-plan lowering currently has measured map-frame overhead; no acceleration claim.",
       "evidence": {
         "contracts": [
           "docs/api/atomic-pipeline-capabilities.md",
@@ -916,17 +917,20 @@
           "docs/api/root-topology-loops.md",
           "docs/api/pipeline-endpoint-revisions.md",
           "docs/api/durable-pipelines.md",
-          "docs/api/durable-pipeline-writeback.md"
+          "docs/api/durable-pipeline-writeback.md",
+          "docs/api/checked-numeric-loop-plans.md"
         ],
         "native_tests": [
           "tests/pipeline_endpoint_revisions.rs",
-          "tests/durable_pipeline_execution.rs"
+          "tests/durable_pipeline_execution.rs",
+          "tests/checked_batch_lowering.rs"
         ],
         "python_tests": [
           "tests/test_staged_revision_endpoints.py",
           "tests/test_typed_pipeline_values.py",
           "tests/test_fixed_child_attachments.py",
-          "tests/test_durable_pipeline_execution.py"
+          "tests/test_durable_pipeline_execution.py",
+          "tests/test_checked_batch_lowering.py"
         ]
       },
       "python_exports": [
