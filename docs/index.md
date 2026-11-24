@@ -46,6 +46,7 @@ Detailed API documentation with theory and examples
 - [Atomic property pipelines](api/atomic-pipelines.md)
 - [Durable pipelines](api/durable-pipelines.md)
 - [Durable computed writeback and topology](api/durable-pipeline-writeback.md)
+- [Checked numeric loop plans](api/checked-numeric-loop-plans.md)
 - [Explicit history pruning](api/history-retention.md)
 - [Durable storage and recovery](api/durable-storage.md)
 

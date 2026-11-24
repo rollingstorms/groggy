@@ -67,6 +67,20 @@ impl<'a> ReadStepScope<'a> {
         }
     }
 
+    /// Run one nested native frame, retaining its pending-read cache across steps.
+    pub(crate) fn with_executor<T>(
+        &mut self,
+        run: impl FnOnce(super::core::StepExecutor<'_>, &mut StepVariables) -> Result<T>,
+    ) -> Result<T> {
+        let executor = match &self.source {
+            Source::Memory(s) => super::core::StepExecutor::for_frame(s, self.fixed),
+            Source::Detached {
+                allocation, base, ..
+            } => super::core::StepExecutor::detached(*allocation, base),
+        };
+        run(executor, self.variables)
+    }
+
     pub(crate) fn variables(&self) -> &StepVariables {
         self.variables
     }

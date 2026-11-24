@@ -326,8 +326,13 @@ impl BatchPlan {
             self.validate_instruction(i, instr)?;
         }
 
+        // A phi destination must have exactly one source.
+        let mut destinations = std::collections::HashSet::new();
         // Check carried slots
         for (from, to) in &self.carried_slots {
+            if !destinations.insert(*to) {
+                return Err(anyhow!("Duplicate carried slot destination {to}"));
+            }
             if *from >= self.slot_count {
                 return Err(anyhow!(
                     "Carried slot from={} exceeds slot_count={}",
@@ -362,6 +367,36 @@ impl BatchPlan {
             }
         };
 
+        let finite = |value: f64| -> Result<()> {
+            if value.is_finite() {
+                Ok(())
+            } else {
+                Err(anyhow!(
+                    "Instruction {index}: numeric controls must be finite"
+                ))
+            }
+        };
+        match instr {
+            BatchInstruction::LoadScalar { value, .. }
+            | BatchInstruction::InitNodes { value, .. } => finite(*value)?,
+            BatchInstruction::LoadNodeAttr { default, .. }
+            | BatchInstruction::LoadEdgeAttr { default, .. } => finite(*default)?,
+            BatchInstruction::Clip { min, max, .. } => {
+                finite(*min)?;
+                finite(*max)?;
+                if min > max {
+                    return Err(anyhow!("Instruction {index}: invalid clip range"));
+                }
+            }
+            BatchInstruction::Recip { epsilon, .. }
+            | BatchInstruction::Normalize { epsilon, .. } => {
+                finite(*epsilon)?;
+                if *epsilon < 0. {
+                    return Err(anyhow!("Instruction {index}: epsilon must be non-negative"));
+                }
+            }
+            _ => {}
+        }
         match instr {
             BatchInstruction::LoadNodeProp { dst, .. } => check_slot(*dst, "dst"),
             BatchInstruction::StoreNodeProp { src, .. } => check_slot(*src, "src"),

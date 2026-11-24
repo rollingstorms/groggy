@@ -295,6 +295,13 @@ pub(crate) struct CheckedReadStep<'a> {
     kernel: &'a dyn super::read_scope::ReadStep,
 }
 impl<'a> CheckedReadStep<'a> {
+    pub(crate) fn native(
+        id: &'static str,
+        effect: AtomicStepEffect,
+        kernel: &'a dyn super::read_scope::ReadStep,
+    ) -> Self {
+        Self { id, effect, kernel }
+    }
     pub(crate) fn new(step: &'a dyn Step) -> Result<Self> {
         let id = step.id();
         let effect = step.atomic_effect();

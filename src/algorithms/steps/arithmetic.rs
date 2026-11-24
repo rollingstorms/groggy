@@ -1,5 +1,6 @@
 //! Arithmetic operation step primitives.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -121,7 +122,17 @@ impl Step for BinaryArithmeticStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for BinaryArithmeticStep {}
+impl ReadStep for BinaryArithmeticStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("{} cancelled", self.id));
         }
@@ -284,7 +295,17 @@ impl Step for UnaryMathStep {
             cost_hint: CostHint::Linear,
         }
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for UnaryMathStep {}
+impl ReadStep for UnaryMathStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             bail!("{} cancelled", self.id);
         }
@@ -327,7 +348,7 @@ enum Operand<'a> {
     Scalar(&'a AlgorithmParamValue),
 }
 
-fn resolve_operand<'a>(scope: &'a StepScope<'a>, name: &str) -> Result<Operand<'a>> {
+fn resolve_operand<'a>(scope: &'a ReadStepScope<'_>, name: &str) -> Result<Operand<'a>> {
     if !scope.variables().contains(name) {
         bail!("variable '{name}' not found");
     }
@@ -602,7 +623,17 @@ impl Step for RecipStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for RecipStep {}
+impl ReadStep for RecipStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.recip cancelled"));
         }
@@ -714,15 +745,23 @@ impl CompareOp {
         }
     }
 
-    pub(crate) fn apply(self, left: f64, right: f64) -> bool {
-        match self {
-            CompareOp::Eq => (left - right).abs() < f64::EPSILON,
-            CompareOp::Ne => (left - right).abs() >= f64::EPSILON,
-            CompareOp::Lt => left < right,
-            CompareOp::Le => left <= right,
-            CompareOp::Gt => left > right,
-            CompareOp::Ge => left >= right,
-        }
+    pub(crate) fn apply_values(
+        self,
+        left: &AlgorithmParamValue,
+        right: &AlgorithmParamValue,
+    ) -> Result<bool> {
+        NumericValue::from(left, "comparison left")?;
+        NumericValue::from(right, "comparison right")?;
+        let order = super::filtering::compare_values(left, right)
+            .ok_or_else(|| anyhow!("comparison requires numeric values without NaN"))?;
+        Ok(match self {
+            CompareOp::Eq => order.is_eq(),
+            CompareOp::Ne => !order.is_eq(),
+            CompareOp::Lt => order.is_lt(),
+            CompareOp::Le => !order.is_gt(),
+            CompareOp::Gt => order.is_gt(),
+            CompareOp::Ge => !order.is_lt(),
+        })
     }
 }
 
@@ -778,7 +817,17 @@ impl Step for CompareStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for CompareStep {}
+impl ReadStep for CompareStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.compare cancelled"));
         }
@@ -859,10 +908,7 @@ where
             )
         })?;
 
-        let left_num = NumericValue::from(left_value, left_name)?;
-        let right_num = NumericValue::from(right_value, right_name)?;
-
-        let cmp_result = op.apply(left_num.as_f64(), right_num.as_f64());
+        let cmp_result = op.apply_values(left_value, right_value)?;
         let mask_value = if cmp_result { 1.0 } else { 0.0 };
 
         result.insert(key, AlgorithmParamValue::Float(mask_value));
@@ -896,15 +942,12 @@ where
         return Ok(HashMap::new());
     }
 
-    let scalar_num = NumericValue::from(scalar, scalar_name)?;
-    let scalar_val = scalar_num.as_f64();
+    NumericValue::from(scalar, scalar_name)?;
 
     let mut result = HashMap::with_capacity(map.len());
     for (&key, value) in map.iter() {
-        let num = NumericValue::from(value, map_name)?;
-        let val = num.as_f64();
-
-        let cmp_result = op.apply(val, scalar_val);
+        NumericValue::from(value, map_name)?;
+        let cmp_result = op.apply_values(value, scalar)?;
         let mask_value = if cmp_result { 1.0 } else { 0.0 };
 
         result.insert(key, AlgorithmParamValue::Float(mask_value));
@@ -973,7 +1016,17 @@ impl Step for WhereStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for WhereStep {}
+impl ReadStep for WhereStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.where cancelled"));
         }
@@ -1187,7 +1240,17 @@ impl Step for ReduceScalarStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for ReduceScalarStep {}
+impl ReadStep for ReduceScalarStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.reduce_scalar cancelled"));
         }
@@ -1284,7 +1347,17 @@ impl Step for BroadcastScalarStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for BroadcastScalarStep {}
+impl ReadStep for BroadcastScalarStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.broadcast_scalar cancelled"));
         }
@@ -1440,7 +1513,17 @@ impl Step for ModeListStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for ModeListStep {}
+impl ReadStep for ModeListStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.mode_list cancelled"));
         }
@@ -1671,5 +1754,29 @@ impl Step for CollectNeighborValuesStep {
             .variables_mut()
             .set_node_map(self.target.clone(), result);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod checked_comparison_tests {
+    use super::*;
+    #[test]
+    fn comparisons_preserve_adjacent_integers_and_distinguish_tiny_floats() {
+        let low = AlgorithmParamValue::Int(9_007_199_254_740_992);
+        let high = AlgorithmParamValue::Int(9_007_199_254_740_993);
+        assert!(CompareOp::Lt.apply_values(&low, &high).unwrap());
+        assert!(!CompareOp::Eq.apply_values(&low, &high).unwrap());
+        assert!(CompareOp::Gt
+            .apply_values(&high, &AlgorithmParamValue::Float(9_007_199_254_740_992.))
+            .unwrap());
+        assert!(!CompareOp::Eq
+            .apply_values(
+                &AlgorithmParamValue::Float(1e-20),
+                &AlgorithmParamValue::Float(0.)
+            )
+            .unwrap());
+        assert!(CompareOp::Eq
+            .apply_values(&AlgorithmParamValue::Float(f64::NAN), &low)
+            .is_err());
     }
 }

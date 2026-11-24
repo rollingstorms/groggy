@@ -1,5 +1,10 @@
 # Atomic pipeline capability map
 
+Numeric plan follow-up: [checked numeric loop plans](checked-numeric-loop-plans.md)
+lists the 26 lowered instruction forms and shared arithmetic/normalization
+kernels now supported by durable execution. Ordinary step-body loops and
+unported neighbor/in-place/fused plans remain outside the durable guarantee.
+
 An atomic pipeline shares one pending graph mutation across certified builders and
 classic algorithms. A successful run publishes one delta; failures and cancellation
 restore prior outputs and leave graph state and allocations unchanged. Immutable

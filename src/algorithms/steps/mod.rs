@@ -11,6 +11,7 @@ mod aggregations;
 mod arithmetic;
 mod attributes;
 mod captured_algorithms;
+pub(crate) mod checked_batch;
 mod community;
 pub mod composition;
 mod core;

@@ -1,5 +1,7 @@
 use super::super::{AlgorithmParamValue, Context};
+use super::checked_batch::LoweredBatchPlan;
 use super::core::{loop_effect, AtomicStepEffect, Step, StepExecutor, StepRegistry, StepScope};
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use crate::algorithms::execution::{BatchExecutor, BatchPlan};
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
@@ -31,10 +33,9 @@ struct LoopExecutionStats {
 /// This replaces loop unrolling with native iteration, executing the entire
 /// loop body in Rust without crossing the FFI boundary for each step.
 ///
-/// ## Execution Tiers
-/// 1. **Step-by-step**: Initial execution, collects statistics
-/// 2. **Batch Executor (Tier 1)**: Interpreted batch plan execution
-/// 3. **JIT (Tier 2)**: Native machine code (hot paths only, x86_64 only)
+/// Ordinary bodies use cached native steps. Supported numeric batch plans lower
+/// to checked kernels; unported plans retain only non-atomic compatibility.
+/// JIT execution is disabled on every platform.
 pub struct LoopStep {
     /// Number of iterations
     iterations: usize,
@@ -42,6 +43,7 @@ pub struct LoopStep {
     /// Serialized body to avoid eager deserialization / circular registry deps
     body_json: Value,
     body_cache: OnceCell<Vec<Box<dyn Step>>>,
+    lowered_cache: OnceCell<Option<LoweredBatchPlan>>,
 
     /// Optional: variable initialization for loops
     /// Format: Vec<(initial_var, loop_var)>
@@ -72,6 +74,7 @@ impl LoopStep {
             iterations,
             body_json,
             body_cache: OnceCell::new(),
+            lowered_cache: OnceCell::new(),
             loop_vars: None,
             registry,
             stats: LoopExecutionStats::default(),
@@ -91,6 +94,7 @@ impl LoopStep {
             iterations,
             body_json,
             body_cache: OnceCell::new(),
+            lowered_cache: OnceCell::new(),
             loop_vars: Some(loop_vars),
             registry,
             stats: LoopExecutionStats::default(),
@@ -122,37 +126,27 @@ impl LoopStep {
     //     None // ARM64 not supported
     // }
 
-    /// Try to deserialize body as a BatchPlan (if it's been pre-compiled)
-    fn try_batch_plan(&self) -> Option<BatchPlan> {
-        // The batch_plan is at the top level of body_json
-        let bp_wrapped = self.body_json.get("batch_plan")?;
-
-        // It might be wrapped in AlgorithmParamValue format: {"type": "Json", "value": {...}}
-        let bp_val = if let Some(inner) = bp_wrapped.get("value") {
-            inner // Unwrap
-        } else {
-            bp_wrapped // Already unwrapped
+    /// A supplied malformed plan is never replaced silently by another program.
+    fn batch_plan(&self) -> Result<Option<BatchPlan>> {
+        let Some(wrapped) = self.body_json.get("batch_plan") else {
+            return Ok(None);
         };
+        let value = wrapped.get("value").unwrap_or(wrapped);
+        let plan: BatchPlan = serde_json::from_value(value.clone())
+            .map_err(|e| anyhow!("iter.loop invalid batch_plan: {e}"))?;
+        plan.validate()?;
+        Ok(Some(plan))
+    }
 
-        match serde_json::from_value::<BatchPlan>(bp_val.clone()) {
-            Ok(plan) => {
-                if std::env::var("GROGGY_DEBUG_BATCH").is_ok() {
-                    eprintln!("[LOOP_STEP] ✅ Successfully deserialized BatchPlan!");
-                    eprintln!(
-                        "[LOOP_STEP]    {} instructions, {} slots",
-                        plan.instructions.len(),
-                        plan.slot_count
-                    );
-                }
-                Some(plan)
-            }
-            Err(e) => {
-                if std::env::var("GROGGY_DEBUG_BATCH").is_ok() {
-                    eprintln!("[LOOP_STEP] ⚠️  BatchPlan deserialization failed: {}", e);
-                }
-                None
-            }
-        }
+    fn lowered_batch(&self) -> Result<Option<&LoweredBatchPlan>> {
+        self.lowered_cache
+            .get_or_try_init(|| {
+                self.batch_plan()?
+                    .map(|plan| LoweredBatchPlan::compile(&plan))
+                    .transpose()
+                    .map(Option::flatten)
+            })
+            .map(Option::as_ref)
     }
 
     fn body_steps(&self) -> Result<&Vec<Box<dyn Step>>> {
@@ -187,19 +181,29 @@ impl LoopStep {
 impl Step for LoopStep {
     fn atomic_effect(&self) -> AtomicStepEffect {
         if self.body_json.get("batch_plan").is_some() {
-            return AtomicStepEffect::Unsupported;
+            return if self.lowered_batch().is_ok_and(|plan| plan.is_some()) {
+                AtomicStepEffect::PendingProperties
+            } else {
+                AtomicStepEffect::Unsupported
+            };
         }
         self.body_steps()
             .map_or(AtomicStepEffect::Unsupported, |steps| loop_effect(steps))
     }
 
     fn supports_atomic_properties(&self) -> bool {
-        // Batch plans execute outside StepScope's property overlay. Reject them
-        // even for zero iterations rather than certifying an alternate program.
-        self.body_json.get("batch_plan").is_none()
-            && self
-                .body_steps()
-                .is_ok_and(|steps| steps.iter().all(|step| step.supports_atomic_properties()))
+        if self.body_json.get("batch_plan").is_some() {
+            return self.lowered_batch().is_ok_and(|plan| plan.is_some());
+        }
+        self.body_steps()
+            .is_ok_and(|steps| steps.iter().all(|step| step.supports_atomic_properties()))
+    }
+
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        self.lowered_batch()
+            .ok()
+            .flatten()
+            .map(|_| self as &dyn ReadStep)
     }
 
     fn id(&self) -> &'static str {
@@ -207,6 +211,10 @@ impl Step for LoopStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if self.lowered_batch()?.is_some() {
+            return self.apply_read(ctx, &mut scope.read_scope());
+        }
+        let legacy_plan = self.batch_plan()?;
         let body_steps = self.body_steps()?;
         if ctx.property_batch.as_ref().is_some_and(|batch| {
             let effect = self.atomic_effect();
@@ -241,7 +249,7 @@ impl Step for LoopStep {
             .fetch_add(self.iterations as u64, Ordering::Relaxed);
 
         // Try tiered execution (if batch plan available)
-        if let Some(batch_plan) = self.try_batch_plan() {
+        if let Some(batch_plan) = legacy_plan {
             let node_count = scope.subgraph().node_count();
 
             // Tier 2: JIT compilation disabled temporarily
@@ -256,7 +264,7 @@ impl Step for LoopStep {
             let mut executor = BatchExecutor::new(node_count);
 
             return executor
-                .execute(&batch_plan, self.iterations, scope)
+                .execute_with_context(&batch_plan, self.iterations, ctx, scope)
                 .map_err(|e| anyhow!("Batch execution failed: {}", e));
         }
 
@@ -293,6 +301,33 @@ impl Step for LoopStep {
     }
 }
 
+impl sealed::Sealed for LoopStep {}
+impl ReadStep for LoopStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("iter.loop cancelled"));
+        }
+        let plan = self
+            .lowered_cache
+            .get()
+            .and_then(Option::as_ref)
+            .ok_or_else(|| anyhow!("iter.loop has no prepared native batch program"))?;
+        if let Some(bindings) = &self.loop_vars {
+            for (initial, logical) in bindings {
+                let value = scope.variables().value(initial).cloned().ok_or_else(|| {
+                    anyhow!("Loop variable initialization: '{initial}' not found")
+                })?;
+                scope.variables_mut().set_value(logical, value);
+            }
+        }
+        self.stats.execution_count.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .total_iterations
+            .fetch_add(self.iterations as u64, Ordering::Relaxed);
+        plan.execute(ctx, scope, self.iterations).map(|_| ())
+    }
+}
+
 /// Deserialize a loop step from a JSON spec.
 ///
 /// Expected format:
@@ -314,10 +349,12 @@ pub fn deserialize_loop_step(
     registry: &'static StepRegistry,
 ) -> Result<Box<dyn Step>> {
     // Extract iterations
-    let iterations = spec["iterations"]
-        .as_u64()
-        .ok_or_else(|| anyhow!("iter.loop requires 'iterations' field"))?
-        as usize;
+    let iterations = usize::try_from(
+        spec["iterations"]
+            .as_u64()
+            .ok_or_else(|| anyhow!("iter.loop requires non-negative 'iterations' field"))?,
+    )
+    .map_err(|_| anyhow!("iter.loop iterations must fit usize"))?;
 
     // Capture raw body JSON for lazy instantiation
     let body_json = spec
@@ -392,6 +429,45 @@ mod tests {
         let step = LoopStep::new(2, serde_json::json!([]), global_step_registry());
         let error = step.apply(&mut ctx, &mut scope).expect_err("cancelled");
         assert!(error.to_string().contains("cancelled before iteration 1"));
+    }
+
+    #[test]
+    fn malformed_supplied_plans_never_fall_back_even_for_zero_iterations() {
+        use crate::{subgraphs::Subgraph, Graph};
+        let owner = Graph::new().into_shared();
+        let selected =
+            Subgraph::from_nodes(owner, Default::default(), "invalid".into()).expect("selection");
+        for plan in [
+            serde_json::json!({}),
+            serde_json::json!({"instructions":[{"type":"load_scalar","dst":1,"value":1.}],"slot_count":1,"carried_slots":[]}),
+            serde_json::json!({"instructions":[],"slot_count":2,"carried_slots":[[0,1],[1,1]]}),
+            serde_json::json!({"instructions":[{"type":"clip","dst":0,"src":0,"min":2.,"max":1.}],"slot_count":1,"carried_slots":[]}),
+        ] {
+            let step = LoopStep::new(
+                0,
+                serde_json::json!({"value":[],"batch_plan":plan}),
+                global_step_registry(),
+            );
+            assert!(!step.supports_atomic_properties());
+            let mut variables = super::super::core::StepVariables::default();
+            let error = step.apply(
+                &mut Context::new(),
+                &mut StepScope::new(&selected, &mut variables),
+            );
+            assert!(error.is_err(), "malformed plan silently fell back");
+        }
+        let plan_only = LoopStep::new(
+            0,
+            serde_json::json!({"batch_plan":{"instructions":[],"slot_count":0,"carried_slots":[]}}),
+            global_step_registry(),
+        );
+        assert!(plan_only.supports_atomic_properties());
+        plan_only
+            .apply(
+                &mut Context::new(),
+                &mut StepScope::new(&selected, &mut Default::default()),
+            )
+            .expect("plan-only zero iteration");
     }
 
     #[test]

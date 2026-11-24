@@ -1,5 +1,6 @@
 //! Normalization step primitives.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
@@ -71,7 +72,17 @@ impl Step for NormalizeValuesStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for NormalizeValuesStep {}
+impl ReadStep for NormalizeValuesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("normalize_values cancelled"));
         }
@@ -228,8 +239,17 @@ impl Step for NormalizeNodeValuesStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        self.inner.apply(ctx, scope)
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for NormalizeNodeValuesStep {}
+impl ReadStep for NormalizeNodeValuesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        self.inner.apply_read(ctx, scope)
     }
 }
 
@@ -271,7 +291,17 @@ impl Step for StandardizeStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for StandardizeStep {}
+impl ReadStep for StandardizeStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("standardize cancelled"));
         }
@@ -384,7 +414,17 @@ impl Step for ClipValuesStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for ClipValuesStep {}
+impl ReadStep for ClipValuesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("clip cancelled"));
         }

@@ -425,3 +425,7 @@ harness = false
 [[bench]]
 name = "durable_pipeline"
 harness = false
+
+[[bench]]
+name = "checked_batch"
+harness = false

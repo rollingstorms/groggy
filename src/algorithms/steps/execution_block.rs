@@ -463,8 +463,7 @@ impl ExecutionBlockStep {
                     self.resolve_node_value(left, node_id, node_column, local_values, scope)?;
                 let right =
                     self.resolve_node_value(right, node_id, node_column, local_values, scope)?;
-                let result =
-                    comparison_op(body_node)?.apply(value_to_f64(&left)?, value_to_f64(&right)?);
+                let result = comparison_op(body_node)?.apply_values(&left, &right)?;
                 Ok(AlgorithmParamValue::Float(if result { 1.0 } else { 0.0 }))
             }
 

@@ -2140,11 +2140,8 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
         |spec| {
             // Extract iterations
-            let iterations = spec
-                .params
-                .get_int("iterations")
-                .ok_or_else(|| anyhow!("iter.loop requires 'iterations' param"))?
-                as usize;
+            let iterations = usize::try_from(spec.params.expect_int("iterations")?)
+                .map_err(|_| anyhow!("iter.loop iterations must be non-negative and fit usize"))?;
 
             // Extract body exactly like ExecutionBlockStep does
             let body_value = spec

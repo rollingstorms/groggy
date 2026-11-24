@@ -50,6 +50,9 @@ with TemporaryDirectory() as folder:
 | `graph.add_nodes`, `graph.add_edges` | Stage creations; explicit `{"added": position}` references address the entire outer batch. Numeric endpoints denote accepted selected nodes. |
 | `core.init_nodes`, `core.init_nodes_with_index`, `core.init_edges`, `core.init_scalar`, `core.graph_node_count`, `core.graph_edge_count` | Use the pending selection and deterministic node ordering; scalar values remain owned intermediates. |
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
+| `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
+| `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
+| `iter.loop` with a fully lowered numeric `batch_plan` | Private register frame; shared checked execution, staged reads and simultaneous carried slots. See [numeric loop plans](checked-numeric-loop-plans.md). |
 | `table.attach`, `graph.set_edge_endpoints`, `graph.remove_nodes`, `graph.remove_edges` | Explicit row-bound computed writeback and accepted-entity topology edits; see [writeback and cascades](durable-pipeline-writeback.md). |
 | `graph.capture_staged` | Capture an immutable pending selection without allocating accepted IDs or inventing retained history. |
 | `graph.select_nodes`, `graph.select_edges`, `graph.nodes_table`, `graph.edges_table`, `graph.degrees_table`, `table.select_columns`, `table.select_rows`, `graph.emit`, `table.emit` | Transform or emit explicit immutable variables. Earlier captures retain their values and membership. |
@@ -58,9 +61,9 @@ with TemporaryDirectory() as folder:
 `graph.from_snapshot` has the same sealed implementation as the typed reads, but
 this entry point currently has no supported retained-snapshot producer. It does
 not make owner-bound temporal steps portable. Atomic builders are required;
-ordinary classic algorithm handles, custom callbacks, loops, provisional-entity
-removal/revision, unported arithmetic/read steps, alternate
-plans and streaming reject during preflight. These remain explicit migration
+ordinary classic algorithm handles, custom callbacks, ordinary step-body loops,
+provisional-entity removal/revision, unported read steps, unlowered alternate plans
+and streaming reject during preflight. These remain explicit migration
 work in existing checklist rows. A supported effect flag alone grants no durable
 invocation authority. This entry point does not add pipeline-run history, cache
 policy, or a service concurrency model.

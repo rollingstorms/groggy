@@ -1,30 +1,46 @@
 //! Batch execution engine for efficient loop interpretation.
 //!
-//! The BatchExecutor interprets BatchPlans in native Rust code, eliminating
-//! per-step FFI overhead and enabling tight loop execution.
+//! Numeric plans delegate to checked native kernels. Unported families retain
+//! the non-atomic register interpreter until their semantic migration completes.
 
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::algorithms::steps::StepScope;
-use crate::algorithms::AlgorithmParamValue;
+use crate::algorithms::{AlgorithmParamValue, Context};
 use crate::traits::subgraph_operations::SubgraphOperations;
 use crate::types::AttrName;
 use crate::types::NodeId;
 
 use super::batch_plan::{AggregateOp, BatchInstruction, BatchPlan, Direction, SlotId, TieBreak};
 
-/// Batch executor for efficient loop body interpretation.
+fn numeric_slot_value(value: &AlgorithmParamValue) -> Result<f64> {
+    match value {
+        AlgorithmParamValue::Int(value) => Ok(*value as f64),
+        AlgorithmParamValue::Float(value) => Ok(*value),
+        _ => Err(anyhow!("Expected numeric JIT slot")),
+    }
+}
+
+/// Compatibility facade for serialized loop plans.
 ///
-/// Maintains a register file (slots) and executes instructions sequentially
-/// without variable lookups or per-step overhead.
+/// Supported numeric plans use the shared native step executor. The retained
+/// register interpreter serves only unported non-atomic plans; the explicit JIT
+/// pointer facade still exposes f64 storage without changing computed values.
 pub struct BatchExecutor {
     /// Register file: temporary storage for intermediate values (float vectors)
     slots: Vec<SlotData>,
+    // Typed results remain independent of the optional f64 pointer projection.
+    checked_slots: Option<Vec<CheckedSlot>>,
 
     /// Number of nodes (for validation and initialization)
     node_count: usize,
+}
+
+enum CheckedSlot {
+    Values(Vec<AlgorithmParamValue>),
+    Scalar(AlgorithmParamValue),
 }
 
 #[allow(dead_code)]
@@ -49,6 +65,7 @@ impl BatchExecutor {
     pub fn new(node_count: usize) -> Self {
         Self {
             slots: Vec::new(),
+            checked_slots: None,
             node_count,
         }
     }
@@ -67,8 +84,63 @@ impl BatchExecutor {
         iterations: usize,
         scope: &mut StepScope,
     ) -> Result<()> {
-        // Validate plan before execution
+        self.execute_with_context(plan, iterations, &mut Context::new(), scope)
+    }
+
+    /// Execute with the caller's cancellation and staged-property context.
+    pub fn execute_with_context(
+        &mut self,
+        plan: &BatchPlan,
+        iterations: usize,
+        ctx: &mut Context,
+        scope: &mut StepScope<'_>,
+    ) -> Result<()> {
         plan.validate()?;
+        if scope.subgraph().node_count() != self.node_count {
+            return Err(anyhow!("BatchExecutor node_count mismatch"));
+        }
+        self.checked_slots = None;
+        if let Some(lowered) =
+            crate::algorithms::steps::checked_batch::LoweredBatchPlan::compile(plan)?
+        {
+            let locals = lowered.execute(ctx, &mut scope.read_scope(), iterations)?;
+            // Do not coerce loaded lists or other typed values merely to retain
+            // a pointer facade for an inactive backend. Projection is explicit.
+            let nodes = scope.subgraph().ordered_nodes();
+            self.checked_slots = Some(
+                (0..plan.slot_count)
+                    .map(|index| {
+                        let name = format!("slot/{index}");
+                        match locals.value(&name) {
+                            Some(crate::algorithms::steps::StepValue::Scalar(value)) => {
+                                Ok(CheckedSlot::Scalar(value.clone()))
+                            }
+                            Some(crate::algorithms::steps::StepValue::NodeMap(values)) => {
+                                let values = nodes
+                                    .iter()
+                                    .map(|node| {
+                                        values
+                                            .get(node)
+                                            .cloned()
+                                            .ok_or_else(|| anyhow!("Missing slot node {node}"))
+                                    })
+                                    .collect::<Result<Vec<_>>>()?;
+                                Ok(CheckedSlot::Values(values))
+                            }
+                            _ => Err(anyhow!("Unsupported checked slot representation")),
+                        }
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+            );
+            self.slots.clear();
+            return Ok(());
+        }
+        // Unported instruction families retain the explicitly uncertified path.
+        if ctx.property_batch.is_some() {
+            return Err(anyhow!(
+                "Batch plan contains instructions without checked atomic lowering"
+            ));
+        }
 
         // DEBUG: Print plan details on first execution
         if std::env::var("GROGGY_DEBUG_BATCH").is_ok() {
@@ -91,8 +163,14 @@ impl BatchExecutor {
 
         // Execute loop iterations
         for iter in 0..iterations {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Batch loop cancelled"));
+            }
             // Execute instruction sequence
             for (idx, instr) in plan.instructions.iter().enumerate() {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("Batch loop cancelled"));
+                }
                 self.execute_instruction(instr, scope, &context)
                     .map_err(|e| {
                         anyhow!(
@@ -120,6 +198,7 @@ impl BatchExecutor {
 
     /// Allocate slots (registers) for execution
     fn allocate_slots(&mut self, count: usize) -> Result<()> {
+        self.checked_slots = None;
         self.slots.clear();
         self.slots.reserve(count);
         for _ in 0..count {
@@ -143,6 +222,24 @@ impl BatchExecutor {
     /// 2. No other methods that reallocate slots are called
     /// 3. The slot count matches what was allocated
     pub fn get_slot_pointers(&mut self) -> Vec<*mut f64> {
+        if let Some(checked) = self.checked_slots.take() {
+            self.slots = checked
+                .into_iter()
+                .map(|value| {
+                    let vector = match value {
+                        CheckedSlot::Scalar(value) => {
+                            numeric_slot_value(&value).map(|value| vec![value; self.node_count])
+                        }
+                        CheckedSlot::Values(values) => values
+                            .iter()
+                            .map(numeric_slot_value)
+                            .collect::<Result<Vec<_>>>(),
+                    }
+                    .unwrap_or_else(|_| vec![0.; self.node_count]);
+                    SlotData::FloatVec(vector)
+                })
+                .collect();
+        }
         for slot in 0..self.slots.len() {
             let converted = self
                 .to_f64_vec(slot)
