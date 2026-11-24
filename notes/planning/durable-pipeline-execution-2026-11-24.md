@@ -110,3 +110,16 @@ includes storage synchronization; reopening includes journal replay. Setup and
 program compilation are excluded. No production budget or comparison with a
 previous library release is claimed. Exact observations and prototype limitations
 are linked from the local receipt.
+
+## Commit and platform follow-up
+
+Runtime implementation is committed as `aff5e09007f7fd16f751be930630100935bdd5e1`
+and pushed on `groggy-roadmap-2026-10-20`. The capability matrix now pins this
+runtime and its local qualification receipt; `--check --verify-runtime` passes
+for all 499 production sources, 50 feature families, 105 public exports and the
+fixed 268-row checklist. No feature-family status is upgraded by this update.
+
+Cross-platform qualification is running separately on the pinned runtime:
+[run 45439515458](https://github.com/rollingstorms/groggy/actions/runs/45439515458).
+It is a manual qualification run; publication remains disabled for this event.
+Its result is not yet counted as a pass.
