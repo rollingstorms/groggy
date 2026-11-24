@@ -97,8 +97,15 @@ impl PreparedEffects {
         self,
         store: &mut crate::storage::journal::DurableGraph,
         selection: &crate::GraphView,
+        additional_schema: Option<&crate::GraphSchema>,
     ) -> GraphResult<crate::GraphView> {
-        store.accept_pipeline_batch(self.coordinate, self.allocation, self.batch, selection)
+        store.accept_pipeline_batch(
+            self.coordinate,
+            self.allocation,
+            self.batch,
+            selection,
+            additional_schema,
+        )
     }
 
     /// Empty effects still validate the complete coordinate. All nonempty effects

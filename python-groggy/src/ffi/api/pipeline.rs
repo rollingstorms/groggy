@@ -208,12 +208,13 @@ fn outputs_to_python<'py>(
 /// Execute owned native preparation without the GIL; durable acceptance stays
 /// on the creator thread. All semantic dispatch lives in the Rust core.
 #[pyfunction]
-#[pyo3(name = "run_durable_pipeline", signature = (handle, store, selected = None))]
+#[pyo3(name = "run_durable_pipeline", signature = (handle, store, selected = None, *, schema = None))]
 pub fn py_run_durable_pipeline(
     py: Python<'_>,
     handle: &PyPipelineHandle,
     store: &mut super::durable::PyDurableGraph,
     selected: Option<&crate::ffi::subgraphs::view::PyGraphView>,
+    schema: Option<&PyDict>,
 ) -> PyResult<(crate::ffi::subgraphs::view::PyGraphView, PyObject)> {
     let (pipeline, build_time) = {
         let guard = registry()
@@ -231,6 +232,7 @@ pub fn py_run_durable_pipeline(
             .read_view()
             .map_err(crate::ffi::utils::graph_error_to_py_err)?,
     };
+    let schema = schema.map(super::graph::parse_schema).transpose()?;
     let plan = pipeline
         .prepare_durable(store.core()?, &selected)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
@@ -241,9 +243,11 @@ pub fn py_run_durable_pipeline(
         (prepared, context)
     });
     let prepared = prepared.map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let result = prepared
-        .accept(store.core_mut()?)
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let result = match schema.as_ref() {
+        Some(schema) => prepared.accept_with_schema(store.core_mut()?, schema),
+        None => prepared.accept(store.core_mut()?),
+    }
+    .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let profile = PyDict::new(py);
     profile.set_item("build_time", build_time)?;
     profile.set_item("run_time", started.elapsed().as_secs_f64())?;

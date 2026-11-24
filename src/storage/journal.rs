@@ -789,12 +789,16 @@ impl DurableGraph {
         allocation: Option<(crate::NodeId, crate::EdgeId)>,
         batch: Option<GraphBatch>,
         selection: &crate::GraphView,
+        additional_schema: Option<&GraphSchema>,
     ) -> GraphResult<crate::GraphView> {
         self.ready()?;
         self.graph.validate_write_coordinate(&coordinate)?;
         self.graph.validate_allocation_expectation(allocation)?;
         let full = self.graph.read_view()?;
         let Some(batch) = batch else {
+            if let Some(schema) = additional_schema {
+                self.graph.check_schema_at(schema, coordinate.state_id())?;
+            }
             return crate::GraphView::from_membership(
                 full.read_state().clone(),
                 selection.nodes().clone(),
@@ -802,9 +806,12 @@ impl DurableGraph {
             );
         };
         let stored = StoredBatch::encode(&batch)?;
-        let prepared =
-            self.graph
-                .prepare_view_publication(&full, batch, self.schema.as_ref(), None)?;
+        let prepared = self.graph.prepare_view_publication(
+            &full,
+            batch,
+            self.schema.as_ref(),
+            additional_schema,
+        )?;
         let output = crate::GraphView::from_membership(
             prepared.view.read_state().clone(),
             selection.nodes().clone(),
@@ -816,7 +823,7 @@ impl DurableGraph {
             prepared.expected_state,
             "atomic pipeline effects".into(),
             "groggy".into(),
-            None,
+            additional_schema,
         )?;
         Ok(self.graph.accepted_view_result(batch, output).view)
     }

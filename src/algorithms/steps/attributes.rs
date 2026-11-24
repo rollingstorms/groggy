@@ -293,17 +293,11 @@ impl Step for AttachTableStep {
     fn atomic_effect(&self) -> AtomicStepEffect {
         AtomicStepEffect::StagedProperties
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("table attachment cancelled"));
-        }
-        let table = scope.variables().table(&self.source)?;
-        let pending = ctx
-            .property_batch
-            .as_mut()
-            .ok_or_else(|| anyhow!("table.attach requires a persistent atomic builder"))?;
-        pending.attach_table(scope.subgraph(), table, &self.columns, self.effective_at)?;
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -510,6 +504,18 @@ impl ReadStep for LoadEdgeAttrStep {
             map.insert(edge, value);
         }
         scope.variables_mut().set_edge_map(self.target.clone(), map);
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for AttachTableStep {}
+impl ReadStep for AttachTableStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("table attachment cancelled"));
+        }
+        let table = scope.variables().table(&self.source)?;
+        scope.attach_table(ctx, table, &self.columns, self.effective_at)?;
         Ok(())
     }
 }

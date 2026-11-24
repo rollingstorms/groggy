@@ -226,6 +226,18 @@ impl PropertyBatch {
         let binding = subgraph.graph();
         let graph = binding.borrow();
         graph.validate_write_coordinate(&self.coordinate)?;
+        drop(graph);
+        self.attach_table_membership(subgraph.nodes(), subgraph.edges(), table, columns, at)
+    }
+
+    pub(crate) fn attach_table_membership(
+        &mut self,
+        selected_nodes: &HashSet<NodeId>,
+        selected_edges: &HashSet<EdgeId>,
+        table: &crate::storage::table::BaseTable,
+        columns: &[(AttrName, AttrName)],
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<()> {
         let (source, prepared) = table.source_batch_mapped(columns, at)?;
         if !self
             .captures
@@ -276,9 +288,9 @@ impl PropertyBatch {
         for rows in attrs.values() {
             for (id, _) in rows {
                 let selected = if nodes {
-                    subgraph.nodes().contains(id)
+                    selected_nodes.contains(id)
                 } else {
-                    subgraph.edges().contains(id)
+                    selected_edges.contains(id)
                 };
                 if !selected {
                     return Err(crate::GraphError::InvalidInput(format!(
@@ -287,8 +299,13 @@ impl PropertyBatch {
                 }
             }
         }
-        graph.validate_scoped_bulk_attrs(&attrs, nodes, subgraph.frozen_view())?;
-        drop(graph);
+        crate::api::graph::bulk_validation::validate(&attrs, nodes, None, |id| {
+            if nodes {
+                selected_nodes.contains(&id)
+            } else {
+                selected_edges.contains(&id)
+            }
+        })?;
         self.stage_at(nodes, attrs, at)
     }
 
@@ -420,10 +437,26 @@ impl PropertyBatch {
         selected: &Subgraph,
         reference: BatchNodeRef,
     ) -> GraphResult<NodeId> {
+        self.resolve_node_reference(selected.nodes(), |id| graph.has_node(id), reference)
+    }
+
+    pub(crate) fn resolve_node_in_view(
+        &self,
+        accepted: &crate::GraphView,
+        selected: &crate::GraphView,
+        reference: BatchNodeRef,
+    ) -> GraphResult<NodeId> {
+        self.resolve_node_reference(selected.nodes(), |id| accepted.contains_node(id), reference)
+    }
+
+    fn resolve_node_reference(
+        &self,
+        selected: &HashSet<NodeId>,
+        accepted: impl FnOnce(NodeId) -> bool,
+        reference: BatchNodeRef,
+    ) -> GraphResult<NodeId> {
         let resolved = match reference {
-            BatchNodeRef::Existing(id) if selected.nodes().contains(&id) && graph.has_node(id) => {
-                Some(id)
-            }
+            BatchNodeRef::Existing(id) if selected.contains(&id) && accepted(id) => Some(id),
             BatchNodeRef::Added(position) if position < self.add_nodes => self
                 .allocation_base
                 .and_then(|(base, _)| base.checked_add(position)),
@@ -464,19 +497,7 @@ impl PropertyBatch {
     ) -> GraphResult<Vec<EdgeId>> {
         for &(source, target) in edges {
             for reference in [source, target] {
-                let valid = match reference {
-                    BatchNodeRef::Existing(id) => {
-                        selected.contains_node(id) && accepted.contains_node(id)
-                    }
-                    BatchNodeRef::Added(position) => {
-                        position < self.add_nodes && self.allocation_base.is_some()
-                    }
-                };
-                if !valid {
-                    return Err(crate::GraphError::InvalidInput(
-                        "Edge endpoint is outside the selected or staged nodes".into(),
-                    ));
-                }
+                self.resolve_node_in_view(accepted, selected, reference)?;
             }
         }
         self.stage_validated_edges(allocation, edges, attrs, at)

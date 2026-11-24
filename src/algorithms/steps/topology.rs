@@ -34,37 +34,11 @@ impl Step for ReviseEndpointsStep {
     fn atomic_effect(&self) -> AtomicStepEffect {
         AtomicStepEffect::Topology
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if !ctx.persist_results() || ctx.property_batch.is_none() {
-            bail!("{} requires a persistent local atomic builder", self.id());
-        }
-        let binding = scope.subgraph().graph();
-        let graph = binding.borrow();
-        let pending = ctx
-            .property_batch
-            .as_ref()
-            .ok_or_else(|| anyhow!("missing atomic effect scope"))?;
-        let mut rows = Vec::with_capacity(self.rows.len());
-        for &(edge, source, target) in &self.rows {
-            if ctx.is_cancelled() {
-                bail!("endpoint revision cancelled");
-            }
-            if !scope.subgraph().edges().contains(&edge) || !graph.has_edge(edge) {
-                bail!("endpoint revision edge {edge} is outside the active execution selection");
-            }
-            let source = pending.resolve_selected_node(&graph, scope.subgraph(), source)?;
-            let target = pending.resolve_selected_node(&graph, scope.subgraph(), target)?;
-            rows.push((edge, source, target));
-        }
-        if ctx.is_cancelled() {
-            bail!("endpoint revision cancelled");
-        }
-        drop(graph);
-        ctx.property_batch
-            .as_mut()
-            .ok_or_else(|| anyhow!("missing atomic effect scope"))?
-            .stage_endpoint_revisions(rows, self.effective_at);
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -136,59 +110,11 @@ impl Step for RemoveStep {
         AtomicStepEffect::Topology
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if !ctx.persist_results() || ctx.property_batch.is_none() {
-            bail!("{} requires a persistent local atomic builder", self.id());
-        }
-        if ctx.is_cancelled() {
-            bail!("topology removal cancelled");
-        }
-        let ids = match &self.input {
-            RemovalInput::Ids(ids) => ids.clone(),
-            RemovalInput::Keys(source) => {
-                let mut ids = match (self.nodes, scope.variables().value(source)) {
-                    (true, Some(StepValue::NodeMap(map))) => {
-                        map.keys().copied().collect::<Vec<_>>()
-                    }
-                    (true, Some(StepValue::NodeColumn(column))) => column.nodes().to_vec(),
-                    (false, Some(StepValue::EdgeMap(map))) => map.keys().copied().collect(),
-                    (_, None) => bail!("variable '{source}' not found"),
-                    _ => bail!(
-                        "{} requires a matching node/edge map or node column",
-                        self.id()
-                    ),
-                };
-                ids.sort_unstable();
-                ids
-            }
-        };
-        // Validate every target against the original execution selection before
-        // touching staging. Final canonical validation also checks duplicate
-        // removals, property conflicts, cascades, and temporal endpoint validity.
-        let binding = scope.subgraph().graph();
-        let graph = binding.borrow();
-        for &id in &ids {
-            if ctx.is_cancelled() {
-                bail!("topology removal cancelled");
-            }
-            let selected = if self.nodes {
-                scope.subgraph().nodes().contains(&id) && graph.has_node(id)
-            } else {
-                scope.subgraph().edges().contains(&id) && graph.has_edge(id)
-            };
-            if !selected {
-                bail!(
-                    "{} target {id} is outside the active execution selection",
-                    self.id()
-                );
-            }
-        }
-        drop(graph);
-        ctx.property_batch
-            .as_mut()
-            .ok_or_else(|| anyhow!("missing atomic effect scope"))?
-            .stage_removals(self.nodes, ids, self.effective_at);
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -287,6 +213,50 @@ impl ReadStep for CaptureStagedStep {
         scope
             .variables_mut()
             .set_value(&self.output, StepValue::GraphView(view));
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for RemoveStep {}
+impl ReadStep for RemoveStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if !ctx.persist_results() || ctx.property_batch.is_none() {
+            bail!("{} requires a persistent local atomic builder", self.id());
+        }
+        if ctx.is_cancelled() {
+            bail!("topology removal cancelled");
+        }
+        let ids = match &self.input {
+            RemovalInput::Ids(ids) => ids.clone(),
+            RemovalInput::Keys(source) => {
+                let mut ids = match (self.nodes, scope.variables().value(source)) {
+                    (true, Some(StepValue::NodeMap(map))) => {
+                        map.keys().copied().collect::<Vec<_>>()
+                    }
+                    (true, Some(StepValue::NodeColumn(column))) => column.nodes().to_vec(),
+                    (false, Some(StepValue::EdgeMap(map))) => map.keys().copied().collect(),
+                    (_, None) => bail!("variable '{source}' not found"),
+                    _ => bail!(
+                        "{} requires a matching node/edge map or node column",
+                        self.id()
+                    ),
+                };
+                ids.sort_unstable();
+                ids
+            }
+        };
+        scope.remove(ctx, self.nodes, ids, self.effective_at)?;
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for ReviseEndpointsStep {}
+impl ReadStep for ReviseEndpointsStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if !ctx.persist_results() || ctx.property_batch.is_none() {
+            bail!("{} requires a persistent local atomic builder", self.id());
+        }
+        scope.revise_endpoints(ctx, &self.rows, self.effective_at)?;
         Ok(())
     }
 }

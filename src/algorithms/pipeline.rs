@@ -210,9 +210,32 @@ impl Pipeline {
         store: &mut crate::storage::journal::DurableGraph,
         selected: &crate::GraphView,
     ) -> Result<crate::GraphView> {
+        self.run_durable_internal(ctx, store, selected, None)
+    }
+
+    /// Apply a stricter per-call policy in addition to the installed durable policy.
+    pub fn run_durable_with_schema(
+        &self,
+        ctx: &mut Context,
+        store: &mut crate::storage::journal::DurableGraph,
+        selected: &crate::GraphView,
+        additional_schema: &crate::GraphSchema,
+    ) -> Result<crate::GraphView> {
+        self.run_durable_internal(ctx, store, selected, Some(additional_schema))
+    }
+
+    fn run_durable_internal(
+        &self,
+        ctx: &mut Context,
+        store: &mut crate::storage::journal::DurableGraph,
+        selected: &crate::GraphView,
+        additional_schema: Option<&crate::GraphSchema>,
+    ) -> Result<crate::GraphView> {
         let plan = self.prepare_durable(store, selected)?;
         let previous_outputs = ctx.take_outputs();
-        let result = plan.execute(ctx).and_then(|effects| effects.accept(store));
+        let result = plan
+            .execute(ctx)
+            .and_then(|effects| effects.accept_internal(store, additional_schema));
         ctx.finish_output_scope(previous_outputs, result.is_ok());
         result
     }
@@ -306,6 +329,24 @@ impl PreparedDurablePipeline {
         self,
         store: &mut crate::storage::journal::DurableGraph,
     ) -> Result<crate::GraphView> {
+        self.accept_internal(store, None)
+    }
+
+    /// Accept with an additional proposed-state schema, retained in the journal
+    /// for exact recovery without changing the installed schema policy.
+    pub fn accept_with_schema(
+        self,
+        store: &mut crate::storage::journal::DurableGraph,
+        schema: &crate::GraphSchema,
+    ) -> Result<crate::GraphView> {
+        self.accept_internal(store, Some(schema))
+    }
+
+    fn accept_internal(
+        self,
+        store: &mut crate::storage::journal::DurableGraph,
+        schema: Option<&crate::GraphSchema>,
+    ) -> Result<crate::GraphView> {
         if self
             .cancellation
             .as_ref()
@@ -314,7 +355,7 @@ impl PreparedDurablePipeline {
             return Err(anyhow!("pipeline cancelled before publication"));
         }
         self.effects
-            .accept_durable(store, &self.selection)
+            .accept_durable(store, &self.selection, schema)
             .map_err(Into::into)
     }
 }

@@ -182,6 +182,106 @@ impl<'a> ReadStepScope<'a> {
             }
         }
     }
+    pub(crate) fn attach_table(
+        &self,
+        ctx: &mut Context,
+        table: &crate::storage::table::BaseTable,
+        columns: &[(AttrName, AttrName)],
+        at: Option<crate::TimestampMicros>,
+    ) -> Result<()> {
+        let batch = ctx
+            .property_batch
+            .as_mut()
+            .ok_or_else(|| anyhow!("table.attach requires a persistent atomic builder"))?;
+        match &self.source {
+            Source::Memory(s) => batch.attach_table(s, table, columns, at)?,
+            Source::Detached { current, .. } => batch.attach_table_membership(
+                current.nodes(),
+                current.edges(),
+                table,
+                columns,
+                at,
+            )?,
+        }
+        Ok(())
+    }
+
+    pub(crate) fn remove(
+        &self,
+        ctx: &mut Context,
+        nodes: bool,
+        ids: Vec<usize>,
+        at: Option<crate::TimestampMicros>,
+    ) -> Result<()> {
+        let label = if nodes {
+            "graph.remove_nodes target"
+        } else {
+            "graph.remove_edges target"
+        };
+        match &self.source {
+            Source::Memory(s) => {
+                let owner = s.graph();
+                let graph = owner.borrow();
+                validate_targets(ctx, &ids, "topology removal cancelled", label, |id| {
+                    if nodes {
+                        s.nodes().contains(&id) && graph.has_node(id)
+                    } else {
+                        s.edges().contains(&id) && graph.has_edge(id)
+                    }
+                })?;
+            }
+            Source::Detached { base, current, .. } => {
+                validate_targets(ctx, &ids, "topology removal cancelled", label, |id| {
+                    if nodes {
+                        base.contains_node(id) && current.contains_node(id)
+                    } else {
+                        base.contains_edge(id) && current.contains_edge(id)
+                    }
+                })?
+            }
+        }
+        ctx.property_batch
+            .as_mut()
+            .ok_or_else(|| anyhow!("missing atomic effect scope"))?
+            .stage_removals(nodes, ids, at);
+        Ok(())
+    }
+
+    pub(crate) fn revise_endpoints(
+        &self,
+        ctx: &mut Context,
+        rows: &[(usize, BatchNodeRef, BatchNodeRef)],
+        at: Option<crate::TimestampMicros>,
+    ) -> Result<()> {
+        let batch = ctx
+            .property_batch
+            .as_ref()
+            .ok_or_else(|| anyhow!("missing atomic effect scope"))?;
+        let prepared = match &self.source {
+            Source::Memory(s) => {
+                let owner = s.graph();
+                let graph = owner.borrow();
+                prepare_endpoints(
+                    ctx,
+                    rows,
+                    |edge| s.edges().contains(&edge) && graph.has_edge(edge),
+                    |reference| batch.resolve_selected_node(&graph, s, reference),
+                )?
+            }
+            Source::Detached { base, current, .. } => prepare_endpoints(
+                ctx,
+                rows,
+                |edge| base.contains_edge(edge) && current.contains_edge(edge),
+                |reference| batch.resolve_node_in_view(base, current, reference),
+            )?,
+        };
+        ctx.property_batch
+            .as_mut()
+            .ok_or_else(|| anyhow!("missing atomic effect scope"))?
+            .stage_endpoint_revisions(prepared, at);
+        Ok(())
+    }
+
     pub(crate) fn attach_node_column(
         &self,
         ctx: &mut Context,
@@ -259,4 +359,43 @@ impl<'a> ReadStepScope<'a> {
             }
         }
     }
+}
+
+fn validate_targets(
+    ctx: &Context,
+    ids: &[usize],
+    cancelled: &str,
+    label: &str,
+    mut contains: impl FnMut(usize) -> bool,
+) -> Result<()> {
+    for &id in ids {
+        if ctx.is_cancelled() {
+            bail!("{cancelled}");
+        }
+        if !contains(id) {
+            bail!("{label} {id} is outside the active execution selection");
+        }
+    }
+    Ok(())
+}
+fn prepare_endpoints(
+    ctx: &Context,
+    rows: &[(usize, BatchNodeRef, BatchNodeRef)],
+    mut edge_ok: impl FnMut(usize) -> bool,
+    mut node: impl FnMut(BatchNodeRef) -> GraphResult<usize>,
+) -> Result<Vec<(usize, usize, usize)>> {
+    let mut prepared = Vec::with_capacity(rows.len());
+    for &(edge, source, target) in rows {
+        if ctx.is_cancelled() {
+            bail!("endpoint revision cancelled");
+        }
+        if !edge_ok(edge) {
+            bail!("endpoint revision edge {edge} is outside the active execution selection");
+        }
+        prepared.push((edge, node(source)?, node(target)?));
+    }
+    if ctx.is_cancelled() {
+        bail!("endpoint revision cancelled");
+    }
+    Ok(prepared)
 }

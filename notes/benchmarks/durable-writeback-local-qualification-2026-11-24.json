@@ -1,0 +1,53 @@
+{
+  "scope": "Durable issued-table writeback, accepted topology edits and additional schema; local qualification. Broad parents remain open. No new platform or performance claim.",
+  "date": "2026-11-24",
+  "production_source_file_count": 499,
+  "production_source_tree_sha256": "e4e1c6524ddcb68084bf9965e4a5725364dfe425256b305874a4c4a47da887ed",
+  "production_source_hash_recipe": "Sorted relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1645,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 226,
+    "doctests_passed": 10,
+    "serial_checkpoint_recovery_passed": 1,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed",
+    "changed_ffi_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3409,
+    "maintained_skipped": 1,
+    "established_warnings": 14,
+    "documentation_examples": 292,
+    "durable_tests": 24,
+    "python_38_syntax": "passed",
+    "packaged_python_source_files_match": 62
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "dfa252672f59e7bf3b52cabf72d4735be55c37762d2a6fb55df4a77973c7a555",
+    "qualification_receipt": "notes/benchmarks/durable-writeback-wheel-qualification-2026-11-24.json"
+  },
+  "prior_benchmark": {
+    "receipt": "notes/benchmarks/durable-pipeline-local-qualification-2026-11-24.json",
+    "runtime": "aff5e09007f7fd16f751be930630100935bdd5e1",
+    "scope": "Historical first-slice baseline; not reassigned to this changed runtime."
+  },
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "78cd286b04ee1033b4d215e2704148b9cbf02de08149316c64f72929d8c51cc4",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-durable-writeback-final-native.log": "457b7e482a7643388c9f7c64d08d3b432a2563c05a65fe4b8e889fc0313c1d3f",
+    "/tmp/groggy-durable-writeback-final-clippy.log": "2bd0ca78a8c9d4620278b70d69091085a15f974b5b00766bd0a9d70e460a9154",
+    "/tmp/groggy-durable-writeback-wheel-gates.log": "c3110d642c92b160afbe330e3d197bf2939dbb13dd1e03dd4c70901e1c3a2ae6",
+    "/tmp/groggy-durable-writeback-checkpoint.log": "c93e6fc63fb20aac496ba56beb31b356af09cae38424ec9a624b397b59d8cc46"
+  }
+}

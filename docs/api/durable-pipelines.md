@@ -1,6 +1,6 @@
 # Durable pipeline execution
 
-`Pipeline.run_durable(store, selected=None, return_profile=False)` runs supported
+`Pipeline.run_durable(store, selected=None, return_profile=False, schema=None)` runs supported
 atomic step builders through one journaled publication. Omitting `selected` uses
 the whole current graph; an explicit input must be a current accepted view from
 that durable owner. The returned `GraphView` is immutable and has accepted write
@@ -50,6 +50,7 @@ with TemporaryDirectory() as folder:
 | `graph.add_nodes`, `graph.add_edges` | Stage creations; explicit `{"added": position}` references address the entire outer batch. Numeric endpoints denote accepted selected nodes. |
 | `core.init_nodes`, `core.init_nodes_with_index`, `core.init_edges`, `core.init_scalar`, `core.graph_node_count`, `core.graph_edge_count` | Use the pending selection and deterministic node ordering; scalar values remain owned intermediates. |
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
+| `table.attach`, `graph.set_edge_endpoints`, `graph.remove_nodes`, `graph.remove_edges` | Explicit row-bound computed writeback and accepted-entity topology edits; see [writeback and cascades](durable-pipeline-writeback.md). |
 | `graph.capture_staged` | Capture an immutable pending selection without allocating accepted IDs or inventing retained history. |
 | `graph.select_nodes`, `graph.select_edges`, `graph.nodes_table`, `graph.edges_table`, `graph.degrees_table`, `table.select_columns`, `table.select_rows`, `graph.emit`, `table.emit` | Transform or emit explicit immutable variables. Earlier captures retain their values and membership. |
 | `graph.algorithm_table` | Reuse the existing captured BFS, DFS, Dijkstra, A*, PageRank, betweenness, closeness, components, Louvain, Leiden, Infomap, Girvan–Newman and LPA kernels. Existing algorithm domains/options still apply. |
@@ -57,8 +58,8 @@ with TemporaryDirectory() as folder:
 `graph.from_snapshot` has the same sealed implementation as the typed reads, but
 this entry point currently has no supported retained-snapshot producer. It does
 not make owner-bound temporal steps portable. Atomic builders are required;
-ordinary classic algorithm handles, custom callbacks, loops, removals, endpoint
-revision, issued-table attachment, unported arithmetic/read steps, alternate
+ordinary classic algorithm handles, custom callbacks, loops, provisional-entity
+removal/revision, unported arithmetic/read steps, alternate
 plans and streaming reject during preflight. These remain explicit migration
 work in existing checklist rows. A supported effect flag alone grants no durable
 invocation authority. This entry point does not add pipeline-run history, cache
@@ -75,8 +76,10 @@ It holds no `Graph` or writable `Subgraph`. Dropping the proposal publishes noth
 
 `PreparedDurablePipeline::accept` returns to the durable owner. It rechecks the
 coordinate and any staged allocation expectation, then checks the latest
-installed schema and prepares the complete accepted output before journal
-append/sync/publication. Returning to the same branch/head after allocations on a
+installed schema and any explicit stricter per-call schema and prepares the complete accepted output before journal
+append/sync/publication. A per-call schema is retained with its operation for
+replay and does not replace the installed schema; it is checked on empty runs
+without creating a history version. Returning to the same branch/head after allocations on a
 sibling branch does not authorize reinterpreting provisional IDs. Empty runs
 validate the source and publish no version. Each nonempty run uses one engine
 clock default unless explicit change timestamps were supplied. Reading or

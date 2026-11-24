@@ -1,5 +1,10 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Implementation follow-up — 2026-11-24:**
+[computed writeback and accepted topology edits](durable-pipeline-writeback-2026-11-24.md)
+now use the same checked durable boundary. Existing schema, time, identity and
+cascade rules are preserved; no unanswered owner policy is resolved here.
+
 **Implementation checkpoint — 2026-11-24:** supported durable step-builder
 execution is complete with shared sealed kernels, detached preparation, one
 journal acceptance and exact recovery. See

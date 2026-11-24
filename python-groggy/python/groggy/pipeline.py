@@ -149,17 +149,19 @@ class Pipeline:
             self._handle = handle
             self._build_timings = timings
 
-    def run_durable(self, store, selected=None, *, return_profile=False):
+    def run_durable(self, store, selected=None, *, return_profile=False, schema=None):
         """Run supported atomic step builders as one journaled publication.
 
         ``selected`` is a current immutable view from ``store``; omitting it
         selects the whole graph. Preparation runs without the GIL. Acceptance
-        and schema checks run on the durable owner's thread. Unsupported steps
+        and schema checks run on the durable owner's thread. Optional ``schema``
+        adds a stricter per-call policy without replacing the installed policy.
+        Unsupported steps
         reject before execution. The result is an immutable GraphView.
         """
         self._ensure_built()
         result, profile = _groggy.pipeline.run_durable_pipeline(
-            self._handle, store, selected
+            self._handle, store, selected, schema=schema
         )
         self._last_profile = profile
         return (result, profile) if return_profile else result

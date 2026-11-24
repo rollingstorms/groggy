@@ -217,3 +217,222 @@ def test_read_only_durable_computation_publishes_no_version_or_journal_record(tm
         assert result.write_state_id == head == store.current_state_id
         assert profile["outputs"]["answer"].column("value").to_list() == [0, 1]
         assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("directed", [False, True])
+def test_durable_computed_columns_endpoint_revision_and_external_cascade(
+    tmp_path, directed
+):
+    graph = Graph(directed=directed)
+    batch = GraphBatch(effective_at=0)
+    nodes = [batch.add_node() for _ in range(4)]
+    batch.add_edge(nodes[0], nodes[1], weight=2.5)
+    batch.add_edge(nodes[1], nodes[3])  # Outside the selected view below.
+    batch.add_edge(nodes[2], nodes[2])
+    graph.writer().apply_batch(batch)
+    path = tmp_path / "writeback.journal"
+    store = DurableGraph.create_from_graph(path, graph)
+    selected = store.read_view().select_nodes([0, 1, 2])
+    head = store.current_state_id
+    result, profile = pipeline(
+        [
+            step("graph.add_nodes", count=1, output="new", effective_at=10),
+            step(
+                "graph.set_edge_endpoints",
+                revisions=[[0, 0, {"added": 0}]],
+                effective_at=20,
+            ),
+            step("graph.remove_edges", ids=[2], effective_at=15),
+            step("graph.remove_nodes", ids=[1], effective_at=20),
+            step("graph.capture_staged", output="pending"),
+            step(
+                "graph.algorithm_table",
+                source="pending",
+                algorithm="bfs",
+                start=0,
+                output="answer",
+            ),
+            step("table.select_rows", source="answer", rows=[1, 0], output="reordered"),
+            step(
+                "table.attach",
+                source="reordered",
+                columns={"value": "hops"},
+                effective_at=30,
+            ),
+            step("graph.edges_table", source="pending", output="edges"),
+            step(
+                "table.attach",
+                source="edges",
+                columns={"weight": "copied_weight"},
+                effective_at=35,
+            ),
+            step("graph.emit", source="pending", name="pending"),
+        ]
+    ).run_durable(store, selected, return_profile=True)
+    assert result.node_ids == [0, 2, 4]
+    assert result.edge_ids == [0]
+    assert result.edge_endpoints(0) == (0, 4)
+    assert result.node_attr(4, "hops") == 1
+    assert result.edge_attr(0, "copied_weight") == 2.5
+    assert store.current_state_id == head + 1
+    assert store.read_view().node_ids == [0, 2, 3, 4]
+    assert store.read_view().edge_ids == [0]
+    assert selected.edge_endpoints(0) == (0, 1)
+    assert profile["outputs"]["pending"].node_attr(4, "hops") is None
+    store.close()
+    reopened = DurableGraph.open(path)
+    assert reopened.read_view_at(19).edge_endpoints(0) == (0, 1)
+    assert reopened.read_view_at(20).edge_endpoints(0) == (0, 4)
+    assert reopened.read_view_at(29).node_attr(4, "hops") is None
+    assert reopened.read_view_at(30).node_attr(4, "hops") == 1
+    assert reopened.read_view_at(34).edge_attr(0, "copied_weight") is None
+    assert reopened.read_view_at(35).edge_attr(0, "copied_weight") == 2.5
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        [
+            step("graph.remove_nodes", ids=[0]),
+            step("table.attach", source="table", columns={"score": "copied"}),
+        ],
+        [step("graph.remove_nodes", ids=[2])],
+        [step("graph.set_edge_endpoints", revisions=[[0, 0, 1], [0, 1, 0]])],
+    ],
+)
+def test_durable_late_writeback_and_topology_errors_preserve_entire_graph(
+    tmp_path, suffix
+):
+    graph = Graph()
+    graph.add_nodes([{"score": 7}, {"score": 9}])
+    graph.add_edge(0, 1)
+    path = tmp_path / "reject.journal"
+    store = DurableGraph.create_from_graph(path, graph)
+    original = path.read_bytes()
+    head = store.current_state_id
+    with pytest.raises(RuntimeError):
+        pipeline(
+            [
+                step("graph.add_nodes", count=1, output="new"),
+                step("graph.capture_staged", output="capture"),
+                step("graph.nodes_table", source="capture", output="table"),
+            ]
+            + suffix
+        ).run_durable(store)
+    assert store.current_state_id == head
+    assert path.read_bytes() == original
+    result = pipeline([step("graph.add_nodes", count=1, output="new")]).run_durable(
+        store
+    )
+    assert result.node_ids == [0, 1, 2]
+
+
+@pytest.mark.parametrize(
+    "algorithm,options,column",
+    [
+        ("bfs", {"start": 0}, "value"),
+        ("dfs", {"start": 0}, "value"),
+        ("dijkstra", {"start": 0}, "value"),
+        ("astar", {"start": 0, "goal": 2}, "cost"),
+        ("pagerank", {}, "value"),
+        ("betweenness", {}, "value"),
+        ("closeness", {}, "value"),
+        ("components", {}, "value"),
+        ("louvain", {}, "value"),
+        ("leiden", {"seed": 7}, "value"),
+        ("infomap", {"seed": 7, "num_trials": 1}, "value"),
+        ("girvan_newman", {}, "value"),
+        ("lpa", {"seed": 7}, "value"),
+    ],
+)
+def test_every_captured_kernel_can_publish_row_bound_results_durably(
+    tmp_path, algorithm, options, column
+):
+    graph = Graph()
+    batch = GraphBatch(effective_at=0)
+    a, b = batch.add_node(), batch.add_node()
+    batch.add_edge(a, b)
+    graph.writer().apply_batch(batch)
+    path = tmp_path / "compute.journal"
+    store = DurableGraph.create_from_graph(path, graph)
+    result, profile = pipeline(
+        [
+            step("graph.add_nodes", count=1, output="new", effective_at=10),
+            step(
+                "graph.add_edges",
+                edges=[[1, {"added": 0}]],
+                output="edge",
+                effective_at=20,
+            ),
+            step("graph.capture_staged", output="pending"),
+            step(
+                "graph.algorithm_table",
+                source="pending",
+                output="metric",
+                algorithm=algorithm,
+                **options,
+            ),
+            step(
+                "table.attach",
+                source="metric",
+                columns={column: "computed"},
+                effective_at=30,
+            ),
+            step("table.emit", source="metric", name="metric"),
+        ]
+    ).run_durable(store, return_profile=True)
+    table = profile["outputs"]["metric"]
+    expected = dict(zip(table.source_entity_ids, table.column(column).to_list()))
+    assert 2 in expected
+    for node, value in expected.items():
+        assert result.node_attr(node, "computed") == value
+        assert store.read_view_at(29).node_attr(node, "computed") is None
+        assert table.source_views()[0].node_attr(node, "computed") is None
+    store.close()
+    reopened = DurableGraph.open(path)
+    for node, value in expected.items():
+        assert reopened.read_view_at(30).node_attr(node, "computed") == value
+
+
+def test_durable_pipeline_checks_additional_schema_without_replacing_installed_policy(
+    tmp_path,
+):
+    path = tmp_path / "schema.journal"
+    store = DurableGraph.create(path)
+    schema = {"node_labels": {"Entity": {"x": {"type": "text", "required": False}}}}
+    original = path.read_bytes()
+    with pytest.raises(RuntimeError):
+        pipeline(
+            [
+                step(
+                    "graph.add_nodes",
+                    count=1,
+                    output="new",
+                    attributes={"labels": ["Entity"], "x": 1},
+                )
+            ]
+        ).run_durable(store, schema=schema)
+    assert path.read_bytes() == original
+    result = pipeline(
+        [
+            step(
+                "graph.add_nodes",
+                count=1,
+                output="new",
+                attributes={"labels": ["Entity"], "x": "text"},
+            )
+        ]
+    ).run_durable(store, schema=schema)
+    assert result.node_ids == [0]
+    original = path.read_bytes()
+    with pytest.raises(RuntimeError):
+        pipeline([]).run_durable(
+            store,
+            schema={
+                "node_labels": {"Entity": {"x": {"type": "int", "required": False}}}
+            },
+        )
+    assert path.read_bytes() == original
+    store.close()
+    reopened = DurableGraph.open(path)
+    assert reopened.read_view().node_attr(0, "x") == "text"

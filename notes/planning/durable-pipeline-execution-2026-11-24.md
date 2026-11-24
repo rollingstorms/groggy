@@ -1,5 +1,10 @@
 # Durable pipeline execution — 2026-11-24
 
+**Follow-up:** issued computed-table writeback, accepted-entity removal/revision
+and stricter per-call schemas are now implemented in
+[the next completed component](durable-pipeline-writeback-2026-11-24.md). The
+qualification and original limits below describe the first pinned slice.
+
 Existing scope: 30.1, 09.4b.2, AR3, AR6 and AR7.8. This completes the first
 supported durable program from `durable-pipeline-boundary-2026-11-16.md`.
 No stable checklist rows are added or closed by narrowing their scope. Broad

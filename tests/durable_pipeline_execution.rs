@@ -372,18 +372,33 @@ fn all_thirteen_captured_kernels_match_memory_on_the_same_pending_selection() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("graph.journal");
         let mut graph = Graph::new_publishing();
-        graph.insert_nodes(3).unwrap();
-        graph.add_edges(&[(0, 1), (1, 2), (1, 2), (2, 2)]).unwrap();
+        graph
+            .apply_batch(
+                GraphBatch {
+                    add_nodes: 3,
+                    add_edges: [(0, 1), (1, 2), (1, 2), (2, 2)]
+                        .into_iter()
+                        .map(|(a, b)| (N::Added(a), N::Added(b)))
+                        .collect(),
+                    effective_at: Some(0),
+                    ..Default::default()
+                },
+                0,
+                "fixture".into(),
+                "test".into(),
+            )
+            .unwrap();
         let mut store = DurableGraph::create_from_graph(&path, &graph, None).unwrap();
         let source = store.read_view().unwrap();
         options["algorithm"] = json!(algorithm);
         options["source"] = json!("pending");
         options["output"] = json!("answer");
         let p = pipeline(json!([
-            {"id":"graph.add_nodes","params":{"count":1,"output":"new"}},
-            {"id":"graph.add_edges","params":{"edges":[[2,{"added":0}]],"output":"edge"}},
+            {"id":"graph.add_nodes","params":{"count":1,"output":"new","effective_at":10}},
+            {"id":"graph.add_edges","params":{"edges":[[2,{"added":0}]],"output":"edge","effective_at":20}},
             {"id":"graph.capture_staged","params":{"output":"pending"}},
             {"id":"graph.algorithm_table","params":options},
+            {"id":"table.attach","params":{"source":"answer","columns":{"value":"computed"},"effective_at":30}},
             {"id":"table.emit","params":{"source":"answer","name":"answer"}}
         ]));
         let mut durable_ctx = Context::new();
@@ -406,6 +421,35 @@ fn all_thirteen_captured_kernels_match_memory_on_the_same_pending_selection() {
             expected.column_names(),
             "{algorithm}"
         );
+        for (id, value) in actual
+            .column("node_id")
+            .unwrap()
+            .to_vec()
+            .into_iter()
+            .zip(actual.column("value").unwrap().to_vec())
+        {
+            let V::Int(id) = id else {
+                panic!("node identity")
+            };
+            let id = usize::try_from(id).unwrap();
+            assert_eq!(
+                store
+                    .graph()
+                    .unwrap()
+                    .get_node_attr(id, &"computed".into())
+                    .unwrap(),
+                Some(value.clone()),
+                "{algorithm}"
+            );
+            assert_eq!(
+                owner
+                    .borrow()
+                    .get_node_attr(id, &"computed".into())
+                    .unwrap(),
+                Some(value),
+                "{algorithm}"
+            );
+        }
         for name in actual.column_names() {
             assert_eq!(
                 actual.column(name).unwrap().to_vec(),
@@ -433,4 +477,211 @@ fn captured_computation_without_effects_returns_outputs_without_recording_histor
     assert_eq!(output.write_state_id(), selected.write_state_id());
     assert_eq!(fs::read(&path).unwrap(), bytes);
     assert!(ctx.take_outputs().contains_key("answer"));
+}
+
+#[test]
+fn durable_computed_table_writeback_and_revisions_preserve_owner_cascades_and_clocks() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("writeback.journal");
+    let mut graph = Graph::new_directed();
+    graph
+        .apply_batch(
+            GraphBatch {
+                add_nodes: 4,
+                add_edges: vec![
+                    (N::Added(0), N::Added(1)),
+                    (N::Added(1), N::Added(3)),
+                    (N::Added(2), N::Added(2)),
+                ],
+                edge_attrs: [(
+                    "weight".into(),
+                    vec![(groggy::BatchEdgeRef::Added(0), V::Float64(2.5))],
+                )]
+                .into(),
+                effective_at: Some(0),
+                ..Default::default()
+            },
+            0,
+            "fixture".into(),
+            "test".into(),
+        )
+        .unwrap();
+    let mut store = DurableGraph::create_from_graph(&path, &graph, None).unwrap();
+    let selected = store.read_view().unwrap().select_nodes(&[0, 1, 2]).unwrap();
+    let head = store.graph().unwrap().current_state_id();
+    let p = pipeline(json!([
+        {"id":"graph.add_nodes","params":{"count":1,"output":"new","effective_at":10}},
+        {"id":"graph.set_edge_endpoints","params":{"revisions":[[0,0,{"added":0}]],"effective_at":20}},
+        {"id":"graph.remove_edges","params":{"ids":[2],"effective_at":15}},
+        {"id":"graph.remove_nodes","params":{"ids":[1],"effective_at":20}},
+        {"id":"graph.capture_staged","params":{"output":"pending"}},
+        {"id":"graph.algorithm_table","params":{"source":"pending","algorithm":"bfs","start":0,"output":"answer"}},
+        {"id":"table.select_rows","params":{"source":"answer","rows":[1,0],"output":"reordered"}},
+        {"id":"table.attach","params":{"source":"reordered","columns":{"value":"hops"},"effective_at":30}},
+        {"id":"graph.edges_table","params":{"source":"pending","output":"edges"}},
+        {"id":"table.attach","params":{"source":"edges","columns":{"weight":"copied_weight"},"effective_at":35}},
+        {"id":"graph.emit","params":{"source":"pending","name":"pending"}}
+    ]));
+    let mut ctx = Context::new();
+    let accepted = p.run_durable(&mut ctx, &mut store, &selected).unwrap();
+    assert_eq!(accepted.node_ids(), vec![0, 2, 4]);
+    assert_eq!(accepted.edge_ids(), vec![0]);
+    assert_eq!(
+        accepted.node_attr(4, &"hops".into()).unwrap(),
+        Some(V::Int(1))
+    );
+    assert_eq!(
+        accepted.edge_attr(0, &"copied_weight".into()).unwrap(),
+        Some(V::Float64(2.5))
+    );
+    assert!(store.graph().unwrap().has_node(3));
+    assert!(!store.graph().unwrap().has_edge(1));
+    assert_eq!(store.graph().unwrap().current_state_id(), head + 1);
+    let outputs = ctx.take_outputs();
+    let AlgorithmOutput::GraphView(pending) = &outputs["pending"] else {
+        panic!("view")
+    };
+    assert_eq!(pending.node_attr(4, &"hops".into()).unwrap(), None);
+    assert_eq!(selected.edge_endpoints(0).unwrap(), (0, 1));
+    use groggy::state::publication::ChangeKey;
+    let times = store
+        .graph()
+        .unwrap()
+        .publication_metadata(head + 1)
+        .unwrap()
+        .unwrap()
+        .change_times;
+    assert_eq!(times[&ChangeKey::EdgeEndpoints(0)], 20);
+    assert_eq!(times[&ChangeKey::NodeRemoved(1)], 20);
+    assert_eq!(times[&ChangeKey::EdgeRemoved(1)], 20);
+    assert_eq!(times[&ChangeKey::EdgeRemoved(2)], 15);
+    assert_eq!(times[&ChangeKey::NodeAttribute(4, "hops".into())], 30);
+    assert_eq!(
+        times[&ChangeKey::EdgeAttribute(0, "copied_weight".into())],
+        35
+    );
+    drop(store);
+    let reopened = DurableGraph::open(&path).unwrap();
+    assert_eq!(
+        reopened
+            .read_view_at(19, None)
+            .unwrap()
+            .edge_endpoints(0)
+            .unwrap(),
+        (0, 1)
+    );
+    assert_eq!(
+        reopened
+            .read_view_at(20, None)
+            .unwrap()
+            .edge_endpoints(0)
+            .unwrap(),
+        (0, 4)
+    );
+    assert_eq!(
+        reopened
+            .read_view_at(29, None)
+            .unwrap()
+            .node_attr(4, &"hops".into())
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        reopened
+            .read_view_at(30, None)
+            .unwrap()
+            .node_attr(4, &"hops".into())
+            .unwrap(),
+        Some(V::Int(1))
+    );
+}
+
+#[test]
+fn table_writeback_to_removed_rows_and_invalid_topology_discard_the_whole_durable_program() {
+    for suffix in [
+        json!([
+            {"id":"graph.remove_nodes","params":{"ids":[0]}},
+            {"id":"table.attach","params":{"source":"table","columns":{"x":"copied"}}}
+        ]),
+        json!([{"id":"graph.remove_nodes","params":{"ids":[4]}}]),
+        json!([{"id":"graph.set_edge_endpoints","params":{"revisions":[[0,0,2],[0,2,0]]}}]),
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("reject.journal");
+        let mut graph = fixture();
+        graph.set_node_attr(0, "x".into(), V::Int(7)).unwrap();
+        let mut store = DurableGraph::create_from_graph(&path, &graph, None).unwrap();
+        let source = store.read_view().unwrap();
+        let bytes = fs::read(&path).unwrap();
+        let mut steps = vec![
+            json!({"id":"graph.add_nodes","params":{"count":1,"output":"new"}}),
+            json!({"id":"graph.capture_staged","params":{"output":"capture"}}),
+            json!({"id":"graph.nodes_table","params":{"source":"capture","output":"table"}}),
+        ];
+        steps.extend(suffix.as_array().unwrap().iter().cloned());
+        let mut ctx = Context::new();
+        ctx.add_output("old", AlgorithmOutput::GraphView(source.clone()));
+        assert!(pipeline(json!(steps))
+            .run_durable(&mut ctx, &mut store, &source)
+            .is_err());
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(store.graph().unwrap().pool().statistics().node_count, 4);
+        let outputs = ctx.take_outputs();
+        assert_eq!(outputs.len(), 1);
+        assert!(outputs.contains_key("old"));
+    }
+}
+
+#[test]
+fn durable_pipeline_additional_schema_validates_before_publication_and_survives_replay() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("schema.journal");
+    let mut store = DurableGraph::create(&path, GraphConfig::default(), None).unwrap();
+    let source = store.read_view().unwrap();
+    let bytes = fs::read(&path).unwrap();
+    let text = groggy::GraphSchema::from_json(
+        r#"{"node_labels":{"Entity":{"x":{"type":"text","required":false}}}}"#,
+    )
+    .unwrap();
+    let integer = groggy::GraphSchema::from_json(
+        r#"{"node_labels":{"Entity":{"x":{"type":"int","required":false}}}}"#,
+    )
+    .unwrap();
+    let bad = pipeline(
+        json!([{"id":"graph.add_nodes","params":{"count":1,"output":"new","attributes":{"labels":["Entity"],"x":1}}}]),
+    );
+    let mut ctx = Context::new();
+    ctx.add_output("old", AlgorithmOutput::GraphView(source.clone()));
+    assert!(bad
+        .run_durable_with_schema(&mut ctx, &mut store, &source, &text)
+        .is_err());
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    assert!(ctx.take_outputs().contains_key("old"));
+    let good = pipeline(
+        json!([{"id":"graph.add_nodes","params":{"count":1,"output":"new","attributes":{"labels":["Entity"],"x":"text"}}}]),
+    );
+    let prepared = good
+        .prepare_durable(&store, &source)
+        .unwrap()
+        .execute(&mut ctx)
+        .unwrap();
+    let result = prepared.accept_with_schema(&mut store, &text).unwrap();
+    assert_eq!(result.node_ids(), vec![0]);
+    assert!(store.schema().is_none());
+    let bytes = fs::read(&path).unwrap();
+    assert!(pipeline(json!([]))
+        .run_durable_with_schema(&mut ctx, &mut store, &result, &integer)
+        .is_err());
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    drop(store);
+    let reopened = DurableGraph::open(&path).unwrap();
+    assert!(reopened.schema().is_none());
+    assert_eq!(
+        reopened
+            .read_view()
+            .unwrap()
+            .node_attr(0, &"x".into())
+            .unwrap(),
+        Some(V::Text("text".into()))
+    );
 }
