@@ -26,6 +26,14 @@ An explicit snapshot/checkpoint and a reconstructed effective-time view are
 separate operations. Default graph selections now use the accepted pinned-state model; explicit
 connected compatibility remains available.
 
+Latest performance component — 2026-11-24: [shared numeric bindings](shared-numeric-bindings-2026-11-24.md)
+completes private immutable sharing and copy-on-write access, preserving public
+value kinds and mutation independence. The unchanged benchmark measured 58–60%
+less lowered-loop time at 1,000/10,000 nodes over 100 iterations; residual copying
+and broader budgets remain in 32.2/A15. Local gates: 1,658 native tests, 3,432
+packaged Python tests and 293 documentation examples. Global counts stay
+217 checked / 51 open; no row was added or closed beyond its original scope.
+
 Latest execution component — 2026-11-24: [checked numeric plan lowering](checked-batch-lowering-2026-11-24.md)
 shares arithmetic/normalization kernels across memory and durable runs and lowers
 26 numeric instruction forms through the shared executor. It covers exact loaded

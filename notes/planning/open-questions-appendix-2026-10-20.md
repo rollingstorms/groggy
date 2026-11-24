@@ -1,5 +1,12 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Binding performance follow-up — 2026-11-24:**
+[shared immutable bindings and copy-on-write access](shared-numeric-bindings-2026-11-24.md)
+reduce the measured register-copy cost while preserving public value kinds and
+independent mutation. The same-workload samples and residual costs are recorded;
+production budgets in A15 remain unanswered. This completes a bounded component
+of existing 32.2/AR7.8, with no new roadmap row or policy decision.
+
 **Numeric execution follow-up — 2026-11-24:**
 [checked numeric plan lowering](checked-batch-lowering-2026-11-24.md) completes the
 bounded numeric frontend migration and shares graph-independent kernels with

@@ -113,3 +113,13 @@ retain all observations, ranges and hashes. OS cache, power state and unrelated
 background activity were uncontrolled. This is not a comparison with the old
 vector interpreter, a native-allocation/RSS measurement, or a production SLA.
 No new budget or roadmap row is introduced.
+
+
+## Shared-binding performance follow-up
+
+The finite copying follow-up is now implemented and qualified:
+[shared numeric bindings](shared-numeric-bindings-2026-11-24.md). The table above
+remains the original runtime baseline. Exact-membership bindings, carries and
+initial zero registers now share immutable values; mutable access detaches on
+write. The same benchmark records the improvement and remaining costs under the
+existing 32.2 row, without changing the broader execution inventory.
