@@ -13,6 +13,7 @@
 
 pub(crate) mod archive;
 pub use archive::PreparedArchive;
+pub(crate) mod bulk_validation;
 mod checkpoints;
 mod compaction;
 pub use compaction::{PoolCompactionOutcome, PoolCompactionPlan, PoolCompactionReport};
@@ -2599,43 +2600,26 @@ impl Graph {
         pending_view: Option<&crate::GraphView>,
         errors: &mut Vec<String>,
     ) {
-        let kind = if is_node { "node" } else { "edge" };
-        let mut first_positions = HashMap::new();
-        for (offset, (id, value)) in values.iter().enumerate() {
-            let id = *id;
-            let position = positions
-                .and_then(|positions| positions.get(offset))
-                .copied()
-                .unwrap_or(offset);
-            if let Err(error) = kinds::validate_property(attr_name, value, is_node) {
-                errors.push(format!("{attr_name}[{position}]: {error}"));
-            }
-            let exists = if let Some(view) = pending_view {
-                if is_node {
-                    view.contains_node(id)
+        bulk_validation::collect(
+            attr_name,
+            values,
+            is_node,
+            positions,
+            &mut |id| {
+                if let Some(view) = pending_view {
+                    if is_node {
+                        view.contains_node(id)
+                    } else {
+                        view.contains_edge(id)
+                    }
+                } else if is_node {
+                    self.space.contains_node(id)
                 } else {
-                    view.contains_edge(id)
+                    self.space.contains_edge(id)
                 }
-            } else if is_node {
-                self.space.contains_node(id)
-            } else {
-                self.space.contains_edge(id)
-            };
-            if !exists {
-                errors.push(format!(
-                    "{attr_name}[{position}]: {kind} {id} is not active"
-                ));
-            }
-            match first_positions.entry(id) {
-                std::collections::hash_map::Entry::Vacant(entry) => {
-                    entry.insert(position);
-                }
-                std::collections::hash_map::Entry::Occupied(entry) => errors.push(format!(
-                    "{attr_name}[{position}]: duplicate {kind} {id} (first at {attr_name}[{}])",
-                    entry.get()
-                )),
-            }
-        }
+            },
+            errors,
+        );
     }
 
     fn validate_bulk_attr_targets(
@@ -2665,37 +2649,19 @@ impl Graph {
         positions: Option<&HashMap<AttrName, Vec<usize>>>,
         pending_view: Option<&crate::GraphView>,
     ) -> GraphResult<()> {
-        let mut attrs: Vec<_> = attrs_values.iter().collect();
-        attrs.sort_unstable_by_key(|(name, _)| *name);
-        let mut errors = Vec::new();
-        for (attr_name, values) in attrs {
-            if is_node && attr_name == "entity_type" && !values.is_empty() {
-                errors.push("entity_type: system-managed node attribute cannot be changed".into());
+        bulk_validation::validate(attrs_values, is_node, positions, |id| {
+            if let Some(view) = pending_view {
+                if is_node {
+                    view.contains_node(id)
+                } else {
+                    view.contains_edge(id)
+                }
+            } else if is_node {
+                self.space.contains_node(id)
+            } else {
+                self.space.contains_edge(id)
             }
-            let column_positions = positions
-                .and_then(|positions| positions.get(attr_name))
-                .map(Vec::as_slice);
-            if attr_name == EXTERNAL_ID && !values.is_empty() {
-                errors
-                    .push("external_id: system-managed attribute; use the external-ID API".into());
-            }
-            self.collect_invalid_attr_targets(
-                attr_name,
-                values,
-                is_node,
-                column_positions,
-                pending_view,
-                &mut errors,
-            );
-        }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(GraphError::InvalidInput(format!(
-                "Invalid bulk attribute assignments: {}",
-                errors.join("; ")
-            )))
-        }
+        })
     }
 
     /// Validate node property assignments without changing values or change tracking.

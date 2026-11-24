@@ -3,6 +3,7 @@
 use super::core::{
     AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue,
 };
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use crate::{
     algorithms::{AlgorithmOutput, AlgorithmParamValue, Context, CostHint},
     storage::table::Table,
@@ -51,61 +52,11 @@ impl Step for TypedReadStep {
         self.id
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        check_cancelled(ctx)?;
-        let vars = scope.variables();
-        let value = match &self.operation {
-            Operation::FromSnapshot => StepValue::GraphView(GraphView::all(
-                vars.snapshot(&self.source)?.read_state().clone(),
-            )),
-            Operation::SelectNodes(ids) => {
-                StepValue::GraphView(vars.graph_view(&self.source)?.select_nodes(ids)?)
-            }
-            Operation::SelectEdges(ids) => {
-                StepValue::GraphView(vars.graph_view(&self.source)?.select_edges(ids)?)
-            }
-            Operation::NodesTable => StepValue::Table(Arc::new(
-                vars.graph_view(&self.source)?
-                    .node_table_data()?
-                    .into_base_table()?,
-            )),
-            Operation::EdgesTable => StepValue::Table(Arc::new(
-                vars.graph_view(&self.source)?
-                    .edge_table_data()?
-                    .into_base_table()?,
-            )),
-            Operation::DegreesTable => StepValue::Table(Arc::new(degrees_table(
-                ctx,
-                vars.graph_view(&self.source)?,
-            )?)),
-            Operation::SelectColumns(names) => {
-                StepValue::Table(Arc::new(vars.table(&self.source)?.select(names)?))
-            }
-            Operation::SelectRows(rows) => {
-                StepValue::Table(Arc::new(vars.table(&self.source)?.select_rows(rows)?))
-            }
-            Operation::EmitGraph => {
-                let view = vars.graph_view(&self.source)?.clone();
-                check_cancelled(ctx)?;
-                ctx.add_output(&self.output, AlgorithmOutput::GraphView(view));
-                return Ok(());
-            }
-            Operation::EmitTable => {
-                let table = match vars.value(&self.source) {
-                    Some(StepValue::Table(table)) => Arc::clone(table),
-                    Some(_) => bail!("variable '{}' is not a table", self.source),
-                    None => bail!("variable '{}' not found", self.source),
-                };
-                check_cancelled(ctx)?;
-                ctx.add_output(&self.output, AlgorithmOutput::Table(table));
-                return Ok(());
-            }
-        };
-        // Install only fully computed values. Failed selection/projection or
-        // cancellation leaves a pre-existing target variable intact.
-        check_cancelled(ctx)?;
-        scope.variables_mut().set_value(&self.output, value);
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -296,4 +247,64 @@ pub(super) fn register(registry: &StepRegistry) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+impl sealed::Sealed for TypedReadStep {}
+impl ReadStep for TypedReadStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        check_cancelled(ctx)?;
+        let vars = scope.variables();
+        let value = match &self.operation {
+            Operation::FromSnapshot => StepValue::GraphView(GraphView::all(
+                vars.snapshot(&self.source)?.read_state().clone(),
+            )),
+            Operation::SelectNodes(ids) => {
+                StepValue::GraphView(vars.graph_view(&self.source)?.select_nodes(ids)?)
+            }
+            Operation::SelectEdges(ids) => {
+                StepValue::GraphView(vars.graph_view(&self.source)?.select_edges(ids)?)
+            }
+            Operation::NodesTable => StepValue::Table(Arc::new(
+                vars.graph_view(&self.source)?
+                    .node_table_data()?
+                    .into_base_table()?,
+            )),
+            Operation::EdgesTable => StepValue::Table(Arc::new(
+                vars.graph_view(&self.source)?
+                    .edge_table_data()?
+                    .into_base_table()?,
+            )),
+            Operation::DegreesTable => StepValue::Table(Arc::new(degrees_table(
+                ctx,
+                vars.graph_view(&self.source)?,
+            )?)),
+            Operation::SelectColumns(names) => {
+                StepValue::Table(Arc::new(vars.table(&self.source)?.select(names)?))
+            }
+            Operation::SelectRows(rows) => {
+                StepValue::Table(Arc::new(vars.table(&self.source)?.select_rows(rows)?))
+            }
+            Operation::EmitGraph => {
+                let view = vars.graph_view(&self.source)?.clone();
+                check_cancelled(ctx)?;
+                ctx.add_output(&self.output, AlgorithmOutput::GraphView(view));
+                return Ok(());
+            }
+            Operation::EmitTable => {
+                let table = match vars.value(&self.source) {
+                    Some(StepValue::Table(table)) => Arc::clone(table),
+                    Some(_) => bail!("variable '{}' is not a table", self.source),
+                    None => bail!("variable '{}' not found", self.source),
+                };
+                check_cancelled(ctx)?;
+                ctx.add_output(&self.output, AlgorithmOutput::Table(table));
+                return Ok(());
+            }
+        };
+        // Install only fully computed values. Failed selection/projection or
+        // cancellation leaves a pre-existing target variable intact.
+        check_cancelled(ctx)?;
+        scope.variables_mut().set_value(&self.output, value);
+        Ok(())
+    }
 }

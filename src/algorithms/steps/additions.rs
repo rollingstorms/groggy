@@ -2,6 +2,7 @@
 use super::core::{
     AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue,
 };
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use crate::{
     algorithms::{AlgorithmParamValue, Context, CostHint},
     AttrName, AttrValue, BatchNodeRef,
@@ -28,47 +29,11 @@ impl Step for AddStep {
     fn atomic_effect(&self) -> AtomicStepEffect {
         AtomicStepEffect::Topology
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            bail!("topology addition cancelled");
-        }
-        if !ctx.persist_results() {
-            bail!("{} requires persist=True", self.id());
-        }
-        let binding = scope.subgraph().graph();
-        let graph = binding.borrow();
-        let pending = ctx
-            .property_batch
-            .as_mut()
-            .ok_or_else(|| anyhow!("{} requires a persistent local atomic builder", self.id()))?;
-        let ids = if self.nodes {
-            pending.stage_nodes(&graph, self.count, &self.attributes, self.effective_at)?
-        } else {
-            pending.stage_edges(
-                &graph,
-                scope.subgraph(),
-                &self.edges,
-                &self.attributes,
-                self.effective_at,
-            )?
-        };
-        let values = ids
-            .into_iter()
-            .map(|id| (id, AlgorithmParamValue::None))
-            .collect();
-        drop(graph);
-        if ctx.is_cancelled() {
-            bail!("topology addition cancelled");
-        }
-        scope.variables_mut().set_value(
-            &self.output,
-            if self.nodes {
-                StepValue::NodeMap(values)
-            } else {
-                StepValue::EdgeMap(values)
-            },
-        );
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 pub(super) fn endpoint(value: &serde_json::Value) -> Result<BatchNodeRef> {
@@ -160,4 +125,40 @@ pub(super) fn register(registry: &StepRegistry) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+impl sealed::Sealed for AddStep {}
+impl ReadStep for AddStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            bail!("topology addition cancelled");
+        }
+        if !ctx.persist_results() {
+            bail!("{} requires persist=True", self.id());
+        }
+        let ids = scope.add(
+            ctx,
+            self.nodes,
+            self.count,
+            &self.edges,
+            &self.attributes,
+            self.effective_at,
+        )?;
+        let values = ids
+            .into_iter()
+            .map(|id| (id, AlgorithmParamValue::None))
+            .collect();
+        if ctx.is_cancelled() {
+            bail!("topology addition cancelled");
+        }
+        scope.variables_mut().set_value(
+            &self.output,
+            if self.nodes {
+                StepValue::NodeMap(values)
+            } else {
+                StepValue::EdgeMap(values)
+            },
+        );
+        Ok(())
+    }
 }

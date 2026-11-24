@@ -7,8 +7,9 @@ use std::ops::Range;
 
 /// No graph owner, read pin, callback, cache or history payload survives here.
 #[derive(Debug)]
-pub(super) struct PreparedEffects {
+pub(crate) struct PreparedEffects {
     coordinate: WriteCoordinate,
+    allocation: Option<(NodeId, EdgeId)>,
     batch: Option<GraphBatch>,
     projection: SelectionProjection,
 }
@@ -24,7 +25,7 @@ pub(super) struct SelectionProjection {
 impl PropertyBatch {
     /// Move the staged column values and explicit clocks into a canonical batch.
     /// Accepted IDs and the default engine clock are resolved only at publication.
-    pub(super) fn prepare(self) -> PreparedEffects {
+    pub(crate) fn prepare(self) -> PreparedEffects {
         let topology = self.has_topology();
         let (nodes, edges) = self.allocation_base.unwrap_or_default();
         let projection = SelectionProjection {
@@ -84,6 +85,7 @@ impl PropertyBatch {
             };
         PreparedEffects {
             coordinate: self.coordinate,
+            allocation: self.allocation_base,
             batch,
             projection,
         }
@@ -91,10 +93,19 @@ impl PropertyBatch {
 }
 
 impl PreparedEffects {
+    pub(crate) fn accept_durable(
+        self,
+        store: &mut crate::storage::journal::DurableGraph,
+        selection: &crate::GraphView,
+    ) -> GraphResult<crate::GraphView> {
+        store.accept_pipeline_batch(self.coordinate, self.allocation, self.batch, selection)
+    }
+
     /// Empty effects still validate the complete coordinate. All nonempty effects
     /// go through the existing publication coordinator exactly once.
     pub(super) fn accept(self, graph: &mut Graph) -> GraphResult<SelectionProjection> {
         graph.validate_write_coordinate(&self.coordinate)?;
+        graph.validate_allocation_expectation(self.allocation)?;
         if let Some(batch) = self.batch {
             graph.apply_batch(
                 batch,

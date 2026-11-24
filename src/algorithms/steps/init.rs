@@ -1,5 +1,6 @@
 //! Initialization step primitives for creating node and edge variables.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use std::collections::HashMap;
 
 use anyhow::Result;
@@ -43,14 +44,11 @@ impl Step for InitNodesStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let nodes = scope.subgraph().ordered_nodes();
-        let mut map = HashMap::with_capacity(nodes.len());
-        for &node in nodes.iter() {
-            map.insert(node, self.value.clone());
-        }
-        scope.variables_mut().set_node_map(self.target.clone(), map);
-        Ok(())
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -89,16 +87,11 @@ impl Step for InitNodesWithIndexStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let nodes = scope.subgraph().ordered_nodes();
-        let mut map = HashMap::with_capacity(nodes.len());
-
-        for (idx, &node) in nodes.iter().enumerate() {
-            map.insert(node, AlgorithmParamValue::Int(idx as i64));
-        }
-
-        scope.variables_mut().set_node_map(self.target.clone(), map);
-        Ok(())
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -138,11 +131,11 @@ impl Step for InitScalarStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        scope
-            .variables_mut()
-            .set_scalar(self.target.clone(), self.value.clone());
-        Ok(())
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -182,13 +175,11 @@ impl Step for InitEdgesStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map = HashMap::new();
-        for &edge in scope.edge_ids() {
-            map.insert(edge, self.value.clone());
-        }
-        scope.variables_mut().set_edge_map(self.target.clone(), map);
-        Ok(())
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -226,12 +217,11 @@ impl Step for GraphNodeCountStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let count = scope.subgraph().node_count();
-        scope
-            .variables_mut()
-            .set_scalar(self.target.clone(), AlgorithmParamValue::Int(count as i64));
-        Ok(())
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -269,8 +259,79 @@ impl Step for GraphEdgeCountStep {
         }
     }
 
-    fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let count = scope.subgraph().edge_count();
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for InitNodesStep {}
+impl ReadStep for InitNodesStep {
+    fn apply_read(&self, _ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let nodes = scope.ordered_nodes();
+        let mut map = HashMap::with_capacity(nodes.len());
+        for &node in nodes.iter() {
+            map.insert(node, self.value.clone());
+        }
+        scope.variables_mut().set_node_map(self.target.clone(), map);
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for InitNodesWithIndexStep {}
+impl ReadStep for InitNodesWithIndexStep {
+    fn apply_read(&self, _ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let nodes = scope.ordered_nodes();
+        let mut map = HashMap::with_capacity(nodes.len());
+
+        for (idx, &node) in nodes.iter().enumerate() {
+            map.insert(node, AlgorithmParamValue::Int(idx as i64));
+        }
+
+        scope.variables_mut().set_node_map(self.target.clone(), map);
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for InitScalarStep {}
+impl ReadStep for InitScalarStep {
+    fn apply_read(&self, _ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        scope
+            .variables_mut()
+            .set_scalar(self.target.clone(), self.value.clone());
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for InitEdgesStep {}
+impl ReadStep for InitEdgesStep {
+    fn apply_read(&self, _ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let mut map = HashMap::new();
+        for edge in scope.edge_ids() {
+            map.insert(edge, self.value.clone());
+        }
+        scope.variables_mut().set_edge_map(self.target.clone(), map);
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for GraphNodeCountStep {}
+impl ReadStep for GraphNodeCountStep {
+    fn apply_read(&self, _ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let count = scope.node_count();
+        scope
+            .variables_mut()
+            .set_scalar(self.target.clone(), AlgorithmParamValue::Int(count as i64));
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for GraphEdgeCountStep {}
+impl ReadStep for GraphEdgeCountStep {
+    fn apply_read(&self, _ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let count = scope.edge_count();
         scope
             .variables_mut()
             .set_scalar(self.target.clone(), AlgorithmParamValue::Int(count as i64));

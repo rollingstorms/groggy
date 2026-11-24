@@ -25,6 +25,8 @@ mod init;
 mod loop_step;
 mod normalization;
 mod pathfinding;
+#[doc(hidden)]
+pub mod read_scope;
 mod registry;
 mod sampling;
 pub mod schema;
@@ -35,7 +37,7 @@ mod transformations;
 mod typed_values;
 pub mod validation;
 
-pub(crate) use core::StepExecutor;
+pub(crate) use core::{CheckedReadStep, StepExecutor};
 
 // Re-export core types
 pub use core::{

@@ -98,98 +98,213 @@ fn composed_effect(steps: &[Box<dyn Step>], topology: bool) -> AtomicStepEffect 
 /// One fixed selected execution frame. All levels of the step interpreter use
 /// the same pending-read refresh boundary rather than holding stale loop pins.
 pub(crate) struct StepExecutor<'a> {
-    base: &'a Subgraph,
+    source: ExecutionSource<'a>,
     fixed: bool,
-    pending: Option<(u64, Subgraph)>,
+}
+enum ExecutionSource<'a> {
+    Memory {
+        base: &'a Subgraph,
+        pending: Option<(u64, Subgraph)>,
+    },
+    Detached {
+        allocation: (usize, usize),
+        base: &'a crate::GraphView,
+        pending: Option<(u64, crate::GraphView)>,
+    },
 }
 impl<'a> StepExecutor<'a> {
     pub(crate) fn new(base: &'a Subgraph) -> Self {
-        Self {
-            base,
-            fixed: false,
-            pending: None,
-        }
+        Self::for_frame(base, false)
     }
     pub(crate) fn for_frame(base: &'a Subgraph, fixed: bool) -> Self {
         Self {
-            base,
+            source: ExecutionSource::Memory {
+                base,
+                pending: None,
+            },
             fixed,
-            pending: None,
         }
     }
-
+    pub(crate) fn detached(allocation: (usize, usize), base: &'a crate::GraphView) -> Self {
+        Self {
+            source: ExecutionSource::Detached {
+                allocation,
+                base,
+                pending: None,
+            },
+            fixed: false,
+        }
+    }
     pub(crate) fn apply(
         &mut self,
         ctx: &mut Context,
         variables: &mut StepVariables,
         step: &dyn Step,
     ) -> Result<()> {
+        self.apply_inner(
+            ctx,
+            variables,
+            step.id(),
+            step.atomic_effect(),
+            step.read_kernel(),
+            Some(step),
+        )
+    }
+
+    pub(crate) fn apply_prepared(
+        &mut self,
+        ctx: &mut Context,
+        variables: &mut StepVariables,
+        step: &CheckedReadStep<'_>,
+    ) -> Result<()> {
+        self.apply_inner(
+            ctx,
+            variables,
+            step.id,
+            step.effect,
+            Some(step.kernel),
+            None,
+        )
+    }
+
+    fn apply_inner(
+        &mut self,
+        ctx: &mut Context,
+        variables: &mut StepVariables,
+        id: &str,
+        effect: AtomicStepEffect,
+        kernel: Option<&dyn super::read_scope::ReadStep>,
+        legacy: Option<&dyn Step>,
+    ) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("step execution cancelled"));
         }
-        let effect = step.atomic_effect();
         if let Some(batch) = ctx.property_batch.as_ref() {
             if effect == AtomicStepEffect::Unsupported
                 || (batch.has_topology() && effect == AtomicStepEffect::Properties)
             {
                 return Err(anyhow!(
                     "Step '{}' does not support the current atomic scope",
-                    step.id()
+                    id
                 ));
             }
         }
-        let source = if matches!(
+        let pending_read = matches!(
             effect,
             AtomicStepEffect::PendingProperties
                 | AtomicStepEffect::PendingSelections
                 | AtomicStepEffect::StagedProperties
-        ) {
-            if let Some(batch) = ctx.property_batch.as_mut().filter(|batch| {
-                batch.has_topology()
-                    || effect == AtomicStepEffect::PendingSelections
-                    || self.base.frozen_view().is_some()
-            }) {
-                if batch.capture_is_current(self.base) {
-                    self.base
-                } else {
-                    let revision = batch.read_revision();
-                    if self
-                        .pending
-                        .as_ref()
-                        .is_none_or(|(old, _)| *old != revision)
-                    {
-                        let view = if self.fixed {
-                            batch.capture_scoped(self.base, true)?
+        );
+        match &mut self.source {
+            ExecutionSource::Memory { base, pending } => {
+                let base = *base;
+                let source = if pending_read {
+                    if let Some(batch) = ctx.property_batch.as_mut().filter(|batch| {
+                        batch.has_topology()
+                            || effect == AtomicStepEffect::PendingSelections
+                            || base.frozen_view().is_some()
+                    }) {
+                        if batch.capture_is_current(base) {
+                            base
                         } else {
-                            batch.capture(self.base)?
-                        };
-                        self.pending = Some((
+                            let revision = batch.read_revision();
+                            if pending.as_ref().is_none_or(|(old, _)| *old != revision) {
+                                let view = batch.capture_scoped(base, self.fixed)?;
+                                *pending = Some((
+                                    revision,
+                                    Subgraph::from_frozen_view(
+                                        base.graph(),
+                                        view,
+                                        "pending execution".into(),
+                                    ),
+                                ));
+                            }
+                            &pending
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    anyhow!("pending execution scope was not installed")
+                                })?
+                                .1
+                        }
+                    } else {
+                        base
+                    }
+                } else {
+                    base
+                };
+                let mut scope = StepScope::for_frame(source, variables, self.fixed);
+                if let Some(kernel) = kernel {
+                    kernel.apply_read(ctx, &mut scope.read_scope())?;
+                } else {
+                    legacy
+                        .ok_or_else(|| anyhow!("missing legacy step adapter"))?
+                        .apply(ctx, &mut scope)?;
+                }
+            }
+            ExecutionSource::Detached {
+                allocation,
+                base,
+                pending,
+            } => {
+                let kernel =
+                    kernel.ok_or_else(|| anyhow!("Step '{}' has no detached native kernel", id))?;
+                // Topology staging and explicit captures use the accepted base
+                // themselves. Refresh only pending readers, as in memory execution.
+                let current = if !pending_read {
+                    *base
+                } else {
+                    let batch = ctx
+                        .property_batch
+                        .as_mut()
+                        .ok_or_else(|| anyhow!("missing atomic execution scope"))?;
+                    let revision = batch.read_revision();
+                    if pending.as_ref().is_none_or(|(old, _)| *old != revision) {
+                        *pending = Some((
                             revision,
-                            Subgraph::from_frozen_view(
-                                self.base.graph(),
-                                view,
-                                "pending execution".into(),
-                            ),
+                            batch.capture_membership(base, base.nodes(), base.edges(), false)?,
                         ));
                     }
-                    &self
-                        .pending
+                    &pending
                         .as_ref()
-                        .ok_or_else(|| anyhow!("pending execution scope was not installed"))?
+                        .ok_or_else(|| anyhow!("missing pending read capture"))?
                         .1
-                }
-            } else {
-                self.base
+                };
+                kernel.apply_read(
+                    ctx,
+                    &mut super::read_scope::ReadStepScope::detached(
+                        *allocation,
+                        base,
+                        current,
+                        variables,
+                    ),
+                )?;
             }
-        } else {
-            self.base
-        };
-        let mut scope = StepScope::for_frame(source, variables, self.fixed);
-        step.apply(ctx, &mut scope)?;
+        }
         if ctx.is_cancelled() {
             return Err(anyhow!("step execution cancelled"));
         }
         Ok(())
+    }
+}
+
+/// Only sealed kernel references and already-read metadata cross workers.
+/// No user-supplied Step/Algorithm method is called by the detached executor.
+pub(crate) struct CheckedReadStep<'a> {
+    pub(crate) id: &'static str,
+    effect: AtomicStepEffect,
+    kernel: &'a dyn super::read_scope::ReadStep,
+}
+impl<'a> CheckedReadStep<'a> {
+    pub(crate) fn new(step: &'a dyn Step) -> Result<Self> {
+        let id = step.id();
+        let effect = step.atomic_effect();
+        let kernel = step
+            .read_kernel()
+            .ok_or_else(|| anyhow!("Step '{id}' has no detached native kernel"))?;
+        if effect == AtomicStepEffect::Unsupported {
+            return Err(anyhow!("Step '{id}' has no detached native kernel"));
+        }
+        Ok(Self { id, effect, kernel })
     }
 }
 
@@ -202,6 +317,13 @@ pub(crate) struct SelectedCsr {
 
 /// Trait implemented by all step primitives.
 pub trait Step: Send + Sync {
+    /// A sealed native invocation that cannot obtain a writable graph owner.
+    /// Atomic effect declarations alone do not grant detached execution.
+    #[doc(hidden)]
+    fn read_kernel(&self) -> Option<&dyn super::read_scope::ReadStep> {
+        None
+    }
+
     /// Effect classification for local atomic execution. Existing property
     /// certification remains conservative for extensions and nested executors.
     fn atomic_effect(&self) -> AtomicStepEffect {
@@ -579,6 +701,10 @@ pub struct StepScope<'a> {
 }
 
 impl<'a> StepScope<'a> {
+    pub(crate) fn read_scope(&mut self) -> super::read_scope::ReadStepScope<'_> {
+        super::read_scope::ReadStepScope::memory(self.subgraph, self.variables, self.fixed)
+    }
+
     pub fn new(subgraph: &'a Subgraph, variables: &'a mut StepVariables) -> Self {
         Self {
             subgraph,
@@ -708,18 +834,6 @@ impl<'a> StepScope<'a> {
         ctx.attach_edge_attrs(self.subgraph, attrs)
     }
 
-    /// Attach explicitly timed columns through the same fixed-frame validation.
-    pub(crate) fn attach_attrs_at(
-        &self,
-        ctx: &mut Context,
-        nodes: bool,
-        attrs: HashMap<AttrName, Vec<(usize, AttrValue)>>,
-        at: crate::TimestampMicros,
-    ) -> Result<()> {
-        self.validate_attachment_targets(nodes, attrs.values().flatten().map(|(id, _)| *id))?;
-        ctx.attach_attrs_at(self.subgraph, nodes, attrs, at)
-    }
-
     // Root execution keeps its established explicit owner-ID attachment contract.
     // Fixed children must constrain writes as well as reads, including live
     // property-overlay frames and transient owned outputs.
@@ -728,22 +842,7 @@ impl<'a> StepScope<'a> {
         nodes: bool,
         targets: impl Iterator<Item = usize>,
     ) -> Result<()> {
-        if self.fixed {
-            let selected = if nodes {
-                self.subgraph.nodes()
-            } else {
-                self.subgraph.edges()
-            };
-            for id in targets {
-                if !selected.contains(&id) {
-                    return Err(anyhow!(
-                        "{} attachment target {id} is outside the fixed execution frame",
-                        if nodes { "Node" } else { "Edge" }
-                    ));
-                }
-            }
-        }
-        Ok(())
+        validate_attachment_targets(self.subgraph, self.fixed, nodes, targets)
     }
 
     pub fn variables(&self) -> &StepVariables {
@@ -877,6 +976,30 @@ static GLOBAL_STEP_REGISTRY: OnceLock<StepRegistry> = OnceLock::new();
 
 pub fn global_step_registry() -> &'static StepRegistry {
     GLOBAL_STEP_REGISTRY.get_or_init(StepRegistry::default)
+}
+
+pub(crate) fn validate_attachment_targets(
+    subgraph: &Subgraph,
+    fixed: bool,
+    nodes: bool,
+    targets: impl Iterator<Item = usize>,
+) -> Result<()> {
+    if fixed {
+        let selected = if nodes {
+            subgraph.nodes()
+        } else {
+            subgraph.edges()
+        };
+        for id in targets {
+            if !selected.contains(&id) {
+                return Err(anyhow!(
+                    "{} attachment target {id} is outside the fixed execution frame",
+                    if nodes { "Node" } else { "Edge" }
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

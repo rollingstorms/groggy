@@ -15,7 +15,7 @@ pub struct PyDurableGraph {
     owner: groggy::ownership::OwnerCell<()>,
 }
 impl PyDurableGraph {
-    fn core(&self) -> PyResult<&DurableGraph> {
+    pub(crate) fn core(&self) -> PyResult<&DurableGraph> {
         self.owner.assert_owner_thread();
         self.store
             .as_ref()

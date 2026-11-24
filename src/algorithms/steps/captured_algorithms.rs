@@ -2,6 +2,7 @@
 use super::core::{
     AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue,
 };
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use crate::{
     algorithms::{
         centrality, community, AlgorithmParamValue as V, AlgorithmRead, Context, CostHint,
@@ -70,7 +71,79 @@ impl Step for CapturedAlgorithm {
     fn supports_atomic_properties(&self) -> bool {
         true
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+pub(super) fn register(registry: &StepRegistry) -> Result<()> {
+    registry.register(
+        "graph.algorithm_table",
+        StepMetadata {
+            id: "graph.algorithm_table".into(),
+            description: "Compute through canonical kernels on an explicit immutable graph input"
+                .into(),
+            cost_hint: CostHint::Unknown,
+        },
+        |spec| {
+            let algorithm = spec.params.expect_text("algorithm")?.to_owned();
+            let options: &[&str] = match algorithm.as_str() {
+                "bfs" | "dfs" => &["start"],
+                "dijkstra" => &["start", "weight_attr"],
+                "astar" => &["start", "goal", "weight_attr", "heuristic_attr"],
+                "pagerank" => &["damping", "max_iter", "tolerance", "personalization_attr"],
+                "betweenness" => &["normalized", "weight_attr"],
+                "closeness" => &["normalized", "harmonic", "weight_attr", "direction"],
+                "components" => &["mode"],
+                "louvain" => &["max_iter", "max_phases", "resolution"],
+                "leiden" => &["max_iter", "max_phases", "resolution", "seed", "theta"],
+                "infomap" => &[
+                    "max_iter",
+                    "num_trials",
+                    "teleportation",
+                    "seed",
+                    "flow_max_iter",
+                ],
+                "girvan_newman" => &["num_levels", "modularity_threshold", "weight_attr"],
+                "lpa" => &["max_iter", "tolerance", "seed_attr", "seed"],
+                _ => bail!("unsupported captured algorithm '{algorithm}'"),
+            };
+            for key in spec.params.keys() {
+                if !matches!(key.as_str(), "algorithm" | "source" | "output")
+                    && !options.contains(&key.as_str())
+                {
+                    bail!("{algorithm} does not support parameter '{key}'");
+                }
+            }
+            for key in ["start", "goal"]
+                .iter()
+                .filter(|&&key| options.contains(&key))
+            {
+                if !spec.params.contains_key(*key) {
+                    bail!("{algorithm} requires {key}");
+                }
+            }
+            let source = spec.params.expect_text("source")?.to_owned();
+            let output = spec.params.expect_text("output")?.to_owned();
+            if source.trim().is_empty() || output.trim().is_empty() {
+                bail!("source and output must be nonempty");
+            }
+            Ok(Box::new(CapturedAlgorithm {
+                spec: spec.clone(),
+                source,
+                output,
+                algorithm,
+            }))
+        },
+    )?;
+    Ok(())
+}
+
+impl sealed::Sealed for CapturedAlgorithm {}
+impl ReadStep for CapturedAlgorithm {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             bail!("captured algorithm cancelled");
         }
@@ -271,66 +344,4 @@ impl Step for CapturedAlgorithm {
             .set_value(&self.output, StepValue::Table(Arc::new(table)));
         Ok(())
     }
-}
-pub(super) fn register(registry: &StepRegistry) -> Result<()> {
-    registry.register(
-        "graph.algorithm_table",
-        StepMetadata {
-            id: "graph.algorithm_table".into(),
-            description: "Compute through canonical kernels on an explicit immutable graph input"
-                .into(),
-            cost_hint: CostHint::Unknown,
-        },
-        |spec| {
-            let algorithm = spec.params.expect_text("algorithm")?.to_owned();
-            let options: &[&str] = match algorithm.as_str() {
-                "bfs" | "dfs" => &["start"],
-                "dijkstra" => &["start", "weight_attr"],
-                "astar" => &["start", "goal", "weight_attr", "heuristic_attr"],
-                "pagerank" => &["damping", "max_iter", "tolerance", "personalization_attr"],
-                "betweenness" => &["normalized", "weight_attr"],
-                "closeness" => &["normalized", "harmonic", "weight_attr", "direction"],
-                "components" => &["mode"],
-                "louvain" => &["max_iter", "max_phases", "resolution"],
-                "leiden" => &["max_iter", "max_phases", "resolution", "seed", "theta"],
-                "infomap" => &[
-                    "max_iter",
-                    "num_trials",
-                    "teleportation",
-                    "seed",
-                    "flow_max_iter",
-                ],
-                "girvan_newman" => &["num_levels", "modularity_threshold", "weight_attr"],
-                "lpa" => &["max_iter", "tolerance", "seed_attr", "seed"],
-                _ => bail!("unsupported captured algorithm '{algorithm}'"),
-            };
-            for key in spec.params.keys() {
-                if !matches!(key.as_str(), "algorithm" | "source" | "output")
-                    && !options.contains(&key.as_str())
-                {
-                    bail!("{algorithm} does not support parameter '{key}'");
-                }
-            }
-            for key in ["start", "goal"]
-                .iter()
-                .filter(|&&key| options.contains(&key))
-            {
-                if !spec.params.contains_key(*key) {
-                    bail!("{algorithm} requires {key}");
-                }
-            }
-            let source = spec.params.expect_text("source")?.to_owned();
-            let output = spec.params.expect_text("output")?.to_owned();
-            if source.trim().is_empty() || output.trim().is_empty() {
-                bail!("source and output must be nonempty");
-            }
-            Ok(Box::new(CapturedAlgorithm {
-                spec: spec.clone(),
-                source,
-                output,
-                algorithm,
-            }))
-        },
-    )?;
-    Ok(())
 }

@@ -780,6 +780,47 @@ impl DurableGraph {
         )
     }
 
+    /// Pipeline staging has already checked its selected inputs. Acceptance uses
+    /// owner-wide canonical cascade rules, not apply_view_batch's stricter scope.
+    /// Complete the returned pin before journal append/sync makes anything visible.
+    pub(crate) fn accept_pipeline_batch(
+        &mut self,
+        coordinate: crate::api::graph::WriteCoordinate,
+        allocation: Option<(crate::NodeId, crate::EdgeId)>,
+        batch: Option<GraphBatch>,
+        selection: &crate::GraphView,
+    ) -> GraphResult<crate::GraphView> {
+        self.ready()?;
+        self.graph.validate_write_coordinate(&coordinate)?;
+        self.graph.validate_allocation_expectation(allocation)?;
+        let full = self.graph.read_view()?;
+        let Some(batch) = batch else {
+            return crate::GraphView::from_membership(
+                full.read_state().clone(),
+                selection.nodes().clone(),
+                selection.edges().clone(),
+            );
+        };
+        let stored = StoredBatch::encode(&batch)?;
+        let prepared =
+            self.graph
+                .prepare_view_publication(&full, batch, self.schema.as_ref(), None)?;
+        let output = crate::GraphView::from_membership(
+            prepared.view.read_state().clone(),
+            selection.nodes().clone(),
+            selection.edges().clone(),
+        )?;
+        let batch = self.execute_prepared_batch(
+            prepared.publication,
+            stored,
+            prepared.expected_state,
+            "atomic pipeline effects".into(),
+            "groggy".into(),
+            None,
+        )?;
+        Ok(self.graph.accepted_view_result(batch, output).view)
+    }
+
     /// Persist an explicit immutable source group before it is referenced by a batch.
     pub fn retain_group(
         &mut self,
@@ -1263,6 +1304,90 @@ impl DurableGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn pipeline_fixture() -> crate::algorithms::Pipeline {
+        crate::algorithms::PipelineBuilder::new()
+            .with_algorithm("builder.step_pipeline", |p| {
+                p.set_text(
+                    "steps",
+                    r#"{"atomic":true,"steps":[
+                {"id":"graph.add_nodes","params":{"count":2,"output":"new","effective_at":10}},
+                {"id":"graph.capture_staged","params":{"output":"pending"}},
+                {"id":"graph.emit","params":{"source":"pending","name":"pending"}}
+            ]}"#,
+                );
+            })
+            .build(crate::algorithms::global_registry())
+            .unwrap()
+    }
+
+    #[test]
+    fn durable_pipeline_append_failures_restore_outputs_state_and_allocation() {
+        for failure in [
+            Failure::BeforeHeader,
+            Failure::AfterHeader,
+            Failure::AfterPayload,
+            Failure::AfterSync,
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("pipeline.ggj");
+            let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+            let source = store.read_view().unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let p = pipeline_fixture();
+            let mut ctx = crate::algorithms::Context::new();
+            ctx.add_output(
+                "old",
+                crate::algorithms::AlgorithmOutput::GraphView(source.clone()),
+            );
+            store.failure = Some(failure);
+            assert!(p.run_durable(&mut ctx, &mut store, &source).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+            assert_eq!(store.graph().unwrap().current_state_id(), 0);
+            assert_eq!(store.graph().unwrap().pool().statistics().node_count, 0);
+            let outputs = ctx.take_outputs();
+            assert_eq!(outputs.len(), 1);
+            assert!(outputs.contains_key("old"));
+            store.failure = None;
+            assert_eq!(
+                p.run_durable(&mut ctx, &mut store, &source)
+                    .unwrap()
+                    .node_ids(),
+                vec![0, 1]
+            );
+            drop(store);
+            let reopened = DurableGraph::open(&path).unwrap();
+            assert_eq!(
+                reopened.read_view_at(10, None).unwrap().node_ids(),
+                vec![0, 1]
+            );
+            assert_eq!(reopened.graph().unwrap().current_state_id(), 1);
+        }
+    }
+
+    #[test]
+    fn durable_pipeline_indeterminate_append_requires_reopen_without_accepted_outputs() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pipeline.ggj");
+        let mut store = DurableGraph::create(&path, GraphConfig::new(), None).unwrap();
+        let source = store.read_view().unwrap();
+        let p = pipeline_fixture();
+        let mut ctx = crate::algorithms::Context::new();
+        ctx.add_output(
+            "old",
+            crate::algorithms::AlgorithmOutput::GraphView(source.clone()),
+        );
+        store.failure = Some(Failure::Rollback);
+        assert!(p.run_durable(&mut ctx, &mut store, &source).is_err());
+        assert!(store.graph().is_err());
+        let outputs = ctx.take_outputs();
+        assert_eq!(outputs.len(), 1);
+        assert!(outputs.contains_key("old"));
+        drop(store);
+        let reopened = DurableGraph::open(&path).unwrap();
+        assert_eq!(reopened.graph().unwrap().current_state_id(), 1);
+        assert_eq!(reopened.read_view().unwrap().node_ids(), vec![0, 1]);
+    }
+
     fn pending(store: &DurableGraph) -> (Record, PublicationMetadata) {
         let batch = GraphBatch {
             add_nodes: 1,

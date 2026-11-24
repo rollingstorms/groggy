@@ -7,7 +7,7 @@ use super::*;
 impl PropertyBatch {
     /// The adapter must supply this batch's checked accepted root. Membership is
     /// explicit so fixed children and dynamic roots reuse the identical kernel.
-    pub(super) fn capture_membership(
+    pub(crate) fn capture_membership(
         &mut self,
         base: &crate::GraphView,
         selected_nodes: &HashSet<NodeId>,

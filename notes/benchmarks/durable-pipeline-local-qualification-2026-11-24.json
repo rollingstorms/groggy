@@ -1,0 +1,88 @@
+{
+  "scope": "Supported durable pipeline invocation boundary; broad parent rows remain open. Local qualification only; no new platform or release claim.",
+  "date": "2026-11-24",
+  "production_source_file_count": 499,
+  "production_source_tree_sha256": "6ee3967746f677cb3a1b727a2c6d2e88b18a36640d4decf4b0d9b0ded5ee756b",
+  "production_source_hash_recipe": "Sorted relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1642,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 226,
+    "doctests_passed": 10,
+    "serial_checkpoint_recovery_passed": 1,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed",
+    "changed_ffi_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3390,
+    "maintained_skipped": 1,
+    "established_warnings": 14,
+    "documentation_examples": 291,
+    "new_durable_tests": 5,
+    "python_38_syntax": "passed",
+    "packaged_python_source_files_match": 62
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "173ecbe64351a66aea1fa01b012ce036633054249b87c258c7642a589ab3079c",
+    "qualification_receipt": "notes/benchmarks/durable-pipeline-wheel-qualification-2026-11-24.json"
+  },
+  "benchmark": {
+    "harness": "benches/durable_pipeline.rs",
+    "final_receipts": [
+      "notes/benchmarks/durable-pipeline-2026-11-24-1.json",
+      "notes/benchmarks/durable-pipeline-2026-11-24-2.json",
+      "notes/benchmarks/durable-pipeline-2026-11-24-3.json"
+    ],
+    "final_conditions": "Three fresh processes after native/extension builds, native tests and clippy stopped; seven observations each per size. Local wall-time baseline; no historical speedup or interchangeable-operation comparison.",
+    "prototype_receipts": [
+      "notes/benchmarks/durable-pipeline-2026-11-24-initial.json",
+      "notes/benchmarks/durable-pipeline-2026-11-24-warmup.json"
+    ],
+    "prototype_limits": "Initial/warmup candidates included build/test contention. The initial candidate also preceded shared pending-reader refresh classification. Not used as a controlled before/after speedup.",
+    "medians_of_21_observations": [
+      {
+        "base_nodes": 1,
+        "observations": 21,
+        "memory_atomic_seconds": 5.4666e-05,
+        "durable_prepare_seconds": 4.3625e-05,
+        "durable_accept_seconds": 0.0041195,
+        "durable_reopen_seconds": 0.000150333
+      },
+      {
+        "base_nodes": 1000,
+        "observations": 21,
+        "memory_atomic_seconds": 0.003287292,
+        "durable_prepare_seconds": 0.003300167,
+        "durable_accept_seconds": 0.006771041,
+        "durable_reopen_seconds": 0.005842792
+      },
+      {
+        "base_nodes": 10000,
+        "observations": 21,
+        "memory_atomic_seconds": 0.03447925,
+        "durable_prepare_seconds": 0.037463125,
+        "durable_accept_seconds": 0.032908875,
+        "durable_reopen_seconds": 0.058285083
+      }
+    ]
+  },
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "78cd286b04ee1033b4d215e2704148b9cbf02de08149316c64f72929d8c51cc4",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-durable-native-qualified.log": "a0353cc791a910bc963ede58ff88d77477e5a2bb2d561c387e15a5fdfddc9c8f",
+    "/tmp/groggy-durable-clippy-qualified.log": "cadb7ee1967659c306c4b02c41572750348555daadde0b06d82164f32726893e",
+    "/tmp/groggy-durable-wheel-gates.log": "71547110d1f5bc5e85921fb51f8d91ce04d405756959568809e9f4386a0163dc",
+    "/tmp/groggy-durable-checkpoint-qualified.log": "448283601040476609dde5de844d66aa13677cd131d1d69767bfdf7e0100bc2f"
+  }
+}

@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 mod capture;
-mod prepared;
+pub(super) mod prepared;
 
 type TopologyStamp = (usize, usize, usize, usize, usize);
 #[derive(Debug)]
@@ -338,6 +338,9 @@ impl PropertyBatch {
         graph.validate_write_coordinate(&self.coordinate)?;
         let stats = graph.pool().statistics();
         let current = (stats.node_count, stats.edge_count);
+        self.bind_allocation(current)
+    }
+    fn bind_allocation(&mut self, current: (NodeId, EdgeId)) -> GraphResult<(NodeId, EdgeId)> {
         if self.allocation_base.is_some_and(|base| base != current) {
             return Err(crate::GraphError::InvalidInput(
                 "Staged allocation coordinates changed".into(),
@@ -364,7 +367,18 @@ impl PropertyBatch {
         attrs: &HashMap<AttrName, AttrValue>,
         at: Option<crate::TimestampMicros>,
     ) -> GraphResult<Vec<NodeId>> {
-        let (base, _) = self.allocation_base(graph)?;
+        let allocation = self.allocation_base(graph)?;
+        self.stage_nodes_at_allocation(allocation, count, attrs, at)
+    }
+    pub(crate) fn stage_nodes_at_allocation(
+        &mut self,
+        allocation: (NodeId, EdgeId),
+        count: usize,
+        attrs: &HashMap<AttrName, AttrValue>,
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<Vec<NodeId>> {
+        let (base, _) = self.bind_allocation(allocation)?;
+
         let total = self
             .add_nodes
             .checked_add(count)
@@ -430,18 +444,58 @@ impl PropertyBatch {
         attrs: &HashMap<AttrName, AttrValue>,
         at: Option<crate::TimestampMicros>,
     ) -> GraphResult<Vec<EdgeId>> {
-        let (_, base) = self.allocation_base(graph)?;
+        for &(source, target) in edges {
+            for reference in [source, target] {
+                self.resolve_selected_node(graph, selected, reference)?;
+            }
+        }
+        let allocation = self.allocation_base(graph)?;
+        self.stage_validated_edges(allocation, edges, attrs, at)
+    }
+
+    pub(crate) fn stage_edges_in_view(
+        &mut self,
+        allocation: (NodeId, EdgeId),
+        accepted: &crate::GraphView,
+        selected: &crate::GraphView,
+        edges: &[(BatchNodeRef, BatchNodeRef)],
+        attrs: &HashMap<AttrName, AttrValue>,
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<Vec<EdgeId>> {
+        for &(source, target) in edges {
+            for reference in [source, target] {
+                let valid = match reference {
+                    BatchNodeRef::Existing(id) => {
+                        selected.contains_node(id) && accepted.contains_node(id)
+                    }
+                    BatchNodeRef::Added(position) => {
+                        position < self.add_nodes && self.allocation_base.is_some()
+                    }
+                };
+                if !valid {
+                    return Err(crate::GraphError::InvalidInput(
+                        "Edge endpoint is outside the selected or staged nodes".into(),
+                    ));
+                }
+            }
+        }
+        self.stage_validated_edges(allocation, edges, attrs, at)
+    }
+
+    fn stage_validated_edges(
+        &mut self,
+        allocation: (NodeId, EdgeId),
+        edges: &[(BatchNodeRef, BatchNodeRef)],
+        attrs: &HashMap<AttrName, AttrValue>,
+        at: Option<crate::TimestampMicros>,
+    ) -> GraphResult<Vec<EdgeId>> {
+        let (_, base) = self.bind_allocation(allocation)?;
         let total = self
             .add_edges
             .len()
             .checked_add(edges.len())
             .filter(|&n| base.checked_add(n).is_some())
             .ok_or_else(|| crate::GraphError::InvalidInput("Staged edge IDs overflow".into()))?;
-        for &(source, target) in edges {
-            for reference in [source, target] {
-                self.resolve_selected_node(graph, selected, reference)?;
-            }
-        }
         let first = self.add_edges.len();
         let ids: Vec<_> = (base + first..base + total).collect();
         self.add_edges.extend_from_slice(edges);

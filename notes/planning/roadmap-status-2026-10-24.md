@@ -1,5 +1,13 @@
 # Groggy roadmap status — 2026-10-24
 
+**Implementation checkpoint — 2026-11-24:** supported durable step-builder
+execution is complete with shared sealed kernels, detached preparation, one
+journal acceptance and exact recovery. See
+[finished component checks](durable-pipeline-execution-2026-11-24.md). Broader
+execution/retention/service rows and unanswered A14/A15 policies remain open.
+This implementation does not add an owner decision or change the fixed checklist
+inventory.
+
 ## Current checkpoint — 2026-11-11
 
 The authoritative [flat checklist](graph-engine-flat-checklist.md) has

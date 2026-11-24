@@ -44,6 +44,7 @@ Detailed API documentation with theory and examples
 - [Owned snapshots and restoration](api/owned-snapshots.md)
 - [Branch state reads and manual reset](api/branch-state-reads.md)
 - [Atomic property pipelines](api/atomic-pipelines.md)
+- [Durable pipelines](api/durable-pipelines.md)
 - [Explicit history pruning](api/history-retention.md)
 - [Durable storage and recovery](api/durable-storage.md)
 

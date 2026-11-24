@@ -147,6 +147,115 @@ pub fn py_build_sample_pipeline(py: Python, spec: &PyAny) -> PyResult<PySamplePi
     Ok(PySamplePipelineHandle { handle_id })
 }
 
+fn outputs_to_python<'py>(
+    py: Python<'py>,
+    outputs: HashMap<String, groggy::algorithms::AlgorithmOutput>,
+) -> PyResult<&'py PyDict> {
+    let py_outputs = PyDict::new(py);
+    for (key, output) in outputs {
+        match output {
+            groggy::algorithms::AlgorithmOutput::GraphView(inner) => {
+                py_outputs.set_item(
+                    key,
+                    Py::new(py, crate::ffi::subgraphs::view::PyGraphView { inner })?,
+                )?;
+            }
+            groggy::algorithms::AlgorithmOutput::Table(table) => {
+                py_outputs.set_item(
+                    key,
+                    Py::new(
+                        py,
+                        crate::ffi::storage::table::PyBaseTable::from_table((*table).clone()),
+                    )?,
+                )?;
+            }
+            groggy::algorithms::AlgorithmOutput::Histogram(counts) => {
+                py_outputs.set_item(key, counts)?;
+            }
+            groggy::algorithms::AlgorithmOutput::NodeAttributes(values)
+            | groggy::algorithms::AlgorithmOutput::EdgeAttributes(values) => {
+                let rows = PyList::empty(py);
+                for (id, value) in values {
+                    rows.append((
+                        id,
+                        crate::ffi::utils::attr_value_to_python_value(py, &value)?,
+                    ))?;
+                }
+                py_outputs.set_item(key, rows)?;
+            }
+            groggy::algorithms::AlgorithmOutput::NodeIntegers(values) => {
+                py_outputs.set_item(key, values)?;
+            }
+            groggy::algorithms::AlgorithmOutput::NodeScores(scores) => {
+                py_outputs.set_item(key, scores)?;
+            }
+            groggy::algorithms::AlgorithmOutput::Components(components) => {
+                let py_components = PyList::empty(py);
+                for component in components {
+                    let py_nodes = PyList::empty(py);
+                    for node in component {
+                        py_nodes.append(node)?;
+                    }
+                    py_components.append(py_nodes)?;
+                }
+                py_outputs.set_item(key, py_components)?;
+            }
+        }
+    }
+    Ok(py_outputs)
+}
+
+/// Execute owned native preparation without the GIL; durable acceptance stays
+/// on the creator thread. All semantic dispatch lives in the Rust core.
+#[pyfunction]
+#[pyo3(name = "run_durable_pipeline", signature = (handle, store, selected = None))]
+pub fn py_run_durable_pipeline(
+    py: Python<'_>,
+    handle: &PyPipelineHandle,
+    store: &mut super::durable::PyDurableGraph,
+    selected: Option<&crate::ffi::subgraphs::view::PyGraphView>,
+) -> PyResult<(crate::ffi::subgraphs::view::PyGraphView, PyObject)> {
+    let (pipeline, build_time) = {
+        let guard = registry()
+            .lock()
+            .map_err(|_| PyRuntimeError::new_err("pipeline registry poisoned"))?;
+        let entry = guard
+            .get(&handle.handle_id)
+            .ok_or_else(|| PyRuntimeError::new_err("invalid pipeline handle"))?;
+        (Arc::clone(&entry.pipeline), entry.build_time_seconds)
+    };
+    let selected = match selected {
+        Some(view) => view.inner.clone(),
+        None => store
+            .core()?
+            .read_view()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+    };
+    let plan = pipeline
+        .prepare_durable(store.core()?, &selected)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let started = Instant::now();
+    let (prepared, mut context) = py.allow_threads(move || {
+        let mut context = groggy::algorithms::Context::new();
+        let prepared = plan.execute(&mut context);
+        (prepared, context)
+    });
+    let prepared = prepared.map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let result = prepared
+        .accept(store.core_mut()?)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let profile = PyDict::new(py);
+    profile.set_item("build_time", build_time)?;
+    profile.set_item("run_time", started.elapsed().as_secs_f64())?;
+    profile.set_item("atomic", true)?;
+    profile.set_item("persist_results", true)?;
+    profile.set_item("outputs", outputs_to_python(py, context.take_outputs())?)?;
+    Ok((
+        crate::ffi::subgraphs::view::PyGraphView { inner: result },
+        profile.into(),
+    ))
+}
+
 #[pyfunction]
 #[pyo3(name = "run_pipeline", signature = (handle, subgraph, *, persist_results = true, atomic = false))]
 pub fn py_run_pipeline(
@@ -228,58 +337,7 @@ pub fn py_run_pipeline(
     stats.set_item("persist_results", persist_results)?;
     stats.set_item("atomic", atomic)?;
 
-    let outputs = context.take_outputs();
-    let py_outputs = PyDict::new(py);
-    for (key, output) in outputs {
-        match output {
-            groggy::algorithms::AlgorithmOutput::GraphView(inner) => {
-                py_outputs.set_item(
-                    key,
-                    Py::new(py, crate::ffi::subgraphs::view::PyGraphView { inner })?,
-                )?;
-            }
-            groggy::algorithms::AlgorithmOutput::Table(table) => {
-                py_outputs.set_item(
-                    key,
-                    Py::new(
-                        py,
-                        crate::ffi::storage::table::PyBaseTable::from_table((*table).clone()),
-                    )?,
-                )?;
-            }
-            groggy::algorithms::AlgorithmOutput::Histogram(counts) => {
-                py_outputs.set_item(key, counts)?;
-            }
-            groggy::algorithms::AlgorithmOutput::NodeAttributes(values)
-            | groggy::algorithms::AlgorithmOutput::EdgeAttributes(values) => {
-                let rows = PyList::empty(py);
-                for (id, value) in values {
-                    rows.append((
-                        id,
-                        crate::ffi::utils::attr_value_to_python_value(py, &value)?,
-                    ))?;
-                }
-                py_outputs.set_item(key, rows)?;
-            }
-            groggy::algorithms::AlgorithmOutput::NodeIntegers(values) => {
-                py_outputs.set_item(key, values)?;
-            }
-            groggy::algorithms::AlgorithmOutput::NodeScores(scores) => {
-                py_outputs.set_item(key, scores)?;
-            }
-            groggy::algorithms::AlgorithmOutput::Components(components) => {
-                let py_components = PyList::empty(py);
-                for component in components {
-                    let py_nodes = PyList::empty(py);
-                    for node in component {
-                        py_nodes.append(node)?;
-                    }
-                    py_components.append(py_nodes)?;
-                }
-                py_outputs.set_item(key, py_components)?;
-            }
-        }
-    }
+    let py_outputs = outputs_to_python(py, context.take_outputs())?;
     stats.set_item("outputs", py_outputs)?;
 
     let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(result)?;
@@ -639,6 +697,7 @@ pub fn pipeline(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySamplePipelineHandle>()?;
     m.add_function(wrap_pyfunction!(py_build_pipeline, m)?)?;
     m.add_function(wrap_pyfunction!(py_run_pipeline, m)?)?;
+    m.add_function(wrap_pyfunction!(py_run_durable_pipeline, m)?)?;
     m.add_function(wrap_pyfunction!(py_drop_pipeline, m)?)?;
     m.add_function(wrap_pyfunction!(py_build_sample_pipeline, m)?)?;
     m.add_function(wrap_pyfunction!(py_run_sample_pipeline, m)?)?;

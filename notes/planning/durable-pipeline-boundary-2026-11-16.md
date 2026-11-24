@@ -1,5 +1,12 @@
 # Next execution slice: durable pipeline preparation boundary
 
+**Implementation checkpoint — 2026-11-24:** the first complete supported durable
+program and Python entry point are implemented. See
+[completion evidence](durable-pipeline-execution-2026-11-24.md) and the
+[exact supported inventory](../../docs/api/durable-pipelines.md). The remaining
+text records the original design and its historical source boundaries; unported
+routes and parent requirements remain open.
+
 Context, 2026-11-16. The first extraction below is now implemented; see
 [owned pipeline effects](owned-pipeline-effects-2026-11-16.md). Durable dispatch
 and its invocation adapter remain open. Selected materialization is now also

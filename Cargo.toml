@@ -421,3 +421,7 @@ same-file = "1.0" # Safe handle identity for non-repairing Windows journal verif
 [[bench]]
 name = "pending_frame_allocations"
 harness = false
+
+[[bench]]
+name = "durable_pipeline"
+harness = false

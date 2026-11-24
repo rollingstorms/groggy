@@ -2,6 +2,7 @@
 use super::core::{
     AtomicStepEffect, Step, StepMetadata, StepRegistry, StepScope, StepSpec, StepValue,
 };
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use crate::algorithms::{AlgorithmParamValue, Context, CostHint};
 use anyhow::{anyhow, bail, Result};
 
@@ -114,21 +115,11 @@ impl Step for CaptureStagedStep {
     fn atomic_effect(&self) -> AtomicStepEffect {
         AtomicStepEffect::StagedCapture
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if ctx.is_cancelled() {
-            bail!("staged graph capture cancelled");
-        }
-        let pending = ctx.property_batch.as_mut().ok_or_else(|| {
-            anyhow!("graph.capture_staged requires a persistent local atomic builder")
-        })?;
-        let view = pending.capture_scoped(scope.subgraph(), scope.fixed_selection())?;
-        if ctx.is_cancelled() {
-            bail!("staged graph capture cancelled");
-        }
-        scope
-            .variables_mut()
-            .set_value(&self.output, StepValue::GraphView(view));
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -281,4 +272,21 @@ pub(super) fn register(registry: &StepRegistry) -> Result<()> {
     super::additions::register(registry)?;
     super::captured_algorithms::register(registry)?;
     Ok(())
+}
+
+impl sealed::Sealed for CaptureStagedStep {}
+impl ReadStep for CaptureStagedStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            bail!("staged graph capture cancelled");
+        }
+        let view = scope.capture(ctx)?;
+        if ctx.is_cancelled() {
+            bail!("staged graph capture cancelled");
+        }
+        scope
+            .variables_mut()
+            .set_value(&self.output, StepValue::GraphView(view));
+        Ok(())
+    }
 }

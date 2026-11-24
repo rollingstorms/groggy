@@ -16,7 +16,7 @@ owner, branch and accepted head before execution.
 | Retained lifecycle/window helpers | Surviving accepted IDs after pending topology | Provisional-node history remains explicitly guarded pending its policy decision. |
 | Root `iter.loop` | Sequential creation, accepted-entity removal/revision, refreshed properties, nested root loops | Added references remain whole-batch positions; canonical duplicate rules remain. |
 | Fixed child `sample.for_each` | Exact immutable child selection with shared property staging and refreshed reads | Child topology changes remain rejected, including nested topology loops. |
-| Other execution routes | Certified native step interpreter and ordinary supported algorithm calls | Alternate batch plans, streaming, unsupported callbacks and durable pipeline dispatch remain open. |
+| Other execution routes | Certified native step interpreter and ordinary supported algorithm calls | Bounded durable step-builder invocation is implemented; see [durable pipelines](durable-pipelines.md). Unported durable kernels, alternate batch plans, streaming and unsupported callbacks remain guarded. |
 
 ## All classic families in one publication
 

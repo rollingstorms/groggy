@@ -154,6 +154,10 @@ impl StepPipelineAlgorithm {
 }
 
 impl Algorithm for StepPipelineAlgorithm {
+    fn read_steps(&self) -> Option<&[Box<dyn Step>]> {
+        self.atomic.then_some(self.steps.as_slice())
+    }
+
     fn id(&self) -> &'static str {
         "builder.step_pipeline"
     }

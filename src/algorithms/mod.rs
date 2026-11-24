@@ -862,6 +862,14 @@ pub struct AtomicMutationEffects {
 
 /// Trait implemented by all core algorithms.
 pub trait Algorithm: Send + Sync {
+    /// Read-oriented native step program, when this algorithm is a step builder.
+    /// Each step must additionally supply its sealed detached kernel. Legacy
+    /// algorithm callbacks are never invoked through this adapter.
+    #[doc(hidden)]
+    fn read_steps(&self) -> Option<&[Box<dyn Step>]> {
+        None
+    }
+
     /// Stable identifier used for registry lookup.
     fn id(&self) -> &'static str;
 

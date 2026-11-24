@@ -1,5 +1,13 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Implementation checkpoint — 2026-11-24:** supported durable step-builder
+execution is complete with shared sealed kernels, detached preparation, one
+journal acceptance and exact recovery. See
+[finished component checks](durable-pipeline-execution-2026-11-24.md). Broader
+execution/retention/service rows and unanswered A14/A15 policies remain open.
+This implementation does not add an owner decision or change the fixed checklist
+inventory.
+
 Companion to the design workbook. Baseline: `c01f20d4`, branch `groggy-roadmap-2026-10-20`. The PDF has printable/fillable answer fields. Roadmap numbers below use the staged 1-34 list.
 
 **Status (updated 2026-10-22):** owner answers and explicit clarifications are recorded below and in [the answer record](workbook-answers-2026-10-22.md). Unanswered choices and suggestions remain provisional. An accepted answer authorizes implementation; it does not mark that implementation complete. Existing owner decisions remain authoritative. Blank answers do not authorize a new direction. Core implementation can continue where accepted decisions already provide enough guidance.
@@ -23,7 +31,7 @@ choices; unanswered decision fields below remain unchanged.
 
 Immutable state-pinned views; stale writes conflict; one version per accepted checked batch; separate effective/recorded time; explicit optional recorded_by; inactive history retained until explicit purge; global identity; flexible properties with optional schema; one serialized writer first; undirected default; Neo4j/NetworkX comparison targets; Graphiti integration deferred behind core/numerical completion.
 
-## Current boundary
+## Historical boundary at appendix creation
 
 Checked writers and DurableGraph implement documented automatic publication and journal recovery. Legacy Graph calls still use manual grouping. Effective-time reconstruction, pooled/meta persistence, pinned ordinary subgraphs/tables, compact checkpoints and storage migration remain unfinished.
 

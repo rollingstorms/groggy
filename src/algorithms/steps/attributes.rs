@@ -1,5 +1,6 @@
 //! Attribute loading and attaching step primitives.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
@@ -48,23 +49,11 @@ impl Step for LoadNodeAttrStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map = HashMap::with_capacity(scope.subgraph().node_set().len());
-        for &node in scope.node_ids() {
-            let value = match scope
-                .node_attribute(ctx, node, &self.attr)?
-                .and_then(AlgorithmParamValue::from_attr_value)
-            {
-                Some(attr_value) => attr_value,
-                None if self.attr.as_str() == "entity_id" || self.attr.as_str() == "node_id" => {
-                    AlgorithmParamValue::Int(node as i64)
-                }
-                None => self.default.clone(),
-            };
-            map.insert(node, value);
-        }
-        scope.variables_mut().set_node_map(self.target.clone(), map);
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -116,65 +105,11 @@ impl Step for AttachNodeAttrStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        if let Ok(column) = scope.variables().node_column(&self.source) {
-            let mut values = Vec::with_capacity(column.nodes().len());
-            for (node, value) in column.iter() {
-                if ctx.is_cancelled() {
-                    return Err(anyhow!("attach_node_attr cancelled"));
-                }
-                if let Some(attr_value) = value.as_attr_value() {
-                    values.push((node, attr_value));
-                } else {
-                    return Err(anyhow!(
-                        "variable '{}' contains unsupported attribute type",
-                        self.source
-                    ));
-                }
-            }
-
-            if let Some(at) = self.effective_at {
-                return scope.attach_attrs_at(
-                    ctx,
-                    true,
-                    HashMap::from([(self.attr.clone(), values)]),
-                    at,
-                );
-            }
-            return scope
-                .attach_node_column(ctx, self.attr.clone(), values)
-                .map_err(|err| anyhow!("failed to set node attributes: {err}"));
-        }
-
-        let map = scope.variables().node_map(&self.source)?;
-        let mut entries: Vec<(NodeId, &AlgorithmParamValue)> =
-            map.iter().map(|(node, value)| (*node, value)).collect();
-        entries.sort_unstable_by_key(|(node, _)| *node);
-        let mut values = Vec::with_capacity(entries.len());
-
-        for (node, value) in entries {
-            if ctx.is_cancelled() {
-                return Err(anyhow!("attach_node_attr cancelled"));
-            }
-            if let Some(attr_value) = value.as_attr_value() {
-                values.push((node, attr_value));
-            } else {
-                return Err(anyhow!(
-                    "variable '{}' contains unsupported attribute type",
-                    self.source
-                ));
-            }
-        }
-
-        let mut attrs = HashMap::new();
-        attrs.insert(self.attr.clone(), values);
-        if let Some(at) = self.effective_at {
-            return scope.attach_attrs_at(ctx, true, attrs, at);
-        }
-        scope
-            .attach_node_attrs(ctx, attrs)
-            .map_err(|err| anyhow!("failed to set node attributes: {err}"))?;
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -216,17 +151,11 @@ impl Step for LoadEdgeAttrStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map = HashMap::with_capacity(scope.subgraph().edge_set().len());
-        for &edge in scope.edge_ids() {
-            let value = scope
-                .edge_attribute(ctx, edge, &self.attr)?
-                .and_then(AlgorithmParamValue::from_attr_value)
-                .unwrap_or_else(|| self.default.clone());
-            map.insert(edge, value);
-        }
-        scope.variables_mut().set_edge_map(self.target.clone(), map);
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -278,33 +207,11 @@ impl Step for AttachEdgeAttrStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let map = scope.variables().edge_map(&self.source)?;
-        let mut entries: Vec<(EdgeId, &AlgorithmParamValue)> =
-            map.iter().map(|(edge, value)| (*edge, value)).collect();
-        entries.sort_unstable_by_key(|(edge, _)| *edge);
-        let mut attrs = HashMap::new();
-        let mut values = Vec::with_capacity(entries.len());
-
-        for (edge, value) in entries {
-            if let Some(attr_value) = value.as_attr_value() {
-                values.push((edge, attr_value));
-            } else {
-                return Err(anyhow!(
-                    "variable '{}' contains unsupported attribute type",
-                    self.source
-                ));
-            }
-        }
-
-        attrs.insert(self.attr.clone(), values);
-        if let Some(at) = self.effective_at {
-            return scope.attach_attrs_at(ctx, false, attrs, at);
-        }
-        scope
-            .attach_edge_attrs(ctx, attrs)
-            .map_err(|err| anyhow!("failed to set edge attributes: {err}"))?;
-        Ok(())
+        self.apply_read(ctx, &mut scope.read_scope())
     }
 }
 
@@ -471,4 +378,138 @@ pub(super) fn register_table_attachment(registry: &StepRegistry) -> Result<()> {
         },
     )?;
     Ok(())
+}
+
+impl sealed::Sealed for AttachNodeAttrStep {}
+impl ReadStep for AttachNodeAttrStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if let Ok(column) = scope.variables().node_column(&self.source) {
+            let mut values = Vec::with_capacity(column.nodes().len());
+            for (node, value) in column.iter() {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("attach_node_attr cancelled"));
+                }
+                if let Some(attr_value) = value.as_attr_value() {
+                    values.push((node, attr_value));
+                } else {
+                    return Err(anyhow!(
+                        "variable '{}' contains unsupported attribute type",
+                        self.source
+                    ));
+                }
+            }
+
+            if let Some(at) = self.effective_at {
+                return scope.attach_attrs_at(
+                    ctx,
+                    true,
+                    HashMap::from([(self.attr.clone(), values)]),
+                    at,
+                );
+            }
+            return scope
+                .attach_node_column(ctx, self.attr.clone(), values)
+                .map_err(|err| anyhow!("failed to set node attributes: {err}"));
+        }
+
+        let map = scope.variables().node_map(&self.source)?;
+        let mut entries: Vec<(NodeId, &AlgorithmParamValue)> =
+            map.iter().map(|(node, value)| (*node, value)).collect();
+        entries.sort_unstable_by_key(|(node, _)| *node);
+        let mut values = Vec::with_capacity(entries.len());
+
+        for (node, value) in entries {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("attach_node_attr cancelled"));
+            }
+            if let Some(attr_value) = value.as_attr_value() {
+                values.push((node, attr_value));
+            } else {
+                return Err(anyhow!(
+                    "variable '{}' contains unsupported attribute type",
+                    self.source
+                ));
+            }
+        }
+
+        let mut attrs = HashMap::new();
+        attrs.insert(self.attr.clone(), values);
+        if let Some(at) = self.effective_at {
+            return scope.attach_attrs_at(ctx, true, attrs, at);
+        }
+        scope
+            .attach_node_attrs(ctx, attrs)
+            .map_err(|err| anyhow!("failed to set node attributes: {err}"))?;
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for AttachEdgeAttrStep {}
+impl ReadStep for AttachEdgeAttrStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let map = scope.variables().edge_map(&self.source)?;
+        let mut entries: Vec<(EdgeId, &AlgorithmParamValue)> =
+            map.iter().map(|(edge, value)| (*edge, value)).collect();
+        entries.sort_unstable_by_key(|(edge, _)| *edge);
+        let mut attrs = HashMap::new();
+        let mut values = Vec::with_capacity(entries.len());
+
+        for (edge, value) in entries {
+            if let Some(attr_value) = value.as_attr_value() {
+                values.push((edge, attr_value));
+            } else {
+                return Err(anyhow!(
+                    "variable '{}' contains unsupported attribute type",
+                    self.source
+                ));
+            }
+        }
+
+        attrs.insert(self.attr.clone(), values);
+        if let Some(at) = self.effective_at {
+            return scope.attach_attrs_at(ctx, false, attrs, at);
+        }
+        scope
+            .attach_edge_attrs(ctx, attrs)
+            .map_err(|err| anyhow!("failed to set edge attributes: {err}"))?;
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for LoadNodeAttrStep {}
+impl ReadStep for LoadNodeAttrStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let mut map = HashMap::with_capacity(scope.node_count());
+        for node in scope.node_ids() {
+            let value = match scope
+                .node_attribute(ctx, node, &self.attr)?
+                .and_then(AlgorithmParamValue::from_attr_value)
+            {
+                Some(attr_value) => attr_value,
+                None if self.attr.as_str() == "entity_id" || self.attr.as_str() == "node_id" => {
+                    AlgorithmParamValue::Int(node as i64)
+                }
+                None => self.default.clone(),
+            };
+            map.insert(node, value);
+        }
+        scope.variables_mut().set_node_map(self.target.clone(), map);
+        Ok(())
+    }
+}
+
+impl sealed::Sealed for LoadEdgeAttrStep {}
+impl ReadStep for LoadEdgeAttrStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let mut map = HashMap::with_capacity(scope.edge_count());
+        for edge in scope.edge_ids() {
+            let value = scope
+                .edge_attribute(ctx, edge, &self.attr)?
+                .and_then(AlgorithmParamValue::from_attr_value)
+                .unwrap_or_else(|| self.default.clone());
+            map.insert(edge, value);
+        }
+        scope.variables_mut().set_edge_map(self.target.clone(), map);
+        Ok(())
+    }
 }

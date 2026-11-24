@@ -200,6 +200,57 @@ impl Pipeline {
         result
     }
 
+    /// Execute supported atomic step builders through durable journal acceptance.
+    /// Every step is preflighted for a sealed read-oriented native kernel before
+    /// any prefix executes. Results are immutable and carry no writable owner.
+    /// Legacy/custom callbacks and unported steps fail explicitly.
+    pub fn run_durable(
+        &self,
+        ctx: &mut Context,
+        store: &mut crate::storage::journal::DurableGraph,
+        selected: &crate::GraphView,
+    ) -> Result<crate::GraphView> {
+        let plan = self.prepare_durable(store, selected)?;
+        let previous_outputs = ctx.take_outputs();
+        let result = plan.execute(ctx).and_then(|effects| effects.accept(store));
+        ctx.finish_output_scope(previous_outputs, result.is_ok());
+        result
+    }
+
+    /// Check support/source and capture immutable inputs on the owner thread.
+    /// The returned plan contains no Graph or writable Subgraph and may execute
+    /// on another thread. Acceptance must return to the durable owner's thread.
+    pub fn prepare_durable<'a>(
+        &'a self,
+        store: &crate::storage::journal::DurableGraph,
+        selected: &crate::GraphView,
+    ) -> Result<DurablePipelinePlan<'a>> {
+        let mut programs = Vec::with_capacity(self.steps.len());
+        for (index, algorithm) in self.steps.iter().enumerate() {
+            let steps = algorithm.algorithm.read_steps().ok_or_else(|| {
+                anyhow!(
+                    "Pipeline step {index} ({}) has no detached atomic step program",
+                    algorithm.id
+                )
+            })?;
+            programs.push(
+                steps
+                    .iter()
+                    .map(|step| super::steps::CheckedReadStep::new(step.as_ref()))
+                    .collect::<Result<Vec<_>>>()?,
+            );
+        }
+        let graph = store.graph()?;
+        graph.validate_bound_source(selected, true)?;
+        let counts = graph.pool().statistics();
+        Ok(DurablePipelinePlan {
+            programs,
+            selected: selected.clone(),
+            coordinate: graph.write_coordinate(),
+            allocation: (counts.node_count, counts.edge_count),
+        })
+    }
+
     fn run_steps(
         &self,
         ctx: &mut Context,
@@ -229,6 +280,97 @@ impl Pipeline {
     /// Export the pipeline metadata (useful for introspection).
     pub fn metadata(&self) -> Vec<&AlgorithmMetadata> {
         self.steps.iter().map(|step| &step.metadata).collect()
+    }
+}
+
+/// Immutable input and sealed kernels for one proposed durable invocation.
+/// Execution publishes nothing and consumes no accepted IDs.
+pub struct DurablePipelinePlan<'a> {
+    programs: Vec<Vec<super::steps::CheckedReadStep<'a>>>,
+    selected: crate::GraphView,
+    coordinate: crate::api::graph::WriteCoordinate,
+    allocation: (usize, usize),
+}
+
+/// Completely prepared effects and selected output; no live graph owner is held.
+/// Dropping this value discards the proposal. `accept` rechecks the full source
+/// coordinate before schema validation, journal append/sync and publication.
+pub struct PreparedDurablePipeline {
+    effects: super::property_batch::prepared::PreparedEffects,
+    selection: crate::GraphView,
+    cancellation: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+}
+impl PreparedDurablePipeline {
+    /// Publish one accepted operation and return its immutable selected state.
+    pub fn accept(
+        self,
+        store: &mut crate::storage::journal::DurableGraph,
+    ) -> Result<crate::GraphView> {
+        if self
+            .cancellation
+            .as_ref()
+            .is_some_and(|token| token.load(std::sync::atomic::Ordering::Relaxed))
+        {
+            return Err(anyhow!("pipeline cancelled before publication"));
+        }
+        self.effects
+            .accept_durable(store, &self.selection)
+            .map_err(Into::into)
+    }
+}
+impl DurablePipelinePlan<'_> {
+    /// Run the existing native step executor against immutable inputs only.
+    /// Outputs are pending until acceptance; on execution failure earlier Context
+    /// outputs are restored and staging is always cleared.
+    pub fn execute(self, ctx: &mut Context) -> Result<PreparedDurablePipeline> {
+        if ctx.property_batch.is_some() {
+            return Err(anyhow!(
+                "Nested outer atomic pipeline execution is unsupported"
+            ));
+        }
+        if !ctx.persist_results() {
+            return Err(anyhow!("durable pipeline requires persist=True"));
+        }
+        let selected = &self.selected;
+        ctx.property_batch = Some(super::property_batch::PropertyBatch::new(self.coordinate));
+        let previous_outputs = ctx.take_outputs();
+        let result = (|| {
+            let mut executor = super::steps::StepExecutor::detached(self.allocation, selected);
+            for steps in &self.programs {
+                let mut variables = super::steps::StepVariables::default();
+                for (index, step) in steps.iter().enumerate() {
+                    ctx.begin_step(index, step.id);
+                    let result = executor.apply_prepared(ctx, &mut variables, step);
+                    ctx.finish_step();
+                    result?;
+                }
+            }
+            if ctx.is_cancelled() {
+                return Err(anyhow!("pipeline cancelled before publication"));
+            }
+            let batch = ctx
+                .property_batch
+                .as_mut()
+                .ok_or_else(|| anyhow!("Atomic pipeline lost its property batch"))?;
+            let selection =
+                batch.capture_membership(selected, selected.nodes(), selected.edges(), false)?;
+            let effects = ctx
+                .property_batch
+                .take()
+                .ok_or_else(|| anyhow!("Atomic pipeline lost its property batch"))?
+                .prepare();
+            if ctx.is_cancelled() {
+                return Err(anyhow!("pipeline cancelled before publication"));
+            }
+            Ok(PreparedDurablePipeline {
+                effects,
+                selection,
+                cancellation: ctx.cancel_token(),
+            })
+        })();
+        ctx.property_batch = None;
+        ctx.finish_output_scope(previous_outputs, result.is_ok());
+        result
     }
 }
 
