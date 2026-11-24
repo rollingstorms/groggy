@@ -74,7 +74,8 @@ Commands (with `CARGO_INCREMENTAL=0`, `CARGO_TARGET_DIR=python-groggy/target`):
 [Local qualification](../benchmarks/durable-writeback-local-qualification-2026-11-24.json)
 pins the exact 499-file production tree and artifact/cargo/log hashes. No pip
 wheel installation or new dependency installation was used. Cross-platform
-qualification is separate and is not yet counted as a pass. The first slice's receipts remain pinned to `aff5e090`;
+qualification subsequently passed; its exact gate levels and artifact evidence
+are retained below. The first slice's receipts remain pinned to `aff5e090`;
 its timing results are not silently assigned to this changed runtime.
 
 ## Commit and platform follow-up
@@ -85,8 +86,21 @@ fresh local receipt; production-source verification is separate from historical
 first-slice timing evidence. The fixed 268-row inventory has not changed.
 
 [Platform qualification run 45443651638](https://github.com/rollingstorms/groggy/actions/runs/45443651638)
-is pinned to this runtime. Its result remains pending and is not counted as a
-pass. This manual event does not publish a release.
+is pinned to this runtime and completed successfully. All 21 required jobs
+passed: nineteen wheel combinations, native gates and source rebuild. The manual
+publish job was skipped. Linux CPython 3.12 ran the maintained suite; the other
+eighteen wheels ran ownership plus isolated export/archive/journal workflows.
+The source rebuild ran isolated workflows/exports only.
+
+[Final platform receipt](../benchmarks/durable-writeback-platform-qualification-2026-11-24.json)
+retains all twenty qualification reports and forty uploaded artifact identities/
+ZIP digests. The 5,380,869-byte source archive matches all 499 production files at
+`b24e86e0`, independently checked against Git archive and Git blob contents. Its
+combined production hash matches the local receipt. Source-tar and inner-wheel
+hashes are distinct from upload ZIP digests; actual regenerated archive lockfile
+hashes are retained without claiming identical local dependencies. The archive
+precedes later documentation/test-harness-only commits; production code remains
+identical, as the capability validator confirms.
 
 ## Repeated workload baseline
 

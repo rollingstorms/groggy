@@ -26,6 +26,14 @@ An explicit snapshot/checkpoint and a reconstructed effective-time view are
 separate operations. Default graph selections now use the accepted pinned-state model; explicit
 connected compatibility remains available.
 
+Latest qualification — 2026-11-24: both durable execution slices are complete
+within their supported inventory. Runtime `b24e86e0` passed 1,645 local native
+tests, 3,409 packaged Python tests and 292 documentation examples, plus all
+nineteen wheel combinations and native/source CI gates. See
+[qualified writeback scope](durable-pipeline-writeback-2026-11-24.md) for exact
+platform test levels, completed component checks and the next existing lowering
+boundary. The overlapping parent inventory remains 217 checked / 51 open.
+
 Latest durable follow-up: [computed writeback and topology](durable-pipeline-writeback-2026-11-24.md)
 completes issued node/edge table attachment, accepted-entity removal/revision,
 owner-wide cascades and optional per-call schema through the same coordinator.
