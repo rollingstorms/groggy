@@ -76,3 +76,14 @@ pins the exact 499-file production tree and artifact/cargo/log hashes. No pip
 wheel installation or new dependency installation was used. Cross-platform
 qualification is separate and is not yet counted as a pass. The first slice's receipts remain pinned to `aff5e090`;
 its timing results are not silently assigned to this changed runtime.
+
+## Commit and platform follow-up
+
+Runtime commit: `b24e86e028962c7fc1dbc11a3ac82bb27ebdbf8d`, pushed on
+`groggy-roadmap-2026-10-20`. The current capability matrix pins this code and its
+fresh local receipt; production-source verification is separate from historical
+first-slice timing evidence. The fixed 268-row inventory has not changed.
+
+[Platform qualification run 45443651638](https://github.com/rollingstorms/groggy/actions/runs/45443651638)
+is pinned to this runtime. Its result remains pending and is not counted as a
+pass. This manual event does not publish a release.

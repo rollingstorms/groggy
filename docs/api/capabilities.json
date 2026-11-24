@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "reviewed_runtime": "aff5e09007f7fd16f751be930630100935bdd5e1",
+  "reviewed_runtime": "b24e86e028962c7fc1dbc11a3ac82bb27ebdbf8d",
   "updated": "2026-11-24",
   "scope": "Public feature-family capability matrix, with all stable checklist rows mapped. Bounded means only the stated contract is qualified; it never closes an overlapping parent by implication.",
-  "local_receipt": "notes/benchmarks/durable-pipeline-local-qualification-2026-11-24.json",
+  "local_receipt": "notes/benchmarks/durable-writeback-local-qualification-2026-11-24.json",
   "features": [
     {
       "id": "graph-model",
@@ -894,27 +894,29 @@
           "src/algorithms/mod.rs",
           "src/algorithms/property_batch/prepared.rs",
           "src/algorithms/pipeline.rs",
-          "src/algorithms/steps/read_scope.rs"
+          "src/algorithms/steps/read_scope.rs",
+          "src/algorithms/property_batch.rs"
         ]
       },
       "python": {
         "support": "available",
-        "surface": "Pipeline and atomic step_pipeline builders, bounded run_durable, typed captured graph/table/results",
+        "surface": "Pipeline and atomic step_pipeline builders; run_durable with explicit writeback, topology and optional per-call schema; typed immutable results",
         "sources": [
           "python-groggy/python/groggy/builder/algorithm_builder.py",
           "python-groggy/src/ffi/api/pipeline.rs",
           "python-groggy/python/groggy/pipeline.py"
         ]
       },
-      "persistence": "Certified memory programs accept one delta; supported durable step builders use one journal acceptance. Read-only computations/outputs create no history.",
-      "limits": "Memory root sequential topology loops and all 13 classic wrappers work. Durable creation/property/captured-table programs use shared sealed kernels and detached preparation; unported durable kernels/loops, fixed-child topology, provisional history, alternate plans, public IR, custom/streaming effects and naming/history policy remain open.",
+      "persistence": "Certified memory programs accept one delta; supported durable programs journal one acceptance, including explicitly attached computed columns. Read-only computations/outputs create no history.",
+      "limits": "Memory root sequential topology loops and all 13 classic wrappers work. Durable creation, properties, issued-table writeback and accepted-entity removal/revision use sealed kernels and one coordinator. Unported durable arithmetic/neighbor/history and loops, provisional removal/revision/history, fixed-child topology, alternate plans/public IR, custom/streaming effects and naming/history policy remain open.",
       "evidence": {
         "contracts": [
           "docs/api/atomic-pipeline-capabilities.md",
           "docs/api/typed-pipeline-values.md",
           "docs/api/root-topology-loops.md",
           "docs/api/pipeline-endpoint-revisions.md",
-          "docs/api/durable-pipelines.md"
+          "docs/api/durable-pipelines.md",
+          "docs/api/durable-pipeline-writeback.md"
         ],
         "native_tests": [
           "tests/pipeline_endpoint_revisions.rs",
@@ -999,7 +1001,7 @@
           "python-groggy/python/groggy/algorithms/pathfinding.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Selected hop/traversal order; directed/undirected rules explicit. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1038,7 +1040,7 @@
           "python-groggy/python/groggy/algorithms/pathfinding.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Finite nonnegative lengths; selected minimum parallel edge retains actual identity. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1077,7 +1079,7 @@
           "python-groggy/python/groggy/algorithms/pathfinding.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Validated heuristic/goal/length domains; no universal admissibility promise for arbitrary user heuristics. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1116,7 +1118,7 @@
           "python-groggy/python/groggy/algorithms/centrality.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Validated damping/weights/personalization; bounded convergence, explicit nonconvergence. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1158,7 +1160,7 @@
           "python-groggy/python/groggy/algorithms/centrality.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Explicit incoming/outgoing directed definitions and checked nonnegative distances. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1197,7 +1199,7 @@
           "python-groggy/python/groggy/algorithms/centrality.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Checked shortest-path domains; equal minimum parallel instances preserve multiplicity. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1236,7 +1238,7 @@
           "python-groggy/python/groggy/algorithms/community.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Weak/strong direction modes are distinct; stable selected identity. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1277,7 +1279,7 @@
           "python-groggy/python/groggy/algorithms/community.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Seeded bounded sweeps; directed/loop/parallel conventions are documented. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1316,7 +1318,7 @@
           "python-groggy/python/groggy/algorithms/community.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Two-level recorded uniform-node teleportation model only; hierarchical acceleration and external equivalence remain open. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
@@ -1357,7 +1359,7 @@
           "python-groggy/python/groggy/algorithms/community.py"
         ]
       },
-      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders; direct classic-wrapper durable invocation remains unsupported.",
+      "persistence": "Only accepted graph properties are retained in history/archive/journal. Detached algorithm results are transient. Captured-table kernels can run in supported durable step builders, with explicit table.attach for persistence; direct classic-wrapper durable invocation remains unsupported.",
       "limits": "Undirected input and documented resolution/loop/parallel/weight definitions; no universal external parity. Remaining algorithm-family/secondary-caller certification is separate.",
       "evidence": {
         "contracts": [
