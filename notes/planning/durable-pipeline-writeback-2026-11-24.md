@@ -111,3 +111,31 @@ not controlled, so these descriptive observations establish no causal speedup or
 regression guarantee. Complete accepted snapshot preparation and storage
 synchronization remain material costs under existing 32.2/AR6 work. No new
 latency/memory budget or stable checklist row is introduced.
+
+## Next existing execution priority: alternate plan lowering
+
+This refines the already-open 30.1/AR7.8 scope and adds no checklist item.
+The current sources confirm why alternate plans remain guarded:
+
+- `steps/loop_step.rs::LoopStep::apply` parses ordinary body steps before trying
+  a batch plan. `try_batch_plan` returns no plan on deserialization failure;
+  valid legacy wrappers can consequently fall back to body execution. This is
+  not one common validation/lowering boundary.
+- `execution/batch_executor.rs::BatchExecutor::execute` receives StepScope but no
+  Context, so it does not share checked execution's cancellation/pending refresh
+  boundary. Attribute loaders access Subgraph directly.
+- Its division instruction substitutes zero for denominator magnitude below
+  `1e-9`; numeric property loading/arithmetic uses f64 conversion. Those are
+  concrete differences from checked step errors and typed integer handling.
+  Python `builder/legacy_compat.py` can attach this plan to loop metadata.
+
+The next finite implementation chunk should lower validated alternate plans to
+checked native execution, retaining the existing public facade. Its exits are:
+explicit malformed-plan rejection; parity for typed arithmetic/errors and carried
+bindings; shared pending read/write/cancellation/output rollback; zero-iteration
+and sparse/directed/parallel/loop fixtures; and one accepted version/reopen
+parity for supported durable programs. Compare overlapping carries/aliases with
+existing step execution rather than inventing A14 naming/history/cache policy.
+Keep unsupported effects explicit. Do not enable the alternate atomic flag or
+restore JIT merely because a plan parses. Bench the shared implementation after
+semantic parity; owner latency/memory targets remain open.
