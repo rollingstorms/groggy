@@ -162,9 +162,6 @@ def test_detached_preparation_releases_gil_and_returns_only_immutable_outputs(tm
         progress.set()
         done.wait()
 
-    thread = threading.Thread(target=peer)
-    thread.start()
-    assert ready.wait(timeout=5)
     p = pipeline(
         [
             step("graph.add_nodes", count=40_000, output="nodes"),
@@ -176,13 +173,18 @@ def test_detached_preparation_releases_gil_and_returns_only_immutable_outputs(tm
     )
     p._ensure_built()
     interval = sys.getswitchinterval()
+    thread = threading.Thread(target=peer)
+    thread.start()
     try:
+        assert ready.wait(timeout=5)
         sys.setswitchinterval(10.0)
         begin.set()
         result, profile = p.run_durable(store, return_profile=True)
         progressed = progress.is_set()
     finally:
         sys.setswitchinterval(interval)
+        # Release the peer even if readiness/setup fails before native entry.
+        begin.set()
         done.set()
         thread.join(timeout=5)
     assert progressed, "Python peer did not progress during native preparation"

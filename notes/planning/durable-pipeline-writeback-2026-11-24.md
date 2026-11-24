@@ -139,3 +139,10 @@ existing step execution rather than inventing A14 naming/history/cache policy.
 Keep unsupported effects explicit. Do not enable the alternate atomic flag or
 restore JIT merely because a plan parses. Bench the shared implementation after
 semantic parity; owner latency/memory targets remain open.
+
+### Test harness cleanup
+
+A test-only follow-up moves pipeline setup before starting the GIL peer and
+always releases both synchronization events when readiness fails. The focused
+24-case durable Python suite passed afterward. Production sources remain exactly
+those qualified at `b24e86e0`; this cleanup adds no engine feature or checklist row.
