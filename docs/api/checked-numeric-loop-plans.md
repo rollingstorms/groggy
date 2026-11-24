@@ -89,10 +89,19 @@ is unchanged. Ordinary nested step-body loops still need a separate portable
 composition migration. There is no new pipeline naming, cache or run-history
 policy.
 
-Execution uses owned native map intermediates and a shared pending-read cache.
-This establishes checked semantic parity, not a claim that register lowering is
-faster than the earlier vector interpreter. Initial register maps and intermediate
-maps scale with selected node count and live slots. Acceptance retains the
+Execution uses native map intermediates and a shared pending-read cache.
+Register bindings and frame clones share immutable values internally. Mutable
+node-map or column access copies the value when it has another reader; mutation
+of a uniquely held value stays in place. Exact-membership numeric loads/stores
+and carried values share their backing value, while subsets still project
+explicitly and column outputs retain their representation. Initial registers
+share one zero map; a zero-slot plan allocates no unused zero map.
+
+Copy on write can copy an entire large map or column on its first aliased
+mutation. New arithmetic results still allocate their own maps, and membership/
+numeric validation still scans input rows. See the
+[measured binding follow-up](../../notes/planning/shared-numeric-bindings-2026-11-24.md)
+for the benchmark and remaining costs. Acceptance retains the
 [durable publication cost](durable-pipelines.md).
 
 Evidence: [native parity tests](../../tests/checked_batch_lowering.rs),

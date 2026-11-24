@@ -485,10 +485,11 @@ impl StepValue {
     }
 }
 
-/// Mutable variable storage passed between steps.
+/// Mutable bindings passed between steps. Values are shared immutably; mutable
+/// map and column accessors detach on write, preserving independent frame values.
 #[derive(Clone, Debug)]
 pub struct StepVariables {
-    values: HashMap<String, StepValue>,
+    values: HashMap<String, Arc<StepValue>>,
     neighbor_cache: Option<NeighborCache>,
     instance_id: u64,
 }
@@ -545,17 +546,26 @@ impl NeighborCache {
 impl StepVariables {
     /// Inspect a typed intermediate without guessing its representation.
     pub fn value(&self, name: &str) -> Option<&StepValue> {
-        self.values.get(name)
+        self.values.get(name).map(Arc::as_ref)
+    }
+
+    /// Internal immutable binding; mutation through public accessors detaches.
+    pub(crate) fn shared_value(&self, name: &str) -> Option<Arc<StepValue>> {
+        self.values.get(name).map(Arc::clone)
+    }
+
+    pub(crate) fn set_shared_value(&mut self, name: impl Into<String>, value: Arc<StepValue>) {
+        self.values.insert(name.into(), value);
     }
 
     /// Install a completely prepared typed value. Replacing a name is explicit.
     pub fn set_value(&mut self, name: impl Into<String>, value: StepValue) {
-        self.values.insert(name.into(), value);
+        self.values.insert(name.into(), Arc::new(value));
     }
 
     /// Retrieve an immutable captured graph; wrong-type inputs fail explicitly.
     pub fn graph_view(&self, name: &str) -> Result<&crate::GraphView> {
-        match self.values.get(name) {
+        match self.value(name) {
             Some(StepValue::GraphView(view)) => Ok(view),
             Some(_) => Err(anyhow!("variable '{name}' is not a graph view")),
             None => Err(anyhow!("variable '{name}' not found")),
@@ -564,7 +574,7 @@ impl StepVariables {
 
     /// Retrieve an immutable table intermediate, retaining its graph provenance.
     pub fn table(&self, name: &str) -> Result<&crate::storage::table::BaseTable> {
-        match self.values.get(name) {
+        match self.value(name) {
             Some(StepValue::Table(table)) => Ok(table),
             Some(_) => Err(anyhow!("variable '{name}' is not a table")),
             None => Err(anyhow!("variable '{name}' not found")),
@@ -576,35 +586,31 @@ impl StepVariables {
         name: impl Into<String>,
         map: HashMap<NodeId, AlgorithmParamValue>,
     ) {
-        self.values.insert(name.into(), StepValue::NodeMap(map));
+        self.set_value(name, StepValue::NodeMap(map));
     }
 
     pub fn set_node_column(&mut self, name: impl Into<String>, column: NodeColumn) {
-        self.values
-            .insert(name.into(), StepValue::NodeColumn(column));
+        self.set_value(name, StepValue::NodeColumn(column));
     }
 
     pub fn node_map(&self, name: &str) -> Result<&HashMap<NodeId, AlgorithmParamValue>> {
-        self.values
-            .get(name)
+        self.value(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| value.expect_node_map(name))
     }
 
     pub fn set_subgraph_array(&mut self, name: impl Into<String>, array: Vec<Subgraph>) {
-        self.values
-            .insert(name.into(), StepValue::SubgraphArray(array));
+        self.set_value(name, StepValue::SubgraphArray(array));
     }
 
     pub fn subgraph_array(&self, name: &str) -> Result<&Vec<Subgraph>> {
-        self.values
-            .get(name)
+        self.value(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| value.expect_subgraph_array(name))
     }
 
     pub fn node_column(&self, name: &str) -> Result<&NodeColumn> {
-        match self.values.get(name) {
+        match self.value(name) {
             Some(StepValue::NodeColumn(column)) => Ok(column),
             Some(_) => Err(anyhow!("variable '{name}' is not stored as a node column")),
             None => Err(anyhow!("variable '{name}' not found")),
@@ -612,10 +618,16 @@ impl StepVariables {
     }
 
     pub fn node_column_mut(&mut self, name: &str) -> Result<&mut NodeColumn> {
-        match self.values.get_mut(name) {
-            Some(StepValue::NodeColumn(column)) => Ok(column),
-            Some(_) => Err(anyhow!("variable '{name}' is not stored as a node column")),
-            None => Err(anyhow!("variable '{name}' not found")),
+        let value = self
+            .values
+            .get_mut(name)
+            .ok_or_else(|| anyhow!("variable '{name}' not found"))?;
+        if !matches!(value.as_ref(), StepValue::NodeColumn(_)) {
+            return Err(anyhow!("variable '{name}' is not stored as a node column"));
+        }
+        match Arc::make_mut(value) {
+            StepValue::NodeColumn(column) => Ok(column),
+            _ => Err(anyhow!("variable '{name}' is not stored as a node column")),
         }
     }
 
@@ -623,15 +635,21 @@ impl StepVariables {
         &mut self,
         name: &str,
     ) -> Result<&mut HashMap<NodeId, AlgorithmParamValue>> {
-        match self.values.get_mut(name) {
-            Some(StepValue::NodeMap(map)) => Ok(map),
-            Some(_) => Err(anyhow!("variable '{name}' is not stored as a node map")),
-            None => Err(anyhow!("variable '{name}' not found")),
+        let value = self
+            .values
+            .get_mut(name)
+            .ok_or_else(|| anyhow!("variable '{name}' not found"))?;
+        if !matches!(value.as_ref(), StepValue::NodeMap(_)) {
+            return Err(anyhow!("variable '{name}' is not stored as a node map"));
+        }
+        match Arc::make_mut(value) {
+            StepValue::NodeMap(map) => Ok(map),
+            _ => Err(anyhow!("variable '{name}' is not stored as a node map")),
         }
     }
 
     pub fn set_scalar(&mut self, name: impl Into<String>, value: AlgorithmParamValue) {
-        self.values.insert(name.into(), StepValue::Scalar(value));
+        self.set_value(name, StepValue::Scalar(value));
     }
 
     pub fn set_edge_map(
@@ -639,17 +657,15 @@ impl StepVariables {
         name: impl Into<String>,
         map: HashMap<EdgeId, AlgorithmParamValue>,
     ) {
-        self.values.insert(name.into(), StepValue::EdgeMap(map));
+        self.set_value(name, StepValue::EdgeMap(map));
     }
 
     pub fn set_snapshot(&mut self, name: impl Into<String>, snapshot: TemporalSnapshot) {
-        self.values
-            .insert(name.into(), StepValue::Snapshot(snapshot));
+        self.set_value(name, StepValue::Snapshot(snapshot));
     }
 
     pub fn snapshot(&self, name: &str) -> Result<&TemporalSnapshot> {
-        self.values
-            .get(name)
+        self.value(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| match value {
                 StepValue::Snapshot(snapshot) => Ok(snapshot),
@@ -658,13 +674,11 @@ impl StepVariables {
     }
 
     pub fn set_temporal_index(&mut self, name: impl Into<String>, index: Arc<TemporalIndex>) {
-        self.values
-            .insert(name.into(), StepValue::TemporalIndex(index));
+        self.set_value(name, StepValue::TemporalIndex(index));
     }
 
     pub fn temporal_index(&self, name: &str) -> Result<Arc<TemporalIndex>> {
-        self.values
-            .get(name)
+        self.value(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| match value {
                 StepValue::TemporalIndex(index) => Ok(Arc::clone(index)),
@@ -673,15 +687,13 @@ impl StepVariables {
     }
 
     pub fn scalar(&self, name: &str) -> Result<&AlgorithmParamValue> {
-        self.values
-            .get(name)
+        self.value(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| value.expect_scalar(name))
     }
 
     pub fn edge_map(&self, name: &str) -> Result<&HashMap<EdgeId, AlgorithmParamValue>> {
-        self.values
-            .get(name)
+        self.value(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| value.expect_edge_map(name))
     }
@@ -691,7 +703,9 @@ impl StepVariables {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &StepValue)> {
-        self.values.iter()
+        self.values
+            .iter()
+            .map(|(name, value)| (name, value.as_ref()))
     }
 
     pub fn count(&self) -> usize {
@@ -1069,5 +1083,66 @@ mod fixed_frame_tests {
                 assert_eq!(owner.borrow().get_edge_attr(0, &"x".into()).unwrap(), None);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod shared_variable_tests {
+    use super::*;
+    use crate::algorithms::AlgorithmParamValue as V;
+
+    #[test]
+    fn cloned_frames_share_values_and_mutable_accessors_preserve_independence() {
+        let mut original = StepVariables::default();
+        original.set_node_map("map", [(7, V::Int(11))].into());
+        original.set_node_column("column", NodeColumn::new(vec![7], vec![V::Int(13)]));
+        let mut cloned = original.clone();
+        assert!(Arc::ptr_eq(
+            &original.shared_value("map").unwrap(),
+            &cloned.shared_value("map").unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            &original.shared_value("column").unwrap(),
+            &cloned.shared_value("column").unwrap()
+        ));
+        cloned.node_map_mut("map").unwrap().insert(7, V::Int(17));
+        cloned.node_column_mut("column").unwrap().values_mut()[0] = V::Int(19);
+        assert_eq!(original.node_map("map").unwrap()[&7], V::Int(11));
+        assert_eq!(
+            original.node_column("column").unwrap().get(7),
+            Some(&V::Int(13))
+        );
+        assert_eq!(cloned.node_map("map").unwrap()[&7], V::Int(17));
+        assert_eq!(
+            cloned.node_column("column").unwrap().get(7),
+            Some(&V::Int(19))
+        );
+        assert!(!Arc::ptr_eq(
+            &original.shared_value("map").unwrap(),
+            &cloned.shared_value("map").unwrap()
+        ));
+        drop(original);
+        assert_eq!(cloned.iter().count(), 2);
+        assert!(cloned.node_map_mut("column").is_err());
+        assert!(cloned.node_column_mut("missing").is_err());
+    }
+
+    #[test]
+    fn shared_aliases_detach_on_write_and_rebinding_does_not_change_prior_values() {
+        let mut vars = StepVariables::default();
+        vars.set_node_map("source", [(3, V::Int(5))].into());
+        let retained = vars.shared_value("source").unwrap();
+        vars.set_shared_value("alias", Arc::clone(&retained));
+        assert!(vars.node_column_mut("source").is_err());
+        assert!(Arc::ptr_eq(
+            &retained,
+            &vars.shared_value("source").unwrap()
+        ));
+        vars.node_map_mut("alias").unwrap().clear();
+        assert_eq!(vars.node_map("source").unwrap()[&3], V::Int(5));
+        vars.set_scalar("source", V::Int(9));
+        assert_eq!(retained.expect_node_map("retained").unwrap()[&3], V::Int(5));
+        assert_eq!(vars.scalar("source").unwrap(), &V::Int(9));
+        assert!(vars.node_map("alias").unwrap().is_empty());
     }
 }

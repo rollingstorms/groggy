@@ -16,7 +16,7 @@ use crate::algorithms::{
     AlgorithmParamValue as V, Context,
 };
 use anyhow::{anyhow, bail, Result};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 struct Native {
     id: &'static str,
@@ -249,11 +249,14 @@ impl LoweredBatchPlan {
         scope.with_executor(|mut executor, outer| {
             let mut locals = StepVariables::default();
             // Legacy registers begin as zero-valued node vectors.
-            for index in 0..self.slot_count {
-                locals.set_node_map(
-                    slot(index),
+            if self.slot_count > 0 {
+                let zero = Arc::new(StepValue::NodeMap(
                     nodes.iter().map(|&id| (id, V::Float(0.))).collect(),
-                );
+                ));
+                for index in 0..self.slot_count {
+                    locals.set_shared_value(slot(index), Arc::clone(&zero));
+                }
+                drop(zero);
             }
             for iteration in 0..iterations {
                 if ctx.is_cancelled() {
@@ -267,9 +270,8 @@ impl LoweredBatchPlan {
                         Operation::Native(native) => {
                             executor.apply_prepared(ctx, &mut locals, &native.checked())
                         }
-                        Operation::Load { slot, name } => {
-                            load(outer, &nodes, name).map(|value| locals.set_node_map(slot, value))
-                        }
+                        Operation::Load { slot, name } => load(outer, &nodes, name)
+                            .map(|value| locals.set_shared_value(slot, value)),
                         Operation::Store { slot, name } => {
                             store(&locals, outer, &nodes, slot, name)
                         }
@@ -290,14 +292,13 @@ impl LoweredBatchPlan {
                         .iter()
                         .map(|(a, b)| {
                             locals
-                                .value(a)
-                                .cloned()
+                                .shared_value(a)
                                 .map(|value| (b.clone(), value))
                                 .ok_or_else(|| anyhow!("Missing carried slot {a}"))
                         })
                         .collect::<Result<Vec<_>>>()?;
                     for (name, value) in carried {
-                        locals.set_value(name, value);
+                        locals.set_shared_value(name, value);
                     }
                 }
             }
@@ -308,7 +309,15 @@ impl LoweredBatchPlan {
         })
     }
 }
-fn load(vars: &StepVariables, nodes: &[usize], name: &str) -> Result<HashMap<usize, V>> {
+fn load(vars: &StepVariables, nodes: &[usize], name: &str) -> Result<Arc<StepValue>> {
+    if let Some(StepValue::NodeMap(map)) = vars.value(name) {
+        if map.len() == nodes.len() {
+            validate_map(map, nodes, "LoadNodeProp")?;
+            return vars
+                .shared_value(name)
+                .ok_or_else(|| anyhow!("Missing variable '{name}'"));
+        }
+    }
     nodes
         .iter()
         .map(|&node| {
@@ -323,7 +332,19 @@ fn load(vars: &StepVariables, nodes: &[usize], name: &str) -> Result<HashMap<usi
             }
             Ok((node, value.clone()))
         })
-        .collect()
+        .collect::<Result<HashMap<usize, V>>>()
+        .map(|map| Arc::new(StepValue::NodeMap(map)))
+}
+fn validate_map(map: &HashMap<usize, V>, nodes: &[usize], operation: &str) -> Result<()> {
+    for node in nodes {
+        let value = map
+            .get(node)
+            .ok_or_else(|| anyhow!("{operation} missing node {node}"))?;
+        if !matches!(value, V::Int(_) | V::Float(_)) {
+            bail!("{operation} requires numeric values");
+        }
+    }
+    Ok(())
 }
 fn store(
     locals: &StepVariables,
@@ -332,6 +353,18 @@ fn store(
     source: &str,
     name: &str,
 ) -> Result<()> {
+    if !matches!(outer.value(name), Some(StepValue::NodeColumn(_))) {
+        if let Some(StepValue::NodeMap(map)) = locals.value(source) {
+            if map.len() == nodes.len() {
+                validate_map(map, nodes, "StoreNodeProp")?;
+                let value = locals
+                    .shared_value(source)
+                    .ok_or_else(|| anyhow!("Missing slot '{source}'"))?;
+                outer.set_shared_value(name, value);
+                return Ok(());
+            }
+        }
+    }
     let values = match locals.value(source) {
         Some(StepValue::NodeMap(map)) => nodes
             .iter()
@@ -353,4 +386,51 @@ fn store(
         outer.set_node_map(name, nodes.iter().copied().zip(values).collect());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod binding_tests {
+    use super::*;
+
+    #[test]
+    fn exact_membership_loads_and_stores_share_and_subset_loads_project() {
+        let mut outer = StepVariables::default();
+        outer.set_node_map("source", [(3, V::Int(7)), (9, V::Int(11))].into());
+        let loaded = load(&outer, &[3, 9], "source").unwrap();
+        assert!(Arc::ptr_eq(&loaded, &outer.shared_value("source").unwrap()));
+        let mut locals = StepVariables::default();
+        locals.set_shared_value("slot", loaded);
+        store(&locals, &mut outer, &[3, 9], "slot", "target").unwrap();
+        assert!(Arc::ptr_eq(
+            &locals.shared_value("slot").unwrap(),
+            &outer.shared_value("target").unwrap()
+        ));
+        outer.node_map_mut("target").unwrap().insert(3, V::Int(13));
+        assert_eq!(locals.node_map("slot").unwrap()[&3], V::Int(7));
+        let projected = load(&outer, &[9], "source").unwrap();
+        assert_eq!(projected.expect_node_map("projected").unwrap().len(), 1);
+        assert!(!Arc::ptr_eq(
+            &projected,
+            &outer.shared_value("source").unwrap()
+        ));
+        assert!(load(&outer, &[3, 7], "source").is_err());
+    }
+
+    #[test]
+    fn sharing_preserves_validation_and_column_output_representation() {
+        let mut outer = StepVariables::default();
+        let mut locals = StepVariables::default();
+        locals.set_node_map("slot", [(3, V::Text("bad".into()))].into());
+        outer.set_node_map("target", [(3, V::Int(17))].into());
+        assert!(store(&locals, &mut outer, &[3], "slot", "target").is_err());
+        assert_eq!(outer.node_map("target").unwrap()[&3], V::Int(17));
+        locals.set_node_map("slot", [(3, V::Int(19))].into());
+        outer.set_node_column("target", NodeColumn::new(vec![3], vec![V::Int(17)]));
+        store(&locals, &mut outer, &[3], "slot", "target").unwrap();
+        assert_eq!(
+            outer.node_column("target").unwrap().get(3),
+            Some(&V::Int(19))
+        );
+        assert!(outer.node_map("target").is_err());
+    }
 }
