@@ -87,3 +87,27 @@ first-slice timing evidence. The fixed 268-row inventory has not changed.
 [Platform qualification run 45443651638](https://github.com/rollingstorms/groggy/actions/runs/45443651638)
 is pinned to this runtime. Its result remains pending and is not counted as a
 pass. This manual event does not publish a release.
+
+## Repeated workload baseline
+
+The unchanged `benches/durable_pipeline.rs` program was repeated on this runtime
+in three fresh processes, with 21 observations per size. It exercises the first
+slice's creation/property/BFS acceptance program. The harness bytes are identical
+at both runtime commits. [Raw observations and comparison](../benchmarks/durable-pipeline-runtime-comparison-2026-11-24.json)
+retain both runtime/source identities, ranges and timing conditions.
+
+Median wall times in milliseconds on the follow-up runtime:
+
+| Accepted base nodes | Memory atomic run | Durable prepare | Durable accept | Durable reopen |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.042 | 0.029 | 4.689 | 0.098 |
+| 1,000 | 3.184 | 3.146 | 6.889 | 5.702 |
+| 10,000 | 32.917 | 33.398 | 31.574 | 54.553 |
+
+The 1-node acceptance median rose from 4.119 to 4.689 ms; acceptance includes
+fsync and its distributions overlap. The 1,000/10,000-node phase medians stayed
+close or lower in this sample. OS cache, power/frequency and background load were
+not controlled, so these descriptive observations establish no causal speedup or
+regression guarantee. Complete accepted snapshot preparation and storage
+synchronization remain material costs under existing 32.2/AR6 work. No new
+latency/memory budget or stable checklist row is introduced.

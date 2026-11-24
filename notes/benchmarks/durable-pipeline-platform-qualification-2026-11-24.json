@@ -1240,7 +1240,8 @@
     "size_bytes": 5371539,
     "sha256": "146346c965ffe87854121c4efade9129871576579f9bfe3ba3d6e8fa29e3b789",
     "production_sources_match_pinned_commit": 499,
-    "production_source_tree_sha256": "21c1ac177d15027b7edf511ab7907bcc8c0e1642914bfb2dc31179ffe05f3cec",
+    "production_source_tree_sha256": "6ee3967746f677cb3a1b727a2c6d2e88b18a36640d4decf4b0d9b0ded5ee756b",
+    "production_source_hash_recipe": "Path-component sorting, matching the capability validator/local qualification recipe; concatenate relative path + NUL + content SHA256 + newline.",
     "regenerated_archive_lockfile_sha256": {
       "Cargo.lock": "b87f14693f0f3af7d93bbfbf38dc02a7785609223c5a596cc1980ee154dfc470",
       "python-groggy/Cargo.lock": "abf74e6c83137014cfbb9535fefe5d84af2241c18e63fdeb5154b5b98538a34e"

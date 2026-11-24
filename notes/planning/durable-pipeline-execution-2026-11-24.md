@@ -119,12 +119,26 @@ are linked from the local receipt.
 ## Commit and platform follow-up
 
 Runtime implementation is committed as `aff5e09007f7fd16f751be930630100935bdd5e1`
-and pushed on `groggy-roadmap-2026-10-20`. The capability matrix now pins this
-runtime and its local qualification receipt; `--check --verify-runtime` passes
+and pushed on `groggy-roadmap-2026-10-20`. The capability matrix at first closeout pinned this
+runtime and its local qualification receipt; the current matrix now points to
+the follow-up runtime. At first closeout, `--check --verify-runtime` passes
 for all 499 production sources, 50 feature families, 105 public exports and the
 fixed 268-row checklist. No feature-family status is upgraded by this update.
 
-Cross-platform qualification is running separately on the pinned runtime:
+Cross-platform qualification completed successfully for this pinned runtime:
 [run 45439515458](https://github.com/rollingstorms/groggy/actions/runs/45439515458).
 It is a manual qualification run; publication remains disabled for this event.
-Its result is not yet counted as a pass.
+All 21 required jobs passed: nineteen wheel combinations, native gates and
+source rebuild. The publish job was skipped. Linux CPython 3.12 ran the maintained
+suite; the other eighteen wheels ran ownership plus isolated export/archive/
+journal workflows. Source rebuild ran isolated workflows/exports only. This
+qualifies the first runtime, not the later writeback follow-up.
+
+[Retained platform evidence](../benchmarks/durable-pipeline-platform-qualification-2026-11-24.json)
+includes all twenty qualification reports and forty uploaded-artifact identities/
+ZIP digests. The 5,371,539-byte source archive matches all 499 production sources
+at `aff5e090`. Actual regenerated archive lockfile hashes are retained separately
+from local dependency inputs. The combined source hash uses Path-component
+ordering, matching the local qualification recipe; an initial aggregate used
+string ordering. Individual source-byte verification was unchanged.
+No identical dependency resolution or cross-platform binary identity is claimed.
