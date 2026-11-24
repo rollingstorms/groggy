@@ -1,0 +1,244 @@
+{
+  "scope": "Repeat the identical first-slice acceptance program on the follow-up runtime; descriptive local regression evidence, not table-writeback-specific timing or a universal speedup/latency budget.",
+  "date": "2026-11-24",
+  "first_runtime": "aff5e09007f7fd16f751be930630100935bdd5e1",
+  "current_runtime": "b24e86e028962c7fc1dbc11a3ac82bb27ebdbf8d",
+  "harness": "benches/durable_pipeline.rs",
+  "harness_sha256": "b8062ca4ab3e3fc1e212348e7093ea2a88baee6630ec95ad2eaff3737a76fbbb",
+  "current_production_source_tree_sha256": "e4e1c6524ddcb68084bf9965e4a5725364dfe425256b305874a4c4a47da887ed",
+  "conditions": "Three fresh processes per runtime, seven observations per size. No other local native build/test process during measurement. No controlled OS cache, power/frequency or background-system-load guarantee. Fixture/journal/program setup excluded; accept includes complete proposed snapshot and fsync; memory/durable results have their documented distinct contracts.",
+  "first_receipts": [
+    "notes/benchmarks/durable-pipeline-2026-11-24-1.json",
+    "notes/benchmarks/durable-pipeline-2026-11-24-2.json",
+    "notes/benchmarks/durable-pipeline-2026-11-24-3.json"
+  ],
+  "current_receipts": [
+    "notes/benchmarks/durable-pipeline-current-runtime-2026-11-24-1.json",
+    "notes/benchmarks/durable-pipeline-current-runtime-2026-11-24-2.json",
+    "notes/benchmarks/durable-pipeline-current-runtime-2026-11-24-3.json"
+  ],
+  "cases": [
+    {
+      "base_nodes": 1,
+      "observations_per_runtime": 21,
+      "phases": {
+        "memory_atomic_seconds": {
+          "medians": {
+            "first": 5.4666e-05,
+            "current": 4.225e-05
+          },
+          "change_percent": -22.712472103318337,
+          "ranges": {
+            "first": [
+              3.975e-05,
+              0.000411709
+            ],
+            "current": [
+              3.6584e-05,
+              0.000822
+            ]
+          }
+        },
+        "durable_prepare_seconds": {
+          "medians": {
+            "first": 4.3625e-05,
+            "current": 2.8625e-05
+          },
+          "change_percent": -34.38395415472779,
+          "ranges": {
+            "first": [
+              2.6792e-05,
+              0.000168833
+            ],
+            "current": [
+              2.2334e-05,
+              0.00037725
+            ]
+          }
+        },
+        "durable_accept_seconds": {
+          "medians": {
+            "first": 0.0041195,
+            "current": 0.004689375
+          },
+          "change_percent": 13.833596310231822,
+          "ranges": {
+            "first": [
+              0.003145459,
+              0.006063791
+            ],
+            "current": [
+              0.002944584,
+              0.022646791
+            ]
+          }
+        },
+        "durable_reopen_seconds": {
+          "medians": {
+            "first": 0.000150333,
+            "current": 9.7875e-05
+          },
+          "change_percent": -34.894534134222035,
+          "ranges": {
+            "first": [
+              8.8459e-05,
+              0.009225375
+            ],
+            "current": [
+              7.9959e-05,
+              0.001515333
+            ]
+          }
+        }
+      }
+    },
+    {
+      "base_nodes": 1000,
+      "observations_per_runtime": 21,
+      "phases": {
+        "memory_atomic_seconds": {
+          "medians": {
+            "first": 0.003287292,
+            "current": 0.003183667
+          },
+          "change_percent": -3.1522907000655853,
+          "ranges": {
+            "first": [
+              0.003051792,
+              0.005430792
+            ],
+            "current": [
+              0.003004458,
+              0.00801
+            ]
+          }
+        },
+        "durable_prepare_seconds": {
+          "medians": {
+            "first": 0.003300167,
+            "current": 0.003146375
+          },
+          "change_percent": -4.66012780565348,
+          "ranges": {
+            "first": [
+              0.003035834,
+              0.004272208
+            ],
+            "current": [
+              0.002946333,
+              0.005055292
+            ]
+          }
+        },
+        "durable_accept_seconds": {
+          "medians": {
+            "first": 0.006771041,
+            "current": 0.006889333
+          },
+          "change_percent": 1.747028263453143,
+          "ranges": {
+            "first": [
+              0.005537042,
+              0.007779291
+            ],
+            "current": [
+              0.005857167,
+              0.009673125
+            ]
+          }
+        },
+        "durable_reopen_seconds": {
+          "medians": {
+            "first": 0.005842792,
+            "current": 0.005701875
+          },
+          "change_percent": -2.4118092856976636,
+          "ranges": {
+            "first": [
+              0.0055805,
+              0.007134125
+            ],
+            "current": [
+              0.005487,
+              0.008167667
+            ]
+          }
+        }
+      }
+    },
+    {
+      "base_nodes": 10000,
+      "observations_per_runtime": 21,
+      "phases": {
+        "memory_atomic_seconds": {
+          "medians": {
+            "first": 0.03447925,
+            "current": 0.032917458
+          },
+          "change_percent": -4.529657692670252,
+          "ranges": {
+            "first": [
+              0.032247,
+              0.03898425
+            ],
+            "current": [
+              0.032047084,
+              0.03625175
+            ]
+          }
+        },
+        "durable_prepare_seconds": {
+          "medians": {
+            "first": 0.037463125,
+            "current": 0.033398209
+          },
+          "change_percent": -10.850445604844772,
+          "ranges": {
+            "first": [
+              0.032532459,
+              0.039222375
+            ],
+            "current": [
+              0.03215875,
+              0.040009584
+            ]
+          }
+        },
+        "durable_accept_seconds": {
+          "medians": {
+            "first": 0.032908875,
+            "current": 0.03157425
+          },
+          "change_percent": -4.055516938819692,
+          "ranges": {
+            "first": [
+              0.030179666,
+              0.036397792
+            ],
+            "current": [
+              0.0299145,
+              0.03361575
+            ]
+          }
+        },
+        "durable_reopen_seconds": {
+          "medians": {
+            "first": 0.058285083,
+            "current": 0.054553083
+          },
+          "change_percent": -6.403010526724307,
+          "ranges": {
+            "first": [
+              0.054559209,
+              0.062573333
+            ],
+            "current": [
+              0.05346075,
+              0.058367541
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

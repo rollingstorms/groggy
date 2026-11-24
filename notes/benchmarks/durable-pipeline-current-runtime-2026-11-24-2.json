@@ -1,0 +1,189 @@
+{
+  "cases": [
+    {
+      "accepted_base_nodes": 1,
+      "base_edges": 0,
+      "medians": {
+        "durable_accept_seconds": 0.004046959,
+        "durable_prepare_seconds": 0.000025709,
+        "durable_reopen_seconds": 0.00008825,
+        "memory_atomic_seconds": 0.000037833
+      },
+      "observations": [
+        {
+          "durable_accept_seconds": 0.004564709,
+          "durable_prepare_seconds": 0.000040459,
+          "durable_reopen_seconds": 0.000138292,
+          "journal_bytes": 2127,
+          "memory_atomic_seconds": 0.000104917
+        },
+        {
+          "durable_accept_seconds": 0.004046959,
+          "durable_prepare_seconds": 0.000028291,
+          "durable_reopen_seconds": 0.000097875,
+          "journal_bytes": 2127,
+          "memory_atomic_seconds": 0.000036667
+        },
+        {
+          "durable_accept_seconds": 0.004773958,
+          "durable_prepare_seconds": 0.00002625,
+          "durable_reopen_seconds": 0.000079959,
+          "journal_bytes": 2123,
+          "memory_atomic_seconds": 0.000037833
+        },
+        {
+          "durable_accept_seconds": 0.004254,
+          "durable_prepare_seconds": 0.000022334,
+          "durable_reopen_seconds": 0.000085708,
+          "journal_bytes": 2131,
+          "memory_atomic_seconds": 0.000036917
+        },
+        {
+          "durable_accept_seconds": 0.00389925,
+          "durable_prepare_seconds": 0.00002375,
+          "durable_reopen_seconds": 0.00008825,
+          "journal_bytes": 2131,
+          "memory_atomic_seconds": 0.000039291
+        },
+        {
+          "durable_accept_seconds": 0.002944584,
+          "durable_prepare_seconds": 0.000025709,
+          "durable_reopen_seconds": 0.000086375,
+          "journal_bytes": 2131,
+          "memory_atomic_seconds": 0.000036584
+        },
+        {
+          "durable_accept_seconds": 0.003949167,
+          "durable_prepare_seconds": 0.00002475,
+          "durable_reopen_seconds": 0.000092583,
+          "journal_bytes": 2127,
+          "memory_atomic_seconds": 0.000040292
+        }
+      ]
+    },
+    {
+      "accepted_base_nodes": 1000,
+      "base_edges": 999,
+      "medians": {
+        "durable_accept_seconds": 0.007138417,
+        "durable_prepare_seconds": 0.003228125,
+        "durable_reopen_seconds": 0.005701875,
+        "memory_atomic_seconds": 0.0031905
+      },
+      "observations": [
+        {
+          "durable_accept_seconds": 0.007402875,
+          "durable_prepare_seconds": 0.003792667,
+          "durable_reopen_seconds": 0.006448667,
+          "journal_bytes": 230476,
+          "memory_atomic_seconds": 0.004432334
+        },
+        {
+          "durable_accept_seconds": 0.006836833,
+          "durable_prepare_seconds": 0.003228125,
+          "durable_reopen_seconds": 0.005866666,
+          "journal_bytes": 230468,
+          "memory_atomic_seconds": 0.003416
+        },
+        {
+          "durable_accept_seconds": 0.006889333,
+          "durable_prepare_seconds": 0.00310075,
+          "durable_reopen_seconds": 0.005701875,
+          "journal_bytes": 230468,
+          "memory_atomic_seconds": 0.00320325
+        },
+        {
+          "durable_accept_seconds": 0.007138417,
+          "durable_prepare_seconds": 0.003251625,
+          "durable_reopen_seconds": 0.005692125,
+          "journal_bytes": 230472,
+          "memory_atomic_seconds": 0.003081542
+        },
+        {
+          "durable_accept_seconds": 0.00630225,
+          "durable_prepare_seconds": 0.003096208,
+          "durable_reopen_seconds": 0.005620584,
+          "journal_bytes": 230472,
+          "memory_atomic_seconds": 0.003167375
+        },
+        {
+          "durable_accept_seconds": 0.008052125,
+          "durable_prepare_seconds": 0.002946333,
+          "durable_reopen_seconds": 0.005502166,
+          "journal_bytes": 230476,
+          "memory_atomic_seconds": 0.003145459
+        },
+        {
+          "durable_accept_seconds": 0.007504917,
+          "durable_prepare_seconds": 0.003231416,
+          "durable_reopen_seconds": 0.005722167,
+          "journal_bytes": 230472,
+          "memory_atomic_seconds": 0.0031905
+        }
+      ]
+    },
+    {
+      "accepted_base_nodes": 10000,
+      "base_edges": 9999,
+      "medians": {
+        "durable_accept_seconds": 0.030866333,
+        "durable_prepare_seconds": 0.032961292,
+        "durable_reopen_seconds": 0.054279958,
+        "memory_atomic_seconds": 0.033125292
+      },
+      "observations": [
+        {
+          "durable_accept_seconds": 0.030866333,
+          "durable_prepare_seconds": 0.034701583,
+          "durable_reopen_seconds": 0.054371,
+          "journal_bytes": 2327480,
+          "memory_atomic_seconds": 0.032890208
+        },
+        {
+          "durable_accept_seconds": 0.030103791,
+          "durable_prepare_seconds": 0.032961292,
+          "durable_reopen_seconds": 0.053466084,
+          "journal_bytes": 2327480,
+          "memory_atomic_seconds": 0.032786125
+        },
+        {
+          "durable_accept_seconds": 0.030004458,
+          "durable_prepare_seconds": 0.032576042,
+          "durable_reopen_seconds": 0.05346075,
+          "journal_bytes": 2327476,
+          "memory_atomic_seconds": 0.033125292
+        },
+        {
+          "durable_accept_seconds": 0.032774875,
+          "durable_prepare_seconds": 0.036542166,
+          "durable_reopen_seconds": 0.056433458,
+          "journal_bytes": 2327476,
+          "memory_atomic_seconds": 0.033638542
+        },
+        {
+          "durable_accept_seconds": 0.0330445,
+          "durable_prepare_seconds": 0.038333709,
+          "durable_reopen_seconds": 0.054246334,
+          "journal_bytes": 2327480,
+          "memory_atomic_seconds": 0.033936625
+        },
+        {
+          "durable_accept_seconds": 0.031047167,
+          "durable_prepare_seconds": 0.032621875,
+          "durable_reopen_seconds": 0.056946375,
+          "journal_bytes": 2327480,
+          "memory_atomic_seconds": 0.032272167
+        },
+        {
+          "durable_accept_seconds": 0.030857666,
+          "durable_prepare_seconds": 0.03215875,
+          "durable_reopen_seconds": 0.054279958,
+          "journal_bytes": 2327480,
+          "memory_atomic_seconds": 0.035025
+        }
+      ]
+    }
+  ],
+  "measurement": "Instant wall time, seven observations per size. Fixture, journal initialization and program compilation excluded. Durable accept includes complete proposed snapshot, journal encoding, append and fsync; reopen includes replay. Memory returns its usual Subgraph continuation; durable returns an accepted immutable view. No interchangeable-operation speedup, RSS/allocation or cross-platform claim.",
+  "scope": "One supported program: create node/edge, initialize/attach, capture, BFS table. Local baseline; not a performance budget or historical speedup."
+}
