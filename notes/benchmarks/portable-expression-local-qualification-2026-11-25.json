@@ -1,0 +1,57 @@
+{
+  "runtime": "05e71ca435c21e120e4e1a585d300ed193a471ea",
+  "date": "2026-11-25",
+  "scope": "Declarative expressions share one evaluator through private owner/read inputs. Public ExprContext/StepInput/Expr.eval APIs preserved; pending attributes, default neighborhoods, async source visibility, short-circuit and errors retained. Callbacks remain owner-only. Local qualification only; broader execution parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "1fc407e2a7a1b7f0c4433641adf585de3df9077928dd76ccb5c20ff4da94e58c",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1684,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 233,
+    "doctests_passed": 10,
+    "expression_oracle_cases": 16,
+    "new_expression_integration_tests": 2,
+    "public_legacy_expression_api": "preserved",
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3539,
+    "maintained_skipped": 1,
+    "expected_validation_warnings": 23,
+    "warning_breakdown": {
+      "earlier_suite": 14,
+      "new_facade_cases_using_existing_redefinition_warning": 9
+    },
+    "documentation_examples": 299,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "32079e0adaed59897006b88c75889d8cca9680ee755b55c2aa36901c60df0dde",
+    "qualification_receipt": "notes/benchmarks/portable-expression-wheel-qualification-2026-11-25.json"
+  },
+  "performance": {
+    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-25.json",
+    "scope": "No new expression performance claim. Prior alias measurements apply only to their recorded runtime and workload."
+  },
+  "platform_boundary": "Earlier cross-platform qualification at runtime b24e86e0 remains historical; no new platform qualification claimed for this slice.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-portable-expression-native.log": "4b20aaeab41ca54f48af00e14e7040c92277f3d6a7d722f5a8167c10cc661160",
+    "/tmp/groggy-portable-expression-clippy.log": "2cea9cb0b3f637c7740681a200618d57aaa362acb67844719e6695764baefa77",
+    "/tmp/groggy-portable-expression-wheel-gates.log": "2c4fe2c1df770a5a58494b6bb2ebb091b2db8ee9be895bebfd6086bc2420436b"
+  }
+}

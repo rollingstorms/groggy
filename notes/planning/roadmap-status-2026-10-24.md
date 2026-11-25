@@ -1,5 +1,15 @@
 # Groggy roadmap status — 2026-10-24
 
+**Expression follow-up — 2026-11-25:**
+[Portable declarative expressions](portable-declarative-expressions-2026-11-25.md)
+completes the declarative mapper's shared memory/durable route through one
+private read-source adapter. Public Rust expression APIs remain unchanged;
+pending properties, async visibility and neighborhood distinctions are preserved.
+Six component checks are complete; flat counts remain **217 checked / 51 open**.
+Local gates pass **1,684 native / 3,539 Python tests / 299 examples**; qualification
+and remaining scope are recorded in the component note.
+
+
 **Flow/alias follow-up — 2026-11-25:**
 [Portable flow values and aliases](portable-flow-and-aliases-2026-11-25.md) completes
 the three-step flow module's shared memory/durable route. Checked flow/residual
