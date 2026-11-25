@@ -6,6 +6,14 @@ and fused kernels now supported by durable execution. Ordinary step-body loops
 recursively prepare supported sealed children, including nested register loops.
 Edge-attribute registers and normalize(min/mean) remain outside this guarantee.
 
+The shared durable read inventory also includes all eight aggregation steps,
+all four predicate/rank steps, node/edge/reservoir masks, flow/residual/alias
+values, supported message-pass blocks and declarative expression maps. These
+preserve their existing domains and output kinds; only explicit attachments
+publish computed properties. Custom Rust mapping callbacks, subgraph-returning
+samplers and foreach containers retain their owner-only boundary. The detailed
+inventory and executable examples are in [durable pipelines](durable-pipelines.md).
+
 An atomic pipeline shares one pending graph mutation across certified builders and
 classic algorithms. A successful run publishes one delta; failures and cancellation
 restore prior outputs and leave graph state and allocations unchanged. Immutable

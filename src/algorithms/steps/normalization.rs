@@ -16,9 +16,31 @@ pub enum NormalizeMethod {
     MinMax,
 }
 
+fn finite(value: f64, context: &str) -> Result<f64> {
+    if !value.is_finite() {
+        return Err(anyhow!(
+            "{context} requires finite numeric values and intermediates"
+        ));
+    }
+    Ok(value)
+}
+fn validate_epsilon(epsilon: f64) -> Result<()> {
+    if !epsilon.is_finite() || epsilon < 0.0 {
+        return Err(anyhow!("epsilon must be finite and non-negative"));
+    }
+    Ok(())
+}
+fn validate_clip(min: f64, max: f64) -> Result<()> {
+    if min.is_nan() || max.is_nan() || min > max {
+        return Err(anyhow!(
+            "invalid clip range: bounds must be ordered and not NaN"
+        ));
+    }
+    Ok(())
+}
 fn value_as_f64(value: &AlgorithmParamValue, context: &str) -> Result<f64> {
     match value {
-        AlgorithmParamValue::Float(v) => Ok(*v),
+        AlgorithmParamValue::Float(v) => finite(*v, context),
         AlgorithmParamValue::Int(v) => Ok(*v as f64),
         other => Err(anyhow!(
             "expected numeric value for {context}, found {:?}",
@@ -87,6 +109,8 @@ impl ReadStep for NormalizeValuesStep {
             return Err(anyhow!("normalize_values cancelled"));
         }
 
+        validate_epsilon(self.epsilon)?;
+
         // Try node map first, then edge map
         if let Ok(map) = scope.variables().node_map(&self.source) {
             let normalized = normalize_map(map, self.method, self.epsilon, &self.source)?;
@@ -115,6 +139,11 @@ fn normalize_map<K>(
 where
     K: Copy + std::cmp::Eq + std::hash::Hash + Ord,
 {
+    validate_epsilon(epsilon)?;
+    // Preserve existing empty policies without evaluating infinite sentinels.
+    if map.is_empty() && !matches!(method, NormalizeMethod::Sum) {
+        return Ok(HashMap::new());
+    }
     let mut normalized = HashMap::with_capacity(map.len());
     let mut keys: Vec<K> = map.keys().copied().collect();
     keys.sort_unstable();
@@ -127,6 +156,7 @@ where
                 sum += value_as_f64(value, source_name)?;
             }
 
+            finite(sum, source_name)?;
             if sum.abs() <= epsilon {
                 return Err(anyhow!(
                     "cannot normalize '{}': total magnitude below epsilon ({})",
@@ -138,7 +168,10 @@ where
             for key in keys {
                 let value = map.get(&key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
-                normalized.insert(key, AlgorithmParamValue::Float(raw / sum));
+                normalized.insert(
+                    key,
+                    AlgorithmParamValue::Float(finite(raw / sum, source_name)?),
+                );
             }
         }
         NormalizeMethod::Max => {
@@ -151,6 +184,7 @@ where
                 }
             }
 
+            finite(max_value, source_name)?;
             if max_value.abs() <= epsilon {
                 return Err(anyhow!(
                     "cannot normalize '{}': max magnitude below epsilon ({})",
@@ -162,7 +196,10 @@ where
             for key in keys {
                 let value = map.get(&key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
-                normalized.insert(key, AlgorithmParamValue::Float(raw / max_value));
+                normalized.insert(
+                    key,
+                    AlgorithmParamValue::Float(finite(raw / max_value, source_name)?),
+                );
             }
         }
         NormalizeMethod::MinMax => {
@@ -179,7 +216,7 @@ where
                 }
             }
 
-            let range = max_value - min_value;
+            let range = finite(max_value - min_value, source_name)?;
             if range.abs() <= epsilon {
                 return Err(anyhow!(
                     "cannot normalize '{}': range below epsilon ({})",
@@ -191,7 +228,7 @@ where
             for key in keys {
                 let value = map.get(&key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
-                let normalized_value = (raw - min_value) / range;
+                let normalized_value = finite((raw - min_value) / range, source_name)?;
                 normalized.insert(key, AlgorithmParamValue::Float(normalized_value));
             }
         }
@@ -306,6 +343,8 @@ impl ReadStep for StandardizeStep {
             return Err(anyhow!("standardize cancelled"));
         }
 
+        validate_epsilon(self.epsilon)?;
+
         // Try node map first, then edge map
         if let Ok(map) = scope.variables().node_map(&self.source) {
             let standardized = standardize_map(map, self.epsilon, &self.source)?;
@@ -333,6 +372,7 @@ fn standardize_map<K>(
 where
     K: Copy + std::cmp::Eq + std::hash::Hash,
 {
+    validate_epsilon(epsilon)?;
     if map.is_empty() {
         return Ok(HashMap::new());
     }
@@ -344,7 +384,7 @@ where
         sum += value_as_f64(value, source_name)?;
         count += 1;
     }
-    let mean = sum / count as f64;
+    let mean = finite(sum / count as f64, source_name)?;
 
     // Compute standard deviation
     let mut variance_sum = 0.0;
@@ -353,7 +393,7 @@ where
         let diff = val - mean;
         variance_sum += diff * diff;
     }
-    let std_dev = (variance_sum / count as f64).sqrt();
+    let std_dev = finite((variance_sum / count as f64).sqrt(), source_name)?;
 
     if std_dev <= epsilon {
         return Err(anyhow!(
@@ -367,7 +407,7 @@ where
     let mut standardized = HashMap::with_capacity(map.len());
     for (&key, value) in map.iter() {
         let val = value_as_f64(value, source_name)?;
-        let z_score = (val - mean) / std_dev;
+        let z_score = finite((val - mean) / std_dev, source_name)?;
         standardized.insert(key, AlgorithmParamValue::Float(z_score));
     }
 
@@ -429,13 +469,7 @@ impl ReadStep for ClipValuesStep {
             return Err(anyhow!("clip cancelled"));
         }
 
-        if self.min > self.max {
-            return Err(anyhow!(
-                "invalid clip range: min ({}) > max ({})",
-                self.min,
-                self.max
-            ));
-        }
+        validate_clip(self.min, self.max)?;
 
         // Try node map first, then edge map
         if let Ok(map) = scope.variables().node_map(&self.source) {
@@ -465,6 +499,7 @@ fn clip_map<K>(
 where
     K: Copy + std::cmp::Eq + std::hash::Hash,
 {
+    validate_clip(min, max)?;
     let mut clipped = HashMap::with_capacity(map.len());
 
     for (&key, value) in map.iter() {
@@ -474,4 +509,152 @@ where
     }
 
     Ok(clipped)
+}
+
+#[cfg(test)]
+mod safety_tests {
+    use super::*;
+    fn values(xs: &[f64]) -> HashMap<usize, AlgorithmParamValue> {
+        xs.iter()
+            .enumerate()
+            .map(|(i, &x)| (i, AlgorithmParamValue::Float(x)))
+            .collect()
+    }
+    #[test]
+    fn invalid_epsilon_rejects_even_for_empty_maps() {
+        for epsilon in [-1.0, f64::NAN, f64::INFINITY] {
+            for data in [values(&[]), values(&[0.0])] {
+                for method in [
+                    NormalizeMethod::Sum,
+                    NormalizeMethod::Max,
+                    NormalizeMethod::MinMax,
+                ] {
+                    assert!(normalize_map(&data, method, epsilon, "test").is_err());
+                }
+                assert!(standardize_map(&data, epsilon, "test").is_err());
+            }
+        }
+    }
+    #[test]
+    fn invalid_clip_controls_return_errors_without_panicking() {
+        for (min, max) in [(f64::NAN, 1.0), (0.0, f64::NAN), (2.0, 1.0)] {
+            for data in [values(&[]), values(&[0.5])] {
+                let result = std::panic::catch_unwind(|| clip_map(&data, min, max, "test"));
+                assert!(result.is_ok(), "clip controls must not panic");
+                assert!(result.unwrap().is_err());
+            }
+        }
+    }
+    #[test]
+    fn nonfinite_inputs_and_unrepresentable_intermediates_never_install_numeric_results() {
+        for x in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let data = values(&[1.0, x]);
+            for method in [
+                NormalizeMethod::Sum,
+                NormalizeMethod::Max,
+                NormalizeMethod::MinMax,
+            ] {
+                assert!(normalize_map(&data, method, 0.0, "test").is_err());
+            }
+            assert!(standardize_map(&data, 0.0, "test").is_err());
+            assert!(clip_map(&data, 0.0, 1.0, "test").is_err());
+        }
+        assert!(normalize_map(
+            &values(&[f64::MAX, f64::MAX]),
+            NormalizeMethod::Sum,
+            0.0,
+            "test"
+        )
+        .is_err());
+        assert!(normalize_map(
+            &values(&[-f64::MAX, f64::MAX]),
+            NormalizeMethod::MinMax,
+            0.0,
+            "test"
+        )
+        .is_err());
+        assert!(standardize_map(&values(&[-f64::MAX, f64::MAX]), 0.0, "test").is_err());
+    }
+    #[test]
+    fn valid_normalization_keeps_population_variance_signed_max_and_empty_rules() {
+        let data = values(&[-2.0, -4.0]);
+        let out = normalize_map(&data, NormalizeMethod::Max, 0.0, "test").unwrap();
+        assert_eq!(out[&0], AlgorithmParamValue::Float(1.0));
+        assert_eq!(out[&1], AlgorithmParamValue::Float(2.0));
+        let standardized = standardize_map(&values(&[2.0, 4.0]), 0.0, "test").unwrap();
+        assert_eq!(standardized[&0], AlgorithmParamValue::Float(-1.0));
+        assert_eq!(standardized[&1], AlgorithmParamValue::Float(1.0));
+        assert!(normalize_map(&values(&[]), NormalizeMethod::Sum, 0.0, "test").is_err());
+        assert!(
+            normalize_map(&values(&[]), NormalizeMethod::Max, 0.0, "test")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(standardize_map(&values(&[]), 0.0, "test")
+            .unwrap()
+            .is_empty());
+        assert!(clip_map(&values(&[]), 0.0, 1.0, "test").unwrap().is_empty());
+        for (min, max) in [
+            (f64::NEG_INFINITY, 1.0),
+            (0.0, f64::INFINITY),
+            (f64::NEG_INFINITY, f64::INFINITY),
+        ] {
+            assert!(clip_map(&values(&[0.5]), min, max, "test").is_ok());
+        }
+    }
+    #[test]
+    fn normalization_errors_preserve_node_and_edge_outputs() {
+        use super::super::core::StepVariables;
+        use crate::{subgraphs::Subgraph, Graph};
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(2).unwrap();
+        graph.add_edge(0, 1).unwrap();
+        graph.add_edge(1, 1).unwrap();
+        let selected = Subgraph::from_nodes(
+            graph.into_shared(),
+            [0, 1].into_iter().collect(),
+            "test".into(),
+        )
+        .unwrap();
+        for edges in [false, true] {
+            let steps: Vec<Box<dyn Step>> = vec![
+                Box::new(NormalizeValuesStep::new(
+                    "input",
+                    "out",
+                    NormalizeMethod::Sum,
+                    -1.0,
+                )),
+                Box::new(NormalizeNodeValuesStep::new(
+                    "input",
+                    "out",
+                    NormalizeMethod::Max,
+                    0.0,
+                )),
+                Box::new(StandardizeStep::new("input", "out", 0.0)),
+                Box::new(ClipValuesStep::new("input", "out", f64::NAN, 1.0)),
+            ];
+            for step in steps {
+                let mut vars = StepVariables::default();
+                let source = values(&[1.0, f64::INFINITY]);
+                let old = values(&[42.0]);
+                if edges {
+                    vars.set_edge_map("input", source);
+                    vars.set_edge_map("out", old.clone());
+                } else {
+                    vars.set_node_map("input", source);
+                    vars.set_node_map("out", old.clone());
+                }
+                let mut scope = StepScope::new(&selected, &mut vars);
+                assert!(step.apply(&mut Context::new(), &mut scope).is_err());
+                assert_eq!(
+                    if edges {
+                        vars.edge_map("out").unwrap()
+                    } else {
+                        vars.node_map("out").unwrap()
+                    },
+                    &old
+                );
+            }
+        }
+    }
 }

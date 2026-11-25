@@ -459,3 +459,47 @@ with TemporaryDirectory() as directory:
     assert sum(result.node_attr(node, "chosen") == 1 for node in result.node_ids) == 2
     store.close()
 ```
+
+## Normalization safety
+
+Ordinary normalization and standardization require finite, nonnegative epsilon
+and finite numeric inputs. Clip bounds must be ordered and not NaN; infinite
+bounds preserve the existing unbounded-side defaults. Invalid
+controls reject even for empty maps; NaN bounds return an error rather than
+reaching the underlying clamp operation. A nonfinite arithmetic intermediate or
+result rejects the complete operation before output installation or publication.
+This is a bounded f64 normalization contract, not a claim that all extreme-value
+ratios are reconstructed through otherwise unrepresentable intermediates.
+
+Existing definitions remain: max means the signed maximum, minmax uses the
+range, and standardization uses population variance. Empty sum normalization
+rejects its zero denominator; empty max/minmax, standardization and clipping
+return empty maps when their controls are valid. This does not enable the
+separate register-plan normalize(min/mean) options.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+with TemporaryDirectory() as directory:
+    graph = Graph()
+    batch = GraphBatch(effective_at=0)
+    batch.add_node(score=0.0)
+    graph.writer().apply_batch(batch)
+    store = DurableGraph.create_from_graph(Path(directory) / "normalize.journal", graph)
+    head = store.current_state_id
+    program = Pipeline([step_pipeline("invalid epsilon", [
+        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "values"}},
+        {"id": "core.normalize_values", "params": {"source": "values", "target": "out", "epsilon": -1.0}},
+    ], atomic=True)])
+    try:
+        program.run_durable(store)
+    except Exception as error:
+        assert "epsilon" in str(error)
+    else:
+        raise AssertionError("negative epsilon must reject")
+    assert store.current_state_id == head
+    store.close()
+```
