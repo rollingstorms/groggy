@@ -235,7 +235,7 @@ fn unsupported_suffix_stale_foreign_and_cancelled_programs_leave_journal_unchang
     let mut ctx = Context::new();
     let p = pipeline(json!([
         {"id":"graph.add_nodes","params":{"count":1,"output":"new"}},
-        {"id":"core.node_degree","params":{"target":"unsupported"}}
+        {"id":"core.weighted_degree","params":{"target":"unsupported","weight_attr":"weight"}}
     ]));
     assert!(p
         .run_durable(&mut ctx, &mut store, &source)

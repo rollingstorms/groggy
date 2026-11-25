@@ -756,56 +756,11 @@ impl<'a> StepScope<'a> {
     /// Build checked adjacency from the selected source, never retained owner
     /// pool endpoints when a frozen source supplies topology.
     pub(crate) fn selected_csr(
-        &self,
+        &mut self,
         ctx: &Context,
         direction: super::direction::NeighborDirection,
     ) -> Result<SelectedCsr> {
-        use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
-        if ctx.is_cancelled() {
-            return Err(anyhow!("selected topology cancelled"));
-        }
-        self.subgraph.validate_selected_read()?;
-        let nodes = self.subgraph.ordered_nodes();
-        let positions: HashMap<_, _> = nodes
-            .iter()
-            .enumerate()
-            .map(|(row, &node)| (node, row))
-            .collect();
-        let edges = self.subgraph.ordered_edges();
-        let mapping = direction.edge_mapping();
-        let mut failure = None;
-        let mut csr = Csr::default();
-        build_csr_from_edges_with_scratch(
-            &mut csr,
-            nodes.len(),
-            edges.iter().copied(),
-            |node| positions.get(&node).copied(),
-            |edge| {
-                if ctx.is_cancelled() {
-                    failure = Some(anyhow!("selected topology cancelled"));
-                    return None;
-                }
-                match self.subgraph.edge_endpoints(edge) {
-                    Ok(pair) => Some(mapping(pair)),
-                    Err(error) => {
-                        failure = Some(error.into());
-                        None
-                    }
-                }
-            },
-            CsrOptions {
-                add_reverse_edges: direction.add_reverse_edges(),
-                sort_neighbors: true,
-            },
-        );
-        if let Some(error) = failure {
-            return Err(error);
-        }
-        Ok(SelectedCsr {
-            nodes,
-            positions,
-            csr,
-        })
+        self.read_scope().selected_csr(ctx, direction)
     }
 
     /// Read through the shared staged node-property overlay.

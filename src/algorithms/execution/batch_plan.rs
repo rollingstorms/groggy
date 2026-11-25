@@ -219,6 +219,7 @@ pub enum BatchInstruction {
     },
 
     /// Fused multiply-add: dst = a * b + c
+    #[serde(alias = "fused_madd")]
     FusedMADD {
         dst: SlotId,
         a: SlotId,
@@ -227,6 +228,7 @@ pub enum BatchInstruction {
     },
 
     /// Fused axpy: dst = alpha * x + y (where alpha is scalar)
+    #[serde(alias = "fused_axpy")]
     FusedAXPY {
         dst: SlotId,
         alpha: SlotId,

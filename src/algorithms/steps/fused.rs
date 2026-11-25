@@ -4,6 +4,7 @@
 //! intermediate allocations and improve cache locality. Primary use case is
 //! optimizing iterative graph algorithms like PageRank and LPA.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
@@ -106,7 +107,17 @@ impl Step for FusedNeighborMulAgg {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for FusedNeighborMulAgg {}
+impl ReadStep for FusedNeighborMulAgg {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("FusedNeighborMulAgg cancelled"));
         }
@@ -142,6 +153,13 @@ impl Step for FusedNeighborMulAgg {
             }
         }
 
+        if values_arr
+            .iter()
+            .chain(&scalars_arr)
+            .any(|v| !v.is_finite())
+        {
+            return Err(anyhow!("Fused operation requires finite numeric inputs"));
+        }
         // Allocate result map
         let mut result = HashMap::with_capacity(nodes.len());
 
@@ -154,10 +172,16 @@ impl Step for FusedNeighborMulAgg {
 
             // Iterate over CSR neighbors and accumulate weighted sum
             for &neighbor_idx in csr.neighbors(idx) {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("Fused operation cancelled"));
+                }
                 // Fused: multiply neighbor's value by its scalar, then accumulate
                 sum += values_arr[neighbor_idx] * scalars_arr[neighbor_idx];
             }
 
+            if !sum.is_finite() {
+                return Err(anyhow!("Fused neighbor result is not finite"));
+            }
             result.insert(node, crate::algorithms::AlgorithmParamValue::Float(sum));
         }
 
@@ -256,14 +280,23 @@ impl Step for FusedAXPY {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for FusedAXPY {}
+impl ReadStep for FusedAXPY {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("FusedAXPY cancelled"));
         }
 
-        let subgraph = scope.subgraph();
-        subgraph.validate_selected_read()?;
-        let nodes = subgraph.ordered_nodes();
+        scope.validate_selected_read()?;
+        let nodes = scope.ordered_nodes();
 
         // Try to get each variable as node map or scalar
         let a_map = scope.variables().node_map(&self.a).ok();
@@ -342,7 +375,13 @@ impl Step for FusedAXPY {
             };
 
             // Fused computation: a * x + b * y
+            if [a_val, x_val, b_val, y_val].iter().any(|v| !v.is_finite()) {
+                return Err(anyhow!("Fused operation requires finite numeric inputs"));
+            }
             let value = a_val * x_val + b_val * y_val;
+            if !value.is_finite() {
+                return Err(anyhow!("Fused AXPY result is not finite"));
+            }
             result.insert(node, crate::algorithms::AlgorithmParamValue::Float(value));
         }
 
@@ -427,14 +466,23 @@ impl Step for FusedMADD {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for FusedMADD {}
+impl ReadStep for FusedMADD {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("FusedMADD cancelled"));
         }
 
-        let subgraph = scope.subgraph();
-        subgraph.validate_selected_read()?;
-        let nodes = subgraph.ordered_nodes();
+        scope.validate_selected_read()?;
+        let nodes = scope.ordered_nodes();
 
         let a_map = scope.variables().node_map(&self.a)?;
         let b_map = scope.variables().node_map(&self.b)?;
@@ -463,7 +511,13 @@ impl Step for FusedMADD {
             };
 
             // Fused computation: a * b + c
+            if [a_val, b_val, c_val].iter().any(|v| !v.is_finite()) {
+                return Err(anyhow!("Fused operation requires finite numeric inputs"));
+            }
             let value = a_val * b_val + c_val;
+            if !value.is_finite() {
+                return Err(anyhow!("Fused MADD result is not finite"));
+            }
             result.insert(node, crate::algorithms::AlgorithmParamValue::Float(value));
         }
 

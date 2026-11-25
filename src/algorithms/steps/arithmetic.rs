@@ -1458,6 +1458,7 @@ pub struct CollectNeighborValuesStep {
     source: String,
     target: String,
     include_self: bool,
+    direction: Option<super::direction::NeighborDirection>,
 }
 
 /// Tie-breaking strategy for mode calculation
@@ -1536,6 +1537,7 @@ impl ReadStep for ModeListStep {
                 return Err(anyhow!("core.mode_list cancelled"));
             }
 
+            super::expression::validate_value(value)?;
             // Extract array from JSON value
             let array = match value {
                 AlgorithmParamValue::Json(serde_json::Value::Array(arr)) => arr,
@@ -1568,6 +1570,9 @@ impl ReadStep for ModeListStep {
                 std::collections::HashMap::new();
 
             for val in array {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("core.mode_list cancelled"));
+                }
                 let key = serde_json::to_string(val).unwrap_or_default();
                 freq_map
                     .entry(key)
@@ -1589,6 +1594,11 @@ impl ReadStep for ModeListStep {
                 .map(|(_, (_, val))| val)
                 .collect();
 
+            if !matches!(self.tie_break, ModeTieBreak::Keep) {
+                for candidate in &candidates {
+                    compare_json_values(candidate, &candidates[0])?;
+                }
+            }
             // Apply tie-breaking
             let mode_value = match self.tie_break {
                 ModeTieBreak::Keep => {
@@ -1611,14 +1621,18 @@ impl ReadStep for ModeListStep {
                 ModeTieBreak::Lowest => {
                     // Find the minimum value
                     candidates.sort_by(|a, b| {
-                        compare_json_values(a, b).unwrap_or(std::cmp::Ordering::Equal)
+                        compare_json_values(a, b)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| a.to_string().cmp(&b.to_string()))
                     });
                     candidates.into_iter().next().unwrap()
                 }
                 ModeTieBreak::Highest => {
                     // Find the maximum value
                     candidates.sort_by(|a, b| {
-                        compare_json_values(b, a).unwrap_or(std::cmp::Ordering::Equal)
+                        compare_json_values(b, a)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| a.to_string().cmp(&b.to_string()))
                     });
                     candidates.into_iter().next().unwrap()
                 }
@@ -1637,16 +1651,26 @@ impl ReadStep for ModeListStep {
 }
 
 fn compare_json_values(a: &serde_json::Value, b: &serde_json::Value) -> Result<std::cmp::Ordering> {
+    use crate::storage::numeric::scalar::{compare_inputs, NumericInput};
     use serde_json::Value;
-    match (a, b) {
-        (Value::Number(na), Value::Number(nb)) => {
-            let fa = na.as_f64().unwrap_or(0.0);
-            let fb = nb.as_f64().unwrap_or(0.0);
-            Ok(fa.partial_cmp(&fb).unwrap_or(std::cmp::Ordering::Equal))
+    let input = |n: &serde_json::Number| -> Result<NumericInput> {
+        if let Some(i) = n.as_i64() {
+            Ok(NumericInput::Integer(i128::from(i)))
+        } else if let Some(i) = n.as_u64() {
+            Ok(NumericInput::Integer(i128::from(i)))
+        } else {
+            n.as_f64()
+                .map(NumericInput::Float)
+                .ok_or_else(|| anyhow!("Invalid numeric label"))
         }
-        (Value::String(sa), Value::String(sb)) => Ok(sa.cmp(sb)),
-        (Value::Bool(ba), Value::Bool(bb)) => Ok(ba.cmp(bb)),
-        _ => Ok(std::cmp::Ordering::Equal),
+    };
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => compare_inputs(input(a)?, input(b)?)
+            .ok_or_else(|| anyhow!("Mode ties require ordered numeric labels")),
+        (Value::String(a), Value::String(b)) => Ok(a.cmp(b)),
+        (Value::Bool(a), Value::Bool(b)) => Ok(a.cmp(b)),
+        (Value::Null, Value::Null) => Ok(std::cmp::Ordering::Equal),
+        _ => Err(anyhow!("Mode ties require comparable scalar labels")),
     }
 }
 
@@ -1675,7 +1699,13 @@ impl CollectNeighborValuesStep {
             source: source.into(),
             target: target.into(),
             include_self,
+            direction: None,
         }
+    }
+    /// Override graph-default adjacency with an explicit traversal direction.
+    pub fn with_direction(mut self, direction: super::direction::NeighborDirection) -> Self {
+        self.direction = Some(direction);
+        self
     }
 }
 
@@ -1700,17 +1730,33 @@ impl Step for CollectNeighborValuesStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for CollectNeighborValuesStep {}
+impl ReadStep for CollectNeighborValuesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.collect_neighbor_values cancelled"));
         }
 
         // Get ordered nodes and build CSR
-        let subgraph = scope.subgraph();
-        let nodes = subgraph.ordered_nodes();
+        let nodes = scope.ordered_nodes();
 
-        let add_reverse = !subgraph.read_is_directed();
-        let csr = subgraph.get_or_build_csr_internal(add_reverse)?;
+        let direction = self.direction.unwrap_or_else(|| {
+            if scope.is_directed() {
+                super::direction::NeighborDirection::Out
+            } else {
+                super::direction::NeighborDirection::Undirected
+            }
+        });
+        let topology = scope.selected_csr(ctx, direction)?;
+        let csr = &topology.csr;
 
         // Get source values
         let source_map = scope.variables().node_map(&self.source)?;
@@ -1732,14 +1778,19 @@ impl Step for CollectNeighborValuesStep {
             // Optionally include self value
             if self.include_self {
                 if let Some(self_value) = source_map.get(&node) {
+                    super::expression::validate_value(self_value)?;
                     values.push(value_to_json(self_value));
                 }
             }
 
             // Collect neighbor values
             for &nbr_idx in nbrs {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("core.collect_neighbor_values cancelled"));
+                }
                 let nbr_node = nodes[nbr_idx];
                 if let Some(value) = source_map.get(&nbr_node) {
+                    super::expression::validate_value(value)?;
                     values.push(value_to_json(value));
                 }
             }

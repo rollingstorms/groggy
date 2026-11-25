@@ -34,7 +34,13 @@ def test_batch_plan_compiles_compare_where():
     from groggy.builder.ir.batch import compile_loop_to_batch_plan
 
     body = [
-        {"type": "core.compare", "left": "x", "op": "gt", "right": "y", "output": "mask"},
+        {
+            "type": "core.compare",
+            "left": "x",
+            "op": "gt",
+            "right": "y",
+            "output": "mask",
+        },
         {
             "type": "core.where",
             "condition": "mask",
@@ -54,7 +60,12 @@ def test_batch_plan_compiles_normalize():
     from groggy.builder.ir.batch import compile_loop_to_batch_plan
 
     body = [
-        {"type": "normalize", "input": "values", "output": "normalized", "method": "sum"}
+        {
+            "type": "normalize",
+            "input": "values",
+            "output": "normalized",
+            "method": "sum",
+        }
     ]
     plan = compile_loop_to_batch_plan(body)
     assert plan is not None
@@ -79,7 +90,7 @@ def test_batch_plan_compiles_map_nodes_arith():
     assert "mul" in instr_types
 
 
-def test_batch_plan_compiles_map_nodes_neighbor_sum():
+def test_batch_plan_preserves_native_graph_default_neighbor_expressions():
     from groggy.builder.ir.batch import compile_loop_to_batch_plan
 
     body = [
@@ -91,9 +102,9 @@ def test_batch_plan_compiles_map_nodes_neighbor_sum():
         }
     ]
     plan = compile_loop_to_batch_plan(body)
-    assert plan is not None
-    instr_types = [instr["type"] for instr in plan["instructions"]]
-    assert "neighbor_aggregate" in instr_types
+    # Direction is determined by the graph at execution, so the expression
+    # must not be rewritten to an unconditional incoming-neighbor instruction.
+    assert plan is None
 
 
 def test_batch_plan_compiles_collect_neighbor_values_and_mode():
@@ -130,3 +141,19 @@ def test_batch_plan_compiles_load_edge_attr():
     assert plan is not None
     instr_types = [instr["type"] for instr in plan["instructions"]]
     assert "load_edge_attr" in instr_types
+
+
+def test_batch_plan_never_silently_omits_an_unsupported_expression():
+    from groggy.builder.ir.batch import compile_loop_to_batch_plan
+
+    for expression in ["sum(value)", "value % 2", "value ** 2"]:
+        body = [
+            {
+                "type": "map_nodes",
+                "fn": expression,
+                "inputs": {"value": "values"},
+                "output": "mapped",
+            },
+            {"type": "core.add", "a": "mapped", "b": "values", "output": "result"},
+        ]
+        assert compile_loop_to_batch_plan(body) is None

@@ -1,11 +1,11 @@
 //! Transformation step primitives that map values.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
-use crate::traits::SubgraphOperations;
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
@@ -32,33 +32,8 @@ pub(super) fn selected_neighbors(
     subgraph: &crate::subgraphs::Subgraph,
     ctx: &Context,
 ) -> Result<(Vec<NodeId>, HashMap<NodeId, Vec<NodeId>>)> {
-    let nodes = selected_nodes(subgraph, ctx)?;
-    let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
-    let directed = subgraph.read_is_directed();
-    for &edge in subgraph.ordered_edges().iter() {
-        if ctx.is_cancelled() {
-            return Err(anyhow!("transformation cancelled"));
-        }
-        let (source, target) = subgraph.edge_endpoints(edge)?;
-        if !rows.contains_key(&source) || !rows.contains_key(&target) {
-            return Err(anyhow!(
-                "Transformation edge {} endpoint is outside selection",
-                edge
-            ));
-        }
-        rows.get_mut(&source)
-            .ok_or_else(|| anyhow!("Missing selected endpoint"))?
-            .push(target);
-        if !directed && source != target {
-            rows.get_mut(&target)
-                .ok_or_else(|| anyhow!("Missing selected endpoint"))?
-                .push(source);
-        }
-    }
-    for row in rows.values_mut() {
-        row.sort_unstable();
-    }
-    Ok((nodes, rows))
+    let mut variables = super::core::StepVariables::default();
+    ReadStepScope::memory(subgraph, &mut variables, false).selected_neighbors(ctx)
 }
 
 /// Callback trait for node-wise mapping steps.
@@ -218,12 +193,22 @@ impl Step for NeighborModeUpdateStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for NeighborModeUpdateStep {}
+impl ReadStep for NeighborModeUpdateStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("core.neighbor_mode_update cancelled"));
         }
 
-        let (nodes, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+        let (nodes, neighbors) = scope.selected_neighbors(ctx)?;
         // Work privately: traversal remains asynchronous, but failures never install
         // a partially updated variable. Both ordering modes use stable ID order.
         let mut target_map = scope.variables().node_map(&self.target)?.clone();
@@ -538,17 +523,30 @@ impl Step for UpdateInPlaceStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for UpdateInPlaceStep {}
+impl ReadStep for UpdateInPlaceStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let start = std::time::Instant::now();
 
         if ctx.is_cancelled() {
             return Err(anyhow!("core.update_in_place cancelled"));
         }
 
-        // Get source values (the new values to apply) - clone to avoid borrow issues
-        let source_map = scope.variables().node_map(&self.source)?.clone();
+        // The source remains immutable while the private target is prepared.
+        let source_map = scope.variables().node_map(&self.source)?;
 
-        let selected = selected_nodes(scope.subgraph(), ctx)?;
+        let selected = {
+            scope.validate_selected_read()?;
+            scope.ordered_nodes().to_vec()
+        };
         let selected: std::collections::HashSet<_> = selected.into_iter().collect();
         if source_map.keys().any(|node| !selected.contains(node)) {
             return Err(anyhow!(

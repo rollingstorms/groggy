@@ -1,17 +1,21 @@
 //! Compatibility lowering for the numeric subset of the legacy register plan.
 //! There is no arithmetic interpreter here: operations use the checked kernels.
 use super::{
+    aggregations::{NeighborAggType, NeighborAggregationStep},
     arithmetic::{BinaryArithmeticStep, BinaryOperation, UnaryMathStep},
     core::{AtomicStepEffect, CheckedReadStep, Step, StepValue, StepVariables},
     init::{GraphEdgeCountStep, GraphNodeCountStep, InitNodesStep, InitScalarStep},
     normalization::{ClipValuesStep, NormalizeMethod, NormalizeValuesStep},
     read_scope::{ReadStep, ReadStepScope},
-    BroadcastScalarStep, CompareOp, CompareStep, LoadNodeAttrStep, ModeListStep, ModeTieBreak,
-    NodeColumn, RecipStep, ReduceScalarStep, ReductionOp, UnaryOp, WhereStep,
+    transformations::UpdateInPlaceStep,
+    BroadcastScalarStep, CollectNeighborValuesStep, CompareOp, CompareStep, FusedAXPY, FusedMADD,
+    FusedNeighborMulAgg, LoadNodeAttrStep, ModeListStep, ModeTieBreak, NeighborDirection,
+    NeighborModeUpdateStep, NodeColumn, NodeDegreeStep, RecipStep, ReduceScalarStep, ReductionOp,
+    UnaryOp, WhereStep,
 };
 use crate::algorithms::{
     execution::batch_plan::{
-        AggregateOp, BatchInstruction as I, BatchPlan, CompareOp as C, TieBreak,
+        AggregateOp, BatchInstruction as I, BatchPlan, CompareOp as C, Direction, TieBreak,
     },
     AlgorithmParamValue as V, Context,
 };
@@ -89,6 +93,111 @@ impl LoweredBatchPlan {
                     attr_name.clone().into(),
                     V::Float(*default),
                 )),
+                I::NodeDegree { dst } => Native::new(NodeDegreeStep::new(slot(*dst), None)),
+                I::UpdateInPlace {
+                    source,
+                    target,
+                    ordered,
+                } => Native::new(UpdateInPlaceStep::new(
+                    slot(*source),
+                    slot(*target),
+                    *ordered,
+                )),
+                I::NeighborModeUpdate {
+                    target,
+                    include_self,
+                    tie_break,
+                    ordered,
+                } => Native::new(NeighborModeUpdateStep::new(
+                    slot(*target),
+                    *include_self,
+                    mode_tie(*tie_break),
+                    *ordered,
+                )),
+                I::CollectNeighborValues {
+                    dst,
+                    src,
+                    include_self,
+                } => Native::new(CollectNeighborValuesStep::new(
+                    slot(*src),
+                    slot(*dst),
+                    *include_self,
+                )),
+                I::NeighborAggregate {
+                    dst,
+                    src,
+                    operation,
+                    direction,
+                } => Native::new(
+                    NeighborAggregationStep::new(slot(*src), slot(*dst), aggregate(*operation))
+                        .with_direction(neighbor_direction(*direction)),
+                ),
+                I::NeighborMode {
+                    dst,
+                    src,
+                    tie_break,
+                    direction,
+                } => {
+                    // Keep the collected list separate when dst aliases src.
+                    operations.push(Operation::Native(Native::new(
+                        CollectNeighborValuesStep::new(slot(*src), "neighbor/mode", false)
+                            .with_direction(neighbor_direction(*direction)),
+                    )));
+                    Native::new(ModeListStep::new(
+                        "neighbor/mode",
+                        slot(*dst),
+                        mode_tie(*tie_break),
+                    ))
+                }
+                I::FusedNeighborMulAgg {
+                    dst,
+                    src,
+                    multiplier,
+                    operation,
+                    direction,
+                } => {
+                    if matches!(operation, AggregateOp::Sum) {
+                        Native::new(
+                            FusedNeighborMulAgg::new(slot(*src), slot(*multiplier), slot(*dst))
+                                .with_direction(neighbor_direction(*direction)),
+                        )
+                    } else {
+                        // Only sum has a specialized native fused kernel. Other
+                        // reductions compose the same checked primitives, without
+                        // introducing a second arithmetic/aggregation interpreter.
+                        operations.push(Operation::Native(Native::new(BinaryArithmeticStep::new(
+                            "core.mul",
+                            slot(*src),
+                            slot(*multiplier),
+                            "neighbor/product",
+                            BinaryOperation::Mul,
+                        ))));
+                        Native::new(
+                            NeighborAggregationStep::new(
+                                "neighbor/product",
+                                slot(*dst),
+                                aggregate(*operation),
+                            )
+                            .with_direction(neighbor_direction(*direction)),
+                        )
+                    }
+                }
+                I::FusedMADD { dst, a, b, c } => {
+                    Native::new(FusedMADD::new(slot(*a), slot(*b), slot(*c), slot(*dst)))
+                }
+                I::FusedAXPY { dst, alpha, x, y } => {
+                    operations.push(Operation::Native(Native::new(InitScalarStep::new(
+                        "fused/one",
+                        V::Float(1.),
+                    ))));
+                    Native::new(FusedAXPY::new(
+                        slot(*alpha),
+                        slot(*x),
+                        "fused/one",
+                        slot(*y),
+                        slot(*dst),
+                    ))
+                }
                 I::GraphNodeCount { dst } => Native::new(GraphNodeCountStep::new(slot(*dst))),
                 I::GraphEdgeCount { dst } => Native::new(GraphEdgeCountStep::new(slot(*dst))),
                 I::Add { dst, lhs, rhs }
@@ -307,6 +416,28 @@ impl LoweredBatchPlan {
             }
             Ok(locals)
         })
+    }
+}
+fn neighbor_direction(direction: Direction) -> NeighborDirection {
+    match direction {
+        Direction::In => NeighborDirection::In,
+        Direction::Out => NeighborDirection::Out,
+        Direction::Undirected => NeighborDirection::Undirected,
+    }
+}
+fn aggregate(op: AggregateOp) -> NeighborAggType {
+    match op {
+        AggregateOp::Sum => NeighborAggType::Sum,
+        AggregateOp::Mean => NeighborAggType::Mean,
+        AggregateOp::Min => NeighborAggType::Min,
+        AggregateOp::Max => NeighborAggType::Max,
+    }
+}
+fn mode_tie(tie: TieBreak) -> ModeTieBreak {
+    match tie {
+        TieBreak::Lowest => ModeTieBreak::Lowest,
+        TieBreak::Highest => ModeTieBreak::Highest,
+        TieBreak::First => ModeTieBreak::Keep,
     }
 }
 fn load(vars: &StepVariables, nodes: &[usize], name: &str) -> Result<Arc<StepValue>> {

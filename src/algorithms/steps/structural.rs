@@ -1,5 +1,6 @@
 //! Structural graph operation step primitives.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
@@ -47,11 +48,20 @@ impl Step for NodeDegreeStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for NodeDegreeStep {}
+impl ReadStep for NodeDegreeStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("node_degree cancelled"));
         }
-        let subgraph = scope.subgraph();
         let nodes = if let Some(source) = &self.source {
             if let Ok(column) = scope.variables().node_column(source) {
                 column.nodes().to_vec()
@@ -66,13 +76,13 @@ impl Step for NodeDegreeStep {
                 nodes
             }
         } else {
-            subgraph.ordered_nodes().to_vec()
+            scope.ordered_nodes().to_vec()
         };
-        subgraph.validate_selected_read()?;
-        let directed = subgraph.read_is_directed();
+        scope.validate_selected_read()?;
+        let directed = scope.is_directed();
         let mut counts = HashMap::with_capacity(nodes.len());
         for node in nodes {
-            if !subgraph.has_node(node) {
+            if !scope.has_node(node) {
                 return Err(anyhow!(
                     "node_degree source node {} is outside the active selection",
                     node
@@ -80,11 +90,11 @@ impl Step for NodeDegreeStep {
             }
             counts.insert(node, 0i64);
         }
-        for &edge in subgraph.ordered_edges().iter() {
+        for &edge in scope.ordered_edges().iter() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("node_degree cancelled"));
             }
-            let (source, target) = subgraph.edge_endpoints(edge)?;
+            let (source, target) = scope.edge_endpoints(edge)?;
             for endpoint in [
                 Some(source),
                 (!directed && target != source).then_some(target),

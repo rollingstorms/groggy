@@ -341,9 +341,9 @@ def test_builder_iterate_with_map_nodes():
 
     builder.attach_as("ranks", ranks)
     result = graph.view().apply(builder.build())
-    # Just verify it executes without error
+    # Two undirected neighbors per node: 1 -> 1.85 -> 3.295.
     for node in result.nodes:
-        assert hasattr(node, "ranks")
+        assert abs(node.ranks - 3.295) < 1e-12
 
 
 def test_builder_input():

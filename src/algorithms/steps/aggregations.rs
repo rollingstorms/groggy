@@ -1,5 +1,6 @@
 //! Aggregation and reduction step primitives.
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
@@ -612,7 +613,17 @@ impl Step for NeighborAggregationStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for NeighborAggregationStep {}
+impl ReadStep for NeighborAggregationStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("Aggregation cancelled"));
         }

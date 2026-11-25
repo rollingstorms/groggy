@@ -629,6 +629,8 @@ class IRToBatchCompiler:
                         self.instructions.extend(instr)
                     else:
                         self.instructions.append(instr)
+                else:
+                    raise ValueError("Operation has no faithful batch lowering")
 
         # Step 3.5: Emit StoreNodeProp for loop-carried variables (alias targets)
         for target, source in alias_mappings.items():
@@ -1080,13 +1082,15 @@ class IRToBatchCompiler:
             if node_type == "const":
                 slot = self._alloc_temp()
                 instructions.append(
-                    {"type": "load_scalar", "dst": slot, "value": float(node["value"])}
+                    {"type": "init_nodes", "dst": slot, "value": float(node["value"])}
                 )
                 return slot
             if node_type == "var":
                 return self.allocator.get_slot(node["name"])
             if node_type == "binary_op":
                 op = node.get("op")
+                if op not in {"add", "sub", "mul", "div", "min", "max"}:
+                    return None
                 left = lower_expr(node.get("left"))
                 right = lower_expr(node.get("right"))
                 if left is None or right is None:
@@ -1096,47 +1100,9 @@ class IRToBatchCompiler:
                     {"type": op, "dst": slot, "lhs": left, "rhs": right}
                 )
                 return slot
-            if node_type == "call":
-                func = node.get("func")
-                args = node.get("args", [])
-                if func in {"sum", "mean", "mode", "count"} and args:
-                    inner = args[0]
-                    if inner.get("type") == "call" and inner.get("func") in {
-                        "neighbor_values",
-                        "neighbors",
-                    }:
-                        if func == "count":
-                            slot = self._alloc_temp()
-                            instructions.append({"type": "node_degree", "dst": slot})
-                            return slot
-                        if inner.get("func") == "neighbor_values":
-                            var_node = inner.get("args", [None])[0]
-                            if not var_node or var_node.get("type") != "var":
-                                return None
-                            src = self.allocator.get_slot(var_node["name"])
-                            slot = self._alloc_temp()
-                            if func == "mode":
-                                instructions.append(
-                                    {
-                                        "type": "neighbor_mode",
-                                        "dst": slot,
-                                        "src": src,
-                                        "tie_break": "lowest",
-                                        "direction": "in",
-                                    }
-                                )
-                            else:
-                                instructions.append(
-                                    {
-                                        "type": "neighbor_aggregate",
-                                        "dst": slot,
-                                        "src": src,
-                                        "operation": func,
-                                        "direction": "in",
-                                    }
-                                )
-                            return slot
-                    return None
+            # Neighbor expressions use graph-default direction. The register
+            # instruction currently requires an explicit stored-edge direction;
+            # preserve the native expression path rather than inventing "in".
             return None
 
         result_slot = lower_expr(expr)
@@ -1151,6 +1117,15 @@ class IRToBatchCompiler:
             {
                 "type": "store_node_prop",
                 "src": result_slot,
+                "var_name": target,
+            }
+        )
+        # Expression temporaries are not the allocator's named output slot.
+        # Bind that slot too, so the following operation cannot read stale data.
+        instructions.append(
+            {
+                "type": "load_node_prop",
+                "dst": self.allocator.get_slot(target),
                 "var_name": target,
             }
         )
@@ -1228,11 +1203,14 @@ def _collect_batch_diagnostics(
             if step.get(key) in edge_attr_outputs:
                 return True
         inputs = step.get("inputs")
-        if isinstance(inputs, dict) and any(v in edge_attr_outputs for v in inputs.values()):
+        if isinstance(inputs, dict) and any(
+            v in edge_attr_outputs for v in inputs.values()
+        ):
             return True
         if isinstance(inputs, list) and any(v in edge_attr_outputs for v in inputs):
             return True
         return False
+
     for idx, step in enumerate(body_steps):
         step_type = step.get("type", "")
         if step_type.startswith("iter.") or step_type.startswith("control."):
@@ -1330,7 +1308,13 @@ def _instruction_output_slots(instr: Dict[str, Any]) -> List[int]:
     instr_type = instr.get("type")
     if instr_type in {"load_node_prop", "load_scalar"}:
         return [instr.get("dst", -1)]
-    if instr_type in {"init_nodes", "load_node_attr", "node_degree", "graph_node_count", "graph_edge_count"}:
+    if instr_type in {
+        "init_nodes",
+        "load_node_attr",
+        "node_degree",
+        "graph_node_count",
+        "graph_edge_count",
+    }:
         return [instr.get("dst", -1)]
     if instr_type in {"load_edge_attr"}:
         return [instr.get("dst", -1)]
@@ -1478,7 +1462,12 @@ def compile_loop_to_batch_plan(
 
     # All operations supported - proceed with compilation
     compiler = IRToBatchCompiler()
-    plan = compiler.compile_loop_body(body_steps, loop_vars)
+    try:
+        plan = compiler.compile_loop_body(body_steps, loop_vars)
+    except ValueError:
+        # A supported family may contain an expression the register vocabulary
+        # cannot represent. Do not silently omit it from a partial program.
+        return None
     instructions = plan.get("instructions", [])
     plan["instructions"] = _optimize_instructions(instructions)
 

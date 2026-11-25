@@ -23,10 +23,12 @@ def loop(instructions, slots=3, iterations=1, carried=()):
     )
 
 
+def pipeline(steps):
+    return Pipeline([step_pipeline("checked numeric plan", steps, atomic=True)])
+
+
 def run(store, steps):
-    return Pipeline(
-        [step_pipeline("checked numeric plan", steps, atomic=True)]
-    ).run_durable(store)
+    return pipeline(steps).run_durable(store)
 
 
 @pytest.mark.parametrize("directed", [False, True])
@@ -95,7 +97,14 @@ def test_checked_plan_reads_pending_changes_and_keeps_tiny_nonzero_divisors(
             "carried_slots": [],
         },
         {
-            "instructions": [{"type": "node_degree", "dst": 0}],
+            "instructions": [
+                {
+                    "type": "load_edge_attr",
+                    "dst": 0,
+                    "attr_name": "weight",
+                    "default": 0.0,
+                }
+            ],
             "slot_count": 1,
             "carried_slots": [],
         },
@@ -238,3 +247,199 @@ def test_list_intermediates_use_the_same_native_mode_kernel(tmp_path):
     )
     assert result.node_attr(0, "answer") == 5
     assert isinstance(result.node_attr(0, "answer"), int)
+
+
+@pytest.mark.parametrize(
+    "direction,expected",
+    [("in", [5.0, 9.0]), ("out", [10.0, 7.0]), ("undirected", [15.0, 11.0])],
+)
+@pytest.mark.parametrize("directed", [False, True])
+def test_neighbor_plans_keep_direction_multiplicity_and_pending_values(
+    tmp_path, direction, expected, directed
+):
+    graph = Graph(directed=directed)
+    batch = GraphBatch(effective_at=0)
+    batch.add_node()
+    batch.add_node()
+    batch.add_edge(0, 1)
+    batch.add_edge(0, 1)
+    batch.add_edge(1, 1)
+    batch.add_edge(1, 0)
+    graph.writer().apply_batch(batch)
+    graph.writer().set_node_attr(0, "x", 2, effective_at=0)
+    graph.writer().set_node_attr(1, "x", 5, effective_at=0)
+    path = tmp_path / "neighbors.journal"
+    store = DurableGraph.create_from_graph(path, graph)
+    before = store.read_view()
+    head = store.current_state_id
+    instructions = [
+        {"type": "load_node_attr", "dst": 0, "attr_name": "x", "default": 0.0},
+        {
+            "type": "neighbor_aggregate",
+            "src": 0,
+            "dst": 0,
+            "operation": "sum",
+            "direction": direction,
+        },
+        {"type": "store_node_prop", "src": 0, "var_name": "answer"},
+    ]
+    p = pipeline(
+        [
+            {
+                "id": "iter.loop",
+                "params": {
+                    "iterations": 2,
+                    "body": [],
+                    "batch_plan": {
+                        "instructions": instructions,
+                        "slot_count": 1,
+                        "carried_slots": [],
+                    },
+                },
+            },
+            {
+                "id": "core.attach_node_attr",
+                "params": {"source": "answer", "attr": "answer", "effective_at": 20},
+            },
+        ]
+    )
+    result = p.run_durable(store)
+    assert result.write_state_id == head + 1
+    assert [result.node_attr(n, "answer") for n in range(2)] == expected
+    assert before.node_attr(0, "answer") is None
+    store.close()
+    recovered = DurableGraph.open(path)
+    assert [recovered.read_view().node_attr(n, "answer") for n in range(2)] == expected
+    assert recovered.read_view_at(19).node_attr(0, "answer") is None
+    recovered.close()
+
+
+@pytest.mark.parametrize(
+    "tie,expected",
+    [
+        ("lowest", 9007199254740992),
+        ("highest", 9007199254740993),
+        ("first", 9007199254740993),
+    ],
+)
+def test_neighbor_mode_ties_keep_exact_integer_labels(tmp_path, tie, expected):
+    graph = Graph(directed=True)
+    graph.add_node(label=9007199254740993)
+    graph.add_node(label=9007199254740992)
+    graph.add_edge(0, 0)
+    graph.add_edge(0, 1)
+    graph.add_edge(1, 0)
+    path = tmp_path / "labels.journal"
+    store = DurableGraph.create_from_graph(path, graph)
+    instructions = [
+        {"type": "load_node_attr", "dst": 0, "attr_name": "label", "default": 0.0},
+        {
+            "type": "neighbor_mode",
+            "src": 0,
+            "dst": 0,
+            "tie_break": tie,
+            "direction": "out",
+        },
+        {"type": "store_node_prop", "src": 0, "var_name": "answer"},
+    ]
+    result = pipeline(
+        [
+            {
+                "id": "iter.loop",
+                "params": {
+                    "iterations": 1,
+                    "body": [],
+                    "batch_plan": {
+                        "instructions": instructions,
+                        "slot_count": 1,
+                        "carried_slots": [],
+                    },
+                },
+            },
+            {
+                "id": "core.attach_node_attr",
+                "params": {"source": "answer", "attr": "answer"},
+            },
+        ]
+    ).run_durable(store)
+    assert result.node_attr(0, "answer") == expected
+    assert isinstance(result.node_attr(0, "answer"), int)
+    store.close()
+
+
+@pytest.mark.parametrize("kind", ["fused_madd", "fused_axpy"])
+def test_python_fused_plan_spellings_and_overflow_rollback(tmp_path, kind):
+    graph = Graph()
+    graph.add_node()
+    path = tmp_path / "fused.journal"
+    store = DurableGraph.create_from_graph(path, graph)
+    original = path.read_bytes()
+    op = {"type": kind, "dst": 0}
+    if kind == "fused_madd":
+        op.update(a=0, b=1, c=2)
+    else:
+        op.update(alpha=1, x=0, y=2)
+    instructions = [
+        {"type": "init_nodes", "dst": 0, "value": 1e308},
+        {"type": "init_nodes", "dst": 1, "value": 1e308},
+        {"type": "init_nodes", "dst": 2, "value": 0.0},
+        op,
+    ]
+    p = pipeline(
+        [
+            {"id": "graph.add_nodes", "params": {"count": 1, "output": "new"}},
+            {
+                "id": "iter.loop",
+                "params": {
+                    "iterations": 1,
+                    "body": [],
+                    "batch_plan": {
+                        "instructions": instructions,
+                        "slot_count": 3,
+                        "carried_slots": [],
+                    },
+                },
+            },
+        ]
+    )
+    with pytest.raises(RuntimeError, match="not finite"):
+        p.run_durable(store)
+    assert path.read_bytes() == original
+    assert store.read_view().node_ids == [0]
+    store.close()
+
+
+@pytest.mark.parametrize(
+    "expression,expected", [("value * 2", 15.0), ("2", 3.0), ("value", 5.0)]
+)
+def test_compiled_map_expression_binds_its_named_register_for_following_steps(
+    tmp_path, expression, expected
+):
+    from groggy.builder.ir.batch import compile_loop_to_batch_plan
+
+    body = [
+        {
+            "type": "map_nodes",
+            "fn": expression,
+            "inputs": {"value": "values"},
+            "output": "mapped",
+        },
+        {"type": "core.constant", "value": 1.0, "output": "one"},
+        {"type": "core.add", "a": "mapped", "b": "one", "output": "next"},
+        {"type": "alias", "source": "next", "target": "values"},
+    ]
+    compiled = compile_loop_to_batch_plan(body)
+    assert compiled is not None
+    graph = Graph()
+    graph.add_node()
+    store = DurableGraph.create_from_graph(tmp_path / "expressions.journal", graph)
+    result = run(
+        store,
+        [
+            step("core.init_nodes", target="values", value=3.0),
+            step("iter.loop", body=[], batch_plan=compiled, iterations=2),
+            step("core.attach_node_attr", source="values", attr="answer"),
+        ],
+    )
+    assert result.node_attr(0, "answer") == expected
+    store.close()

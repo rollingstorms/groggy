@@ -97,7 +97,9 @@ def test_late_error_and_unsupported_suffix_consume_no_ids_or_journal_bytes(tmp_p
         pipeline(
             [
                 step("graph.add_nodes", count=1, output="new"),
-                step("core.node_degree", target="unsupported"),
+                step(
+                    "core.weighted_degree", target="unsupported", weight_attr="weight"
+                ),
             ]
         ).run_durable(store)
     assert path.read_bytes() == original

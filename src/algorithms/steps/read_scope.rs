@@ -1,6 +1,7 @@
 //! Sealed native step invocation over read authority. There is deliberately no
 //! `subgraph()` or mutable owner accessor. Legacy callbacks retain StepScope.
-use super::core::{validate_attachment_targets, StepVariables};
+use super::core::{validate_attachment_targets, SelectedCsr, StepVariables};
+use crate::traits::SubgraphOperations;
 use crate::{
     algorithms::Context, subgraphs::Subgraph, AttrName, AttrValue, BatchNodeRef, GraphResult,
     GraphView,
@@ -118,6 +119,133 @@ impl<'a> ReadStepScope<'a> {
             Source::Memory(s) => s.edge_count(),
             Source::Detached { current, .. } => current.edges().len(),
         }
+    }
+    pub(crate) fn validate_selected_read(&self) -> Result<()> {
+        if let Source::Memory(s) = &self.source {
+            s.validate_selected_read()?;
+        }
+        Ok(())
+    }
+    pub(crate) fn is_directed(&self) -> bool {
+        match &self.source {
+            Source::Memory(s) => s.read_is_directed(),
+            Source::Detached { current, .. } => current.is_directed(),
+        }
+    }
+    pub(crate) fn has_node(&self, id: usize) -> bool {
+        match &self.source {
+            Source::Memory(s) => s.has_node(id),
+            Source::Detached { current, .. } => current.nodes().contains(&id),
+        }
+    }
+    pub(crate) fn ordered_edges(&self) -> Arc<[usize]> {
+        match &self.source {
+            Source::Memory(s) => s.ordered_edges(),
+            Source::Detached { current, .. } => current.edge_ids().into(),
+        }
+    }
+    pub(crate) fn edge_endpoints(&self, id: usize) -> GraphResult<(usize, usize)> {
+        match &self.source {
+            Source::Memory(s) => s.edge_endpoints(id),
+            Source::Detached { current, .. } => current.edge_endpoints(id),
+        }
+    }
+    /// Explicit direction, sorted neighbors, parallel incidences and one self-loop.
+    pub(crate) fn selected_csr(
+        &self,
+        ctx: &Context,
+        direction: super::direction::NeighborDirection,
+    ) -> Result<SelectedCsr> {
+        use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
+        if ctx.is_cancelled() {
+            return Err(anyhow!("selected topology cancelled"));
+        }
+        self.validate_selected_read()?;
+        let nodes = self.ordered_nodes();
+        let positions: HashMap<_, _> = nodes
+            .iter()
+            .enumerate()
+            .map(|(row, &node)| (node, row))
+            .collect();
+        let edges = self.ordered_edges();
+        let mapping = direction.edge_mapping();
+        let mut failure = None;
+        let mut csr = Csr::default();
+        build_csr_from_edges_with_scratch(
+            &mut csr,
+            nodes.len(),
+            edges.iter().copied(),
+            |node| positions.get(&node).copied(),
+            |edge| {
+                if ctx.is_cancelled() {
+                    failure = Some(anyhow!("selected topology cancelled"));
+                    return None;
+                }
+                match self.edge_endpoints(edge) {
+                    Ok(pair) => {
+                        if !positions.contains_key(&pair.0) || !positions.contains_key(&pair.1) {
+                            failure = Some(anyhow!(
+                                "Selected edge {} endpoint is outside selection",
+                                edge
+                            ));
+                            None
+                        } else {
+                            Some(mapping(pair))
+                        }
+                    }
+                    Err(error) => {
+                        failure = Some(error.into());
+                        None
+                    }
+                }
+            },
+            CsrOptions {
+                add_reverse_edges: direction.add_reverse_edges(),
+                sort_neighbors: true,
+            },
+        );
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok(SelectedCsr {
+            nodes,
+            positions,
+            csr,
+        })
+    }
+
+    /// Graph-default adjacency is outgoing for directed selections and symmetric
+    /// for undirected selections. This is shared by expression and label updates.
+    pub(crate) fn selected_neighbors(
+        &self,
+        ctx: &Context,
+    ) -> Result<(Vec<usize>, HashMap<usize, Vec<usize>>)> {
+        use super::direction::NeighborDirection;
+        let topology = self.selected_csr(
+            ctx,
+            if self.is_directed() {
+                NeighborDirection::Out
+            } else {
+                NeighborDirection::Undirected
+            },
+        )?;
+        let rows = topology
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, &node)| {
+                (
+                    node,
+                    topology
+                        .csr
+                        .neighbors(index)
+                        .iter()
+                        .map(|&i| topology.nodes[i])
+                        .collect(),
+                )
+            })
+            .collect();
+        Ok((topology.nodes.to_vec(), rows))
     }
     pub(crate) fn node_attribute(
         &self,
