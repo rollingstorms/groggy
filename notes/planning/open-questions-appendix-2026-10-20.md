@@ -1,5 +1,15 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Flow/alias follow-up — 2026-11-25:**
+[Portable flow values and aliases](portable-flow-and-aliases-2026-11-25.md) completes
+the three-step flow module's shared memory/durable route. Checked flow/residual
+arithmetic and immutable alias semantics remain; aliases now share payloads until
+mutation. Six finite component checks are complete; the flat list remains **217
+checked / 51 open**. Local gates pass **1,682 native / 3,525 Python tests / 298
+examples**; matched alias medians improve 81–83% at 100 iterations. Scope and
+remaining costs are recorded in the component note.
+
+
 **Message-block follow-up — 2026-11-25:**
 [Portable message blocks](portable-message-blocks-2026-11-25.md) completes the
 supported message-pass block's shared memory/durable route, including its public

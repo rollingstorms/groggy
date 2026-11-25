@@ -1,0 +1,103 @@
+{
+  "package": "/private/tmp/groggy-owned-alias-after-wheel/groggy/__init__.py",
+  "benchmark_sha256": "c2479816a62c62ac742988d87c170acb2aa7c14c315f009d3bc3e4b777202a19",
+  "scope": "Matched owned-map alias workload; run against an explicit unpacked wheel.\n\nSetup/compilation and warm-up are excluded; execution and final Python output\nmarshalling are included. This is a transient memory workload, not durability,\nallocator or RSS evidence. No package installation is needed.\n",
+  "cases": [
+    {
+      "kind": "control",
+      "nodes": 1000,
+      "iterations": 10,
+      "observations_seconds": [
+        0.00019937500000000163,
+        0.00014304199999998213,
+        0.0001462910000000206
+      ],
+      "median_seconds": 0.0001462910000000206,
+      "checksum": 7000
+    },
+    {
+      "kind": "alias",
+      "nodes": 1000,
+      "iterations": 10,
+      "observations_seconds": [
+        0.0001447079999999934,
+        0.00015808299999997555,
+        0.00013604100000003116
+      ],
+      "median_seconds": 0.0001447079999999934,
+      "checksum": 7000
+    },
+    {
+      "kind": "control",
+      "nodes": 10000,
+      "iterations": 10,
+      "observations_seconds": [
+        0.0018046670000000375,
+        0.0015908749999999916,
+        0.001624334000000005
+      ],
+      "median_seconds": 0.001624334000000005,
+      "checksum": 70000
+    },
+    {
+      "kind": "alias",
+      "nodes": 10000,
+      "iterations": 10,
+      "observations_seconds": [
+        0.0016638340000000307,
+        0.0017287080000000232,
+        0.0016353749999999945
+      ],
+      "median_seconds": 0.0016638340000000307,
+      "checksum": 70000
+    },
+    {
+      "kind": "control",
+      "nodes": 1000,
+      "iterations": 100,
+      "observations_seconds": [
+        0.00013825000000000642,
+        0.00013383399999999934,
+        0.00014250000000004537
+      ],
+      "median_seconds": 0.00013825000000000642,
+      "checksum": 7000
+    },
+    {
+      "kind": "alias",
+      "nodes": 1000,
+      "iterations": 100,
+      "observations_seconds": [
+        0.00014012499999999095,
+        0.00015083300000001687,
+        0.00014079099999997347
+      ],
+      "median_seconds": 0.00014079099999997347,
+      "checksum": 7000
+    },
+    {
+      "kind": "control",
+      "nodes": 10000,
+      "iterations": 100,
+      "observations_seconds": [
+        0.0017103749999999862,
+        0.0016017090000000067,
+        0.0017741669999999932
+      ],
+      "median_seconds": 0.0017103749999999862,
+      "checksum": 70000
+    },
+    {
+      "kind": "alias",
+      "nodes": 10000,
+      "iterations": 100,
+      "observations_seconds": [
+        0.0018066250000000061,
+        0.0016654580000000085,
+        0.0016377920000000268
+      ],
+      "median_seconds": 0.0016654580000000085,
+      "checksum": 70000
+    }
+  ]
+}
