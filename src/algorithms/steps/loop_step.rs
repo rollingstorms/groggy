@@ -1,6 +1,9 @@
 use super::super::{AlgorithmParamValue, Context};
 use super::checked_batch::LoweredBatchPlan;
-use super::core::{loop_effect, AtomicStepEffect, Step, StepExecutor, StepRegistry, StepScope};
+use super::core::{
+    loop_effect, AtomicStepEffect, CheckedReadStep, Step, StepExecutor, StepRegistry, StepScope,
+    StepVariables,
+};
 use super::read_scope::{sealed, ReadStep, ReadStepScope};
 use crate::algorithms::execution::{BatchExecutor, BatchPlan};
 use anyhow::{anyhow, Result};
@@ -206,6 +209,29 @@ impl Step for LoopStep {
             .map(|_| self as &dyn ReadStep)
     }
 
+    fn prepare_read_kernel(&self) -> Result<Option<Box<dyn ReadStep + '_>>> {
+        // Supplied plans keep their own strict lowering boundary; an unported
+        // plan must never be replaced with the JSON body, even at zero iterations.
+        if self.body_json.get("batch_plan").is_some()
+            || self.atomic_effect() == AtomicStepEffect::Unsupported
+        {
+            return Ok(None);
+        }
+        let mut body = Vec::new();
+        for step in self.body_steps()? {
+            let Some(prepared) = CheckedReadStep::try_new(step.as_ref())? else {
+                return Ok(None);
+            };
+            body.push(prepared);
+        }
+        Ok(Some(Box::new(PreparedLoop {
+            iterations: self.iterations,
+            body,
+            bindings: self.loop_vars.as_deref(),
+            stats: &self.stats,
+        })))
+    }
+
     fn id(&self) -> &'static str {
         "iter.loop"
     }
@@ -216,6 +242,11 @@ impl Step for LoopStep {
         }
         let legacy_plan = self.batch_plan()?;
         let body_steps = self.body_steps()?;
+        if legacy_plan.is_none() {
+            if let Some(prepared) = self.prepare_read_kernel()? {
+                return prepared.apply_read(ctx, &mut scope.read_scope());
+            }
+        }
         if ctx.property_batch.as_ref().is_some_and(|batch| {
             let effect = self.atomic_effect();
             effect == AtomicStepEffect::Unsupported
@@ -226,21 +257,7 @@ impl Step for LoopStep {
             ));
         }
 
-        // Before first iteration, create initial variable bindings
-        // loop_vars format: [(initial_var, loop_var), ...]
-        // e.g., [("nodes_0", "ranks")] means: create alias ranks = nodes_0
-        if let Some(loop_vars) = &self.loop_vars {
-            for (initial_var, loop_var) in loop_vars {
-                let value = scope
-                    .variables()
-                    .value(initial_var)
-                    .cloned()
-                    .ok_or_else(|| {
-                        anyhow!("Loop variable initialization: '{}' not found", initial_var)
-                    })?;
-                scope.variables_mut().set_value(loop_var, value);
-            }
-        }
+        initialize_bindings(scope.variables_mut(), self.loop_vars.as_deref())?;
 
         // Update statistics
         let _exec_count = self.stats.execution_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -312,20 +329,75 @@ impl ReadStep for LoopStep {
             .get()
             .and_then(Option::as_ref)
             .ok_or_else(|| anyhow!("iter.loop has no prepared native batch program"))?;
-        if let Some(bindings) = &self.loop_vars {
-            for (initial, logical) in bindings {
-                let value = scope.variables().value(initial).cloned().ok_or_else(|| {
-                    anyhow!("Loop variable initialization: '{initial}' not found")
-                })?;
-                scope.variables_mut().set_value(logical, value);
-            }
-        }
+        initialize_bindings(scope.variables_mut(), self.loop_vars.as_deref())?;
         self.stats.execution_count.fetch_add(1, Ordering::Relaxed);
         self.stats
             .total_iterations
             .fetch_add(self.iterations as u64, Ordering::Relaxed);
         plan.execute(ctx, scope, self.iterations).map(|_| ())
     }
+}
+
+/// Owned control plan borrowing only already-prepared sealed child kernels.
+/// The registry, child Step methods and mutable graph owner stay off workers.
+struct PreparedLoop<'a> {
+    iterations: usize,
+    body: Vec<CheckedReadStep<'a>>,
+    bindings: Option<&'a [(String, String)]>,
+    stats: &'a LoopExecutionStats,
+}
+impl sealed::Sealed for PreparedLoop<'_> {}
+impl ReadStep for PreparedLoop<'_> {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!(if self.iterations == 0 {
+                "iter.loop cancelled"
+            } else {
+                "Loop cancelled before iteration 1"
+            }));
+        }
+        initialize_bindings(scope.variables_mut(), self.bindings)?;
+        self.stats.execution_count.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .total_iterations
+            .fetch_add(self.iterations as u64, Ordering::Relaxed);
+        scope.with_executor(|mut executor, variables| {
+            for iteration in 0..self.iterations {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("Loop cancelled before iteration {}", iteration + 1));
+                }
+                for (index, step) in self.body.iter().enumerate() {
+                    executor.apply_prepared(ctx, variables, step).map_err(|e| {
+                        anyhow!(
+                            "Loop iteration {}/{}, step {}/{} ({}) failed: {}",
+                            iteration + 1,
+                            self.iterations,
+                            index + 1,
+                            self.body.len(),
+                            step.id,
+                            e
+                        )
+                    })?;
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+fn initialize_bindings(
+    variables: &mut StepVariables,
+    bindings: Option<&[(String, String)]>,
+) -> Result<()> {
+    if let Some(bindings) = bindings {
+        for (initial, logical) in bindings {
+            let value = variables
+                .shared_value(initial)
+                .ok_or_else(|| anyhow!("Loop variable initialization: '{initial}' not found"))?;
+            variables.set_shared_value(logical, value);
+        }
+    }
+    Ok(())
 }
 
 /// Deserialize a loop step from a JSON spec.

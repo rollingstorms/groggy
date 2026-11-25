@@ -162,7 +162,7 @@ impl<'a> StepExecutor<'a> {
             variables,
             step.id,
             step.effect,
-            Some(step.kernel),
+            Some(step.kernel.as_read()),
             None,
         )
     }
@@ -287,12 +287,25 @@ impl<'a> StepExecutor<'a> {
     }
 }
 
-/// Only sealed kernel references and already-read metadata cross workers.
+/// Only sealed kernels and already-read metadata cross workers. Preparation may
+/// own a composition of borrowed native kernels without borrowing its own fields.
 /// No user-supplied Step/Algorithm method is called by the detached executor.
 pub(crate) struct CheckedReadStep<'a> {
     pub(crate) id: &'static str,
     effect: AtomicStepEffect,
-    kernel: &'a dyn super::read_scope::ReadStep,
+    kernel: ReadKernel<'a>,
+}
+enum ReadKernel<'a> {
+    Borrowed(&'a dyn super::read_scope::ReadStep),
+    Prepared(Box<dyn super::read_scope::ReadStep + 'a>),
+}
+impl ReadKernel<'_> {
+    fn as_read(&self) -> &dyn super::read_scope::ReadStep {
+        match self {
+            Self::Borrowed(kernel) => *kernel,
+            Self::Prepared(kernel) => kernel.as_ref(),
+        }
+    }
 }
 impl<'a> CheckedReadStep<'a> {
     pub(crate) fn native(
@@ -300,18 +313,30 @@ impl<'a> CheckedReadStep<'a> {
         effect: AtomicStepEffect,
         kernel: &'a dyn super::read_scope::ReadStep,
     ) -> Self {
-        Self { id, effect, kernel }
+        Self {
+            id,
+            effect,
+            kernel: ReadKernel::Borrowed(kernel),
+        }
     }
-    pub(crate) fn new(step: &'a dyn Step) -> Result<Self> {
+    pub(crate) fn try_new(step: &'a dyn Step) -> Result<Option<Self>> {
         let id = step.id();
         let effect = step.atomic_effect();
-        let kernel = step
-            .read_kernel()
-            .ok_or_else(|| anyhow!("Step '{id}' has no detached native kernel"))?;
         if effect == AtomicStepEffect::Unsupported {
-            return Err(anyhow!("Step '{id}' has no detached native kernel"));
+            return Ok(None);
         }
-        Ok(Self { id, effect, kernel })
+        let kernel = if let Some(kernel) = step.read_kernel() {
+            ReadKernel::Borrowed(kernel)
+        } else if let Some(kernel) = step.prepare_read_kernel()? {
+            ReadKernel::Prepared(kernel)
+        } else {
+            return Ok(None);
+        };
+        Ok(Some(Self { id, effect, kernel }))
+    }
+    pub(crate) fn new(step: &'a dyn Step) -> Result<Self> {
+        Self::try_new(step)?
+            .ok_or_else(|| anyhow!("Step '{}' has no detached native kernel", step.id()))
     }
 }
 
@@ -329,6 +354,14 @@ pub trait Step: Send + Sync {
     #[doc(hidden)]
     fn read_kernel(&self) -> Option<&dyn super::read_scope::ReadStep> {
         None
+    }
+
+    /// Prepare a sealed composition on the owner before detached execution.
+    /// Native leaves keep their borrowed kernel path; containers capture child
+    /// kernels and metadata here, never through registry callbacks on a worker.
+    #[doc(hidden)]
+    fn prepare_read_kernel(&self) -> Result<Option<Box<dyn super::read_scope::ReadStep + '_>>> {
+        Ok(None)
     }
 
     /// Effect classification for local atomic execution. Existing property

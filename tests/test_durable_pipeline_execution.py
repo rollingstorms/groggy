@@ -440,3 +440,94 @@ def test_durable_pipeline_checks_additional_schema_without_replacing_installed_p
     store.close()
     reopened = DurableGraph.open(path)
     assert reopened.read_view().node_attr(0, "x") == "text"
+
+
+def test_nested_ordinary_loops_refresh_pending_values_and_recover(tmp_path):
+    path = tmp_path / "nested-loop.journal"
+    graph = Graph(directed=True)
+    initial = GraphBatch(effective_at=0)
+    for _ in range(3):
+        initial.add_node()
+    graph.writer().apply_batch(initial)
+    store = DurableGraph.create_from_graph(path, graph)
+    original = store.read_view().select_nodes([0, 1])
+    head = store.current_state_id
+    increment = [
+        step("graph.capture_staged", output="before"),
+        step("core.load_node_attr", target="x", attr="x"),
+        step("core.init_nodes", target="one", value=1),
+        step("core.add", left="x", right="one", target="next"),
+        step("core.attach_node_attr", source="next", attr="x", effective_at=20),
+    ]
+    p = pipeline(
+        [
+            step("core.init_nodes", target="zero", value=0),
+            step("core.attach_node_attr", source="zero", attr="x", effective_at=10),
+            step(
+                "iter.loop",
+                iterations=2,
+                body=[
+                    step(
+                        "graph.add_nodes",
+                        count=1,
+                        output="new",
+                        attributes={"x": 0},
+                        effective_at=10,
+                    ),
+                    step("iter.loop", iterations=3, body=increment),
+                ],
+            ),
+            step("graph.emit", source="before", name="before"),
+        ]
+    )
+    result, profile = p.run_durable(store, original, return_profile=True)
+    assert result.node_ids == [0, 1, 3, 4]
+    assert [result.node_attr(i, "x") for i in result.node_ids] == [6, 6, 6, 3]
+    assert store.current_state_id == head + 1
+    assert store.read_view().node_attr(2, "x") is None
+    before = profile["outputs"]["before"]
+    assert [before.node_attr(i, "x") for i in before.node_ids] == [5, 5, 5, 2]
+    assert before.write_state_id is None
+    assert original.node_ids == [0, 1] and original.node_attr(0, "x") is None
+    store.close()
+    reopened = DurableGraph.open(path)
+    assert reopened.current_state_id == head + 1
+    # A batch retains the final write per key, at its final effective time.
+    assert reopened.read_view_at(19).node_attr(0, "x") is None
+    assert reopened.read_view_at(20).node_attr(0, "x") == 6
+    assert before.node_attr(4, "x") == 2
+    reopened.close()
+
+
+@pytest.mark.parametrize("iterations", [0, 2])
+def test_nested_ordinary_loop_rejects_unported_body_before_prefix(tmp_path, iterations):
+    path = tmp_path / "unported-loop.journal"
+    store = DurableGraph.create(path)
+    original = path.read_bytes()
+    p = pipeline(
+        [
+            step("graph.add_nodes", count=1, output="new"),
+            step(
+                "iter.loop",
+                iterations=iterations,
+                body=[
+                    step(
+                        "iter.loop",
+                        iterations=0,
+                        body=[
+                            step(
+                                "core.weighted_degree",
+                                target="bad",
+                                weight_attr="weight",
+                            )
+                        ],
+                    )
+                ],
+            ),
+        ]
+    )
+    with pytest.raises(RuntimeError, match="no detached native kernel"):
+        p.run_durable(store)
+    assert path.read_bytes() == original
+    assert store.read_view().node_ids == []
+    store.close()

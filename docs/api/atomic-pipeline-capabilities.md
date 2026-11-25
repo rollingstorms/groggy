@@ -2,8 +2,9 @@
 
 Numeric plan follow-up: [checked numeric loop plans](checked-numeric-loop-plans.md)
 lists the 35 lowered instruction forms and shared arithmetic, topology, update
-and fused kernels now supported by durable execution. Ordinary step-body loops,
-edge-attribute registers and normalize(min/mean) remain outside this guarantee.
+and fused kernels now supported by durable execution. Ordinary step-body loops
+recursively prepare supported sealed children, including nested register loops.
+Edge-attribute registers and normalize(min/mean) remain outside this guarantee.
 
 An atomic pipeline shares one pending graph mutation across certified builders and
 classic algorithms. A successful run publishes one delta; failures and cancellation
@@ -19,7 +20,7 @@ owner, branch and accepted head before execution.
 | Immutable graph/table intermediates | Explicit captures, named variables/outputs, selected reads and issued-table attachment | Earlier captures stay immutable; matching numeric IDs do not grant write authority. |
 | Retained snapshots/diffs | Accepted retained history, independent of pending working edits | Unpublished changes do not become retained history. |
 | Retained lifecycle/window helpers | Surviving accepted IDs after pending topology | Provisional-node history remains explicitly guarded pending its policy decision. |
-| Root `iter.loop` | Sequential creation, accepted-entity removal/revision, refreshed properties, nested root loops | Added references remain whole-batch positions; canonical duplicate rules remain. |
+| Root `iter.loop` | Sequential creation, accepted-entity removal/revision, refreshed properties, nested root loops; certified ordinary bodies also run detached through durable execution | Added references remain whole-batch positions; canonical duplicate rules remain. |
 | Fixed child `sample.for_each` | Exact immutable child selection with shared property staging and refreshed reads | Child topology changes remain rejected, including nested topology loops. |
 | Other execution routes | Certified native step interpreter and ordinary supported algorithm calls | Bounded durable step-builder invocation is implemented; see [durable pipelines](durable-pipelines.md). Unported durable kernels, alternate batch plans, streaming and unsupported callbacks remain guarded. |
 

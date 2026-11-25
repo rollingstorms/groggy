@@ -52,6 +52,7 @@ with TemporaryDirectory() as folder:
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
+| `iter.loop` with an ordinary `body` of supported steps | Prepare sealed child kernels recursively on the owner; nested loops share pending reads, captures, cancellation and one outer publication. |
 | `iter.loop` with a fully lowered numeric/topology `batch_plan` | Private register frame; shared checked execution, staged reads and simultaneous carried slots. See [numeric loop plans](checked-numeric-loop-plans.md). |
 | `core.node_degree`, `core.neighbor_agg`, `core.collect_neighbor_values`, `core.neighbor_mode_update`, `core.update_in_place` | Share checked selected topology and immutable input maps. Asynchronous label updates keep stable ID order; pending revisions/removals are visible. |
 | `core.fused_axpy`, `core.fused_madd`, `graph.fused_neighbor_mul_agg` | Retain native f64 arithmetic; invalid nonfinite inputs/results reject before publication. |
@@ -63,9 +64,9 @@ with TemporaryDirectory() as folder:
 `graph.from_snapshot` has the same sealed implementation as the typed reads, but
 this entry point currently has no supported retained-snapshot producer. It does
 not make owner-bound temporal steps portable. Atomic builders are required;
-ordinary classic algorithm handles, custom callbacks, ordinary step-body loops,
-provisional-entity removal/revision, unported read steps, unlowered alternate plans
-and streaming reject during preflight. These remain explicit migration
+ordinary classic algorithm handles, custom callbacks, loop bodies containing
+unported steps, provisional-entity removal/revision, unported read steps,
+unlowered alternate plans and streaming reject during preflight. These remain explicit migration
 work in existing checklist rows. A supported effect flag alone grants no durable
 invocation authority. This entry point does not add pipeline-run history, cache
 policy, or a service concurrency model.
@@ -74,8 +75,8 @@ policy, or a service concurrency model.
 
 Rust `Pipeline::prepare_durable` captures the accepted source, complete
 owner/branch/head coordinate, allocation high-water counters, and sealed native
-kernel references. No custom Step/Algorithm method is invoked by its worker
-execution. `DurablePipelinePlan::execute` uses the same `StepExecutor` and kernels
+kernel references, including recursively prepared ordinary loop bodies. No custom
+Step/Algorithm method is invoked by its worker execution. `DurablePipelinePlan::execute` uses the same `StepExecutor` and kernels
 as memory execution and prepares owned changes and immutable output membership.
 It holds no `Graph` or writable `Subgraph`. Dropping the proposal publishes nothing.
 
@@ -109,3 +110,41 @@ Evidence: [native workflow tests](../../tests/durable_pipeline_execution.rs),
 [Python workflow and GIL tests](../../tests/test_durable_pipeline_execution.py),
 [journal failure injection](../../src/storage/journal.rs), and
 [completion record](../../notes/planning/durable-pipeline-execution-2026-11-24.md).
+
+## Ordinary nested bodies
+
+A `body` uses the same supported invocation inventory as the outer builder.
+Preparation checks every child, even in a zero-iteration loop. Unsupported or
+malformed supplied `batch_plan` programs never fall back to a different body.
+The worker uses captured kernel references and metadata; it does not instantiate
+steps or call Step/Algorithm hooks. The existing owner-only memory fallback for
+unported ordinary bodies remains available outside durable execution.
+
+```python
+from tempfile import TemporaryDirectory
+from pathlib import Path
+from groggy import DurableGraph, Pipeline
+from groggy.builder import step_pipeline
+
+with TemporaryDirectory() as folder:
+    store = DurableGraph.create(Path(folder) / "loops.journal")
+    def loop_step(kind, **params):
+        return {"id": kind, "params": params}
+    inner = loop_step("iter.loop", iterations=3, body=[
+        loop_step("graph.add_nodes", count=1, output="new", effective_at=10),
+    ])
+    outer = loop_step("iter.loop", iterations=2, body=[inner])
+    handle = step_pipeline("nested creation", [outer], atomic=True)
+    result = Pipeline([handle]).run_durable(store)
+    assert result.node_ids == [0, 1, 2, 3, 4, 5]
+    assert store.current_state_id == 1
+    store.close()
+```
+
+Loop variables use sequential `[initial, logical]` bindings, including when the
+iteration count is zero. Immutable values share their payload until a mutable
+consumer needs its own copy. Earlier captures remain unchanged by later writes.
+As with other atomic builders, repeated writes to one key coalesce into its
+final staged value and effective time; internal iterations do not create
+separate retained versions. An inner failure or cancellation discards the
+whole publication and restores earlier Context outputs.
