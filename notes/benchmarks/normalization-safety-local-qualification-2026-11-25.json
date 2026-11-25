@@ -1,0 +1,58 @@
+{
+  "runtime": "6ec32ed1959543036f638abedf0dbe23df21a6f7",
+  "date": "2026-11-25",
+  "scope": "Ordinary normalization safety: reject invalid epsilon, NaN/reversed clip bounds, nonfinite input and unrepresentable f64 intermediates/results. Preserve unbounded clip sides, signed maximum, population z-scores, valid empty policies and target maps on rejection. No extreme-value scaled-kernel claim; broader numerical/execution parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "cdd318adae9077a70ae012e78f56e35517f0b718194f37addddf655096cc29ea",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1695,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 235,
+    "doctests_passed": 10,
+    "normalization_safety_tests": 5,
+    "before_fix_regression_passed": 1,
+    "before_fix_regression_failed": 3,
+    "new_public_cases": 28,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3597,
+    "maintained_skipped": 1,
+    "expected_validation_warnings": 23,
+    "warning_breakdown": {
+      "earlier_suite": 14,
+      "new_facade_cases_using_existing_redefinition_warning": 9
+    },
+    "documentation_examples": 302,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "f29d0063688f1e3f4f2d38cf3493633ba84ca2dd864d4aad4332c3ff2557af0f",
+    "qualification_receipt": "notes/benchmarks/normalization-safety-wheel-qualification-2026-11-25.json"
+  },
+  "performance": {
+    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-25.json",
+    "scope": "Matched valid-input normalization measurements are recorded separately; this gate receipt makes no performance claim. Prior alias measurements apply only to their recorded runtime and workload."
+  },
+  "platform_boundary": "CI run 45646459570 passed on earlier flow candidate 978dbb2cb76a14f83d9c690b67a8eb82162419ea; does not qualify later expression, filtering, sampling or numerical safety code. A later candidate must have its own receipt.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-normalization-safety-native-final.log": "220af5d34ce70f85015d59c0efaf06b283c7fc53e2e15ae07d8731726bff1fc9",
+    "/tmp/groggy-normalization-safety-clippy-final.log": "3bb679965f0a12982e07be2b1c71ba457c15ceb768859fabb10911106022ba16",
+    "/tmp/groggy-normalization-safety-wheel-gates.log": "01d94aa31573c93040bba079ccc63df57e09dd1141428c99e21631e0268a377f"
+  }
+}

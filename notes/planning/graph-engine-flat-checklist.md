@@ -1,5 +1,12 @@
 # Groggy implementation checklist
 
+**Numerical safety follow-up — 2026-11-25:**
+[Normalization safety](normalization-safety-2026-11-25.md) closes demonstrated
+invalid-control/nonfinite-result gaps in the ordinary node/edge normalization
+steps. Shared Rust guards prevent unsafe clipping and preserve outputs and
+staged writes on rejection. Six component checks are complete; stable flat
+counts remain **217 checked / 51 open**. Extreme-value scaling remains bounded.
+
 **Sampling follow-up — 2026-11-25:**
 [Portable sampling masks](portable-sampling-masks-2026-11-25.md) completes node,
 edge and reservoir masks on the shared selected memory/durable boundary. Seeded
