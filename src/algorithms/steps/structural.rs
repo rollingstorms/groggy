@@ -6,7 +6,6 @@ use std::collections::VecDeque;
 
 use anyhow::{anyhow, Result};
 
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
@@ -156,7 +155,17 @@ impl Step for WeightedDegreeStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for WeightedDegreeStep {}
+impl ReadStep for WeightedDegreeStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let result = incident_weight_sums(ctx, scope, &self.weight_attr)?;
         scope
             .variables_mut()
@@ -201,7 +210,17 @@ impl Step for KCoreMarkStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for KCoreMarkStep {}
+impl ReadStep for KCoreMarkStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let topology = undirected_topology(ctx, scope)?;
         let mut degrees: Vec<_> = topology.neighbors.iter().map(Vec::len).collect();
         let mut retained = vec![true; degrees.len()];
@@ -283,7 +302,17 @@ impl Step for TriangleCountStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for TriangleCountStep {}
+impl ReadStep for TriangleCountStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let topology = undirected_topology(ctx, scope)?;
         let counts = crate::algorithms::structural::triangle_counts(topology.neighbors, || {
             ctx.is_cancelled()
@@ -308,13 +337,13 @@ struct UndirectedTopology {
 
 /// Preserve selected multiedges and once-per-loop incidence. Directed variants
 /// need separate definitions; never infer one from endpoint storage order.
-fn undirected_topology(ctx: &Context, scope: &StepScope<'_>) -> Result<UndirectedTopology> {
+fn undirected_topology(ctx: &Context, scope: &ReadStepScope<'_>) -> Result<UndirectedTopology> {
     if ctx.is_cancelled() {
         return Err(anyhow!("structural topology cancelled"));
     }
-    let selection = scope.subgraph();
+    let selection = scope;
     selection.validate_selected_read()?;
-    if selection.read_is_directed() {
+    if selection.is_directed() {
         return Err(anyhow!("Triangle and k-core builder steps require an undirected graph; directed definitions are not implemented"));
     }
     let nodes = selection.ordered_nodes().to_vec();
@@ -385,7 +414,17 @@ impl Step for EdgeWeightSumStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for EdgeWeightSumStep {}
+impl ReadStep for EdgeWeightSumStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let result = incident_weight_sums(ctx, scope, &self.weight_attr)?;
         scope
             .variables_mut()
@@ -399,13 +438,13 @@ impl Step for EdgeWeightSumStep {
 /// must be finite numeric scalars. Signed weights are valid for this sum.
 fn incident_weight_sums(
     ctx: &Context,
-    scope: &StepScope<'_>,
+    scope: &ReadStepScope<'_>,
     weight_attr: &AttrName,
 ) -> Result<HashMap<NodeId, AlgorithmParamValue>> {
     if ctx.is_cancelled() {
         return Err(anyhow!("incident weight sum cancelled"));
     }
-    let subgraph = scope.subgraph();
+    let subgraph = scope;
     let mut sums = HashMap::with_capacity(subgraph.node_count());
     subgraph.validate_selected_read()?;
     for &node in subgraph.ordered_nodes().iter() {

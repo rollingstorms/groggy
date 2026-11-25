@@ -54,6 +54,7 @@ with TemporaryDirectory() as folder:
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
 | `iter.loop` with an ordinary `body` of supported steps | Prepare sealed child kernels recursively on the owner; nested loops share pending reads, captures, cancellation and one outer publication. |
 | `iter.loop` with a fully lowered numeric/topology `batch_plan` | Private register frame; shared checked execution, staged reads and simultaneous carried slots. See [numeric loop plans](checked-numeric-loop-plans.md). |
+| `core.weighted_degree`, `core.edge_weight_sum`, `core.triangle_count`, `core.k_core_mark` | Share the existing selected structural kernels. Weight sums use total incidence, signed finite weights and twice-per-loop contribution; triangles/k-core require undirected input. |
 | `core.node_degree`, `core.neighbor_agg`, `core.collect_neighbor_values`, `core.neighbor_mode_update`, `core.update_in_place` | Share checked selected topology and immutable input maps. Asynchronous label updates keep stable ID order; pending revisions/removals are visible. |
 | `core.fused_axpy`, `core.fused_madd`, `graph.fused_neighbor_mul_agg` | Retain native f64 arithmetic; invalid nonfinite inputs/results reject before publication. |
 | `table.attach`, `graph.set_edge_endpoints`, `graph.remove_nodes`, `graph.remove_edges` | Explicit row-bound computed writeback and accepted-entity topology edits; see [writeback and cascades](durable-pipeline-writeback.md). |
@@ -148,3 +149,46 @@ As with other atomic builders, repeated writes to one key coalesce into its
 final staged value and effective time; internal iterations do not create
 separate retained versions. An inner failure or cancellation discards the
 whole publication and restores earlier Context outputs.
+
+
+## Structural step definitions
+
+`core.weighted_degree` and `core.edge_weight_sum` retain their existing total
+incidence definition on directed and undirected graphs: both endpoints receive
+the weight, and a self-loop contributes twice. Missing weights default to one;
+present weights must be finite numeric scalars. Signed weights are allowed and
+nonfinite accumulated sums reject before publication. This differs from the
+outgoing edge count produced by `core.node_degree` on directed graphs.
+
+`core.triangle_count` and `core.k_core_mark` retain their existing undirected
+contracts. Triangles use the simple loop-free projection. K-core peeling uses
+selected edge instances and counts each self-loop once. Directed inputs reject;
+no directed definition is inferred. Every step sees pending weights/endpoints
+and the selected membership, including prior creations/removals in its batch.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+initial = Graph()
+batch = GraphBatch(effective_at=0)
+for _ in range(3):
+    batch.add_node()
+for source, target in [(0, 1), (1, 2), (2, 0)]:
+    batch.add_edge(source, target)
+initial.writer().apply_batch(batch)
+with TemporaryDirectory() as folder:
+    store = DurableGraph.create_from_graph(Path(folder) / "triangles.journal", initial)
+    old_head = store.current_state_id
+    handle = step_pipeline("triangle counts", [
+        {"id": "core.triangle_count", "params": {"target": "counts"}},
+        {"id": "core.attach_node_attr", "params": {
+            "source": "counts", "attr": "triangles", "effective_at": 10}},
+    ], atomic=True)
+    result = Pipeline([handle]).run_durable(store)
+    assert [result.node_attr(i, "triangles") for i in result.node_ids] == [1, 1, 1]
+    assert store.current_state_id == old_head + 1
+    store.close()
+```

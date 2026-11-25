@@ -97,9 +97,7 @@ def test_late_error_and_unsupported_suffix_consume_no_ids_or_journal_bytes(tmp_p
         pipeline(
             [
                 step("graph.add_nodes", count=1, output="new"),
-                step(
-                    "core.weighted_degree", target="unsupported", weight_attr="weight"
-                ),
+                step("core.median", target="unsupported", source="missing"),
             ]
         ).run_durable(store)
     assert path.read_bytes() == original
@@ -516,9 +514,9 @@ def test_nested_ordinary_loop_rejects_unported_body_before_prefix(tmp_path, iter
                         iterations=0,
                         body=[
                             step(
-                                "core.weighted_degree",
+                                "core.median",
                                 target="bad",
-                                weight_attr="weight",
+                                source="missing",
                             )
                         ],
                     )
@@ -529,5 +527,87 @@ def test_nested_ordinary_loop_rejects_unported_body_before_prefix(tmp_path, iter
     with pytest.raises(RuntimeError, match="no detached native kernel"):
         p.run_durable(store)
     assert path.read_bytes() == original
+    assert store.read_view().node_ids == []
+    store.close()
+
+
+@pytest.mark.parametrize(
+    "kind,directed,options,expected",
+    [
+        ("weighted_degree", False, {"weight_attr": "weight"}, [7.5, 7.5, 10]),
+        ("weighted_degree", True, {"weight_attr": "weight"}, [7.5, 7.5, 10]),
+        ("edge_weight_sum", False, {"weight_attr": "weight"}, [7.5, 7.5, 10]),
+        ("edge_weight_sum", True, {"weight_attr": "weight"}, [7.5, 7.5, 10]),
+        ("triangle_count", False, {}, [1, 1, 1]),
+        ("k_core_mark", False, {"k": 2}, [1, 1, 1]),
+    ],
+)
+def test_structural_steps_run_in_durable_ordinary_body(
+    tmp_path, kind, directed, options, expected
+):
+    graph = Graph(directed=directed)
+    batch = GraphBatch(effective_at=0)
+    for _ in range(3):
+        batch.add_node()
+    for source, target in [(0, 1), (0, 1), (1, 2), (2, 0), (2, 2)]:
+        batch.add_edge(source, target)
+    graph.writer().apply_batch(batch)
+    path = tmp_path / "structural.journal"
+    store = DurableGraph.create_from_graph(path, graph)
+    head = store.current_state_id
+    p = pipeline(
+        [
+            step("core.init_edges", target="weights", value=2.5),
+            step(
+                "core.attach_edge_attr",
+                source="weights",
+                attr="weight",
+                effective_at=10,
+            ),
+            step(
+                "iter.loop",
+                iterations=2,
+                body=[
+                    step("core." + kind, target="answer", **options),
+                    step(
+                        "core.attach_node_attr",
+                        source="answer",
+                        attr="answer",
+                        effective_at=20,
+                    ),
+                ],
+            ),
+        ]
+    )
+    result = p.run_durable(store)
+    assert [result.node_attr(i, "answer") for i in result.node_ids] == expected
+    assert store.current_state_id == head + 1
+    store.close()
+    reopened = DurableGraph.open(path)
+    assert reopened.read_view_at(19).node_attr(0, "answer") is None
+    assert reopened.read_view_at(20).node_attr(0, "answer") == expected[0]
+    reopened.close()
+
+
+@pytest.mark.parametrize(
+    "kind,options", [("triangle_count", {}), ("k_core_mark", {"k": 2})]
+)
+def test_structural_directed_rejection_preserves_journal_and_ids(
+    tmp_path, kind, options
+):
+    store = DurableGraph.create_from_graph(
+        tmp_path / "directed.journal", Graph(directed=True)
+    )
+    path = tmp_path / "directed.journal"
+    before = path.read_bytes()
+    p = pipeline(
+        [
+            step("graph.add_nodes", count=1, output="new"),
+            step("core." + kind, target="answer", **options),
+        ]
+    )
+    with pytest.raises(RuntimeError, match="require an undirected graph"):
+        p.run_durable(store)
+    assert path.read_bytes() == before
     assert store.read_view().node_ids == []
     store.close()
