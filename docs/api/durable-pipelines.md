@@ -52,6 +52,7 @@ with TemporaryDirectory() as folder:
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
 | `core.filter_nodes_by_attr`, `core.filter_edges_by_attr`, `core.sort_nodes_by_attr`, `core.top_k` | Share selected pending property reads and existing predicate/rank rules; masks/ranks are owned maps, with graph changes only through explicit attachment. |
+| `core.sample_nodes`, `core.sample_edges`, `core.reservoir_sample` | Seeded selected node/edge masks; reservoir inputs are validated even at zero k, and only explicit attachment writes graph properties. |
 | Declarative `core.map_nodes` expressions | Share the existing evaluator with a private selected-read input adapter. Pending attributes, graph-default neighbors, checked operators, short-circuit and async source visibility retain their native rules. Rust callback mapping remains owner-only. |
 | `alias`, `core.flow_update`, `core.residual_capacity` | Share owned immutable values and checked edge-map arithmetic; aliases remain independent under mutation/rebinding. Positive residuals retain their supplied edge IDs. |
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
@@ -420,5 +421,41 @@ with TemporaryDirectory() as folder:
     result = Pipeline([handle]).run_durable(store)
     assert result.node_ids == [0, 1, 2, 3]
     assert [result.node_attr(i, "rank") for i in result.node_ids] == [0, None, 1, None]
+    store.close()
+```
+
+## Seeded sampling masks
+
+Sampling returns owned ID-to-one masks, preserving graph membership and distinct
+parallel/self-loop edge instances. Counts cannot exceed the selected population.
+Fractions are finite in `[0, 1]`; the selected count rounds halfway upward.
+Reservoir sampling takes at most the available source rows, validates all source
+IDs even at zero k, and keeps no streaming state between invocations. A fixed
+seed and stable population reproduce the mask. Without a seed, results may vary.
+Only explicit attachment publishes these results; repeated masks are not a new
+selection. Subgraph-producing samplers and foreach containers retain their
+separate owner-bound execution limitation.
+
+```python
+from tempfile import TemporaryDirectory
+from pathlib import Path
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+with TemporaryDirectory() as directory:
+    graph = Graph()
+    batch = GraphBatch(effective_at=0)
+    for _ in range(5):
+        batch.add_node()
+    graph.writer().apply_batch(batch)
+    store = DurableGraph.create_from_graph(Path(directory) / "sampling.journal", graph)
+    program = Pipeline([step_pipeline("sample masks", [
+        {"id": "core.sample_nodes", "params": {"fraction": 0.5, "seed": 42, "target": "sample"}},
+        {"id": "core.reservoir_sample", "params": {"source": "sample", "k": 2, "seed": 42, "target": "two"}},
+        {"id": "core.attach_node_attr", "params": {"source": "two", "attr": "chosen", "effective_at": 20}},
+    ], atomic=True)])
+    result = program.run_durable(store)
+    assert len(result.node_ids) == 5
+    assert sum(result.node_attr(node, "chosen") == 1 for node in result.node_ids) == 2
     store.close()
 ```

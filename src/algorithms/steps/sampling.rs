@@ -24,6 +24,8 @@ use super::core::{
     nested_effect, AtomicStepEffect, Step, StepExecutor, StepMetadata, StepScope, StepVariables,
 };
 
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
+
 /// Specification for sampling: either a fraction or absolute count.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -55,14 +57,13 @@ impl SampleSpec {
 }
 
 /// Stable IDs from the validated selected source, including immutable pending reads.
-fn checked_population(ctx: &Context, scope: &StepScope<'_>, edges: bool) -> Result<Vec<usize>> {
+fn checked_population(ctx: &Context, scope: &ReadStepScope<'_>, edges: bool) -> Result<Vec<usize>> {
     check_cancelled(ctx)?;
-    let selection = scope.subgraph();
-    selection.validate_selected_read()?;
+    scope.validate_selected_read()?;
     let ids = if edges {
-        selection.ordered_edges()
+        scope.ordered_edges()
     } else {
-        selection.ordered_nodes()
+        scope.ordered_nodes()
     };
     check_cancelled(ctx)?;
     Ok(ids.to_vec())
@@ -136,7 +137,16 @@ impl Step for SampleNodesStep {
         }
     }
 
-    fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for SampleNodesStep {}
+impl ReadStep for SampleNodesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let ids = checked_population(ctx, scope, false)?;
         let count = self.spec.calculate_sample_size(ids.len())?;
         let result = sample_mask(ctx, &ids, count, self.seed)?;
@@ -187,7 +197,16 @@ impl Step for SampleEdgesStep {
         }
     }
 
-    fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for SampleEdgesStep {}
+impl ReadStep for SampleEdgesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let ids = checked_population(ctx, scope, true)?;
         let count = self.spec.calculate_sample_size(ids.len())?;
         let result = sample_mask(ctx, &ids, count, self.seed)?;
@@ -206,7 +225,9 @@ struct SelectionTopology {
 }
 impl SelectionTopology {
     fn prepare(ctx: &Context, scope: &StepScope<'_>) -> Result<Self> {
-        let edges = checked_population(ctx, scope, true)?;
+        check_cancelled(ctx)?;
+        scope.subgraph().validate_selected_read()?;
+        let edges = scope.subgraph().ordered_edges().to_vec();
         let nodes = scope.subgraph().ordered_nodes().to_vec();
         let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
         let mut endpoints = HashMap::with_capacity(edges.len());
@@ -940,7 +961,16 @@ impl Step for ReservoirSampleStep {
         }
     }
 
-    fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for ReservoirSampleStep {}
+impl ReadStep for ReservoirSampleStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let edges = matches!(self.entity_type, EntityType::Edges);
         let population = checked_population(ctx, scope, edges)?;
         let source = if edges {
