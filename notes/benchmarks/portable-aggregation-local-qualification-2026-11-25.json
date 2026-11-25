@@ -1,0 +1,52 @@
+{
+  "runtime": "a305dac5f200886b0fcf8d96792fa4b498669713",
+  "date": "2026-11-25",
+  "scope": "Complete eight-step aggregation native-read inventory: seven owned-map statistics join the previously portable neighbor aggregator. Shared numerical/category kernels and output/publication policies preserved. Local qualification only; broader execution parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "c88e64f80d105263d8f8b36b76df918125868fe27f52f719eec503fd1bf60355",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1675,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 230,
+    "doctests_passed": 10,
+    "aggregation_module_portable_steps": 8,
+    "new_aggregation_integration_tests": 3,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3489,
+    "maintained_skipped": 1,
+    "established_warnings": 14,
+    "documentation_examples": 296,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "ef9e29be44225a8a025c80654045a92d03bd1651c2f18883752abd19a54c3de7",
+    "qualification_receipt": "notes/benchmarks/portable-aggregation-wheel-qualification-2026-11-25.json"
+  },
+  "performance": {
+    "prior_loop_receipt": "notes/benchmarks/ordinary-loop-performance-2026-11-24.json",
+    "scope": "No new aggregation performance claim. Earlier ordinary-loop samples remain evidence for their recorded runtime and workload."
+  },
+  "platform_boundary": "Earlier cross-platform qualification at runtime b24e86e0 remains historical; no new platform qualification claimed for this slice.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-portable-aggregation-native.log": "7036867eafa7ef8e4551d562bd899a26c33d51dfe5cf02fc02673ef24b7436bd",
+    "/tmp/groggy-portable-aggregation-clippy.log": "faeae617dd652cdfee3e05409f2f951357a15c08a02cb6ded5450423ed337a4f",
+    "/tmp/groggy-portable-aggregation-wheel-gates.log": "8696ca5865cb5802cd61c4053a64f8434086fcc74862de409e1a3daaa3d8c79e"
+  }
+}

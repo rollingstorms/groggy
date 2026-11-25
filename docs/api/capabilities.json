@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "reviewed_runtime": "9ae820e8550c9878eb1543202839b8d7996909c9",
-  "updated": "2026-11-24",
+  "reviewed_runtime": "a305dac5f200886b0fcf8d96792fa4b498669713",
+  "updated": "2026-11-25",
   "scope": "Public feature-family capability matrix, with all stable checklist rows mapped. Bounded means only the stated contract is qualified; it never closes an overlapping parent by implication.",
-  "local_receipt": "notes/benchmarks/portable-structural-local-qualification-2026-11-24.json",
+  "local_receipt": "notes/benchmarks/portable-aggregation-local-qualification-2026-11-25.json",
   "features": [
     {
       "id": "graph-model",
@@ -899,12 +899,13 @@
           "src/algorithms/steps/checked_batch.rs",
           "src/algorithms/steps/core.rs",
           "src/algorithms/steps/loop_step.rs",
-          "src/algorithms/steps/structural.rs"
+          "src/algorithms/steps/structural.rs",
+          "src/algorithms/steps/aggregations.rs"
         ]
       },
       "python": {
         "support": "available",
-        "surface": "Pipeline and atomic step_pipeline builders; run_durable with checked arithmetic, ordinary nested loop bodies and all five structural steps, 35 numeric/topology loop instruction forms, explicit writeback/topology/schema; unoptimized AlgorithmBuilder arithmetic",
+        "surface": "Pipeline and atomic step_pipeline builders; run_durable with checked arithmetic, ordinary nested loop bodies and all five structural steps and all eight aggregation steps, 35 numeric/topology loop instruction forms, explicit writeback/topology/schema; unoptimized AlgorithmBuilder arithmetic",
         "sources": [
           "python-groggy/python/groggy/builder/algorithm_builder.py",
           "python-groggy/src/ffi/api/pipeline.rs",
@@ -913,7 +914,7 @@
         ]
       },
       "persistence": "Certified memory programs accept one delta; supported durable programs journal one acceptance, including explicitly attached computed columns. Read-only computations/outputs create no history.",
-      "limits": "Memory root sequential topology loops and all 13 classic wrappers work. Durable creation, properties, computed writeback, accepted topology edits, shared arithmetic/normalization, degree/weighted-incidence/triangle/k-core/neighbor/update/fused kernels and 35 loop instruction forms use sealed kernels. Ordinary loop bodies recursively prepare sealed children, including nested ordinary/register loops; worker execution makes no registry or Step/Algorithm callbacks. Edge-attribute registers, normalize(min/mean), other unported read/history steps and composition containers, remaining expression lowering, provisional removal/revision/history, fixed-child topology, remaining alternate plans/public IR, custom/streaming effects and naming/history policy remain open. Private immutable bindings and copy-on-write access reduce measured register-copy overhead; row validation, output-map allocation, first aliased mutation and production budgets remain explicit costs. Selected adjacency is rebuilt/sorted per checked invocation; integer-mode specialization avoids JSON counting keys, while measured compiled-neighbor overhead remains in the performance scope. Unlowerable expressions preserve the ordinary native path rather than selecting an incorrect direction or omitting operations. Weighted sums retain total incidence (loops twice), signed/missing weight rules and finite accumulation; triangle/k-core steps retain their undirected domains and existing projection/multiplicity definitions.",
+      "limits": "Memory root sequential topology loops and all 13 classic wrappers work. Durable creation, properties, computed writeback, accepted topology edits, shared arithmetic/normalization, degree/weighted-incidence/triangle/k-core/neighbor/update/fused kernels and 35 loop instruction forms use sealed kernels. Ordinary loop bodies recursively prepare sealed children, including nested ordinary/register loops; worker execution makes no registry or Step/Algorithm callbacks. Edge-attribute registers, normalize(min/mean), other unported read/history steps and composition containers, remaining expression lowering, provisional removal/revision/history, fixed-child topology, remaining alternate plans/public IR, custom/streaming effects and naming/history policy remain open. Private immutable bindings and copy-on-write access reduce measured register-copy overhead; row validation, output-map allocation, first aliased mutation and production budgets remain explicit costs. Selected adjacency is rebuilt/sorted per checked invocation; integer-mode specialization avoids JSON counting keys, while measured compiled-neighbor overhead remains in the performance scope. Unlowerable expressions preserve the ordinary native path rather than selecting an incorrect direction or omitting operations. Weighted sums retain total incidence (loops twice), signed/missing weight rules and finite accumulation; triangle/k-core steps retain their undirected domains and existing projection/multiplicity definitions. Owned map reductions, std/median/quantile, typed mode/entropy and histogram share existing numerical kernels, empty/tie policies and owned outputs; read-only computations create no version.",
       "evidence": {
         "contracts": [
           "docs/api/atomic-pipeline-capabilities.md",
@@ -929,7 +930,8 @@
           "tests/durable_pipeline_execution.rs",
           "tests/checked_batch_lowering.rs",
           "tests/durable_loop_execution.rs",
-          "tests/durable_structural_steps.rs"
+          "tests/durable_structural_steps.rs",
+          "tests/durable_aggregation_steps.rs"
         ],
         "python_tests": [
           "tests/test_staged_revision_endpoints.py",
@@ -938,7 +940,8 @@
           "tests/test_durable_pipeline_execution.py",
           "tests/test_checked_batch_lowering.py",
           "tests/test_batch_plan.py",
-          "tests/test_builder_core.py"
+          "tests/test_builder_core.py",
+          "tests/test_durable_aggregation_steps.py"
         ]
       },
       "python_exports": [

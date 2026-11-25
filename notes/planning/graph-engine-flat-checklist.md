@@ -1,5 +1,14 @@
 # Groggy implementation checklist
 
+**Aggregation follow-up — 2026-11-25:**
+[Portable aggregation steps](portable-aggregation-steps-2026-11-25.md) completes
+the eight-step aggregation module's native-read inventory. Seven owned-map
+statistics now run through the same memory/durable kernels, preserving precision,
+ties, empty behavior and owned histograms. Six component checks are complete;
+broad flat counts remain **217 checked / 51 open**. Local gates pass **1,675 native /
+3,489 Python tests / 296 examples**; remaining composition/history migration stays open.
+
+
 **Structural step follow-up — 2026-11-24:**
 [Portable structural steps](portable-structural-steps-2026-11-24.md) completes the
 five-step structural module's native-read inventory: weighted degree, incident
