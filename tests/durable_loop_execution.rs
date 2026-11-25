@@ -191,7 +191,7 @@ fn unsupported_nested_body_is_rejected_even_at_zero_iterations() {
         let p = pipeline(json!([
             {"id":"graph.add_nodes","params":{"count":1,"output":"new"}},
             repeat(iterations, json!([repeat(0, json!([
-                {"id":"core.median","params":{"target":"bad","source":"missing"}}
+                {"id":"temporal.snapshot_at","params":{"output":"bad","state_id":0}}
             ]))]))
         ]));
         assert!(p.prepare_durable(&store, &selected).is_err());

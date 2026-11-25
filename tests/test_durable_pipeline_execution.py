@@ -97,7 +97,7 @@ def test_late_error_and_unsupported_suffix_consume_no_ids_or_journal_bytes(tmp_p
         pipeline(
             [
                 step("graph.add_nodes", count=1, output="new"),
-                step("core.median", target="unsupported", source="missing"),
+                step("temporal.snapshot_at", output="unsupported", state_id=0),
             ]
         ).run_durable(store)
     assert path.read_bytes() == original
@@ -514,9 +514,9 @@ def test_nested_ordinary_loop_rejects_unported_body_before_prefix(tmp_path, iter
                         iterations=0,
                         body=[
                             step(
-                                "core.median",
-                                target="bad",
-                                source="missing",
+                                "temporal.snapshot_at",
+                                output="bad",
+                                state_id=0,
                             )
                         ],
                     )

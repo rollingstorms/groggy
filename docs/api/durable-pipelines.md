@@ -51,6 +51,7 @@ with TemporaryDirectory() as folder:
 | `core.init_nodes`, `core.init_nodes_with_index`, `core.init_edges`, `core.init_scalar`, `core.graph_node_count`, `core.graph_edge_count` | Use the pending selection and deterministic node ordering; scalar values remain owned intermediates. |
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
+| `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
 | `iter.loop` with an ordinary `body` of supported steps | Prepare sealed child kernels recursively on the owner; nested loops share pending reads, captures, cancellation and one outer publication. |
 | `iter.loop` with a fully lowered numeric/topology `batch_plan` | Private register frame; shared checked execution, staged reads and simultaneous carried slots. See [numeric loop plans](checked-numeric-loop-plans.md). |
@@ -190,5 +191,46 @@ with TemporaryDirectory() as folder:
     result = Pipeline([handle]).run_durable(store)
     assert [result.node_attr(i, "triangles") for i in result.node_ids] == [1, 1, 1]
     assert store.current_state_id == old_head + 1
+    store.close()
+```
+
+
+## Owned aggregation inputs
+
+Aggregation steps consume the named node map, rather than reading graph
+properties again. A later property write cannot change a previously loaded map;
+an explicit new load sees pending values. Use `core.broadcast_scalar` to turn a
+scalar statistic into a node map before attachment. A histogram is a count vector,
+not a graph selection; its named `histograms.<target>` output can also be read
+without attaching anything or publishing history.
+
+`core.std` uses sample standard deviation and returns null for fewer than two
+values. Empty reductions, median, quantile and mode return null; empty entropy
+is zero and histogram bins are zero-filled. Numeric statistics require finite
+numeric inputs. Mode and entropy accept typed categories; tied modes choose the
+category whose contributor has the lowest node ID. The existing numerical kernels
+and quantile interpolation rules are shared across both execution paths.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+input_graph = Graph()
+batch = GraphBatch(effective_at=0)
+for value in [1, 2, 3, 4]:
+    batch.add_node(score=value)
+input_graph.writer().apply_batch(batch)
+with TemporaryDirectory() as folder:
+    store = DurableGraph.create_from_graph(Path(folder) / "histogram.journal", input_graph)
+    head = store.current_state_id
+    handle = step_pipeline("owned histogram", [
+        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "values"}},
+        {"id": "core.histogram", "params": {"source": "values", "target": "counts", "bins": 2}},
+    ], atomic=True)
+    result, profile = Pipeline([handle]).run_durable(store, return_profile=True)
+    assert profile["outputs"]["histograms.counts"] == [2, 2]
+    assert result.write_state_id == head == store.current_state_id
     store.close()
 ```
