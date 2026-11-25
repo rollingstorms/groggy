@@ -1,5 +1,15 @@
 # Groggy roadmap status — 2026-10-24
 
+**Structural step follow-up — 2026-11-24:**
+[Portable structural steps](portable-structural-steps-2026-11-24.md) completes the
+five-step structural module's native-read inventory: weighted degree, incident
+weight sums, triangle counts and k-core marking now join degree on the shared
+memory/durable execution boundary. Existing semantics and rejection domains are
+preserved. Six component checks are complete; broad counts remain **217 checked
+/ 51 open**. Local gates pass **1,672 native tests / 3,458 Python tests / 295
+examples**; qualification and remaining scope are recorded in the component note.
+
+
 **Ordinary loop follow-up — 2026-11-24:**
 [Ordinary loop portability](ordinary-loop-portability-2026-11-24.md) completes
 recursive preparation and detached execution of certified step bodies, including

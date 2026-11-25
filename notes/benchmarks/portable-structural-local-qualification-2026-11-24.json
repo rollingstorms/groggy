@@ -1,0 +1,52 @@
+{
+  "runtime": "9ae820e8550c9878eb1543202839b8d7996909c9",
+  "date": "2026-11-24",
+  "scope": "Complete five-step structural native-read inventory: weighted degree, edge weight sums, triangles and k-core join the already portable degree step. Existing memory/durable definitions preserved; broader execution parents remain open. Local qualification only.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "bbf7c0c5eda7871bec0b4efb31760988d5fe2c0cd31bcae466266f3dadb9fc2f",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1672,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 229,
+    "doctests_passed": 10,
+    "structural_module_portable_steps": 5,
+    "new_structural_integration_tests": 2,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3458,
+    "maintained_skipped": 1,
+    "established_warnings": 14,
+    "documentation_examples": 295,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "601961957ffbe68d03a43f84c64d93c9beb16f76ce5423340336c5a47d6e594d",
+    "qualification_receipt": "notes/benchmarks/portable-structural-wheel-qualification-2026-11-24.json"
+  },
+  "performance": {
+    "prior_loop_receipt": "notes/benchmarks/ordinary-loop-performance-2026-11-24.json",
+    "scope": "No new structural performance claim. Earlier ordinary-loop samples remain evidence for their recorded runtime and workload."
+  },
+  "platform_boundary": "Earlier cross-platform qualification at runtime b24e86e0 remains historical; no new platform qualification claimed for this slice.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-portable-structural-native.log": "20d4dd8684ca1ea931988e4c558f5cda01578175b058365de430e3c4fea35e18",
+    "/tmp/groggy-portable-structural-clippy.log": "591e1c111605a2b98469460ef87cd79d6bcbdef2b4bcec38f0b7cbc35d7e8911",
+    "/tmp/groggy-portable-structural-wheel-gates.log": "0a42f649af8590b77a06f2b19e5913dd24c6e3e294eeab2626af27fb65bec941"
+  }
+}
