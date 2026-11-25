@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 
 /// Update flow values along a path or set of edges.
 ///
@@ -61,7 +62,17 @@ impl Step for FlowUpdateStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for FlowUpdateStep {}
+impl ReadStep for FlowUpdateStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("flow_update cancelled"));
         }
@@ -176,7 +187,17 @@ impl Step for ResidualCapacityStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for ResidualCapacityStep {}
+impl ReadStep for ResidualCapacityStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("residual_capacity cancelled"));
         }
@@ -393,20 +414,29 @@ impl Step for AliasStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for AliasStep {}
+impl ReadStep for AliasStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("alias cancelled"));
         }
 
         let value = scope
             .variables()
-            .value(&self.source)
-            .cloned()
+            .shared_value(&self.source)
             .ok_or_else(|| anyhow!("alias: source variable '{}' not found", self.source))?;
         if ctx.is_cancelled() {
             return Err(anyhow!("alias cancelled"));
         }
-        scope.variables_mut().set_value(&self.target, value);
+        scope.variables_mut().set_shared_value(&self.target, value);
 
         Ok(())
     }
@@ -429,6 +459,57 @@ mod checked_flow_tests {
             HashSet::new(),
             "flow values".into(),
         )
+    }
+
+    #[test]
+    fn aliases_preserve_independent_map_and_column_mutation() {
+        use super::super::core::NodeColumn;
+        let selected = selection();
+        let mut variables = StepVariables::default();
+        variables.set_node_map("original", [(0, AlgorithmParamValue::Int(7))].into());
+        variables.set_node_column(
+            "column",
+            NodeColumn::new(vec![0], vec![AlgorithmParamValue::Int(9)]),
+        );
+        let mut scope = StepScope::new(&selected, &mut variables);
+        AliasStep::new("original", "copy")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        AliasStep::new("column", "column_copy")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        scope
+            .variables_mut()
+            .node_map_mut("copy")
+            .unwrap()
+            .insert(0, AlgorithmParamValue::Int(8));
+        scope
+            .variables_mut()
+            .node_column_mut("column_copy")
+            .unwrap()
+            .values_mut()[0] = AlgorithmParamValue::Int(10);
+        assert_eq!(
+            scope.variables().node_map("original").unwrap()[&0],
+            AlgorithmParamValue::Int(7)
+        );
+        assert_eq!(
+            scope.variables().node_column("column").unwrap().get(0),
+            Some(&AlgorithmParamValue::Int(9))
+        );
+        AliasStep::new("copy", "copy")
+            .apply(&mut Context::new(), &mut scope)
+            .unwrap();
+        assert_eq!(
+            scope.variables().node_map("copy").unwrap()[&0],
+            AlgorithmParamValue::Int(8)
+        );
+        assert!(AliasStep::new("missing", "copy")
+            .apply(&mut Context::new(), &mut scope)
+            .is_err());
+        assert_eq!(
+            scope.variables().node_map("copy").unwrap()[&0],
+            AlgorithmParamValue::Int(8)
+        );
     }
 
     #[test]

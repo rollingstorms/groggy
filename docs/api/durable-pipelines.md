@@ -51,6 +51,7 @@ with TemporaryDirectory() as folder:
 | `core.init_nodes`, `core.init_nodes_with_index`, `core.init_edges`, `core.init_scalar`, `core.graph_node_count`, `core.graph_edge_count` | Use the pending selection and deterministic node ordering; scalar values remain owned intermediates. |
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
+| `alias`, `core.flow_update`, `core.residual_capacity` | Share owned immutable values and checked edge-map arithmetic; aliases remain independent under mutation/rebinding. Positive residuals retain their supplied edge IDs. |
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
 | `core.execution_block` in supported `message_pass` mode | Prepare the existing body on the owner; use selected pending adjacency and preserve ordered/synchronous updates, column order, directions and checked body operations. Streaming and unsupported body operations reject. |
@@ -282,5 +283,53 @@ with TemporaryDirectory() as folder:
     builder.attach_as("answer", values)
     result = Pipeline([builder.build(atomic=True, optimize=False)]).run_durable(store)
     assert [result.node_attr(i, "answer") for i in result.node_ids] == [0, 1, 2]
+    store.close()
+```
+
+
+## Flow maps and aliases
+
+`alias` creates an independent logical binding to an immutable value. Its payload
+is shared until a mutable consumer needs a private copy. Rebinding either name
+leaves the other unchanged. Graph/table aliases retain their original immutable
+pin, including after later graph changes or closing the owner.
+
+`core.flow_update` accepts an edge-map delta or scalar delta and uses checked
+integer/finite-float arithmetic. Map deltas use the union of supplied edge IDs;
+missing deltas preserve the original value. `core.residual_capacity` retains
+positive capacity-minus-flow values and positive flow-only values under their
+supplied IDs. These primitives neither create reverse edges nor enforce complete
+flow conservation. Explicit edge attachment still checks graph authority.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+graph = Graph(directed=True)
+batch = GraphBatch(effective_at=0)
+batch.add_node()
+batch.add_node()
+batch.add_edge(0, 1)
+graph.writer().apply_batch(batch)
+with TemporaryDirectory() as folder:
+    store = DurableGraph.create_from_graph(Path(folder) / "flow.journal", graph)
+    def flow_step(kind, **params):
+        return {"id": kind, "params": params}
+    handle = step_pipeline("flow update", [
+        flow_step("core.init_edges", target="flow", value=2),
+        flow_step("alias", source="flow", target="saved"),
+        flow_step("core.init_scalar", target="delta", value=3),
+        flow_step("core.flow_update", flow="flow", delta="delta", target="flow"),
+        flow_step("core.init_edges", target="capacity", value=10),
+        flow_step("core.residual_capacity", capacity="capacity", flow="flow", target="residual"),
+        flow_step("core.attach_edge_attr", source="flow", attr="flow", effective_at=20),
+        flow_step("core.attach_edge_attr", source="saved", attr="saved", effective_at=20),
+        flow_step("core.attach_edge_attr", source="residual", attr="residual", effective_at=30),
+    ], atomic=True)
+    result = Pipeline([handle]).run_durable(store)
+    assert result.edge_attr(0, "flow") == result.edge_attr(0, "residual") == 5
+    assert result.edge_attr(0, "saved") == 2
     store.close()
 ```
