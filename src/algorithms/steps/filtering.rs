@@ -16,6 +16,7 @@ use crate::types::{AttrName, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 
 /// Predicate for filtering operations.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -213,14 +214,23 @@ impl Step for SortNodesByAttrStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for SortNodesByAttrStep {}
+impl ReadStep for SortNodesByAttrStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("sort_nodes_by_attr cancelled"));
         }
 
         let attr_name = AttrName::from(self.attr.clone());
-        let mut node_values = Vec::with_capacity(scope.subgraph().node_count());
-        for &node in scope.node_ids() {
+        let mut node_values = Vec::with_capacity(scope.node_count());
+        for &node in scope.ordered_nodes().iter() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("sort_nodes_by_attr cancelled"));
             }
@@ -298,7 +308,16 @@ impl Step for FilterNodesByAttrStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for FilterNodesByAttrStep {}
+impl ReadStep for FilterNodesByAttrStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("filter_nodes_by_attr cancelled"));
         }
@@ -307,7 +326,7 @@ impl Step for FilterNodesByAttrStep {
         let mut result = HashMap::new();
 
         self.predicate.validate()?;
-        for &node in scope.node_ids() {
+        for &node in scope.ordered_nodes().iter() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("filter_nodes_by_attr cancelled"));
             }
@@ -371,7 +390,16 @@ impl Step for FilterEdgesByAttrStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for FilterEdgesByAttrStep {}
+impl ReadStep for FilterEdgesByAttrStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("filter_edges_by_attr cancelled"));
         }
@@ -380,7 +408,7 @@ impl Step for FilterEdgesByAttrStep {
         let mut result = HashMap::new();
 
         self.predicate.validate()?;
-        for &edge in scope.edge_ids() {
+        for &edge in scope.ordered_edges().iter() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("filter_edges_by_attr cancelled"));
             }
@@ -451,7 +479,16 @@ impl Step for TopKStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for TopKStep {}
+impl ReadStep for TopKStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("top_k cancelled"));
         }
@@ -459,9 +496,9 @@ impl Step for TopKStep {
         let source_map = scope.variables().node_map(&self.source)?;
 
         let mut items = Vec::with_capacity(source_map.len());
-        scope.subgraph().validate_selected_read()?;
+        scope.validate_selected_read()?;
         for (&node, value) in source_map {
-            if !scope.subgraph().has_node(node) {
+            if !scope.has_node(node) {
                 return Err(anyhow!(
                     "top_k source node {} is outside active selection",
                     node

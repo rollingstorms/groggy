@@ -51,6 +51,7 @@ with TemporaryDirectory() as folder:
 | `core.init_nodes`, `core.init_nodes_with_index`, `core.init_edges`, `core.init_scalar`, `core.graph_node_count`, `core.graph_edge_count` | Use the pending selection and deterministic node ordering; scalar values remain owned intermediates. |
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
+| `core.filter_nodes_by_attr`, `core.filter_edges_by_attr`, `core.sort_nodes_by_attr`, `core.top_k` | Share selected pending property reads and existing predicate/rank rules; masks/ranks are owned maps, with graph changes only through explicit attachment. |
 | Declarative `core.map_nodes` expressions | Share the existing evaluator with a private selected-read input adapter. Pending attributes, graph-default neighbors, checked operators, short-circuit and async source visibility retain their native rules. Rust callback mapping remains owner-only. |
 | `alias`, `core.flow_update`, `core.residual_capacity` | Share owned immutable values and checked edge-map arithmetic; aliases remain independent under mutation/rebinding. Positive residuals retain their supplied edge IDs. |
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
@@ -379,5 +380,45 @@ with TemporaryDirectory() as folder:
     builder.attach_as("rank", ranks)
     result = Pipeline([builder.build(atomic=True, optimize=False)]).run_durable(store)
     assert all(abs(result.node_attr(i, "rank") - 3.295) < 1e-12 for i in result.node_ids)
+    store.close()
+```
+
+
+## Filter masks and rank maps
+
+Filtering steps produce owned maps containing integer `1` for matching node/edge
+IDs. They do not remove or deactivate entities. Missing attributes are skipped;
+explicit null is still a typed value for equality/inequality predicates.
+Ordering comparisons preserve mixed integer/floating precision. Equality retains
+its typed comparison rule; numeric range and ordering predicates use numeric
+comparison. String containment and inclusive ranges retain their existing rules.
+
+Sort and top-k produce ID-to-rank maps. They require a single comparable numeric,
+text or Boolean domain; missing/null values sort last in either direction and
+value ties break by ID. NaNs and incompatible domains reject. Even top-k zero
+validates its entire source before returning an empty map. Computation alone
+creates no version; explicit attachment uses the canonical checked batch.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+graph = Graph()
+batch = GraphBatch(effective_at=0)
+for score in [3, 1, 3, None]:
+    batch.add_node(score=score)
+graph.writer().apply_batch(batch)
+with TemporaryDirectory() as folder:
+    store = DurableGraph.create_from_graph(Path(folder) / "ranks.journal", graph)
+    handle = step_pipeline("rank selected values", [
+        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "values"}},
+        {"id": "core.top_k", "params": {"source": "values", "order": "desc", "k": 2, "target": "top"}},
+        {"id": "core.attach_node_attr", "params": {"source": "top", "attr": "rank", "effective_at": 10}},
+    ], atomic=True)
+    result = Pipeline([handle]).run_durable(store)
+    assert result.node_ids == [0, 1, 2, 3]
+    assert [result.node_attr(i, "rank") for i in result.node_ids] == [0, None, 1, None]
     store.close()
 ```
