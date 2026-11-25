@@ -786,16 +786,6 @@ impl<'a> StepScope<'a> {
         self.subgraph
     }
 
-    /// Build checked adjacency from the selected source, never retained owner
-    /// pool endpoints when a frozen source supplies topology.
-    pub(crate) fn selected_csr(
-        &mut self,
-        ctx: &Context,
-        direction: super::direction::NeighborDirection,
-    ) -> Result<SelectedCsr> {
-        self.read_scope().selected_csr(ctx, direction)
-    }
-
     /// Read through the shared staged node-property overlay.
     pub fn node_attribute(
         &self,

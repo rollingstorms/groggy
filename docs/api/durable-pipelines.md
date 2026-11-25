@@ -53,6 +53,7 @@ with TemporaryDirectory() as folder:
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
+| `core.execution_block` in supported `message_pass` mode | Prepare the existing body on the owner; use selected pending adjacency and preserve ordered/synchronous updates, column order, directions and checked body operations. Streaming and unsupported body operations reject. |
 | `iter.loop` with an ordinary `body` of supported steps | Prepare sealed child kernels recursively on the owner; nested loops share pending reads, captures, cancellation and one outer publication. |
 | `iter.loop` with a fully lowered numeric/topology `batch_plan` | Private register frame; shared checked execution, staged reads and simultaneous carried slots. See [numeric loop plans](checked-numeric-loop-plans.md). |
 | `core.weighted_degree`, `core.edge_weight_sum`, `core.triangle_count`, `core.k_core_mark` | Share the existing selected structural kernels. Weight sums use total incidence, signed finite weights and twice-per-loop contribution; triangles/k-core require undirected input. |
@@ -232,5 +233,54 @@ with TemporaryDirectory() as folder:
     result, profile = Pipeline([handle]).run_durable(store, return_profile=True)
     assert profile["outputs"]["histograms.counts"] == [2, 2]
     assert result.write_state_id == head == store.current_state_id
+    store.close()
+```
+
+
+## Message-passing blocks
+
+Supported `core.execution_block` message-pass bodies run through the same sealed
+kernel as memory execution, including inside ordinary loops. The Python
+`AlgorithmBuilder.message_pass` facade uses this route with an atomic builder.
+Body parsing and certification happen during owner preparation; detached workers
+do not instantiate steps or call the registry.
+
+Ordered mode reads each earlier update in the target's row order; node maps use
+ascending IDs and explicit node columns preserve their order. Synchronous mode
+reads the original column throughout one block invocation. Direction defaults
+to incoming and can be explicitly `in`, `out` or `undirected`. Parallel neighbor
+incidences remain distinct; self-loops count once and `include_self` adds a node
+only when it is absent from that neighbor row. These are the existing block
+rules, rather than a new general adjacency definition.
+
+Supported bodies retain neighbor collection/mode, unweighted neighbor sum,
+constants, checked arithmetic, comparisons, conditional selection and apply.
+Weighted or other reducer variants inside a block remain rejected; use the
+standalone aggregation steps. Streaming, unsupported body operations and invalid
+directions reject before execution, including within a zero-iteration loop.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import AlgorithmBuilder
+
+graph = Graph(directed=True)
+batch = GraphBatch(effective_at=0)
+for value in [1, 2, 3]:
+    batch.add_node(score=value)
+batch.add_edge(0, 1)
+batch.add_edge(1, 2)
+graph.writer().apply_batch(batch)
+with TemporaryDirectory() as folder:
+    store = DurableGraph.create_from_graph(Path(folder) / "messages.journal", graph)
+    builder = AlgorithmBuilder("synchronous messages")
+    values = builder.load_attr("score")
+    with builder.message_pass(target=values, ordered=False,
+                              include_self=False, direction="in") as messages:
+        messages.apply(builder.graph_ops.neighbor_agg(values, "sum"))
+    builder.attach_as("answer", values)
+    result = Pipeline([builder.build(atomic=True, optimize=False)]).run_durable(store)
+    assert [result.node_attr(i, "answer") for i in result.node_ids] == [0, 1, 2]
     store.close()
 ```

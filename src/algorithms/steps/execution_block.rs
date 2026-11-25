@@ -16,6 +16,7 @@ use super::super::{AlgorithmParamValue, Context};
 use super::arithmetic::{condition_is_true, CompareOp};
 use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 use super::direction::NeighborDirection;
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 
 /// Execution mode for the block.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,7 +110,7 @@ impl ExecutionBlockStep {
     }
 
     /// Execute message passing with ordered or synchronous visibility.
-    fn execute_message_pass(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+    fn execute_message_pass(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         // Get the target variable (what we're updating)
         // Remember the original storage type so we can preserve it
         let was_node_map = scope.variables().node_map(&self.target).is_ok();
@@ -308,7 +309,7 @@ impl ExecutionBlockStep {
         node_column: &super::core::NodeColumn,
         body: &BlockBody,
         ctx: &mut Context,
-        scope: &mut StepScope<'_>,
+        scope: &mut ReadStepScope<'_>,
     ) -> Result<AlgorithmParamValue> {
         // Build a local value store for intermediate results
         // Store values as Vec for neighbor collections
@@ -376,7 +377,7 @@ impl ExecutionBlockStep {
         local_values: &HashMap<String, AlgorithmParamValue>,
         local_lists: &mut HashMap<String, Vec<AlgorithmParamValue>>,
         _ctx: &mut Context,
-        scope: &mut StepScope<'_>,
+        scope: &mut ReadStepScope<'_>,
     ) -> Result<AlgorithmParamValue> {
         match body_node.op_type.as_str() {
             // Graph operations
@@ -565,12 +566,23 @@ impl Step for ExecutionBlockStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        self.supports_atomic_properties().then_some(self)
+    }
+
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         if ctx.property_batch.is_some() && !self.supports_atomic_properties() {
             return Err(anyhow!(
                 "Execution block does not support this atomic property body"
             ));
         }
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+
+impl sealed::Sealed for ExecutionBlockStep {}
+impl ReadStep for ExecutionBlockStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         if ctx.is_cancelled() {
             return Err(anyhow!("Execution block cancelled"));
         }
@@ -760,7 +772,7 @@ impl ExecutionBlockStep {
         neighbors: &[NodeId],
         node_column: &super::core::NodeColumn,
         local_values: &HashMap<String, AlgorithmParamValue>,
-        scope: &mut StepScope<'_>,
+        scope: &mut ReadStepScope<'_>,
     ) -> Result<AlgorithmParamValue> {
         let mut total = 0.0f64;
         for &nbr in neighbors {
@@ -776,7 +788,7 @@ impl ExecutionBlockStep {
         node_id: NodeId,
         node_column: &super::core::NodeColumn,
         local_values: &HashMap<String, AlgorithmParamValue>,
-        scope: &mut StepScope<'_>,
+        scope: &mut ReadStepScope<'_>,
     ) -> Result<AlgorithmParamValue> {
         if var_name == self.target {
             if let Some(val) = node_column.get(node_id) {
