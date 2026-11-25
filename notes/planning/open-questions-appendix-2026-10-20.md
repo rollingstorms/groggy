@@ -1,5 +1,13 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Filtering follow-up — 2026-11-25:**
+[Portable filtering steps](portable-filtering-steps-2026-11-25.md) completes all
+four predicate/rank steps on the shared memory/durable read boundary. Exact
+comparisons, stable ranks, null/domain rules and selected pending reads remain;
+mask computation does not change liveness. Six component checks are complete;
+flat counts remain **217 checked / 51 open**. Qualification is in the note.
+
+
 **Expression follow-up — 2026-11-25:**
 [Portable declarative expressions](portable-declarative-expressions-2026-11-25.md)
 completes the declarative mapper's shared memory/durable route through one

@@ -94,3 +94,14 @@ qualify arbitrary mutation-heavy workloads. Other read producers/containers,
 retained history, edge-aware registers, normalization options, fixed-child and
 provisional topology, alternate IR and streaming stay in the existing parents.
 A14 naming/cache/history and A15 production budgets remain unanswered.
+
+## Cross-platform follow-up
+
+[CI run 45646459570](https://github.com/rollingstorms/groggy/actions/runs/45646459570)
+passed all 21 required jobs on candidate `978dbb2cb76a14f83d9c690b67a8eb82162419ea`.
+Native gates, source rebuilding and 19 wheel combinations passed; publication
+was skipped. Only Linux Python 3.12 runs the maintained full Python/docs suite;
+other wheel combinations run smoke/application/ownership checks. All 20 artifact
+qualification receipts are embedded in the [CI receipt](../benchmarks/portable-flow-ci-qualification-2026-11-25.json).
+This candidate precedes the expression and filtering slices; those newer sources
+are not credited with this platform qualification.

@@ -1,0 +1,56 @@
+{
+  "runtime": "8c29687d82d811b3c4245be1922e342c906921c3",
+  "date": "2026-11-25",
+  "scope": "All four filtering/order kernels share selected memory/durable reads. Typed predicates, exact mixed numeric comparisons, stable ranks and null/domain rules preserved. Local qualification only; broader execution parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "d7900d9cca2770905bd7c78f64775bcd9c88f03b6847acfb6b1bb11afaf7b8db",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1687,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 234,
+    "doctests_passed": 10,
+    "new_filtering_integration_tests": 3,
+    "portable_filtering_steps": 4,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3558,
+    "maintained_skipped": 1,
+    "expected_validation_warnings": 23,
+    "warning_breakdown": {
+      "earlier_suite": 14,
+      "new_facade_cases_using_existing_redefinition_warning": 9
+    },
+    "documentation_examples": 300,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "a4db9e80de5f2dc690032c730d9774ee373d5200a2e53ca73a92c0ffc9ec3759",
+    "qualification_receipt": "notes/benchmarks/portable-filtering-wheel-qualification-2026-11-25.json"
+  },
+  "performance": {
+    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-25.json",
+    "scope": "No new filtering performance claim. Prior alias measurements apply only to their recorded runtime and workload."
+  },
+  "platform_boundary": "Cross-platform CI run 45646459570 passed on earlier flow candidate 978dbb2cb76a14f83d9c690b67a8eb82162419ea; does not qualify later expressions or filtering.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-portable-filtering-native.log": "b16a6800b8463aa795bac79ce9ef7621d4c11ec4b8c865b280019fece51bf124",
+    "/tmp/groggy-portable-filtering-clippy.log": "a9244197cab0d019ff4df6c8188fe7670e6348d6f89f6b4f5b49b018a68b7140",
+    "/tmp/groggy-portable-filtering-wheel-gates.log": "0e34b51006cf38a773f9010c8b9afb26d0770d4eb54996adaade30b013777bad"
+  }
+}
