@@ -911,3 +911,66 @@ fn isolated_nodes_keep_native_empty_neighborhood_results() {
     assert_eq!(result.node_attr(0, &"min".into()).unwrap(), Some(V::Null));
     assert_eq!(result.node_attr(0, &"mode".into()).unwrap(), Some(V::Null));
 }
+
+#[test]
+fn integer_mode_specialization_matches_general_labels_at_signed_limits() {
+    use groggy::algorithms::{
+        steps::{ModeListStep, ModeTieBreak, Step, StepScope, StepVariables},
+        AlgorithmParamValue as A,
+    };
+    let owner = neighbor_fixture(true).into_shared();
+    let selected = Subgraph::from_frozen_view(
+        owner.clone(),
+        owner.borrow().read_view().unwrap(),
+        "integer mode".into(),
+    );
+    for (low, high) in [
+        (i64::MIN, i64::MIN + 1),
+        (i64::MAX - 1, i64::MAX),
+        (9_007_199_254_740_992, 9_007_199_254_740_993),
+    ] {
+        for values in [
+            vec![high, low, low, high],
+            vec![low, high, high, low],
+            vec![high, high, high, low, low],
+        ] {
+            for tie in [
+                ModeTieBreak::Lowest,
+                ModeTieBreak::Highest,
+                ModeTieBreak::Keep,
+            ] {
+                let mut mixed: Vec<Value> = values.iter().map(|value| json!(*value)).collect();
+                // This nonmodal floating category forces the general kernel but
+                // cannot change either modal frequency or first modal occurrence.
+                mixed.push(json!(1.5));
+                let mut vars = StepVariables::default();
+                vars.set_node_map("typed", [(0, A::IntList(values.clone()))].into());
+                vars.set_node_map("json", [(0, A::Json(json!(values)))].into());
+                vars.set_node_map("general", [(0, A::Json(json!(mixed)))].into());
+                for name in ["typed", "json", "general"] {
+                    ModeListStep::new(name, format!("{name}/result"), tie)
+                        .apply(
+                            &mut Context::new(),
+                            &mut StepScope::new(&selected, &mut vars),
+                        )
+                        .unwrap();
+                }
+                let expected = if values.iter().filter(|&&value| value == high).count() == 3 {
+                    high
+                } else {
+                    match tie {
+                        ModeTieBreak::Lowest => low,
+                        ModeTieBreak::Highest => high,
+                        ModeTieBreak::Keep => values[0],
+                    }
+                };
+                for name in ["typed", "json", "general"] {
+                    assert_eq!(
+                        vars.node_map(&format!("{name}/result")).unwrap()[&0],
+                        A::Int(expected)
+                    );
+                }
+            }
+        }
+    }
+}

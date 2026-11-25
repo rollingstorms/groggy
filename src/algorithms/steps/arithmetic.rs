@@ -1537,6 +1537,27 @@ impl ReadStep for ModeListStep {
                 return Err(anyhow!("core.mode_list cancelled"));
             }
 
+            // Keep integer labels typed through counting. The generic JSON path
+            // remains authoritative for mixed domains and floating labels.
+            let integer_mode = match value {
+                AlgorithmParamValue::IntList(values) => {
+                    Some(mode_integers(ctx, values.iter().copied(), self.tie_break)?)
+                }
+                AlgorithmParamValue::Json(serde_json::Value::Array(values))
+                    if values.iter().all(|value| value.as_i64().is_some()) =>
+                {
+                    Some(mode_integers(
+                        ctx,
+                        values.iter().filter_map(|value| value.as_i64()),
+                        self.tie_break,
+                    )?)
+                }
+                _ => None,
+            };
+            if let Some(value) = integer_mode {
+                result.insert(node_id, value);
+                continue;
+            }
             super::expression::validate_value(value)?;
             // Extract array from JSON value
             let array = match value {
@@ -1648,6 +1669,38 @@ impl ReadStep for ModeListStep {
             .set_node_map(self.target.clone(), result);
         Ok(())
     }
+}
+
+/// Integer specialization of the same mode contract: exact category identity,
+/// modal frequency first, then numeric or first-occurrence tie resolution.
+fn mode_integers(
+    ctx: &Context,
+    values: impl Iterator<Item = i64>,
+    tie_break: ModeTieBreak,
+) -> Result<AlgorithmParamValue> {
+    let mut counts: HashMap<i64, (usize, usize)> = HashMap::new();
+    for (position, value) in values.enumerate() {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("core.mode_list cancelled"));
+        }
+        let entry = counts.entry(value).or_insert((0, position));
+        entry.0 = entry
+            .0
+            .checked_add(1)
+            .ok_or_else(|| anyhow!("Mode frequency exceeds usize"))?;
+    }
+    let best = counts
+        .into_iter()
+        .max_by(|(left, (lc, lp)), (right, (rc, rp))| {
+            lc.cmp(rc).then_with(|| match tie_break {
+                ModeTieBreak::Lowest => right.cmp(left),
+                ModeTieBreak::Highest => left.cmp(right),
+                ModeTieBreak::Keep => rp.cmp(lp),
+            })
+        });
+    Ok(best
+        .map(|(value, _)| AlgorithmParamValue::Int(value))
+        .unwrap_or(AlgorithmParamValue::None))
 }
 
 fn compare_json_values(a: &serde_json::Value, b: &serde_json::Value) -> Result<std::cmp::Ordering> {

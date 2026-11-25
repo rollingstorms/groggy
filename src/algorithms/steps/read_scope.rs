@@ -162,7 +162,8 @@ impl<'a> ReadStepScope<'a> {
         }
         self.validate_selected_read()?;
         let nodes = self.ordered_nodes();
-        let positions: HashMap<_, _> = nodes
+        // Engine-assigned integer IDs use the same index hasher as AlgorithmRead.
+        let positions: rustc_hash::FxHashMap<_, _> = nodes
             .iter()
             .enumerate()
             .map(|(row, &node)| (node, row))

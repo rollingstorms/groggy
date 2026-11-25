@@ -318,7 +318,7 @@ impl<'a> CheckedReadStep<'a> {
 /// Ordered checked adjacency for selected directional step reads.
 pub(crate) struct SelectedCsr {
     pub nodes: Arc<[NodeId]>,
-    pub positions: HashMap<NodeId, usize>,
+    pub positions: rustc_hash::FxHashMap<NodeId, usize>,
     pub csr: crate::state::topology::Csr,
 }
 
