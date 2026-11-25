@@ -1,5 +1,17 @@
 # Groggy roadmap status — 2026-10-24
 
+**Ordinary loop follow-up — 2026-11-24:**
+[Ordinary loop portability](ordinary-loop-portability-2026-11-24.md) completes
+recursive preparation and detached execution of certified step bodies, including
+nested ordinary/register loops, pending updates, immutable captures and one
+publication. Its six finite component checks are complete. Unported children,
+other containers/frontends, edge registers and normalization options remain in
+the existing open parents. Stable counts remain **217 checked / 51 open**;
+A14/A15 remain unanswered. Local gates pass **1,670 native tests / 3,450
+Python tests / 294 examples**; matched observations and remaining costs are
+recorded in the component note.
+
+
 
 **Topology execution follow-up — 2026-11-24:**
 [checked topology plans](checked-topology-plans-2026-11-24.md) completes nine more

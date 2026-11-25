@@ -1,0 +1,111 @@
+{
+  "package": "/private/tmp/groggy-ordinary-loop-benchmark-wheel/groggy/__init__.py",
+  "benchmark_sha256": "9293129a4ad3f4a799e79a99b8fb7c4100e789caded37ebe56b274f0f637be6a",
+  "scope": "Directed ring with parallel edges and self-loops; pinned memory view; collection/lowest mode in a native step-body or equivalent explicit-out neighbor_mode register loop, then transient attachment. Register mode is the unported vector interpreter before migration and checked native lowering afterward. Includes output marshalling; excludes setup/compilation/warm-up. No atomic/durable acceptance, allocator, RSS or production budget claim.",
+  "cases": [
+    {
+      "kind": "native",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 10,
+      "observations_seconds": [
+        0.002875791999999988,
+        0.0026923750000000246,
+        0.0028092080000000075
+      ],
+      "median_seconds": 0.0028092080000000075,
+      "checksum": 499300
+    },
+    {
+      "kind": "register",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 10,
+      "observations_seconds": [
+        0.0031444170000000105,
+        0.0030275840000000276,
+        0.0030150420000000233
+      ],
+      "median_seconds": 0.0030275840000000276,
+      "checksum": 499300
+    },
+    {
+      "kind": "native",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 10,
+      "observations_seconds": [
+        0.03486574999999997,
+        0.025656875000000023,
+        0.026533499999999932
+      ],
+      "median_seconds": 0.026533499999999932,
+      "checksum": 49993000
+    },
+    {
+      "kind": "register",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 10,
+      "observations_seconds": [
+        0.03686229199999991,
+        0.03253862500000004,
+        0.027382666000000055
+      ],
+      "median_seconds": 0.03253862500000004,
+      "checksum": 49993000
+    },
+    {
+      "kind": "native",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 100,
+      "observations_seconds": [
+        0.021063834000000003,
+        0.023747167000000013,
+        0.024786375000000027
+      ],
+      "median_seconds": 0.023747167000000013,
+      "checksum": 499300
+    },
+    {
+      "kind": "register",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 100,
+      "observations_seconds": [
+        0.024097166999999975,
+        0.02691958299999997,
+        0.026903542000000003
+      ],
+      "median_seconds": 0.026903542000000003,
+      "checksum": 499300
+    },
+    {
+      "kind": "native",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 100,
+      "observations_seconds": [
+        0.237164084,
+        0.256145042,
+        0.26067620800000024
+      ],
+      "median_seconds": 0.256145042,
+      "checksum": 49993000
+    },
+    {
+      "kind": "register",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 100,
+      "observations_seconds": [
+        0.2834686249999998,
+        0.28150724999999976,
+        0.29148495799999985
+      ],
+      "median_seconds": 0.2834686249999998,
+      "checksum": 49993000
+    }
+  ]
+}
