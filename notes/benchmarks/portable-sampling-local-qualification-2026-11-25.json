@@ -1,0 +1,57 @@
+{
+  "runtime": "bd1c42ffdb9a333f0166b531894527a6f5bc4e1e",
+  "date": "2026-11-25",
+  "scope": "Three seeded mask samplers share selected memory/durable reads, stable populations and invocation-local RNG. Counts reject oversize, fractions round halfway upward, reservoir caps available rows. Subgraph-producing samplers remain owner-only; broader execution parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "bf4af582c88983d5dca5b58dbafdd91ce2b5f22a2ed7a4f65197fb0f88c4ebd9",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1690,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 235,
+    "doctests_passed": 10,
+    "new_sampling_integration_tests": 3,
+    "seeded_worker_memory_recovery_cases": 4,
+    "portable_mask_steps": 3,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3569,
+    "maintained_skipped": 1,
+    "expected_validation_warnings": 23,
+    "warning_breakdown": {
+      "earlier_suite": 14,
+      "new_facade_cases_using_existing_redefinition_warning": 9
+    },
+    "documentation_examples": 301,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "2acef770e4f304e0c082a1ea3e4882f87806a2c604f6741e7c77895ec999c5b5",
+    "qualification_receipt": "notes/benchmarks/portable-sampling-wheel-qualification-2026-11-25.json"
+  },
+  "performance": {
+    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-25.json",
+    "scope": "No new sampling performance claim. Prior alias measurements apply only to their recorded runtime and workload."
+  },
+  "platform_boundary": "Cross-platform CI run 45646459570 passed on earlier flow candidate 978dbb2cb76a14f83d9c690b67a8eb82162419ea; does not qualify later expressions, filtering or sampling.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-portable-sampling-native.log": "64e715721857f65d48072ded0932a8d9276f718c6ef1c0de46723578c0dab820",
+    "/tmp/groggy-portable-sampling-clippy.log": "9041d5aecd16764fa0f1b4035f49d40f5b26555499397d115ea8e7ebe1a0320f",
+    "/tmp/groggy-portable-sampling-wheel-gates.log": "1878b2694d1452154a7ddc2304fa681846dddf67941cfbfac7907d7a8e106fcd"
+  }
+}

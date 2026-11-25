@@ -1,5 +1,12 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Sampling follow-up — 2026-11-25:**
+[Portable sampling masks](portable-sampling-masks-2026-11-25.md) completes node,
+edge and reservoir masks on the shared selected memory/durable boundary. Seeded
+population semantics, bounded reservoir behavior and explicit-only writeback
+remain unchanged. Six component checks are complete; flat counts remain
+**217 checked / 51 open**. Subgraph-producing samplers remain owner-bound.
+
 **Filtering follow-up — 2026-11-25:**
 [Portable filtering steps](portable-filtering-steps-2026-11-25.md) completes all
 four predicate/rank steps on the shared memory/durable read boundary. Exact
