@@ -11,8 +11,9 @@ use crate::types::{AttrName, NodeId};
 
 use std::collections::{HashMap, HashSet};
 
-use super::super::AlgorithmParamValue;
-use super::core::StepInput;
+use super::super::{AlgorithmParamValue, Context};
+use super::core::{StepInput, StepVariables};
+use super::read_scope::ReadStepScope;
 
 /// Binary operations supported in expressions.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -211,18 +212,25 @@ impl<'a> ExprContext<'a> {
     }
 }
 
-// Keep run-specific overlays private and preserve the public ExprContext shape.
+// Keep run-specific inputs private and preserve the public ExprContext shape.
+enum EvaluationSource<'a> {
+    Owner {
+        input: &'a StepInput<'a>,
+        property_batch: Option<&'a super::super::property_batch::PropertyBatch>,
+    },
+    Read {
+        scope: &'a ReadStepScope<'a>,
+        context: &'a Context,
+    },
+}
 struct Evaluation<'a> {
-    context: &'a ExprContext<'a>,
-    property_batch: Option<&'a super::super::property_batch::PropertyBatch>,
+    node: NodeId,
+    variables: &'a StepVariables,
+    current_value: Option<&'a AlgorithmParamValue>,
+    csr_ctx: Option<&'a CsrContext<'a>>,
+    source: EvaluationSource<'a>,
     neighbors: Option<&'a [NodeId]>,
     source_override: Option<(&'a str, &'a HashMap<NodeId, AlgorithmParamValue>)>,
-}
-impl<'a> std::ops::Deref for Evaluation<'a> {
-    type Target = ExprContext<'a>;
-    fn deref(&self) -> &Self::Target {
-        self.context
-    }
 }
 impl Evaluation<'_> {
     fn node_map(&self, name: &str) -> Result<&HashMap<NodeId, AlgorithmParamValue>> {
@@ -231,7 +239,26 @@ impl Evaluation<'_> {
                 return Ok(values);
             }
         }
-        self.context.input.variables.node_map(name)
+        self.variables.node_map(name)
+    }
+    fn node_attribute(&self, name: &AttrName) -> Result<Option<crate::AttrValue>> {
+        match &self.source {
+            EvaluationSource::Owner {
+                input,
+                property_batch,
+            } => {
+                if let Some(value) =
+                    property_batch.and_then(|batch| batch.get(true, self.node, name))
+                {
+                    Ok(Some(value.clone()))
+                } else {
+                    Ok(input.subgraph.get_node_attribute(self.node, name)?)
+                }
+            }
+            EvaluationSource::Read { scope, context } => {
+                Ok(scope.node_attribute(context, self.node, name)?)
+            }
+        }
     }
 }
 
@@ -249,8 +276,34 @@ impl Expr {
         source_override: Option<(&'a str, &'a HashMap<NodeId, AlgorithmParamValue>)>,
     ) -> Result<AlgorithmParamValue> {
         self.eval_context(&Evaluation {
-            context,
-            property_batch,
+            node: context.node,
+            variables: context.input.variables,
+            current_value: context.current_value,
+            csr_ctx: context.csr_ctx.as_ref(),
+            source: EvaluationSource::Owner {
+                input: context.input,
+                property_batch,
+            },
+            neighbors,
+            source_override,
+        })
+    }
+
+    pub(super) fn eval_read<'a>(
+        &self,
+        node: NodeId,
+        current_value: Option<&'a AlgorithmParamValue>,
+        scope: &'a ReadStepScope<'a>,
+        context: &'a Context,
+        neighbors: Option<&'a [NodeId]>,
+        source_override: Option<(&'a str, &'a HashMap<NodeId, AlgorithmParamValue>)>,
+    ) -> Result<AlgorithmParamValue> {
+        self.eval_context(&Evaluation {
+            node,
+            variables: scope.variables(),
+            current_value,
+            csr_ctx: None,
+            source: EvaluationSource::Read { scope, context },
             neighbors,
             source_override,
         })
@@ -283,14 +336,7 @@ impl Expr {
 
             Expr::Attr { name } => {
                 let name = AttrName::from(name.clone());
-                let value = if let Some(value) = ctx
-                    .property_batch
-                    .and_then(|batch| batch.get(true, ctx.node, &name))
-                {
-                    Some(value.clone())
-                } else {
-                    ctx.input.subgraph.get_node_attribute(ctx.node, &name)?
-                };
+                let value = ctx.node_attribute(&name)?;
                 value
                     .and_then(AlgorithmParamValue::from_attr_value)
                     .ok_or_else(|| {
@@ -538,10 +584,12 @@ fn expression_neighbors(ctx: &Evaluation<'_>) -> Result<Vec<NodeId>> {
             .map(|&i| csr.ordered_nodes[i])
             .collect());
     }
-    let (_, mut rows) = super::transformations::selected_neighbors(
-        ctx.input.subgraph,
-        &super::super::Context::default(),
-    )?;
+    let (_, mut rows) = match &ctx.source {
+        EvaluationSource::Owner { input, .. } => {
+            super::transformations::selected_neighbors(input.subgraph, &Context::default())?
+        }
+        EvaluationSource::Read { scope, context } => scope.selected_neighbors(context)?,
+    };
     rows.remove(&ctx.node)
         .ok_or_else(|| anyhow!("expression node outside selection"))
 }

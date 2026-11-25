@@ -11,7 +11,7 @@ use crate::types::NodeId;
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::arithmetic::ModeTieBreak;
 use super::core::{AtomicStepEffect, Step, StepInput, StepMetadata, StepScope};
-use super::expression::{Expr, ExprContext};
+use super::expression::Expr;
 use super::filtering::compare_values;
 
 pub(super) fn selected_nodes(
@@ -382,14 +382,24 @@ impl Step for MapNodesExprStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for MapNodesExprStep {}
+impl ReadStep for MapNodesExprStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         let start = std::time::Instant::now();
         if ctx.is_cancelled() {
             return Err(anyhow!("map_nodes cancelled"));
         }
-        let nodes = selected_nodes(scope.subgraph(), ctx)?;
+        scope.validate_selected_read()?;
+        let nodes = scope.ordered_nodes().to_vec();
         let neighbors = if self.expr.needs_neighbors() {
-            Some(selected_neighbors(scope.subgraph(), ctx)?.1)
+            Some(scope.selected_neighbors(ctx)?.1)
         } else {
             None
         };
@@ -411,22 +421,15 @@ impl Step for MapNodesExprStep {
                 return Err(anyhow!("map_nodes cancelled"));
             }
             let variables = scope.variables();
-            let input = StepInput {
-                subgraph: scope.subgraph(),
-                variables,
-            };
             let source_map = working
                 .as_ref()
                 .or_else(|| variables.node_map(&self.source).ok());
             let value = source_map.and_then(|map| map.get(&node));
-            let expr_ctx = if let Some(value) = value {
-                ExprContext::with_value(node, &input, value)
-            } else {
-                ExprContext::new(node, &input)
-            };
-            let value = self.expr.eval_scoped(
-                &expr_ctx,
-                ctx.property_batch.as_ref(),
+            let value = self.expr.eval_read(
+                node,
+                value,
+                scope,
+                ctx,
                 neighbors.as_ref().map(|rows| rows[&node].as_slice()),
                 working.as_ref().map(|map| (self.source.as_str(), map)),
             )?;

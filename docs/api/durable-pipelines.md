@@ -51,6 +51,7 @@ with TemporaryDirectory() as folder:
 | `core.init_nodes`, `core.init_nodes_with_index`, `core.init_edges`, `core.init_scalar`, `core.graph_node_count`, `core.graph_edge_count` | Use the pending selection and deterministic node ordering; scalar values remain owned intermediates. |
 | `core.load_node_attr`, `core.load_edge_attr`, `core.attach_node_attr`, `core.attach_edge_attr` | Read pending properties; attach through shared canonical validation. Explicit attachment clocks require persistent atomic execution. |
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
+| Declarative `core.map_nodes` expressions | Share the existing evaluator with a private selected-read input adapter. Pending attributes, graph-default neighbors, checked operators, short-circuit and async source visibility retain their native rules. Rust callback mapping remains owner-only. |
 | `alias`, `core.flow_update`, `core.residual_capacity` | Share owned immutable values and checked edge-map arithmetic; aliases remain independent under mutation/rebinding. Positive residuals retain their supplied edge IDs. |
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
@@ -331,5 +332,52 @@ with TemporaryDirectory() as folder:
     result = Pipeline([handle]).run_durable(store)
     assert result.edge_attr(0, "flow") == result.edge_attr(0, "residual") == 5
     assert result.edge_attr(0, "saved") == 2
+    store.close()
+```
+
+
+## Declarative expressions
+
+Declarative `core.map_nodes` and supported Python `AlgorithmBuilder.map_nodes`
+programs use the existing expression evaluator with a private read-source
+adapter. The public Rust `ExprContext`, `StepInput` and `Expr.eval` shapes remain
+unchanged. Programmatic Rust mapping callbacks retain their separate owner-only
+boundary and do not gain detached execution authority.
+
+Attributes read staged properties. Named maps remain owned inputs; asynchronous
+mapping uses the existing private working-source override, with deterministic
+ascending node processing and complete-result installation. Invalid arithmetic,
+missing inputs and unknown functions return explicit errors. Existing short
+circuit and conditional rules remain.
+
+Neighbor functions retain graph-default outgoing direction for directed graphs
+and symmetric direction for undirected graphs. `neighbors` and `neighbor_count`
+preserve incidences, while `neighbor_values` preserves one value per distinct
+neighbor. A self-loop contributes its node once. This distinction is preserved
+rather than inferred from another collection primitive.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import AlgorithmBuilder
+
+graph = Graph()
+batch = GraphBatch(effective_at=0)
+for _ in range(3):
+    batch.add_node()
+for source, target in [(0, 1), (1, 2), (2, 0)]:
+    batch.add_edge(source, target)
+graph.writer().apply_batch(batch)
+with TemporaryDirectory() as folder:
+    store = DurableGraph.create_from_graph(Path(folder) / "expressions.journal", graph)
+    builder = AlgorithmBuilder("structured expressions")
+    ranks = builder.init_nodes(1.0)
+    with builder.iterate(2):
+        sums = builder.map_nodes("sum(ranks[neighbors(node)])", inputs={"ranks": ranks})
+        ranks = builder.var("ranks", builder.core.add(builder.core.mul(sums, 0.85), 0.15))
+    builder.attach_as("rank", ranks)
+    result = Pipeline([builder.build(atomic=True, optimize=False)]).run_durable(store)
+    assert all(abs(result.node_attr(i, "rank") - 3.295) < 1e-12 for i in result.node_ids)
     store.close()
 ```
