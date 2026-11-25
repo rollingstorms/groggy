@@ -1,0 +1,56 @@
+{
+  "runtime": "233998982f1ee6d72d791e31fb6468e4b9d73612",
+  "date": "2026-11-25",
+  "scope": "Supported message-passing blocks share sealed memory/durable execution and selected reads, including public unoptimized builder invocation and ordinary loops. Existing visibility/direction/self/operation rules preserved; streaming and unsupported bodies reject. Local qualification only; broad parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "f3dfaa3bf4ce065488d93ff5946db8e39ca7bdb1a1ca931940bb15bf61362614",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1678,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 231,
+    "doctests_passed": 10,
+    "message_pass_oracle_cases": 24,
+    "new_message_block_integration_tests": 3,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3513,
+    "maintained_skipped": 1,
+    "expected_validation_warnings": 23,
+    "warning_breakdown": {
+      "earlier_suite": 14,
+      "new_facade_cases_using_existing_redefinition_warning": 9
+    },
+    "documentation_examples": 297,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "6e0ae4893769b807326b4b68d55e4c7696c90b61b452360f99a143849bb302f3",
+    "qualification_receipt": "notes/benchmarks/portable-block-wheel-qualification-2026-11-25.json"
+  },
+  "performance": {
+    "prior_loop_receipt": "notes/benchmarks/ordinary-loop-performance-2026-11-24.json",
+    "scope": "No new message-block performance claim. Earlier ordinary-loop samples remain evidence for their recorded runtime and workload."
+  },
+  "platform_boundary": "Earlier cross-platform qualification at runtime b24e86e0 remains historical; no new platform qualification claimed for this slice.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-portable-block-native.log": "f8efedcd52cba0b208e30af650a6e1da7d97a1aaa28dc18628ecc1dffeee72a7",
+    "/tmp/groggy-portable-block-clippy.log": "0b5e1f9bd9e0912d49b9af13aa1414257cb2b4d3cd5010b743564a412bde4a2b",
+    "/tmp/groggy-portable-block-wheel-gates.log": "4ed9b314b2cddea0cc5cb6cbf70da07f713b71e1c5c022918c3d68128526f7f1"
+  }
+}

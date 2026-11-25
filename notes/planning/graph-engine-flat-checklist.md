@@ -1,5 +1,14 @@
 # Groggy implementation checklist
 
+**Message-block follow-up — 2026-11-25:**
+[Portable message blocks](portable-message-blocks-2026-11-25.md) completes the
+supported message-pass block's shared memory/durable route, including its public
+builder facade. Ordered/synchronous and direction/self/parallel semantics remain
+unchanged; streaming stays unsupported. Six component checks are complete; the
+flat list remains **217 checked / 51 open**. Local gates pass **1,678 native /
+3,513 Python tests / 297 examples**; final qualification is in the note.
+
+
 **Aggregation follow-up — 2026-11-25:**
 [Portable aggregation steps](portable-aggregation-steps-2026-11-25.md) completes
 the eight-step aggregation module's native-read inventory. Seven owned-map
