@@ -1,64 +1,14 @@
 # Groggy roadmap status — 2026-10-24
 
-**Numerical safety follow-up — 2026-11-25:**
-[Normalization safety](normalization-safety-2026-11-25.md) closes demonstrated
-invalid-control/nonfinite-result gaps in the ordinary node/edge normalization
-steps. Shared Rust guards prevent unsafe clipping and preserve outputs and
-staged writes on rejection. Six component checks are complete; stable flat
-counts remain **217 checked / 51 open**. Extreme-value scaling remains bounded.
-
-**Sampling follow-up — 2026-11-25:**
-[Portable sampling masks](portable-sampling-masks-2026-11-25.md) completes node,
-edge and reservoir masks on the shared selected memory/durable boundary. Seeded
-population semantics, bounded reservoir behavior and explicit-only writeback
-remain unchanged. Six component checks are complete; flat counts remain
-**217 checked / 51 open**. Subgraph-producing samplers remain owner-bound.
-
-**Filtering follow-up — 2026-11-25:**
-[Portable filtering steps](portable-filtering-steps-2026-11-25.md) completes all
-four predicate/rank steps on the shared memory/durable read boundary. Exact
-comparisons, stable ranks, null/domain rules and selected pending reads remain;
-mask computation does not change liveness. Six component checks are complete;
-flat counts remain **217 checked / 51 open**. Qualification is in the note.
-
-
-**Expression follow-up — 2026-11-25:**
-[Portable declarative expressions](portable-declarative-expressions-2026-11-25.md)
-completes the declarative mapper's shared memory/durable route through one
-private read-source adapter. Public Rust expression APIs remain unchanged;
-pending properties, async visibility and neighborhood distinctions are preserved.
-Six component checks are complete; flat counts remain **217 checked / 51 open**.
-Local gates pass **1,684 native / 3,539 Python tests / 299 examples**; qualification
-and remaining scope are recorded in the component note.
-
-
-**Flow/alias follow-up — 2026-11-25:**
-[Portable flow values and aliases](portable-flow-and-aliases-2026-11-25.md) completes
-the three-step flow module's shared memory/durable route. Checked flow/residual
-arithmetic and immutable alias semantics remain; aliases now share payloads until
-mutation. Six finite component checks are complete; the flat list remains **217
-checked / 51 open**. Local gates pass **1,682 native / 3,525 Python tests / 298
-examples**; matched alias medians improve 81–83% at 100 iterations. Scope and
-remaining costs are recorded in the component note.
-
-
-**Message-block follow-up — 2026-11-25:**
-[Portable message blocks](portable-message-blocks-2026-11-25.md) completes the
-supported message-pass block's shared memory/durable route, including its public
-builder facade. Ordered/synchronous and direction/self/parallel semantics remain
-unchanged; streaming stays unsupported. Six component checks are complete; the
-flat list remains **217 checked / 51 open**. Local gates pass **1,678 native /
-3,513 Python tests / 297 examples**; final qualification is in the note.
-
-
-**Aggregation follow-up — 2026-11-25:**
-[Portable aggregation steps](portable-aggregation-steps-2026-11-25.md) completes
-the eight-step aggregation module's native-read inventory. Seven owned-map
-statistics now run through the same memory/durable kernels, preserving precision,
-ties, empty behavior and owned histograms. Six component checks are complete;
-broad flat counts remain **217 checked / 51 open**. Local gates pass **1,675 native /
-3,489 Python tests / 296 examples**; remaining composition/history migration stays open.
-
+**Priority block — 2026-11-25:**
+[Seven completed slices](priority-execution-block-2026-11-25.md) cover aggregation,
+message blocks, flow/immutable aliases, declarative expressions, filtering/order,
+sampling masks and normalization safety. Their notes contain 42 completed
+component checks; 19 additional step implementations now share memory/durable
+execution. Latest local gates pass **1,695 native / 3,597 packaged Python tests /
+302 documentation examples**. Stable counts remain **217 checked / 51 open**;
+no new roadmap row was added. Qualification, measured costs and the remaining
+execution priorities are summarized in the block note.
 
 **Structural step follow-up — 2026-11-24:**
 [Portable structural steps](portable-structural-steps-2026-11-24.md) completes the

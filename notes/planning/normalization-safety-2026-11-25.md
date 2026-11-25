@@ -62,3 +62,35 @@ and [wheel receipt](../benchmarks/normalization-safety-wheel-qualification-2026-
 The recovered isolated Python environment's actual build is recorded. Earlier
 platform and alias measurements remain pinned to their own candidates; new
 normalization measurements and candidate CI are recorded separately.
+
+## Matched valid-input timings
+
+[Raw observations, matched source/build and artifact hashes](../benchmarks/normalization-performance-2026-11-25.json)
+compare qualified sampling runtime `bd1c42ff` with numerical safety runtime
+`6ec32ed1`. Only `steps/normalization.rs` differs among production sources; Cargo
+inputs and the Python build match. Three processes per runtime run in alternating
+order, yielding 21 observations per case. Local builds/tests are finished before
+formal measurements. The earlier smoke under builds is excluded.
+
+The 24 workloads cover 1k/10k nodes, one/ten invocations, five numerical operations
+and an alias control. Setup/compilation/warm-up are excluded; public transient
+execution, final attachment and Python output conversion are included. Every
+output is checked independently and graph history stays unchanged.
+
+For 10k rows and ten invocations:
+
+| Method | Before ms | After ms | Median change |
+| --- | ---: | ---: | ---: |
+| control | 4.387 | 4.096 | -6.6% |
+| sum | 11.455 | 11.688 | +2.0% |
+| max | 11.925 | 12.244 | +2.7% |
+| minmax | 12.475 | 12.582 | +0.9% |
+| standardize | 7.176 | 7.496 | +4.5% |
+| clip | 7.221 | 6.478 | -10.3% |
+
+Four normalization/standardization medians are 0.9–4.5% higher; clipping is 10.3%
+lower and its matching control 6.6% lower. Across fixtures control changes range
+from -6.6% to +26.2%, so these are descriptive observations, not an isolated
+per-kernel causal estimate or a general speed claim. No allocator/RSS, storage
+sync or production SLA is measured; A15 budgets and broader numerical throughput
+remain open. Correct rejection behavior is retained regardless of these timings.
