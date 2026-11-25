@@ -1,5 +1,19 @@
 # Groggy roadmap status — 2026-10-24
 
+
+**Topology execution follow-up — 2026-11-24:**
+[checked topology plans](checked-topology-plans-2026-11-24.md) completes nine more
+instruction families: selected degree, neighbor collection/aggregation/mode,
+in-place/async label updates and fused operations. Shared read authority now
+covers 35/36 opcode forms, with explicit option/type boundaries. The Python
+expression compiler preserves graph-default direction and binds expression
+outputs correctly. Edge-attribute registers, normalize(min/mean), ordinary
+portable composition and other frontends remain in existing execution rows.
+Final local gates pass **1,664 native tests / 3,447 packaged Python tests / 293
+examples**. The matched neighbor benchmark and residual compiled-loop costs are
+recorded in the completion note. Global counts remain **217 checked / 51 open**;
+its finite component checks are complete. A14/A15 remain unanswered.
+
 **Binding performance follow-up — 2026-11-24:**
 [shared immutable bindings and copy-on-write access](shared-numeric-bindings-2026-11-24.md)
 reduce the measured register-copy cost while preserving public value kinds and
@@ -10,8 +24,8 @@ of existing 32.2/AR7.8, with no new roadmap row or policy decision.
 **Numeric execution follow-up — 2026-11-24:**
 [checked numeric plan lowering](checked-batch-lowering-2026-11-24.md) completes the
 bounded numeric frontend migration and shares graph-independent kernels with
-durable execution. Neighbor/in-place/fused instructions and portable ordinary
-composition remain in the existing execution rows. A14 naming/cache and A15
+durable execution. The neighbor/in-place/fused follow-up is recorded above; portable ordinary
+composition remains in the existing execution rows. A14 naming/cache and A15
 production budgets are still unanswered; this implementation makes no new policy
 choice for either.
 

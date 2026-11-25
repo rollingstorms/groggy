@@ -1,0 +1,30 @@
+{
+  "python": "3.9.6 (default, Mar 12 2025, 20:22:46) \n[Clang 17.0.0 (clang-1700.0.13.3)]",
+  "platform": "macOS-26.3.1-arm64-arm-64bit",
+  "artifacts": [
+    {
+      "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+      "sha256": "f56738bd7aa7b4b9bdce26ed0c2a7bc245bd9104b609e922460b4884118b4e86",
+      "smoke": {
+        "version": "0.6.0",
+        "exports": 105,
+        "package": "/private/var/folders/jy/34vkbxz97tbgm78bc07fmx380000gn/T/groggy-wheel-check-m95yi1di/groggy/__init__.py",
+        "workflows": [
+          {
+            "storage": "archive",
+            "initial": 1,
+            "edited": 2,
+            "restored": 3
+          },
+          {
+            "storage": "journal",
+            "initial": 1,
+            "edited": 2,
+            "restored": 3
+          }
+        ]
+      },
+      "tests": "maintained"
+    }
+  ]
+}

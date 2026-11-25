@@ -1,0 +1,53 @@
+{
+  "runtime": "fc70c592865e8fc6490b4fb9b72904580fd13d55",
+  "date": "2026-11-24",
+  "scope": "Shared checked topology, update and fused execution plus Python compiler correctness; selected-ID indexing alignment and exact integer mode specialization. Nine additional register instruction forms (35/36), with documented option/type boundaries. Local qualification only; broad parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "54e573227670d204dc6bfb69958d87f7b29a6f0d24273ab6a16690f5310d29dd",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1664,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 227,
+    "doctests_passed": 10,
+    "checked_plan_integration_tests": 13,
+    "new_incidence_matrix_combinations": 112,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "CPython 3.9.6",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3447,
+    "maintained_skipped": 1,
+    "established_warnings": 14,
+    "documentation_examples": 293,
+    "checked_plan_regression_cases": 37,
+    "packaged_python_source_files_match": 62,
+    "python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "f56738bd7aa7b4b9bdce26ed0c2a7bc245bd9104b609e922460b4884118b4e86",
+    "qualification_receipt": "notes/benchmarks/integer-mode-wheel-qualification-2026-11-24.json"
+  },
+  "performance": {
+    "receipt": "notes/benchmarks/checked-neighbors-2026-11-24-summary.json",
+    "scope": "Three processes and nine observations per case per runtime, with independent expected modes. Native workflow medians improve 5-9% versus the prior baseline; checked register workflow remains 36-107% slower than the narrower float-only interpreter. Descriptive timings only; no RSS/allocator or production SLA claim."
+  },
+  "platform_boundary": "Earlier cross-platform qualification at runtime b24e86e0 remains historical; no new platform qualification claimed for these changes.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-integer-mode-native.log": "7b7a6afdd67ef882a9f7631cd947f8c52f67765a4e118ed8e94e8d14fc6cd367",
+    "/tmp/groggy-integer-mode-clippy.log": "8b201d8ab4ac5ae6e97d5c149ed9722a1887c8d6e448fdf2ed7a693babf53ff0",
+    "/tmp/groggy-integer-mode-wheel-gates.log": "638da7383ba79c95539d537c0433297b0a84cc8aab64b0aa7f7a7bb20f9dcf4e"
+  }
+}

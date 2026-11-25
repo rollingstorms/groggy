@@ -1,0 +1,257 @@
+{
+  "date": "2026-11-24",
+  "benchmark_sha256": "9293129a4ad3f4a799e79a99b8fb7c4100e789caded37ebe56b274f0f637be6a",
+  "scope": "Directed ring with parallel edges and self-loops; pinned memory view; collection/lowest mode in a native step-body or equivalent explicit-out neighbor_mode register loop, then transient attachment. Register mode is the unported vector interpreter before migration and checked native lowering afterward. Includes output marshalling; excludes setup/compilation/warm-up. No atomic/durable acceptance, allocator, RSS or production budget claim.",
+  "runtimes": {
+    "before": "0ff2417776cde8b11d012f549038841c3926d3a1",
+    "migrated": "17d2f0eaae7828fb6e1e1f575953c754aec3a756",
+    "final": "fc70c592865e8fc6490b4fb9b72904580fd13d55"
+  },
+  "raw_files_sha256": {
+    "notes/benchmarks/checked-neighbors-before-2026-11-24-1.json": "53c3f3000684d4651be67f87c878dce876b95e2cc8fbf038a3d9af5eda888cc9",
+    "notes/benchmarks/checked-neighbors-before-2026-11-24-2.json": "404abdb9d51145d4e3e0aa21c5276ba0e0c751931bbd7f104b64333741387d01",
+    "notes/benchmarks/checked-neighbors-before-2026-11-24-3.json": "bcedd748e44a4e6ecf7f33fa656ee3d92c66fd44744fa07381898eedd3c584cd",
+    "notes/benchmarks/checked-neighbors-after-2026-11-24-1.json": "0f1d695b76b5770f5efd416e459ede125cc08dd7479e012c7c28ccccf9b575e2",
+    "notes/benchmarks/checked-neighbors-after-2026-11-24-3.json": "14aa82872b9158b023a5710797246e4d204ba69d27d4c5272cceeaff9b063ed7",
+    "notes/benchmarks/checked-neighbors-after-2026-11-24-4.json": "5a1f7e4b7b2a785eba6b25219e1b98d6b2e8c6a8671b124f5569e7af032c6c37",
+    "notes/benchmarks/checked-neighbors-final-2026-11-24-1.json": "79d65fca8acf0018499189ab7fd371bac52010281d8548ccd1b770aecbc41f58",
+    "notes/benchmarks/checked-neighbors-final-2026-11-24-2.json": "652df797b736f14417573dada4ce78895831d3a089acd198ce3b525902ecc243",
+    "notes/benchmarks/checked-neighbors-final-2026-11-24-3.json": "4378b85ca6cb9e27558009eb7c0042a18bfba6124f835001157c22e005ef9ed0"
+  },
+  "excluded_run": {
+    "path": "notes/benchmarks/checked-neighbors-after-2026-11-24-2.json",
+    "reason": "Qualification source/hash audit overlapped this timing process; excluded from the aggregate."
+  },
+  "caveats": [
+    "Three independent processes and three timed observations per case per process; warm-up and setup excluded.",
+    "Build and test gates ended before sampling. OS cache, power state and unrelated background activity were uncontrolled.",
+    "The prior register path uses narrowed/discretized f64 labels and cached graph-default neighbors; checked lowering preserves typed labels and honors explicit direction. Results match on this small-integer outgoing fixture only; no general semantic equivalence is claimed.",
+    "Pinned read capture, transient result marshalling and native loop execution are measured; no accepted delta, fsync, allocator bytes, RSS or production SLA."
+  ],
+  "cases": [
+    {
+      "kind": "native",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 10,
+      "checksum": 499300,
+      "before": {
+        "samples": 9,
+        "median_ms": 3.1444999999999945,
+        "minimum_ms": 2.659583000000021,
+        "maximum_ms": 3.346583000000014
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 3.770125000000013,
+        "minimum_ms": 3.6436249999999837,
+        "maximum_ms": 4.317707999999976
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 2.8705410000000597,
+        "minimum_ms": 2.342499999999914,
+        "maximum_ms": 3.1008339999999412
+      },
+      "migrated_change_percent": 19.89584989664557,
+      "final_change_percent": -8.712323103830034,
+      "final_vs_migrated_percent": -23.860853419978124
+    },
+    {
+      "kind": "register",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 10,
+      "checksum": 499300,
+      "before": {
+        "samples": 9,
+        "median_ms": 2.249457999999982,
+        "minimum_ms": 1.9282500000000202,
+        "maximum_ms": 2.3375409999999985
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 3.972124999999993,
+        "minimum_ms": 3.8445420000000063,
+        "maximum_ms": 4.502958000000001
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 3.060375000000004,
+        "minimum_ms": 2.667792000000002,
+        "maximum_ms": 3.6740419999999885
+      },
+      "migrated_change_percent": 76.58142539225115,
+      "final_change_percent": 36.04943946497461,
+      "final_vs_migrated_percent": -22.953708657204665
+    },
+    {
+      "kind": "native",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 10,
+      "checksum": 49993000,
+      "before": {
+        "samples": 9,
+        "median_ms": 37.20566599999997,
+        "minimum_ms": 28.064083000000018,
+        "maximum_ms": 44.22791599999998
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 40.41066700000001,
+        "minimum_ms": 38.53120900000001,
+        "maximum_ms": 54.70666700000004
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 34.35116599999999,
+        "minimum_ms": 24.760666000000153,
+        "maximum_ms": 37.83887499999994
+      },
+      "migrated_change_percent": 8.614282028979247,
+      "final_change_percent": -7.672218527145791,
+      "final_vs_migrated_percent": -14.994805703157576
+    },
+    {
+      "kind": "register",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 10,
+      "checksum": 49993000,
+      "before": {
+        "samples": 9,
+        "median_ms": 19.611875000000055,
+        "minimum_ms": 18.96774999999995,
+        "maximum_ms": 24.795249999999935
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 43.52441600000001,
+        "minimum_ms": 41.08995800000004,
+        "maximum_ms": 56.9360000000001
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 30.136541000000072,
+        "minimum_ms": 27.69504200000017,
+        "maximum_ms": 38.075749999999964
+      },
+      "migrated_change_percent": 121.9288874725129,
+      "final_change_percent": 53.66476178335824,
+      "final_vs_migrated_percent": -30.759459242370845
+    },
+    {
+      "kind": "native",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 100,
+      "checksum": 499300,
+      "before": {
+        "samples": 9,
+        "median_ms": 25.38320900000002,
+        "minimum_ms": 23.686874999999997,
+        "maximum_ms": 28.330124999999985
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 35.11029099999996,
+        "minimum_ms": 34.26312499999995,
+        "maximum_ms": 37.22370899999983
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 24.131541999999897,
+        "minimum_ms": 21.429000000000144,
+        "maximum_ms": 26.977792000000058
+      },
+      "migrated_change_percent": 38.32093097448765,
+      "final_change_percent": -4.931082590858082,
+      "final_vs_migrated_percent": -31.269319300145014
+    },
+    {
+      "kind": "register",
+      "nodes": 1000,
+      "edges": 1350,
+      "iterations": 100,
+      "checksum": 499300,
+      "before": {
+        "samples": 9,
+        "median_ms": 14.569458999999952,
+        "minimum_ms": 13.381040999999927,
+        "maximum_ms": 15.768958
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 36.45808299999986,
+        "minimum_ms": 36.21295799999991,
+        "maximum_ms": 40.719750000000055
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 26.460750000000033,
+        "minimum_ms": 23.663624999999968,
+        "maximum_ms": 27.792874999999828
+      },
+      "migrated_change_percent": 150.23635400600654,
+      "final_change_percent": 81.61793104328801,
+      "final_vs_migrated_percent": -27.42144451204378
+    },
+    {
+      "kind": "native",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 100,
+      "checksum": 49993000,
+      "before": {
+        "samples": 9,
+        "median_ms": 296.9463329999999,
+        "minimum_ms": 244.098959,
+        "maximum_ms": 302.4277499999999
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 367.79904200000016,
+        "minimum_ms": 353.44508400000007,
+        "maximum_ms": 439.59400000000005
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 269.1436250000001,
+        "minimum_ms": 255.72187499999987,
+        "maximum_ms": 290.4538750000001
+      },
+      "migrated_change_percent": 23.860442486083922,
+      "final_change_percent": -9.362872987557601,
+      "final_vs_migrated_percent": -26.823184873874684
+    },
+    {
+      "kind": "register",
+      "nodes": 10000,
+      "edges": 13500,
+      "iterations": 100,
+      "checksum": 49993000,
+      "before": {
+        "samples": 9,
+        "median_ms": 144.49204099999992,
+        "minimum_ms": 134.29674999999986,
+        "maximum_ms": 152.785792
+      },
+      "migrated": {
+        "samples": 9,
+        "median_ms": 389.2093750000001,
+        "minimum_ms": 381.46416699999986,
+        "maximum_ms": 471.3829589999996
+      },
+      "final": {
+        "samples": 9,
+        "median_ms": 299.4498330000002,
+        "minimum_ms": 290.87625000000014,
+        "maximum_ms": 313.84862499999986
+      },
+      "migrated_change_percent": 169.36388489384012,
+      "final_change_percent": 107.24313320482501,
+      "final_vs_migrated_percent": -23.062019510706765
+    }
+  ]
+}

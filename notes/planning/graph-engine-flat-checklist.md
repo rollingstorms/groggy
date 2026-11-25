@@ -1,5 +1,19 @@
 # Groggy implementation checklist
 
+
+**Topology execution follow-up — 2026-11-24:**
+[checked topology plans](checked-topology-plans-2026-11-24.md) completes nine more
+instruction families: selected degree, neighbor collection/aggregation/mode,
+in-place/async label updates and fused operations. Shared read authority now
+covers 35/36 opcode forms, with explicit option/type boundaries. The Python
+expression compiler preserves graph-default direction and binds expression
+outputs correctly. Edge-attribute registers, normalize(min/mean), ordinary
+portable composition and other frontends remain in existing execution rows.
+Final local gates pass **1,664 native tests / 3,447 packaged Python tests / 293
+examples**. The matched neighbor benchmark and residual compiled-loop costs are
+recorded in the completion note. Global counts remain **217 checked / 51 open**;
+its finite component checks are complete. A14/A15 remain unanswered.
+
 Updated 2026-11-24 on `groggy-roadmap-2026-10-20`.
 
 One flat list of concrete work, using the stable item numbers from the
@@ -26,7 +40,7 @@ An explicit snapshot/checkpoint and a reconstructed effective-time view are
 separate operations. Default graph selections now use the accepted pinned-state model; explicit
 connected compatibility remains available.
 
-Latest performance component — 2026-11-24: [shared numeric bindings](shared-numeric-bindings-2026-11-24.md)
+Earlier binding performance component — 2026-11-24: [shared numeric bindings](shared-numeric-bindings-2026-11-24.md)
 completes private immutable sharing and copy-on-write access, preserving public
 value kinds and mutation independence. The unchanged benchmark measured 58–60%
 less lowered-loop time at 1,000/10,000 nodes over 100 iterations; residual copying
@@ -34,16 +48,16 @@ and broader budgets remain in 32.2/A15. Local gates: 1,658 native tests, 3,432
 packaged Python tests and 293 documentation examples. Global counts stay
 217 checked / 51 open; no row was added or closed beyond its original scope.
 
-Latest execution component — 2026-11-24: [checked numeric plan lowering](checked-batch-lowering-2026-11-24.md)
+Earlier numeric execution component — 2026-11-24: [checked numeric plan lowering](checked-batch-lowering-2026-11-24.md)
 shares arithmetic/normalization kernels across memory and durable runs and lowers
 26 numeric instruction forms through the shared executor. It covers exact loaded
 integers/comparison, staged reads, private registers, simultaneous carries,
-malformed-plan rejection and one durable acceptance. Remaining neighbor/in-place/
-fused forms and ordinary portable composition stay in the existing parent rows.
+malformed-plan rejection and one durable acceptance. The neighbor/in-place/fused follow-up is recorded above; ordinary portable
+composition remains in the existing parent rows.
 The stable inventory remains **217 checked / 51 open**; this finite component has
 its own completion checks and qualification record rather than a new roadmap row.
-Current local gates: 1,654 native tests, 3,432 packaged Python tests and 293
-documentation examples. The benchmark measures 1.30–3.11× lowered-loop overhead
+At that checkpoint, local gates were 1,654 native tests, 3,432 packaged Python tests and 293
+documentation examples. The initial benchmark measured 1.30–3.11× lowered-loop overhead
 against equivalent checked native loops; profiling register/map copies remains
 part of existing performance row 32.2. No acceleration or fresh platform-wide
 qualification is claimed for this changed runtime.

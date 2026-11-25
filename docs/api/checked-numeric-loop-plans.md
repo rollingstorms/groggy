@@ -157,8 +157,13 @@ numeric validation still scans input rows. See the
 for the benchmark and remaining costs. Selected topology construction is still
 linear in selected nodes/edges; the checked neighbor path builds sorted adjacency
 per invocation. Migrated collection therefore no longer uses its separate
-unordered CSR cache. There is no claim of improved neighbor throughput; topology
-cache sharing and measurement remain in the existing performance scope. Acceptance retains the
+unordered CSR cache. The integer list-mode kernel counts signed labels directly, and selected ID
+indexing uses the same integer hasher as the immutable reader. The
+[matched neighbor measurements](../../notes/planning/checked-topology-plans-2026-11-24.md)
+show native workflow medians 5–9% below the prior baseline on the measured fixture,
+while checked register execution remains 36–107% slower than the narrower legacy
+float path. Topology cache sharing remains in the existing performance scope;
+these measurements are not a general throughput or production budget guarantee. Acceptance retains the
 [durable publication cost](durable-pipelines.md).
 
 Evidence: [native parity tests](../../tests/checked_batch_lowering.rs),
