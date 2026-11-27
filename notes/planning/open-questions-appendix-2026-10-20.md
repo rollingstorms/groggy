@@ -1,5 +1,13 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Priority block — 2026-11-27:**
+[Seven completed slices](priority-execution-block-2026-11-27.md) add thirteen more
+portable native step implementations, checked min/mean normalization and reusable
+CI evidence validation. Latest source passes **1,716 Rust / 3,753 Python / 306
+examples**. Membership sharing improves measured readonly paths; raw write/RSS
+trade-offs are retained. Stable counts remain **217 checked / 51 open** (42 core,
+nine deferred); broad parents stay open for their listed remaining scope.
+
 **Path primitive follow-up — 2026-11-27:**
 [Selected shortest/Yen/walk steps](portable-path-primitives-2026-11-27.md) now share
 immutable worker kernels, preserving native definitions. Six component checks

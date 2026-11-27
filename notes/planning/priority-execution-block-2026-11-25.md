@@ -1,5 +1,10 @@
 # Priority execution block — 2026-11-25
 
+Follow-up: [the 2026-11-27 block](priority-execution-block-2026-11-27.md)
+completes this block's edge-transform, collection/foreach and min/mean priorities,
+plus community/decay/path read kernels. The priorities below retain their dated
+historical scope; use the follow-up for current remaining work.
+
 This block extends the existing engine's shared execution boundary and repairs
 one demonstrated numerical discrepancy. It does not redefine the engine contract
 or introduce a new roadmap. Seven finite slices are complete, with 42 component

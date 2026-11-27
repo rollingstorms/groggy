@@ -1,6 +1,6 @@
 # Groggy 0.6.0 release qualification
 
-Updated 2026-11-18. **Expanded 0.6.0 scope in progress; earlier candidate qualified. Unreleased.**
+Updated 2026-11-27. **Expanded 0.6.0 scope in progress; earlier candidate qualified. Unreleased.**
 
 ## Expanded release target — 2026-11-15
 
@@ -8,6 +8,34 @@ The owner now targets all remaining hierarchical groups except group 8:
 **42 unchecked rows in scope; nine retrieval/integration rows deferred**.
 This includes provenance and multi-user/concurrency work. The expanded target
 remains unfinished. See [scope and next chunk](notes/planning/release-060-expanded-scope-2026-11-15.md).
+
+## Current execution follow-up — 2026-11-27
+
+[Seven completed priority slices](notes/planning/priority-execution-block-2026-11-27.md)
+add thirteen portable native step implementations, min/mean normalization and CI
+evidence validation. Source **1ffdf5eb** passes **1,716 Rust tests / 3,753 packaged
+Python tests / 306 examples**, strict Clippy and source/artifact checks. Worker
+collections preserve immutable pins and exact fixed child selection; existing
+memory collection identity is preserved. Computation alone records no mutation.
+
+[Local qualification](notes/benchmarks/normalization-final-controls-local-qualification-2026-11-27.json)
+and [wheel qualification](notes/benchmarks/normalization-final-controls-wheel-qualification-2026-11-27.json).
+The matched membership optimization improves these readonly fixtures 11–32%;
+nonempty writes vary about −0.2% to +2.8% at measured source `57cf0129`. Larger-corpus process peak RSS is
+734–739 MiB versus 788–792 MiB. These are bounded directed-path measurements;
+[raw evidence](notes/benchmarks/shared-collection-membership-performance-2026-11-27.json)
+retains sample, allocator/RSS and workload limits.
+
+[Final artifact run 46079596058](https://github.com/rollingstorms/groggy/actions/runs/46079596058)
+is qualifying this exact code source; the earlier membership run qualifies its
+recorded source. Final evidence is recorded separately.
+The remaining expanded scope is still **42 core rows plus nine deferred rows**.
+Native retained-history producers, remaining facade/IR/register/topology domains,
+certification, provenance and concurrency/service requirements remain open.
+
+## Historical display qualification — 2026-11-18
+
+The following evidence retains its original runtime and platform boundary.
 
 Completed in this block: **AR7.6 — one display foundation** and
 **34.1 — capability publication**. Historical

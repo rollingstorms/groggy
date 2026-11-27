@@ -32,3 +32,38 @@ production source files match runtime `4be4c415` (same production tree as
 `5155a878`). [Local receipt](../benchmarks/normalize-minmean-local-qualification-2026-11-27.json)
 and [wheel receipt](../benchmarks/normalize-minmean-wheel-qualification-2026-11-27.json).
 No new performance or cross-platform qualification claim.
+
+
+## Completed control-presence follow-up
+
+Source `1ffdf5eb` closes a concrete factory gap found during review: malformed
+explicit epsilon, method or clip-alias values used to become defaults. Defaults
+now apply only when omitted. The two normalization aliases share method/epsilon
+parsing; standardization uses the same epsilon checks and clipping uses the same
+kernel bound validator. Both explicit clip spellings validate; valid
+`min_value`/`max_value` precedence remains. Invalid numeric controls reject during
+preparation, including a zero-iteration ordinary body. Construction may reject
+earlier than execution. Nested bodies retain existing uncertified-loop diagnostics;
+no unsupported body is silently skipped. Direct Rust constructors still validate
+at execution as before.
+
+Clipping also checks its computed output: equal infinite bounds cannot install
+nonfinite values from finite inputs. Conventional outward-unbounded clip ranges
+still work; source-dependent arithmetic validation remains at computation time.
+Two native registry tests and extended kernel/old-output cases cover nonfinite
+controls/results. Forty-seven additional Python cases cover explicit wrong types,
+null versus omitted controls, both aliases, zero/one iteration, integer epsilon,
+valid precedence and no changed journal/properties/IDs.
+
+Fresh local gates pass **1,716 native tests** (54 ignored), **3,753 packaged Python
+tests** (one skipped, 23 expected warnings), **306 documentation examples**, strict
+all-target Clippy, formatting, Python 3.8 syntax and all source/artifact byte checks.
+All 500 production sources match `1ffdf5eb5e15abcd5fdd564634a2bb826215830a`.
+[Final local receipt](../benchmarks/normalization-final-controls-local-qualification-2026-11-27.json)
+and [final wheel receipt](../benchmarks/normalization-final-controls-wheel-qualification-2026-11-27.json).
+
+Final code [CI run 46079596058](https://github.com/rollingstorms/groggy/actions/runs/46079596058)
+is separate qualification evidence. The prior control candidate 46079465175 was
+cancelled as superseded after the clipped-result guard changed production source;
+it is not counted as a successful gate. The existing normalization checklist item
+is completed more thoroughly; no new stable roadmap row was introduced.

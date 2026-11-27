@@ -1,5 +1,9 @@
 # Expanded 0.6.0 scope — 2026-11-15
 
+Current follow-up: [seven completed 2026-11-27 slices](priority-execution-block-2026-11-27.md),
+with 217 checked / 51 open (42 core, nine deferred). The owner decision below
+retains its original dated count; full expanded-scope completion is still open.
+
 ## Owner decision
 
 Include all remaining groups from the hierarchical 53-entry outline in 0.6.0,

@@ -1,0 +1,1048 @@
+{
+  "date": "2026-11-27",
+  "scope": "Matched qualified wheels, directed paths, fresh graph owners outside operation timing. Small and larger corpora run separately in ABBA order after builds/tests stop. No production budget/SLA, allocator count or per-operation RSS claim. Whole-process memory includes imports, wheel extraction, graph setup, warmups and both workloads.",
+  "benchmark_script": "benches/subgraph_collections.py",
+  "benchmark_script_sha256": "6b221ace42d317b71a2a8399347e84adfb0c4801fd9f3c719dca35672de35fb7",
+  "changed_production_paths": [
+    "src/algorithms/steps/read_scope.rs",
+    "src/algorithms/steps/sampling.rs",
+    "src/subgraphs/subgraph/binding.rs"
+  ],
+  "small": {
+    "order": [
+      "before-a",
+      "after-a",
+      "after-b",
+      "before-b"
+    ],
+    "runs": {
+      "before-a": {
+        "runtime": "5f19e15e9f3f84c093d01cc44aa716fd2c784562",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "cb08b6388da32f2d81e8ee29757d89c1a464c7abd912e438cfbe465cc6d230a3",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 11,
+        "results": [
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              393709,
+              399333,
+              369375,
+              361292,
+              379208,
+              385167,
+              361125,
+              316750,
+              318542,
+              308083,
+              307042
+            ],
+            "cpu_ns": [
+              394000,
+              401000,
+              371000,
+              362000,
+              381000,
+              387000,
+              362000,
+              318000,
+              319000,
+              310000,
+              307000
+            ],
+            "median_wall_ns": 361292,
+            "median_cpu_ns": 362000
+          },
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              667333,
+              665167,
+              666458,
+              662709,
+              663292,
+              663458,
+              657500,
+              665584,
+              659625,
+              658625,
+              661791
+            ],
+            "cpu_ns": [
+              668000,
+              665000,
+              667000,
+              663000,
+              664000,
+              663000,
+              659000,
+              666000,
+              660000,
+              659000,
+              663000
+            ],
+            "median_wall_ns": 663292,
+            "median_cpu_ns": 663000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              2839417,
+              2875417,
+              2916584,
+              3500292,
+              3487667,
+              3386584,
+              3521958,
+              3520459,
+              3600958,
+              3613875,
+              3517333
+            ],
+            "cpu_ns": [
+              2839000,
+              2876000,
+              2917000,
+              3503000,
+              3490000,
+              3389000,
+              3525000,
+              3522000,
+              3604000,
+              3616000,
+              3520000
+            ],
+            "median_wall_ns": 3500292,
+            "median_cpu_ns": 3503000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              7662416,
+              6625500,
+              6476750,
+              6482417,
+              6522667,
+              6448041,
+              7596625,
+              7837584,
+              7685625,
+              7652625,
+              7670417
+            ],
+            "cpu_ns": [
+              7666000,
+              6627000,
+              6478000,
+              6483000,
+              6524000,
+              6449000,
+              7598000,
+              7841000,
+              7690000,
+              7656000,
+              7672000
+            ],
+            "median_wall_ns": 7596625,
+            "median_cpu_ns": 7598000
+          }
+        ]
+      },
+      "after-a": {
+        "runtime": "57cf012911bc4e0f8040d6b30bba85a2db286413",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "20141aed0df2ef985476bf9a044e6597a882e2cf05c856faf6b00cfe29162b0a",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 11,
+        "results": [
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              258334,
+              250125,
+              250958,
+              255959,
+              249625,
+              246083,
+              248333,
+              249500,
+              243583,
+              244667,
+              241333
+            ],
+            "cpu_ns": [
+              258000,
+              251000,
+              251000,
+              257000,
+              250000,
+              246000,
+              249000,
+              250000,
+              244000,
+              246000,
+              242000
+            ],
+            "median_wall_ns": 249500,
+            "median_cpu_ns": 250000
+          },
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              651584,
+              654084,
+              656375,
+              653750,
+              655333,
+              655375,
+              655875,
+              647750,
+              651458,
+              658084,
+              649542
+            ],
+            "cpu_ns": [
+              652000,
+              655000,
+              658000,
+              655000,
+              657000,
+              656000,
+              657000,
+              648000,
+              651000,
+              658000,
+              650000
+            ],
+            "median_wall_ns": 654084,
+            "median_cpu_ns": 655000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              2825458,
+              2803125,
+              2822833,
+              2838875,
+              2993916,
+              2472875,
+              2337042,
+              2341375,
+              2324667,
+              2331083,
+              2315417
+            ],
+            "cpu_ns": [
+              2828000,
+              2806000,
+              2825000,
+              2841000,
+              2996000,
+              2474000,
+              2338000,
+              2342000,
+              2326000,
+              2332000,
+              2315000
+            ],
+            "median_wall_ns": 2472875,
+            "median_cpu_ns": 2474000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              7676000,
+              7579875,
+              7614792,
+              7656292,
+              7653875,
+              7684375,
+              7569958,
+              7701792,
+              6845250,
+              6477625,
+              7254875
+            ],
+            "cpu_ns": [
+              7678000,
+              7583000,
+              7619000,
+              7659000,
+              7657000,
+              7687000,
+              7572000,
+              7704000,
+              6847000,
+              6479000,
+              7232000
+            ],
+            "median_wall_ns": 7614792,
+            "median_cpu_ns": 7619000
+          }
+        ]
+      },
+      "after-b": {
+        "runtime": "57cf012911bc4e0f8040d6b30bba85a2db286413",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "20141aed0df2ef985476bf9a044e6597a882e2cf05c856faf6b00cfe29162b0a",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 11,
+        "results": [
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              299833,
+              289625,
+              303666,
+              322250,
+              305666,
+              294708,
+              301834,
+              284834,
+              267584,
+              268125,
+              297292
+            ],
+            "cpu_ns": [
+              301000,
+              290000,
+              304000,
+              324000,
+              306000,
+              296000,
+              302000,
+              285000,
+              268000,
+              269000,
+              299000
+            ],
+            "median_wall_ns": 297292,
+            "median_cpu_ns": 299000
+          },
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              802083,
+              817583,
+              772667,
+              788833,
+              793375,
+              777458,
+              743291,
+              750958,
+              775166,
+              784417,
+              789458
+            ],
+            "cpu_ns": [
+              803000,
+              820000,
+              774000,
+              790000,
+              795000,
+              778000,
+              744000,
+              752000,
+              776000,
+              786000,
+              790000
+            ],
+            "median_wall_ns": 784417,
+            "median_cpu_ns": 786000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              2721416,
+              2364833,
+              2262500,
+              2280916,
+              2323416,
+              2274375,
+              2271875,
+              2330958,
+              2228708,
+              2299916,
+              2776834
+            ],
+            "cpu_ns": [
+              2725000,
+              2366000,
+              2263000,
+              2282000,
+              2324000,
+              2275000,
+              2273000,
+              2332000,
+              2229000,
+              2301000,
+              2779000
+            ],
+            "median_wall_ns": 2299916,
+            "median_cpu_ns": 2301000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              7663167,
+              6583875,
+              6384375,
+              6340916,
+              6348917,
+              6333750,
+              7011625,
+              7692500,
+              7662542,
+              7674500,
+              7649167
+            ],
+            "cpu_ns": [
+              7667000,
+              6586000,
+              6385000,
+              6342000,
+              6349000,
+              6335000,
+              7013000,
+              7696000,
+              7667000,
+              7678000,
+              7652000
+            ],
+            "median_wall_ns": 7011625,
+            "median_cpu_ns": 7013000
+          }
+        ]
+      },
+      "before-b": {
+        "runtime": "5f19e15e9f3f84c093d01cc44aa716fd2c784562",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "cb08b6388da32f2d81e8ee29757d89c1a464c7abd912e438cfbe465cc6d230a3",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 11,
+        "results": [
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              379625,
+              340042,
+              342667,
+              359834,
+              396000,
+              383958,
+              359291,
+              378667,
+              374292,
+              377334,
+              365875
+            ],
+            "cpu_ns": [
+              382000,
+              341000,
+              344000,
+              361000,
+              398000,
+              385000,
+              359000,
+              380000,
+              376000,
+              378000,
+              368000
+            ],
+            "median_wall_ns": 374292,
+            "median_cpu_ns": 376000
+          },
+          {
+            "nodes": 100,
+            "edges": 99,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              824875,
+              776959,
+              785584,
+              801083,
+              782250,
+              735292,
+              774250,
+              794083,
+              811166,
+              762916,
+              781875
+            ],
+            "cpu_ns": [
+              827000,
+              778000,
+              786000,
+              802000,
+              783000,
+              737000,
+              776000,
+              796000,
+              813000,
+              765000,
+              782000
+            ],
+            "median_wall_ns": 782250,
+            "median_cpu_ns": 783000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              3608084,
+              3570541,
+              3606833,
+              3604500,
+              3389417,
+              2902291,
+              2837667,
+              2837250,
+              2890042,
+              2897708,
+              2906708
+            ],
+            "cpu_ns": [
+              3610000,
+              3572000,
+              3609000,
+              3608000,
+              3391000,
+              2903000,
+              2839000,
+              2839000,
+              2892000,
+              2898000,
+              2908000
+            ],
+            "median_wall_ns": 2906708,
+            "median_cpu_ns": 2908000
+          },
+          {
+            "nodes": 1000,
+            "edges": 999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              7715167,
+              7626875,
+              7653750,
+              6550125,
+              6457542,
+              6406375,
+              6466209,
+              6462208,
+              7186791,
+              7771041,
+              7746042
+            ],
+            "cpu_ns": [
+              7719000,
+              7629000,
+              7656000,
+              6555000,
+              6458000,
+              6407000,
+              6467000,
+              6463000,
+              7189000,
+              7773000,
+              7748000
+            ],
+            "median_wall_ns": 7186791,
+            "median_cpu_ns": 7189000
+          }
+        ]
+      }
+    },
+    "comparisons": [
+      {
+        "nodes": 100,
+        "edges": 99,
+        "workload": "per_node_passthrough",
+        "samples_per_runtime": 22,
+        "before_median_wall_ns": 367625.0,
+        "after_median_wall_ns": 262959.0,
+        "wall_change_percent": -28.470860251615093,
+        "before_median_cpu_ns": 369500.0,
+        "after_median_cpu_ns": 263000.0,
+        "cpu_change_percent": -28.822733423545333
+      },
+      {
+        "nodes": 100,
+        "edges": 99,
+        "workload": "overlapping_edges_write",
+        "samples_per_runtime": 22,
+        "before_median_wall_ns": 701312.5,
+        "after_median_wall_ns": 700687.5,
+        "wall_change_percent": -0.08911861687906919,
+        "before_median_cpu_ns": 702500.0,
+        "after_median_cpu_ns": 701000.0,
+        "cpu_change_percent": -0.2135231316725994
+      },
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "workload": "per_node_passthrough",
+        "samples_per_runtime": 22,
+        "before_median_wall_ns": 3438542.0,
+        "after_median_wall_ns": 2334062.5,
+        "wall_change_percent": -32.120576104639696,
+        "before_median_cpu_ns": 3440500.0,
+        "after_median_cpu_ns": 2335000.0,
+        "cpu_change_percent": -32.13195756430751
+      },
+      {
+        "nodes": 1000,
+        "edges": 999,
+        "workload": "overlapping_edges_write",
+        "samples_per_runtime": 22,
+        "before_median_wall_ns": 7391708.0,
+        "after_median_wall_ns": 7597333.5,
+        "wall_change_percent": 2.7818401376244806,
+        "before_median_cpu_ns": 7393500.0,
+        "after_median_cpu_ns": 7601000.0,
+        "cpu_change_percent": 2.806519239872851
+      }
+    ]
+  },
+  "scale": {
+    "order": [
+      "before-a",
+      "after-a",
+      "after-b",
+      "before-b"
+    ],
+    "runs": {
+      "before-a": {
+        "runtime": "5f19e15e9f3f84c093d01cc44aa716fd2c784562",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "cb08b6388da32f2d81e8ee29757d89c1a464c7abd912e438cfbe465cc6d230a3",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 3,
+        "results": [
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              33612709,
+              39180500,
+              39373375
+            ],
+            "cpu_ns": [
+              33530000,
+              39186000,
+              39377000
+            ],
+            "median_wall_ns": 39180500,
+            "median_cpu_ns": 39186000
+          },
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              79096833,
+              78581792,
+              84079334
+            ],
+            "cpu_ns": [
+              78823000,
+              78585000,
+              83502000
+            ],
+            "median_wall_ns": 79096833,
+            "median_cpu_ns": 78823000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              544375500,
+              503321000,
+              557685125
+            ],
+            "cpu_ns": [
+              544145000,
+              503056000,
+              554913000
+            ],
+            "median_wall_ns": 544375500,
+            "median_cpu_ns": 544145000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              1210838959,
+              1052642208,
+              1098128875
+            ],
+            "cpu_ns": [
+              1135013000,
+              1052357000,
+              1095826000
+            ],
+            "median_wall_ns": 1098128875,
+            "median_cpu_ns": 1095826000
+          }
+        ]
+      },
+      "after-a": {
+        "runtime": "57cf012911bc4e0f8040d6b30bba85a2db286413",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "20141aed0df2ef985476bf9a044e6597a882e2cf05c856faf6b00cfe29162b0a",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 3,
+        "results": [
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              33585083,
+              25275916,
+              33225583
+            ],
+            "cpu_ns": [
+              33589000,
+              25279000,
+              33228000
+            ],
+            "median_wall_ns": 33225583,
+            "median_cpu_ns": 33228000
+          },
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              81681625,
+              86781417,
+              76997125
+            ],
+            "cpu_ns": [
+              81685000,
+              86784000,
+              76999000
+            ],
+            "median_wall_ns": 81681625,
+            "median_cpu_ns": 81685000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              477843875,
+              487164500,
+              481751334
+            ],
+            "cpu_ns": [
+              477812000,
+              486793000,
+              481605000
+            ],
+            "median_wall_ns": 481751334,
+            "median_cpu_ns": 481605000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              1074415500,
+              1100240000,
+              1102712666
+            ],
+            "cpu_ns": [
+              1073839000,
+              1099596000,
+              1102314000
+            ],
+            "median_wall_ns": 1100240000,
+            "median_cpu_ns": 1099596000
+          }
+        ]
+      },
+      "after-b": {
+        "runtime": "57cf012911bc4e0f8040d6b30bba85a2db286413",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "20141aed0df2ef985476bf9a044e6597a882e2cf05c856faf6b00cfe29162b0a",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 3,
+        "results": [
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              28681625,
+              34284667,
+              34138834
+            ],
+            "cpu_ns": [
+              28685000,
+              34289000,
+              34144000
+            ],
+            "median_wall_ns": 34138834,
+            "median_cpu_ns": 34144000
+          },
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              76179459,
+              79385167,
+              85407916
+            ],
+            "cpu_ns": [
+              76184000,
+              79388000,
+              85404000
+            ],
+            "median_wall_ns": 79385167,
+            "median_cpu_ns": 79388000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              479147125,
+              480581125,
+              478661500
+            ],
+            "cpu_ns": [
+              478706000,
+              480587000,
+              478655000
+            ],
+            "median_wall_ns": 479147125,
+            "median_cpu_ns": 478706000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              1126264125,
+              1075987625,
+              1058556583
+            ],
+            "cpu_ns": [
+              1098227000,
+              1067751000,
+              1057570000
+            ],
+            "median_wall_ns": 1075987625,
+            "median_cpu_ns": 1067751000
+          }
+        ]
+      },
+      "before-b": {
+        "runtime": "5f19e15e9f3f84c093d01cc44aa716fd2c784562",
+        "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+        "wheel_sha256": "cb08b6388da32f2d81e8ee29757d89c1a464c7abd912e438cfbe465cc6d230a3",
+        "python": "3.9.6",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "scope": "Directed path, fresh memory owner outside timing, explicit atomic step builder; three warmups. No allocation/RSS or production scale claim.",
+        "samples_per_case": 3,
+        "results": [
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              37185792,
+              41575917,
+              32638334
+            ],
+            "cpu_ns": [
+              37185000,
+              41581000,
+              32642000
+            ],
+            "median_wall_ns": 37185792,
+            "median_cpu_ns": 37185000
+          },
+          {
+            "nodes": 10000,
+            "edges": 9999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              79048041,
+              86868125,
+              77691667
+            ],
+            "cpu_ns": [
+              79055000,
+              86858000,
+              77691000
+            ],
+            "median_wall_ns": 79048041,
+            "median_cpu_ns": 79055000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "per_node_passthrough",
+            "wall_ns": [
+              554271083,
+              531216875,
+              536039000
+            ],
+            "cpu_ns": [
+              554280000,
+              528020000,
+              535129000
+            ],
+            "median_wall_ns": 536039000,
+            "median_cpu_ns": 535129000
+          },
+          {
+            "nodes": 100000,
+            "edges": 99999,
+            "workload": "overlapping_edges_write",
+            "wall_ns": [
+              1074585417,
+              1088069166,
+              1091397916
+            ],
+            "cpu_ns": [
+              1072584000,
+              1076095000,
+              1090558000
+            ],
+            "median_wall_ns": 1088069166,
+            "median_cpu_ns": 1076095000
+          }
+        ]
+      }
+    },
+    "comparisons": [
+      {
+        "nodes": 10000,
+        "edges": 9999,
+        "workload": "per_node_passthrough",
+        "samples_per_runtime": 6,
+        "before_median_wall_ns": 38183146.0,
+        "after_median_wall_ns": 33405333.0,
+        "wall_change_percent": -12.512884611446108,
+        "before_median_cpu_ns": 38185500.0,
+        "after_median_cpu_ns": 33408500.0,
+        "cpu_change_percent": -12.509984156289688
+      },
+      {
+        "nodes": 10000,
+        "edges": 9999,
+        "workload": "overlapping_edges_write",
+        "samples_per_runtime": 6,
+        "before_median_wall_ns": 79072437.0,
+        "after_median_wall_ns": 80533396.0,
+        "wall_change_percent": 1.8476210616855004,
+        "before_median_cpu_ns": 78939000.0,
+        "after_median_cpu_ns": 80536500.0,
+        "cpu_change_percent": 2.0237145137384616
+      },
+      {
+        "nodes": 100000,
+        "edges": 99999,
+        "workload": "per_node_passthrough",
+        "samples_per_runtime": 6,
+        "before_median_wall_ns": 540207250.0,
+        "after_median_wall_ns": 479864125.0,
+        "wall_change_percent": -11.170365632819623,
+        "before_median_cpu_ns": 539637000.0,
+        "after_median_cpu_ns": 479646500.0,
+        "cpu_change_percent": -11.11682482854215
+      },
+      {
+        "nodes": 100000,
+        "edges": 99999,
+        "workload": "overlapping_edges_write",
+        "samples_per_runtime": 6,
+        "before_median_wall_ns": 1089733541.0,
+        "after_median_wall_ns": 1088113812.5,
+        "wall_change_percent": -0.14863528000741422,
+        "before_median_cpu_ns": 1083326500.0,
+        "after_median_cpu_ns": 1086033000.0,
+        "cpu_change_percent": 0.24983234509632357
+      }
+    ]
+  },
+  "process_memory": {
+    "unit": "bytes as reported by macOS /usr/bin/time -l",
+    "measurements": [
+      {
+        "run": "before-a",
+        "maximum_resident_set_bytes": 830849024,
+        "peak_memory_footprint_bytes": 691751552,
+        "raw_macos_time": "       17.56 real        16.35 user         0.66 sys\n           830849024  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n              146048  page reclaims\n                  23  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                  24  voluntary context switches\n                2564  involuntary context switches\n        134389223934  instructions retired\n         50709171566  cycles elapsed\n           691751552  peak memory footprint\n"
+      },
+      {
+        "run": "after-a",
+        "maximum_resident_set_bytes": 774979584,
+        "peak_memory_footprint_bytes": 523258368,
+        "raw_macos_time": "       16.90 real        15.87 user         0.51 sys\n           774979584  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n              113534  page reclaims\n                  85  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                 406  voluntary context switches\n                1782  involuntary context switches\n        125831005444  instructions retired\n         48948552881  cycles elapsed\n           523258368  peak memory footprint\n"
+      },
+      {
+        "run": "after-b",
+        "maximum_resident_set_bytes": 769785856,
+        "peak_memory_footprint_bytes": 650971648,
+        "raw_macos_time": "       16.98 real        15.78 user         0.53 sys\n           769785856  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n              114055  page reclaims\n                  62  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                 399  voluntary context switches\n                3057  involuntary context switches\n        125534215747  instructions retired\n         48771872522  cycles elapsed\n           650971648  peak memory footprint\n"
+      },
+      {
+        "run": "before-b",
+        "maximum_resident_set_bytes": 826572800,
+        "peak_memory_footprint_bytes": 723618496,
+        "raw_macos_time": "       17.37 real        16.16 user         0.65 sys\n           826572800  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n              146010  page reclaims\n                  34  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                 390  voluntary context switches\n                1507  involuntary context switches\n        134350447616  instructions retired\n         50239307515  cycles elapsed\n           723618496  peak memory footprint\n"
+      }
+    ]
+  }
+}

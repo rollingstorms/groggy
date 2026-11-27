@@ -52,6 +52,11 @@ Implemented capabilities, within their documented boundaries:
   and compose with pending topology without rebinding explicit map IDs.
 - Filters/order, numerical maps, fused/community primitives and sampling masks
   now compose after pending topology through shared selected readers.
+- Supported durable step builders now include immutable sampling collections,
+  recursive fixed foreach bodies, community helpers, numerical decay, edge-weight
+  scaling, shortest/Yen/walk primitives and signed min/mean normalization, using
+  sealed native kernels and one checked publication. Memory collection identities
+  are preserved; workers carry owner-free graph views.
 - Typed pipeline values, atomic property programs and selected topology effects.
   Certified loads, initialization, arithmetic and attachments can follow staged
   topology using pending selected IDs and the same one-delta acceptance.
@@ -62,7 +67,7 @@ Implemented capabilities, within their documented boundaries:
   loops and message-passing blocks share pending reads and typed bindings.
   Local atomic programs can stage node/edge additions and run 13 existing
   algorithms on immutable pending captures. Supported outer pipelines now share
-  topology effects and accept once; general topology loops, unadapted effects
+  topology effects and accept once; fixed-child topology, unadapted effects
   and remaining DSL/streaming work retain their checklist boundaries.
 
 See the [flat checklist](notes/planning/graph-engine-flat-checklist.md) for exact
@@ -93,6 +98,24 @@ entry points now declare `>=3.8,<3.13`, matching the current PyO3 0.20.3 build
 limit. The nested build no longer forces its experimental forward-compatibility
 bypass. Supporting newer interpreters requires a separate dependency upgrade and
 qualification; it is not implied by a successful local 3.9 build.
+
+### Explicit numerical controls
+
+Normalization/standardization apply defaults only to omitted epsilon/method
+controls. Explicit wrong types or invalid numeric controls reject during factory
+preparation, including zero-iteration nested bodies. Clip aliases keep valid
+primary precedence, validate every explicit value, and reject nonfinite computed
+outputs before replacing results. Conventional outward-unbounded clip defaults
+remain valid. Construction can therefore reject earlier than execution.
+
+### Native intermediate compatibility
+
+`StepValue::GraphViewArray` is an additive Rust enum variant for immutable portable
+collections. Exhaustive Rust matches must include it. The memory adapter retains
+`SubgraphArray`, including pass-through source pins and subgraph identity; existing
+Python exports and graph/journal formats are unchanged. Supported native foreach
+bodies prepare sealed children; owner callbacks and the standalone sampler facade
+keep their documented compatibility boundaries. See [durable pipeline contracts](docs/api/durable-pipelines.md).
 
 ## Boundaries and open risks
 

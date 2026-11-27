@@ -38,7 +38,7 @@
     "qualification_receipt": "notes/benchmarks/portable-community-decay-wheel-qualification-2026-11-27.json"
   },
   "performance": {
-    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-27.json",
+    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-25.json",
     "scope": "No new community/decay performance claim. Prior alias measurements apply only to their recorded runtime and workload."
   },
   "platform_boundary": "CI run 45652492406 qualifies earlier candidate ac59fcf1 and source-equivalent numerical safety runtime 6ec32ed1. This newer community/decay slice is locally qualified only.",
