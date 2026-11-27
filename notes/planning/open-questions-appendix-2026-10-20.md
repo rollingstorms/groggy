@@ -1,5 +1,12 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Collection/foreach follow-up — 2026-11-27:**
+[Portable immutable collections](portable-read-collections-2026-11-27.md) completes
+four collection producers and recursively certified fixed foreach bodies on
+workers. Six component checks complete; **1,712 Rust / 3,686 Python / 305 examples**
+pass. Memory payload identity is preserved; child topology remains rejected.
+Stable counts remain **217 checked / 51 open**.
+
 **Checked normalization follow-up — 2026-11-27:**
 [Signed minimum/mean normalization](checked-normalize-minmean-2026-11-27.md)
 closes the two remaining normalization options in register-plan lowering. Six
