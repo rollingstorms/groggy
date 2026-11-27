@@ -1,9 +1,8 @@
 //! Checked selected path primitives sharing one staged-weight topology/kernel.
 use super::{
     core::{AtomicStepEffect, Step, StepMetadata, StepScope},
-    transformations::selected_nodes,
+    read_scope::{sealed, ReadStep, ReadStepScope},
 };
-use crate::traits::SubgraphOperations;
 use crate::{
     algorithms::{AlgorithmParamValue, Context, CostHint},
     storage::numeric::scalar::attribute_number,
@@ -22,7 +21,7 @@ fn check(ctx: &Context) -> Result<()> {
     }
     Ok(())
 }
-fn resolve(scope: &StepScope<'_>, name: &str) -> Result<NodeId> {
+fn resolve(scope: &ReadStepScope<'_>, name: &str) -> Result<NodeId> {
     match scope.variables().scalar(name)? {
         AlgorithmParamValue::Int(value) => usize::try_from(*value)
             .map_err(|_| anyhow!("node ID must be non-negative and fit usize")),
@@ -42,14 +41,15 @@ struct PathTopology {
     rows: HashMap<NodeId, Vec<ArcStep>>,
 }
 impl PathTopology {
-    fn prepare(ctx: &Context, scope: &StepScope<'_>, attr: Option<&AttrName>) -> Result<Self> {
-        let nodes = selected_nodes(scope.subgraph(), ctx)?;
+    fn prepare(ctx: &Context, scope: &ReadStepScope<'_>, attr: Option<&AttrName>) -> Result<Self> {
+        check(ctx)?;
+        scope.validate_selected_read()?;
+        let nodes = scope.ordered_nodes();
         let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
-        let subgraph = scope.subgraph();
-        let directed = subgraph.read_is_directed();
-        for &edge in scope.subgraph().ordered_edges().iter() {
+        let directed = scope.is_directed();
+        for &edge in scope.ordered_edges().iter() {
             check(ctx)?;
-            let (source, target) = subgraph.edge_endpoints(edge)?;
+            let (source, target) = scope.edge_endpoints(edge)?;
             if !rows.contains_key(&source) || !rows.contains_key(&target) {
                 bail!("Path edge {edge} endpoint is outside selection");
             }
@@ -236,7 +236,16 @@ impl Step for ShortestPathMapStep {
             cost_hint: CostHint::Linearithmic,
         }
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for ShortestPathMapStep {}
+impl ReadStep for ShortestPathMapStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         check(ctx)?;
         let source = resolve(scope, &self.source)?;
         let topology = PathTopology::prepare(ctx, scope, self.weight_attr.as_ref())?;
@@ -409,7 +418,16 @@ impl Step for KShortestPathsStep {
             cost_hint: CostHint::Quadratic,
         }
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for KShortestPathsStep {}
+impl ReadStep for KShortestPathsStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         check(ctx)?;
         let source = resolve(scope, &self.source)?;
         let target = resolve(scope, &self.target)?;
@@ -473,7 +491,16 @@ impl Step for RandomWalkStep {
             cost_hint: CostHint::Linear,
         }
     }
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for RandomWalkStep {}
+impl ReadStep for RandomWalkStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         check(ctx)?;
         if !self.restart_prob.is_finite() || !(0.0..=1.0).contains(&self.restart_prob) {
             bail!("restart_prob must be finite and in [0,1]");

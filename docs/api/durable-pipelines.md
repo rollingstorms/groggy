@@ -60,6 +60,7 @@ with TemporaryDirectory() as folder:
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
 | `core.edge_weight_scale` | Selected pending edge properties; finite numeric factors/results, legacy unit fallback and nonnumeric pass-through; only attachment publishes. |
 | `core.community_seed`, `core.modularity_gain`, `core.label_propagate_step` | Selected pending neighborhoods and ordered owned columns; retain seeding, modularity and typed label-vote definitions. |
+| `core.shortest_path_map`, `core.k_shortest_paths`, `core.random_walk` | Shared selected BFS/Dijkstra, loopless Yen node sequences and locally seeded walks; preserve direction, parallel arcs, pending weights, restart rules and checked scalar/map outputs. |
 | `temporal.decay` | Checked numerical decay over selected owned node maps, ordered columns and edge maps; no retained-history lookup or implicit clock. |
 | `core.execution_block` in supported `message_pass` mode | Prepare the existing body on the owner; use selected pending adjacency and preserve ordered/synchronous updates, column order, directions and checked body operations. Streaming and unsupported body operations reject. |
 | `iter.loop` with an ordinary `body` of supported steps | Prepare sealed child kernels recursively on the owner; nested loops share pending reads, captures, cancellation and one outer publication. |
@@ -658,3 +659,49 @@ source pins does not make wide captures free, and this portability change makes
 no new latency, allocator/RSS or scale guarantee. Retained-history producers,
 edge-aware registers, remaining frontend/alternate plans, streaming/custom
 callbacks and the existing naming/cache/run-history questions remain open.
+
+
+## Selected path primitives
+
+`core.shortest_path_map` produces reachable-node maps: exact integer BFS distances
+without `weight_attr`, or f64 Dijkstra distances with that option. Missing weights
+remain unit cost; explicit weights must be finite, numeric and nonnegative.
+`core.k_shortest_paths` produces JSON text containing loopless node sequences and
+costs, using the minimum parallel-arc weight for each node-to-node transition.
+Parallel edges do not turn an identical node sequence into multiple paths.
+`core.random_walk` produces JSON text containing ordered walks, retaining per-edge
+transition multiplicity, local seeded RNG, restart and zero-weight fallback rules.
+These scalar text outputs can be broadcast explicitly before property attachment.
+
+Source/target IDs must belong to the current selected frame. Validating a zero
+path count or zero walk length does not skip ID/weight checks. Fixed foreach
+children cannot inspect outside rows. Pending creations, removals, endpoint
+revisions and property weights are read through the same immutable boundary as
+other native kernels. Cost overflow, cancellation and domain errors preserve old
+outputs and roll back the complete invocation. Search/tie/random-walk definitions
+are unchanged; no new precision or path-enumeration scale claim is made.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+with TemporaryDirectory() as directory:
+    graph = Graph(directed=True)
+    batch = GraphBatch(effective_at=0)
+    for _ in range(3):
+        batch.add_node()
+    batch.add_edge(0, 1, cost=2.0)
+    batch.add_edge(1, 2, cost=3.0)
+    graph.writer().apply_batch(batch)
+    store = DurableGraph.create_from_graph(Path(directory) / "paths.journal", graph)
+    program = Pipeline([step_pipeline("selected distance", [
+        {"id": "core.init_scalar", "params": {"target": "start", "value": 0}},
+        {"id": "core.shortest_path_map", "params": {"source": "start", "weight_attr": "cost", "output": "distances"}},
+        {"id": "core.attach_node_attr", "params": {"source": "distances", "attr": "distance", "effective_at": 20}},
+    ], atomic=True)])
+    result = program.run_durable(store)
+    assert [result.node_attr(n, "distance") for n in range(3)] == [0.0, 2.0, 5.0]
+    store.close()
+```
