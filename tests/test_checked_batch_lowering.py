@@ -453,9 +453,12 @@ def test_signed_minimum_and_mean_match_independent_oracle_and_recover(
 ):
     path = tmp_path / "signed-normalize.journal"
     graph = Graph(directed=True)
-    graph.add_nodes(2)
-    graph.add_edge(0, 1)
-    graph.add_edge(1, 1)
+    batch = GraphBatch(effective_at=0)
+    batch.add_node()
+    batch.add_node()
+    batch.add_edge(0, 1)
+    batch.add_edge(1, 1)
+    graph.writer().apply_batch(batch)
     setter = (
         graph.writer().set_edge_attr
         if layout == "edges"
