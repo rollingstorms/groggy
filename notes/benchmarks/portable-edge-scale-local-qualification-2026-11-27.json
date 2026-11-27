@@ -1,0 +1,57 @@
+{
+  "runtime": "a80223251e43e95a20e5faf84049d362ab30fa64",
+  "date": "2026-11-27",
+  "scope": "Edge-weight transform shares selected pending memory/durable reads. Numeric scalar output remains f64, missing/unrepresentable values retain unit fallback and representable nonnumeric values pass through. Explicit malformed/nonfinite factors and numeric overflow reject atomically. No new platform/performance claim; broader execution parents remain open.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "b293c94566fc7b870392ea85d88969afab3ddd00fecc7ce3a00c59fcb26389c6",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1700,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 236,
+    "doctests_passed": 10,
+    "edge_scale_safety_tests": 2,
+    "new_edge_scale_integration_tests": 3,
+    "worker_memory_recovery_factor_cases": 3,
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3612,
+    "maintained_skipped": 1,
+    "expected_validation_warnings": 23,
+    "warning_breakdown": {
+      "earlier_suite": 14,
+      "new_facade_cases_using_existing_redefinition_warning": 9
+    },
+    "documentation_examples": 303,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "5f82a5085ea777b7cfc553f714406a44a736323b5ddbe813eb20b84b6d36bc18",
+    "qualification_receipt": "notes/benchmarks/portable-edge-scale-wheel-qualification-2026-11-27.json"
+  },
+  "performance": {
+    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-27.json",
+    "scope": "No new edge-transform performance claim. Prior alias measurements apply only to their recorded runtime and workload."
+  },
+  "platform_boundary": "CI run 45652492406 qualifies earlier candidate ac59fcf1 (source-equivalent numerical safety runtime 6ec32ed1). This newer edge-transform code is locally qualified only.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-edge-scale-native.log": "817b356e55b11adfd5d1a506557ea803a9cfacb20933fb5fa18230c065a5c755",
+    "/tmp/groggy-edge-scale-clippy.log": "55d821814022120b134c747c38235db08c6b4c2662be1c745115170f7f5cf161",
+    "/tmp/groggy-edge-scale-wheel-gates.log": "da2e1a28746d3b3e93cdfc28d32d6793a9137f3dff2a0bb4c0d515dc0fc32a99"
+  }
+}

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "reviewed_runtime": "6ec32ed1959543036f638abedf0dbe23df21a6f7",
-  "updated": "2026-11-25",
+  "reviewed_runtime": "a80223251e43e95a20e5faf84049d362ab30fa64",
+  "updated": "2026-11-27",
   "scope": "Public feature-family capability matrix, with all stable checklist rows mapped. Bounded means only the stated contract is qualified; it never closes an overlapping parent by implication.",
-  "local_receipt": "notes/benchmarks/normalization-safety-local-qualification-2026-11-25.json",
+  "local_receipt": "notes/benchmarks/portable-edge-scale-local-qualification-2026-11-27.json",
   "features": [
     {
       "id": "graph-model",
@@ -907,12 +907,13 @@
           "src/algorithms/steps/transformations.rs",
           "src/algorithms/steps/filtering.rs",
           "src/algorithms/steps/sampling.rs",
-          "src/algorithms/steps/normalization.rs"
+          "src/algorithms/steps/normalization.rs",
+          "src/algorithms/steps/attributes.rs"
         ]
       },
       "python": {
         "support": "available",
-        "surface": "Pipeline and atomic step_pipeline builders; run_durable with checked arithmetic, ordinary nested loop bodies and all five structural steps and all eight aggregation steps, 35 numeric/topology loop instruction forms, explicit writeback/topology/schema; unoptimized AlgorithmBuilder arithmetic; supported unoptimized AlgorithmBuilder message-pass blocks; checked flow/residual maps and immutable aliases; supported declarative expression/structured-iteration builders with either optimization setting; all four predicate/rank steps; node/edge/reservoir sampling masks",
+        "surface": "Pipeline and atomic step_pipeline builders; run_durable with checked arithmetic, ordinary nested loop bodies and all five structural steps and all eight aggregation steps, 35 numeric/topology loop instruction forms, explicit writeback/topology/schema; unoptimized AlgorithmBuilder arithmetic; supported unoptimized AlgorithmBuilder message-pass blocks; checked flow/residual maps and immutable aliases; supported declarative expression/structured-iteration builders with either optimization setting; all four predicate/rank steps; node/edge/reservoir sampling masks; selected edge-weight transformation",
         "sources": [
           "python-groggy/python/groggy/builder/algorithm_builder.py",
           "python-groggy/src/ffi/api/pipeline.rs",
@@ -921,7 +922,7 @@
         ]
       },
       "persistence": "Certified memory programs accept one delta; supported durable programs journal one acceptance, including explicitly attached computed columns. Read-only computations/outputs create no history.",
-      "limits": "Certified memory execution and supported durable programs share sealed native read kernels, one pending operation and one acceptance. Root topology loops, thirteen classic wrappers, all structural/aggregation/filtering steps, supported message blocks and declarative expressions, flow/residual/alias values, sampling masks, shared arithmetic/normalization and 35 loop instruction forms retain their documented domains. Ordinary bodies recursively prepare sealed children; workers make no registry or custom Step/Algorithm callbacks. Maps, columns, graph/table captures and aliases preserve immutable bindings with copy-on-write mutation. Computation alone creates no graph history; explicit attachment stages writeback. Expressions preserve incidence counts versus distinct-neighbor values, ordered async visibility and public ExprContext/StepInput/Expr.eval shapes. Predicates retain typed equality, exact mixed comparisons and stable ranks; masks never alter membership. Seeded sampling retains local RNG and selected IDs, rejecting oversized counts while capping reservoir requests. Normalization rejects invalid epsilon, NaN/reversed clip bounds, nonfinite inputs and unrepresentable intermediates; unbounded clip sides remain valid. Remaining: edge-aware registers, normalize(min/mean), unported history/read producers and composition containers, owner-bound subgraph arrays/foreach and custom Rust mapping callbacks, fixed-child/provisional topology domains, remaining expression lowering/alternate plans/public IR, streaming and A14 naming/cache/run-history decisions. Selected adjacency rebuilding/sorting, output allocation and first aliased mutation remain costs. Bounded alias timings do not establish general latency, allocator/RSS or A15 production budgets. Extreme-value normalization requiring scaled intermediates remains outside the current finite f64 contract.",
+      "limits": "Certified memory execution and supported durable programs share sealed native read kernels, one pending operation and one acceptance. Root topology loops, thirteen classic wrappers, all structural/aggregation/filtering steps, supported message blocks and declarative expressions, flow/residual/alias values, sampling masks, shared arithmetic/normalization and 35 loop instruction forms retain their documented domains. Ordinary bodies recursively prepare sealed children; workers make no registry or custom Step/Algorithm callbacks. Maps, columns, graph/table captures and aliases preserve immutable bindings with copy-on-write mutation. Computation alone creates no graph history; explicit attachment stages writeback. Expressions preserve incidence counts versus distinct-neighbor values, ordered async visibility and public ExprContext/StepInput/Expr.eval shapes. Predicates retain typed equality, exact mixed comparisons and stable ranks; masks never alter membership. Seeded sampling retains local RNG and selected IDs, rejecting oversized counts while capping reservoir requests. Normalization rejects invalid epsilon, NaN/reversed clip bounds, nonfinite inputs and unrepresentable intermediates; unbounded clip sides remain valid. Remaining: edge-aware registers, normalize(min/mean), unported history/read producers and composition containers, owner-bound subgraph arrays/foreach and custom Rust mapping callbacks, fixed-child/provisional topology domains, remaining expression lowering/alternate plans/public IR, streaming and A14 naming/cache/run-history decisions. Selected adjacency rebuilding/sorting, output allocation and first aliased mutation remain costs. Bounded alias timings do not establish general latency, allocator/RSS or A15 production budgets. Extreme-value normalization requiring scaled intermediates remains outside the current finite f64 contract. Edge-weight scaling shares selected pending reads; omitted factor and legacy unit/nonnumeric behavior remain, while malformed/nonfinite explicit factors and numeric overflow reject.",
       "evidence": {
         "contracts": [
           "docs/api/atomic-pipeline-capabilities.md",
@@ -944,7 +945,8 @@
           "tests/durable_expression_steps.rs",
           "tests/durable_filtering_steps.rs",
           "tests/durable_sampling_steps.rs",
-          "src/algorithms/steps/normalization.rs"
+          "src/algorithms/steps/normalization.rs",
+          "tests/durable_edge_weight_scale.rs"
         ],
         "python_tests": [
           "tests/test_staged_revision_endpoints.py",
@@ -960,7 +962,8 @@
           "tests/test_durable_expression_steps.py",
           "tests/test_durable_filtering_steps.py",
           "tests/test_durable_sampling_steps.py",
-          "tests/test_normalization_safety.py"
+          "tests/test_normalization_safety.py",
+          "tests/test_durable_edge_weight_scale.py"
         ]
       },
       "python_exports": [

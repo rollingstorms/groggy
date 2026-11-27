@@ -1,5 +1,13 @@
 # Groggy open questions appendix - 2026-10-20
 
+**Edge-transform follow-up — 2026-11-27:**
+[Portable edge-weight scaling](portable-edge-weight-scale-2026-11-27.md) completes
+the attribute module's shared read inventory, with explicit factor/overflow
+errors and preserved legacy value behavior. Six component checks are complete;
+local gates pass **1,700 native / 3,612 Python tests / 303 examples**. Stable counts
+remain **217 checked / 51 open**. Earlier [candidate CI](release-ci-evidence-2026-11-27.md)
+is now fully recorded; its source boundary remains explicit.
+
 **Priority block — 2026-11-25:**
 [Seven completed slices](priority-execution-block-2026-11-25.md) cover aggregation,
 message blocks, flow/immutable aliases, declarative expressions, filtering/order,
