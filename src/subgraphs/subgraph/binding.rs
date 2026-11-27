@@ -18,6 +18,11 @@ impl Subgraph {
         )
     }
 
+    /// Cheap immutable membership sharing for native collection adapters.
+    pub(crate) fn shared_membership(&self) -> (Arc<HashSet<NodeId>>, Arc<HashSet<EdgeId>>) {
+        (self.nodes.clone(), self.edges.clone())
+    }
+
     /// Bind current selected reads to one immutable source without changing the owner.
     /// Default-facing adapters use this; low-level execution scopes remain explicit.
     pub fn freeze(mut self) -> GraphResult<Self> {

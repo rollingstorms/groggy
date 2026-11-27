@@ -329,8 +329,8 @@ fn selected_output(
     name: String,
 ) -> Result<SelectionPart> {
     Ok(SelectionPart {
-        nodes,
-        edges,
+        nodes: Arc::new(nodes),
+        edges: Arc::new(edges),
         name,
         source: None,
         legacy: None,
@@ -523,7 +523,10 @@ impl ReadStep for NeighborsStep {
                 for seed in &seeds {
                     topology.validate_membership(ctx, &seed.nodes, &seed.edges)?;
                 }
-                seeds.iter().map(|seed| seed.nodes.clone()).collect()
+                seeds
+                    .iter()
+                    .map(|seed| seed.nodes.as_ref().clone())
+                    .collect()
             } else if let Ok(nodes) = scope.variables().node_map(&self.source) {
                 let mut ids: Vec<_> = nodes.keys().copied().collect();
                 ids.sort_unstable();
@@ -652,7 +655,10 @@ impl ReadStep for EmitSubgraphsStep {
         if let Some(array) = scope.collection(ctx, &self.source)? {
             for selector in array {
                 topology.validate_membership(ctx, &selector.nodes, &selector.edges)?;
-                selections.push((selector.nodes, selector.edges));
+                selections.push((
+                    selector.nodes.as_ref().clone(),
+                    selector.edges.as_ref().clone(),
+                ));
             }
             if matches!(self.mode, EmitMode::Unified) && !selections.is_empty() {
                 let mut nodes = HashSet::new();
@@ -996,6 +1002,11 @@ impl ReadStep for PreparedForEach<'_> {
         // Validate every selector before staging any child write.
         for part in &inputs {
             topology.validate_membership(ctx, &part.nodes, &part.edges)?;
+        }
+        // All selectors were checked. An empty body preserves its input pins and
+        // cannot observe pending values, so no projected child frame is needed.
+        if self.body.is_empty() {
+            return scope.install_collection(ctx, self.target, inputs);
         }
         let prior = ctx.take_outputs();
         let mut collected = ForEachOutputs::default();

@@ -26,8 +26,8 @@ pub trait ReadStep: sealed::Sealed + Send + Sync {
 /// Membership and optional retained value pin. New selections bind the current source;
 /// foreach pass-through retains the original pin rather than recapturing its values.
 pub(crate) struct SelectionPart {
-    pub nodes: HashSet<usize>,
-    pub edges: HashSet<usize>,
+    pub nodes: Arc<HashSet<usize>>,
+    pub edges: Arc<HashSet<usize>>,
     pub name: String,
     pub source: Option<GraphView>,
     // Only the memory adapter populates this; detached arrays never carry owners.
@@ -126,9 +126,10 @@ impl<'a> ReadStepScope<'a> {
                     if !Arc::ptr_eq(&parent.graph(), &selected.graph()) {
                         bail!("Subgraph selector belongs to a different graph owner");
                     }
+                    let (nodes, edges) = selected.shared_membership();
                     out.push(SelectionPart {
-                        nodes: selected.nodes().clone(),
-                        edges: selected.edges().clone(),
+                        nodes,
+                        edges,
                         name: selected.subgraph_type().into(),
                         source: selected.frozen_view().cloned(),
                         legacy: Some(selected.clone()),
@@ -162,9 +163,10 @@ impl<'a> ReadStepScope<'a> {
                             "Graph view selector belongs to a different graph owner or execution"
                         );
                     }
+                    let (nodes, edges) = view.shared_membership();
                     out.push(SelectionPart {
-                        nodes: view.nodes().clone(),
-                        edges: view.edges().clone(),
+                        nodes,
+                        edges,
                         name: "portable selection".into(),
                         source: Some(view.clone()),
                         legacy: None,
@@ -233,7 +235,7 @@ impl<'a> ReadStepScope<'a> {
                     let source = part.source.as_ref().or(parent.frozen_view());
                     out.push(if let Some(source) = source {
                         parent.bound_selection(
-                            GraphView::from_membership(
+                            GraphView::from_shared_membership(
                                 source.read_state().clone(),
                                 part.nodes,
                                 part.edges,
@@ -241,7 +243,12 @@ impl<'a> ReadStepScope<'a> {
                             part.name,
                         )
                     } else {
-                        Subgraph::new(parent.graph(), part.nodes, part.edges, part.name)
+                        Subgraph::new(
+                            parent.graph(),
+                            part.nodes.as_ref().clone(),
+                            part.edges.as_ref().clone(),
+                            part.name,
+                        )
                     });
                 }
                 StepValue::SubgraphArray(out)
@@ -253,7 +260,7 @@ impl<'a> ReadStepScope<'a> {
                         bail!("collection cancelled");
                     }
                     let source = part.source.as_ref().unwrap_or(current);
-                    out.push(GraphView::from_membership(
+                    out.push(GraphView::from_shared_membership(
                         source.read_state().clone(),
                         part.nodes,
                         part.edges,
@@ -281,8 +288,8 @@ impl<'a> ReadStepScope<'a> {
             Source::Memory(parent) => {
                 let frame = Subgraph::new(
                     parent.graph(),
-                    part.nodes.clone(),
-                    part.edges.clone(),
+                    part.nodes.as_ref().clone(),
+                    part.edges.as_ref().clone(),
                     "for_each frame".into(),
                 );
                 run(
@@ -866,8 +873,8 @@ mod collection_tests {
         vars.set_value("out", StepValue::GraphViewArray(vec![view.clone()]));
         let mut scope = ReadStepScope::detached((2, 1), &view, &view, None, &mut vars);
         let part = || SelectionPart {
-            nodes: HashSet::from([100]),
-            edges: HashSet::new(),
+            nodes: Arc::new(HashSet::from([100])),
+            edges: Arc::new(HashSet::new()),
             name: "bad".into(),
             source: None,
             legacy: None,
