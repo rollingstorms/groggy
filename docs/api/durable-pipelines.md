@@ -467,6 +467,13 @@ with TemporaryDirectory() as directory:
 
 ## Normalization safety
 
+Ordinary normalization factories apply defaults only to omitted controls. Explicit
+malformed epsilon/method/bounds reject, including null, booleans and invalid
+alias values. Numeric controls are validated during factory preparation, so bad
+epsilon or clip ranges reject even inside a zero-iteration body. Existing clip
+`min_value`/`max_value` precedence over `min`/`max` remains when both are valid.
+Construction can therefore reject earlier than execution.
+
 Ordinary normalization and standardization require finite, nonnegative epsilon
 and finite numeric inputs. Clip bounds must be ordered and not NaN; infinite
 bounds preserve the existing unbounded-side defaults. Invalid
@@ -495,11 +502,11 @@ with TemporaryDirectory() as directory:
     graph.writer().apply_batch(batch)
     store = DurableGraph.create_from_graph(Path(directory) / "normalize.journal", graph)
     head = store.current_state_id
-    program = Pipeline([step_pipeline("invalid epsilon", [
-        {"id": "core.load_node_attr", "params": {"attr": "score", "target": "values"}},
-        {"id": "core.normalize_values", "params": {"source": "values", "target": "out", "epsilon": -1.0}},
-    ], atomic=True)])
     try:
+        program = Pipeline([step_pipeline("invalid epsilon", [
+            {"id": "core.load_node_attr", "params": {"attr": "score", "target": "values"}},
+            {"id": "core.normalize_values", "params": {"source": "values", "target": "out", "epsilon": -1.0}},
+        ], atomic=True)])
         program.run_durable(store)
     except Exception as error:
         assert "epsilon" in str(error)

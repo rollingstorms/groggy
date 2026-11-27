@@ -28,7 +28,8 @@ use super::flow::{FlowUpdateStep, ResidualCapacityStep};
 use super::fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
 use super::init::{InitEdgesStep, InitNodesStep, InitNodesWithIndexStep};
 use super::normalization::{
-    ClipValuesStep, NormalizeMethod, NormalizeNodeValuesStep, NormalizeValuesStep, StandardizeStep,
+    validate_clip, validate_epsilon, ClipValuesStep, NormalizeMethod, NormalizeNodeValuesStep,
+    NormalizeValuesStep, StandardizeStep,
 };
 use super::pathfinding::{KShortestPathsStep, RandomWalkStep, ShortestPathMapStep};
 use super::structural::{
@@ -180,6 +181,47 @@ fn sampling_spec(params: &AlgorithmParams) -> Result<super::sampling::SampleSpec
         }
         _ => Err(anyhow!("Exactly one of count or fraction is required")),
     }
+}
+
+// Defaults apply only to omitted controls. Explicit malformed values are errors.
+fn numeric_control(params: &AlgorithmParams, name: &str, default: f64) -> Result<f64> {
+    if params.get(name).is_some() {
+        params.expect_float(name)
+    } else {
+        Ok(default)
+    }
+}
+fn normalization_epsilon(params: &AlgorithmParams) -> Result<f64> {
+    let epsilon = numeric_control(params, "epsilon", 1e-9)?;
+    validate_epsilon(epsilon)?;
+    Ok(epsilon)
+}
+fn normalization_method(params: &AlgorithmParams) -> Result<NormalizeMethod> {
+    let method = if params.get("method").is_some() {
+        params.expect_text("method")?
+    } else {
+        "sum"
+    };
+    match method {
+        "sum" => Ok(NormalizeMethod::Sum),
+        "mean" => Ok(NormalizeMethod::Mean),
+        "min" => Ok(NormalizeMethod::Min),
+        "max" => Ok(NormalizeMethod::Max),
+        "minmax" => Ok(NormalizeMethod::MinMax),
+        other => Err(anyhow!("unknown normalization method '{other}'")),
+    }
+}
+fn clip_bound(params: &AlgorithmParams, primary: &str, alias: &str, default: f64) -> Result<f64> {
+    // Validate both explicit spellings, retaining the historical primary precedence.
+    let primary_value = params
+        .get(primary)
+        .map(|_| params.expect_float(primary))
+        .transpose()?;
+    let alias_value = params
+        .get(alias)
+        .map(|_| params.expect_float(alias))
+        .transpose()?;
+    Ok(primary_value.or(alias_value).unwrap_or(default))
 }
 
 /// Register the core steps that ship with the engine.
@@ -1256,21 +1298,14 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         "core.normalize_node_values",
         StepMetadata {
             id: "core.normalize_node_values".to_string(),
-            description: "Normalize node map using sum/max/minmax".to_string(),
+            description: "Normalize node map using sum/mean/min/max/minmax".to_string(),
             cost_hint: CostHint::Linear,
         },
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let epsilon = spec.params.get_float("epsilon").unwrap_or(1e-9);
-            let method = match spec.params.get_text("method") {
-                Some("max") => NormalizeMethod::Max,
-                Some("min") => NormalizeMethod::Min,
-                Some("mean") => NormalizeMethod::Mean,
-                Some("minmax") => NormalizeMethod::MinMax,
-                Some("sum") | None => NormalizeMethod::Sum,
-                Some(other) => return Err(anyhow!("unknown normalization method '{other}'")),
-            };
+            let epsilon = normalization_epsilon(&spec.params)?;
+            let method = normalization_method(&spec.params)?;
             Ok(Box::new(NormalizeNodeValuesStep::new(
                 source, target, method, epsilon,
             )))
@@ -1281,21 +1316,15 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         "core.normalize_values",
         StepMetadata {
             id: "core.normalize_values".to_string(),
-            description: "Normalize values (node or edge map) using sum/max/minmax".to_string(),
+            description: "Normalize values (node or edge map) using sum/mean/min/max/minmax"
+                .to_string(),
             cost_hint: CostHint::Linear,
         },
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let epsilon = spec.params.get_float("epsilon").unwrap_or(1e-9);
-            let method = match spec.params.get_text("method") {
-                Some("max") => NormalizeMethod::Max,
-                Some("min") => NormalizeMethod::Min,
-                Some("mean") => NormalizeMethod::Mean,
-                Some("minmax") => NormalizeMethod::MinMax,
-                Some("sum") | None => NormalizeMethod::Sum,
-                Some(other) => return Err(anyhow!("unknown normalization method '{other}'")),
-            };
+            let epsilon = normalization_epsilon(&spec.params)?;
+            let method = normalization_method(&spec.params)?;
             Ok(Box::new(NormalizeValuesStep::new(
                 source, target, method, epsilon,
             )))
@@ -1312,7 +1341,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let epsilon = spec.params.get_float("epsilon").unwrap_or(1e-9);
+            let epsilon = normalization_epsilon(&spec.params)?;
             Ok(Box::new(StandardizeStep::new(source, target, epsilon)))
         },
     )?;
@@ -1328,16 +1357,9 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
             // Accept both "min"/"max" and "min_value"/"max_value" for compatibility
-            let min = spec
-                .params
-                .get_float("min_value")
-                .or_else(|| spec.params.get_float("min"))
-                .unwrap_or(f64::NEG_INFINITY);
-            let max = spec
-                .params
-                .get_float("max_value")
-                .or_else(|| spec.params.get_float("max"))
-                .unwrap_or(f64::INFINITY);
+            let min = clip_bound(&spec.params, "min_value", "min", f64::NEG_INFINITY)?;
+            let max = clip_bound(&spec.params, "max_value", "max", f64::INFINITY)?;
+            validate_clip(min, max)?;
             Ok(Box::new(ClipValuesStep::new(source, target, min, max)))
         },
     )?;
@@ -2349,5 +2371,79 @@ mod nested_body_tests {
         ] {
             assert!(parse_body_steps(&AlgorithmParamValue::Json(body)).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod normalization_control_tests {
+    use super::*;
+    use crate::algorithms::Step;
+    fn instantiate(id: &str, key: &str, value: AlgorithmParamValue) -> Result<Box<dyn Step>> {
+        ensure_core_steps_registered();
+        let mut params = AlgorithmParams::new();
+        params.insert("source", AlgorithmParamValue::Text("input".into()));
+        params.insert("target", AlgorithmParamValue::Text("output".into()));
+        params.insert(key, value);
+        global_step_registry().instantiate(&super::super::core::StepSpec {
+            id: id.into(),
+            params,
+            inputs: vec![],
+            outputs: vec![],
+        })
+    }
+    #[test]
+    fn normalization_factories_reject_malformed_or_nonfinite_explicit_controls() {
+        for id in [
+            "core.normalize_values",
+            "core.normalize_node_values",
+            "core.standardize",
+        ] {
+            for value in [
+                AlgorithmParamValue::None,
+                AlgorithmParamValue::Bool(false),
+                AlgorithmParamValue::Text("bad".into()),
+                AlgorithmParamValue::Float(f64::NAN),
+                AlgorithmParamValue::Float(f64::INFINITY),
+                AlgorithmParamValue::Float(-1.0),
+            ] {
+                assert!(instantiate(id, "epsilon", value).is_err());
+            }
+            assert!(instantiate(id, "epsilon", AlgorithmParamValue::Int(0)).is_ok());
+        }
+        for id in ["core.normalize_values", "core.normalize_node_values"] {
+            for value in [
+                AlgorithmParamValue::None,
+                AlgorithmParamValue::Bool(true),
+                AlgorithmParamValue::Int(42),
+            ] {
+                assert!(instantiate(id, "method", value).is_err());
+            }
+        }
+    }
+    #[test]
+    fn clip_factories_keep_unbounded_sides_but_reject_bad_aliases_and_nan() {
+        for key in ["min", "max", "min_value", "max_value"] {
+            for value in [
+                AlgorithmParamValue::None,
+                AlgorithmParamValue::Bool(false),
+                AlgorithmParamValue::Text("bad".into()),
+                AlgorithmParamValue::Float(f64::NAN),
+            ] {
+                assert!(instantiate("core.clip", key, value).is_err());
+            }
+            assert!(instantiate("core.clip", key, AlgorithmParamValue::Int(0)).is_ok());
+        }
+        assert!(instantiate(
+            "core.clip",
+            "min",
+            AlgorithmParamValue::Float(f64::NEG_INFINITY)
+        )
+        .is_ok());
+        assert!(instantiate(
+            "core.clip",
+            "max",
+            AlgorithmParamValue::Float(f64::INFINITY)
+        )
+        .is_ok());
     }
 }

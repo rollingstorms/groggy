@@ -26,13 +26,13 @@ fn finite(value: f64, context: &str) -> Result<f64> {
     }
     Ok(value)
 }
-fn validate_epsilon(epsilon: f64) -> Result<()> {
+pub(super) fn validate_epsilon(epsilon: f64) -> Result<()> {
     if !epsilon.is_finite() || epsilon < 0.0 {
         return Err(anyhow!("epsilon must be finite and non-negative"));
     }
     Ok(())
 }
-fn validate_clip(min: f64, max: f64) -> Result<()> {
+pub(super) fn validate_clip(min: f64, max: f64) -> Result<()> {
     if min.is_nan() || max.is_nan() || min > max {
         return Err(anyhow!(
             "invalid clip range: bounds must be ordered and not NaN"
