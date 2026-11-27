@@ -1,5 +1,12 @@
 # Groggy implementation checklist
 
+**Community/decay follow-up — 2026-11-27:**
+[Portable community helpers and decay](portable-community-and-decay-2026-11-27.md)
+completes four more selected read kernels, including ordered column producers.
+Worker results match independent objectives/votes and memory/recovery. Local
+gates pass **1,706 native / 3,641 Python tests / 304 examples**; six component
+checks are complete and stable counts remain **217 checked / 51 open**.
+
 **Edge-transform follow-up — 2026-11-27:**
 [Portable edge-weight scaling](portable-edge-weight-scale-2026-11-27.md) completes
 the attribute module's shared read inventory, with explicit factor/overflow
