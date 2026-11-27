@@ -54,7 +54,7 @@ with TemporaryDirectory() as folder:
 - `add`, `sub`, `mul`, `div`, `min`, `max`, `pow`.
 - `abs`, `sqrt`, `exp`, `log`, `clip`, `recip`.
 - `compare`, `where`, `reduce_scalar`, `mode_list`.
-- `normalize` with `sum` or `max`.
+- `normalize` with `sum`, `mean`, `min` or `max`.
 - `node_degree`, `collect_neighbor_values`, `neighbor_aggregate`, `neighbor_mode`.
 - `update_in_place`, `neighbor_mode_update`.
 - `fused_neighbor_mul_agg`, `fused_madd`, `fused_axpy` (the historical serialized
@@ -84,9 +84,16 @@ nonzero; true division by zero reports the native error. Numeric comparison uses
 exact ordering, including mixed integer/float inputs; equality does not apply an
 implicit tolerance. Streaming comparison uses that same comparator.
 
+Normalization divides by the signed sum, arithmetic mean, minimum or maximum.
+A divisor whose absolute value is at most epsilon rejects; checked execution
+does not clamp a negative or tiny divisor to epsilon. All inputs, intermediates
+and outputs must be finite. Empty sum normalization rejects; empty mean/min/max
+return empty maps. Legacy uncertified mixed plans retain their old interpreter
+behavior; this finite checked contract is explicit.
+
 ## Remaining boundary and cost
 
-`load_edge_attr` and `normalize(min/mean)` remain outside this lowering.
+`load_edge_attr` remains outside this lowering.
 The edge-attribute instruction needs an edge-aware register result contract;
 ordinary `core.load_edge_attr` already works in durable programs. A plan containing
 an unlowered instruction stays uncertified for atomic/durable execution; its

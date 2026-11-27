@@ -4,7 +4,8 @@ Numeric plan follow-up: [checked numeric loop plans](checked-numeric-loop-plans.
 lists the 35 lowered instruction forms and shared arithmetic, topology, update
 and fused kernels now supported by durable execution. Ordinary step-body loops
 recursively prepare supported sealed children, including nested register loops.
-Edge-attribute registers and normalize(min/mean) remain outside this guarantee.
+Edge-attribute registers remain outside this guarantee. Normalize min/mean use
+the same checked kernels as sum/max.
 
 The shared durable read inventory also includes all eight aggregation steps,
 all four predicate/rank steps, node/edge/reservoir masks, flow/residual/alias

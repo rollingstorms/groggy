@@ -474,11 +474,11 @@ result rejects the complete operation before output installation or publication.
 This is a bounded f64 normalization contract, not a claim that all extreme-value
 ratios are reconstructed through otherwise unrepresentable intermediates.
 
-Existing definitions remain: max means the signed maximum, minmax uses the
-range, and standardization uses population variance. Empty sum normalization
-rejects its zero denominator; empty max/minmax, standardization and clipping
-return empty maps when their controls are valid. This does not enable the
-separate register-plan normalize(min/mean) options.
+Normalization supports signed sum, arithmetic mean, minimum, maximum and minmax
+range; standardization uses population variance. Empty sum normalization
+rejects its zero denominator; empty mean/min/max/minmax, standardization and
+clipping return empty maps when their controls are valid. Checked register plans
+also support sum/mean/min/max, with the same finite and epsilon checks.
 
 ```python
 from pathlib import Path

@@ -12,6 +12,8 @@ use super::core::{AtomicStepEffect, Step, StepMetadata, StepScope};
 #[derive(Clone, Copy, Debug)]
 pub enum NormalizeMethod {
     Sum,
+    Mean,
+    Min,
     Max,
     MinMax,
 }
@@ -149,7 +151,7 @@ where
     keys.sort_unstable();
 
     match method {
-        NormalizeMethod::Sum => {
+        NormalizeMethod::Sum | NormalizeMethod::Mean => {
             let mut sum = 0.0;
             for key in &keys {
                 let value = map.get(key).expect("key must exist");
@@ -157,9 +159,12 @@ where
             }
 
             finite(sum, source_name)?;
+            if matches!(method, NormalizeMethod::Mean) {
+                sum /= keys.len() as f64;
+            }
             if sum.abs() <= epsilon {
                 return Err(anyhow!(
-                    "cannot normalize '{}': total magnitude below epsilon ({})",
+                    "cannot normalize '{}': sum/mean magnitude below epsilon ({})",
                     source_name,
                     epsilon
                 ));
@@ -174,12 +179,17 @@ where
                 );
             }
         }
-        NormalizeMethod::Max => {
-            let mut max_value = f64::NEG_INFINITY;
+        NormalizeMethod::Min | NormalizeMethod::Max => {
+            let is_min = matches!(method, NormalizeMethod::Min);
+            let mut max_value = if is_min {
+                f64::INFINITY
+            } else {
+                f64::NEG_INFINITY
+            };
             for key in &keys {
                 let value = map.get(key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
-                if raw > max_value {
+                if (is_min && raw < max_value) || (!is_min && raw > max_value) {
                     max_value = raw;
                 }
             }
@@ -187,7 +197,7 @@ where
             finite(max_value, source_name)?;
             if max_value.abs() <= epsilon {
                 return Err(anyhow!(
-                    "cannot normalize '{}': max magnitude below epsilon ({})",
+                    "cannot normalize '{}': min/max magnitude below epsilon ({})",
                     source_name,
                     epsilon
                 ));
@@ -526,6 +536,8 @@ mod safety_tests {
             for data in [values(&[]), values(&[0.0])] {
                 for method in [
                     NormalizeMethod::Sum,
+                    NormalizeMethod::Mean,
+                    NormalizeMethod::Min,
                     NormalizeMethod::Max,
                     NormalizeMethod::MinMax,
                 ] {
@@ -551,6 +563,8 @@ mod safety_tests {
             let data = values(&[1.0, x]);
             for method in [
                 NormalizeMethod::Sum,
+                NormalizeMethod::Mean,
+                NormalizeMethod::Min,
                 NormalizeMethod::Max,
                 NormalizeMethod::MinMax,
             ] {
@@ -601,6 +615,43 @@ mod safety_tests {
         ] {
             assert!(clip_map(&values(&[0.5]), min, max, "test").is_ok());
         }
+    }
+    #[test]
+    fn minimum_and_mean_use_signed_divisors_and_reject_zero_or_overflow() {
+        for sign in [-1.0, 1.0] {
+            let input = values(&[sign * 2.0, sign * 4.0]);
+            let mean = normalize_map(&input, NormalizeMethod::Mean, 0.0, "test").unwrap();
+            assert_eq!(mean[&0], AlgorithmParamValue::Float(2.0 / 3.0));
+            assert_eq!(mean[&1], AlgorithmParamValue::Float(4.0 / 3.0));
+            let min = normalize_map(&input, NormalizeMethod::Min, 0.0, "test").unwrap();
+            let expected = if sign > 0.0 { [1.0, 2.0] } else { [0.5, 1.0] };
+            for (i, x) in expected.into_iter().enumerate() {
+                assert_eq!(min[&i], AlgorithmParamValue::Float(x));
+            }
+        }
+        for method in [NormalizeMethod::Min, NormalizeMethod::Mean] {
+            assert!(normalize_map(&values(&[]), method, 0.0, "test")
+                .unwrap()
+                .is_empty());
+            assert!(normalize_map(&values(&[0.0]), method, 0.0, "test").is_err());
+            assert!(normalize_map(&values(&[1e-30]), method, 1e-20, "test").is_err());
+            assert!(normalize_map(&values(&[1e-30]), method, 0.0, "test").is_ok());
+        }
+        assert!(normalize_map(&values(&[-1.0, 1.0]), NormalizeMethod::Mean, 0.0, "test").is_err());
+        assert!(normalize_map(
+            &values(&[f64::MAX, f64::MAX]),
+            NormalizeMethod::Mean,
+            0.0,
+            "test"
+        )
+        .is_err());
+        assert!(normalize_map(
+            &values(&[f64::MIN_POSITIVE, f64::MAX]),
+            NormalizeMethod::Min,
+            0.0,
+            "test"
+        )
+        .is_err());
     }
     #[test]
     fn normalization_errors_preserve_node_and_edge_outputs() {

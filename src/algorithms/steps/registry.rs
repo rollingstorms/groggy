@@ -1265,6 +1265,8 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let epsilon = spec.params.get_float("epsilon").unwrap_or(1e-9);
             let method = match spec.params.get_text("method") {
                 Some("max") => NormalizeMethod::Max,
+                Some("min") => NormalizeMethod::Min,
+                Some("mean") => NormalizeMethod::Mean,
                 Some("minmax") => NormalizeMethod::MinMax,
                 Some("sum") | None => NormalizeMethod::Sum,
                 Some(other) => return Err(anyhow!("unknown normalization method '{other}'")),
@@ -1288,6 +1290,8 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let epsilon = spec.params.get_float("epsilon").unwrap_or(1e-9);
             let method = match spec.params.get_text("method") {
                 Some("max") => NormalizeMethod::Max,
+                Some("min") => NormalizeMethod::Min,
+                Some("mean") => NormalizeMethod::Mean,
                 Some("minmax") => NormalizeMethod::MinMax,
                 Some("sum") | None => NormalizeMethod::Sum,
                 Some(other) => return Err(anyhow!("unknown normalization method '{other}'")),

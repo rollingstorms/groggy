@@ -86,7 +86,7 @@ fn cases() -> Vec<(Value, Value)> {
         json!({"type":"clip","dst":2,"src":0,"min":1.,"max":3.}),
         json!({"id":"core.clip","params":{"source":"a","target":"answer","min":1.,"max":3.}}),
     ));
-    for method in ["sum", "max"] {
+    for method in ["sum", "mean", "min", "max"] {
         cases.push((json!({"type":"normalize","dst":2,"src":0,"method":method,"epsilon":1e-9}),json!({"id":"core.normalize_values","params":{"source":"a","target":"answer","method":method,"epsilon":1e-9}})));
     }
     for operation in ["sum", "mean", "min", "max"] {

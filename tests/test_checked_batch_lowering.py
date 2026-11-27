@@ -443,3 +443,109 @@ def test_compiled_map_expression_binds_its_named_register_for_following_steps(
     )
     assert result.node_attr(0, "answer") == expected
     store.close()
+
+
+@pytest.mark.parametrize("method", ["min", "mean"])
+@pytest.mark.parametrize("sign", [-1.0, 1.0])
+@pytest.mark.parametrize("layout", ["plan", "nodes", "edges"])
+def test_signed_minimum_and_mean_match_independent_oracle_and_recover(
+    tmp_path, method, sign, layout
+):
+    path = tmp_path / "signed-normalize.journal"
+    graph = Graph(directed=True)
+    graph.add_nodes(2)
+    graph.add_edge(0, 1)
+    graph.add_edge(1, 1)
+    setter = (
+        graph.writer().set_edge_attr
+        if layout == "edges"
+        else graph.writer().set_node_attr
+    )
+    setter(0, "input", sign * 2.0, effective_at=0)
+    setter(1, "input", sign * 4.0, effective_at=0)
+    store = DurableGraph.create_from_graph(path, graph)
+    load = "core.load_edge_attr" if layout == "edges" else "core.load_node_attr"
+    attach = "core.attach_edge_attr" if layout == "edges" else "core.attach_node_attr"
+    steps = [step(load, attr="input", target="input")]
+    divisor = sign * (3.0 if method == "mean" else (2.0 if sign > 0 else 4.0))
+    expected = [sign * 2.0 / divisor, sign * 4.0 / divisor]
+    if layout == "plan":
+        steps.append(
+            loop(
+                [
+                    {"type": "load_node_prop", "dst": 0, "var_name": "input"},
+                    {
+                        "type": "normalize",
+                        "dst": 0,
+                        "src": 0,
+                        "method": method,
+                        "epsilon": 0.0,
+                    },
+                    {"type": "store_node_prop", "src": 0, "var_name": "answer"},
+                ],
+                slots=1,
+                iterations=2,
+            )
+        )
+    else:
+        steps.append(
+            step(
+                "core.normalize_values",
+                source="input",
+                target="answer",
+                method=method,
+                epsilon=0.0,
+            )
+        )
+    steps += [step(attach, source="answer", attr="answer", effective_at=20)]
+    retained = store.read_view()
+    result = run(store, steps)
+    getter = result.edge_attr if layout == "edges" else result.node_attr
+    assert [getter(i, "answer") for i in [0, 1]] == pytest.approx(expected)
+    assert retained.node_attr(0, "answer") is None
+    store.close()
+    reopened = DurableGraph.open(path)
+    prior, recovered = reopened.read_view_at(19), reopened.read_view_at(20)
+    assert (prior.edge_attr if layout == "edges" else prior.node_attr)(
+        0, "answer"
+    ) is None
+    getter = recovered.edge_attr if layout == "edges" else recovered.node_attr
+    assert [getter(i, "answer") for i in [0, 1]] == pytest.approx(expected)
+    reopened.close()
+
+
+@pytest.mark.parametrize("method", ["min", "mean"])
+@pytest.mark.parametrize("value,epsilon", [(0.0, 0.0), (1e-30, 1e-20)])
+def test_checked_minimum_mean_rejection_rolls_back_pending_writes(
+    tmp_path, method, value, epsilon
+):
+    path = tmp_path / "zero-normalize.journal"
+    graph = Graph()
+    graph.add_node()
+    store = DurableGraph.create_from_graph(path, graph)
+    before, head = path.read_bytes(), store.current_state_id
+    with pytest.raises(RuntimeError, match="epsilon"):
+        run(
+            store,
+            [
+                step("core.init_nodes", target="prefix", value=7),
+                step("core.attach_node_attr", source="prefix", attr="prefix"),
+                loop(
+                    [
+                        {"type": "init_nodes", "dst": 0, "value": value},
+                        {
+                            "type": "normalize",
+                            "dst": 0,
+                            "src": 0,
+                            "method": method,
+                            "epsilon": epsilon,
+                        },
+                    ],
+                    slots=1,
+                ),
+            ],
+        )
+    assert path.read_bytes() == before
+    assert store.current_state_id == head
+    assert store.read_view().node_attr(0, "prefix") is None
+    store.close()

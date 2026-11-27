@@ -303,18 +303,17 @@ impl LoweredBatchPlan {
                     src,
                     method,
                     epsilon,
-                } if !matches!(method, AggregateOp::Min | AggregateOp::Mean) => {
-                    Native::new(NormalizeValuesStep::new(
-                        slot(*src),
-                        slot(*dst),
-                        if matches!(method, AggregateOp::Sum) {
-                            NormalizeMethod::Sum
-                        } else {
-                            NormalizeMethod::Max
-                        },
-                        *epsilon,
-                    ))
-                }
+                } => Native::new(NormalizeValuesStep::new(
+                    slot(*src),
+                    slot(*dst),
+                    match method {
+                        AggregateOp::Sum => NormalizeMethod::Sum,
+                        AggregateOp::Mean => NormalizeMethod::Mean,
+                        AggregateOp::Min => NormalizeMethod::Min,
+                        AggregateOp::Max => NormalizeMethod::Max,
+                    },
+                    *epsilon,
+                )),
                 I::BroadcastScalar { dst, scalar } => {
                     // A fresh reference is required even when dst aliases scalar.
                     operations.push(Operation::Native(Native::new(InitNodesStep::new(
