@@ -1,5 +1,11 @@
 # Groggy roadmap status — 2026-10-24
 
+**Path primitive follow-up — 2026-11-27:**
+[Selected shortest/Yen/walk steps](portable-path-primitives-2026-11-27.md) now share
+immutable worker kernels, preserving native definitions. Six component checks
+complete; **1,714 Rust / 3,706 Python / 306 examples** pass. Stable counts remain
+**217 checked / 51 open**; seven owner-history producers remain explicit.
+
 **Collection/foreach follow-up — 2026-11-27:**
 [Portable immutable collections](portable-read-collections-2026-11-27.md) completes
 four collection producers and recursively certified fixed foreach bodies on
