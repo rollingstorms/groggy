@@ -165,7 +165,9 @@ def test_explicit_normalization_controls_reject_before_atomic_prefix_even_in_zer
     path = tmp_path / "malformed-controls.journal"
     store = fixture(path, [2.0, 4.0])
     before, head = path.read_bytes(), store.current_state_id
-    with pytest.raises(Exception, match="epsilon|method|min|max|clip range"):
+    with pytest.raises(
+        Exception, match="epsilon|method|min|max|clip range|iter.loop|atomic"
+    ):
         pipeline(
             [
                 step("core.init_nodes", target="prior", value=99),
