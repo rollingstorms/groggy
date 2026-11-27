@@ -40,8 +40,10 @@ The earlier [flow candidate CI](https://github.com/rollingstorms/groggy/actions/
 passed all 21 required jobs, including 19 wheel combinations and source rebuilding.
 Only Linux Python 3.12 runs the full maintained Python/docs suite; other wheel
 jobs run smoke/application/ownership checks. That evidence is pinned to its
-candidate and is not assigned to newer code. A fresh candidate run is being
-qualified separately. Manual workflow dispatch cannot publish a package.
+candidate and is not assigned to newer code. The [newer candidate run](https://github.com/rollingstorms/groggy/actions/runs/45652492406)
+also passed all 21 required jobs on `ac59fcf1`, whose 500 production source files
+match the local numerical safety runtime. Its [CI receipt](../benchmarks/normalization-safety-ci-qualification-2026-11-27.json)
+was collected on November 27 with the reusable validation tool. Manual workflow dispatch cannot publish a package.
 
 Matched repeated-alias observations improved 81–83% at 100 aliases for their
 recorded source and fixtures; controls also varied. See the
