@@ -53,6 +53,7 @@ with TemporaryDirectory() as folder:
 | `core.add/sub/mul/div/pow/min/max`, `core.abs/sqrt/exp/log`, `core.recip/compare/where/reduce_scalar/broadcast_scalar/mode_list` | Share the existing checked scalar/node/edge kernels; existing operand kinds and domain errors apply. Comparisons preserve exact integer ordering. |
 | `core.filter_nodes_by_attr`, `core.filter_edges_by_attr`, `core.sort_nodes_by_attr`, `core.top_k` | Share selected pending property reads and existing predicate/rank rules; masks/ranks are owned maps, with graph changes only through explicit attachment. |
 | `core.sample_nodes`, `core.sample_edges`, `core.reservoir_sample` | Seeded selected node/edge masks; reservoir inputs are validated even at zero k, and only explicit attachment writes graph properties. |
+| `sample.iterate_nodes`, `sample.iterate_edges`, `sample.neighbors`, `sample.emit_subgraphs`, certified `sample.for_each` | Immutable selected collections and recursively prepared fixed child bodies, including pending IDs, nested loops/captures and sibling property visibility. Child topology and unported bodies reject. |
 | Declarative `core.map_nodes` expressions | Share the existing evaluator with a private selected-read input adapter. Pending attributes, graph-default neighbors, checked operators, short-circuit and async source visibility retain their native rules. Rust callback mapping remains owner-only. |
 | `alias`, `core.flow_update`, `core.residual_capacity` | Share owned immutable values and checked edge-map arithmetic; aliases remain independent under mutation/rebinding. Positive residuals retain their supplied edge IDs. |
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
@@ -585,3 +586,75 @@ with TemporaryDirectory() as directory:
     assert [result.node_attr(node, "next") for node in result.node_ids] == [1, 0, 2]
     store.close()
 ```
+
+
+## Immutable collections and fixed foreach frames
+
+Portable collection steps carry `GraphViewArray` values without writable owners.
+The Rust memory adapter retains its existing `SubgraphArray` output and explicit
+owner association. This adds one public `StepValue` enum variant: exhaustive Rust
+matches must include it; existing variants and accessors retain their contracts.
+The standalone sampler facade still uses its owner-connected adapter. These
+step-builder guarantees do not certify every standalone algorithm entry point.
+
+All selector sources are checked before child execution: matching numeric IDs
+alone do not establish ownership. Accepted views must share history identity;
+pending views must have been issued by this atomic invocation. Child execution
+refreshes pending values through the accepted root and projects exact membership,
+including provisional IDs. It never grows to include a sibling's rows. Nested
+loops and captures retain that boundary. Topology inside fixed children remains
+rejected, including zero-iteration nested topology programs.
+
+A missing child output preserves its input pin; an explicit empty array emits
+zero children. Rebinding an alias does not mutate its source. Invalid selectors,
+wrong reserved-output types, errors or cancellation preserve prior outputs and
+roll back staged writes and allocations. Neighborhood direction, selected edge
+scope, parallel instances, self-loops, ordered overlap and induced/per-item/unified
+rules remain the existing native definitions.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+
+def collection_step(kind, **params):
+    return {"id": kind, "params": params}
+
+
+with TemporaryDirectory() as directory:
+    graph = Graph(directed=True)
+    batch = GraphBatch(effective_at=0)
+    for _ in range(3):
+        batch.add_node()
+    batch.add_edge(0, 1)
+    batch.add_edge(1, 2)
+    graph.writer().apply_batch(batch)
+    store = DurableGraph.create_from_graph(Path(directory) / "frames.journal", graph)
+    program = Pipeline([step_pipeline("fixed edge frames", [
+        collection_step("sample.iterate_edges", target="seeds"),
+        collection_step("sample.for_each", source="seeds", target="mapped", body=[
+            collection_step("core.load_node_attr", attr="counter", default=0, target="old"),
+            collection_step("core.init_scalar", value=1, target="one"),
+            collection_step("core.add", left="old", right="one", target="next"),
+            collection_step("core.attach_node_attr", source="next", attr="counter", effective_at=20),
+            collection_step("graph.capture_staged", output="pin"),
+            collection_step("graph.emit", source="pin", name="child"),
+        ]),
+    ], atomic=True)])
+    result, profile = program.run_durable(store, return_profile=True)
+    first = profile["outputs"]["for_each.mapped.0.child"]
+    assert first.node_ids == [0, 1]
+    assert first.node_attr(1, "counter") == 1
+    assert [result.node_attr(n, "counter") for n in range(3)] == [1, 2, 1]
+    store.close()
+    # Captured child values remain readable after the owner closes.
+    assert first.node_attr(1, "counter") == 1
+```
+
+Membership sets and projected child values still require allocation. Reusing
+source pins does not make wide captures free, and this portability change makes
+no new latency, allocator/RSS or scale guarantee. Retained-history producers,
+edge-aware registers, remaining frontend/alternate plans, streaming/custom
+callbacks and the existing naming/cache/run-history questions remain open.

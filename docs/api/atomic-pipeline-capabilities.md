@@ -11,8 +11,9 @@ The shared durable read inventory also includes all eight aggregation steps,
 all four predicate/rank steps, node/edge/reservoir masks, flow/residual/alias
 values, supported message-pass blocks and declarative expression maps. These
 preserve their existing domains and output kinds; only explicit attachments
-publish computed properties. Custom Rust mapping callbacks, subgraph-returning
-samplers and foreach containers retain their owner-only boundary. The detailed
+publish computed properties. Subgraph-returning samplers and recursively certified
+foreach bodies also use immutable portable collections; custom Rust mapping
+callbacks retain their owner-only boundary. The detailed
 inventory and executable examples are in [durable pipelines](durable-pipelines.md).
 
 An atomic pipeline shares one pending graph mutation across certified builders and
@@ -30,7 +31,7 @@ owner, branch and accepted head before execution.
 | Retained snapshots/diffs | Accepted retained history, independent of pending working edits | Unpublished changes do not become retained history. |
 | Retained lifecycle/window helpers | Surviving accepted IDs after pending topology | Provisional-node history remains explicitly guarded pending its policy decision. |
 | Root `iter.loop` | Sequential creation, accepted-entity removal/revision, refreshed properties, nested root loops; certified ordinary bodies also run detached through durable execution | Added references remain whole-batch positions; canonical duplicate rules remain. |
-| Fixed child `sample.for_each` | Exact immutable child selection with shared property staging and refreshed reads | Child topology changes remain rejected, including nested topology loops. |
+| Fixed child `sample.for_each` | Exact immutable child selection with shared property staging and refreshed reads on memory or durable workers | Child topology changes remain rejected, including nested topology loops. |
 | Other execution routes | Certified native step interpreter and ordinary supported algorithm calls | Bounded durable step-builder invocation is implemented; see [durable pipelines](durable-pipelines.md). Unported durable kernels, alternate batch plans, streaming and unsupported callbacks remain guarded. |
 
 ## All classic families in one publication

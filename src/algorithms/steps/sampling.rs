@@ -21,10 +21,11 @@ use crate::types::{EdgeId, NodeId};
 
 use super::super::{AlgorithmOutput, AlgorithmParamValue, Context, CostHint};
 use super::core::{
-    nested_effect, AtomicStepEffect, Step, StepExecutor, StepMetadata, StepScope, StepVariables,
+    nested_effect, AtomicStepEffect, CheckedReadStep, Step, StepExecutor, StepMetadata, StepScope,
+    StepVariables,
 };
 
-use super::read_scope::{sealed, ReadStep, ReadStepScope};
+use super::read_scope::{sealed, ReadStep, ReadStepScope, SelectionPart};
 
 /// Specification for sampling: either a fraction or absolute count.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -225,20 +226,26 @@ struct SelectionTopology {
 }
 impl SelectionTopology {
     fn prepare(ctx: &Context, scope: &StepScope<'_>) -> Result<Self> {
+        let mut variables = StepVariables::default();
+        Self::prepare_read(
+            ctx,
+            &ReadStepScope::memory(scope.subgraph(), &mut variables, scope.fixed_selection()),
+        )
+    }
+    fn prepare_read(ctx: &Context, scope: &ReadStepScope<'_>) -> Result<Self> {
         check_cancelled(ctx)?;
-        scope.subgraph().validate_selected_read()?;
-        let edges = scope.subgraph().ordered_edges().to_vec();
-        let nodes = scope.subgraph().ordered_nodes().to_vec();
+        scope.validate_selected_read()?;
+        let edges = scope.ordered_edges().to_vec();
+        let nodes = scope.ordered_nodes().to_vec();
         let mut rows: HashMap<_, Vec<_>> = nodes.iter().map(|&node| (node, Vec::new())).collect();
         let mut endpoints = HashMap::with_capacity(edges.len());
-        let selected = scope.subgraph();
         for &edge in &edges {
             check_cancelled(ctx)?;
-            let (source, target) = selected.edge_endpoints(edge)?;
+            let (source, target) = scope.edge_endpoints(edge)?;
             rows.get_mut(&source)
                 .ok_or_else(|| anyhow::anyhow!("Missing selected source"))?
                 .push((target, edge));
-            if !selected.read_is_directed() && source != target {
+            if !scope.is_directed() && source != target {
                 rows.get_mut(&target)
                     .ok_or_else(|| anyhow::anyhow!("Missing selected target"))?
                     .push((source, edge));
@@ -261,7 +268,15 @@ impl SelectionTopology {
         if !Arc::ptr_eq(&scope.subgraph().graph(), &selector.graph()) {
             bail!("Subgraph selector belongs to a different graph owner");
         }
-        for &node in selector.node_set() {
+        self.validate_membership(ctx, selector.node_set(), selector.edge_set())
+    }
+    fn validate_membership(
+        &self,
+        ctx: &Context,
+        nodes: &HashSet<NodeId>,
+        edges: &HashSet<EdgeId>,
+    ) -> Result<()> {
+        for &node in nodes {
             check_cancelled(ctx)?;
             if !self.rows.contains_key(&node) {
                 bail!(
@@ -270,7 +285,7 @@ impl SelectionTopology {
                 );
             }
         }
-        for &edge in selector.edge_set() {
+        for &edge in edges {
             check_cancelled(ctx)?;
             let (source, target) = self.endpoints.get(&edge).ok_or_else(|| {
                 anyhow::anyhow!(
@@ -278,7 +293,7 @@ impl SelectionTopology {
                     edge
                 )
             })?;
-            if !selector.node_set().contains(source) || !selector.node_set().contains(target) {
+            if !nodes.contains(source) || !nodes.contains(target) {
                 bail!(
                     "Subgraph selector edge {} endpoint is outside its node selection",
                     edge
@@ -308,29 +323,26 @@ impl SelectionTopology {
 }
 
 fn selected_output(
-    scope: &StepScope<'_>,
+    _scope: &ReadStepScope<'_>,
     nodes: HashSet<NodeId>,
     edges: HashSet<EdgeId>,
     name: String,
-) -> Result<Subgraph> {
-    let selected = scope.subgraph();
-    if let Some(source) = selected.frozen_view() {
-        let view = crate::GraphView::from_membership(source.read_state().clone(), nodes, edges)?;
-        Ok(selected.bound_selection(view, name))
-    } else {
-        Ok(Subgraph::new(selected.graph(), nodes, edges, name))
-    }
+) -> Result<SelectionPart> {
+    Ok(SelectionPart {
+        nodes,
+        edges,
+        name,
+        source: None,
+        legacy: None,
+    })
 }
-
 fn install_subgraphs(
     ctx: &Context,
-    scope: &mut StepScope<'_>,
+    scope: &mut ReadStepScope<'_>,
     target: &str,
-    outputs: Vec<Subgraph>,
+    outputs: Vec<SelectionPart>,
 ) -> Result<()> {
-    check_cancelled(ctx)?;
-    scope.variables_mut().set_subgraph_array(target, outputs);
-    Ok(())
+    scope.install_collection(ctx, target, outputs)
 }
 
 /// Iterate nodes and emit one subgraph per node.
@@ -368,8 +380,17 @@ impl Step for IterateNodesStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        let topology = SelectionTopology::prepare(ctx, scope)?;
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for IterateNodesStep {}
+impl ReadStep for IterateNodesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope) -> Result<()> {
+        let topology = SelectionTopology::prepare_read(ctx, scope)?;
         let mut outputs = Vec::with_capacity(topology.nodes.len());
         for &node in &topology.nodes {
             check_cancelled(ctx)?;
@@ -421,8 +442,17 @@ impl Step for IterateEdgesStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        let topology = SelectionTopology::prepare(ctx, scope)?;
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for IterateEdgesStep {}
+impl ReadStep for IterateEdgesStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope) -> Result<()> {
+        let topology = SelectionTopology::prepare_read(ctx, scope)?;
         let mut outputs = Vec::with_capacity(topology.edges.len());
         for &edge in &topology.edges {
             check_cancelled(ctx)?;
@@ -477,14 +507,23 @@ impl Step for NeighborsStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        let topology = SelectionTopology::prepare(ctx, scope)?;
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for NeighborsStep {}
+impl ReadStep for NeighborsStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope) -> Result<()> {
+        let topology = SelectionTopology::prepare_read(ctx, scope)?;
         let seeds: Vec<HashSet<NodeId>> =
-            if let Ok(seeds) = scope.variables().subgraph_array(&self.source) {
-                for seed in seeds {
-                    topology.validate(ctx, scope, seed)?;
+            if let Some(seeds) = scope.collection(ctx, &self.source)? {
+                for seed in &seeds {
+                    topology.validate_membership(ctx, &seed.nodes, &seed.edges)?;
                 }
-                seeds.iter().map(|seed| seed.node_set().clone()).collect()
+                seeds.iter().map(|seed| seed.nodes.clone()).collect()
             } else if let Ok(nodes) = scope.variables().node_map(&self.source) {
                 let mut ids: Vec<_> = nodes.keys().copied().collect();
                 ids.sort_unstable();
@@ -598,13 +637,22 @@ impl Step for EmitSubgraphsStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
-        let topology = SelectionTopology::prepare(ctx, scope)?;
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for EmitSubgraphsStep {}
+impl ReadStep for EmitSubgraphsStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope) -> Result<()> {
+        let topology = SelectionTopology::prepare_read(ctx, scope)?;
         let mut selections: Vec<(HashSet<NodeId>, HashSet<EdgeId>)> = Vec::new();
-        if let Ok(array) = scope.variables().subgraph_array(&self.source) {
+        if let Some(array) = scope.collection(ctx, &self.source)? {
             for selector in array {
-                topology.validate(ctx, scope, selector)?;
-                selections.push((selector.node_set().clone(), selector.edge_set().clone()));
+                topology.validate_membership(ctx, &selector.nodes, &selector.edges)?;
+                selections.push((selector.nodes, selector.edges));
             }
             if matches!(self.mode, EmitMode::Unified) && !selections.is_empty() {
                 let mut nodes = HashSet::new();
@@ -798,6 +846,24 @@ impl Step for ForEachSubgraphStep {
             .all(|step| step.supports_atomic_properties())
     }
 
+    fn prepare_read_kernel(&self) -> Result<Option<Box<dyn ReadStep + '_>>> {
+        if self.atomic_effect() == AtomicStepEffect::Unsupported {
+            return Ok(None);
+        }
+        let mut body = Vec::with_capacity(self.body_steps.len());
+        for step in &self.body_steps {
+            let Some(prepared) = CheckedReadStep::try_new(step.as_ref())? else {
+                return Ok(None);
+            };
+            body.push(prepared);
+        }
+        Ok(Some(Box::new(PreparedForEach {
+            source: &self.source,
+            target: &self.target,
+            body,
+        })))
+    }
+
     fn id(&self) -> &'static str {
         "sample.for_each"
     }
@@ -811,6 +877,9 @@ impl Step for ForEachSubgraphStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope) -> Result<()> {
+        if let Some(prepared) = self.prepare_read_kernel()? {
+            return prepared.apply_read(ctx, &mut scope.read_scope());
+        }
         check_cancelled(ctx)?;
         if ctx.property_batch.as_ref().is_some_and(|batch| {
             let effect = self.atomic_effect();
@@ -875,29 +944,116 @@ impl Step for ForEachSubgraphStep {
                 return Err(error);
             }
         };
-        // Validate result kinds before consuming prior payloads, preserving those
-        // payloads if a custom non-atomic body used conflicting output keys.
-        for (key, column) in &collected.columns {
-            if let Some(old) = prior.get(key) {
-                if !matches!(
-                    (column, old),
-                    (OwnedColumn::Nodes(_), AlgorithmOutput::NodeAttributes(_))
-                        | (OwnedColumn::Edges(_), AlgorithmOutput::EdgeAttributes(_))
-                ) {
-                    restore_outputs(ctx, prior);
-                    bail!("for_each output column type mismatch with prior result");
-                }
-            }
-        }
-        if let Err(error) = check_cancelled(ctx) {
-            restore_outputs(ctx, prior);
-            return Err(error);
-        }
-        let merged = collected.finish(prior)?;
-        restore_outputs(ctx, merged);
+        finish_for_each(ctx, prior, collected)?;
         scope
             .variables_mut()
             .set_subgraph_array(&self.target, outputs);
+        Ok(())
+    }
+}
+
+fn finish_for_each(
+    ctx: &mut Context,
+    prior: HashMap<String, AlgorithmOutput>,
+    collected: ForEachOutputs,
+) -> Result<()> {
+    // Validate result kinds before consuming prior payloads, preserving those
+    // payloads if a custom non-atomic body used conflicting output keys.
+    for (key, column) in &collected.columns {
+        if let Some(old) = prior.get(key) {
+            if !matches!(
+                (column, old),
+                (OwnedColumn::Nodes(_), AlgorithmOutput::NodeAttributes(_))
+                    | (OwnedColumn::Edges(_), AlgorithmOutput::EdgeAttributes(_))
+            ) {
+                restore_outputs(ctx, prior);
+                bail!("for_each output column type mismatch with prior result");
+            }
+        }
+    }
+    if let Err(error) = check_cancelled(ctx) {
+        restore_outputs(ctx, prior);
+        return Err(error);
+    }
+    let merged = collected.finish(prior)?;
+    restore_outputs(ctx, merged);
+    Ok(())
+}
+
+struct PreparedForEach<'a> {
+    source: &'a str,
+    target: &'a str,
+    body: Vec<CheckedReadStep<'a>>,
+}
+impl sealed::Sealed for PreparedForEach<'_> {}
+impl ReadStep for PreparedForEach<'_> {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        check_cancelled(ctx)?;
+        let topology = SelectionTopology::prepare_read(ctx, scope)?;
+        let inputs = scope
+            .collection(ctx, self.source)?
+            .ok_or_else(|| anyhow::anyhow!("for_each requires a subgraph array"))?;
+        // Validate every selector before staging any child write.
+        for part in &inputs {
+            topology.validate_membership(ctx, &part.nodes, &part.edges)?;
+        }
+        let prior = ctx.take_outputs();
+        let mut collected = ForEachOutputs::default();
+        let result: Result<Vec<SelectionPart>> = (|| {
+            let mut outputs = Vec::new();
+            for (index, part) in inputs.into_iter().enumerate() {
+                check_cancelled(ctx)?;
+                let emitted =
+                    scope.with_child_executor(ctx, &part, |ctx, mut executor, variables| {
+                        for step in &self.body {
+                            executor.apply_prepared(ctx, variables, step)?;
+                            collected.absorb(self.target, index, ctx.take_outputs())?;
+                        }
+                        check_cancelled(ctx)?;
+                        // Decode through the parent authority, retaining the child's exact pins.
+                        Ok(std::mem::take(variables))
+                    })?;
+                if emitted.contains("__sample_output__") {
+                    let mut emitted = emitted;
+                    let children = scope
+                        .collection_from(ctx, &mut emitted, "__sample_output__")?
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("__sample_output__ must be a subgraph array")
+                        })?;
+                    for child in &children {
+                        topology.validate_membership(ctx, &child.nodes, &child.edges)?;
+                        if !child.nodes.is_subset(&part.nodes)
+                            || !child.edges.is_subset(&part.edges)
+                        {
+                            bail!("Subgraph selector is outside fixed child selection");
+                        }
+                    }
+                    outputs.extend(children);
+                } else {
+                    outputs.push(part);
+                }
+            }
+            check_cancelled(ctx)?;
+            Ok(outputs)
+        })();
+        let outputs = match result {
+            Ok(outputs) => outputs,
+            Err(error) => {
+                ctx.take_outputs();
+                restore_outputs(ctx, prior);
+                return Err(error);
+            }
+        };
+        let value = match scope.collection_value(ctx, outputs) {
+            Ok(value) => value,
+            Err(error) => {
+                ctx.take_outputs();
+                restore_outputs(ctx, prior);
+                return Err(error);
+            }
+        };
+        finish_for_each(ctx, prior, collected)?;
+        scope.variables_mut().set_value(self.target, value);
         Ok(())
     }
 }

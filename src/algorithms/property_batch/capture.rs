@@ -263,6 +263,14 @@ impl PropertyBatch {
         Ok(topology)
     }
 
+    /// Membership derivatives retain the same issued capture identity.
+    pub(crate) fn owns_capture(&self, source: &crate::GraphView) -> bool {
+        self.captures
+            .get(&source.read_state().capture_key())
+            .and_then(|(_, capture)| capture.upgrade())
+            .is_some_and(|issued| issued.shares_capture(source.read_state()))
+    }
+
     fn register_capture(&mut self, state: &crate::state::read_state::PinnedReadState) {
         if self.captures.len() >= self.capture_sweep_at {
             self.captures

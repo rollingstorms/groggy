@@ -239,12 +239,7 @@ impl PropertyBatch {
         at: Option<crate::TimestampMicros>,
     ) -> GraphResult<()> {
         let (source, prepared) = table.source_batch_mapped(columns, at)?;
-        if !self
-            .captures
-            .get(&source.read_state().capture_key())
-            .and_then(|(_, capture)| capture.upgrade())
-            .is_some_and(|issued| issued.shares_capture(source.read_state()))
-        {
+        if !self.owns_capture(&source) {
             return Err(crate::GraphError::InvalidInput(
                 "table.attach requires a source capture issued by this atomic run".into(),
             ));

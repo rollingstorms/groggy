@@ -109,6 +109,7 @@ enum ExecutionSource<'a> {
     Detached {
         allocation: (usize, usize),
         base: &'a crate::GraphView,
+        frame: Option<&'a crate::GraphView>,
         pending: Option<(u64, crate::GraphView)>,
     },
 }
@@ -130,9 +131,25 @@ impl<'a> StepExecutor<'a> {
             source: ExecutionSource::Detached {
                 allocation,
                 base,
+                frame: None,
                 pending: None,
             },
             fixed: false,
+        }
+    }
+    pub(crate) fn detached_fixed(
+        allocation: (usize, usize),
+        base: &'a crate::GraphView,
+        frame: &'a crate::GraphView,
+    ) -> Self {
+        Self {
+            source: ExecutionSource::Detached {
+                allocation,
+                base,
+                frame: Some(frame),
+                pending: None,
+            },
+            fixed: true,
         }
     }
     pub(crate) fn apply(
@@ -189,6 +206,11 @@ impl<'a> StepExecutor<'a> {
                 ));
             }
         }
+        if self.fixed && effect == AtomicStepEffect::Topology {
+            return Err(anyhow!(
+                "Topology mutation is not supported in a fixed child execution frame"
+            ));
+        }
         let pending_read = matches!(
             effect,
             AtomicStepEffect::PendingProperties
@@ -244,14 +266,16 @@ impl<'a> StepExecutor<'a> {
             ExecutionSource::Detached {
                 allocation,
                 base,
+                frame,
                 pending,
             } => {
                 let kernel =
                     kernel.ok_or_else(|| anyhow!("Step '{}' has no detached native kernel", id))?;
                 // Topology staging and explicit captures use the accepted base
                 // themselves. Refresh only pending readers, as in memory execution.
+                let selected = frame.unwrap_or(base);
                 let current = if !pending_read {
-                    *base
+                    selected
                 } else {
                     let batch = ctx
                         .property_batch
@@ -261,7 +285,12 @@ impl<'a> StepExecutor<'a> {
                     if pending.as_ref().is_none_or(|(old, _)| *old != revision) {
                         *pending = Some((
                             revision,
-                            batch.capture_membership(base, base.nodes(), base.edges(), false)?,
+                            batch.capture_membership(
+                                base,
+                                selected.nodes(),
+                                selected.edges(),
+                                frame.is_some(),
+                            )?,
                         ));
                     }
                     &pending
@@ -275,6 +304,7 @@ impl<'a> StepExecutor<'a> {
                         *allocation,
                         base,
                         current,
+                        *frame,
                         variables,
                     ),
                 )?;
@@ -428,6 +458,8 @@ pub enum StepValue {
     EdgeMap(HashMap<EdgeId, AlgorithmParamValue>),
     /// Collection of subgraphs (sampling output).
     SubgraphArray(Vec<Subgraph>),
+    /// Immutable graph selections without a writable owner (portable sampling output).
+    GraphViewArray(Vec<crate::GraphView>),
     /// Scalar helper value.
     Scalar(AlgorithmParamValue),
     /// Immutable temporal snapshot cached for reuse.
