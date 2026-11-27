@@ -514,7 +514,7 @@ where
 
     for (&key, value) in map.iter() {
         let val = value_as_f64(value, source_name)?;
-        let clipped_val = val.clamp(min, max);
+        let clipped_val = finite(val.clamp(min, max), source_name)?;
         clipped.insert(key, AlgorithmParamValue::Float(clipped_val));
     }
 
@@ -588,6 +588,12 @@ mod safety_tests {
         )
         .is_err());
         assert!(standardize_map(&values(&[-f64::MAX, f64::MAX]), 0.0, "test").is_err());
+        for bounds in [
+            (f64::INFINITY, f64::INFINITY),
+            (f64::NEG_INFINITY, f64::NEG_INFINITY),
+        ] {
+            assert!(clip_map(&values(&[0.5]), bounds.0, bounds.1, "test").is_err());
+        }
     }
     #[test]
     fn valid_normalization_keeps_population_variance_signed_max_and_empty_rules() {
@@ -683,6 +689,12 @@ mod safety_tests {
                 )),
                 Box::new(StandardizeStep::new("input", "out", 0.0)),
                 Box::new(ClipValuesStep::new("input", "out", f64::NAN, 1.0)),
+                Box::new(ClipValuesStep::new(
+                    "input",
+                    "out",
+                    f64::INFINITY,
+                    f64::INFINITY,
+                )),
             ];
             for step in steps {
                 let mut vars = StepVariables::default();
