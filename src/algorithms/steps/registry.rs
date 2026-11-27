@@ -1238,7 +1238,11 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
         |spec| {
             let attr = spec.params.expect_text("attr")?.to_string();
-            let factor = spec.params.get_float("factor").unwrap_or(1.0);
+            let factor = if spec.params.get("factor").is_some() {
+                spec.params.expect_float("factor")?
+            } else {
+                1.0
+            };
             let target = spec.params.expect_text("target")?.to_string();
             Ok(Box::new(EdgeWeightScaleStep::new(
                 AttrName::from(attr),

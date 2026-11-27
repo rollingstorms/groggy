@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
@@ -253,28 +252,47 @@ impl Step for EdgeWeightScaleStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map = HashMap::with_capacity(scope.subgraph().edge_set().len());
-
-        for &edge in scope.edge_ids() {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for EdgeWeightScaleStep {}
+impl ReadStep for EdgeWeightScaleStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("edge_weight_scale cancelled"));
+        }
+        if !self.factor.is_finite() {
+            return Err(anyhow!("edge_weight_scale factor must be finite"));
+        }
+        scope.validate_selected_read()?;
+        let mut map = HashMap::with_capacity(scope.edge_count());
+        for edge in scope.edge_ids() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("edge_weight_scale cancelled"));
             }
-
             let weight = scope
                 .edge_attribute(ctx, edge, &self.attr)?
                 .and_then(AlgorithmParamValue::from_attr_value)
                 .unwrap_or(AlgorithmParamValue::Float(1.0));
-
             let scaled = match weight {
                 AlgorithmParamValue::Float(v) => AlgorithmParamValue::Float(v * self.factor),
                 AlgorithmParamValue::Int(v) => AlgorithmParamValue::Float(v as f64 * self.factor),
-                other => other, // Pass through non-numeric values
+                other => other,
             };
-
+            if matches!(&scaled, AlgorithmParamValue::Float(value) if !value.is_finite()) {
+                return Err(anyhow!(
+                    "edge_weight_scale requires finite numeric input and result"
+                ));
+            }
             map.insert(edge, scaled);
         }
-
+        if ctx.is_cancelled() {
+            return Err(anyhow!("edge_weight_scale cancelled"));
+        }
         scope.variables_mut().set_edge_map(self.target.clone(), map);
         Ok(())
     }
@@ -517,5 +535,78 @@ impl ReadStep for AttachTableStep {
         let table = scope.variables().table(&self.source)?;
         scope.attach_table(ctx, table, &self.columns, self.effective_at)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod scale_safety_tests {
+    use super::super::core::StepVariables;
+    use super::*;
+    use crate::{subgraphs::Subgraph, AttrValue, Graph};
+    use std::sync::{atomic::AtomicBool, Arc};
+    fn selected(value: Option<AttrValue>) -> Subgraph {
+        let mut graph = Graph::new_directed_manual();
+        graph.add_nodes(2).unwrap();
+        let edge = graph.add_edge(0, 1).unwrap();
+        if let Some(v) = value {
+            graph.set_edge_attr(edge, "weight".into(), v).unwrap();
+        }
+        Subgraph::from_nodes(
+            graph.into_shared(),
+            [0, 1].into_iter().collect(),
+            "test".into(),
+        )
+        .unwrap()
+    }
+    #[test]
+    fn invalid_scale_controls_inputs_and_cancellation_preserve_previous_output() {
+        for (factor, value) in [
+            (f64::NAN, None),
+            (f64::INFINITY, None),
+            (2.0, Some(AttrValue::Float64(f64::INFINITY))),
+            (f64::MAX, Some(AttrValue::Int(2))),
+        ] {
+            let input = selected(value);
+            let mut vars = StepVariables::default();
+            let old = HashMap::from([(0, AlgorithmParamValue::Int(42))]);
+            vars.set_edge_map("out", old.clone());
+            let step = EdgeWeightScaleStep::new("weight".into(), factor, "out");
+            assert!(step
+                .apply(&mut Context::new(), &mut StepScope::new(&input, &mut vars))
+                .is_err());
+            assert_eq!(vars.edge_map("out").unwrap(), &old);
+        }
+        let input = selected(None);
+        let mut vars = StepVariables::default();
+        let mut ctx = Context::with_cancel_token(Arc::new(AtomicBool::new(true)));
+        assert!(EdgeWeightScaleStep::new("weight".into(), 1.0, "out")
+            .apply(&mut ctx, &mut StepScope::new(&input, &mut vars))
+            .is_err());
+        assert!(vars.edge_map("out").is_err());
+    }
+    #[test]
+    fn nonnumeric_values_and_legacy_unrepresentable_fallback_are_preserved() {
+        for (input, expected) in [
+            (Some(AttrValue::Bool(true)), AlgorithmParamValue::Bool(true)),
+            (Some(AttrValue::Null), AlgorithmParamValue::None),
+            (
+                Some(AttrValue::Float64Vec(vec![1.0, 2.0])),
+                AlgorithmParamValue::FloatList(vec![1.0, 2.0]),
+            ),
+            (
+                Some(AttrValue::Date(
+                    crate::types::CalendarDate::new(2020, 1, 2).unwrap(),
+                )),
+                AlgorithmParamValue::Float(2.0),
+            ),
+            (None, AlgorithmParamValue::Float(2.0)),
+        ] {
+            let input = selected(input);
+            let mut vars = StepVariables::default();
+            EdgeWeightScaleStep::new("weight".into(), 2.0, "out")
+                .apply(&mut Context::new(), &mut StepScope::new(&input, &mut vars))
+                .unwrap();
+            assert_eq!(vars.edge_map("out").unwrap().get(&0), Some(&expected));
+        }
     }
 }

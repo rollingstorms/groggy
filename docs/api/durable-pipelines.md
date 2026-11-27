@@ -57,6 +57,7 @@ with TemporaryDirectory() as folder:
 | `alias`, `core.flow_update`, `core.residual_capacity` | Share owned immutable values and checked edge-map arithmetic; aliases remain independent under mutation/rebinding. Positive residuals retain their supplied edge IDs. |
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
+| `core.edge_weight_scale` | Selected pending edge properties; finite numeric factors/results, legacy unit fallback and nonnumeric pass-through; only attachment publishes. |
 | `core.execution_block` in supported `message_pass` mode | Prepare the existing body on the owner; use selected pending adjacency and preserve ordered/synchronous updates, column order, directions and checked body operations. Streaming and unsupported body operations reject. |
 | `iter.loop` with an ordinary `body` of supported steps | Prepare sealed child kernels recursively on the owner; nested loops share pending reads, captures, cancellation and one outer publication. |
 | `iter.loop` with a fully lowered numeric/topology `batch_plan` | Private register frame; shared checked execution, staged reads and simultaneous carried slots. See [numeric loop plans](checked-numeric-loop-plans.md). |
@@ -501,5 +502,38 @@ with TemporaryDirectory() as directory:
     else:
         raise AssertionError("negative epsilon must reject")
     assert store.current_state_id == head
+    store.close()
+```
+
+## Edge-weight transformation
+
+`core.edge_weight_scale` uses the selected pending edge properties. Numeric scalar
+weights produce f64 results; missing weights use one. Existing representable
+nonnumeric values pass through unchanged. Attributes outside the step-value
+representation retain the legacy unit fallback; this is not an arbitrary-property
+conversion API. The default factor is one. An explicit factor must be numeric
+and finite; scalar nonfinite input or overflow rejects without replacing prior
+outputs or publishing staged changes. Loops and parallel edges retain their IDs.
+Only explicit attachment writes graph properties.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+with TemporaryDirectory() as directory:
+    graph = Graph()
+    batch = GraphBatch(effective_at=0)
+    first, second = batch.add_node(), batch.add_node()
+    batch.add_edge(first, second, weight=3.5)
+    batch.add_edge(first, second)
+    graph.writer().apply_batch(batch)
+    store = DurableGraph.create_from_graph(Path(directory) / "weights.journal", graph)
+    result = Pipeline([step_pipeline("scale weights", [
+        {"id": "core.edge_weight_scale", "params": {"attr": "weight", "factor": 2, "target": "out"}},
+        {"id": "core.attach_edge_attr", "params": {"source": "out", "attr": "scaled", "effective_at": 20}},
+    ], atomic=True)]).run_durable(store)
+    assert [result.edge_attr(edge, "scaled") for edge in result.edge_ids] == [7.0, 2.0]
     store.close()
 ```
