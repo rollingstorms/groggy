@@ -1,0 +1,57 @@
+{
+  "runtime": "4be4c415ca483a6dd00c847157bd50b830c20baf",
+  "date": "2026-11-27",
+  "scope": "Signed minimum and arithmetic mean normalization use shared finite kernels in native steps and checked register plans. Legacy uncertified mixed plans retain their existing interpreter; edge-aware registers remain open. Local qualification only.",
+  "production_source_file_count": 500,
+  "production_source_tree_sha256": "becbd6b177e3ce90d98658ff859e597dbf43c5dd9b380f99eea47c51e357d0f3",
+  "production_source_hash_recipe": "Sort pathlib.Path objects componentwise for relative .rs/.py/.pyi paths under src, python-groggy/src, python-groggy/python/groggy; SHA256 of concatenated path + NUL + file SHA256 + newline.",
+  "native": {
+    "passed": 1707,
+    "failed": 0,
+    "ignored": 54,
+    "suite_results": 238,
+    "doctests_passed": 10,
+    "additional_normalization_modes": 2,
+    "independent_new_python_cases": 16,
+    "expanded_numeric_instruction_oracle": "memory, workers, directedness, recovery",
+    "strict_all_target_clippy": "passed",
+    "root_format": "passed"
+  },
+  "python": {
+    "interpreter": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+    "platform": "macOS-26.3.1-arm64-arm-64bit",
+    "maintained_passed": 3657,
+    "maintained_skipped": 1,
+    "expected_validation_warnings": 23,
+    "warning_breakdown": {
+      "earlier_suite": 14,
+      "new_facade_cases_using_existing_redefinition_warning": 9
+    },
+    "documentation_examples": 304,
+    "packaged_python_source_files_match": 62,
+    "changed_python_38_syntax": "passed"
+  },
+  "artifact": {
+    "wheel": "groggy-0.6.0-cp39-cp39-macosx_11_0_arm64.whl",
+    "sha256": "f507db125e990f9a97f6b8b241706bbf4bb3f461692d0037b2621017bdb74437",
+    "qualification_receipt": "notes/benchmarks/normalize-minmean-wheel-qualification-2026-11-27.json"
+  },
+  "performance": {
+    "prior_receipt": "notes/benchmarks/owned-alias-performance-2026-11-27.json",
+    "scope": "No new normalization performance claim. Prior alias measurements apply only to their recorded runtime and workload."
+  },
+  "platform_boundary": "CI run 45652492406 qualifies earlier candidate ac59fcf1 and source-equivalent numerical safety runtime 6ec32ed1. This newer slice is locally qualified only.",
+  "cargo_inputs_sha256": {
+    "Cargo.toml": "b1c7b333201aab9c68a02d044a0015ce01a7691bef1096cebe39a7237185b27c",
+    "Cargo.lock": "dd0a5678262f57e0d1ffbe17c678d68bdeb6b743e18a6e8e8f8b3b6744977e70",
+    "python-groggy/Cargo.toml": "7afb5c436830d4ca98529c0e3a70adf1de94b710e2db01fad890dcbcaf63631d",
+    "python-groggy/Cargo.lock": "5e634972b987a53a734e2e295fdb526ccd061c50a8574f866cde449db6b3b27c",
+    "pyproject.toml": "7c216e6d9f0eef821050fa5b61db81798f9139a6f03fd801b45aa49a4aec3b2f",
+    "python-groggy/pyproject.toml": "fd9f892887f249561b491913d473b48f0ff573e6b28cdf00ba3efce91412c0ef"
+  },
+  "gate_log_sha256": {
+    "/tmp/groggy-normalize-minmean-native.log": "b43e2dfbdf0def38b5967b03b37442af9babe99c9ed920f6680678359d096a82",
+    "/tmp/groggy-normalize-minmean-clippy.log": "2c2e7991d5fe6bedb98f30ff393087df99625f2b3ebf67ed9a9391b2f594a050",
+    "/tmp/groggy-normalize-minmean-wheel-gates.log": "e8059aa3b64b693d600b57375e53702eea84acdbd93e9d11f01192c01c5f1266"
+  }
+}

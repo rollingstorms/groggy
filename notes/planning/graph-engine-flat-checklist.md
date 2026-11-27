@@ -1,5 +1,11 @@
 # Groggy implementation checklist
 
+**Checked normalization follow-up — 2026-11-27:**
+[Signed minimum/mean normalization](checked-normalize-minmean-2026-11-27.md)
+closes the two remaining normalization options in register-plan lowering. Six
+component checks complete; gates pass **1,707 native / 3,657 Python / 304 examples**.
+Stable counts remain **217 checked / 51 open**; edge registers remain open.
+
 **Community/decay follow-up — 2026-11-27:**
 [Portable community helpers and decay](portable-community-and-decay-2026-11-27.md)
 completes four more selected read kernels, including ordered column producers.
