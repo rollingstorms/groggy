@@ -8,7 +8,7 @@ use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{AtomicStepEffect, NodeColumn, Step, StepMetadata, StepScope};
-use super::transformations::{selected_neighbors, selected_nodes};
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 
 fn check_cancelled(ctx: &Context) -> Result<()> {
     if ctx.is_cancelled() {
@@ -25,7 +25,7 @@ fn node_label(node: NodeId) -> Result<AlgorithmParamValue> {
 
 /// Preserve explicit column order; maps use stable ID order. Accept both layouts.
 fn checked_input(
-    scope: &StepScope<'_>,
+    scope: &ReadStepScope<'_>,
     name: &str,
     selected: &[NodeId],
 ) -> Result<(Vec<NodeId>, HashMap<NodeId, AlgorithmParamValue>)> {
@@ -59,7 +59,7 @@ fn checked_input(
 
 fn install(
     ctx: &Context,
-    scope: &mut StepScope<'_>,
+    scope: &mut ReadStepScope<'_>,
     target: &str,
     nodes: Vec<NodeId>,
     values: Vec<AlgorithmParamValue>,
@@ -149,7 +149,16 @@ impl Step for CommunitySeedStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for CommunitySeedStep {}
+impl ReadStep for CommunitySeedStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         check_cancelled(ctx)?;
         let k = if self.strategy == SeedStrategy::Random {
             let k = self
@@ -162,7 +171,8 @@ impl Step for CommunitySeedStep {
         } else {
             None
         };
-        let nodes = selected_nodes(scope.subgraph(), ctx)?;
+        scope.validate_selected_read()?;
+        let nodes = scope.ordered_nodes().to_vec();
         let mut values = Vec::with_capacity(nodes.len());
         match self.strategy {
             SeedStrategy::Singleton => {
@@ -172,7 +182,7 @@ impl Step for CommunitySeedStep {
                 }
             }
             SeedStrategy::DegreeBased => {
-                let (_, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+                let (_, neighbors) = scope.selected_neighbors(ctx)?;
                 let mut hubs = nodes.clone();
                 hubs.sort_by_key(|node| (std::cmp::Reverse(neighbors[node].len()), *node));
                 let hub_count = nodes.len().div_ceil(10).max(1).min(nodes.len());
@@ -250,8 +260,17 @@ impl Step for ModularityGainStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let (selected, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for ModularityGainStep {}
+impl ReadStep for ModularityGainStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let (selected, neighbors) = scope.selected_neighbors(ctx)?;
         let (nodes, input) = checked_input(scope, &self.partition, &selected)?;
         let mut labels = HashMap::new();
         for &node in &selected {
@@ -262,8 +281,8 @@ impl Step for ModularityGainStep {
             };
             labels.insert(node, label);
         }
-        let directed = scope.subgraph().read_is_directed();
-        let m = scope.subgraph().edges().len() as f64;
+        let directed = scope.is_directed();
+        let m = scope.edge_count() as f64;
         let mut incoming: HashMap<NodeId, Vec<NodeId>> =
             selected.iter().map(|&node| (node, Vec::new())).collect();
         let mut degrees = HashMap::new();
@@ -390,8 +409,17 @@ impl Step for LabelPropagateStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let (selected, neighbors) = selected_neighbors(scope.subgraph(), ctx)?;
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for LabelPropagateStep {}
+impl ReadStep for LabelPropagateStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
+        let (selected, neighbors) = scope.selected_neighbors(ctx)?;
         let (nodes, labels) = checked_input(scope, &self.labels, &selected)?;
         let mut new_values = Vec::with_capacity(nodes.len());
         for &node in &nodes {

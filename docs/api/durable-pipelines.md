@@ -58,6 +58,8 @@ with TemporaryDirectory() as folder:
 | `core.reduce_nodes`, `core.std`, `core.median`, `core.quantile`, `core.mode`, `core.entropy`, `core.histogram` | Reduce explicitly loaded owned node maps; preserve native precision, empty-input and tie rules. Histogram outputs are owned count vectors. |
 | `core.normalize_values`, `core.normalize_node_values`, `core.standardize`, `core.clip` | Share native normalization over owned node/edge intermediates. |
 | `core.edge_weight_scale` | Selected pending edge properties; finite numeric factors/results, legacy unit fallback and nonnumeric pass-through; only attachment publishes. |
+| `core.community_seed`, `core.modularity_gain`, `core.label_propagate_step` | Selected pending neighborhoods and ordered owned columns; retain seeding, modularity and typed label-vote definitions. |
+| `temporal.decay` | Checked numerical decay over selected owned node maps, ordered columns and edge maps; no retained-history lookup or implicit clock. |
 | `core.execution_block` in supported `message_pass` mode | Prepare the existing body on the owner; use selected pending adjacency and preserve ordered/synchronous updates, column order, directions and checked body operations. Streaming and unsupported body operations reject. |
 | `iter.loop` with an ordinary `body` of supported steps | Prepare sealed child kernels recursively on the owner; nested loops share pending reads, captures, cancellation and one outer publication. |
 | `iter.loop` with a fully lowered numeric/topology `batch_plan` | Private register frame; shared checked execution, staged reads and simultaneous carried slots. See [numeric loop plans](checked-numeric-loop-plans.md). |
@@ -535,5 +537,51 @@ with TemporaryDirectory() as directory:
         {"id": "core.attach_edge_attr", "params": {"source": "out", "attr": "scaled", "effective_at": 20}},
     ], atomic=True)]).run_durable(store)
     assert [result.edge_attr(edge, "scaled") for edge in result.edge_ids] == [7.0, 2.0]
+    store.close()
+```
+
+## Community helper columns and numerical decay
+
+Community seeding retains ascending node IDs, stable degree-hub ties and local
+seeded RNG. Modularity gains use unweighted selected edge instances, their
+existing directed/undirected objective, twice-per-undirected-loop degree, and
+best nonnegative moves to neighboring communities. Label propagation uses one
+explicit self vote in addition to stored self-loop incidences; typed canonical
+serialization breaks frequency ties. Output columns retain supplied column order;
+input maps use ascending ID order. Earlier aliases remain unchanged.
+
+`temporal.decay` multiplies an owned numeric map/column by
+`exp(-ln(2) * time_delta / half_life)`. Time delta is supplied by the caller and
+is not a storage timestamp. Half-life is finite and positive, elapsed time finite
+and nonnegative. Subnormal half-lives handle zero elapsed time and underflow
+without NaN; node/edge membership is validated even at zero elapsed time.
+Only attachment writes properties. This enables numerical decay without claiming
+that retained snapshot/index/window producers run on workers.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from groggy import DurableGraph, Graph, GraphBatch, Pipeline
+from groggy.builder import step_pipeline
+
+with TemporaryDirectory() as directory:
+    graph = Graph()
+    batch = GraphBatch(effective_at=0)
+    nodes = [batch.add_node() for _ in range(3)]
+    batch.add_edge(nodes[0], nodes[1])
+    batch.add_edge(nodes[0], nodes[1])
+    batch.add_edge(nodes[1], nodes[1])
+    graph.writer().apply_batch(batch)
+    store = DurableGraph.create_from_graph(Path(directory) / "community.journal", graph)
+    result = Pipeline([step_pipeline("community and decay", [
+        {"id": "core.community_seed", "params": {"strategy": "singleton", "target": "labels"}},
+        {"id": "core.modularity_gain", "params": {"partition": "labels", "target": "gain"}},
+        {"id": "core.label_propagate_step", "params": {"labels": "labels", "target": "next"}},
+        {"id": "temporal.decay", "params": {"attr": "labels", "output": "half", "half_life": 2, "time_delta": 2}},
+        {"id": "core.attach_node_attr", "params": {"source": "half", "attr": "half", "effective_at": 20}},
+        {"id": "core.attach_node_attr", "params": {"source": "next", "attr": "next", "effective_at": 20}},
+    ], atomic=True)]).run_durable(store)
+    assert [result.node_attr(node, "half") for node in result.node_ids] == [0.0, 0.5, 1.0]
+    assert [result.node_attr(node, "next") for node in result.node_ids] == [1, 0, 2]
     store.close()
 ```

@@ -15,7 +15,6 @@ use anyhow::{anyhow, Result};
 use crate::algorithms::temporal::ChangeType;
 use crate::algorithms::{AlgorithmParamValue, Context, CostHint};
 use crate::temporal::{TemporalIndex, TemporalSnapshot};
-use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId, StateId};
 
 use super::{
@@ -23,6 +22,8 @@ use super::{
     core::NodeColumn,
     Step, StepMetadata, StepScope,
 };
+
+use super::read_scope::{sealed, ReadStep, ReadStepScope};
 
 const DEFAULT_TEMPORAL_INDEX_VAR: &str = "temporal_index";
 
@@ -798,10 +799,19 @@ impl Step for DecayStep {
         }
     }
 
+    fn read_kernel(&self) -> Option<&dyn ReadStep> {
+        Some(self)
+    }
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        self.apply_read(ctx, &mut scope.read_scope())
+    }
+}
+impl sealed::Sealed for DecayStep {}
+impl ReadStep for DecayStep {
+    fn apply_read(&self, ctx: &mut Context, scope: &mut ReadStepScope<'_>) -> Result<()> {
         check_cancelled(ctx)?;
         validate_decay_controls(self.half_life, self.time_delta)?;
-        scope.subgraph().validate_selected_read()?;
+        scope.validate_selected_read()?;
         // Divide before multiplying: LN_2 / a subnormal half-life can overflow,
         // producing NaN for zero elapsed time. A nonnegative ratio may overflow
         // to infinity legitimately, in which case exp(-infinity) is zero.
@@ -886,23 +896,22 @@ fn decay_value(value: &AlgorithmParamValue, factor: f64) -> Result<AlgorithmPara
     Ok(AlgorithmParamValue::Float(result))
 }
 
-fn validate_decay_entity(scope: &StepScope<'_>, entity: usize, edges: bool) -> Result<()> {
-    let selected = scope.subgraph();
+fn validate_decay_entity(scope: &ReadStepScope<'_>, entity: usize, edges: bool) -> Result<()> {
     if edges {
-        if !selected.edge_set().contains(&entity) {
+        if !scope.has_edge(entity) {
             return Err(anyhow!(
                 "temporal.decay edge {entity} is outside the active selection"
             ));
         }
         // Frozen membership/endpoints are validated at the common read boundary;
         // an explicit live source is validated before processing any map row.
-        let (source, target) = selected.edge_endpoints(entity)?;
-        if !selected.node_set().contains(&source) || !selected.node_set().contains(&target) {
+        let (source, target) = scope.edge_endpoints(entity)?;
+        if !scope.has_node(source) || !scope.has_node(target) {
             return Err(anyhow!(
                 "temporal.decay edge {entity} endpoints are outside the active selection"
             ));
         }
-    } else if !selected.node_set().contains(&entity) {
+    } else if !scope.has_node(entity) {
         return Err(anyhow!(
             "temporal.decay node {entity} is outside the active selection"
         ));

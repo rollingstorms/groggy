@@ -138,6 +138,12 @@ impl<'a> ReadStepScope<'a> {
             Source::Detached { current, .. } => current.nodes().contains(&id),
         }
     }
+    pub(crate) fn has_edge(&self, id: usize) -> bool {
+        match &self.source {
+            Source::Memory(s) => s.edges().contains(&id),
+            Source::Detached { current, .. } => current.edges().contains(&id),
+        }
+    }
     pub(crate) fn ordered_edges(&self) -> Arc<[usize]> {
         match &self.source {
             Source::Memory(s) => s.ordered_edges(),
